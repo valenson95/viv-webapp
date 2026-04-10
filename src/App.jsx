@@ -271,7 +271,18 @@ function RiskTab({ demo }) {
 function ExpectancyTab({ demo }) {
   const [port,setPort]=useState(demo?DEMO_EXPECT.port:"");const[posSize,setPosSize]=useState(demo?DEMO_EXPECT.posSize:"");const[desRet,setDesRet]=useState(demo?DEMO_EXPECT.desRet:"");const[avgGain,setAvgGain]=useState(demo?DEMO_EXPECT.avgGain:"");const[avgLoss,setAvgLoss]=useState(demo?DEMO_EXPECT.avgLoss:"");const[winRate,setWinRate]=useState(demo?DEMO_EXPECT.winRate:"");
   useEffect(()=>{if(demo){setPort(DEMO_EXPECT.port);setPosSize(DEMO_EXPECT.posSize);setDesRet(DEMO_EXPECT.desRet);setAvgGain(DEMO_EXPECT.avgGain);setAvgLoss(DEMO_EXPECT.avgLoss);setWinRate(DEMO_EXPECT.winRate)}else{setPort("");setPosSize("");setDesRet("");setAvgGain("");setAvgLoss("");setWinRate("")}},[demo]);
-  const r=useMemo(()=>{const ag=+avgGain,al=+avgLoss,wr=+winRate;if(!ag||!al||!wr||ag<=0||al<=0||wr<=0||wr>100)return null;const wrd=wr/100,lrd=1-wrd,glRatio=ag/al,ev=wrd*ag-lrd*al;return{glRatio,ev,compound10:(Math.pow(1+ev/100,10)-1)*100,recStop:ag/2,beWinRate:(al/(ag+al))*100}},[avgGain,avgLoss,winRate]);
+  const r=useMemo(()=>{
+    const ag=+avgGain,al=+avgLoss,wr=+winRate,ps=+posSize,dr=+desRet,pf=+port;
+    if(!ag||!al||!wr||ag<=0||al<=0||wr<=0||wr>100)return null;
+    const wrd=wr/100,lrd=1-wrd,glRatio=ag/al,ev=wrd*ag-lrd*al;
+    const compound10=(Math.pow(1+ev/100,10)-1)*100;
+    const recStop=ag/2,beWinRate=(al/(ag+al))*100;
+    // Trades to hit desired return: each trade impacts portfolio by ev% × posSize% / 100
+    const impactPerTrade = ps > 0 ? (ev * ps / 100) : 0;
+    const tradesToTarget = (impactPerTrade > 0 && dr > 0) ? Math.ceil(Math.log(1 + dr/100) / Math.log(1 + impactPerTrade/100)) : null;
+    const dollarTarget = pf > 0 && dr > 0 ? pf * dr / 100 : 0;
+    return{glRatio,ev,compound10,recStop,beWinRate,tradesToTarget,impactPerTrade,dollarTarget};
+  },[avgGain,avgLoss,winRate,posSize,desRet,port]);
   return (
     <div style={{display:"flex",gap:28,padding:"24px 28px 32px",flexWrap:"wrap"}}>
       <div style={{flex:"1 1 300px",display:"flex",flexDirection:"column",gap:16}}>
@@ -284,7 +295,13 @@ function ExpectancyTab({ demo }) {
         {!r?(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",minHeight:200,color:C.muted,fontSize:"0.82rem",textAlign:"center",lineHeight:1.6}}>Fill in all fields to<br/>see your results.</div>):(<>
           <ResultRow label="Gain/Loss Ratio" value={r.glRatio.toFixed(2)} color={r.glRatio>=2?C.green:r.glRatio>=1?C.gold:C.red} />
           <ResultRow label="Expected Value / Trade" value={`${r.ev>=0?"+":""}${r.ev.toFixed(2)}%`} color={r.ev>=0?C.green:C.red} />
+          <ResultRow label="Portfolio Impact / Trade" value={`${r.impactPerTrade>=0?"+":""}${r.impactPerTrade.toFixed(3)}%`} color={r.impactPerTrade>=0?C.green:C.red} />
           <ResultRow label="10-Trade Compound" value={`${r.compound10>=0?"+":""}${r.compound10.toFixed(2)}%`} color={r.compound10>=0?C.green:C.red} />
+          {r.tradesToTarget !== null && r.ev > 0 ? (
+            <ResultRow label={`Trades to +${+desRet}% (${r.dollarTarget>0?`$${r.dollarTarget.toLocaleString(undefined,{maximumFractionDigits:0})}`:""})` } value={`${r.tradesToTarget} trades`} color={C.goldBright} />
+          ) : r.ev <= 0 && +desRet > 0 ? (
+            <ResultRow label={`Trades to +${+desRet}%`} value="Never" color={C.red} />
+          ) : null}
           <ResultRow label="Recommended Max Stop" value={`${r.recStop.toFixed(1)}%`} />
           <ResultRow label="Breakeven Win Rate" value={`${r.beWinRate.toFixed(1)}%`} />
           <div style={{marginTop:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
