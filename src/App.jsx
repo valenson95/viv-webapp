@@ -1,5 +1,16 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
+
+// ─── Responsive Hook ───
+function useScreenWidth() {
+  const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const h = () => setW(window.innerWidth);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  return w;
+}
 
 // ─── VIV Design Tokens ───
 const C = {
@@ -612,7 +623,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       </div>
 
       {/* Charts */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14, marginBottom: 20 }}>
         <GlassCard style={{ padding: "18px 22px" }}>
           <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white, marginBottom: 14 }}>Equity Curve</div>
           <ResponsiveContainer width="100%" height={170}>
@@ -1064,18 +1075,88 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
 }
 
 // ═══════════════════════════════════════
+// ─── LOGIN PAGE ───
+// ═══════════════════════════════════════
+const ACCESS_CODE = "VIV2026"; // Change this to whatever you want to share with Skool members
+
+function LoginPage({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError("");
+    if (!email.trim() || !email.includes("@")) { setError("Enter a valid email address."); return; }
+    if (code.trim().toUpperCase() !== ACCESS_CODE) { setError("Invalid access code. Check your Skool community for the code."); return; }
+    setLoading(true);
+    setTimeout(() => { onLogin(email.trim()); }, 600);
+  };
+
+  return (
+    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased", color: C.text }}>
+      <div style={{ width: "100%", maxWidth: 420, padding: "0 24px" }}>
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <div style={{ fontWeight: 800, fontSize: "1.5rem", letterSpacing: "-0.03em", color: C.white, marginBottom: 8 }}>
+            Valen <span style={{ color: C.gold }}>Insiders</span> Vault
+          </div>
+          <div style={{ fontWeight: 400, fontSize: "0.82rem", color: C.muted, lineHeight: 1.6 }}>
+            Members-only trading dashboard.
+          </div>
+        </div>
+        <GlassCard style={{ padding: "32px 28px" }}>
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Email Address</label>
+              <input type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)}
+                style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 16px", color: C.white, fontSize: "0.88rem", fontWeight: 500, fontFamily: font, outline: "none" }}
+                onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Access Code</label>
+              <input type="text" placeholder="Enter your member code" value={code} onChange={e => setCode(e.target.value.toUpperCase())}
+                style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 16px", color: C.white, fontSize: "0.88rem", fontWeight: 500, fontFamily: font, outline: "none", textTransform: "uppercase", letterSpacing: "0.08em" }}
+                onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+            </div>
+            {error && <div style={{ padding: "10px 14px", borderRadius: 10, background: C.redDim, border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: "0.74rem", fontWeight: 500, marginBottom: 16 }}>{error}</div>}
+            <button type="submit" disabled={loading} style={{
+              width: "100%", padding: "14px", borderRadius: 980, border: "none", cursor: loading ? "wait" : "pointer",
+              background: `linear-gradient(135deg, #a06800, ${C.goldBright}, #a06800)`, color: "#000",
+              fontWeight: 800, fontSize: "0.88rem", fontFamily: font, letterSpacing: "-0.01em",
+              opacity: loading ? 0.7 : 1, transition: "opacity 0.2s",
+            }}>{loading ? "Signing in..." : "Sign In"}</button>
+          </form>
+        </GlassCard>
+        <div style={{ textAlign: "center", marginTop: 20, fontSize: "0.68rem", color: C.muted, lineHeight: 1.6 }}>
+          Don't have an access code?<br />
+          <a href="https://www.skool.com/valens-insiders-vault" target="_blank" rel="noopener noreferrer" style={{ color: C.gold, fontWeight: 600, textDecoration: "none" }}>Join the Skool community</a> to get access.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════
 // ─── MAIN APP ───
 // ═══════════════════════════════════════
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "\u{1F4C8}" },
-  { id: "tools", label: "Premium Tools", icon: "\u{26A1}" },
-  { id: "journal", label: "Trade Journal", icon: "\u{1F4CA}" },
+  { id: "tools", label: "Tools", icon: "\u{26A1}" },
+  { id: "journal", label: "Journal", icon: "\u{1F4CA}" },
   { id: "settings", label: "Settings", icon: "\u{2699}" },
 ];
 
 export default function App() {
+  const screenW = useScreenWidth();
+  const isMobile = screenW < 768;
+  const isTablet = screenW >= 768 && screenW < 1024;
+
+  const [user, setUser] = useState(() => {
+    try { const saved = localStorage.getItem("viv_user"); return saved ? JSON.parse(saved) : null; } catch { return null; }
+  });
   const [page, setPage] = useState("dashboard");
-  const [demo, setDemo] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Single source of truth — managed in App, passed everywhere
   const [setupTypes, setSetupTypes] = useState(DEFAULT_SETUP_TYPES);
@@ -1085,40 +1166,95 @@ export default function App() {
 
   const handleJournalTrade = useCallback((trade) => { setJournaledTrades(prev => [...prev, trade]); }, []);
 
-  return (
-    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text }}>
-      <div style={{ width: 220, minHeight: "100vh", padding: "24px 16px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
-        <div style={{ fontWeight: 800, fontSize: "0.88rem", letterSpacing: "-0.01em", color: C.white, marginBottom: 28, padding: "0 8px" }}>
-          Valen <span style={{ color: C.gold }}>Insiders</span> Vault
+  const handleLogin = (email) => {
+    const userData = { email, loginAt: new Date().toISOString() };
+    localStorage.setItem("viv_user", JSON.stringify(userData));
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("viv_user");
+    setUser(null);
+  };
+
+  if (!user) return <LoginPage onLogin={handleLogin} />;
+
+  const displayName = user.email.split("@")[0];
+  const sidebarW = isTablet ? 200 : 220;
+  const contentPadH = isMobile ? 16 : isTablet ? 24 : 36;
+  const contentPadV = isMobile ? 16 : 28;
+
+  const pageContent = (
+    <>
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
+      {page === "tools" && <PremiumToolsPage demo={false} />}
+      {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} />}
+    </>
+  );
+
+  // ─── MOBILE LAYOUT ───
+  if (isMobile) {
+    return (
+      <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column" }}>
+        {/* Top bar */}
+        <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
+          <div style={{ fontWeight: 800, fontSize: "0.82rem", letterSpacing: "-0.01em", color: C.white }}>
+            Valen <span style={{ color: C.gold }}>Insiders</span> Vault
+          </div>
+          <button onClick={handleLogout} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        {/* Scrollable content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80 }}>
+          {pageContent}
+        </div>
+        {/* Bottom nav */}
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(8,8,14,0.97)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
           {NAV.map(item => (
             <button key={item.id} onClick={() => setPage(item.id)} style={{
-              display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10,
+              flex: 1, padding: "10px 0 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+              border: "none", cursor: "pointer", fontFamily: font, background: "transparent",
+              color: page === item.id ? C.gold : C.muted, transition: "color 0.15s",
+            }}>
+              <span style={{ fontSize: "1.1rem" }}>{item.icon}</span>
+              <span style={{ fontSize: "0.54rem", fontWeight: page === item.id ? 700 : 500, letterSpacing: "0.04em" }}>{item.label}</span>
+              {page === item.id && <div style={{ position: "absolute", top: 0, width: 24, height: 2, borderRadius: 1, background: C.gold }} />}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── DESKTOP / TABLET LAYOUT ───
+  return (
+    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text }}>
+      {/* Sidebar */}
+      <div style={{ width: sidebarW, minHeight: "100vh", padding: "24px 14px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, alignSelf: "flex-start" }}>
+        <div style={{ fontWeight: 800, fontSize: "0.84rem", letterSpacing: "-0.01em", color: C.white, marginBottom: 24, padding: "0 8px" }}>
+          Valen <span style={{ color: C.gold }}>Insiders</span> Vault
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {NAV.map(item => (
+            <button key={item.id} onClick={() => setPage(item.id)} style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10,
               border: "none", cursor: "pointer", fontFamily: font, width: "100%", textAlign: "left",
               background: page === item.id ? C.goldDim : "transparent",
               color: page === item.id ? C.gold : C.muted,
-              fontWeight: page === item.id ? 700 : 500, fontSize: "0.80rem", transition: "all 0.15s",
-            }}><span style={{ fontSize: "0.85rem", width: 20, textAlign: "center" }}>{item.icon}</span>{item.label}</button>
+              fontWeight: page === item.id ? 700 : 500, fontSize: "0.78rem", transition: "all 0.15s",
+            }}><span style={{ fontSize: "0.82rem", width: 18, textAlign: "center" }}>{item.icon}</span>{item.label}</button>
           ))}
         </div>
         <div style={{ flex: 1 }} />
-        <button onClick={() => setDemo(!demo)} style={{
-          padding: "10px 14px", borderRadius: 10, border: `1px solid ${demo ? C.borderGold : C.border}`,
-          background: demo ? C.goldDim : C.glass, color: demo ? C.gold : C.muted,
-          fontWeight: 700, fontSize: "0.70rem", cursor: "pointer", fontFamily: font,
-          marginBottom: 12, textAlign: "center", letterSpacing: "0.05em", textTransform: "uppercase",
-        }}>{demo ? "Demo Mode: ON" : "Demo Mode: OFF"}</button>
-        <div style={{ padding: "12px 14px", borderRadius: 10, background: C.glass, border: `1px solid ${C.border}` }}>
-          <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Valen</div>
-          <div style={{ fontSize: "0.64rem", color: C.muted }}>Founding Member</div>
+        <div style={{ padding: "10px 12px", borderRadius: 10, background: C.glass, border: `1px solid ${C.border}` }}>
+          <div style={{ fontWeight: 700, fontSize: "0.72rem", color: C.white, marginBottom: 2 }}>{displayName}</div>
+          <div style={{ fontSize: "0.56rem", color: C.muted, marginBottom: 6, wordBreak: "break-all" }}>{user.email}</div>
+          <button onClick={handleLogout} style={{ width: "100%", padding: "5px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
         </div>
       </div>
-      <div style={{ flex: 1, padding: "28px 32px", maxWidth: 1200, overflowY: "auto" }}>
-        {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
-        {page === "tools" && <PremiumToolsPage demo={demo} />}
-        {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
-        {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} />}
+      {/* Main content — fluid, fills available space */}
+      <div style={{ flex: 1, padding: `${contentPadV}px ${contentPadH}px`, overflowY: "auto", minWidth: 0 }}>
+        {pageContent}
       </div>
     </div>
   );
