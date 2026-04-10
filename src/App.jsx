@@ -287,7 +287,10 @@ function ExpectancyTab({ demo }) {
           <ResultRow label="10-Trade Compound" value={`${r.compound10>=0?"+":""}${r.compound10.toFixed(2)}%`} color={r.compound10>=0?C.green:C.red} />
           <ResultRow label="Recommended Max Stop" value={`${r.recStop.toFixed(1)}%`} />
           <ResultRow label="Breakeven Win Rate" value={`${r.beWinRate.toFixed(1)}%`} />
-          <div style={{marginTop:14}}><Badge positive={r.ev>=0}>{r.ev>=0?"Positive Expectancy":"Negative Expectancy"}</Badge></div>
+          <div style={{marginTop:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <Badge positive={r.ev>=0}>{r.ev>=0?"Positive Expectancy":"Negative Expectancy"}</Badge>
+            <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:500}}>Min. {Math.max(30, Math.ceil(4/((+winRate/100)*(1-(+winRate/100)))))} trades for statistical confidence</span>
+          </div>
           {r.glRatio<2&&<Alert type={r.glRatio<1?"red":"gold"}>{r.glRatio<1?"Cut losses faster.":"G/L below 2:1. Aim for 3:1."}</Alert>}
         </>)}
       </div>
@@ -839,8 +842,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons 
       <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(180px, 1fr))",gap:12,marginBottom:24 }}>
         <StatTile label="Portfolio" value={fmt$(+portfolioSize)} />
         <StatTile label="Deployed" value={fmt$(totals.totalValue)} sub={`${totals.count} positions`} />
-        <StatTile label="Open P/L" value={fmt$(Math.abs(totals.totalPL))} color={totals.totalPL>=0?C.green:C.red} prefix={totals.totalPL>=0?"+$":"-$"} />
-        <StatTile label="Total RTS" value={fmt$(Math.abs(totals.totalRTS))} color={totals.totalRTS>0?C.green:totals.totalRTS===0?C.gold:C.red} sub="Goal: $0" />
+        <StatTile label="Open P/L" value={`${Math.abs(totals.totalPL).toLocaleString(undefined,{maximumFractionDigits:0})}`} color={totals.totalPL>=0?C.green:C.red} prefix={totals.totalPL>=0?"+$":"-$"} />
+        <StatTile label="Total RTS" value={totals.totalRTS<=0?"FREE":fmt$(Math.abs(totals.totalRTS))} color={totals.totalRTS<=0?C.green:C.red} sub="Goal: $0 (FREE)" />
       </div>
 
       {/* Position Sizer */}
@@ -895,9 +898,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons 
                     <td style={{padding:"6px 4px"}}><MiniSelect value={p.setup} onChange={v=>updateField(p.id,"setup",v)} options={setupTypes} width={85} /></td>
                     <td style={{padding:"6px 4px"}}><TagSelector selected={p.tags||[]} allTags={allTags} onChange={v=>updateField(p.id,"tags",v)} small /></td>
                     {/* DTS — respects $ / % toggle */}
-                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:p.dtsD>0?C.green:p.dtsD===0?C.gold:C.red,fontSize:"0.70rem"}}>{dtsDisplay}</td>
-                    {/* RTS — respects $ / % toggle */}
-                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.rtsD>0?C.green:p.rtsD===0?C.gold:C.red,fontSize:"0.70rem"}}>{rtsDisplay}</td>
+                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:p.dtsD<=0?C.green:C.text,fontSize:"0.70rem"}}>{dtsDisplay}</td>
+                    {/* RTS — respects $ / % toggle. >0 = risk, <=0 = free */}
+                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.rtsD<=0?C.green:C.red,fontSize:"0.70rem"}}>{rtsDisplay}</td>
                     <td style={{padding:"8px 6px",textAlign:"right",color:C.text,fontSize:"0.70rem"}}>{p.cpN?p.sbe.toLocaleString():"—"}</td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:p.sbePct>100?C.red:p.sbePct>90?C.gold:C.green,fontSize:"0.70rem"}}>{p.cpN?`${p.sbePct.toFixed(1)}%`:"—"}</td>
                     {/* P/L — respects $ / % toggle */}
@@ -959,8 +962,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons 
                 <td colSpan={3} style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.text,fontSize:"0.70rem"}}>{enriched.reduce((s,p)=>s+p.sharesN,0).toLocaleString()}</td>
                 <td colSpan={5} />
-                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD>0?C.green:totals.totalDtsD===0?C.gold:C.red}}>{displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
-                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalRTS>0?C.green:totals.totalRTS===0?C.gold:C.red}}>{displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
+                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD<=0?C.green:C.text}}>{displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
+                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalRTS<=0?C.green:C.red}}>{displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
                 <td colSpan={2} />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{totals.totalPL>=0?"+":"-"}{fmt$(Math.abs(totals.totalPL))}</td>
                 <td />
@@ -969,14 +972,26 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons 
             </tbody>
           </table>
         </div>
-        {/* RTS Bar */}
+        {/* RTS Bar — green=free, red=at risk. Bar fills green as RTS approaches $0 */}
         <div style={{ padding:"14px 24px 18px",borderTop:`1px solid ${C.border}` }}>
           <div style={{ display:"flex",alignItems:"center",gap:10 }}>
             <div style={{ fontWeight:700,fontSize:"0.60rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.muted }}>RTS</div>
-            <div style={{ flex:1,height:6,borderRadius:3,background:"rgba(255,255,255,0.05)",position:"relative",overflow:"hidden" }}>
-              <div style={{ position:"absolute",left:0,top:0,bottom:0,borderRadius:3,width:`${Math.max(2,Math.min(100,totals.totalRTS<=0?100:Math.max(0,100-(totals.totalRTS/Math.max(1,+portfolioSize*0.02))*100)))}%`,background:totals.totalRTS<=0?C.green:totals.totalRTS<(+portfolioSize*0.01)?C.gold:C.red,transition:"width 0.3s, background 0.3s" }} />
-            </div>
-            <div style={{ fontWeight:800,fontSize:"0.72rem",color:totals.totalRTS<=0?C.green:C.gold }}>{totals.totalRTS<=0?"FREE":fmt$(totals.totalRTS)}</div>
+            {(() => {
+              const isFree = totals.totalRTS <= 0;
+              const ps = +portfolioSize || 1;
+              // Bar: 100% green when free, shrinks as RTS grows relative to 2% of portfolio
+              const greenPct = isFree ? 100 : Math.max(0, 100 - (totals.totalRTS / (ps * 0.02)) * 100);
+              const barColor = isFree ? C.green : totals.totalRTS < (ps * 0.005) ? C.gold : C.red;
+              const valueColor = isFree ? C.green : C.red;
+              return (
+                <>
+                  <div style={{ flex:1,height:6,borderRadius:3,background:"rgba(255,255,255,0.05)",position:"relative",overflow:"hidden" }}>
+                    <div style={{ position:"absolute",left:0,top:0,bottom:0,borderRadius:3,width:`${Math.max(2, Math.min(100, greenPct))}%`,background:barColor,transition:"width 0.3s, background 0.3s" }} />
+                  </div>
+                  <div style={{ fontWeight:800,fontSize:"0.72rem",color:valueColor,minWidth:60,textAlign:"right" }}>{isFree ? "FREE" : fmt$(totals.totalRTS)}</div>
+                </>
+              );
+            })()}
           </div>
         </div>
       </GlassCard>
