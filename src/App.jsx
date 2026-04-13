@@ -1001,24 +1001,25 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 // ═══════════════════════════════════════
 const FULL_SIZE_OPTIONS = [10,15,20,25,30,35,40,45,50,55,60];
 let _posId = 100;
-const mkPos = (sym, entry, shares, ep, cp, stop, setup, tags = []) => ({ id: _posId++, sym, entry, shares: String(shares), ep: String(ep), cp: String(cp), stop: String(stop), setup, tags });
+const mkPos = (sym, entry, shares, ep, cp, stop, stop2, setup, tags = []) => ({ id: _posId++, sym, entry, shares: String(shares), ep: String(ep), cp: String(cp), stop: String(stop), stop2: String(stop2 || ""), setup, tags });
 const INIT_POSITIONS = [
-  mkPos("MSGS","4/1/26",612,328.25,302.90,302.90,"VCP",["Breakout"]),
-  mkPos("DNTH","4/8/26",2100,87.58,81.75,81.75,"Pivot",["Momentum"]),
-  mkPos("PSMT","4/7/26",322,154.81,143.10,143.10,"VCP",[]),
-  mkPos("CWEN","4/1/26",1250,39.93,38.50,38.50,"VCP",["Sector Leader"]),
-  mkPos("KYMR","4/8/26",574,87.00,81.91,81.91,"Pivot",[]),
-  mkPos("DLX","4/8/26",1737,28.77,26.95,26.95,"Low-Risk Entry",["High Volume"]),
+  mkPos("MSGS","4/1/26",612,328.25,302.90,302.90,295.00,"VCP",["Breakout"]),
+  mkPos("DNTH","4/8/26",2100,87.58,81.75,81.75,78.50,"Pivot",["Momentum"]),
+  mkPos("PSMT","4/7/26",322,154.81,143.10,143.10,138.00,"VCP",[]),
+  mkPos("CWEN","4/1/26",1250,39.93,38.50,38.50,37.00,"VCP",["Sector Leader"]),
+  mkPos("KYMR","4/8/26",574,87.00,81.91,81.91,79.50,"Pivot",[]),
+  mkPos("DLX","4/8/26",1737,28.77,26.95,26.95,25.80,"Low-Risk Entry",["High Volume"]),
 ];
 
 const GLOSSARY = [
-  ["DTS $","Down To Stop","Current Price − Stop Price. Distance to stop per share."],
-  ["DTS %","Down To Stop %","DTS as a percentage of current price."],
-  ["RTS $","Risk To Stop","Shares × DTS. Total dollars lost if stopped out. Goal: $0."],
-  ["ROTE","Risk of Total Equity","(Entry − Stop) × Shares ÷ Portfolio. How much of your total equity this position risks. Keep each position under 1.5%."],
+  ["Stop 1 / 2","Dual Stop Loss","Each stop covers 50% of your shares. Stop 1 = tighter (first half out), Stop 2 = wider (second half). If only one is filled, it covers 100%."],
+  ["DTS","Down To Stop","Weighted average distance from current price to both stops, per share."],
+  ["RTS","Risk To Stop","Total dollars lost if both stops hit. Weighted across both halves. Goal: $0."],
+  ["ROTE","Risk of Total Equity","Initial risk (entry to stops) ÷ portfolio. Weighted across both halves. Keep under 1.5%."],
+  ["Exposure","Risk-Free Exposure","Shows what % of the position is risk-free (stop above entry = locked profit). Green bar = free, red = at risk."],
   ["SBE","Shares to Break Even","Shares to sell at current price to recover entire cost. Remaining shares = free."],
   ["SBE %","SBE Percentage","SBE ÷ total shares. Over 100% = underwater, can't break even."],
-  ["R-Mult","R-Multiple","Return ÷ initial risk. 2R = made 2× what you risked."],
+  ["R-Mult","R-Multiple","Return ÷ weighted initial risk. 2R = made 2× what you risked."],
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
@@ -1043,7 +1044,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const addPosition = useCallback(() => {
     setPositions(prev => {
       const maxId = prev.reduce((m, p) => Math.max(m, p.id || 0), 0);
-      return [...prev, { id: maxId + 1, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", setup: setupTypes[0] || "VCP", tags: [] }];
+      return [...prev, { id: maxId + 1, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", setup: setupTypes[0] || "VCP", tags: [] }];
     });
   }, [setupTypes]);
   const removeRow = useCallback((id) => { setPositions(prev => prev.filter(p => p.id !== id)); }, []);
@@ -1082,36 +1083,70 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     setSellId(null);
   };
 
-  // Enriched
+  // Enriched — dual stop loss: stop1 covers 50% of shares, stop2 covers 50%
   const enriched = useMemo(() => positions.map(p => {
-    const epN = parseFloat(p.ep)||0, cpN = parseFloat(p.cp)||0, stopN = parseFloat(p.stop)||0, sharesN = parseInt(p.shares)||0;
+    const epN = parseFloat(p.ep)||0, cpN = parseFloat(p.cp)||0, sharesN = parseInt(p.shares)||0;
+    const s1 = parseFloat(p.stop)||0;
+    const s2 = parseFloat(p.stop2)||0;
+    const hasS1 = s1 > 0, hasS2 = s2 > 0;
+    // If only one stop is filled, use it for both halves
+    const stop1 = hasS1 ? s1 : (hasS2 ? s2 : 0);
+    const stop2 = hasS2 ? s2 : (hasS1 ? s1 : 0);
+    const h1 = Math.ceil(sharesN / 2), h2 = sharesN - h1; // half shares each
+
     const posValue = epN * sharesN;
     const tier = autoTier(posValue, sizer);
-    const dtsD = cpN - stopN, dtsPct = cpN > 0 ? (dtsD / cpN) * 100 : 0;
-    const rtsD = sharesN * dtsD;
+
+    // Weighted DTS (current price to stop, weighted across both halves)
+    const dts1 = cpN - stop1, dts2 = cpN - stop2;
+    const dtsD = sharesN > 0 ? (dts1 * h1 + dts2 * h2) / sharesN : 0; // weighted avg per share
+    const dtsPct = cpN > 0 ? (dtsD / cpN) * 100 : 0;
+
+    // RTS = total dollars at risk to stops
+    const rtsD = dts1 * h1 + dts2 * h2;
+
+    // SBE uses weighted average stop
+    const avgStop = sharesN > 0 ? (stop1 * h1 + stop2 * h2) / sharesN : 0;
     const sbe = cpN > 0 ? Math.ceil((epN * sharesN) / cpN) : 0;
     const sbePct = sharesN > 0 ? (sbe / sharesN) * 100 : 0;
+
+    // P/L
     const plPct = epN > 0 ? ((cpN - epN) / epN) * 100 : 0;
     const plD = (cpN - epN) * sharesN;
-    const initRisk = epN > 0 ? (epN - stopN) / epN : 0;
-    const rMult = initRisk > 0 ? (plPct / 100) / initRisk : 0;
-    // Risk Status: what's your actual exposure?
-    const riskStatus = !epN || !stopN ? "—"
-      : stopN >= epN ? "Free"       // stop above entry = guaranteed profit, can't lose
-      : plPct > 5 ? "Profit"        // in profit but stop not yet at breakeven
-      : plPct >= -2 ? "Even"         // near breakeven, neutral zone
-      : "At Risk";                   // underwater, losing position
+
+    // R-Multiple uses weighted initial risk
+    const initRiskD = epN > 0 ? (epN - stop1) * h1 + (epN - stop2) * h2 : 0;
+    const initRiskPct = epN > 0 && sharesN > 0 ? initRiskD / (epN * sharesN) : 0;
+    const rMult = initRiskPct > 0 ? (plPct / 100) / initRiskPct : 0;
+
+    // ROTE — uses initial risk (entry to stops)
     const ps = +portfolioSize || 0;
-    const roteD = epN > 0 && stopN > 0 ? (epN - stopN) * sharesN : 0; // initial risk in dollars
-    const rotePct = ps > 0 ? (roteD / ps) * 100 : 0; // risk as % of total equity
-    return { ...p, epN, cpN, stopN, sharesN, posValue, tier, dtsD, dtsPct, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct };
+    const roteD = initRiskD > 0 ? initRiskD : 0;
+    const rotePct = ps > 0 ? (roteD / ps) * 100 : 0;
+
+    // Risk-free exposure: what % of position has stop ≥ entry (locked profit)
+    const s1Free = stop1 >= epN && epN > 0;
+    const s2Free = stop2 >= epN && epN > 0;
+    const riskFreePct = (!hasS1 && !hasS2) ? 0 : (s1Free && s2Free) ? 100 : (s1Free || s2Free) ? 50 : 0;
+    const riskExposurePct = 100 - riskFreePct;
+
+    // Risk Status — uses both halves
+    const bothStops = hasS1 || hasS2;
+    const riskStatus = !epN || !bothStops ? "—"
+      : riskFreePct === 100 ? "Free"
+      : riskFreePct === 50 ? "Profit"
+      : plPct > 5 ? "Profit"
+      : plPct >= -2 ? "Even"
+      : "At Risk";
+
+    return { ...p, epN, cpN, stop1, stop2, sharesN, h1, h2, posValue, tier, dtsD, dtsPct, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct, avgStop };
   }), [positions, sizer, portfolioSize]);
 
   const totals = useMemo(() => {
     const active = enriched.filter(p => p.sym && p.cpN > 0);
     const totalValue = active.reduce((s,p) => s + p.cpN * p.sharesN, 0);
-    // Weighted avg DTS% = sum(dtsD * shares) / sum(cpN * shares) * 100
-    const totalDtsD = active.reduce((s,p) => s + p.dtsD * p.sharesN, 0);
+    // Weighted DTS uses the already-weighted dtsD per share from enriched
+    const totalDtsD = active.reduce((s,p) => s + p.rtsD, 0); // rtsD is already the total $ risk-to-stop for this position
     const avgDtsPct = totalValue > 0 ? (totalDtsD / totalValue) * 100 : 0;
     const totalRoteD = enriched.reduce((s,p) => s + p.roteD, 0);
     const ps = +portfolioSize || 0;
@@ -1170,7 +1205,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Value")}{th("Stop")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{th("SBE")}{th("SBE %")}{th("P/L")}{th("R")}{th("","center")}
+              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Value")}{th("Stop 1")}{th("Stop 2")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{th("Exposure")}{th("SBE")}{th("SBE %")}{th("P/L")}{th("R")}{th("","center")}
             </tr></thead>
             <tbody>
               {enriched.map((p, idx) => {
@@ -1191,7 +1226,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.shares} onChange={v=>updateField(p.id,"shares",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.ep} onChange={v=>updateField(p.id,"ep",v)} /></td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:C.white,whiteSpace:"nowrap"}}>{p.posValue>0?fmt$(p.posValue):"—"}</td>
-                    <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} /></td>
+                    <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} width={72} /></td>
+                    <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.cp} onChange={v=>updateField(p.id,"cp",v)} gold width={82} /></td>
                     <td style={{padding:"6px 4px"}}><MiniSelect value={p.setup} onChange={v=>updateField(p.id,"setup",v)} options={setupTypes} width={85} /></td>
                     <td style={{padding:"6px 4px"}}><TagSelector selected={p.tags||[]} allTags={allTags} onChange={v=>updateField(p.id,"tags",v)} small /></td>
@@ -1200,12 +1236,20 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     {/* RTS — respects $ / % toggle. >0 = risk, <=0 = free */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.rtsD<=0?C.green:C.red,fontSize:"0.70rem"}}>{rtsDisplay}</td>
                     {/* ROTE — Risk of Total Equity. Warning if >1.5% */}
-                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rotePct>1.5?C.red:p.rotePct>1.0?C.gold:C.green,whiteSpace:"nowrap"}}>{p.epN&&p.stopN?<>{p.rotePct.toFixed(2)}%{p.rotePct>1.5&&<span title="ROTE exceeds 1.5% — consider reducing size" style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</>:"—"}</td>
+                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rotePct>1.5?C.red:p.rotePct>1.0?C.gold:C.green,whiteSpace:"nowrap"}}>{p.epN&&(p.stop1||p.stop2)?<>{p.rotePct.toFixed(2)}%{p.rotePct>1.5&&<span title="ROTE exceeds 1.5% — consider reducing size" style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</>:"—"}</td>
+                    {/* Exposure — risk-free vs at-risk split */}
+                    <td style={{padding:"8px 4px",textAlign:"center",fontSize:"0.62rem",whiteSpace:"nowrap"}}>{p.epN&&(p.stop1||p.stop2)?<div style={{display:"flex",alignItems:"center",gap:3,justifyContent:"center"}}>
+                      <div style={{display:"flex",borderRadius:4,overflow:"hidden",height:14,width:44}}>
+                        <div style={{width:`${p.riskFreePct}%`,background:C.green,transition:"width 0.2s"}} />
+                        <div style={{width:`${p.riskExposurePct}%`,background:p.riskExposurePct>0?C.red:"transparent",transition:"width 0.2s"}} />
+                      </div>
+                      <span style={{fontWeight:700,color:p.riskFreePct===100?C.green:p.riskFreePct>=50?C.gold:C.red}}>{p.riskFreePct}%</span>
+                    </div>:"—"}</td>
                     <td style={{padding:"8px 6px",textAlign:"right",color:C.text,fontSize:"0.70rem"}}>{p.cpN?p.sbe.toLocaleString():"—"}</td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:p.sbePct>100?C.red:p.sbePct>90?C.gold:C.green,fontSize:"0.70rem"}}>{p.cpN?`${p.sbePct.toFixed(1)}%`:"—"}</td>
                     {/* P/L — respects $ / % toggle */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.plPct>=0?C.green:C.red,fontSize:"0.70rem"}}>{plDisplay}</td>
-                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rMult>=2?C.green:p.rMult>=1?C.goldBright:p.rMult>=0?C.white:C.red}}>{p.epN&&p.stopN?`${p.rMult.toFixed(2)}R`:"—"}</td>
+                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rMult>=2?C.green:p.rMult>=1?C.goldBright:p.rMult>=0?C.white:C.red}}>{p.epN&&(p.stop1||p.stop2)?`${p.rMult.toFixed(2)}R`:"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"center",whiteSpace:"nowrap"}}>
                       <div style={{display:"flex",gap:4,justifyContent:"center"}}>
                         <button onClick={()=>startSell(p)} title="Sell shares" style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${C.red}33`,background:"transparent",color:C.red,fontWeight:700,fontSize:"0.58rem",cursor:"pointer",fontFamily:font}}>Sell</button>
@@ -1225,7 +1269,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const isPartial = qty < totalShares && qty > 0;
                 return (
                   <tr style={{ background:"rgba(239,68,68,0.06)",borderBottom:`2px solid ${C.red}33` }}>
-                    <td colSpan={18} style={{ padding:"14px 16px" }}>
+                    <td colSpan={20} style={{ padding:"14px 16px" }}>
                       <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap" }}>
                         <span style={{ fontWeight:700,fontSize:"0.68rem",color:C.red,letterSpacing:"0.08em",textTransform:"uppercase" }}>Sell {pos.sym}</span>
                         <div style={{display:"flex",alignItems:"center",gap:5}}>
@@ -1257,16 +1301,24 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 );
               })()}
 
-              {/* Totals — 18 cols: Status,Tier,Symbol,Shares,AvgCost,Value,Stop,Current,Setup,Tags,DTS,RTS,ROTE,SBE,SBE%,P/L,R,Actions */}
+              {/* Totals — 20 cols: Status,Tier,Symbol,Shares,AvgCost,Value,Stop1,Stop2,Current,Setup,Tags,DTS,RTS,ROTE,Exposure,SBE,SBE%,P/L,R,Actions */}
               <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
                 <td colSpan={3} style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.text,fontSize:"0.70rem"}}>{enriched.reduce((s,p)=>s+p.sharesN,0).toLocaleString()}</td>
                 <td />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:C.goldBright}}>{fmt$(enriched.reduce((s,p)=>s+p.posValue,0))}</td>
-                <td colSpan={4} />
+                <td colSpan={5} />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD<=0?C.green:C.text}}>{displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalRTS<=0?C.green:C.red}}>{displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalRotePct>1.5?C.red:totals.totalRotePct>1.0?C.gold:C.green,whiteSpace:"nowrap"}}>{totals.totalRotePct.toFixed(2)}%{totals.totalRotePct>1.5&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</td>
+                {/* Total exposure: weighted avg risk-free % across all positions */}
+                {(() => {
+                  const active = enriched.filter(p => p.epN > 0 && (p.stop1 || p.stop2));
+                  const totalShares = active.reduce((s,p) => s + p.sharesN, 0);
+                  const freeShares = active.reduce((s,p) => s + p.sharesN * (p.riskFreePct / 100), 0);
+                  const avgFree = totalShares > 0 ? (freeShares / totalShares) * 100 : 0;
+                  return <td style={{padding:"12px 4px",textAlign:"center",fontWeight:800,fontSize:"0.66rem",color:avgFree>=50?C.green:avgFree>0?C.gold:C.red}}>{avgFree.toFixed(0)}% free</td>;
+                })()}
                 <td colSpan={2} />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{totals.totalPL>=0?"+":"-"}{fmt$(Math.abs(totals.totalPL))}</td>
                 <td />
