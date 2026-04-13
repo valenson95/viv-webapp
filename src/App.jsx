@@ -222,6 +222,185 @@ function TierStrip({ sizer }) {
   );
 }
 
+// ─── Exposure Grid ───
+function ExposureGrid({ sizer, portfolioSize, numStocks }) {
+  const [phase, setPhase] = useState(0);
+  if (!sizer) return null;
+  const ps = +portfolioSize || 0;
+  if (ps <= 0) return null;
+
+  // Build phases dynamically from the sizer
+  // Phase 0 = ~25% (all pilots/quarters — cautious start)
+  // Phase 1 = ~50% (add halves — market confirming)
+  // Phase 2 = ~100% (add fulls — full conviction)
+  const pilotAmt = sizer.pilot;
+  const quarterAmt = sizer.quarter;
+  const halfAmt = sizer.half;
+  const fullAmt = sizer.full;
+
+  // How many slots per tier in each phase — scales with numStocks
+  const n = numStocks;
+  const phases = [
+    {
+      label: "Cautious",
+      sub: "Testing the water",
+      slots: [
+        ...Array(Math.max(1, Math.ceil(n * 0.4))).fill({ tier: "Pilot", amt: pilotAmt }),
+        ...Array(Math.max(1, Math.floor(n * 0.6))).fill({ tier: "Quarter", amt: quarterAmt }),
+      ],
+      empty: Math.max(0, n * 2 - Math.max(1, Math.ceil(n * 0.4)) - Math.max(1, Math.floor(n * 0.6))),
+    },
+    {
+      label: "Building",
+      sub: "Market confirming",
+      slots: [
+        ...Array(Math.max(1, Math.ceil(n * 0.3))).fill({ tier: "Pilot", amt: pilotAmt }),
+        ...Array(Math.max(1, Math.ceil(n * 0.4))).fill({ tier: "Quarter", amt: quarterAmt }),
+        ...Array(Math.max(1, Math.floor(n * 0.3))).fill({ tier: "Half", amt: halfAmt }),
+      ],
+      empty: Math.max(0, n * 2 - Math.max(1, Math.ceil(n * 0.3)) - Math.max(1, Math.ceil(n * 0.4)) - Math.max(1, Math.floor(n * 0.3))),
+    },
+    {
+      label: "Full Conviction",
+      sub: "Max exposure",
+      slots: [
+        ...Array(Math.max(1, Math.ceil(n * 0.2))).fill({ tier: "Quarter", amt: quarterAmt }),
+        ...Array(Math.max(1, Math.ceil(n * 0.3))).fill({ tier: "Half", amt: halfAmt }),
+        ...Array(Math.max(1, Math.floor(n * 0.5))).fill({ tier: "Full", amt: fullAmt }),
+      ],
+      empty: 0,
+    },
+  ];
+
+  const current = phases[phase];
+  const totalDeployed = current.slots.reduce((s, sl) => s + sl.amt, 0);
+  const deployedPct = (totalDeployed / ps) * 100;
+
+  const tierMeta = {
+    Pilot: { color: C.purple, bg: C.purpleDim, border: "rgba(167,139,250,0.25)", abbr: "P" },
+    Quarter: { color: C.blue, bg: C.blueDim, border: "rgba(59,130,246,0.25)", abbr: "Q" },
+    Half: { color: C.gold, bg: C.goldDim, border: C.borderGold, abbr: "H" },
+    Full: { color: C.green, bg: C.greenDim, border: "rgba(34,197,94,0.25)", abbr: "F" },
+  };
+
+  // Count tiers for summary
+  const tierCounts = {};
+  current.slots.forEach(sl => { tierCounts[sl.tier] = (tierCounts[sl.tier] || 0) + 1; });
+
+  // Slot size for visual — bigger slots for bigger tiers
+  const tierScale = { Pilot: 0.55, Quarter: 0.72, Half: 0.88, Full: 1.0 };
+
+  const phaseLabels = ["25%", "50%", "100%"];
+
+  return (
+    <div style={{ marginTop: 20, borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>Exposure Framework</div>
+          <div style={{ fontWeight: 300, fontSize: "0.72rem", color: C.muted, lineHeight: 1.5 }}>Scale exposure as you win. Stay small when uncertain.</div>
+        </div>
+      </div>
+
+      {/* Phase selector — 3 buttons */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 20, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}` }}>
+        {phases.map((ph, i) => {
+          const active = i === phase;
+          const phDeployed = ph.slots.reduce((s, sl) => s + sl.amt, 0);
+          const phPct = (phDeployed / ps) * 100;
+          return (
+            <button key={i} onClick={() => setPhase(i)} style={{
+              flex: 1, padding: "14px 10px", border: "none", cursor: "pointer", fontFamily: font,
+              background: active ? C.goldDim : "rgba(255,255,255,0.02)",
+              borderRight: i < 2 ? `1px solid ${C.border}` : "none",
+              transition: "all 0.2s",
+            }}>
+              <div style={{ fontWeight: 800, fontSize: "1.1rem", letterSpacing: "-0.03em", color: active ? C.goldBright : C.muted, marginBottom: 2 }}>{phaseLabels[i]}</div>
+              <div style={{ fontWeight: 700, fontSize: "0.54rem", letterSpacing: "0.08em", textTransform: "uppercase", color: active ? C.gold : "rgba(255,255,255,0.25)" }}>{ph.label}</div>
+              <div style={{ fontWeight: 500, fontSize: "0.58rem", color: active ? C.text : "rgba(255,255,255,0.18)", marginTop: 2 }}>{ph.slots.length} positions · {fmt$(phDeployed)}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Deployed bar */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          <span style={{ fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Capital Deployed</span>
+          <span style={{ fontWeight: 800, fontSize: "0.82rem", color: C.goldBright }}>{fmt$(totalDeployed)} <span style={{ fontWeight: 500, fontSize: "0.68rem", color: C.muted }}>/ {fmt$(ps)} ({deployedPct.toFixed(1)}%)</span></span>
+        </div>
+        <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+          <div style={{ height: "100%", borderRadius: 3, width: `${Math.min(100, deployedPct)}%`, background: deployedPct > 80 ? `linear-gradient(90deg, ${C.gold}, ${C.green})` : `linear-gradient(90deg, ${C.purple}, ${C.gold})`, transition: "width 0.4s ease" }} />
+        </div>
+      </div>
+
+      {/* Visual grid */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 16, minHeight: 100 }}>
+        {current.slots.map((sl, idx) => {
+          const meta = tierMeta[sl.tier];
+          const scale = tierScale[sl.tier];
+          const baseSize = 72;
+          const size = Math.round(baseSize * scale);
+          const pctOfPort = ((sl.amt / ps) * 100).toFixed(1);
+          return (
+            <div key={idx} style={{
+              width: size, height: size, borderRadius: 10,
+              background: meta.bg, border: `2px solid ${meta.border}`,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              transition: "all 0.3s ease", position: "relative",
+              boxShadow: `0 0 12px ${meta.color}22`,
+            }}>
+              <div style={{ fontWeight: 900, fontSize: size > 60 ? "0.72rem" : "0.58rem", color: meta.color, letterSpacing: "-0.02em" }}>{sl.tier === "Full" ? "FULL" : sl.tier === "Half" ? "HALF" : sl.tier === "Quarter" ? "QTR" : "PLT"}</div>
+              <div style={{ fontWeight: 700, fontSize: size > 60 ? "0.62rem" : "0.50rem", color: C.white, marginTop: 1 }}>{pctOfPort}%</div>
+              <div style={{ fontWeight: 500, fontSize: "0.46rem", color: C.muted, marginTop: 0 }}>{fmt$(sl.amt)}</div>
+            </div>
+          );
+        })}
+        {/* Empty slots */}
+        {Array(current.empty).fill(0).map((_, idx) => (
+          <div key={`e${idx}`} style={{
+            width: 52, height: 52, borderRadius: 10,
+            border: `2px dashed rgba(255,255,255,0.08)`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.3s ease",
+          }}>
+            <span style={{ fontSize: "0.52rem", color: "rgba(255,255,255,0.12)", fontWeight: 600 }}>—</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Tier breakdown summary */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
+        {["Pilot", "Quarter", "Half", "Full"].map(tier => {
+          const count = tierCounts[tier] || 0;
+          if (count === 0) return null;
+          const meta = tierMeta[tier];
+          const tierTotal = count * (tier === "Pilot" ? pilotAmt : tier === "Quarter" ? quarterAmt : tier === "Half" ? halfAmt : fullAmt);
+          const tierPct = ((tierTotal / ps) * 100).toFixed(1);
+          return (
+            <div key={tier} style={{
+              padding: "6px 12px", borderRadius: 8,
+              background: meta.bg, border: `1px solid ${meta.border}`,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <span style={{ fontWeight: 700, fontSize: "0.54rem", color: meta.color, textTransform: "uppercase", letterSpacing: "0.06em" }}>{count}× {tier}</span>
+              <span style={{ fontWeight: 600, fontSize: "0.54rem", color: C.muted }}>= {tierPct}%</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Phase guidance */}
+      <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 10, background: phase === 2 ? C.greenDim : phase === 1 ? C.goldDim : C.purpleDim, border: `1px solid ${phase === 2 ? "rgba(34,197,94,0.18)" : phase === 1 ? C.borderGold : "rgba(167,139,250,0.18)"}` }}>
+        <div style={{ fontSize: "0.68rem", fontWeight: 600, color: phase === 2 ? C.green : phase === 1 ? C.goldBright : C.purple, lineHeight: 1.6 }}>
+          {phase === 0 && "Start here. Small positions only. Prove the market is working before adding exposure. If setups aren't triggering or you're getting stopped out — stay in this phase."}
+          {phase === 1 && "Your pilots and quarters are working. Now add half-size positions on your best setups. You're earning the right to deploy more capital by winning first."}
+          {phase === 2 && "Full conviction. Your positions are working, stops are moving up. Concentrate on your highest-conviction ideas with full-size positions. This is where the big money is made."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Gold CTA Button ───
 function GoldBtn({ children, onClick, small }) {
   return (
@@ -871,6 +1050,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons 
         <SliderRow label="Full Allocation" min={10} max={60} step={5} value={fullSizePct} onChange={setFullSizePct} suffix="%" calcText={sizer?fmt$(sizer.fullSizeAmt):""} />
         <SliderRow label="Max Positions" min={1} max={12} step={1} value={numStocks} onChange={setNumStocks} calcText={sizer?`${fmt$(sizer.full)} / stock`:""} />
         <TierStrip sizer={sizer} />
+        <ExposureGrid sizer={sizer} portfolioSize={portfolioSize} numStocks={numStocks} />
       </GlassCard>
 
       {/* Open Positions */}
