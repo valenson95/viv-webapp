@@ -1300,7 +1300,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons 
 // ═══════════════════════════════════════
 // ─── SETTINGS PAGE ───
 // ═══════════════════════════════════════
-function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize }) {
+function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail }) {
+  const isAdmin = userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [newSetup, setNewSetup] = useState("");
   const [newTag, setNewTag] = useState("");
   const [newReason, setNewReason] = useState("");
@@ -1386,6 +1387,59 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
         items={exitReasons} onAdd={() => addItem(exitReasons, setExitReasons, newReason, setNewReason)} onRemove={v => removeItem(exitReasons, setExitReasons, v)}
         newVal={newReason} setNewVal={setNewReason} placeholder="e.g. Gap Down"
       />
+
+      {/* Admin Panel — only visible to admin */}
+      {isAdmin && (
+        <>
+          <div style={{ marginTop: 32, marginBottom: 16, borderTop: `1px solid ${C.border}`, paddingTop: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.red }}>Admin Only</span>
+              <span style={{ fontSize: "0.62rem", padding: "2px 8px", borderRadius: 6, background: C.redDim, border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontWeight: 600 }}>Owner</span>
+            </div>
+            <div style={{ fontWeight: 800, fontSize: "1.3rem", letterSpacing: "-0.03em", color: C.white, marginBottom: 4 }}>Access Management</div>
+            <div style={{ fontSize: "0.74rem", color: C.muted, lineHeight: 1.5, marginBottom: 16 }}>Manage the monthly passcode that members use to log in.</div>
+          </div>
+
+          <GlassCard style={{ padding: "24px 28px", marginBottom: 16, borderColor: "rgba(239,68,68,0.15)" }}>
+            <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Current Passcode</div>
+            <div style={{ fontSize: "0.70rem", color: C.muted, marginBottom: 16 }}>This is the active passcode. Share it in your Skool community each month.</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderRadius: 12, background: "rgba(201,152,42,0.06)", border: `1px solid ${C.borderGold}` }}>
+              <span style={{ fontWeight: 900, fontSize: "1.4rem", letterSpacing: "0.10em", color: C.goldBright, fontFamily: "monospace" }}>{ACCESS_CODE}</span>
+              <button onClick={() => { navigator.clipboard.writeText(ACCESS_CODE); }} style={{
+                marginLeft: "auto", padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.border}`,
+                background: "rgba(255,255,255,0.04)", color: C.muted, fontSize: "0.70rem", fontWeight: 600,
+                cursor: "pointer", fontFamily: font, transition: "all 0.15s",
+              }}>Copy</button>
+            </div>
+          </GlassCard>
+
+          <GlassCard style={{ padding: "24px 28px", marginBottom: 16, borderColor: "rgba(239,68,68,0.15)" }}>
+            <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>How to Change the Passcode</div>
+            <div style={{ fontSize: "0.74rem", color: C.muted, lineHeight: 1.7 }}>
+              <span style={{ display: "block", marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, color: C.gold }}>Option A — Vercel Dashboard (recommended):</span><br />
+                Go to your Vercel project → Settings → Environment Variables → Set <span style={{ fontFamily: "monospace", color: C.goldBright, fontWeight: 600 }}>VITE_PASSCODE</span> to the new code → Redeploy. No code changes needed.
+              </span>
+              <span style={{ display: "block" }}>
+                <span style={{ fontWeight: 700, color: C.gold }}>Option B — Direct edit:</span><br />
+                Open <span style={{ fontFamily: "monospace", color: C.goldBright, fontWeight: 600 }}>src/App.jsx</span> → Find <span style={{ fontFamily: "monospace", color: C.goldBright, fontWeight: 600 }}>ACCESS_CODE</span> → Change the fallback value → Push to GitHub → Auto-deploys.
+              </span>
+            </div>
+          </GlassCard>
+
+          <GlassCard style={{ padding: "24px 28px", marginBottom: 16, borderColor: "rgba(239,68,68,0.15)" }}>
+            <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Admin Privileges</div>
+            <div style={{ fontSize: "0.74rem", color: C.muted, lineHeight: 1.7 }}>
+              <span style={{ display: "block", marginBottom: 4 }}>
+                Your email (<span style={{ fontWeight: 600, color: C.white }}>{ADMIN_EMAIL}</span>) has permanent access — no passcode required to log in.
+              </span>
+              <span style={{ display: "block" }}>
+                All other members must enter a valid passcode each time they log in.
+              </span>
+            </div>
+          </GlassCard>
+        </>
+      )}
     </div>
   );
 }
@@ -1393,7 +1447,8 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
 // ═══════════════════════════════════════
 // ─── LOGIN PAGE ───
 // ═══════════════════════════════════════
-const ACCESS_CODE = "VIV2026"; // Change this to whatever you want to share with Skool members
+const ADMIN_EMAIL = "vc-lv@live.com";
+const ACCESS_CODE = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_PASSCODE) || "VIV2026";
 
 function LoginPage({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -1405,7 +1460,8 @@ function LoginPage({ onLogin }) {
     e.preventDefault();
     setError("");
     if (!email.trim() || !email.includes("@")) { setError("Enter a valid email address."); return; }
-    if (code.trim().toUpperCase() !== ACCESS_CODE) { setError("Invalid access code. Check your Skool community for the code."); return; }
+    const isAdmin = email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    if (!isAdmin && code.trim().toUpperCase() !== ACCESS_CODE.toUpperCase()) { setError("Invalid access code. Check your Skool community for the code."); return; }
     setLoading(true);
     setTimeout(() => { onLogin(email.trim()); }, 600);
   };
@@ -1483,7 +1539,12 @@ export default function App() {
     try { return localStorage.getItem("viv_fontSize") || "standard"; } catch { return "standard"; }
   });
 
-  useEffect(() => { try { localStorage.setItem("viv_fontSize", fontSize); } catch {} }, [fontSize]);
+  useEffect(() => {
+    try { localStorage.setItem("viv_fontSize", fontSize); } catch {}
+    const rootPx = fontSize === "large" ? 18 : fontSize === "small" ? 14 : 16;
+    document.documentElement.style.fontSize = rootPx + "px";
+    return () => { document.documentElement.style.fontSize = ""; };
+  }, [fontSize]);
 
   const handleJournalTrade = useCallback((trade) => { setJournaledTrades(prev => [...prev, trade]); }, []);
 
@@ -1504,23 +1565,20 @@ export default function App() {
   const sidebarW = isTablet ? 200 : 220;
   const contentPadH = isMobile ? 16 : isTablet ? 24 : 36;
   const contentPadV = isMobile ? 16 : 28;
-  const fsScale = fontSize === "large" ? 1.15 : fontSize === "small" ? 0.88 : 1.0;
-  const baseFontPx = isMobile ? 15 : 16;
-  const rootFontSize = `${(baseFontPx * fsScale).toFixed(1)}px`;
 
   const pageContent = (
     <>
       {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
-      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={user.email} />}
     </>
   );
 
   // ─── MOBILE LAYOUT ───
   if (isMobile) {
     return (
-      <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column", fontSize: rootFontSize }}>
+      <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column" }}>
         {/* Top bar */}
         <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
           <div style={{ fontWeight: 800, fontSize: "0.82rem", letterSpacing: "-0.01em", color: C.white }}>
@@ -1552,7 +1610,7 @@ export default function App() {
 
   // ─── DESKTOP / TABLET LAYOUT ───
   return (
-    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text, fontSize: rootFontSize }}>
+    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text }}>
       {/* Sidebar */}
       <div style={{ width: sidebarW, minHeight: "100vh", padding: "24px 14px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, alignSelf: "flex-start" }}>
         <div style={{ fontWeight: 800, fontSize: "0.84rem", letterSpacing: "-0.01em", color: C.white, marginBottom: 24, padding: "0 8px" }}>
