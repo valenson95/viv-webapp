@@ -222,179 +222,195 @@ function TierStrip({ sizer }) {
   );
 }
 
-// ─── Exposure Grid ───
+// ─── Exposure Grid (Minervini-style visual) ───
 function ExposureGrid({ sizer, portfolioSize, numStocks }) {
-  const [phase, setPhase] = useState(0);
+  const sw = useScreenWidth();
+  const isMobile = sw < 768;
   if (!sizer) return null;
   const ps = +portfolioSize || 0;
   if (ps <= 0) return null;
 
-  // Build phases dynamically from the sizer
-  // Phase 0 = ~25% (all pilots/quarters — cautious start)
-  // Phase 1 = ~50% (add halves — market confirming)
-  // Phase 2 = ~100% (add fulls — full conviction)
-  const pilotAmt = sizer.pilot;
-  const quarterAmt = sizer.quarter;
-  const halfAmt = sizer.half;
-  const fullAmt = sizer.full;
-
-  // How many slots per tier in each phase — scales with numStocks
+  const { pilot, quarter, half, full } = sizer;
   const n = numStocks;
-  const phases = [
-    {
-      label: "Cautious",
-      sub: "Testing the water",
-      slots: [
-        ...Array(Math.max(1, Math.ceil(n * 0.4))).fill({ tier: "Pilot", amt: pilotAmt }),
-        ...Array(Math.max(1, Math.floor(n * 0.6))).fill({ tier: "Quarter", amt: quarterAmt }),
-      ],
-      empty: Math.max(0, n * 2 - Math.max(1, Math.ceil(n * 0.4)) - Math.max(1, Math.floor(n * 0.6))),
-    },
-    {
-      label: "Building",
-      sub: "Market confirming",
-      slots: [
-        ...Array(Math.max(1, Math.ceil(n * 0.3))).fill({ tier: "Pilot", amt: pilotAmt }),
-        ...Array(Math.max(1, Math.ceil(n * 0.4))).fill({ tier: "Quarter", amt: quarterAmt }),
-        ...Array(Math.max(1, Math.floor(n * 0.3))).fill({ tier: "Half", amt: halfAmt }),
-      ],
-      empty: Math.max(0, n * 2 - Math.max(1, Math.ceil(n * 0.3)) - Math.max(1, Math.ceil(n * 0.4)) - Math.max(1, Math.floor(n * 0.3))),
-    },
-    {
-      label: "Full Conviction",
-      sub: "Max exposure",
-      slots: [
-        ...Array(Math.max(1, Math.ceil(n * 0.2))).fill({ tier: "Quarter", amt: quarterAmt }),
-        ...Array(Math.max(1, Math.ceil(n * 0.3))).fill({ tier: "Half", amt: halfAmt }),
-        ...Array(Math.max(1, Math.floor(n * 0.5))).fill({ tier: "Full", amt: fullAmt }),
-      ],
-      empty: 0,
-    },
-  ];
 
-  const current = phases[phase];
-  const totalDeployed = current.slots.reduce((s, sl) => s + sl.amt, 0);
-  const deployedPct = (totalDeployed / ps) * 100;
+  // Phase compositions — ADDITIVE like Minervini's model
+  // Phase 1: Start with pilots + quarters (cautious)
+  // Phase 2: Keep phase 1 + ADD halves (building)
+  // Phase 3: Keep phase 2 + ADD fulls (concentrated)
+  const nP = Math.max(1, Math.round(n * 0.3));
+  const nQ = Math.max(1, n - nP);
+  const nH = Math.max(1, Math.ceil(n * 0.5));
+  const nF = Math.max(1, Math.ceil(n * 0.5));
 
+  const tierAmts = { Pilot: pilot, Quarter: quarter, Half: half, Full: full };
   const tierMeta = {
-    Pilot: { color: C.purple, bg: C.purpleDim, border: "rgba(167,139,250,0.25)", abbr: "P" },
-    Quarter: { color: C.blue, bg: C.blueDim, border: "rgba(59,130,246,0.25)", abbr: "Q" },
-    Half: { color: C.gold, bg: C.goldDim, border: C.borderGold, abbr: "H" },
-    Full: { color: C.green, bg: C.greenDim, border: "rgba(34,197,94,0.25)", abbr: "F" },
+    Pilot:   { color: C.purple, bg: C.purpleDim, border: "rgba(167,139,250,0.40)", cells: 0 },
+    Quarter: { color: C.blue,   bg: C.blueDim,   border: "rgba(59,130,246,0.40)",  cells: 1 },
+    Half:    { color: C.gold,   bg: C.goldDim,    border: "rgba(201,152,42,0.40)",  cells: 2 },
+    Full:    { color: C.green,  bg: C.greenDim,   border: "rgba(34,197,94,0.40)",   cells: 4 },
   };
 
-  // Count tiers for summary
-  const tierCounts = {};
-  current.slots.forEach(sl => { tierCounts[sl.tier] = (tierCounts[sl.tier] || 0) + 1; });
+  const phases = [
+    { title: "Cautious", groups: [{ tier: "Pilot", count: nP }, { tier: "Quarter", count: nQ }] },
+    { title: "Building", groups: [{ tier: "Pilot", count: nP }, { tier: "Quarter", count: nQ }, { tier: "Half", count: nH }] },
+    { title: "Concentrated", groups: [{ tier: "Pilot", count: nP }, { tier: "Quarter", count: nQ }, { tier: "Half", count: nH }, { tier: "Full", count: nF }] },
+  ];
+  phases.forEach(ph => {
+    ph.deployed = ph.groups.reduce((s, g) => s + g.count * tierAmts[g.tier], 0);
+    ph.pct = ((ph.deployed / ps) * 100).toFixed(1);
+    ph.posCount = ph.groups.reduce((s, g) => s + g.count, 0);
+  });
 
-  // Slot size for visual — bigger slots for bigger tiers
-  const tierScale = { Pilot: 0.55, Quarter: 0.72, Half: 0.88, Full: 1.0 };
+  // ─── 2×2 Block renderer ───
+  // Each position = 2×2 grid of cells. Filled cells = tier level.
+  // Pilot = small square inside cell 0. Quarter = 1 cell. Half = 2 cells. Full = 4 cells.
+  const cellSz = isMobile ? 24 : 32;
+  const cellGap = 2;
 
-  const phaseLabels = ["25%", "50%", "100%"];
+  const renderBlock = (tier, key) => {
+    const meta = tierMeta[tier];
+    const filled = meta.cells;
+    return (
+      <div key={key} style={{ display: "grid", gridTemplateColumns: `${cellSz}px ${cellSz}px`, gap: cellGap }}>
+        {[0, 1, 2, 3].map(i => {
+          const active = i < filled;
+          const isPilot = tier === "Pilot" && i === 0;
+          return (
+            <div key={i} style={{
+              width: cellSz, height: cellSz, borderRadius: Math.max(3, cellSz * 0.14),
+              background: active ? meta.bg : "transparent",
+              border: active ? `2px solid ${meta.border}` : `1.5px dashed rgba(255,255,255,0.06)`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "all 0.25s ease",
+            }}>
+              {isPilot && <div style={{
+                width: cellSz * 0.50, height: cellSz * 0.50, borderRadius: Math.max(2, cellSz * 0.10),
+                background: meta.bg, border: `2px solid ${meta.border}`,
+              }} />}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Phase colors
+  const phColors = [C.purple, C.gold, C.green];
+  const phBgs = [C.purpleDim, C.goldDim, C.greenDim];
+  const phBorders = ["rgba(167,139,250,0.18)", C.borderGold, "rgba(34,197,94,0.18)"];
 
   return (
-    <div style={{ marginTop: 20, borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>Exposure Framework</div>
-          <div style={{ fontWeight: 300, fontSize: "0.72rem", color: C.muted, lineHeight: 1.5 }}>Scale exposure as you win. Stay small when uncertain.</div>
-        </div>
+    <div style={{ marginTop: 24, borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
+      {/* Header */}
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>Exposure Framework</div>
+        <div style={{ fontWeight: 800, fontSize: "1.05rem", letterSpacing: "-0.03em", color: C.white, marginBottom: 4 }}>More Exposure. More Concentration.</div>
+        <div style={{ fontWeight: 300, fontSize: "0.72rem", color: C.muted, lineHeight: 1.5 }}>Start small. Add size as you win. 4 cells = 1 full position.</div>
       </div>
 
-      {/* Phase selector — 3 buttons */}
-      <div style={{ display: "flex", gap: 0, marginBottom: 20, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}` }}>
-        {phases.map((ph, i) => {
-          const active = i === phase;
-          const phDeployed = ph.slots.reduce((s, sl) => s + sl.amt, 0);
-          const phPct = (phDeployed / ps) * 100;
-          return (
-            <button key={i} onClick={() => setPhase(i)} style={{
-              flex: 1, padding: "14px 10px", border: "none", cursor: "pointer", fontFamily: font,
-              background: active ? C.goldDim : "rgba(255,255,255,0.02)",
-              borderRight: i < 2 ? `1px solid ${C.border}` : "none",
-              transition: "all 0.2s",
+      {/* 3 Phases with arrows */}
+      <div style={{
+        display: "flex", flexDirection: isMobile ? "column" : "row",
+        alignItems: isMobile ? "stretch" : "flex-start", justifyContent: "center", gap: 0,
+      }}>
+        {phases.map((ph, pi) => {
+          const items = [];
+
+          {/* Arrow between phases */}
+          if (pi > 0) {
+            items.push(
+              <div key={`arrow-${pi}`} style={{
+                display: "flex", flexDirection: isMobile ? "row" : "column",
+                alignItems: "center", justifyContent: "center", alignSelf: "center",
+                padding: isMobile ? "10px 0" : "0 8px", gap: 3,
+              }}>
+                <div style={{
+                  fontWeight: 900, fontSize: isMobile ? "1.1rem" : "1.5rem", color: C.gold, lineHeight: 1,
+                  transform: isMobile ? "rotate(90deg)" : "none",
+                }}>{"\u2192"}</div>
+                <div style={{ fontSize: "0.54rem", fontWeight: 800, color: C.muted, whiteSpace: "nowrap" }}>
+                  {phases[pi - 1].posCount} to {ph.posCount}
+                </div>
+              </div>
+            );
+          }
+
+          {/* Phase column */}
+          items.push(
+            <div key={`phase-${pi}`} style={{
+              flex: 1, padding: isMobile ? "18px 16px" : "20px 16px", borderRadius: 16,
+              background: "rgba(255,255,255,0.015)", border: `1px solid ${C.border}`,
+              display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0,
             }}>
-              <div style={{ fontWeight: 800, fontSize: "1.1rem", letterSpacing: "-0.03em", color: active ? C.goldBright : C.muted, marginBottom: 2 }}>{phaseLabels[i]}</div>
-              <div style={{ fontWeight: 700, fontSize: "0.54rem", letterSpacing: "0.08em", textTransform: "uppercase", color: active ? C.gold : "rgba(255,255,255,0.25)" }}>{ph.label}</div>
-              <div style={{ fontWeight: 500, fontSize: "0.58rem", color: active ? C.text : "rgba(255,255,255,0.18)", marginTop: 2 }}>{ph.slots.length} positions · {fmt$(phDeployed)}</div>
-            </button>
-          );
-        })}
-      </div>
+              {/* % invested header */}
+              <div style={{ fontWeight: 800, fontSize: "1.4rem", letterSpacing: "-0.04em", color: C.white, marginBottom: 2 }}>{ph.pct}%</div>
+              <div style={{ fontWeight: 700, fontSize: "0.54rem", letterSpacing: "0.12em", textTransform: "uppercase", color: phColors[pi], marginBottom: 4 }}>{ph.title}</div>
+              <div style={{ fontSize: "0.56rem", fontWeight: 500, color: C.muted, marginBottom: 14 }}>{fmt$(ph.deployed)} deployed</div>
 
-      {/* Deployed bar */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-          <span style={{ fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Capital Deployed</span>
-          <span style={{ fontWeight: 800, fontSize: "0.82rem", color: C.goldBright }}>{fmt$(totalDeployed)} <span style={{ fontWeight: 500, fontSize: "0.68rem", color: C.muted }}>/ {fmt$(ps)} ({deployedPct.toFixed(1)}%)</span></span>
-        </div>
-        <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
-          <div style={{ height: "100%", borderRadius: 3, width: `${Math.min(100, deployedPct)}%`, background: deployedPct > 80 ? `linear-gradient(90deg, ${C.gold}, ${C.green})` : `linear-gradient(90deg, ${C.purple}, ${C.gold})`, transition: "width 0.4s ease" }} />
-        </div>
-      </div>
+              {/* Position blocks grid */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 16 }}>
+                {ph.groups.flatMap((g, gi) =>
+                  Array(g.count).fill(null).map((_, i) => renderBlock(g.tier, `${pi}-${gi}-${i}`))
+                )}
+              </div>
 
-      {/* Visual grid */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 16, minHeight: 100 }}>
-        {current.slots.map((sl, idx) => {
-          const meta = tierMeta[sl.tier];
-          const scale = tierScale[sl.tier];
-          const baseSize = 72;
-          const size = Math.round(baseSize * scale);
-          const pctOfPort = ((sl.amt / ps) * 100).toFixed(1);
-          return (
-            <div key={idx} style={{
-              width: size, height: size, borderRadius: 10,
-              background: meta.bg, border: `2px solid ${meta.border}`,
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              transition: "all 0.3s ease", position: "relative",
-              boxShadow: `0 0 12px ${meta.color}22`,
-            }}>
-              <div style={{ fontWeight: 900, fontSize: size > 60 ? "0.72rem" : "0.58rem", color: meta.color, letterSpacing: "-0.02em" }}>{sl.tier === "Full" ? "FULL" : sl.tier === "Half" ? "HALF" : sl.tier === "Quarter" ? "QTR" : "PLT"}</div>
-              <div style={{ fontWeight: 700, fontSize: size > 60 ? "0.62rem" : "0.50rem", color: C.white, marginTop: 1 }}>{pctOfPort}%</div>
-              <div style={{ fontWeight: 500, fontSize: "0.46rem", color: C.muted, marginTop: 0 }}>{fmt$(sl.amt)}</div>
+              {/* Tier breakdown text — "N × X.XX%" like Minervini */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                {ph.groups.map(g => (
+                  <div key={g.tier} style={{ fontSize: "0.68rem", fontWeight: 600, color: C.text }}>
+                    <span style={{ color: tierMeta[g.tier].color, fontWeight: 800 }}>{g.count}</span>
+                    <span style={{ color: C.muted }}> {"\u00D7"} </span>
+                    <span>{((tierAmts[g.tier] / ps) * 100).toFixed(2)}%</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total badge */}
+              <div style={{ marginTop: 10, padding: "5px 14px", borderRadius: 8, background: phBgs[pi], border: `1px solid ${phBorders[pi]}` }}>
+                <span style={{ fontSize: "0.60rem", fontWeight: 700, color: phColors[pi] }}>{ph.posCount} positions</span>
+              </div>
             </div>
           );
+
+          return items;
         })}
-        {/* Empty slots */}
-        {Array(current.empty).fill(0).map((_, idx) => (
-          <div key={`e${idx}`} style={{
-            width: 52, height: 52, borderRadius: 10,
-            border: `2px dashed rgba(255,255,255,0.08)`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "all 0.3s ease",
-          }}>
-            <span style={{ fontSize: "0.52rem", color: "rgba(255,255,255,0.12)", fontWeight: 600 }}>—</span>
-          </div>
-        ))}
       </div>
 
-      {/* Tier breakdown summary */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
-        {["Pilot", "Quarter", "Half", "Full"].map(tier => {
-          const count = tierCounts[tier] || 0;
-          if (count === 0) return null;
+      {/* Legend — shows what each tier looks like */}
+      <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 18, flexWrap: "wrap" }}>
+        {[["Pilot", "= \u00BD cell"], ["Quarter", "= 1 cell"], ["Half", "= 2 cells"], ["Full", "= 4 cells"]].map(([tier, desc]) => {
           const meta = tierMeta[tier];
-          const tierTotal = count * (tier === "Pilot" ? pilotAmt : tier === "Quarter" ? quarterAmt : tier === "Half" ? halfAmt : fullAmt);
-          const tierPct = ((tierTotal / ps) * 100).toFixed(1);
+          const filled = meta.cells;
+          const sm = 10;
           return (
-            <div key={tier} style={{
-              padding: "6px 12px", borderRadius: 8,
-              background: meta.bg, border: `1px solid ${meta.border}`,
-              display: "flex", alignItems: "center", gap: 6,
-            }}>
-              <span style={{ fontWeight: 700, fontSize: "0.54rem", color: meta.color, textTransform: "uppercase", letterSpacing: "0.06em" }}>{count}× {tier}</span>
-              <span style={{ fontWeight: 600, fontSize: "0.54rem", color: C.muted }}>= {tierPct}%</span>
+            <div key={tier} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <div style={{ display: "grid", gridTemplateColumns: `${sm}px ${sm}px`, gap: 1 }}>
+                {[0, 1, 2, 3].map(i => {
+                  const active = i < filled;
+                  const isPilot = tier === "Pilot" && i === 0;
+                  return (
+                    <div key={i} style={{
+                      width: sm, height: sm, borderRadius: 2,
+                      background: active ? meta.bg : "transparent",
+                      border: active ? `1.5px solid ${meta.border}` : `1px dashed rgba(255,255,255,0.05)`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {isPilot && <div style={{ width: 5, height: 5, borderRadius: 1, background: meta.bg, border: `1.5px solid ${meta.border}` }} />}
+                    </div>
+                  );
+                })}
+              </div>
+              <span style={{ fontSize: "0.54rem", fontWeight: 700, color: meta.color }}>{tier}</span>
+              <span style={{ fontSize: "0.50rem", fontWeight: 500, color: C.muted }}>{desc} ({fmt$(tierAmts[tier])})</span>
             </div>
           );
         })}
       </div>
 
-      {/* Phase guidance */}
-      <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 10, background: phase === 2 ? C.greenDim : phase === 1 ? C.goldDim : C.purpleDim, border: `1px solid ${phase === 2 ? "rgba(34,197,94,0.18)" : phase === 1 ? C.borderGold : "rgba(167,139,250,0.18)"}` }}>
-        <div style={{ fontSize: "0.68rem", fontWeight: 600, color: phase === 2 ? C.green : phase === 1 ? C.goldBright : C.purple, lineHeight: 1.6 }}>
-          {phase === 0 && "Start here. Small positions only. Prove the market is working before adding exposure. If setups aren't triggering or you're getting stopped out — stay in this phase."}
-          {phase === 1 && "Your pilots and quarters are working. Now add half-size positions on your best setups. You're earning the right to deploy more capital by winning first."}
-          {phase === 2 && "Full conviction. Your positions are working, stops are moving up. Concentrate on your highest-conviction ideas with full-size positions. This is where the big money is made."}
+      {/* Guidance */}
+      <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: C.goldDim, border: `1px solid ${C.borderGold}` }}>
+        <div style={{ fontSize: "0.70rem", fontWeight: 600, color: C.goldBright, lineHeight: 1.7 }}>
+          Start cautious — pilots and quarters only. As your positions work, add halves. When you're winning consistently, concentrate with full-size positions. Each block is a 2{"\u00D7"}2 grid: 4 filled cells = 1 full position. Never skip phases — earn the right to size up.
         </div>
       </div>
     </div>
