@@ -1155,7 +1155,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons 
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Stop")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("SBE")}{th("SBE %")}{th("P/L")}{th("R")}{th("","center")}
+              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Value")}{th("Stop")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("SBE")}{th("SBE %")}{th("P/L")}{th("R")}{th("","center")}
             </tr></thead>
             <tbody>
               {enriched.map((p, idx) => {
@@ -1175,6 +1175,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons 
                     <td style={{padding:"6px 4px"}}><TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.shares} onChange={v=>updateField(p.id,"shares",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.ep} onChange={v=>updateField(p.id,"ep",v)} /></td>
+                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:C.white,whiteSpace:"nowrap"}}>{p.posValue>0?fmt$(p.posValue):"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.cp} onChange={v=>updateField(p.id,"cp",v)} gold width={82} /></td>
                     <td style={{padding:"6px 4px"}}><MiniSelect value={p.setup} onChange={v=>updateField(p.id,"setup",v)} options={setupTypes} width={85} /></td>
@@ -1207,7 +1208,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons 
                 const isPartial = qty < totalShares && qty > 0;
                 return (
                   <tr style={{ background:"rgba(239,68,68,0.06)",borderBottom:`2px solid ${C.red}33` }}>
-                    <td colSpan={16} style={{ padding:"14px 16px" }}>
+                    <td colSpan={17} style={{ padding:"14px 16px" }}>
                       <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap" }}>
                         <span style={{ fontWeight:700,fontSize:"0.68rem",color:C.red,letterSpacing:"0.08em",textTransform:"uppercase" }}>Sell {pos.sym}</span>
                         <div style={{display:"flex",alignItems:"center",gap:5}}>
@@ -1239,11 +1240,13 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons 
                 );
               })()}
 
-              {/* Totals — 16 cols: Status,Tier,Symbol,Shares,AvgCost,Stop,Current,Setup,Tags,DTS,RTS,SBE,SBE%,P/L,R,Actions */}
+              {/* Totals — 17 cols: Status,Tier,Symbol,Shares,AvgCost,Value,Stop,Current,Setup,Tags,DTS,RTS,SBE,SBE%,P/L,R,Actions */}
               <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
                 <td colSpan={3} style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.text,fontSize:"0.70rem"}}>{enriched.reduce((s,p)=>s+p.sharesN,0).toLocaleString()}</td>
-                <td colSpan={5} />
+                <td />
+                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:C.goldBright}}>{fmt$(enriched.reduce((s,p)=>s+p.posValue,0))}</td>
+                <td colSpan={4} />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD<=0?C.green:C.text}}>{displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalRTS<=0?C.green:C.red}}>{displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
                 <td colSpan={2} />
@@ -1539,12 +1542,8 @@ export default function App() {
     try { return localStorage.getItem("viv_fontSize") || "standard"; } catch { return "standard"; }
   });
 
-  useEffect(() => {
-    try { localStorage.setItem("viv_fontSize", fontSize); } catch {}
-    const rootPx = fontSize === "large" ? 18 : fontSize === "small" ? 14 : 16;
-    document.documentElement.style.fontSize = rootPx + "px";
-    return () => { document.documentElement.style.fontSize = ""; };
-  }, [fontSize]);
+  useEffect(() => { try { localStorage.setItem("viv_fontSize", fontSize); } catch {} }, [fontSize]);
+  const appZoom = fontSize === "large" ? 1.12 : fontSize === "small" ? 0.90 : 1.0;
 
   const handleJournalTrade = useCallback((trade) => { setJournaledTrades(prev => [...prev, trade]); }, []);
 
@@ -1578,7 +1577,7 @@ export default function App() {
   // ─── MOBILE LAYOUT ───
   if (isMobile) {
     return (
-      <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column" }}>
+      <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column", zoom: appZoom }}>
         {/* Top bar */}
         <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
           <div style={{ fontWeight: 800, fontSize: "0.82rem", letterSpacing: "-0.01em", color: C.white }}>
@@ -1610,7 +1609,7 @@ export default function App() {
 
   // ─── DESKTOP / TABLET LAYOUT ───
   return (
-    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text }}>
+    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text, zoom: appZoom }}>
       {/* Sidebar */}
       <div style={{ width: sidebarW, minHeight: "100vh", padding: "24px 14px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, alignSelf: "flex-start" }}>
         <div style={{ fontWeight: 800, fontSize: "0.84rem", letterSpacing: "-0.01em", color: C.white, marginBottom: 24, padding: "0 8px" }}>
