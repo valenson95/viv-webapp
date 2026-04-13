@@ -265,8 +265,8 @@ function ExposureGrid({ sizer, portfolioSize, numStocks, enrichedPositions }) {
   const actualPct = ps > 0 ? (actualDeployed / ps) * 100 : 0;
 
   // ─── 2×2 Block renderer ───
-  const cellSz = isMobile ? 26 : 34;
-  const cellGap = 2;
+  const cellSz = isMobile ? 28 : 38;
+  const cellGap = 3;
   const blockSz = cellSz * 2 + cellGap;
 
   const renderBlock = (tier, key, ghost) => {
@@ -331,8 +331,8 @@ function ExposureGrid({ sizer, portfolioSize, numStocks, enrichedPositions }) {
         </div>
         {/* Tier info */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 800, fontSize: "0.74rem", color: meta.color }}>{tier}</div>
-          <div style={{ fontWeight: 500, fontSize: "0.56rem", color: C.muted }}>{fmt$(amt)} · {pctEach}%</div>
+          <div style={{ fontWeight: 800, fontSize: "0.84rem", color: meta.color }}>{tier}</div>
+          <div style={{ fontWeight: 500, fontSize: "0.66rem", color: C.muted }}>{fmt$(amt)} · {pctEach}%</div>
         </div>
         {/* +/- buttons and count */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
@@ -371,10 +371,10 @@ function ExposureGrid({ sizer, portfolioSize, numStocks, enrichedPositions }) {
       background: "rgba(255,255,255,0.015)", border: `1px solid ${C.border}`,
       display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0,
     }}>
-      <div style={{ fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontWeight: 800, fontSize: "1.5rem", letterSpacing: "-0.04em", color: C.white }}>{pct.toFixed(1)}%</div>
-      <div style={{ fontSize: "0.58rem", fontWeight: 500, color: C.muted, marginBottom: 14 }}>{fmt$(amount)} deployed</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", minHeight: blockSz + 4 }}>
+      <div style={{ fontWeight: 700, fontSize: "0.62rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontWeight: 800, fontSize: "1.6rem", letterSpacing: "-0.04em", color: C.white }}>{pct.toFixed(1)}%</div>
+      <div style={{ fontSize: "0.68rem", fontWeight: 500, color: C.muted, marginBottom: 14 }}>{fmt$(amount)} deployed</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", minHeight: blockSz + 4 }}>
         {blocks.map((t, i) => renderBlock(t, `${label}-${i}`, false))}
         {emptySlots > 0 && Array(emptySlots).fill(0).map((_, i) => (
           <div key={`empty-${i}`} style={{
@@ -396,7 +396,7 @@ function ExposureGrid({ sizer, portfolioSize, numStocks, enrichedPositions }) {
           const meta = tierMeta[t];
           return (
             <div key={t} style={{ padding: "3px 9px", borderRadius: 6, background: meta.bg, border: `1px solid ${meta.border}` }}>
-              <span style={{ fontWeight: 700, fontSize: "0.54rem", color: meta.color }}>{c} {"\u00D7"} {t}</span>
+              <span style={{ fontWeight: 700, fontSize: "0.64rem", color: meta.color }}>{c} {"\u00D7"} {t}</span>
             </div>
           );
         })}
@@ -407,14 +407,14 @@ function ExposureGrid({ sizer, portfolioSize, numStocks, enrichedPositions }) {
   return (
     <div style={{ marginTop: 24, borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
       {/* Header */}
-      <div style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>Exposure Framework</div>
-      <div style={{ fontWeight: 800, fontSize: "1.05rem", letterSpacing: "-0.03em", color: C.white, marginBottom: 4 }}>Plan Your Allocation</div>
-      <div style={{ fontWeight: 300, fontSize: "0.72rem", color: C.muted, lineHeight: 1.5, marginBottom: 18 }}>
+      <div style={{ fontWeight: 700, fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>Exposure Framework</div>
+      <div style={{ fontWeight: 800, fontSize: "1.15rem", letterSpacing: "-0.03em", color: C.white, marginBottom: 4 }}>Plan Your Allocation</div>
+      <div style={{ fontWeight: 300, fontSize: "0.80rem", color: C.muted, lineHeight: 1.5, marginBottom: 18 }}>
         Each block is a position. 4 filled cells = Full. 2 = Half. 1 = Quarter. {"\u00BD"} = Pilot. Pick how many of each.
       </div>
 
       {/* Tier steppers — always visible */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 20 }}>
         {tiers.map(t => <Stepper key={t} tier={t} />)}
       </div>
 
@@ -422,46 +422,38 @@ function ExposureGrid({ sizer, portfolioSize, numStocks, enrichedPositions }) {
       {totalPicked > 0 && (
         <div style={{ marginBottom: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-            <span style={{ fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Planned Deployment</span>
-            <span style={{ fontWeight: 800, fontSize: "0.82rem", color: C.goldBright }}>
-              {fmt$(deployed)} <span style={{ fontWeight: 500, fontSize: "0.68rem", color: C.muted }}>/ {fmt$(ps)} ({deployedPct.toFixed(1)}%)</span>
+            <span style={{ fontWeight: 700, fontSize: "0.64rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Planned Deployment</span>
+            <span style={{ fontWeight: 800, fontSize: "0.90rem", color: C.goldBright }}>
+              {fmt$(deployed)} <span style={{ fontWeight: 500, fontSize: "0.76rem", color: C.muted }}>/ {fmt$(ps)} ({deployedPct.toFixed(1)}%)</span>
             </span>
           </div>
           <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
             <div style={{ height: "100%", borderRadius: 3, width: `${Math.min(100, deployedPct)}%`, background: deployedPct > 60 ? `linear-gradient(90deg, ${C.gold}, ${C.green})` : `linear-gradient(90deg, ${C.purple}, ${C.blue})`, transition: "width 0.3s" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-            <span style={{ fontSize: "0.52rem", color: C.muted }}>{totalPicked} of {maxPos} max positions</span>
-            <span style={{ fontSize: "0.52rem", color: deployedPct > 100 ? C.red : C.muted }}>{deployedPct > 100 ? "Over-allocated!" : deployedPct > 50 ? "Aggressive" : "Conservative"}</span>
+            <span style={{ fontSize: "0.62rem", color: C.muted }}>{totalPicked} of {maxPos} max positions</span>
+            <span style={{ fontSize: "0.62rem", color: deployedPct > 100 ? C.red : C.muted }}>{deployedPct > 100 ? "Over-allocated!" : deployedPct > 50 ? "Aggressive" : "Conservative"}</span>
           </div>
         </div>
       )}
 
       {/* Visual comparison */}
-      {(totalPicked > 0 || hasPositions) && (
+      {totalPicked > 0 && hasPositions && (
         <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 12 }}>
-          {/* Plan / Ideal */}
-          {totalPicked > 0 && renderBlockGrid(
-            planBlocks,
-            hasPositions ? "Your Plan" : "Planned Allocation",
-            deployedPct,
-            deployed,
-            Math.max(0, numStocks - totalPicked)
-          )}
-          {/* Actual — only when positions exist */}
-          {hasPositions && totalPicked > 0 && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: isMobile ? "6px 0" : "0 4px" }}>
-              <span style={{ fontWeight: 900, fontSize: "1.2rem", color: C.gold, transform: isMobile ? "rotate(90deg)" : "none" }}>vs</span>
-            </div>
-          )}
-          {hasPositions && renderBlockGrid(
-            actualBlocks,
-            "Current Positions",
-            actualPct,
-            actualDeployed,
-            0
-          )}
+          {renderBlockGrid(planBlocks, "Your Plan", deployedPct, deployed, Math.max(0, numStocks - totalPicked))}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: isMobile ? "6px 0" : "0 4px" }}>
+            <span style={{ fontWeight: 900, fontSize: "1.2rem", color: C.gold, transform: isMobile ? "rotate(90deg)" : "none" }}>vs</span>
+          </div>
+          {renderBlockGrid(actualBlocks, "Current Positions", actualPct, actualDeployed, 0)}
         </div>
+      )}
+      {/* Plan only — no open positions */}
+      {totalPicked > 0 && !hasPositions && (
+        <div>{renderBlockGrid(planBlocks, "Planned Allocation", deployedPct, deployed, Math.max(0, numStocks - totalPicked))}</div>
+      )}
+      {/* Current positions only — no plan set */}
+      {totalPicked === 0 && hasPositions && (
+        <div>{renderBlockGrid(actualBlocks, "Current Positions", actualPct, actualDeployed, 0)}</div>
       )}
 
       {/* Empty state — nothing picked, no positions */}
@@ -1308,7 +1300,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons 
 // ═══════════════════════════════════════
 // ─── SETTINGS PAGE ───
 // ═══════════════════════════════════════
-function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons }) {
+function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize }) {
   const [newSetup, setNewSetup] = useState("");
   const [newTag, setNewTag] = useState("");
   const [newReason, setNewReason] = useState("");
@@ -1345,6 +1337,25 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
     <div>
       <Eyebrow>Settings</Eyebrow>
       <h1 style={{ fontWeight: 800, fontSize: "2rem", letterSpacing: "-0.04em", color: C.white, marginBottom: 24 }}>Account Settings</h1>
+
+      {/* Font Size */}
+      <GlassCard style={{ padding: "24px 28px", marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Font Size</div>
+        <div style={{ fontSize: "0.70rem", color: C.muted, marginBottom: 16 }}>Choose your preferred reading size. Applies everywhere.</div>
+        <div style={{ display: "flex", gap: 0, borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}`, width: "fit-content" }}>
+          {[{ key: "small", label: "Small" }, { key: "standard", label: "Standard" }, { key: "large", label: "Large" }].map((opt, idx) => (
+            <button key={opt.key} onClick={() => setFontSize(opt.key)} style={{
+              padding: "10px 22px", border: "none", cursor: "pointer", fontFamily: font,
+              fontWeight: fontSize === opt.key ? 800 : 500,
+              fontSize: "0.78rem",
+              background: fontSize === opt.key ? C.goldDim : "rgba(255,255,255,0.02)",
+              color: fontSize === opt.key ? C.gold : C.muted,
+              borderRight: idx < 2 ? `1px solid ${C.border}` : "none",
+              transition: "all 0.15s",
+            }}>{opt.label}</button>
+          ))}
+        </div>
+      </GlassCard>
 
       {/* Profile */}
       <GlassCard style={{ padding: "24px 28px", marginBottom: 16 }}>
@@ -1468,6 +1479,11 @@ export default function App() {
   const [tags, setTags] = useState(DEFAULT_TAGS);
   const [exitReasons, setExitReasons] = useState(DEFAULT_EXIT_REASONS);
   const [journaledTrades, setJournaledTrades] = useState([]);
+  const [fontSize, setFontSize] = useState(() => {
+    try { return localStorage.getItem("viv_fontSize") || "standard"; } catch { return "standard"; }
+  });
+
+  useEffect(() => { try { localStorage.setItem("viv_fontSize", fontSize); } catch {} }, [fontSize]);
 
   const handleJournalTrade = useCallback((trade) => { setJournaledTrades(prev => [...prev, trade]); }, []);
 
@@ -1488,20 +1504,23 @@ export default function App() {
   const sidebarW = isTablet ? 200 : 220;
   const contentPadH = isMobile ? 16 : isTablet ? 24 : 36;
   const contentPadV = isMobile ? 16 : 28;
+  const fsScale = fontSize === "large" ? 1.15 : fontSize === "small" ? 0.88 : 1.0;
+  const baseFontPx = isMobile ? 15 : 16;
+  const rootFontSize = `${(baseFontPx * fsScale).toFixed(1)}px`;
 
   const pageContent = (
     <>
       {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
-      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} />}
     </>
   );
 
   // ─── MOBILE LAYOUT ───
   if (isMobile) {
     return (
-      <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column" }}>
+      <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column", fontSize: rootFontSize }}>
         {/* Top bar */}
         <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
           <div style={{ fontWeight: 800, fontSize: "0.82rem", letterSpacing: "-0.01em", color: C.white }}>
@@ -1533,7 +1552,7 @@ export default function App() {
 
   // ─── DESKTOP / TABLET LAYOUT ───
   return (
-    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text }}>
+    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text, fontSize: rootFontSize }}>
       {/* Sidebar */}
       <div style={{ width: sidebarW, minHeight: "100vh", padding: "24px 14px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, alignSelf: "flex-start" }}>
         <div style={{ fontWeight: 800, fontSize: "0.84rem", letterSpacing: "-0.01em", color: C.white, marginBottom: 24, padding: "0 8px" }}>
