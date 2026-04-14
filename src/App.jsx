@@ -625,7 +625,7 @@ function RiskFinanceTab({ demo }) {
   useEffect(()=>{if(demo){setBuyPrice(DEMO_FINANCE.buyPrice);setShares(DEMO_FINANCE.shares);setStopPrice(DEMO_FINANCE.stopPrice);setStopPct(DEMO_FINANCE.stopPct);setCurPrice(DEMO_FINANCE.curPrice)}else{setBuyPrice("");setShares("");setStopPrice("");setStopPct("");setCurPrice("")}},[demo]);
   const handleSP=v=>{setStopPrice(v);const bp=+buyPrice;if(bp&&+v)setStopPct(((bp-+v)/bp*100).toFixed(2))};
   const handleSPct=v=>{setStopPct(v);const bp=+buyPrice;if(bp&&+v)setStopPrice((bp*(1-+v/100)).toFixed(2))};
-  const r=useMemo(()=>{const bp=+buyPrice,sh=+shares,st=+stopPrice,cp=+curPrice;if(!bp||!sh||!st||!cp||bp<=0||st>=bp)return null;const initRisk=(bp-st)/bp*100,plPct=(cp-bp)/bp*100,rMult=plPct/initRisk,plDollar=(cp-bp)*sh;const sugStop=rMult>=2?bp:st;let action=rMult<1?`Hold stop at $${st.toFixed(2)}`:rMult<2?"Approaching 2R. Monitor.":rMult<3?`Move stop to breakeven ($${bp.toFixed(2)})`:"Protect capital. Stop at breakeven minimum.";return{initRisk,plPct,rMult,plDollar,action,profitIfStopped:(sugStop-bp)*sh}},[buyPrice,shares,stopPrice,curPrice]);
+  const r=useMemo(()=>{const bp=+buyPrice,sh=+shares,st=+stopPrice,cp=+curPrice;if(!bp||!sh||!st||!cp||bp<=0||st>=bp)return null;const initRisk=(bp-st)/bp*100,plPct=(cp-bp)/bp*100,rMult=plPct/initRisk,plDollar=(cp-bp)*sh;const sugStop=rMult>=2?bp:st;let action=rMult<1?`Hold stop at $${st.toFixed(2)}`:rMult<2?"Approaching 2R. Monitor.":rMult<3?`Move stop to breakeven ($${bp.toFixed(2)})`:"Protect capital. Stop at breakeven minimum.";const sbe=cp>0?Math.ceil((bp*sh)/cp):0;const sbePct=sh>0?(sbe/sh)*100:0;return{initRisk,plPct,rMult,plDollar,action,profitIfStopped:(sugStop-bp)*sh,sbe,sbePct}},[buyPrice,shares,stopPrice,curPrice]);
   return (
     <div style={{display:"flex",gap:28,padding:"24px 28px 32px",flexWrap:"wrap"}}>
       <div style={{flex:"1 1 300px",display:"flex",flexDirection:"column",gap:16}}>
@@ -640,6 +640,8 @@ function RiskFinanceTab({ demo }) {
           <ResultRow label="R-Multiple" value={`${r.rMult.toFixed(2)}R`} color={r.rMult>=3?C.green:r.rMult>=1?C.goldBright:r.rMult>=0?C.white:C.red} />
           <ResultRow label="Initial Risk" value={`${r.initRisk.toFixed(2)}%`} />
           <ResultRow label="Profit if Stopped" value={`$${r.profitIfStopped.toLocaleString(undefined,{minimumFractionDigits:2})}`} color={r.profitIfStopped>=0?C.green:C.red} />
+          <ResultRow label="SBE (Shares to BE)" value={`${r.sbe} shares`} color={r.sbePct>100?C.red:C.green} />
+          <ResultRow label="SBE %" value={`${r.sbePct.toFixed(1)}%`} color={r.sbePct>100?C.red:r.sbePct>=80?C.gold:C.green} />
           <div style={{marginTop:16,padding:"14px 16px",borderRadius:12,background:r.rMult>=3?C.greenDim:r.rMult>=2?C.goldDim:"rgba(255,255,255,0.02)",border:`1px solid ${r.rMult>=3?"rgba(34,197,94,0.18)":r.rMult>=2?C.borderGold:C.border}`}}>
             <div style={{fontSize:"0.58rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.12em",color:C.muted,marginBottom:6}}>Suggested Action</div>
             <div style={{fontSize:"0.82rem",fontWeight:600,color:r.rMult>=3?C.green:r.rMult>=2?C.goldBright:C.text,lineHeight:1.5}}>{r.action}</div>
