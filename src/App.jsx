@@ -38,7 +38,7 @@ const DEFAULT_SETUP_TYPES = ["VCP", "Pivot", "Power Play", "Low-Risk Entry", "Ba
 const DEFAULT_TAGS = ["Breakout", "Earnings", "Momentum", "Sector Leader", "High Volume", "Gap Up", "Follow-Through Day"];
 const DEFAULT_EXIT_REASONS = ["Sold Into Strength", "Hit Initial Stop", "Hit Trailing Stop", "Time Stop", "Risk Reduction", "Changed Thesis"];
 
-const DEMO_RISK = { sym: "NVDA", mode: "$", sharePrice: "142.50", stopPrice: "133.80", portfolio: "500000", riskAmt: "5000" };
+const DEMO_RISK = { sym: "NVDA", sharePrice: "142.50", posSizePct: "20", portfolio: "500000", stopVal: "6.11" };
 const DEMO_EXPECT = { port: "500000", posSize: "20", desRet: "15", avgGain: "12.5", avgLoss: "5.8", winRate: "52" };
 const DEMO_FINANCE = { buyPrice: "142.50", shares: "575", stopPrice: "133.80", stopPct: "6.11", curPrice: "168.30" };
 
@@ -78,9 +78,9 @@ function TextInput({ label, value, onChange, placeholder, style, upper = true })
     </div>
   );
 }
-function ResultRow({ label, value, color }) {
+function ResultRow({ label, value, color, highlight }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 8px", marginLeft: -8, marginRight: -8, borderBottom: "1px solid rgba(255,255,255,0.04)", background: highlight ? "rgba(255,255,255,0.03)" : "transparent", borderRadius: highlight ? 6 : 0 }}>
       <span style={{ fontWeight: 400, fontSize: "0.78rem", color: C.muted }}>{label}</span>
       <span style={{ fontWeight: 700, fontSize: "0.88rem", color: color || C.white, textAlign: "right" }}>{value}</span>
     </div>
@@ -540,35 +540,83 @@ function GoldBtn({ children, onClick, small }) {
 // ═══════════════════════════════════════
 function RiskTab({ demo }) {
   const [sym, setSym] = useState(demo ? DEMO_RISK.sym : "");
-  const [mode, setMode] = useState("$");
+  const [mode, setMode] = useState("%");
   const [sharePrice, setSharePrice] = useState(demo ? DEMO_RISK.sharePrice : "");
-  const [stopPrice, setStopPrice] = useState(demo ? DEMO_RISK.stopPrice : "");
+  const [posSizePct, setPosSizePct] = useState(demo ? DEMO_RISK.posSizePct : "");
   const [portfolio, setPortfolio] = useState(demo ? DEMO_RISK.portfolio : "");
-  const [riskAmt, setRiskAmt] = useState(demo ? DEMO_RISK.riskAmt : "");
-  useEffect(() => { if (demo) { setSym(DEMO_RISK.sym); setSharePrice(DEMO_RISK.sharePrice); setStopPrice(DEMO_RISK.stopPrice); setPortfolio(DEMO_RISK.portfolio); setRiskAmt(DEMO_RISK.riskAmt); } else { setSym(""); setSharePrice(""); setStopPrice(""); setPortfolio(""); setRiskAmt(""); } }, [demo]);
-  const r = useMemo(() => { const sp=+sharePrice,st=+stopPrice,p=+portfolio,ra=+riskAmt; if(!sp||!st||!p||!ra||sp<=0||st<=0||st>=sp)return null; const rps=sp-st,stopDist=(rps/sp)*100,dollarRisk=mode==="$"?ra:(ra/100)*p,shares=Math.floor(dollarRisk/rps); if(shares<=0)return null; return{rps,stopDist,shares,posVal:shares*sp,posWt:(shares*sp/p)*100,dollarRisk:shares*rps}; }, [sharePrice,stopPrice,portfolio,riskAmt,mode]);
+  const [stopVal, setStopVal] = useState(demo ? DEMO_RISK.stopVal : "");
+  useEffect(() => { if (demo) { setSym(DEMO_RISK.sym); setSharePrice(DEMO_RISK.sharePrice); setPosSizePct(DEMO_RISK.posSizePct); setPortfolio(DEMO_RISK.portfolio); setStopVal(DEMO_RISK.stopVal); } else { setSym(""); setSharePrice(""); setPosSizePct(""); setPortfolio(""); setStopVal(""); } }, [demo]);
+  const r = useMemo(() => {
+    const sp = +sharePrice, psPct = +posSizePct, p = +portfolio, sv = +stopVal;
+    if (!sp || !psPct || !p || !sv || sp <= 0 || psPct <= 0 || p <= 0 || sv <= 0) return null;
+    const stopPct = mode === "%" ? sv : (sv / sp) * 100;
+    if (stopPct <= 0 || stopPct >= 100) return null;
+    const stopPrice = mode === "%" ? sp * (1 - sv / 100) : sp - sv;
+    if (stopPrice <= 0 || stopPrice >= sp) return null;
+    const posValue = p * (psPct / 100);
+    const shares = Math.floor(posValue / sp);
+    if (shares <= 0) return null;
+    const riskPerShare = sp - stopPrice;
+    const totalRisk = shares * riskPerShare;
+    const riskPctEquity = (totalRisk / p) * 100;
+    const rTargets = [1,2,3,4,5,6].map(n => {
+      const dollarR = riskPerShare * n;
+      const target = sp + dollarR;
+      const pctGain = (dollarR / sp) * 100;
+      return { n, dollarR: dollarR * shares, target, pctGain };
+    });
+    return { shares, riskPctEquity, totalRisk, stopPrice, stopPct, posValue, riskPerShare, rTargets };
+  }, [sharePrice, posSizePct, portfolio, stopVal, mode]);
   return (
     <div style={{ display:"flex",gap:28,padding:"24px 28px 32px",flexWrap:"wrap" }}>
       <div style={{ flex:"1 1 300px",display:"flex",flexDirection:"column",gap:16 }}>
         <TextInput label="Symbol" value={sym} onChange={setSym} placeholder="AAPL" />
         <div><label style={{fontWeight:700,fontSize:"0.60rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.muted,marginBottom:6,display:"block"}}>Type</label>
           <div style={{display:"flex",borderRadius:8,overflow:"hidden",border:`1px solid ${C.border}`}}>
-            {["$","%"].map(m=>(<button key={m} onClick={()=>setMode(m)} style={{padding:"10px 20px",background:mode===m?C.goldDim:"rgba(255,255,255,0.03)",border:"none",color:mode===m?C.gold:C.muted,fontWeight:700,fontSize:"0.78rem",cursor:"pointer",fontFamily:font}}>{m}</button>))}
+            {["$","%"].map(m=>(<button key={m} onClick={()=>{setMode(m);setStopVal("")}} style={{padding:"10px 20px",background:mode===m?C.goldDim:"rgba(255,255,255,0.03)",border:"none",color:mode===m?C.gold:C.muted,fontWeight:700,fontSize:"0.78rem",cursor:"pointer",fontFamily:font}}>{m}</button>))}
           </div></div>
-        <div style={{display:"flex",gap:12}}><CalcInput label="Share Price" value={sharePrice} onChange={setSharePrice} /><CalcInput label="Stop Price" value={stopPrice} onChange={setStopPrice} /></div>
+        <div style={{display:"flex",gap:12}}><CalcInput label="Share Price" value={sharePrice} onChange={setSharePrice} /><CalcInput label="Position Size" value={posSizePct} onChange={setPosSizePct} suffix="%" /></div>
         <CalcInput label="Portfolio Size" value={portfolio} onChange={setPortfolio} />
-        <CalcInput label="Amount to Risk" value={riskAmt} onChange={setRiskAmt} suffix={mode} />
+        <CalcInput label={mode === "%" ? "% Stop" : "$ Stop"} value={stopVal} onChange={setStopVal} suffix={mode === "%" ? "%" : "$"} />
       </div>
       <div style={{ flex:"1 1 300px",display:"flex",flexDirection:"column" }}>
         {!r?(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",minHeight:200,color:C.muted,fontSize:"0.82rem",textAlign:"center",lineHeight:1.6}}>Fill in all fields to<br/>see your results.</div>):(<>
-          <ResultRow label="Risk Per Share" value={`$${r.rps.toFixed(2)}`} />
-          <ResultRow label="Stop Distance" value={`${r.stopDist.toFixed(2)}%`} color={r.stopDist>10?C.red:r.stopDist>7?C.gold:C.white} />
-          <ResultRow label="Position Size" value={`${r.shares.toLocaleString()} shares`} />
-          <ResultRow label="Position Value" value={`$${r.posVal.toLocaleString(undefined,{minimumFractionDigits:2})}`} />
-          <ResultRow label="Position Weight" value={`${r.posWt.toFixed(2)}%`} color={r.posWt>50?C.red:r.posWt>25?C.gold:C.white} />
-          <ResultRow label="Dollar at Risk" value={`$${r.dollarRisk.toFixed(2)}`} color={C.red} />
-          {r.stopDist>10&&<Alert type="red">Stop exceeds 10%. Consider a tighter entry.</Alert>}
-          {r.posWt>25&&<Alert type={r.posWt>50?"red":"gold"}>Position weight at {r.posWt.toFixed(1)}%.</Alert>}
+          <div style={{display:"flex",gap:12,marginBottom:16}}>
+            <div style={{flex:1,padding:"14px 16px",borderRadius:12,background:C.goldDim,border:`1px solid ${C.borderGold}`,textAlign:"center"}}>
+              <div style={{fontSize:"0.56rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.10em",color:C.muted,marginBottom:4}}># of Shares to Buy</div>
+              <div style={{fontSize:"1.15rem",fontWeight:800,color:C.goldBright}}>{r.shares.toLocaleString()}</div>
+            </div>
+            <div style={{flex:1,padding:"14px 16px",borderRadius:12,background:"rgba(255,255,255,0.02)",border:`1px solid ${C.border}`,textAlign:"center"}}>
+              <div style={{fontSize:"0.56rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.10em",color:C.muted,marginBottom:4}}>Risk as % of Equity</div>
+              <div style={{fontSize:"1.15rem",fontWeight:800,color:r.riskPctEquity>2?C.red:r.riskPctEquity>1.5?C.gold:C.white}}>{r.riskPctEquity.toFixed(2)}%</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:0,marginBottom:16,borderRadius:10,overflow:"hidden",border:`1px solid ${C.border}`}}>
+            {[{l:"$ Stop Amount",v:`$${r.totalRisk.toLocaleString(undefined,{minimumFractionDigits:2})}`},{l:"Stop Price",v:`$${r.stopPrice.toFixed(2)}`},{l:"$ Amt Position",v:`$${r.posValue.toLocaleString(undefined,{minimumFractionDigits:2})}`}].map((item,i)=>(
+              <div key={i} style={{flex:1,padding:"12px 10px",textAlign:"center",background:"rgba(255,255,255,0.015)",borderRight:i<2?`1px solid ${C.border}`:"none"}}>
+                <div style={{fontSize:"0.52rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.10em",color:C.muted,marginBottom:4}}>{item.l}</div>
+                <div style={{fontSize:"0.88rem",fontWeight:700,color:C.white}}>{item.v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{borderRadius:10,overflow:"hidden",border:`1px solid ${C.border}`}}>
+            <div style={{display:"flex",background:"rgba(255,255,255,0.03)",borderBottom:`1px solid ${C.border}`}}>
+              {["1-R (Risk)","2R","3R","4R","5R","6R"].map((h,i)=>(<div key={i} style={{flex:1,padding:"8px 4px",textAlign:"center",fontSize:"0.56rem",fontWeight:700,color:i===0?C.muted:C.gold,textTransform:"uppercase",letterSpacing:"0.06em"}}>{h}</div>))}
+            </div>
+            <div style={{display:"flex",borderBottom:`1px solid rgba(255,255,255,0.03)`}}>
+              {r.rTargets.map((t,i)=>(<div key={i} style={{flex:1,padding:"8px 4px",textAlign:"center",fontSize:"0.74rem",fontWeight:600,color:C.white}}>${(t.dollarR).toLocaleString(undefined,{minimumFractionDigits:2})}</div>))}
+            </div>
+            <div style={{display:"flex",borderBottom:`1px solid rgba(255,255,255,0.03)`}}>
+              <div style={{flex:1,padding:"6px 4px",textAlign:"center",fontSize:"0.50rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em"}}>Upside target</div>
+              {r.rTargets.slice(1).map((t,i)=>(<div key={i} style={{flex:1,padding:"6px 4px",textAlign:"center",fontSize:"0.72rem",fontWeight:600,color:C.green}}>${t.target.toFixed(2)}</div>))}
+            </div>
+            <div style={{display:"flex"}}>
+              <div style={{flex:1,padding:"6px 4px",textAlign:"center",fontSize:"0.50rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em"}}>% Gain</div>
+              {r.rTargets.slice(1).map((t,i)=>(<div key={i} style={{flex:1,padding:"6px 4px",textAlign:"center",fontSize:"0.72rem",fontWeight:600,color:C.green}}>{t.pctGain.toFixed(2)}%</div>))}
+            </div>
+          </div>
+          {r.stopPct>10&&<Alert type="red">Stop exceeds 10%. Consider a tighter entry.</Alert>}
+          {r.riskPctEquity>2&&<Alert type="red">Risk exceeds 2% of equity.</Alert>}
         </>)}
       </div>
     </div>
@@ -579,16 +627,41 @@ function ExpectancyTab({ demo }) {
   useEffect(()=>{if(demo){setPort(DEMO_EXPECT.port);setPosSize(DEMO_EXPECT.posSize);setDesRet(DEMO_EXPECT.desRet);setAvgGain(DEMO_EXPECT.avgGain);setAvgLoss(DEMO_EXPECT.avgLoss);setWinRate(DEMO_EXPECT.winRate)}else{setPort("");setPosSize("");setDesRet("");setAvgGain("");setAvgLoss("");setWinRate("")}},[demo]);
   const r=useMemo(()=>{
     const ag=+avgGain,al=+avgLoss,wr=+winRate,ps=+posSize,dr=+desRet,pf=+port;
-    if(!ag||!al||!wr||ag<=0||al<=0||wr<=0||wr>100)return null;
-    const wrd=wr/100,lrd=1-wrd,glRatio=ag/al,ev=wrd*ag-lrd*al;
-    const compound10=(Math.pow(1+ev/100,10)-1)*100;
-    const recStop=ag/2,beWinRate=(al/(ag+al))*100;
-    // Trades to hit desired return: each trade impacts portfolio by ev% × posSize% / 100
-    const impactPerTrade = ps > 0 ? (ev * ps / 100) : 0;
-    const tradesToTarget = (impactPerTrade > 0 && dr > 0) ? Math.ceil(Math.log(1 + dr/100) / Math.log(1 + impactPerTrade/100)) : null;
-    const dollarTarget = pf > 0 && dr > 0 ? pf * dr / 100 : 0;
-    return{glRatio,ev,compound10,recStop,beWinRate,tradesToTarget,impactPerTrade,dollarTarget};
+    if(!ag||!al||!wr||ag<=0||al<=0||wr<=0||wr>100||!pf||pf<=0||!ps||ps<=0)return null;
+    const wrd=wr/100,lrd=1-wrd;
+    const glRatio=ag/al;
+    const ev=wrd*ag-lrd*al; // Expected net return per trade (%)
+    const dollarPosSize=pf*(ps/100);
+    const avgDollarGain=dollarPosSize*(ag/100);
+    const avgDollarLoss=dollarPosSize*(al/100);
+    const expectedDollarReturn=dollarPosSize*(ev/100);
+    const dollarGoal=pf*(dr/100);
+    // Trades to goal: how many trades at expectedDollarReturn per trade to reach dollarGoal
+    let tradesToGoal=0,winningTrades=0,losingTrades=0;
+    if(ev>0&&dr>0){
+      tradesToGoal=Math.ceil(dollarGoal/expectedDollarReturn);
+      winningTrades=Math.round(tradesToGoal*wrd);
+      losingTrades=Math.round(tradesToGoal*lrd);
+    } else if(ev<=0&&dr>0){
+      // With negative EV, show how many trades until you LOSE your goal amount
+      const absReturn=Math.abs(expectedDollarReturn);
+      if(absReturn>0){
+        const negTrades=Math.ceil(dollarGoal/absReturn);
+        winningTrades=-Math.round(negTrades*wrd);
+        losingTrades=-Math.round(negTrades*lrd);
+      }
+      tradesToGoal=0;
+    }
+    // Gain/Loss Ratio Adjusted: adjusted for win rate (edge-weighted)
+    const glAdjusted=glRatio*wrd/lrd;
+    // Breakeven win rate
+    const beWinRate=(al/(ag+al))*100;
+    // Optimal f (Kelly Criterion): f* = W - (1-W)/(G/L) = wrd - lrd/glRatio
+    const kellyRaw=wrd-lrd/glRatio;
+    const optimalF=Math.max(0,kellyRaw)*100;
+    return{glRatio,ev,dollarPosSize,avgDollarGain,avgDollarLoss,expectedDollarReturn,dollarGoal,tradesToGoal,winningTrades,losingTrades,glAdjusted,beWinRate,optimalF};
   },[avgGain,avgLoss,winRate,posSize,desRet,port]);
+  const fmtD=v=>`$${Math.abs(v).toLocaleString(undefined,{minimumFractionDigits:2})}`;
   return (
     <div style={{display:"flex",gap:28,padding:"24px 28px 32px",flexWrap:"wrap"}}>
       <div style={{flex:"1 1 300px",display:"flex",flexDirection:"column",gap:16}}>
@@ -599,20 +672,21 @@ function ExpectancyTab({ demo }) {
       </div>
       <div style={{flex:"1 1 300px",display:"flex",flexDirection:"column"}}>
         {!r?(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",minHeight:200,color:C.muted,fontSize:"0.82rem",textAlign:"center",lineHeight:1.6}}>Fill in all fields to<br/>see your results.</div>):(<>
-          <ResultRow label="Gain/Loss Ratio" value={r.glRatio.toFixed(2)} color={r.glRatio>=2?C.green:r.glRatio>=1?C.gold:C.red} />
-          <ResultRow label="Expected Value / Trade" value={`${r.ev>=0?"+":""}${r.ev.toFixed(2)}%`} color={r.ev>=0?C.green:C.red} />
-          <ResultRow label="Portfolio Impact / Trade" value={`${r.impactPerTrade>=0?"+":""}${r.impactPerTrade.toFixed(3)}%`} color={r.impactPerTrade>=0?C.green:C.red} />
-          <ResultRow label="10-Trade Compound" value={`${r.compound10>=0?"+":""}${r.compound10.toFixed(2)}%`} color={r.compound10>=0?C.green:C.red} />
-          {r.tradesToTarget !== null && r.ev > 0 ? (
-            <ResultRow label={`Trades to +${+desRet}% (${r.dollarTarget>0?`$${r.dollarTarget.toLocaleString(undefined,{maximumFractionDigits:0})}`:""})` } value={`${r.tradesToTarget} trades`} color={C.goldBright} />
-          ) : r.ev <= 0 && +desRet > 0 ? (
-            <ResultRow label={`Trades to +${+desRet}%`} value="Never" color={C.red} />
-          ) : null}
-          <ResultRow label="Recommended Max Stop" value={`${r.recStop.toFixed(1)}%`} />
+          <ResultRow label="Avg $ Gain on Winning Trades" value={fmtD(r.avgDollarGain)} color={C.green} />
+          <ResultRow label="# of Winning Trades" value={`${r.winningTrades}`} color={r.winningTrades<0?C.red:C.white} />
+          <ResultRow label="Avg $ Loss on Losing Trades" value={fmtD(r.avgDollarLoss)} color={C.red} />
+          <ResultRow label="# of Losing Trades" value={`${r.losingTrades}`} color={r.losingTrades<0?C.red:C.white} />
+          <ResultRow label="Gain/Loss Ratio (Non-Adjusted)" value={r.glRatio.toFixed(2)} color={r.glRatio>=2?C.green:r.glRatio>=1?C.gold:C.red} highlight />
+          <ResultRow label="$ Position Size" value={fmtD(r.dollarPosSize)} />
+          <ResultRow label="Expected Net Return per Trade" value={`${r.ev>=0?"+":""}${r.ev.toFixed(2)}%`} color={r.ev>=0?C.green:C.red} />
+          <ResultRow label="Expected $ Return per Trade" value={`${r.expectedDollarReturn>=0?"+":"-"}${fmtD(r.expectedDollarReturn)}`} color={r.expectedDollarReturn>=0?C.green:C.red} />
+          <ResultRow label="$ Goal" value={fmtD(r.dollarGoal)} />
+          <ResultRow label="Number of Trades to Reach Goal" value={r.tradesToGoal>0?`${r.tradesToGoal}`:"0"} color={r.tradesToGoal>0?C.goldBright:C.red} highlight />
+          <ResultRow label="Gain/Loss Ratio (Adjusted)" value={r.glAdjusted.toFixed(2)} color={r.glAdjusted>=1?C.green:C.red} highlight />
+          <ResultRow label="Optimal f" value={`${r.optimalF.toFixed(2)}%`} color={r.optimalF>0?C.green:C.red} />
           <ResultRow label="Breakeven Win Rate" value={`${r.beWinRate.toFixed(1)}%`} />
           <div style={{marginTop:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
             <Badge positive={r.ev>=0}>{r.ev>=0?"Positive Expectancy":"Negative Expectancy"}</Badge>
-            <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:500}}>Min. {Math.max(30, Math.ceil(4/((+winRate/100)*(1-(+winRate/100)))))} trades for statistical confidence</span>
           </div>
           {r.glRatio<2&&<Alert type={r.glRatio<1?"red":"gold"}>{r.glRatio<1?"Cut losses faster.":"G/L below 2:1. Aim for 3:1."}</Alert>}
         </>)}
@@ -625,7 +699,43 @@ function RiskFinanceTab({ demo }) {
   useEffect(()=>{if(demo){setBuyPrice(DEMO_FINANCE.buyPrice);setShares(DEMO_FINANCE.shares);setStopPrice(DEMO_FINANCE.stopPrice);setStopPct(DEMO_FINANCE.stopPct);setCurPrice(DEMO_FINANCE.curPrice)}else{setBuyPrice("");setShares("");setStopPrice("");setStopPct("");setCurPrice("")}},[demo]);
   const handleSP=v=>{setStopPrice(v);const bp=+buyPrice;if(bp&&+v)setStopPct(((bp-+v)/bp*100).toFixed(2))};
   const handleSPct=v=>{setStopPct(v);const bp=+buyPrice;if(bp&&+v)setStopPrice((bp*(1-+v/100)).toFixed(2))};
-  const r=useMemo(()=>{const bp=+buyPrice,sh=+shares,st=+stopPrice,cp=+curPrice;if(!bp||!sh||!st||!cp||bp<=0||st>=bp)return null;const initRisk=(bp-st)/bp*100,plPct=(cp-bp)/bp*100,rMult=plPct/initRisk,plDollar=(cp-bp)*sh;const sugStop=rMult>=2?bp:st;let action=rMult<1?`Hold stop at $${st.toFixed(2)}`:rMult<2?"Approaching 2R. Monitor.":rMult<3?`Move stop to breakeven ($${bp.toFixed(2)})`:"Protect capital. Stop at breakeven minimum.";const sbe=cp>0?Math.ceil((bp*sh)/cp):0;const sbePct=sh>0?(sbe/sh)*100:0;return{initRisk,plPct,rMult,plDollar,action,profitIfStopped:(sugStop-bp)*sh,sbe,sbePct}},[buyPrice,shares,stopPrice,curPrice]);
+  const r=useMemo(()=>{
+    const bp=+buyPrice,sh=+shares,st=+stopPrice,cp=+curPrice;
+    if(!bp||!sh||!st||!cp||bp<=0||st<=0||st>=bp||cp<=0)return null;
+    const initRiskPct=(bp-st)/bp*100;
+    const plPct=(cp-bp)/bp*100;
+    const rMult=initRiskPct>0?plPct/initRiskPct:0;
+    const plDollar=(cp-bp)*sh;
+    const riskPerShare=bp-st;
+    const profitPerShare=cp-bp;
+    const sugStop=rMult>=2?bp:st;
+    let action=rMult<1?`Hold stop at $${st.toFixed(2)}`:rMult<2?"Approaching 2R. Monitor.":rMult<3?`Move stop to breakeven ($${bp.toFixed(2)})`:"Protect capital. Stop at breakeven minimum.";
+    // Risk financing table: at each level, how many shares to sell so net P/L = (level × original risk)
+    // SBE (breakeven): X × (CP-EP) = (N-X) × (EP-Stop) → X = N × (EP-Stop) / (CP-Stop)
+    const canFinance = cp > st; // current price must be above stop for any financing to work
+    const financeRows = [
+      { label: "Breakeven", pct: 100 },
+      { label: "75%", pct: 75 },
+      { label: "50%", pct: 50 },
+      { label: "25%", pct: 25 },
+    ].map(row => {
+      if (!canFinance || profitPerShare <= 0) return { ...row, sharesToSell: null, effStop: null };
+      // For partial financing: sell X shares so that if stopped, net loss = (1 - row.pct/100) × totalRisk
+      // X × profitPerShare - (N-X) × riskPerShare = -(1 - row.pct/100) × totalRisk
+      // X × (profitPerShare + riskPerShare) = N × riskPerShare - (1 - row.pct/100) × N × riskPerShare
+      // X × (CP - Stop) = N × riskPerShare × (row.pct/100)
+      // X = N × riskPerShare × (row.pct/100) / (CP - Stop)
+      const x = sh * riskPerShare * (row.pct / 100) / (cp - st);
+      // Effective stop = worst-case loss as % of original position value
+      // If stopped after selling x: net P/L = x × (cp-bp) + (sh-x) × (st-bp)
+      const netPL = x * profitPerShare + (sh - x) * (st - bp);
+      const effStopPct = (netPL / (bp * sh)) * 100; // as % of cost basis (negative = loss)
+      return { ...row, sharesToSell: x, effStop: Math.abs(effStopPct) };
+    });
+    const sbe = canFinance && profitPerShare > 0 ? sh * riskPerShare / (cp - st) : null;
+    const sbePct = sbe !== null && sh > 0 ? (sbe / sh) * 100 : null;
+    return{initRiskPct,plPct,rMult,plDollar,action,profitIfStopped:(sugStop-bp)*sh,sbe,sbePct,financeRows,canFinance,stopPctVal:initRiskPct};
+  },[buyPrice,shares,stopPrice,curPrice]);
   return (
     <div style={{display:"flex",gap:28,padding:"24px 28px 32px",flexWrap:"wrap"}}>
       <div style={{flex:"1 1 300px",display:"flex",flexDirection:"column",gap:16}}>
@@ -636,13 +746,45 @@ function RiskFinanceTab({ demo }) {
       </div>
       <div style={{flex:"1 1 300px",display:"flex",flexDirection:"column"}}>
         {!r?(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",minHeight:200,color:C.muted,fontSize:"0.82rem",textAlign:"center",lineHeight:1.6}}>Fill in all fields to<br/>see your results.</div>):(<>
-          <ResultRow label="Current P/L" value={`${r.plPct>=0?"+":""}${r.plPct.toFixed(2)}%  ·  ${r.plDollar>=0?"+":""}$${r.plDollar.toLocaleString(undefined,{minimumFractionDigits:2})}`} color={r.plPct>=0?C.green:C.red} />
-          <ResultRow label="R-Multiple" value={`${r.rMult.toFixed(2)}R`} color={r.rMult>=3?C.green:r.rMult>=1?C.goldBright:r.rMult>=0?C.white:C.red} />
-          <ResultRow label="Initial Risk" value={`${r.initRisk.toFixed(2)}%`} />
-          <ResultRow label="Profit if Stopped" value={`$${r.profitIfStopped.toLocaleString(undefined,{minimumFractionDigits:2})}`} color={r.profitIfStopped>=0?C.green:C.red} />
-          <ResultRow label="SBE (Shares to BE)" value={`${r.sbe} shares`} color={r.sbePct>100?C.red:C.green} />
-          <ResultRow label="SBE %" value={`${r.sbePct.toFixed(1)}%`} color={r.sbePct>100?C.red:r.sbePct>=80?C.gold:C.green} />
-          <div style={{marginTop:16,padding:"14px 16px",borderRadius:12,background:r.rMult>=3?C.greenDim:r.rMult>=2?C.goldDim:"rgba(255,255,255,0.02)",border:`1px solid ${r.rMult>=3?"rgba(34,197,94,0.18)":r.rMult>=2?C.borderGold:C.border}`}}>
+          <div style={{display:"flex",gap:12,marginBottom:14}}>
+            <div style={{flex:1,padding:"12px 14px",borderRadius:10,background:"rgba(255,255,255,0.02)",border:`1px solid ${C.border}`,textAlign:"center"}}>
+              <div style={{fontSize:"0.50rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.10em",color:C.muted,marginBottom:2}}>Stop</div>
+              <div style={{fontSize:"1.0rem",fontWeight:800,color:C.white}}>{r.stopPctVal.toFixed(2)}%</div>
+            </div>
+            <div style={{flex:1,padding:"12px 14px",borderRadius:10,background:r.plPct>=0?C.greenDim:"rgba(239,68,68,0.06)",border:`1px solid ${r.plPct>=0?"rgba(34,197,94,0.15)":"rgba(239,68,68,0.15)"}`,textAlign:"center"}}>
+              <div style={{fontSize:"0.50rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.10em",color:C.muted,marginBottom:2}}>Current P/L</div>
+              <div style={{fontSize:"1.0rem",fontWeight:800,color:r.plPct>=0?C.green:C.red}}>{r.plPct>=0?"+":""}{r.plPct.toFixed(2)}%</div>
+            </div>
+            <div style={{flex:1,padding:"12px 14px",borderRadius:10,background:r.rMult>=2?C.goldDim:"rgba(255,255,255,0.02)",border:`1px solid ${r.rMult>=2?C.borderGold:C.border}`,textAlign:"center"}}>
+              <div style={{fontSize:"0.50rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.10em",color:C.muted,marginBottom:2}}>R-Multiple</div>
+              <div style={{fontSize:"1.0rem",fontWeight:800,color:r.rMult>=3?C.green:r.rMult>=1?C.goldBright:r.rMult>=0?C.white:C.red}}>{r.rMult.toFixed(2)}R</div>
+            </div>
+          </div>
+          {r.canFinance && r.plPct > 0 ? (
+            <div style={{borderRadius:10,overflow:"hidden",border:`1px solid ${C.border}`,marginBottom:14}}>
+              <div style={{display:"flex",background:"rgba(255,255,255,0.03)",borderBottom:`1px solid ${C.border}`,padding:"10px 0"}}>
+                <div style={{flex:2,paddingLeft:14,fontSize:"0.54rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.10em"}}>Risk Financed</div>
+                <div style={{flex:1,textAlign:"center",fontSize:"0.54rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.10em"}}># Shares to Sell</div>
+                <div style={{flex:1,textAlign:"center",fontSize:"0.54rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.10em"}}>Effective Stop</div>
+              </div>
+              {r.financeRows.map((row, i) => (
+                <div key={i} style={{display:"flex",padding:"10px 0",borderBottom:i<r.financeRows.length-1?`1px solid rgba(255,255,255,0.03)`:"none",background:i%2===0?"rgba(255,255,255,0.01)":"transparent",alignItems:"center"}}>
+                  <div style={{flex:2,paddingLeft:14,fontSize:"0.78rem",fontWeight:row.pct===100?700:600,color:row.pct===100?C.goldBright:C.text}}>
+                    {row.pct === 100 ? `Breakeven ${row.pct.toFixed(2)}%` : `${row.pct.toFixed(2)}%`}
+                  </div>
+                  <div style={{flex:1,textAlign:"center",fontSize:"0.78rem",fontWeight:600,color:C.white}}>
+                    {row.sharesToSell !== null ? row.sharesToSell % 1 === 0 ? row.sharesToSell.toFixed(0) : row.sharesToSell.toFixed(1) : "—"}
+                  </div>
+                  <div style={{flex:1,textAlign:"center",fontSize:"0.78rem",fontWeight:600,color:row.pct===100?C.green:C.text}}>
+                    {row.effStop !== null ? `${row.effStop.toFixed(2)}%` : "—"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : r.plPct <= 0 ? (
+            <Alert type="red">Position is underwater. Risk financing requires the current price to be above your entry.</Alert>
+          ) : null}
+          <div style={{marginTop:4,padding:"14px 16px",borderRadius:12,background:r.rMult>=3?C.greenDim:r.rMult>=2?C.goldDim:"rgba(255,255,255,0.02)",border:`1px solid ${r.rMult>=3?"rgba(34,197,94,0.18)":r.rMult>=2?C.borderGold:C.border}`}}>
             <div style={{fontSize:"0.58rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.12em",color:C.muted,marginBottom:6}}>Suggested Action</div>
             <div style={{fontSize:"0.82rem",fontWeight:600,color:r.rMult>=3?C.green:r.rMult>=2?C.goldBright:C.text,lineHeight:1.5}}>{r.action}</div>
           </div>
@@ -1061,8 +1203,8 @@ const GLOSSARY = [
   ["RTS","Risk To Stop","Total dollars lost if both stops hit. Weighted across both halves. Goal: $0."],
   ["ROTE","Risk of Total Equity","Initial risk (entry to stops) ÷ portfolio. Weighted across both halves. Keep under 1.5%."],
   ["Exposure","Risk-Free Exposure","Shows what % of the position is risk-free (stop above entry = locked profit). Green bar = free, red = at risk."],
-  ["SBE","Shares to Break Even","Shares to sell at current price to recover entire cost. Remaining shares = free."],
-  ["SBE %","SBE Percentage","SBE ÷ total shares. Over 100% = underwater, can't break even."],
+  ["SBE","Shares to Break Even","Shares to sell at current price so if remaining shares hit the stop, net P/L = $0. Formula: N × (Entry − Stop) ÷ (Current − Stop)."],
+  ["SBE %","SBE Percentage","SBE ÷ total shares. Lower = more profit locked in. Shows only when position is profitable and above stop."],
   ["R-Mult","R-Multiple","Return ÷ weighted initial risk. 2R = made 2× what you risked."],
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
@@ -1152,8 +1294,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     // RTS = total dollars at risk to stops
     const rtsD = dts1 * h1 + dts2 * h2;
 
-    const sbe = cpN > 0 ? Math.ceil((epN * sharesN) / cpN) : 0;
-    const sbePct = sharesN > 0 ? (sbe / sharesN) * 100 : 0;
+    // SBE = shares to sell at current price so if remaining shares get stopped, net P/L = $0
+    // Formula: X = N × (EP - avgStop) / (CP - avgStop), where avgStop is weighted across halves
+    const avgStop = sharesN > 0 ? (stop1 * h1 + stop2 * h2) / sharesN : 0;
+    const canFinanceSBE = cpN > epN && cpN > avgStop && avgStop > 0;
+    const sbe = canFinanceSBE ? Math.ceil(sharesN * (epN - avgStop) / (cpN - avgStop)) : 0;
+    const sbePct = canFinanceSBE && sharesN > 0 ? (sbe / sharesN) * 100 : 0;
 
     // P/L
     const plPct = epN > 0 ? ((cpN - epN) / epN) * 100 : 0;
@@ -1288,8 +1434,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.rtsD<=0?C.green:C.red,fontSize:"0.70rem"}}>{rtsDisplay}</td>
                     {/* ROTE — Risk of Total Equity. Warning if >1.5% */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rotePct>1.5?C.red:p.rotePct>1.0?C.gold:C.green,whiteSpace:"nowrap"}}>{p.epN&&(p.stop1||p.stop2)?<>{p.rotePct.toFixed(2)}%{p.rotePct>1.5&&<span title="ROTE exceeds 1.5% — consider reducing size" style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</>:"—"}</td>
-                    <td style={{padding:"8px 6px",textAlign:"right",color:C.text,fontSize:"0.70rem"}}>{p.cpN?p.sbe.toLocaleString():"—"}</td>
-                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:p.sbePct>100?C.red:p.sbePct>90?C.gold:C.green,fontSize:"0.70rem"}}>{p.cpN?`${p.sbePct.toFixed(1)}%`:"—"}</td>
+                    <td style={{padding:"8px 6px",textAlign:"right",color:p.sbe>0?C.text:C.muted,fontSize:"0.70rem"}}>{p.sbe>0?p.sbe.toLocaleString():"—"}</td>
+                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:!p.sbe?C.muted:p.sbePct>100?C.red:p.sbePct>80?C.gold:C.green,fontSize:"0.70rem"}}>{p.sbe>0?`${p.sbePct.toFixed(1)}%`:"—"}</td>
                     {/* P/L — respects $ / % toggle */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.plPct>=0?C.green:C.red,fontSize:"0.70rem"}}>{plDisplay}</td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rMult>=2?C.green:p.rMult>=1?C.goldBright:p.rMult>=0?C.white:C.red}}>{p.epN&&(p.stop1||p.stop2)?`${p.rMult.toFixed(2)}R`:"—"}</td>
