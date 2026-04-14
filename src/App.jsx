@@ -1574,7 +1574,7 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
   };
   const removeItem = (list, setter, val) => { setter(list.filter(x => x !== val)); };
 
-  const ListManager = ({ title, description, items, onAdd, onRemove, newVal, setNewVal, placeholder }) => (
+  const renderListManager = (title, description, items, onAdd, onRemove, newVal, setNewVal, placeholder) => (
     <GlassCard style={{ padding: "24px 28px", marginBottom: 16 }}>
       <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>{title}</div>
       <div style={{ fontSize: "0.70rem", color: C.muted, marginBottom: 16 }}>{description}</div>
@@ -1606,14 +1606,14 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
         <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Font Size</div>
         <div style={{ fontSize: "0.70rem", color: C.muted, marginBottom: 16 }}>Choose your preferred reading size. Applies everywhere.</div>
         <div style={{ display: "flex", gap: 0, borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}`, width: "fit-content" }}>
-          {[{ key: "small", label: "Small" }, { key: "standard", label: "Standard" }, { key: "large", label: "Large" }].map((opt, idx) => (
+          {[{ key: "small", label: "Small" }, { key: "standard", label: "Standard" }, { key: "large", label: "Large" }, { key: "huge", label: "Huge" }].map((opt, idx, arr) => (
             <button key={opt.key} onClick={() => setFontSize(opt.key)} style={{
               padding: "10px 22px", border: "none", cursor: "pointer", fontFamily: font,
               fontWeight: fontSize === opt.key ? 800 : 500,
               fontSize: "0.78rem",
               background: fontSize === opt.key ? C.goldDim : "rgba(255,255,255,0.02)",
               color: fontSize === opt.key ? C.gold : C.muted,
-              borderRight: idx < 2 ? `1px solid ${C.border}` : "none",
+              borderRight: idx < arr.length - 1 ? `1px solid ${C.border}` : "none",
               transition: "all 0.15s",
             }}>{opt.label}</button>
           ))}
@@ -1630,25 +1630,34 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
       </GlassCard>
 
       {/* Setup Types */}
-      <ListManager
-        title="Setup Types" description="Entry strategies used in your open positions and trade journal. These appear as dropdown options everywhere."
-        items={setupTypes} onAdd={() => addItem(setupTypes, setSetupTypes, newSetup, setNewSetup)} onRemove={v => removeItem(setupTypes, setSetupTypes, v)}
-        newVal={newSetup} setNewVal={setNewSetup} placeholder="e.g. Flag Breakout"
-      />
+      {renderListManager(
+        "Setup Types",
+        "Entry strategies used in your open positions and trade journal. These appear as dropdown options everywhere.",
+        setupTypes,
+        () => addItem(setupTypes, setSetupTypes, newSetup, setNewSetup),
+        v => removeItem(setupTypes, setSetupTypes, v),
+        newSetup, setNewSetup, "e.g. Flag Breakout"
+      )}
 
       {/* Tags */}
-      <ListManager
-        title="Tags" description="Custom labels you can attach to any trade. Use for filtering your journal by theme, catalyst, or strategy nuance."
-        items={tags} onAdd={() => addItem(tags, setTags, newTag, setNewTag)} onRemove={v => removeItem(tags, setTags, v)}
-        newVal={newTag} setNewVal={setNewTag} placeholder="e.g. Pre-Earnings"
-      />
+      {renderListManager(
+        "Tags",
+        "Custom labels you can attach to any trade. Use for filtering your journal by theme, catalyst, or strategy nuance.",
+        tags,
+        () => addItem(tags, setTags, newTag, setNewTag),
+        v => removeItem(tags, setTags, v),
+        newTag, setNewTag, "e.g. Pre-Earnings"
+      )}
 
       {/* Exit Reasons */}
-      <ListManager
-        title="Exit Reasons" description="Reasons for closing a position. Shown when you sell shares from the dashboard."
-        items={exitReasons} onAdd={() => addItem(exitReasons, setExitReasons, newReason, setNewReason)} onRemove={v => removeItem(exitReasons, setExitReasons, v)}
-        newVal={newReason} setNewVal={setNewReason} placeholder="e.g. Gap Down"
-      />
+      {renderListManager(
+        "Exit Reasons",
+        "Reasons for closing a position. Shown when you sell shares from the dashboard.",
+        exitReasons,
+        () => addItem(exitReasons, setExitReasons, newReason, setNewReason),
+        v => removeItem(exitReasons, setExitReasons, v),
+        newReason, setNewReason, "e.g. Gap Down"
+      )}
 
       {/* Admin Panel — only visible to admin */}
       {isAdmin && (
@@ -1732,8 +1741,8 @@ function LoginPage({ onLogin }) {
     <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased", color: C.text }}>
       <div style={{ width: "100%", maxWidth: 420, padding: "0 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ fontWeight: 800, fontSize: "1.5rem", letterSpacing: "-0.03em", color: C.white, marginBottom: 8 }}>
-            Valen <span style={{ color: C.gold }}>Insiders</span> Vault
+          <div style={{ fontWeight: 900, fontSize: "3rem", letterSpacing: "-0.05em", color: C.gold, marginBottom: 8, textShadow: `0 0 30px ${C.goldDim}`, lineHeight: 1 }}>
+            VIV
           </div>
           <div style={{ fontWeight: 400, fontSize: "0.82rem", color: C.muted, lineHeight: 1.6 }}>
             Members-only trading dashboard.
@@ -1822,7 +1831,7 @@ export default function App() {
   });
 
   useEffect(() => { try { localStorage.setItem("viv_fontSize", fontSize); } catch {} }, [fontSize]);
-  const appZoom = fontSize === "large" ? 1.12 : fontSize === "small" ? 0.90 : 1.0;
+  const appZoom = fontSize === "huge" ? 1.30 : fontSize === "large" ? 1.15 : fontSize === "small" ? 0.88 : 1.0;
 
   const handleJournalTrade = useCallback((trade) => { setJournaledTrades(prev => [...prev, trade]); }, []);
 
@@ -1859,8 +1868,8 @@ export default function App() {
       <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column", zoom: appZoom }}>
         {/* Top bar */}
         <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
-          <div style={{ fontWeight: 800, fontSize: "0.82rem", letterSpacing: "-0.01em", color: C.white }}>
-            Valen <span style={{ color: C.gold }}>Insiders</span> Vault
+          <div style={{ fontWeight: 900, fontSize: "1.25rem", letterSpacing: "-0.04em", color: C.gold, lineHeight: 1, textShadow: `0 0 16px ${C.goldDim}` }}>
+            VIV
           </div>
           <button onClick={handleLogout} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
         </div>
@@ -1890,9 +1899,9 @@ export default function App() {
   return (
     <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text, zoom: appZoom }}>
       {/* Sidebar */}
-      <div style={{ width: sidebarW, minHeight: "100vh", padding: "24px 14px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, alignSelf: "flex-start" }}>
-        <div style={{ fontWeight: 800, fontSize: "0.84rem", letterSpacing: "-0.01em", color: C.white, marginBottom: 24, padding: "0 8px" }}>
-          Valen <span style={{ color: C.gold }}>Insiders</span> Vault
+      <div style={{ width: sidebarW, minHeight: "100vh", padding: "24px 14px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, alignSelf: "flex-start" }}>
+        <div style={{ fontWeight: 900, fontSize: "1.75rem", letterSpacing: "-0.04em", color: C.gold, marginBottom: 24, padding: "0 8px", lineHeight: 1, textShadow: `0 0 20px ${C.goldDim}` }}>
+          VIV
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV.map(item => (
