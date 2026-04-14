@@ -1741,8 +1741,8 @@ function LoginPage({ onLogin }) {
     <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased", color: C.text }}>
       <div style={{ width: "100%", maxWidth: 420, padding: "0 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ fontWeight: 900, fontSize: "3rem", letterSpacing: "-0.05em", color: C.gold, marginBottom: 8, textShadow: `0 0 20px rgba(201,152,42,0.65), 0 0 40px rgba(201,152,42,0.4), 0 0 70px rgba(201,152,42,0.2)`, lineHeight: 1 }}>
-            VIV
+          <div style={{ fontWeight: 800, fontSize: "1.6rem", letterSpacing: "-0.03em", color: C.gold, marginBottom: 8, textShadow: `0 0 12px rgba(201,152,42,0.4), 0 0 28px rgba(201,152,42,0.2)`, lineHeight: 1.2 }}>
+            Valen Insiders Vault
           </div>
           <div style={{ fontWeight: 400, fontSize: "0.82rem", color: C.muted, lineHeight: 1.6 }}>
             Members-only trading dashboard.
@@ -1868,8 +1868,8 @@ export default function App() {
       <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column", zoom: appZoom }}>
         {/* Top bar */}
         <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
-          <div style={{ fontWeight: 900, fontSize: "1.25rem", letterSpacing: "-0.04em", color: C.gold, lineHeight: 1, textShadow: `0 0 10px rgba(201,152,42,0.6), 0 0 20px rgba(201,152,42,0.35)` }}>
-            VIV
+          <div style={{ fontWeight: 800, fontSize: "0.88rem", letterSpacing: "-0.02em", color: C.gold, lineHeight: 1, textShadow: `0 0 6px rgba(201,152,42,0.35), 0 0 14px rgba(201,152,42,0.15)` }}>
+            Valen Insiders Vault
           </div>
           <button onClick={handleLogout} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
         </div>
@@ -1900,8 +1900,8 @@ export default function App() {
     <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text, zoom: appZoom }}>
       {/* Sidebar */}
       <div style={{ width: sidebarW, minHeight: "100vh", padding: "24px 14px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, alignSelf: "flex-start" }}>
-        <div style={{ fontWeight: 900, fontSize: "1.75rem", letterSpacing: "-0.04em", color: C.gold, marginBottom: 24, padding: "0 8px", lineHeight: 1, textShadow: `0 0 12px rgba(201,152,42,0.6), 0 0 24px rgba(201,152,42,0.35), 0 0 40px rgba(201,152,42,0.2)` }}>
-          VIV
+        <div style={{ fontWeight: 800, fontSize: "0.95rem", letterSpacing: "-0.02em", color: C.gold, marginBottom: 24, padding: "0 8px", lineHeight: 1.2, textShadow: `0 0 8px rgba(201,152,42,0.35), 0 0 16px rgba(201,152,42,0.15)` }}>
+          Valen Insiders Vault
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV.map(item => (
