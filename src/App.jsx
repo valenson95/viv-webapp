@@ -1563,7 +1563,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 // ═══════════════════════════════════════
 // ─── SETTINGS PAGE ───
 // ═══════════════════════════════════════
-function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName }) {
+function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange }) {
   const isAdmin = userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [newSetup, setNewSetup] = useState("");
   const [newTag, setNewTag] = useState("");
@@ -1662,7 +1662,7 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
       <GlassCard style={{ padding: "24px 28px", marginBottom: 16 }}>
         <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 16 }}>Profile</div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-          <TextInput label="Display Name" value={displayName || ""} onChange={() => {}} placeholder="Your name" upper={false} style={{ flex: "1 1 200px" }} />
+          <TextInput label="Display Name" value={displayName || ""} onChange={onDisplayNameChange} placeholder="Your name" upper={false} style={{ flex: "1 1 200px" }} />
           <TextInput label="Email" value={userEmail || ""} onChange={() => {}} placeholder="email@example.com" upper={false} style={{ flex: "1 1 280px" }} />
         </div>
       </GlassCard>
@@ -2066,6 +2066,18 @@ export default function App() {
 
   const handleJournalTrade = useCallback((trade) => { setJournaledTrades(prev => [...prev, trade]); }, []);
 
+  // ─── Display Name (editable, saved to Supabase) ───
+  const [displayNameState, setDisplayNameState] = useState("");
+  useEffect(() => { if (profile?.display_name) setDisplayNameState(profile.display_name); }, [profile]);
+  const handleDisplayNameChange = useCallback((val) => {
+    setDisplayNameState(val);
+    if (!session) return;
+    clearTimeout(saveTimer.current.display_name);
+    saveTimer.current.display_name = setTimeout(() => {
+      supabase.from("profiles").update({ display_name: val, updated_at: new Date().toISOString() }).eq("id", session.user.id).then(() => {});
+    }, 1000);
+  }, [session]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setSession(null);
@@ -2088,7 +2100,7 @@ export default function App() {
   if (!session) return <AuthPage />;
 
   const userEmail = session.user.email;
-  const displayName = profile?.display_name || userEmail.split("@")[0];
+  const displayName = displayNameState || profile?.display_name || userEmail.split("@")[0];
   const sidebarW = isTablet ? 200 : 220;
   const contentPadH = isMobile ? 16 : isTablet ? 24 : 36;
   const contentPadV = isMobile ? 16 : 28;
@@ -2098,7 +2110,7 @@ export default function App() {
       {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
-      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} />}
     </>
   );
 
