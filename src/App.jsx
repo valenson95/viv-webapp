@@ -1955,11 +1955,50 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // ─── Helper: save positions to Supabase ───
+  const savePositionsNow = useCallback(async (uid, posArr) => {
+    await supabase.from("positions").delete().eq("user_id", uid);
+    if (posArr.length > 0) {
+      const { error } = await supabase.from("positions").insert(posArr.map(p => ({
+        user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
+        entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
+        stop_price_2: p.stop2 || "", setup: p.setup || "VCP", tags: p.tags || [],
+      })));
+      if (error) console.error("Position save error:", error.message);
+    }
+  }, []);
+
+  // ─── Helper: save settings to Supabase ───
+  const saveSettingNow = useCallback(async (uid, key, value) => {
+    const { error } = await supabase.from("user_settings").upsert(
+      { user_id: uid, setting_key: key, setting_value: value, updated_at: new Date().toISOString() },
+      { onConflict: "user_id,setting_key" }
+    );
+    if (error) console.error("Setting save error:", key, error.message);
+  }, []);
+
+  // ─── Helper: save trades to Supabase (full replace) ───
+  const saveTradesNow = useCallback(async (uid, tradeArr) => {
+    // Mark all existing as deleted, then insert fresh
+    await supabase.from("trades").update({ is_deleted: true }).eq("user_id", uid);
+    if (tradeArr.length > 0) {
+      const { error } = await supabase.from("trades").insert(tradeArr.map(t => ({
+        user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
+        entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
+        stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
+        pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
+        exit_reason: t.reason || "", notes: t.notes || "",
+      })));
+      if (error) console.error("Trade save error:", error.message);
+    }
+  }, []);
+
   // ─── Load all data when session is available ───
   useEffect(() => {
     if (!session || dataLoaded.current) return;
     const load = async () => {
       const uid = session.user.id;
+
       // Profile
       const { data: prof } = await supabase.from("profiles").select("*").eq("id", uid).single();
       if (prof) {
@@ -1969,25 +2008,37 @@ export default function App() {
         if (prof.num_stocks != null) setNumStocks(prof.num_stocks);
         if (prof.font_size) setFontSize(prof.font_size);
       }
-      // Settings
+
+      // Settings — load or seed defaults
       const { data: settings } = await supabase.from("user_settings").select("*").eq("user_id", uid);
+      let hasSetup = false, hasTags = false, hasExit = false;
       if (settings) {
         settings.forEach(s => {
-          if (s.setting_key === "setup_types" && Array.isArray(s.setting_value)) setSetupTypes(s.setting_value);
-          if (s.setting_key === "tags" && Array.isArray(s.setting_value)) setTags(s.setting_value);
-          if (s.setting_key === "exit_reasons" && Array.isArray(s.setting_value)) setExitReasons(s.setting_value);
+          if (s.setting_key === "setup_types" && Array.isArray(s.setting_value)) { setSetupTypes(s.setting_value); hasSetup = true; }
+          if (s.setting_key === "tags" && Array.isArray(s.setting_value)) { setTags(s.setting_value); hasTags = true; }
+          if (s.setting_key === "exit_reasons" && Array.isArray(s.setting_value)) { setExitReasons(s.setting_value); hasExit = true; }
         });
       }
-      // Positions
+      // First time? Save defaults to DB so they persist
+      if (!hasSetup) await saveSettingNow(uid, "setup_types", DEFAULT_SETUP_TYPES);
+      if (!hasTags) await saveSettingNow(uid, "tags", DEFAULT_TAGS);
+      if (!hasExit) await saveSettingNow(uid, "exit_reasons", DEFAULT_EXIT_REASONS);
+
+      // Positions — load or seed defaults
       const { data: pos } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
       if (pos && pos.length > 0) {
         setPositions(pos.map(p => ({ id: p.id, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, setup: p.setup, tags: p.tags || [] })));
+      } else {
+        // First time — save INIT_POSITIONS to DB
+        await savePositionsNow(uid, INIT_POSITIONS);
       }
-      // Trades
+
+      // Trades — load (no seeding, journal starts empty)
       const { data: trades } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false });
       if (trades && trades.length > 0) {
         setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, exit: t.exit_date, entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, notes: t.notes })));
       }
+
       dataLoaded.current = true;
       setAuthLoading(false);
     };
@@ -2000,7 +2051,9 @@ export default function App() {
     if (!session) return;
     clearTimeout(saveTimer.current[field]);
     saveTimer.current[field] = setTimeout(() => {
-      supabase.from("profiles").update({ [field]: val, updated_at: new Date().toISOString() }).eq("id", session.user.id).then(() => {});
+      supabase.from("profiles").update({ [field]: val, updated_at: new Date().toISOString() }).eq("id", session.user.id).then(({ error }) => {
+        if (error) console.error("Profile save error:", field, error.message);
+      });
     }, 1000);
   }, [session]);
 
@@ -2010,56 +2063,24 @@ export default function App() {
   useEffect(() => { if (dataLoaded.current) saveProfile("font_size", fontSize); }, [fontSize]);
 
   // ─── Auto-save settings to Supabase ───
-  const saveSetting = useCallback((key, value) => {
-    if (!session) return;
-    supabase.from("user_settings").upsert({ user_id: session.user.id, setting_key: key, setting_value: value, updated_at: new Date().toISOString() }, { onConflict: "user_id,setting_key" }).then(() => {});
-  }, [session]);
+  useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "setup_types", setupTypes); }, [setupTypes]);
+  useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "tags", tags); }, [tags]);
+  useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "exit_reasons", exitReasons); }, [exitReasons]);
 
-  useEffect(() => { if (dataLoaded.current) saveSetting("setup_types", setupTypes); }, [setupTypes]);
-  useEffect(() => { if (dataLoaded.current) saveSetting("tags", tags); }, [tags]);
-  useEffect(() => { if (dataLoaded.current) saveSetting("exit_reasons", exitReasons); }, [exitReasons]);
-
-  // ─── Auto-save positions to Supabase ───
+  // ─── Auto-save positions to Supabase (debounced) ───
   const posTimer = useRef(null);
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
     clearTimeout(posTimer.current);
-    posTimer.current = setTimeout(async () => {
-      const uid = session.user.id;
-      // Delete all existing positions and re-insert (simpler than diffing)
-      await supabase.from("positions").delete().eq("user_id", uid);
-      if (positions.length > 0) {
-        await supabase.from("positions").insert(positions.map(p => ({
-          user_id: uid, symbol: p.sym, entry_date: p.entry, shares: p.shares,
-          entry_price: p.ep, current_price: p.cp, stop_price: p.stop,
-          stop_price_2: p.stop2, setup: p.setup, tags: p.tags,
-        })));
-      }
-    }, 1500);
+    posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), 1500);
   }, [positions, session]);
 
-  // ─── Auto-save journaled trades ───
+  // ─── Auto-save journaled trades to Supabase (debounced) ───
   const tradeTimer = useRef(null);
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
     clearTimeout(tradeTimer.current);
-    tradeTimer.current = setTimeout(async () => {
-      const uid = session.user.id;
-      // Get existing trade IDs from DB
-      const { data: existing } = await supabase.from("trades").select("id").eq("user_id", uid).eq("is_deleted", false);
-      const existingIds = new Set((existing || []).map(t => t.id));
-      // Insert only new trades (ones not in DB)
-      const newTrades = journaledTrades.filter(t => !existingIds.has(t.id));
-      if (newTrades.length > 0) {
-        await supabase.from("trades").insert(newTrades.map(t => ({
-          user_id: uid, ticker: t.ticker, entry_date: t.entry, exit_date: t.exit,
-          entry_price: t.entryP, exit_price: t.exitP, shares: t.shares,
-          stop_price: t.stop, setup: t.setup, tags: t.tags,
-          pl_pct: t.plPct, pl_dollar: t.plDollar, r_mult: t.rMult,
-          exit_reason: t.reason, notes: t.notes,
-        })));
-      }
-    }, 1500);
+    tradeTimer.current = setTimeout(() => saveTradesNow(session.user.id, journaledTrades), 1500);
   }, [journaledTrades, session]);
 
   const appZoom = fontSize === "huge" ? 1.30 : fontSize === "large" ? 1.15 : fontSize === "small" ? 0.88 : 1.0;
