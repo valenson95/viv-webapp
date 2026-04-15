@@ -929,7 +929,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const [importResult, setImportResult] = useState(null);
   const [deletedTradeIds, setDeletedTradeIds] = useState([]);
 
-  const allTrades = useMemo(() => [...SAMPLE_TRADES, ...journaledTrades].filter(t => !deletedTradeIds.includes(t.id)), [journaledTrades, deletedTradeIds]);
+  const allTrades = useMemo(() => journaledTrades.filter(t => !deletedTradeIds.includes(t.id)), [journaledTrades, deletedTradeIds]);
 
   const handleImport = (e) => {
     const file = e.target.files?.[0];
@@ -2024,13 +2024,21 @@ export default function App() {
       if (!hasTags) await saveSettingNow(uid, "tags", DEFAULT_TAGS);
       if (!hasExit) await saveSettingNow(uid, "exit_reasons", DEFAULT_EXIT_REASONS);
 
-      // Positions — load or seed defaults
+      // Positions — load from DB, seed only on very first login
       const { data: pos } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
       if (pos && pos.length > 0) {
         setPositions(pos.map(p => ({ id: p.id, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, setup: p.setup, tags: p.tags || [] })));
       } else {
-        // First time — save INIT_POSITIONS to DB
-        await savePositionsNow(uid, INIT_POSITIONS);
+        // Check if user has been initialized before
+        const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
+        if (!initFlag) {
+          // Very first login — seed demo positions and mark as initialized
+          await savePositionsNow(uid, INIT_POSITIONS);
+          await saveSettingNow(uid, "initialized", true);
+        } else {
+          // User deleted all positions intentionally — keep empty
+          setPositions([]);
+        }
       }
 
       // Trades — load (no seeding, journal starts empty)
