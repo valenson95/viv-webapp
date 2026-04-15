@@ -983,6 +983,10 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     setDeletedTradeIds(prev => [...prev, id]);
     setJournaledTrades(prev => prev.filter(t => t.id !== id));
     if (editingId === id) setEditingId(null);
+    // Immediately delete from Supabase (don't wait for debounced auto-save)
+    supabase.from("trades").update({ is_deleted: true }).eq("id", id).then(({ error }) => {
+      if (error) console.error("Trade delete error:", error.message);
+    });
   };
 
   const activeFilterLabel = filterSetup !== "All" || filterTag !== "All" ? ` (filtered: ${filtered.length}/${allTrades.length})` : "";
@@ -2083,12 +2087,34 @@ export default function App() {
     posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), 1500);
   }, [positions, session]);
 
-  // ─── Auto-save journaled trades to Supabase (debounced) ───
+  // ─── Auto-save journaled trades to Supabase (only insert NEW trades) ───
   const tradeTimer = useRef(null);
+  const prevTradeCount = useRef(0);
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
-    clearTimeout(tradeTimer.current);
-    tradeTimer.current = setTimeout(() => saveTradesNow(session.user.id, journaledTrades), 1500);
+    // Only save when trades are ADDED (count increased), not when deleted
+    if (journaledTrades.length > prevTradeCount.current && prevTradeCount.current > 0) {
+      clearTimeout(tradeTimer.current);
+      tradeTimer.current = setTimeout(async () => {
+        const uid = session.user.id;
+        // Get what's already in DB
+        const { data: existing } = await supabase.from("trades").select("id").eq("user_id", uid).eq("is_deleted", false);
+        const existingIds = new Set((existing || []).map(t => t.id));
+        // Only insert trades not already in DB (new ones won't have a DB id)
+        const newTrades = journaledTrades.filter(t => !existingIds.has(t.id));
+        if (newTrades.length > 0) {
+          const { error } = await supabase.from("trades").insert(newTrades.map(t => ({
+            user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
+            entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
+            stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
+            pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
+            exit_reason: t.reason || "", notes: t.notes || "",
+          })));
+          if (error) console.error("Trade insert error:", error.message);
+        }
+      }, 1500);
+    }
+    prevTradeCount.current = journaledTrades.length;
   }, [journaledTrades, session]);
 
   const appZoom = fontSize === "huge" ? 1.30 : fontSize === "large" ? 1.15 : fontSize === "small" ? 0.88 : 1.0;
