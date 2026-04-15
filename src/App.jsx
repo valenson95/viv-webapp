@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
+import { supabase } from "./supabaseClient";
 
 // ─── Responsive Hook ───
 function useScreenWidth() {
@@ -1562,11 +1563,48 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 // ═══════════════════════════════════════
 // ─── SETTINGS PAGE ───
 // ═══════════════════════════════════════
-function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail }) {
+function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName }) {
   const isAdmin = userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [newSetup, setNewSetup] = useState("");
   const [newTag, setNewTag] = useState("");
   const [newReason, setNewReason] = useState("");
+  const [accessCodes, setAccessCodes] = useState([]);
+  const [newCode, setNewCode] = useState("");
+  const [codeLoading, setCodeLoading] = useState(false);
+  const [allMembers, setAllMembers] = useState([]);
+
+  // Load access codes and members for admin
+  useEffect(() => {
+    if (!isAdmin) return;
+    const loadAdmin = async () => {
+      const { data: codes } = await supabase.from("access_codes").select("*").order("created_at", { ascending: false });
+      if (codes) setAccessCodes(codes);
+      // Admin can read all profiles via service-level or we use a direct query
+      const { data: members } = await supabase.from("profiles").select("id, email, display_name, created_at, is_admin");
+      if (members) setAllMembers(members);
+    };
+    loadAdmin();
+  }, [isAdmin]);
+
+  const activeCode = accessCodes.find(c => c.is_active);
+
+  const handleCreateCode = async () => {
+    const code = newCode.trim().toUpperCase();
+    if (!code) return;
+    setCodeLoading(true);
+    // Deactivate all existing codes
+    await supabase.from("access_codes").update({ is_active: false }).eq("is_active", true);
+    // Insert new active code
+    const { data } = await supabase.from("access_codes").insert({ code, is_active: true }).select();
+    if (data) setAccessCodes(prev => [data[0], ...prev.map(c => ({ ...c, is_active: false }))]);
+    setNewCode("");
+    setCodeLoading(false);
+  };
+
+  const handleDeactivateCode = async (id) => {
+    await supabase.from("access_codes").update({ is_active: false }).eq("id", id);
+    setAccessCodes(prev => prev.map(c => c.id === id ? { ...c, is_active: false } : c));
+  };
 
   const addItem = (list, setter, val, clear) => {
     const v = val.trim();
@@ -1624,8 +1662,8 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
       <GlassCard style={{ padding: "24px 28px", marginBottom: 16 }}>
         <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 16 }}>Profile</div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-          <TextInput label="Display Name" value="Valen" onChange={() => {}} placeholder="Your name" upper={false} style={{ flex: "1 1 200px" }} />
-          <TextInput label="Email" value="vc-lv@live.com" onChange={() => {}} placeholder="email@example.com" upper={false} style={{ flex: "1 1 280px" }} />
+          <TextInput label="Display Name" value={displayName || ""} onChange={() => {}} placeholder="Your name" upper={false} style={{ flex: "1 1 200px" }} />
+          <TextInput label="Email" value={userEmail || ""} onChange={() => {}} placeholder="email@example.com" upper={false} style={{ flex: "1 1 280px" }} />
         </div>
       </GlassCard>
 
@@ -1668,45 +1706,70 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
               <span style={{ fontSize: "0.62rem", padding: "2px 8px", borderRadius: 6, background: C.redDim, border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontWeight: 600 }}>Owner</span>
             </div>
             <div style={{ fontWeight: 800, fontSize: "1.3rem", letterSpacing: "-0.03em", color: C.white, marginBottom: 4 }}>Access Management</div>
-            <div style={{ fontSize: "0.74rem", color: C.muted, lineHeight: 1.5, marginBottom: 16 }}>Manage the monthly passcode that members use to log in.</div>
+            <div style={{ fontSize: "0.74rem", color: C.muted, lineHeight: 1.5, marginBottom: 16 }}>Manage the registration code that members need to create an account.</div>
           </div>
 
+          {/* Current Active Code */}
           <GlassCard style={{ padding: "24px 28px", marginBottom: 16, borderColor: "rgba(239,68,68,0.15)" }}>
-            <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Current Passcode</div>
-            <div style={{ fontSize: "0.70rem", color: C.muted, marginBottom: 16 }}>This is the active passcode. Share it in your Skool community each month.</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderRadius: 12, background: "rgba(201,152,42,0.06)", border: `1px solid ${C.borderGold}` }}>
-              <span style={{ fontWeight: 900, fontSize: "1.4rem", letterSpacing: "0.10em", color: C.goldBright, fontFamily: "monospace" }}>{ACCESS_CODE}</span>
-              <button onClick={() => { navigator.clipboard.writeText(ACCESS_CODE); }} style={{
-                marginLeft: "auto", padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.border}`,
-                background: "rgba(255,255,255,0.04)", color: C.muted, fontSize: "0.70rem", fontWeight: 600,
-                cursor: "pointer", fontFamily: font, transition: "all 0.15s",
-              }}>Copy</button>
+            <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Active Registration Code</div>
+            <div style={{ fontSize: "0.70rem", color: C.muted, marginBottom: 16 }}>Members need this code to create a new account. Share it in your Skool community.</div>
+            {activeCode ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderRadius: 12, background: "rgba(201,152,42,0.06)", border: `1px solid ${C.borderGold}`, marginBottom: 12 }}>
+                <span style={{ fontWeight: 900, fontSize: "1.4rem", letterSpacing: "0.10em", color: C.goldBright, fontFamily: "monospace" }}>{activeCode.code}</span>
+                <button onClick={() => { navigator.clipboard.writeText(activeCode.code); }} style={{
+                  marginLeft: "auto", padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.border}`,
+                  background: "rgba(255,255,255,0.04)", color: C.muted, fontSize: "0.70rem", fontWeight: 600,
+                  cursor: "pointer", fontFamily: font,
+                }}>Copy</button>
+                <button onClick={() => handleDeactivateCode(activeCode.id)} style={{
+                  padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.3)",
+                  background: C.redDim, color: "#fca5a5", fontSize: "0.70rem", fontWeight: 600,
+                  cursor: "pointer", fontFamily: font,
+                }}>Deactivate</button>
+              </div>
+            ) : (
+              <div style={{ padding: "14px 18px", borderRadius: 12, background: C.redDim, border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: "0.78rem", fontWeight: 600, marginBottom: 12 }}>
+                No active code — new members cannot register right now.
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="text" placeholder="NEW CODE (e.g. VIV-MAY-2026)" value={newCode} onChange={e => setNewCode(e.target.value.toUpperCase())}
+                onKeyDown={e => { if (e.key === "Enter") handleCreateCode(); }}
+                style={{ flex: 1, maxWidth: 280, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", color: C.white, fontSize: "0.82rem", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.06em", outline: "none", textTransform: "uppercase" }}
+                onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+              <GoldBtn onClick={handleCreateCode} small disabled={codeLoading}>{codeLoading ? "Saving..." : "Set New Code"}</GoldBtn>
             </div>
           </GlassCard>
 
-          <GlassCard style={{ padding: "24px 28px", marginBottom: 16, borderColor: "rgba(239,68,68,0.15)" }}>
-            <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>How to Change the Passcode</div>
-            <div style={{ fontSize: "0.74rem", color: C.muted, lineHeight: 1.7 }}>
-              <span style={{ display: "block", marginBottom: 8 }}>
-                <span style={{ fontWeight: 700, color: C.gold }}>Option A — Vercel Dashboard (recommended):</span><br />
-                Go to your Vercel project → Settings → Environment Variables → Set <span style={{ fontFamily: "monospace", color: C.goldBright, fontWeight: 600 }}>VITE_PASSCODE</span> to the new code → Redeploy. No code changes needed.
-              </span>
-              <span style={{ display: "block" }}>
-                <span style={{ fontWeight: 700, color: C.gold }}>Option B — Direct edit:</span><br />
-                Open <span style={{ fontFamily: "monospace", color: C.goldBright, fontWeight: 600 }}>src/App.jsx</span> → Find <span style={{ fontFamily: "monospace", color: C.goldBright, fontWeight: 600 }}>ACCESS_CODE</span> → Change the fallback value → Push to GitHub → Auto-deploys.
-              </span>
-            </div>
-          </GlassCard>
+          {/* Code History */}
+          {accessCodes.length > 1 && (
+            <GlassCard style={{ padding: "24px 28px", marginBottom: 16, borderColor: "rgba(239,68,68,0.15)" }}>
+              <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 12 }}>Code History</div>
+              {accessCodes.filter(c => !c.is_active).slice(0, 10).map(c => (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid rgba(255,255,255,0.04)`, fontSize: "0.74rem" }}>
+                  <span style={{ fontFamily: "monospace", color: C.muted, fontWeight: 600, letterSpacing: "0.04em" }}>{c.code}</span>
+                  <span style={{ marginLeft: "auto", color: "rgba(255,255,255,0.25)", fontSize: "0.64rem" }}>{new Date(c.created_at).toLocaleDateString()}</span>
+                  <span style={{ padding: "2px 8px", borderRadius: 6, background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.25)", fontSize: "0.58rem", fontWeight: 600 }}>Expired</span>
+                </div>
+              ))}
+            </GlassCard>
+          )}
 
+          {/* Members List */}
           <GlassCard style={{ padding: "24px 28px", marginBottom: 16, borderColor: "rgba(239,68,68,0.15)" }}>
-            <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Admin Privileges</div>
-            <div style={{ fontSize: "0.74rem", color: C.muted, lineHeight: 1.7 }}>
-              <span style={{ display: "block", marginBottom: 4 }}>
-                Your email (<span style={{ fontWeight: 600, color: C.white }}>{ADMIN_EMAIL}</span>) has permanent access — no passcode required to log in.
-              </span>
-              <span style={{ display: "block" }}>
-                All other members must enter a valid passcode each time they log in.
-              </span>
+            <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Registered Members</div>
+            <div style={{ fontSize: "0.70rem", color: C.muted, marginBottom: 16 }}>{allMembers.length} total member{allMembers.length !== 1 ? "s" : ""}</div>
+            <div style={{ maxHeight: 300, overflowY: "auto" }}>
+              {allMembers.map(m => (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid rgba(255,255,255,0.04)`, fontSize: "0.74rem" }}>
+                  <div>
+                    <div style={{ fontWeight: 600, color: C.white }}>{m.display_name || m.email.split("@")[0]}</div>
+                    <div style={{ fontSize: "0.64rem", color: C.muted }}>{m.email}</div>
+                  </div>
+                  {m.is_admin && <span style={{ marginLeft: "auto", padding: "2px 8px", borderRadius: 6, background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.gold, fontSize: "0.58rem", fontWeight: 700 }}>Admin</span>}
+                  <span style={{ marginLeft: m.is_admin ? 0 : "auto", color: "rgba(255,255,255,0.25)", fontSize: "0.62rem" }}>Joined {new Date(m.created_at).toLocaleDateString()}</span>
+                </div>
+              ))}
             </div>
           </GlassCard>
         </>
@@ -1719,61 +1782,116 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
 // ─── LOGIN PAGE ───
 // ═══════════════════════════════════════
 const ADMIN_EMAIL = "vc-lv@live.com";
-const ACCESS_CODE = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_PASSCODE) || "VIV2026";
 
-function LoginPage({ onLogin }) {
+// ═══════════════════════════════════════
+// ─── AUTH PAGE (Login / Register / Forgot Password) ───
+// ═══════════════════════════════════════
+function AuthPage() {
+  const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [accessCode, setAccessCode] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError("");
+  const handleLogin = async (e) => {
+    e.preventDefault(); setError(""); setSuccess("");
     if (!email.trim() || !email.includes("@")) { setError("Enter a valid email address."); return; }
-    const isAdmin = email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
-    if (!isAdmin && code.trim().toUpperCase() !== ACCESS_CODE.toUpperCase()) { setError("Invalid access code. Check your Skool community for the code."); return; }
+    if (!password) { setError("Enter your password."); return; }
     setLoading(true);
-    setTimeout(() => { onLogin(email.trim()); }, 600);
+    const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (err) setError(err.message === "Invalid login credentials" ? "Wrong email or password." : err.message);
+    setLoading(false);
   };
+
+  const handleRegister = async (e) => {
+    e.preventDefault(); setError(""); setSuccess("");
+    if (!email.trim() || !email.includes("@")) { setError("Enter a valid email address."); return; }
+    if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (password !== confirmPassword) { setError("Passwords don't match."); return; }
+    const isAdmin = email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    if (!isAdmin) {
+      if (!accessCode.trim()) { setError("Enter the access code from the Skool community."); return; }
+      const { data: codes } = await supabase.from("access_codes").select("code").eq("is_active", true);
+      const validCodes = (codes || []).map(c => c.code.toUpperCase());
+      if (!validCodes.includes(accessCode.trim().toUpperCase())) { setError("Invalid access code. Get the current code from the Skool community."); return; }
+    }
+    setLoading(true);
+    const { error: err } = await supabase.auth.signUp({ email: email.trim(), password });
+    if (err) setError(err.message);
+    else { setSuccess("Account created! You can now sign in."); setMode("login"); setPassword(""); }
+    setLoading(false);
+  };
+
+  const handleForgot = async (e) => {
+    e.preventDefault(); setError(""); setSuccess("");
+    if (!email.trim() || !email.includes("@")) { setError("Enter your email address."); return; }
+    setLoading(true);
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim());
+    if (err) setError(err.message);
+    else setSuccess("Password reset email sent! Check your inbox.");
+    setLoading(false);
+  };
+
+  const inp = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 16px", color: C.white, fontSize: "0.88rem", fontWeight: 500, fontFamily: font, outline: "none" };
 
   return (
     <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased", color: C.text }}>
       <div style={{ width: "100%", maxWidth: 420, padding: "0 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ fontWeight: 800, fontSize: "1.6rem", letterSpacing: "-0.03em", color: C.gold, marginBottom: 8, textShadow: `0 0 12px rgba(201,152,42,0.4), 0 0 28px rgba(201,152,42,0.2)`, lineHeight: 1.2 }}>
-            Valen Insiders Vault
-          </div>
+          <div style={{ fontWeight: 800, fontSize: "1.6rem", letterSpacing: "-0.03em", color: C.gold, marginBottom: 8, textShadow: `0 0 12px rgba(201,152,42,0.4), 0 0 28px rgba(201,152,42,0.2)`, lineHeight: 1.2 }}>Valen Insiders Vault</div>
           <div style={{ fontWeight: 400, fontSize: "0.82rem", color: C.muted, lineHeight: 1.6 }}>
-            Members-only trading dashboard.
+            {mode === "login" ? "Members-only trading dashboard." : mode === "register" ? "Create your account to get started." : "Reset your password."}
           </div>
         </div>
         <GlassCard style={{ padding: "32px 28px" }}>
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Email Address</label>
-              <input type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)}
-                style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 16px", color: C.white, fontSize: "0.88rem", fontWeight: 500, fontFamily: font, outline: "none" }}
-                onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+          <form onSubmit={mode === "login" ? handleLogin : mode === "register" ? handleRegister : handleForgot}>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Email</label>
+              <input type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} style={inp} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
             </div>
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Access Code</label>
-              <input type="text" placeholder="Enter your member code" value={code} onChange={e => setCode(e.target.value.toUpperCase())}
-                style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 16px", color: C.white, fontSize: "0.88rem", fontWeight: 500, fontFamily: font, outline: "none", textTransform: "uppercase", letterSpacing: "0.08em" }}
-                onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
-            </div>
+            {mode !== "forgot" && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Password</label>
+                <input type="password" placeholder={mode === "register" ? "Min 6 characters" : "Your password"} value={password} onChange={e => setPassword(e.target.value)} style={inp} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+              </div>
+            )}
+            {mode === "register" && (
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Confirm Password</label>
+                  <input type="password" placeholder="Repeat password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inp} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                </div>
+                <div style={{ marginBottom: 24 }}>
+                  <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Access Code</label>
+                  <input type="text" placeholder="Code from Skool community" value={accessCode} onChange={e => setAccessCode(e.target.value.toUpperCase())} style={{ ...inp, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace", fontWeight: 700 }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                </div>
+              </>
+            )}
             {error && <div style={{ padding: "10px 14px", borderRadius: 10, background: C.redDim, border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: "0.74rem", fontWeight: 500, marginBottom: 16 }}>{error}</div>}
+            {success && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", color: C.green, fontSize: "0.74rem", fontWeight: 500, marginBottom: 16 }}>{success}</div>}
             <button type="submit" disabled={loading} style={{
               width: "100%", padding: "14px", borderRadius: 980, border: "none", cursor: loading ? "wait" : "pointer",
               background: `linear-gradient(135deg, #a06800, ${C.goldBright}, #a06800)`, color: "#000",
               fontWeight: 800, fontSize: "0.88rem", fontFamily: font, letterSpacing: "-0.01em",
               opacity: loading ? 0.7 : 1, transition: "opacity 0.2s",
-            }}>{loading ? "Signing in..." : "Sign In"}</button>
+            }}>{loading ? "Please wait..." : mode === "login" ? "Sign In" : mode === "register" ? "Create Account" : "Send Reset Email"}</button>
           </form>
+          <div style={{ marginTop: 16, textAlign: "center", fontSize: "0.70rem", color: C.muted }}>
+            {mode === "login" && (<>
+              <span onClick={() => { setMode("forgot"); setError(""); setSuccess(""); }} style={{ color: C.gold, cursor: "pointer", fontWeight: 600 }}>Forgot password?</span>
+              <span style={{ margin: "0 8px" }}>·</span>
+              <span onClick={() => { setMode("register"); setError(""); setSuccess(""); }} style={{ color: C.gold, cursor: "pointer", fontWeight: 600 }}>Create account</span>
+            </>)}
+            {mode === "register" && <span>Already have an account? <span onClick={() => { setMode("login"); setError(""); setSuccess(""); }} style={{ color: C.gold, cursor: "pointer", fontWeight: 600 }}>Sign in</span></span>}
+            {mode === "forgot" && <span>Remember your password? <span onClick={() => { setMode("login"); setError(""); setSuccess(""); }} style={{ color: C.gold, cursor: "pointer", fontWeight: 600 }}>Sign in</span></span>}
+          </div>
         </GlassCard>
         <div style={{ textAlign: "center", marginTop: 20, fontSize: "0.68rem", color: C.muted, lineHeight: 1.6 }}>
-          Don't have an access code?<br />
-          <a href="https://www.skool.com/valens-insiders-vault" target="_blank" rel="noopener noreferrer" style={{ color: C.gold, fontWeight: 600, textDecoration: "none" }}>Join the Skool community</a> to get access.
+          Need an access code?<br />
+          <a href="https://www.skool.com/valens-insiders-vault" target="_blank" rel="noopener noreferrer" style={{ color: C.gold, fontWeight: 600, textDecoration: "none" }}>Join the Skool community</a> to get one.
         </div>
       </div>
     </div>
@@ -1790,65 +1908,187 @@ const NAV = [
   { id: "settings", label: "Settings", icon: "\u{2699}" },
 ];
 
+// Debounce helper — saves to Supabase after user stops typing
+function useSupabaseSave(table, userId, field, value, mapFn) {
+  const timeout = useRef(null);
+  useEffect(() => {
+    if (!userId) return;
+    clearTimeout(timeout.current);
+    timeout.current = setTimeout(() => { mapFn(value); }, 800);
+    return () => clearTimeout(timeout.current);
+  }, [value, userId]);
+}
+
 export default function App() {
   const screenW = useScreenWidth();
   const isMobile = screenW < 768;
   const isTablet = screenW >= 768 && screenW < 1024;
 
-  const [user, setUser] = useState(() => {
-    try { const saved = localStorage.getItem("viv_user"); return saved ? JSON.parse(saved) : null; } catch { return null; }
-  });
+  // ─── Auth State ───
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Single source of truth — managed in App, passed everywhere
+  // ─── Data State (starts with defaults, loaded from Supabase after auth) ───
   const [setupTypes, setSetupTypes] = useState(DEFAULT_SETUP_TYPES);
   const [tags, setTags] = useState(DEFAULT_TAGS);
   const [exitReasons, setExitReasons] = useState(DEFAULT_EXIT_REASONS);
   const [journaledTrades, setJournaledTrades] = useState([]);
+  const [positions, setPositions] = useState(INIT_POSITIONS);
+  const [portfolioSize, setPortfolioSize] = useState("500000");
+  const [fullSizePct, setFullSizePct] = useState(25);
+  const [numStocks, setNumStocks] = useState(5);
+  const [fontSize, setFontSize] = useState("standard");
+  const dataLoaded = useRef(false);
 
-  // ─── Positions & sizer — persisted to localStorage so tab switching doesn't reset ───
-  const [positions, setPositions] = useState(() => {
-    try { const saved = localStorage.getItem("viv_positions"); return saved ? JSON.parse(saved) : INIT_POSITIONS; } catch { return INIT_POSITIONS; }
-  });
-  const [portfolioSize, setPortfolioSize] = useState(() => {
-    try { return localStorage.getItem("viv_portfolioSize") || "1550000"; } catch { return "1550000"; }
-  });
-  const [fullSizePct, setFullSizePct] = useState(() => {
-    try { const v = localStorage.getItem("viv_fullSizePct"); return v ? +v : 25; } catch { return 25; }
-  });
-  const [numStocks, setNumStocks] = useState(() => {
-    try { const v = localStorage.getItem("viv_numStocks"); return v ? +v : 5; } catch { return 5; }
-  });
+  // ─── Auth Listener ───
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      if (!s) setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      if (!s) { setAuthLoading(false); dataLoaded.current = false; }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
-  useEffect(() => { try { localStorage.setItem("viv_positions", JSON.stringify(positions)); } catch {} }, [positions]);
-  useEffect(() => { try { localStorage.setItem("viv_portfolioSize", portfolioSize); } catch {} }, [portfolioSize]);
-  useEffect(() => { try { localStorage.setItem("viv_fullSizePct", String(fullSizePct)); } catch {} }, [fullSizePct]);
-  useEffect(() => { try { localStorage.setItem("viv_numStocks", String(numStocks)); } catch {} }, [numStocks]);
+  // ─── Load all data when session is available ───
+  useEffect(() => {
+    if (!session || dataLoaded.current) return;
+    const load = async () => {
+      const uid = session.user.id;
+      // Profile
+      const { data: prof } = await supabase.from("profiles").select("*").eq("id", uid).single();
+      if (prof) {
+        setProfile(prof);
+        if (prof.portfolio_size) setPortfolioSize(String(prof.portfolio_size));
+        if (prof.full_size_pct != null) setFullSizePct(prof.full_size_pct);
+        if (prof.num_stocks != null) setNumStocks(prof.num_stocks);
+        if (prof.font_size) setFontSize(prof.font_size);
+      }
+      // Settings
+      const { data: settings } = await supabase.from("user_settings").select("*").eq("user_id", uid);
+      if (settings) {
+        settings.forEach(s => {
+          if (s.setting_key === "setup_types" && Array.isArray(s.setting_value)) setSetupTypes(s.setting_value);
+          if (s.setting_key === "tags" && Array.isArray(s.setting_value)) setTags(s.setting_value);
+          if (s.setting_key === "exit_reasons" && Array.isArray(s.setting_value)) setExitReasons(s.setting_value);
+        });
+      }
+      // Positions
+      const { data: pos } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
+      if (pos && pos.length > 0) {
+        setPositions(pos.map(p => ({ id: p.id, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, setup: p.setup, tags: p.tags || [] })));
+      }
+      // Trades
+      const { data: trades } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false });
+      if (trades && trades.length > 0) {
+        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, exit: t.exit_date, entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, notes: t.notes })));
+      }
+      dataLoaded.current = true;
+      setAuthLoading(false);
+    };
+    load();
+  }, [session]);
 
-  const [fontSize, setFontSize] = useState(() => {
-    try { return localStorage.getItem("viv_fontSize") || "standard"; } catch { return "standard"; }
-  });
+  // ─── Auto-save profile fields to Supabase (debounced) ───
+  const saveTimer = useRef({});
+  const saveProfile = useCallback((field, val) => {
+    if (!session) return;
+    clearTimeout(saveTimer.current[field]);
+    saveTimer.current[field] = setTimeout(() => {
+      supabase.from("profiles").update({ [field]: val, updated_at: new Date().toISOString() }).eq("id", session.user.id).then(() => {});
+    }, 1000);
+  }, [session]);
 
-  useEffect(() => { try { localStorage.setItem("viv_fontSize", fontSize); } catch {} }, [fontSize]);
+  useEffect(() => { if (dataLoaded.current) saveProfile("portfolio_size", +portfolioSize || 0); }, [portfolioSize]);
+  useEffect(() => { if (dataLoaded.current) saveProfile("full_size_pct", fullSizePct); }, [fullSizePct]);
+  useEffect(() => { if (dataLoaded.current) saveProfile("num_stocks", numStocks); }, [numStocks]);
+  useEffect(() => { if (dataLoaded.current) saveProfile("font_size", fontSize); }, [fontSize]);
+
+  // ─── Auto-save settings to Supabase ───
+  const saveSetting = useCallback((key, value) => {
+    if (!session) return;
+    supabase.from("user_settings").upsert({ user_id: session.user.id, setting_key: key, setting_value: value, updated_at: new Date().toISOString() }, { onConflict: "user_id,setting_key" }).then(() => {});
+  }, [session]);
+
+  useEffect(() => { if (dataLoaded.current) saveSetting("setup_types", setupTypes); }, [setupTypes]);
+  useEffect(() => { if (dataLoaded.current) saveSetting("tags", tags); }, [tags]);
+  useEffect(() => { if (dataLoaded.current) saveSetting("exit_reasons", exitReasons); }, [exitReasons]);
+
+  // ─── Auto-save positions to Supabase ───
+  const posTimer = useRef(null);
+  useEffect(() => {
+    if (!dataLoaded.current || !session) return;
+    clearTimeout(posTimer.current);
+    posTimer.current = setTimeout(async () => {
+      const uid = session.user.id;
+      // Delete all existing positions and re-insert (simpler than diffing)
+      await supabase.from("positions").delete().eq("user_id", uid);
+      if (positions.length > 0) {
+        await supabase.from("positions").insert(positions.map(p => ({
+          user_id: uid, symbol: p.sym, entry_date: p.entry, shares: p.shares,
+          entry_price: p.ep, current_price: p.cp, stop_price: p.stop,
+          stop_price_2: p.stop2, setup: p.setup, tags: p.tags,
+        })));
+      }
+    }, 1500);
+  }, [positions, session]);
+
+  // ─── Auto-save journaled trades ───
+  const tradeTimer = useRef(null);
+  useEffect(() => {
+    if (!dataLoaded.current || !session) return;
+    clearTimeout(tradeTimer.current);
+    tradeTimer.current = setTimeout(async () => {
+      const uid = session.user.id;
+      // Get existing trade IDs from DB
+      const { data: existing } = await supabase.from("trades").select("id").eq("user_id", uid).eq("is_deleted", false);
+      const existingIds = new Set((existing || []).map(t => t.id));
+      // Insert only new trades (ones not in DB)
+      const newTrades = journaledTrades.filter(t => !existingIds.has(t.id));
+      if (newTrades.length > 0) {
+        await supabase.from("trades").insert(newTrades.map(t => ({
+          user_id: uid, ticker: t.ticker, entry_date: t.entry, exit_date: t.exit,
+          entry_price: t.entryP, exit_price: t.exitP, shares: t.shares,
+          stop_price: t.stop, setup: t.setup, tags: t.tags,
+          pl_pct: t.plPct, pl_dollar: t.plDollar, r_mult: t.rMult,
+          exit_reason: t.reason, notes: t.notes,
+        })));
+      }
+    }, 1500);
+  }, [journaledTrades, session]);
+
   const appZoom = fontSize === "huge" ? 1.30 : fontSize === "large" ? 1.15 : fontSize === "small" ? 0.88 : 1.0;
 
   const handleJournalTrade = useCallback((trade) => { setJournaledTrades(prev => [...prev, trade]); }, []);
 
-  const handleLogin = (email) => {
-    const userData = { email, loginAt: new Date().toISOString() };
-    localStorage.setItem("viv_user", JSON.stringify(userData));
-    setUser(userData);
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setProfile(null);
+    dataLoaded.current = false;
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("viv_user");
-    setUser(null);
-  };
+  // ─── Loading / Auth Gate ───
+  if (authLoading) {
+    return (
+      <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontWeight: 800, fontSize: "1.3rem", color: C.gold, marginBottom: 12, textShadow: `0 0 12px rgba(201,152,42,0.4)` }}>Valen Insiders Vault</div>
+          <div style={{ fontSize: "0.78rem", color: C.muted }}>Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
-  if (!user) return <LoginPage onLogin={handleLogin} />;
+  if (!session) return <AuthPage />;
 
-  const displayName = user.email.split("@")[0];
+  const userEmail = session.user.email;
+  const displayName = profile?.display_name || userEmail.split("@")[0];
   const sidebarW = isTablet ? 200 : 220;
   const contentPadH = isMobile ? 16 : isTablet ? 24 : 36;
   const contentPadV = isMobile ? 16 : 28;
@@ -1858,7 +2098,7 @@ export default function App() {
       {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
-      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={user.email} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} />}
     </>
   );
 
@@ -1866,18 +2106,11 @@ export default function App() {
   if (isMobile) {
     return (
       <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column", zoom: appZoom }}>
-        {/* Top bar */}
         <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
-          <div style={{ fontWeight: 800, fontSize: "0.88rem", letterSpacing: "-0.02em", color: C.gold, lineHeight: 1, textShadow: `0 0 6px rgba(201,152,42,0.35), 0 0 14px rgba(201,152,42,0.15)` }}>
-            Valen Insiders Vault
-          </div>
+          <div style={{ fontWeight: 800, fontSize: "0.88rem", letterSpacing: "-0.02em", color: C.gold, lineHeight: 1, textShadow: `0 0 6px rgba(201,152,42,0.35), 0 0 14px rgba(201,152,42,0.15)` }}>Valen Insiders Vault</div>
           <button onClick={handleLogout} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
         </div>
-        {/* Scrollable content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80 }}>
-          {pageContent}
-        </div>
-        {/* Bottom nav */}
+        <div style={{ flex: 1, overflowY: "auto", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80 }}>{pageContent}</div>
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(8,8,14,0.97)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
           {NAV.map(item => (
             <button key={item.id} onClick={() => setPage(item.id)} style={{
@@ -1898,11 +2131,8 @@ export default function App() {
   // ─── DESKTOP / TABLET LAYOUT ───
   return (
     <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text, zoom: appZoom }}>
-      {/* Sidebar */}
       <div style={{ width: sidebarW, minHeight: "100vh", padding: "24px 14px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, alignSelf: "flex-start" }}>
-        <div style={{ fontWeight: 800, fontSize: "0.95rem", letterSpacing: "-0.02em", color: C.gold, marginBottom: 24, padding: "0 8px", lineHeight: 1.2, textShadow: `0 0 8px rgba(201,152,42,0.35), 0 0 16px rgba(201,152,42,0.15)` }}>
-          Valen Insiders Vault
-        </div>
+        <div style={{ fontWeight: 800, fontSize: "0.95rem", letterSpacing: "-0.02em", color: C.gold, marginBottom: 24, padding: "0 8px", lineHeight: 1.2, textShadow: `0 0 8px rgba(201,152,42,0.35), 0 0 16px rgba(201,152,42,0.15)` }}>Valen Insiders Vault</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV.map(item => (
             <button key={item.id} onClick={() => setPage(item.id)} style={{
@@ -1917,14 +2147,11 @@ export default function App() {
         <div style={{ flex: 1 }} />
         <div style={{ padding: "10px 12px", borderRadius: 10, background: C.glass, border: `1px solid ${C.border}` }}>
           <div style={{ fontWeight: 700, fontSize: "0.72rem", color: C.white, marginBottom: 2 }}>{displayName}</div>
-          <div style={{ fontSize: "0.56rem", color: C.muted, marginBottom: 6, wordBreak: "break-all" }}>{user.email}</div>
+          <div style={{ fontSize: "0.56rem", color: C.muted, marginBottom: 6, wordBreak: "break-all" }}>{userEmail}</div>
           <button onClick={handleLogout} style={{ width: "100%", padding: "5px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
         </div>
       </div>
-      {/* Main content — fluid, fills available space */}
-      <div style={{ flex: 1, padding: `${contentPadV}px ${contentPadH}px`, overflowY: "auto", minWidth: 0 }}>
-        {pageContent}
-      </div>
+      <div style={{ flex: 1, padding: `${contentPadV}px ${contentPadH}px`, overflowY: "auto", minWidth: 0 }}>{pageContent}</div>
     </div>
   );
 }
