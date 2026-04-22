@@ -1204,8 +1204,8 @@ const INIT_POSITIONS = [
 
 const GLOSSARY = [
   ["Stop 1 / 2","Dual Stop Loss","Each stop covers 50% of your shares. Stop 1 = tighter (first half out), Stop 2 = wider (second half). If only one is filled, it covers 100%."],
-  ["DTS","Down To Stop","Weighted average distance from current price to both stops, per share."],
-  ["RTS","Risk To Stop","Total dollars lost if both stops hit. Weighted across both halves. Goal: $0."],
+  ["DTS","Down To Stop","Distance from current price down to your stop loss. How far the stock needs to drop before your stop triggers."],
+  ["RTS","Risk To Stop","Actual dollars at risk from your entry to your stop. If stop is at entry, RTS = $0 — you're risk-free. Goal: $0."],
   ["ROTE","Risk of Total Equity","Initial risk (entry to stops) ÷ portfolio. Weighted across both halves. Keep under 1.5%."],
   ["Exposure","Risk-Free Exposure","Shows what % of the position is risk-free (stop above entry = locked profit). Green bar = free, red = at risk."],
   ["SBE","Shares to Break Even","Shares to sell at current price so if remaining shares hit the stop, net P/L = $0. Formula: N × (Entry − Stop) ÷ (Current − Stop)."],
@@ -1296,8 +1296,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const dtsD = sharesN > 0 ? (dts1 * h1 + dts2 * h2) / sharesN : 0;
     const dtsPct = cpN > 0 ? (dtsD / cpN) * 100 : 0;
 
-    // RTS = total dollars at risk to stops
-    const rtsD = dts1 * h1 + dts2 * h2;
+    // DTS total $ (current-to-stop × shares) — used for totals row DTS display
+    const dtsTotalD = dts1 * h1 + dts2 * h2;
+
+    // RTS = actual dollars at risk (entry-to-stop × shares). Goal: $0 when stop ≥ entry.
+    const rtsD = (epN - stop1) * h1 + (isDual ? (epN - stop2) * h2 : 0);
 
     // SBE = shares to sell at current price so if remaining shares get stopped, net P/L = $0
     // Formula: X = N × (EP - avgStop) / (CP - avgStop), where avgStop is weighted across halves
@@ -1341,14 +1344,14 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       : plPct >= -2 ? "Even"
       : "At Risk";
 
-    return { ...p, epN, cpN, stop1, stop2, sharesN, h1, h2, posValue, tier, isDual, dtsD, dtsPct, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct };
+    return { ...p, epN, cpN, stop1, stop2, sharesN, h1, h2, posValue, tier, isDual, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct };
   }), [positions, sizer, portfolioSize]);
 
   const totals = useMemo(() => {
     const active = enriched.filter(p => p.sym && p.cpN > 0);
     const totalValue = active.reduce((s,p) => s + p.cpN * p.sharesN, 0);
-    // Weighted DTS uses the already-weighted dtsD per share from enriched
-    const totalDtsD = active.reduce((s,p) => s + p.rtsD, 0); // rtsD is already the total $ risk-to-stop for this position
+    // Total DTS in dollars (current-to-stop across all positions)
+    const totalDtsD = active.reduce((s,p) => s + p.dtsTotalD, 0);
     const avgDtsPct = totalValue > 0 ? (totalDtsD / totalValue) * 100 : 0;
     const totalRoteD = enriched.reduce((s,p) => s + p.roteD, 0);
     const ps = +portfolioSize || 0;
@@ -1895,7 +1898,7 @@ function AuthPage() {
         </GlassCard>
         <div style={{ textAlign: "center", marginTop: 20, fontSize: "0.68rem", color: C.muted, lineHeight: 1.6 }}>
           Need an access code?<br />
-          <a href="https://www.skool.com/valens-insiders-vault" target="_blank" rel="noopener noreferrer" style={{ color: C.gold, fontWeight: 600, textDecoration: "none" }}>Join the Skool community</a> to get one.
+          <a href="https://www.skool.com/valensontrades/about" target="_blank" rel="noopener noreferrer" style={{ color: C.gold, fontWeight: 600, textDecoration: "none" }}>Join the Skool community</a> to get one.
         </div>
       </div>
     </div>
