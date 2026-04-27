@@ -1262,6 +1262,34 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const [sellAddJournal, setSellAddJournal] = useState(true);
   const [sellNotes, setSellNotes] = useState("");
   const [displayMode, setDisplayMode] = useState("$"); // "$" or "%"
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [lastPriceRefresh, setLastPriceRefresh] = useState(null);
+
+  // Fetch delayed prices from Finnhub via serverless proxy
+  const fetchLivePrices = useCallback(async () => {
+    const tickers = positions.filter(p => p.sym && p.sym.trim()).map(p => p.sym.trim().toUpperCase());
+    const unique = [...new Set(tickers)];
+    if (unique.length === 0) return;
+    setPriceLoading(true);
+    try {
+      const res = await fetch(`/api/prices?symbols=${unique.join(",")}`);
+      if (!res.ok) throw new Error("API error");
+      const prices = await res.json();
+      if (prices && typeof prices === "object" && !prices.error) {
+        setPositions(prev => prev.map(p => {
+          const sym = (p.sym || "").toUpperCase();
+          if (sym && prices[sym] !== undefined) {
+            return { ...p, cp: String(prices[sym]) };
+          }
+          return p;
+        }));
+        setLastPriceRefresh(new Date());
+      }
+    } catch (err) {
+      console.error("Price fetch failed:", err.message);
+    }
+    setPriceLoading(false);
+  }, [positions, setPositions]);
 
   const updateField = useCallback((id, field, val) => { setPositions(prev => prev.map(p => p.id === id ? { ...p, [field]: val } : p)); }, []);
   const addPosition = useCallback(() => {
@@ -1433,11 +1461,32 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
             <div style={{ fontWeight:400,fontSize:"0.64rem",color:C.muted,marginTop:2 }}>Edit any white cell. Gold = current price. Grey = auto-calculated.</div>
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <button onClick={fetchLivePrices} disabled={priceLoading} style={{
+              padding:"8px 14px",borderRadius:980,border:`1px solid ${C.border}`,
+              background:priceLoading?"rgba(255,255,255,0.04)":"rgba(255,255,255,0.04)",
+              color:priceLoading?C.muted:C.white,fontWeight:700,fontSize:"0.68rem",
+              cursor:priceLoading?"wait":"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:6,
+            }}>
+              <span style={{ display:"inline-block",transition:"transform 0.3s",transform:priceLoading?"rotate(180deg)":"none" }}>{"↻"}</span>
+              {priceLoading?"Fetching...":"Refresh Prices"}
+            </button>
             <div style={{display:"flex",borderRadius:8,overflow:"hidden",border:`1px solid ${C.border}`}}>
               {["$","%"].map(m=>(<button key={m} onClick={()=>setDisplayMode(m)} style={{padding:"6px 14px",background:displayMode===m?C.goldDim:"rgba(255,255,255,0.03)",border:"none",color:displayMode===m?C.gold:C.muted,fontWeight:700,fontSize:"0.70rem",cursor:"pointer",fontFamily:font}}>{m}</button>))}
             </div>
             <GoldBtn onClick={addPosition} small>+ Add Position</GoldBtn>
           </div>
+        </div>
+        {/* 15-min delay notice */}
+        <div style={{ padding:"0 24px 8px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:6,padding:"5px 12px",borderRadius:980,background:"rgba(59,130,246,0.08)",border:"1px solid rgba(59,130,246,0.20)" }}>
+            <span style={{ fontSize:"0.60rem",fontWeight:700,color:C.blue,letterSpacing:"0.06em",textTransform:"uppercase" }}>Live Prices</span>
+            <span style={{ fontSize:"0.58rem",fontWeight:500,color:C.muted }}>~15 min delay from real-time</span>
+          </div>
+          {lastPriceRefresh && (
+            <span style={{ fontSize:"0.58rem",color:C.muted }}>
+              Last updated: {lastPriceRefresh.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
         </div>
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
