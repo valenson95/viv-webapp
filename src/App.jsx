@@ -874,6 +874,28 @@ function exportTradesCSV(trades) {
   URL.revokeObjectURL(url);
 }
 
+// Normalize dates: detect DD/MM/YYYY or D/MM/YYYY and convert to YYYY-MM-DD
+function normalizeDate(raw) {
+  if (!raw || !raw.trim()) return "";
+  const s = raw.trim();
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // DD/MM/YYYY or D/MM/YYYY (day > 12 confirms DD/MM, otherwise assume DD/MM for consistency)
+  const slashMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (slashMatch) {
+    const a = parseInt(slashMatch[1]), b = parseInt(slashMatch[2]), y = slashMatch[3];
+    // If first number > 12, it must be day (DD/MM/YYYY)
+    // If second number > 12, it must be day (MM/DD/YYYY)
+    // Otherwise default to DD/MM/YYYY (non-US format, common in SEA)
+    let day, month;
+    if (a > 12) { day = a; month = b; }
+    else if (b > 12) { day = b; month = a; }
+    else { day = a; month = b; } // default DD/MM
+    return `${y}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+  }
+  return s; // return as-is if unrecognized
+}
+
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
@@ -892,26 +914,36 @@ function parseCSV(text) {
     vals.push(cur.trim());
     const row = {};
     colMap.forEach((field, idx) => { if (field && vals[idx] !== undefined) row[field] = vals[idx]; });
-    // Validate minimum: need ticker + at least entry or exit price
-    if (!row.ticker) return results; // skip malformed
+    // Skip rows without a ticker
+    if (!row.ticker) continue;
+    // Skip open positions (no exit price = not a closed trade)
+    const exitP = parseFloat(row.exitP) || 0;
+    if (exitP <= 0) continue;
     // Convert numerics
     const entryP = parseFloat(row.entryP) || 0;
-    const exitP = parseFloat(row.exitP) || 0;
     const shares = parseInt(row.shares) || 0;
     const stop = parseFloat(row.stop) || 0;
-    const plPct = row.plPct !== undefined ? parseFloat(row.plPct) : (entryP > 0 ? ((exitP - entryP) / entryP) * 100 : 0);
-    const plDollar = row.plDollar !== undefined ? parseFloat(row.plDollar) : (exitP - entryP) * shares;
-    const initRisk = entryP > 0 && stop > 0 ? (entryP - stop) / entryP : 0;
-    const rMult = row.rMult !== undefined ? parseFloat(row.rMult) : (initRisk > 0 ? (plPct / 100) / initRisk : 0);
+    // Calculate P/L % — use CSV value if present, otherwise derive from prices
+    const plPct = row.plPct !== undefined && row.plPct !== "" ? parseFloat(row.plPct) : (entryP > 0 ? ((exitP - entryP) / entryP) * 100 : 0);
+    // Calculate P/L $ — use CSV value if present, otherwise derive from prices × shares
+    const plDollar = row.plDollar !== undefined && row.plDollar !== "" ? parseFloat(row.plDollar) : (exitP - entryP) * shares;
+    // If we have plDollar but no entry price, back-calculate entry from exit and P/L
+    const effectiveEntryP = entryP > 0 ? entryP : (shares > 0 && row.plDollar ? exitP - (parseFloat(row.plDollar) / shares) : 0);
+    const effectivePlPct = plPct !== 0 ? plPct : (effectiveEntryP > 0 ? ((exitP - effectiveEntryP) / effectiveEntryP) * 100 : 0);
+    const initRisk = effectiveEntryP > 0 && stop > 0 ? (effectiveEntryP - stop) / effectiveEntryP : 0;
+    const rMult = row.rMult !== undefined && row.rMult !== "" ? parseFloat(row.rMult) : (initRisk > 0 ? (effectivePlPct / 100) / initRisk : 0);
+    // Normalize dates
+    const entryDate = normalizeDate(row.entry);
+    const exitDate = normalizeDate(row.exit);
     results.push({
       id: Date.now() + i,
       ticker: row.ticker.toUpperCase(),
-      entry: row.entry || "",
-      exit: row.exit || "",
-      entryP, exitP, shares, stop,
+      entry: entryDate,
+      exit: exitDate,
+      entryP: effectiveEntryP, exitP, shares, stop,
       setup: row.setup || "VCP",
       tags: row.tags ? row.tags.split(/[;,]/).map(t => t.trim()).filter(Boolean) : [],
-      plPct, plDollar, rMult,
+      plPct: effectivePlPct, plDollar, rMult,
       reason: row.reason || "",
       notes: row.notes || "",
       _imported: true,
