@@ -794,6 +794,175 @@ function RiskFinanceTab({ demo }) {
     </div>
   );
 }
+// ─── Expected Move Calculator ───
+function ExpectedMoveTab({ demo }) {
+  const DEMO = { sym: "CRWD", stockPrice: "34.11", callPrice: "2.30", putPrice: "2.20" };
+  const [sym, setSym] = useState(demo ? DEMO.sym : "");
+  const [stockPrice, setStockPrice] = useState(demo ? DEMO.stockPrice : "");
+  const [callPrice, setCallPrice] = useState(demo ? DEMO.callPrice : "");
+  const [putPrice, setPutPrice] = useState(demo ? DEMO.putPrice : "");
+  const [showGuide, setShowGuide] = useState(false);
+
+  useEffect(() => {
+    if (demo) { setSym(DEMO.sym); setStockPrice(DEMO.stockPrice); setCallPrice(DEMO.callPrice); setPutPrice(DEMO.putPrice); }
+    else { setSym(""); setStockPrice(""); setCallPrice(""); setPutPrice(""); }
+  }, [demo]);
+
+  const r = useMemo(() => {
+    const sp = +stockPrice, cp = +callPrice, pp = +putPrice;
+    if (!sp || sp <= 0 || (!cp && !pp)) return null;
+    const straddle = (cp || 0) + (pp || 0);
+    if (straddle <= 0) return null;
+    const expectedMovePct = (straddle / sp) * 100;
+    const upperTarget = sp + straddle;
+    const lowerTarget = sp - straddle;
+    // Range as zone: ±expected move from current
+    const upperPct = ((upperTarget - sp) / sp) * 100;
+    const lowerPct = ((sp - lowerTarget) / sp) * 100;
+    return { straddle, expectedMovePct, upperTarget, lowerTarget, upperPct, lowerPct };
+  }, [stockPrice, callPrice, putPrice]);
+
+  return (
+    <div style={{ padding: "24px 28px 32px" }}>
+      {/* How-to guide toggle */}
+      <div style={{ marginBottom: 20 }}>
+        <button onClick={() => setShowGuide(!showGuide)} style={{
+          padding: "10px 18px", borderRadius: 10, border: `1px solid ${C.borderGold}`,
+          background: C.goldDim, color: C.goldBright, fontWeight: 700, fontSize: "0.72rem",
+          cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <span style={{ fontSize: "0.9rem" }}>{showGuide ? "▾" : "▸"}</span>
+          How to Find the Straddle Price
+        </button>
+
+        {showGuide && (
+          <div style={{ marginTop: 12, padding: "20px 22px", borderRadius: 14, background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, lineHeight: 1.8 }}>
+            <div style={{ fontWeight: 800, fontSize: "0.88rem", color: C.white, marginBottom: 12 }}>Step-by-Step: Finding the Straddle Price</div>
+
+            <div style={{ fontWeight: 700, fontSize: "0.74rem", color: C.gold, marginBottom: 4 }}>What is a straddle?</div>
+            <div style={{ fontSize: "0.74rem", color: C.text, marginBottom: 14 }}>
+              A straddle is the combined cost of buying the at-the-money (ATM) call and ATM put at the same strike price, at the nearest expiration after earnings. It tells you how much the market expects the stock to move.
+            </div>
+
+            <div style={{ fontWeight: 700, fontSize: "0.74rem", color: C.gold, marginBottom: 4 }}>Step 1: Open your broker's options chain</div>
+            <div style={{ fontSize: "0.74rem", color: C.text, marginBottom: 14 }}>
+              Go to the stock's option chain in your broker (IBKR, Webull, Schwab, etc.) or a free site like Yahoo Finance → Options.
+            </div>
+
+            <div style={{ fontWeight: 700, fontSize: "0.74rem", color: C.gold, marginBottom: 4 }}>Step 2: Select the expiration date right after earnings</div>
+            <div style={{ fontSize: "0.74rem", color: C.text, marginBottom: 14 }}>
+              If earnings are on May 6th, pick the nearest expiration after that date (e.g., May 9th). This captures the earnings event.
+            </div>
+
+            <div style={{ fontWeight: 700, fontSize: "0.74rem", color: C.gold, marginBottom: 4 }}>Step 3: Find the at-the-money (ATM) strike</div>
+            <div style={{ fontSize: "0.74rem", color: C.text, marginBottom: 14 }}>
+              The ATM strike is the one closest to the current stock price. If the stock is at $34.11, the ATM strike is $34 or $34.50 — whichever is closest.
+            </div>
+
+            <div style={{ fontWeight: 700, fontSize: "0.74rem", color: C.gold, marginBottom: 4 }}>Step 4: Get the call and put prices</div>
+            <div style={{ fontSize: "0.74rem", color: C.text, marginBottom: 14 }}>
+              Look at the mid price (halfway between bid and ask) for the ATM call and ATM put. Enter both below. The calculator adds them to get the straddle price.
+            </div>
+
+            <div style={{ fontWeight: 700, fontSize: "0.74rem", color: C.gold, marginBottom: 4 }}>Why this matters for swing traders</div>
+            <div style={{ fontSize: "0.74rem", color: C.text, marginBottom: 0 }}>
+              If you're holding a position into earnings, the expected move tells you the range the stock is likely to land in. If your unrealized gain is less than the expected move, you're gambling — the stock could easily wipe your profit. Consider selling before earnings or at least reducing your size.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Calculator inputs + results */}
+      <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 300px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <TextInput label="Symbol" value={sym} onChange={setSym} placeholder="AAPL" />
+          <CalcInput label="Current Stock Price" value={stockPrice} onChange={setStockPrice} />
+          <div style={{ display: "flex", gap: 12 }}>
+            <CalcInput label="ATM Call Price (Mid)" value={callPrice} onChange={setCallPrice} />
+            <CalcInput label="ATM Put Price (Mid)" value={putPrice} onChange={setPutPrice} />
+          </div>
+          {r && (
+            <div style={{ padding: "14px 18px", borderRadius: 12, background: C.goldDim, border: `1px solid ${C.borderGold}` }}>
+              <div style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.10em", color: C.muted, marginBottom: 4 }}>Straddle Price (Call + Put)</div>
+              <div style={{ fontSize: "1.15rem", fontWeight: 800, color: C.goldBright }}>${r.straddle.toFixed(2)}</div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ flex: "1 1 300px", display: "flex", flexDirection: "column" }}>
+          {!r ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 200, color: C.muted, fontSize: "0.82rem", textAlign: "center", lineHeight: 1.6 }}>
+              Enter stock price and at least<br />one option price to see results.
+            </div>
+          ) : (
+            <>
+              {/* Expected Move headline */}
+              <div style={{ textAlign: "center", padding: "20px 0 18px" }}>
+                <div style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: C.muted, marginBottom: 8 }}>Expected Move</div>
+                <div style={{ fontSize: "2.2rem", fontWeight: 900, letterSpacing: "-0.04em", color: C.goldBright }}>±{r.expectedMovePct.toFixed(2)}%</div>
+                <div style={{ fontSize: "0.76rem", fontWeight: 500, color: C.muted, marginTop: 4 }}>±${r.straddle.toFixed(2)} per share</div>
+              </div>
+
+              {/* Visual range bar */}
+              <div style={{ padding: "18px 16px", borderRadius: 14, background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, marginBottom: 16 }}>
+                <div style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.10em", color: C.muted, marginBottom: 14, textAlign: "center" }}>Expected Price Range After Earnings</div>
+                {/* Bar visualization */}
+                <div style={{ position: "relative", height: 44, marginBottom: 10 }}>
+                  {/* Full bar background */}
+                  <div style={{ position: "absolute", left: "10%", right: "10%", top: 14, height: 16, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}` }} />
+                  {/* Expected range fill */}
+                  <div style={{ position: "absolute", left: "20%", right: "20%", top: 14, height: 16, borderRadius: 8, background: `linear-gradient(90deg, ${C.redDim}, rgba(201,152,42,0.15), ${C.greenDim})`, border: `1px solid rgba(201,152,42,0.25)` }} />
+                  {/* Current price marker */}
+                  <div style={{ position: "absolute", left: "50%", top: 8, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <div style={{ width: 2, height: 28, background: C.gold, borderRadius: 1 }} />
+                  </div>
+                  {/* Lower label */}
+                  <div style={{ position: "absolute", left: "20%", top: 0, transform: "translateX(-50%)" }}>
+                    <div style={{ fontSize: "0.64rem", fontWeight: 700, color: C.red, textAlign: "center" }}>${r.lowerTarget.toFixed(2)}</div>
+                  </div>
+                  {/* Upper label */}
+                  <div style={{ position: "absolute", right: "20%", top: 0, transform: "translateX(50%)" }}>
+                    <div style={{ fontSize: "0.64rem", fontWeight: 700, color: C.green, textAlign: "center" }}>${r.upperTarget.toFixed(2)}</div>
+                  </div>
+                </div>
+                {/* Current price label below bar */}
+                <div style={{ textAlign: "center", fontSize: "0.68rem", fontWeight: 600, color: C.gold }}>
+                  Current: ${(+stockPrice).toFixed(2)}
+                </div>
+              </div>
+
+              {/* Result rows */}
+              <ResultRow label="Upper Target (bullish)" value={`$${r.upperTarget.toFixed(2)}`} color={C.green} />
+              <ResultRow label="Lower Target (bearish)" value={`$${r.lowerTarget.toFixed(2)}`} color={C.red} />
+              <ResultRow label="Expected Move ($)" value={`±$${r.straddle.toFixed(2)}`} color={C.goldBright} highlight />
+              <ResultRow label="Expected Move (%)" value={`±${r.expectedMovePct.toFixed(2)}%`} color={C.goldBright} highlight />
+
+              {/* Decision framework */}
+              <div style={{ marginTop: 16, padding: "16px 18px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.10em", color: C.muted, marginBottom: 10 }}>Earnings Decision Framework</div>
+                <div style={{ fontSize: "0.74rem", color: C.text, lineHeight: 1.8 }}>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                    <span style={{ color: C.green, fontWeight: 800, flexShrink: 0 }}>Hold</span>
+                    <span>— Your unrealized P/L exceeds the expected move AND your stop is above entry (risk-free). You can afford the swing.</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                    <span style={{ color: C.gold, fontWeight: 800, flexShrink: 0 }}>Trim</span>
+                    <span>— Sell enough shares to finance your risk (SBE) before earnings. Keep a free position and let the rest ride.</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <span style={{ color: C.red, fontWeight: 800, flexShrink: 0 }}>Exit</span>
+                    <span>— Your unrealized P/L is less than the expected move and your stop is below entry. You're gambling, not trading.</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LossRecoveryTable() {
   const data=[[5,5.26],[10,11.11],[15,17.65],[20,25],[25,33.33],[30,42.86],[40,66.67],[50,100],[60,150],[75,300]];
   return (<GlassCard style={{marginTop:20}}><div style={{padding:"24px 28px"}}>
@@ -810,7 +979,7 @@ function LossRecoveryTable() {
   </div></GlassCard>);
 }
 function PremiumToolsPage({ demo }) {
-  const[tab,setTab]=useState(0);const tabs=["Risk","Expectancy","Risk Finance"];
+  const[tab,setTab]=useState(0);const tabs=["Risk","Expectancy","Risk Finance","Expected Move"];
   return (<div>
     <Eyebrow>Premium Tools</Eyebrow>
     <h1 style={{fontWeight:800,fontSize:"clamp(1.5rem, 4vw, 2rem)",letterSpacing:"-0.04em",color:C.white,margin:"0 0 4px"}}>Risk Management</h1>
@@ -818,7 +987,7 @@ function PremiumToolsPage({ demo }) {
     <GlassCard><div style={{display:"flex",borderBottom:`1px solid ${C.border}`}}>
       {tabs.map((t,i)=>(<button key={t} onClick={()=>setTab(i)} style={{flex:1,padding:"14px 0",textAlign:"center",fontWeight:tab===i?700:500,fontSize:"0.80rem",color:tab===i?C.white:C.muted,cursor:"pointer",background:"transparent",border:"none",fontFamily:font,borderBottom:tab===i?`2px solid ${C.gold}`:"2px solid transparent"}}>{t}</button>))}
     </div>
-      {tab===0&&<RiskTab demo={demo}/>}{tab===1&&<ExpectancyTab demo={demo}/>}{tab===2&&<RiskFinanceTab demo={demo}/>}
+      {tab===0&&<RiskTab demo={demo}/>}{tab===1&&<ExpectancyTab demo={demo}/>}{tab===2&&<RiskFinanceTab demo={demo}/>}{tab===3&&<ExpectedMoveTab demo={demo}/>}
     </GlassCard>
     <LossRecoveryTable />
   </div>);
