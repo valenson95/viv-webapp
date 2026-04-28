@@ -2440,52 +2440,50 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ─── Helper: save positions to Supabase (safe sync — never deletes without confirmed insert) ───
+  // ─── Helper: save positions to Supabase (insert-first, delete-after, ID-sync) ───
+  const isSaving = useRef(false);
   const savePositionsNow = useCallback(async (uid, posArr) => {
+    // Prevent concurrent saves
+    if (isSaving.current) return;
+    isSaving.current = true;
     try {
-      // Step 1: Get existing DB positions to know what to update vs insert vs delete
-      const { data: existing, error: fetchErr } = await supabase.from("positions").select("id").eq("user_id", uid);
-      if (fetchErr) { console.error("Position fetch error:", fetchErr.message); return; }
+      const rows = posArr.map(p => ({
+        user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
+        entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
+        stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
+      }));
 
-      const existingIds = new Set((existing || []).map(r => r.id));
-      const currentIds = new Set(posArr.filter(p => typeof p.id === "number" && existingIds.has(p.id)).map(p => p.id));
+      if (rows.length === 0) {
+        // User intentionally cleared all — safe to delete
+        await supabase.from("positions").delete().eq("user_id", uid);
+        isSaving.current = false;
+        return;
+      }
 
-      // Step 2: Upsert all current positions (update existing, insert new)
-      const toUpsert = posArr.map(p => {
-        const row = {
-          user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
-          entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
-          stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
-        };
-        // If this position came from DB, include its id for upsert
-        if (typeof p.id === "number" && existingIds.has(p.id)) row.id = p.id;
-        return row;
+      // Step 1: INSERT all current positions as fresh rows (get back real DB IDs)
+      const { data: inserted, error: insertErr } = await supabase.from("positions").insert(rows).select("id");
+      if (insertErr || !inserted) {
+        console.error("Position save error:", insertErr?.message);
+        isSaving.current = false;
+        return; // CRITICAL: if insert fails, don't touch existing data
+      }
+
+      // Step 2: Delete old rows — everything for this user EXCEPT what we just inserted
+      const newIds = inserted.map(r => r.id);
+      if (newIds.length > 0) {
+        await supabase.from("positions").delete().eq("user_id", uid).not("id", "in", `(${newIds.join(",")})`);
+      }
+
+      // Step 3: Sync local state with real DB IDs so next save doesn't create duplicates
+      setPositions(prev => {
+        if (prev.length !== inserted.length) return prev; // state changed during save, skip sync
+        return prev.map((p, i) => ({ ...p, id: inserted[i].id }));
       });
-
-      if (toUpsert.length > 0) {
-        // Split: rows WITH id → upsert (update), rows WITHOUT id → insert (new)
-        const updates = toUpsert.filter(r => r.id);
-        const inserts = toUpsert.filter(r => !r.id);
-
-        if (updates.length > 0) {
-          const { error } = await supabase.from("positions").upsert(updates, { onConflict: "id" });
-          if (error) { console.error("Position upsert error:", error.message); return; }
-        }
-        if (inserts.length > 0) {
-          const { error } = await supabase.from("positions").insert(inserts);
-          if (error) { console.error("Position insert error:", error.message); return; }
-        }
-      }
-
-      // Step 3: Only delete positions that were in DB but are no longer in state (user removed them)
-      const toDelete = [...existingIds].filter(id => !currentIds.has(id));
-      if (toDelete.length > 0) {
-        const { error } = await supabase.from("positions").delete().eq("user_id", uid).in("id", toDelete);
-        if (error) console.error("Position delete error:", error.message);
-      }
+      lastLoadedCount.current = inserted.length;
     } catch (err) {
       console.error("Position save failed:", err.message);
     }
+    isSaving.current = false;
   }, []);
 
   // ─── Helper: save settings to Supabase ───
@@ -2544,11 +2542,31 @@ export default function App() {
       if (!hasTags) await saveSettingNow(uid, "tags", DEFAULT_TAGS);
       if (!hasExit) await saveSettingNow(uid, "exit_reasons", DEFAULT_EXIT_REASONS);
 
-      // Positions — load from DB, seed only on very first login
+      // Positions — load from DB, deduplicate, seed only on very first login
       const { data: pos } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
       if (pos && pos.length > 0) {
-        lastLoadedCount.current = pos.length;
-        setPositions(pos.map(p => ({ id: p.id, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [] })));
+        // Deduplicate: if same symbol+entry_date+entry_price+shares appears multiple times, keep only the latest (highest id)
+        const seen = new Map();
+        const dupIds = [];
+        for (const p of pos) {
+          const key = `${p.symbol}|${p.entry_date}|${p.entry_price}|${p.shares}|${p.stop_price}`;
+          if (seen.has(key)) {
+            // Duplicate — mark the older one (lower id) for deletion
+            const prev = seen.get(key);
+            if (p.id > prev.id) { dupIds.push(prev.id); seen.set(key, p); }
+            else { dupIds.push(p.id); }
+          } else {
+            seen.set(key, p);
+          }
+        }
+        // Clean up duplicates from DB silently
+        if (dupIds.length > 0) {
+          console.log(`Cleaning ${dupIds.length} duplicate positions`);
+          await supabase.from("positions").delete().in("id", dupIds);
+        }
+        const clean = pos.filter(p => !dupIds.includes(p.id));
+        lastLoadedCount.current = clean.length;
+        setPositions(clean.map(p => ({ id: p.id, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [] })));
       } else {
         // Check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
