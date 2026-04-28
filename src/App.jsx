@@ -1393,7 +1393,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 // ═══════════════════════════════════════
 const FULL_SIZE_OPTIONS = [10,15,20,25,30,35,40,45,50,55,60];
 let _posId = 100;
-const mkPos = (sym, entry, shares, ep, cp, stop, stop2, setup, tags = []) => ({ id: _posId++, sym, entry, shares: String(shares), ep: String(ep), cp: String(cp), stop: String(stop), stop2: String(stop2 || ""), setup, tags });
+const mkPos = (sym, entry, shares, ep, cp, stop, stop2, setup, tags = [], trailStop = "") => ({ id: _posId++, sym, entry, shares: String(shares), ep: String(ep), cp: String(cp), stop: String(stop), stop2: String(stop2 || ""), trailStop: String(trailStop || ""), setup, tags });
 const INIT_POSITIONS = [
   mkPos("MSGS","4/1/26",612,328.25,302.90,302.90,0,"VCP",["Breakout"]),
   mkPos("DNTH","4/8/26",2100,87.58,81.75,81.75,0,"Pivot",["Momentum"]),
@@ -1404,16 +1404,18 @@ const INIT_POSITIONS = [
 ];
 
 const GLOSSARY = [
-  ["Stop 1 / 2","Dual Stop Loss","Each stop covers 50% of your shares. Stop 1 = tighter (first half out), Stop 2 = wider (second half). If only one is filled, it covers 100%."],
-  ["DTS","Down To Stop","Distance from current price down to your stop loss. How far the stock needs to drop before your stop triggers."],
-  ["RTS","Risk To Stop","Actual dollars at risk from your entry to your stop. If stop is at entry, RTS = $0 — you're risk-free. Goal: $0."],
+  ["Orig Stop","Original Stop Loss","Your initial stop when the position was opened. Locked — used to calculate R (initial risk). Never changes even if you trail your stop up."],
+  ["Stop 2","Dual Stop Loss","Each original stop covers 50% of your shares. Stop 1 = tighter (first half out), Stop 2 = wider (second half). If only one is filled, it covers 100%."],
+  ["Trail Stop","Trailing Stop","Your current working stop. Update this as you trail up. DTS and RTS calculate from this value. Leave empty to use original stop."],
+  ["DTS","Down To Stop","Distance from current price down to your trailing stop (or original stop if no trail set). How far stock drops before stop triggers."],
+  ["RTS","Risk To Stop","Actual dollars at risk from entry to your trailing stop. When trail stop ≥ entry, RTS goes negative = locked profit. Goal: $0 or better."],
   ["ROTE","Risk of Total Equity","Initial risk (entry to stops) ÷ portfolio. Weighted across both halves. Keep under 1.5%."],
   ["Exposure","Risk-Free Exposure","Shows what % of the position is risk-free (stop above entry = locked profit). Green bar = free, red = at risk."],
   ["SBE","Shares to Break Even","Shares to sell at current price so if remaining shares hit the stop, net P/L = $0. Formula: N × (Entry − Stop) ÷ (Current − Stop)."],
   ["SBE %","SBE Percentage","SBE ÷ total shares. Lower = more profit locked in. Shows only when position is profitable and above stop."],
   ["R-Mult","R-Multiple","Return ÷ weighted initial risk. 2R = made 2× what you risked."],
-  ["Trail Stop","R-Based Trailing Stop","In R Mode: shows where to move your stop based on current R-level. At 1R → stop to breakeven. At 2R → stop to 1R. At 3R → stop to 2R. Mechanical, no discretion."],
-  ["Locked","Locked Profit","In R Mode: profit per share locked in at the suggested trailing stop. If stopped out at the trail stop, this is your guaranteed gain."],
+  ["R Suggest","R-Based Suggested Stop","In R Mode: shows where the R system would place your stop based on current R-level. At 1R → stop to breakeven. At 2R → stop to 1R. At 3R → stop to 2R. Use this as a reference to update your Trail Stop."],
+  ["Locked","Locked Profit","In R Mode: profit per share locked in at the R-suggested stop. If you set your Trail Stop to this value and get stopped out, this is your guaranteed gain."],
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
@@ -1466,7 +1468,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const addPosition = useCallback(() => {
     setPositions(prev => {
       const maxId = prev.reduce((m, p) => Math.max(m, p.id || 0), 0);
-      return [...prev, { id: maxId + 1, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", setup: setupTypes[0] || "VCP", tags: [] }];
+      return [...prev, { id: maxId + 1, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [] }];
     });
   }, [setupTypes]);
   const removeRow = useCallback((id) => { setPositions(prev => prev.filter(p => p.id !== id)); }, []);
@@ -1510,28 +1512,31 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const epN = parseFloat(p.ep)||0, cpN = parseFloat(p.cp)||0, sharesN = parseInt(p.shares)||0;
     const s1 = parseFloat(p.stop)||0;
     const s2 = parseFloat(p.stop2)||0;
-    const hasS1 = s1 > 0, hasS2 = s2 > 0;
+    const tsN = parseFloat(p.trailStop)||0; // trailing stop (member-editable)
+    const hasS1 = s1 > 0, hasS2 = s2 > 0, hasTS = tsN > 0;
     const isDual = hasS1 && hasS2; // only split 50/50 when BOTH stops are filled
 
-    // Single stop = 100% of shares on stop1. Dual = 50/50.
+    // Original stops — locked, used for R calculations
     const stop1 = hasS1 ? s1 : 0;
     const stop2 = hasS2 ? s2 : 0;
     const h1 = isDual ? Math.ceil(sharesN / 2) : sharesN; // stop1 share count
     const h2 = isDual ? sharesN - h1 : 0;                  // stop2 share count
 
+    // Active stop for DTS/RTS: trailing stop if set, otherwise original stops
+    const activeStop = hasTS ? tsN : (isDual ? (stop1 * h1 + stop2 * h2) / (h1 + h2) : stop1);
+
     const posValue = epN * sharesN;
     const tier = autoTier(posValue, sizer);
 
-    // DTS weighted across both halves (or 100% on stop1 if single)
-    const dts1 = cpN - stop1, dts2 = isDual ? cpN - stop2 : 0;
-    const dtsD = sharesN > 0 ? (dts1 * h1 + dts2 * h2) / sharesN : 0;
+    // DTS uses active stop (trail stop if set, otherwise weighted original)
+    const dtsD = hasTS ? (cpN - tsN) : (sharesN > 0 ? ((cpN - stop1) * h1 + (isDual ? (cpN - stop2) * h2 : 0)) / sharesN : 0);
     const dtsPct = cpN > 0 ? (dtsD / cpN) * 100 : 0;
 
-    // DTS total $ (current-to-stop × shares) — used for totals row DTS display
-    const dtsTotalD = dts1 * h1 + dts2 * h2;
+    // DTS total $ — uses active stop
+    const dtsTotalD = hasTS ? (cpN - tsN) * sharesN : ((cpN - stop1) * h1 + (isDual ? (cpN - stop2) * h2 : 0));
 
-    // RTS = actual dollars at risk (entry-to-stop × shares). Goal: $0 when stop ≥ entry.
-    const rtsD = (epN - stop1) * h1 + (isDual ? (epN - stop2) * h2 : 0);
+    // RTS uses active stop: risk from entry to active stop. Goal: $0 when stop ≥ entry.
+    const rtsD = hasTS ? (epN - tsN) * sharesN : ((epN - stop1) * h1 + (isDual ? (epN - stop2) * h2 : 0));
 
     // SBE = shares to sell at current price so if remaining shares get stopped, net P/L = $0
     // Formula: X = N × (EP - avgStop) / (CP - avgStop), where avgStop is weighted across halves
@@ -1554,10 +1559,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const roteD = initRiskD > 0 ? initRiskD : 0;
     const rotePct = ps > 0 ? (roteD / ps) * 100 : 0;
 
-    // Risk-free exposure: what % of position has stop ≥ entry
+    // Risk-free exposure: use trail stop if set, otherwise original stops
     let riskFreePct = 0;
     if (epN > 0) {
-      if (isDual) {
+      if (hasTS) {
+        riskFreePct = tsN >= epN ? 100 : 0;
+      } else if (isDual) {
         const s1Free = stop1 >= epN, s2Free = stop2 >= epN;
         riskFreePct = (s1Free && s2Free) ? 100 : (s1Free || s2Free) ? 50 : 0;
       } else if (hasS1) {
@@ -1575,11 +1582,13 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       : plPct >= -2 ? "Even"
       : "At Risk";
 
-    // R-based trailing stop fields
-    // R = initial risk per share (entry - weighted avg stop)
+    // R-based fields — ALWAYS use original stops for R calculation
+    // R = initial risk per share (entry - weighted avg original stop)
     const rPerShare = epN > 0 && sharesN > 0 ? initRiskD / sharesN : 0;
     // Current R-level (how many R's the stock has moved from entry)
     const currentRLevel = rPerShare > 0 ? Math.floor((cpN - epN) / rPerShare) : 0;
+    // R-multiple (continuous, not floored)
+    const rAchieved = rPerShare > 0 ? (cpN - epN) / rPerShare : 0;
     // Suggested trailing stop: at each R-level, lock in (level - 1) R
     const rSuggestedStop = rPerShare > 0 && currentRLevel >= 1
       ? epN + (currentRLevel - 1) * rPerShare
@@ -1588,10 +1597,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const rLockedProfit = rSuggestedStop > epN ? rSuggestedStop - epN : 0;
     // Next R-target price
     const rNextTarget = rPerShare > 0 ? epN + (Math.max(0, currentRLevel) + 1) * rPerShare : 0;
-    // DTS in R terms (distance from current to stop1 in R units)
+    // DTS in R terms — uses active stop (trail stop if set)
     const dtsR = rPerShare > 0 ? dtsD / rPerShare : 0;
+    // RTS in R terms
+    const rtsR = rPerShare > 0 && sharesN > 0 ? (rtsD / sharesN) / rPerShare : 0;
 
-    return { ...p, epN, cpN, stop1, stop2, sharesN, h1, h2, posValue, tier, isDual, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rSuggestedStop, rLockedProfit, rNextTarget, dtsR };
+    return { ...p, epN, cpN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
   }), [positions, sizer, portfolioSize]);
 
   const totals = useMemo(() => {
@@ -1677,14 +1688,14 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           {displayMode==="R" && (
             <div style={{ display:"flex",alignItems:"center",gap:6,padding:"5px 12px",borderRadius:980,background:C.goldDim,border:`1px solid ${C.borderGold}` }}>
               <span style={{ fontSize:"0.60rem",fontWeight:700,color:C.gold,letterSpacing:"0.06em",textTransform:"uppercase" }}>R Mode</span>
-              <span style={{ fontSize:"0.58rem",fontWeight:500,color:C.muted }}>Trail Stop = move stop to (N-1)R when stock hits NR</span>
+              <span style={{ fontSize:"0.58rem",fontWeight:500,color:C.muted }}>R = original stop risk · DTS/RTS use trail stop · R Suggest = mechanical trail levels</span>
             </div>
           )}
         </div>
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Value")}{th("Stop 1")}{th("Stop 2")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{displayMode==="R"&&th("Trail Stop")}{displayMode==="R"&&th("Locked")}{displayMode!=="R"&&th("SBE")}{displayMode!=="R"&&th("SBE %")}{th("P/L")}{th("R")}{th("","center")}
+              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Value")}{th("Orig Stop")}{th("Stop 2")}{th("Trail Stop")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{displayMode==="R"&&th("R Suggest")}{displayMode==="R"&&th("Locked")}{displayMode!=="R"&&th("SBE")}{displayMode!=="R"&&th("SBE %")}{th("P/L")}{th("R")}{th("","center")}
             </tr></thead>
             <tbody>
               {enriched.map((p, idx) => {
@@ -1695,7 +1706,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const isDollar = displayMode === "$";
                 const isR = displayMode === "R";
                 const dtsDisplay = !p.cpN ? "—" : isR ? `${p.dtsR.toFixed(1)}R` : isDollar ? `$${Math.abs(p.dtsD).toFixed(2)}` : `${Math.abs(p.dtsPct).toFixed(2)}%`;
-                const rtsDisplay = !p.cpN ? "—" : isR ? `${p.rPerShare>0?((p.rtsD/p.sharesN)/p.rPerShare).toFixed(1):"0.0"}R` : isDollar ? `$${Math.abs(p.rtsD).toLocaleString(undefined,{maximumFractionDigits:0})}` : `${(p.sharesN>0?(p.rtsD/(p.cpN*p.sharesN)*100):0).toFixed(2)}%`;
+                const rtsDisplay = !p.cpN ? "—" : isR ? `${p.rtsR.toFixed(1)}R` : isDollar ? `$${Math.abs(p.rtsD).toLocaleString(undefined,{maximumFractionDigits:0})}` : `${(p.sharesN>0?(p.rtsD/(p.cpN*p.sharesN)*100):0).toFixed(2)}%`;
                 const plDisplay = !p.epN ? "—" : isR ? `${p.rMult>=0?"+":""}${p.rMult.toFixed(2)}R` : isDollar ? `${p.plD>=0?"+":"-"}${fmt$(Math.abs(p.plD))}` : `${p.plPct>=0?"+":""}${p.plPct.toFixed(2)}%`;
                 return (
                   <tr key={p.id} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
@@ -1708,6 +1719,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:C.white,whiteSpace:"nowrap"}}>{p.posValue>0?fmt$(p.posValue):"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={72} /></td>
+                    <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.trailStop||""} onChange={v=>updateField(p.id,"trailStop",v)} width={78} gold /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.cp} onChange={v=>updateField(p.id,"cp",v)} gold width={82} /></td>
                     <td style={{padding:"6px 4px"}}><MiniSelect value={p.setup} onChange={v=>updateField(p.id,"setup",v)} options={setupTypes} width={85} /></td>
                     <td style={{padding:"6px 4px"}}><TagSelector selected={p.tags||[]} allTags={allTags} onChange={v=>updateField(p.id,"tags",v)} small /></td>
@@ -1750,7 +1762,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const isPartial = qty < totalShares && qty > 0;
                 return (
                   <tr style={{ background:"rgba(239,68,68,0.06)",borderBottom:`2px solid ${C.red}33` }}>
-                    <td colSpan={19} style={{ padding:"14px 16px" }}>
+                    <td colSpan={22} style={{ padding:"14px 16px" }}>
                       <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap" }}>
                         <span style={{ fontWeight:700,fontSize:"0.68rem",color:C.red,letterSpacing:"0.08em",textTransform:"uppercase" }}>Sell {pos.sym}</span>
                         <div style={{display:"flex",alignItems:"center",gap:5}}>
@@ -1782,13 +1794,13 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 );
               })()}
 
-              {/* Totals — 20 cols: Status,Tier,Symbol,Shares,AvgCost,Value,Stop1,Stop2,Current,Setup,Tags,DTS,RTS,ROTE,Exposure,SBE,SBE%,P/L,R,Actions */}
+              {/* Totals — 21 cols: Status,Tier,Symbol,Shares,AvgCost,Value,OrigStop,Stop2,TrailStop,Current,Setup,Tags,DTS,RTS,ROTE,[RSuggest+Locked|SBE+SBE%],P/L,R,Actions */}
               <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
                 <td colSpan={3} style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.text,fontSize:"0.70rem"}}>{enriched.reduce((s,p)=>s+p.sharesN,0).toLocaleString()}</td>
                 <td />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:C.goldBright}}>{fmt$(enriched.reduce((s,p)=>s+p.posValue,0))}</td>
-                <td colSpan={5} />
+                <td colSpan={6} />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD<=0?C.green:C.text}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalRTS<=0?C.green:C.red}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalRotePct>1.5?C.red:totals.totalRotePct>1.0?C.gold:C.green,whiteSpace:"nowrap"}}>{totals.totalRotePct.toFixed(2)}%{totals.totalRotePct>1.5&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</td>
@@ -2253,7 +2265,7 @@ export default function App() {
       const { error } = await supabase.from("positions").insert(posArr.map(p => ({
         user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
         entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
-        stop_price_2: p.stop2 || "", setup: p.setup || "VCP", tags: p.tags || [],
+        stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
       })));
       if (error) console.error("Position save error:", error.message);
     }
@@ -2318,7 +2330,7 @@ export default function App() {
       // Positions — load from DB, seed only on very first login
       const { data: pos } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
       if (pos && pos.length > 0) {
-        setPositions(pos.map(p => ({ id: p.id, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, setup: p.setup, tags: p.tags || [] })));
+        setPositions(pos.map(p => ({ id: p.id, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [] })));
       } else {
         // Check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
