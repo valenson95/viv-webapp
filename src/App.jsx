@@ -1471,7 +1471,13 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       return [...prev, { id: maxId + 1, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [] }];
     });
   }, [setupTypes]);
-  const removeRow = useCallback((id) => { setPositions(prev => prev.filter(p => p.id !== id)); }, []);
+  const removeRow = useCallback((id) => {
+    setPositions(prev => {
+      const next = prev.filter(p => p.id !== id);
+      lastLoadedCount.current = next.length; // update so autosave safety check doesn't block intentional removal
+      return next;
+    });
+  }, []);
 
   // Sell flow
   const startSell = (p) => { setSellId(p.id); setSellQty(p.shares); setSellPrice(p.cp); setSellReason(exitReasons[0] || "Sold Into Strength"); setSellTags([]); setSellAddJournal(true); setSellNotes(""); };
@@ -1866,7 +1872,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 // ═══════════════════════════════════════
 // ─── SETTINGS PAGE ───
 // ═══════════════════════════════════════
-function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange }) {
+function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session }) {
   const isAdmin = userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [newSetup, setNewSetup] = useState("");
   const [newTag, setNewTag] = useState("");
@@ -1875,6 +1881,7 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
   const [newCode, setNewCode] = useState("");
   const [codeLoading, setCodeLoading] = useState(false);
   const [allMembers, setAllMembers] = useState([]);
+  const [backupStatus, setBackupStatus] = useState("");
 
   // Load access codes and members for admin
   useEffect(() => {
@@ -2075,6 +2082,123 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
               ))}
             </div>
           </GlassCard>
+
+          {/* ═══ Data Backup & Restore ═══ */}
+          <div style={{ marginTop: 24, marginBottom: 16, borderTop: `1px solid ${C.border}`, paddingTop: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.green }}>Data Protection</span>
+              <span style={{ fontSize: "0.62rem", padding: "2px 8px", borderRadius: 6, background: C.greenDim, border: "1px solid rgba(34,197,94,0.25)", color: C.green, fontWeight: 600 }}>Backup</span>
+            </div>
+            <div style={{ fontWeight: 800, fontSize: "1.3rem", letterSpacing: "-0.03em", color: C.white, marginBottom: 4 }}>Backup & Restore</div>
+            <div style={{ fontSize: "0.74rem", color: C.muted, lineHeight: 1.5, marginBottom: 16 }}>Export all member data (positions, trades, profiles, settings) as a JSON file. Run this before every deploy.</div>
+          </div>
+
+          <GlassCard style={{ padding: "24px 28px", marginBottom: 16, borderColor: "rgba(34,197,94,0.15)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <button onClick={async () => {
+                try {
+                  setBackupStatus("Exporting...");
+                  // Fetch ALL data from ALL tables
+                  const [posRes, tradeRes, profRes, settRes] = await Promise.all([
+                    supabase.from("positions").select("*"),
+                    supabase.from("trades").select("*").eq("is_deleted", false),
+                    supabase.from("profiles").select("*"),
+                    supabase.from("user_settings").select("*"),
+                  ]);
+                  const backup = {
+                    exported_at: new Date().toISOString(),
+                    version: "1.0",
+                    counts: {
+                      positions: (posRes.data || []).length,
+                      trades: (tradeRes.data || []).length,
+                      profiles: (profRes.data || []).length,
+                      settings: (settRes.data || []).length,
+                    },
+                    positions: posRes.data || [],
+                    trades: tradeRes.data || [],
+                    profiles: profRes.data || [],
+                    settings: settRes.data || [],
+                  };
+                  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `VIV_Backup_${new Date().toISOString().slice(0,10)}_${new Date().toISOString().slice(11,16).replace(":","")}.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  setBackupStatus(`Exported: ${backup.counts.positions} positions, ${backup.counts.trades} trades, ${backup.counts.profiles} profiles`);
+                } catch (err) {
+                  setBackupStatus("Export failed: " + err.message);
+                }
+              }} style={{
+                padding: "10px 20px", borderRadius: 10, border: `1px solid rgba(34,197,94,0.3)`,
+                background: C.greenDim, color: C.green, fontWeight: 700, fontSize: "0.78rem",
+                cursor: "pointer", fontFamily: font, letterSpacing: "0.02em",
+              }}>Export Full Backup</button>
+
+              <label style={{
+                padding: "10px 20px", borderRadius: 10, border: `1px solid ${C.borderGold}`,
+                background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.78rem",
+                cursor: "pointer", fontFamily: font, letterSpacing: "0.02em",
+              }}>
+                Restore from Backup
+                <input type="file" accept=".json" style={{ display: "none" }} onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    setBackupStatus("Restoring...");
+                    const text = await file.text();
+                    const backup = JSON.parse(text);
+                    if (!backup.version || !backup.positions || !backup.trades) {
+                      setBackupStatus("Invalid backup file — missing required fields.");
+                      return;
+                    }
+
+                    let restored = { positions: 0, trades: 0 };
+
+                    // Restore positions — upsert by id (safe, non-destructive)
+                    if (backup.positions.length > 0) {
+                      const { error } = await supabase.from("positions").upsert(backup.positions, { onConflict: "id" });
+                      if (error) { setBackupStatus("Position restore error: " + error.message); return; }
+                      restored.positions = backup.positions.length;
+                    }
+
+                    // Restore trades — upsert by id (safe, non-destructive)
+                    if (backup.trades.length > 0) {
+                      const { error } = await supabase.from("trades").upsert(backup.trades, { onConflict: "id" });
+                      if (error) { setBackupStatus("Trade restore error: " + error.message); return; }
+                      restored.trades = backup.trades.length;
+                    }
+
+                    // Restore profiles — upsert by id (safe, non-destructive)
+                    if (backup.profiles && backup.profiles.length > 0) {
+                      const { error } = await supabase.from("profiles").upsert(backup.profiles, { onConflict: "id" });
+                      if (error) console.error("Profile restore error:", error.message);
+                    }
+
+                    // Restore settings — upsert (safe, non-destructive)
+                    if (backup.settings && backup.settings.length > 0) {
+                      const { error } = await supabase.from("user_settings").upsert(backup.settings, { onConflict: "user_id,setting_key" });
+                      if (error) console.error("Settings restore error:", error.message);
+                    }
+
+                    setBackupStatus(`Restored: ${restored.positions} positions, ${restored.trades} trades. Reload the page to see changes.`);
+                  } catch (err) {
+                    setBackupStatus("Restore failed: " + err.message);
+                  }
+                  e.target.value = ""; // reset file input
+                }} />
+              </label>
+            </div>
+            {backupStatus && (
+              <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, fontSize: "0.74rem", fontWeight: 500, lineHeight: 1.5, background: backupStatus.includes("fail") || backupStatus.includes("error") || backupStatus.includes("Invalid") ? C.redDim : C.greenDim, border: `1px solid ${backupStatus.includes("fail") || backupStatus.includes("error") || backupStatus.includes("Invalid") ? "rgba(239,68,68,0.2)" : "rgba(34,197,94,0.25)"}`, color: backupStatus.includes("fail") || backupStatus.includes("error") || backupStatus.includes("Invalid") ? "#fca5a5" : C.green }}>
+                {backupStatus}
+              </div>
+            )}
+            <div style={{ marginTop: 12, fontSize: "0.64rem", color: C.muted, lineHeight: 1.5 }}>
+              Run Export before every deploy. Restore is non-destructive — it only adds/updates, never deletes.
+            </div>
+          </GlassCard>
         </>
       )}
     </div>
@@ -2238,7 +2362,7 @@ export default function App() {
   const [tags, setTags] = useState(DEFAULT_TAGS);
   const [exitReasons, setExitReasons] = useState(DEFAULT_EXIT_REASONS);
   const [journaledTrades, setJournaledTrades] = useState([]);
-  const [positions, setPositions] = useState(INIT_POSITIONS);
+  const [positions, setPositions] = useState([]);
   const [portfolioSize, setPortfolioSize] = useState("500000");
   const [fullSizePct, setFullSizePct] = useState(25);
   const [numStocks, setNumStocks] = useState(5);
@@ -2258,16 +2382,51 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ─── Helper: save positions to Supabase ───
+  // ─── Helper: save positions to Supabase (safe sync — never deletes without confirmed insert) ───
   const savePositionsNow = useCallback(async (uid, posArr) => {
-    await supabase.from("positions").delete().eq("user_id", uid);
-    if (posArr.length > 0) {
-      const { error } = await supabase.from("positions").insert(posArr.map(p => ({
-        user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
-        entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
-        stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
-      })));
-      if (error) console.error("Position save error:", error.message);
+    try {
+      // Step 1: Get existing DB positions to know what to update vs insert vs delete
+      const { data: existing, error: fetchErr } = await supabase.from("positions").select("id").eq("user_id", uid);
+      if (fetchErr) { console.error("Position fetch error:", fetchErr.message); return; }
+
+      const existingIds = new Set((existing || []).map(r => r.id));
+      const currentIds = new Set(posArr.filter(p => typeof p.id === "number" && existingIds.has(p.id)).map(p => p.id));
+
+      // Step 2: Upsert all current positions (update existing, insert new)
+      const toUpsert = posArr.map(p => {
+        const row = {
+          user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
+          entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
+          stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
+        };
+        // If this position came from DB, include its id for upsert
+        if (typeof p.id === "number" && existingIds.has(p.id)) row.id = p.id;
+        return row;
+      });
+
+      if (toUpsert.length > 0) {
+        // Split: rows WITH id → upsert (update), rows WITHOUT id → insert (new)
+        const updates = toUpsert.filter(r => r.id);
+        const inserts = toUpsert.filter(r => !r.id);
+
+        if (updates.length > 0) {
+          const { error } = await supabase.from("positions").upsert(updates, { onConflict: "id" });
+          if (error) { console.error("Position upsert error:", error.message); return; }
+        }
+        if (inserts.length > 0) {
+          const { error } = await supabase.from("positions").insert(inserts);
+          if (error) { console.error("Position insert error:", error.message); return; }
+        }
+      }
+
+      // Step 3: Only delete positions that were in DB but are no longer in state (user removed them)
+      const toDelete = [...existingIds].filter(id => !currentIds.has(id));
+      if (toDelete.length > 0) {
+        const { error } = await supabase.from("positions").delete().eq("user_id", uid).in("id", toDelete);
+        if (error) console.error("Position delete error:", error.message);
+      }
+    } catch (err) {
+      console.error("Position save failed:", err.message);
     }
   }, []);
 
@@ -2330,16 +2489,30 @@ export default function App() {
       // Positions — load from DB, seed only on very first login
       const { data: pos } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
       if (pos && pos.length > 0) {
+        lastLoadedCount.current = pos.length;
         setPositions(pos.map(p => ({ id: p.id, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [] })));
       } else {
         // Check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
         if (!initFlag) {
-          // Very first login — seed demo positions and mark as initialized
-          await savePositionsNow(uid, INIT_POSITIONS);
+          // Very first login — seed demo positions, save to DB, then load back with DB ids
+          const { error: seedErr } = await supabase.from("positions").insert(INIT_POSITIONS.map(p => ({
+            user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
+            entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
+            stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
+          })));
+          if (!seedErr) {
+            // Re-load from DB so positions have real DB ids
+            const { data: seeded } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
+            if (seeded && seeded.length > 0) {
+              lastLoadedCount.current = seeded.length;
+              setPositions(seeded.map(p => ({ id: p.id, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [] })));
+            }
+          }
           await saveSettingNow(uid, "initialized", true);
         } else {
           // User deleted all positions intentionally — keep empty
+          lastLoadedCount.current = 0;
           setPositions([]);
         }
       }
@@ -2378,12 +2551,19 @@ export default function App() {
   useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "tags", tags); }, [tags]);
   useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "exit_reasons", exitReasons); }, [exitReasons]);
 
-  // ─── Auto-save positions to Supabase (debounced) ───
+  // ─── Auto-save positions to Supabase (debounced, with safety checks) ───
   const posTimer = useRef(null);
+  const lastLoadedCount = useRef(0); // track how many positions were loaded from DB
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
+    // Safety: if we loaded N positions from DB but state is now empty, don't auto-delete everything.
+    // This prevents accidental wipe from race conditions or re-renders with stale state.
+    if (positions.length === 0 && lastLoadedCount.current > 0) {
+      console.warn("Positions autosave blocked: state is empty but DB had", lastLoadedCount.current, "positions. Skipping to prevent data loss.");
+      return;
+    }
     clearTimeout(posTimer.current);
-    posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), 1500);
+    posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), 2000);
   }, [positions, session]);
 
   // ─── Auto-save journaled trades to Supabase (only insert NEW trades) ───
@@ -2464,7 +2644,7 @@ export default function App() {
       {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
-      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} />}
     </>
   );
 
