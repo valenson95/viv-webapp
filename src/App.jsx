@@ -1412,6 +1412,8 @@ const GLOSSARY = [
   ["SBE","Shares to Break Even","Shares to sell at current price so if remaining shares hit the stop, net P/L = $0. Formula: N × (Entry − Stop) ÷ (Current − Stop)."],
   ["SBE %","SBE Percentage","SBE ÷ total shares. Lower = more profit locked in. Shows only when position is profitable and above stop."],
   ["R-Mult","R-Multiple","Return ÷ weighted initial risk. 2R = made 2× what you risked."],
+  ["Trail Stop","R-Based Trailing Stop","In R Mode: shows where to move your stop based on current R-level. At 1R → stop to breakeven. At 2R → stop to 1R. At 3R → stop to 2R. Mechanical, no discretion."],
+  ["Locked","Locked Profit","In R Mode: profit per share locked in at the suggested trailing stop. If stopped out at the trail stop, this is your guaranteed gain."],
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
@@ -1430,7 +1432,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const [sellTags, setSellTags] = useState([]);
   const [sellAddJournal, setSellAddJournal] = useState(true);
   const [sellNotes, setSellNotes] = useState("");
-  const [displayMode, setDisplayMode] = useState("$"); // "$" or "%"
+  const [displayMode, setDisplayMode] = useState("%"); // "%", "$", or "R"
   const [priceLoading, setPriceLoading] = useState(false);
   const [lastPriceRefresh, setLastPriceRefresh] = useState(null);
 
@@ -1573,7 +1575,23 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       : plPct >= -2 ? "Even"
       : "At Risk";
 
-    return { ...p, epN, cpN, stop1, stop2, sharesN, h1, h2, posValue, tier, isDual, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct };
+    // R-based trailing stop fields
+    // R = initial risk per share (entry - weighted avg stop)
+    const rPerShare = epN > 0 && sharesN > 0 ? initRiskD / sharesN : 0;
+    // Current R-level (how many R's the stock has moved from entry)
+    const currentRLevel = rPerShare > 0 ? Math.floor((cpN - epN) / rPerShare) : 0;
+    // Suggested trailing stop: at each R-level, lock in (level - 1) R
+    const rSuggestedStop = rPerShare > 0 && currentRLevel >= 1
+      ? epN + (currentRLevel - 1) * rPerShare
+      : (hasS1 ? stop1 : 0);
+    // Locked profit per share at suggested stop
+    const rLockedProfit = rSuggestedStop > epN ? rSuggestedStop - epN : 0;
+    // Next R-target price
+    const rNextTarget = rPerShare > 0 ? epN + (Math.max(0, currentRLevel) + 1) * rPerShare : 0;
+    // DTS in R terms (distance from current to stop1 in R units)
+    const dtsR = rPerShare > 0 ? dtsD / rPerShare : 0;
+
+    return { ...p, epN, cpN, stop1, stop2, sharesN, h1, h2, posValue, tier, isDual, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rSuggestedStop, rLockedProfit, rNextTarget, dtsR };
   }), [positions, sizer, portfolioSize]);
 
   const totals = useMemo(() => {
@@ -1639,8 +1657,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               <span style={{ display:"inline-block",transition:"transform 0.3s",transform:priceLoading?"rotate(180deg)":"none" }}>{"↻"}</span>
               {priceLoading?"Fetching...":"Refresh Prices"}
             </button>
-            <div style={{display:"flex",borderRadius:8,overflow:"hidden",border:`1px solid ${C.border}`}}>
-              {["$","%"].map(m=>(<button key={m} onClick={()=>setDisplayMode(m)} style={{padding:"6px 14px",background:displayMode===m?C.goldDim:"rgba(255,255,255,0.03)",border:"none",color:displayMode===m?C.gold:C.muted,fontWeight:700,fontSize:"0.70rem",cursor:"pointer",fontFamily:font}}>{m}</button>))}
+            <div style={{display:"flex",borderRadius:10,overflow:"hidden",border:`1px solid ${displayMode==="R"?C.borderGold:C.border}`,transition:"border-color 0.2s"}}>
+              {[{k:"%",label:"% Mode"},{k:"$",label:"$ Mode"},{k:"R",label:"R Mode"}].map(({k,label})=>(<button key={k} onClick={()=>setDisplayMode(k)} style={{padding:"8px 16px",background:displayMode===k?(k==="R"?C.goldDim:C.goldDim):"rgba(255,255,255,0.03)",border:"none",color:displayMode===k?C.gold:C.muted,fontWeight:800,fontSize:"0.72rem",cursor:"pointer",fontFamily:font,letterSpacing:k==="R"?"0.04em":"0",transition:"all 0.15s"}}>{label}</button>))}
             </div>
             <GoldBtn onClick={addPosition} small>+ Add Position</GoldBtn>
           </div>
@@ -1656,11 +1674,17 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               Last updated: {lastPriceRefresh.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
           )}
+          {displayMode==="R" && (
+            <div style={{ display:"flex",alignItems:"center",gap:6,padding:"5px 12px",borderRadius:980,background:C.goldDim,border:`1px solid ${C.borderGold}` }}>
+              <span style={{ fontSize:"0.60rem",fontWeight:700,color:C.gold,letterSpacing:"0.06em",textTransform:"uppercase" }}>R Mode</span>
+              <span style={{ fontSize:"0.58rem",fontWeight:500,color:C.muted }}>Trail Stop = move stop to (N-1)R when stock hits NR</span>
+            </div>
+          )}
         </div>
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Value")}{th("Stop 1")}{th("Stop 2")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{th("SBE")}{th("SBE %")}{th("P/L")}{th("R")}{th("","center")}
+              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Value")}{th("Stop 1")}{th("Stop 2")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{displayMode==="R"&&th("Trail Stop")}{displayMode==="R"&&th("Locked")}{displayMode!=="R"&&th("SBE")}{displayMode!=="R"&&th("SBE %")}{th("P/L")}{th("R")}{th("","center")}
             </tr></thead>
             <tbody>
               {enriched.map((p, idx) => {
@@ -1669,9 +1693,10 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const RISK_BADGE = { Free:{bg:C.greenDim,color:C.green,border:"rgba(34,197,94,0.25)"}, Profit:{bg:C.blueDim,color:C.blue,border:"rgba(59,130,246,0.25)"}, Even:{bg:C.goldDim,color:C.gold,border:C.borderGold}, "At Risk":{bg:C.redDim,color:C.red,border:"rgba(239,68,68,0.25)"}, "—":{bg:"transparent",color:C.muted,border:C.border} };
                 const rb = RISK_BADGE[p.riskStatus] || RISK_BADGE["—"];
                 const isDollar = displayMode === "$";
-                const dtsDisplay = !p.cpN ? "—" : isDollar ? `$${Math.abs(p.dtsD).toFixed(2)}` : `${Math.abs(p.dtsPct).toFixed(2)}%`;
-                const rtsDisplay = !p.cpN ? "—" : isDollar ? `$${Math.abs(p.rtsD).toLocaleString(undefined,{maximumFractionDigits:0})}` : `${(p.sharesN>0?(p.rtsD/(p.cpN*p.sharesN)*100):0).toFixed(2)}%`;
-                const plDisplay = !p.epN ? "—" : isDollar ? `${p.plD>=0?"+":"-"}${fmt$(Math.abs(p.plD))}` : `${p.plPct>=0?"+":""}${p.plPct.toFixed(2)}%`;
+                const isR = displayMode === "R";
+                const dtsDisplay = !p.cpN ? "—" : isR ? `${p.dtsR.toFixed(1)}R` : isDollar ? `$${Math.abs(p.dtsD).toFixed(2)}` : `${Math.abs(p.dtsPct).toFixed(2)}%`;
+                const rtsDisplay = !p.cpN ? "—" : isR ? `${p.rPerShare>0?((p.rtsD/p.sharesN)/p.rPerShare).toFixed(1):"0.0"}R` : isDollar ? `$${Math.abs(p.rtsD).toLocaleString(undefined,{maximumFractionDigits:0})}` : `${(p.sharesN>0?(p.rtsD/(p.cpN*p.sharesN)*100):0).toFixed(2)}%`;
+                const plDisplay = !p.epN ? "—" : isR ? `${p.rMult>=0?"+":""}${p.rMult.toFixed(2)}R` : isDollar ? `${p.plD>=0?"+":"-"}${fmt$(Math.abs(p.plD))}` : `${p.plPct>=0?"+":""}${p.plPct.toFixed(2)}%`;
                 return (
                   <tr key={p.id} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
                     {/* Risk Status */}
@@ -1692,8 +1717,17 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.rtsD<=0?C.green:C.red,fontSize:"0.70rem"}}>{rtsDisplay}</td>
                     {/* ROTE — Risk of Total Equity. Warning if >1.5% */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rotePct>1.5?C.red:p.rotePct>1.0?C.gold:C.green,whiteSpace:"nowrap"}}>{p.epN&&(p.stop1||p.stop2)?<>{p.rotePct.toFixed(2)}%{p.rotePct>1.5&&<span title="ROTE exceeds 1.5% — consider reducing size" style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</>:"—"}</td>
-                    <td style={{padding:"8px 6px",textAlign:"right",color:p.sbe>0?C.text:C.muted,fontSize:"0.70rem"}}>{p.sbe>0?p.sbe.toLocaleString():"—"}</td>
-                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:!p.sbe?C.muted:p.sbePct>100?C.red:p.sbePct>80?C.gold:C.green,fontSize:"0.70rem"}}>{p.sbe>0?`${p.sbePct.toFixed(1)}%`:"—"}</td>
+                    {isR ? (
+                      <>
+                        <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rSuggestedStop>p.epN?C.green:p.rSuggestedStop===p.epN?C.goldBright:C.muted}}>{p.rPerShare>0?(p.rSuggestedStop>=p.epN&&p.currentRLevel>=1?`$${p.rSuggestedStop.toFixed(2)} (${p.currentRLevel-1===0?"BE":(p.currentRLevel-1)+"R"})`:`$${p.rSuggestedStop.toFixed(2)}`):"—"}</td>
+                        <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rLockedProfit>0?C.green:C.muted}}>{p.rLockedProfit>0?`$${p.rLockedProfit.toFixed(2)}/sh`:"$0"}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td style={{padding:"8px 6px",textAlign:"right",color:p.sbe>0?C.text:C.muted,fontSize:"0.70rem"}}>{p.sbe>0?p.sbe.toLocaleString():"—"}</td>
+                        <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:!p.sbe?C.muted:p.sbePct>100?C.red:p.sbePct>80?C.gold:C.green,fontSize:"0.70rem"}}>{p.sbe>0?`${p.sbePct.toFixed(1)}%`:"—"}</td>
+                      </>
+                    )}
                     {/* P/L — respects $ / % toggle */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.plPct>=0?C.green:C.red,fontSize:"0.70rem"}}>{plDisplay}</td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rMult>=2?C.green:p.rMult>=1?C.goldBright:p.rMult>=0?C.white:C.red}}>{p.epN&&(p.stop1||p.stop2)?`${p.rMult.toFixed(2)}R`:"—"}</td>
@@ -1755,11 +1789,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 <td />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:C.goldBright}}>{fmt$(enriched.reduce((s,p)=>s+p.posValue,0))}</td>
                 <td colSpan={5} />
-                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD<=0?C.green:C.text}}>{displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
-                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalRTS<=0?C.green:C.red}}>{displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
+                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD<=0?C.green:C.text}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
+                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalRTS<=0?C.green:C.red}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalRotePct>1.5?C.red:totals.totalRotePct>1.0?C.gold:C.green,whiteSpace:"nowrap"}}>{totals.totalRotePct.toFixed(2)}%{totals.totalRotePct>1.5&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</td>
-                <td colSpan={2} />
-                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{totals.totalPL>=0?"+":"-"}{fmt$(Math.abs(totals.totalPL))}</td>
+                {displayMode==="R" ? <><td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,fontSize:"0.68rem",color:C.muted}}>—</td><td /></> : <td colSpan={2} />}
+                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{displayMode==="R"?`${totals.totalPL>=0?"+":""}${fmt$(Math.abs(totals.totalPL))}`:`${totals.totalPL>=0?"+":"-"}${fmt$(Math.abs(totals.totalPL))}`}</td>
                 <td />
                 <td />
               </tr>
