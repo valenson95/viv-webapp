@@ -1678,6 +1678,64 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               {[{k:"%",label:"% Mode"},{k:"$",label:"$ Mode"},{k:"R",label:"R Mode"}].map(({k,label})=>(<button key={k} onClick={()=>setDisplayMode(k)} style={{padding:"8px 16px",background:displayMode===k?(k==="R"?C.goldDim:C.goldDim):"rgba(255,255,255,0.03)",border:"none",color:displayMode===k?C.gold:C.muted,fontWeight:800,fontSize:"0.72rem",cursor:"pointer",fontFamily:font,letterSpacing:k==="R"?"0.04em":"0",transition:"all 0.15s"}}>{label}</button>))}
             </div>
             <GoldBtn onClick={addPosition} small>+ Add Position</GoldBtn>
+            <button onClick={() => {
+              const csv = [["Symbol","Entry Date","Shares","Entry Price","Current Price","Stop 1","Stop 2","Trail Stop","Setup","Tags"].join(",")];
+              positions.filter(p => p.sym).forEach(p => {
+                csv.push([p.sym, p.entry, p.shares, p.ep, p.cp, p.stop, p.stop2||"", p.trailStop||"", p.setup, (p.tags||[]).join(";")].map(v => `"${String(v||"").replace(/"/g,'""')}"`).join(","));
+              });
+              const blob = new Blob([csv.join("\n")], { type: "text/csv" });
+              const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+              a.download = `VIV_Positions_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+            }} style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.muted,fontWeight:700,fontSize:"0.62rem",cursor:"pointer",fontFamily:font }}>Export</button>
+            <label style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.muted,fontWeight:700,fontSize:"0.62rem",cursor:"pointer",fontFamily:font }}>
+              Import
+              <input type="file" accept=".csv" style={{ display:"none" }} onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  try {
+                    const lines = ev.target.result.split("\n").map(l => l.trim()).filter(Boolean);
+                    if (lines.length < 2) return;
+                    const hdr = lines[0].split(",").map(h => h.replace(/"/g,"").trim().toLowerCase());
+                    const symIdx = hdr.findIndex(h => /symbol|ticker/i.test(h));
+                    const entryIdx = hdr.findIndex(h => /entry.?date|date/i.test(h));
+                    const sharesIdx = hdr.findIndex(h => /shares|qty|quantity/i.test(h));
+                    const epIdx = hdr.findIndex(h => /entry.?price|avg.?cost|cost/i.test(h));
+                    const cpIdx = hdr.findIndex(h => /current|price|last/i.test(h));
+                    const s1Idx = hdr.findIndex(h => /stop.?1|stop.?price|orig.?stop|stop$/i.test(h));
+                    const s2Idx = hdr.findIndex(h => /stop.?2/i.test(h));
+                    const tsIdx = hdr.findIndex(h => /trail/i.test(h));
+                    const setupIdx = hdr.findIndex(h => /setup/i.test(h));
+                    const tagsIdx = hdr.findIndex(h => /tags/i.test(h));
+                    if (symIdx < 0) { alert("CSV must have a Symbol column"); return; }
+                    const imported = [];
+                    for (let i = 1; i < lines.length; i++) {
+                      const vals = lines[i].match(/("(?:[^"]|"")*"|[^,]*)/g)?.map(v => v.replace(/^"|"$/g,"").replace(/""/g,'"').trim()) || [];
+                      const sym = vals[symIdx] || "";
+                      if (!sym) continue;
+                      imported.push({
+                        id: Date.now() + i, sym: sym.toUpperCase(),
+                        entry: vals[entryIdx] || new Date().toLocaleDateString("en-US",{month:"numeric",day:"numeric",year:"2-digit"}),
+                        shares: vals[sharesIdx] || "", ep: vals[epIdx] || "", cp: vals[cpIdx] || "",
+                        stop: vals[s1Idx] || "", stop2: s2Idx >= 0 ? vals[s2Idx] || "" : "",
+                        trailStop: tsIdx >= 0 ? vals[tsIdx] || "" : "",
+                        setup: vals[setupIdx] || setupTypes[0] || "VCP",
+                        tags: tagsIdx >= 0 && vals[tagsIdx] ? vals[tagsIdx].split(";").map(t => t.trim()).filter(Boolean) : [],
+                      });
+                    }
+                    if (imported.length > 0) {
+                      setPositions(prev => { const next = [...prev, ...imported]; lastLoadedCount.current = next.length; return next; });
+                      alert(`Imported ${imported.length} position${imported.length > 1 ? "s" : ""}`);
+                    } else {
+                      alert("No valid positions found in CSV");
+                    }
+                  } catch (err) { alert("Import error: " + err.message); }
+                  e.target.value = "";
+                };
+                reader.readAsText(file);
+              }} />
+            </label>
           </div>
         </div>
         {/* 15-min delay notice */}
