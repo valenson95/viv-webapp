@@ -1179,6 +1179,19 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const equityData = useMemo(() => { let cum = 0; return filtered.map(t => { cum += t.plDollar; return { trade: t.ticker, equity: cum }; }); }, [filtered]);
 
   const startEdit = (t) => { setEditingId(t.id); setEditRow({ ...t }); };
+  const saveEdit = () => {
+    if (!editingId) return;
+    setJournaledTrades(prev => prev.map(t => {
+      if (t.id !== editingId) return t;
+      const ep = parseFloat(editRow.entryP) || 0, xp = parseFloat(editRow.exitP) || 0, sh = parseInt(editRow.shares) || 0, st = parseFloat(editRow.stop) || 0;
+      const plPct = ep > 0 ? ((xp - ep) / ep) * 100 : 0;
+      const plDollar = (xp - ep) * sh;
+      const initRisk = ep > 0 && st > 0 ? (ep - st) / ep : 0;
+      const rMult = initRisk > 0 ? (plPct / 100) / initRisk : 0;
+      return { ...editRow, plPct, plDollar, rMult };
+    }));
+    setEditingId(null);
+  };
   const cancelEdit = () => setEditingId(null);
   const deleteTrade = (id) => {
     setDeletedTradeIds(prev => [...prev, id]);
@@ -1350,7 +1363,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                       <td style={{ padding: "6px 6px" }}><MiniSelect value={editRow.reason} onChange={v => setEditRow(r => ({...r, reason: v}))} options={exitReasons} width={110} /></td>
                       <td style={{ padding: "6px 6px" }}><input type="text" value={editRow.notes||""} onChange={e => setEditRow(r => ({...r, notes: e.target.value}))} placeholder="Notes..." style={{width:80,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 7px",color:C.white,fontSize:"0.68rem",fontFamily:font,outline:"none"}} /></td>
                       <td style={{ padding: "6px 6px", whiteSpace: "nowrap" }}>
-                        <button onClick={cancelEdit} style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontSize:"0.58rem",cursor:"pointer",fontFamily:font,marginRight:4}}>Done</button>
+                        <button onClick={saveEdit} style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${C.green}33`,background:C.greenDim,color:C.green,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font,marginRight:4}}>Save</button>
+                        <button onClick={cancelEdit} style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontSize:"0.58rem",cursor:"pointer",fontFamily:font,marginRight:4}}>Cancel</button>
                       </td>
                     </tr>
                   );
@@ -1419,7 +1433,7 @@ const GLOSSARY = [
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
-function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks }) {
+function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef }) {
   const sizer = useMemo(() => {
     const ps = +portfolioSize;
     if (!ps || ps <= 0) return null;
@@ -1474,18 +1488,39 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const removeRow = useCallback((id) => {
     setPositions(prev => {
       const next = prev.filter(p => p.id !== id);
-      lastLoadedCount.current = next.length; // update so autosave safety check doesn't block intentional removal
+      if (lastLoadedCountRef) lastLoadedCountRef.current = next.length; // update so autosave safety check doesn't block intentional removal
       return next;
     });
-  }, []);
+  }, [lastLoadedCountRef]);
+
+  // Remap sellId when autosave replaces position IDs
+  useEffect(() => {
+    if (!sellId || !lastSaveIdMapRef || lastSaveIdMapRef.current.size === 0) return;
+    const newId = lastSaveIdMapRef.current.get(sellId);
+    if (newId && newId !== sellId) {
+      setSellId(newId);
+    }
+  }, [positions]); // fires after setPositions syncs IDs from savePositionsNow
 
   // Sell flow
   const startSell = (p) => { setSellId(p.id); setSellQty(p.shares); setSellPrice(p.cp); setSellReason(exitReasons[0] || "Sold Into Strength"); setSellTags([]); setSellAddJournal(true); setSellNotes(""); };
   const cancelSell = () => setSellId(null);
+  // Helper: find position by sellId, with ID-map fallback to survive autosave ID sync
+  const findSellPos = useCallback(() => {
+    if (!sellId) return null;
+    let pos = positions.find(p => p.id === sellId);
+    if (!pos && lastSaveIdMapRef && lastSaveIdMapRef.current.size > 0) {
+      const mappedId = lastSaveIdMapRef.current.get(sellId);
+      if (mappedId) pos = positions.find(p => p.id === mappedId);
+    }
+    return pos;
+  }, [sellId, positions, lastSaveIdMapRef]);
+
   const confirmSell = () => {
-    const pos = positions.find(p => p.id === sellId);
+    const pos = findSellPos();
     if (!pos) return;
     const epN = parseFloat(pos.ep) || 0, stopN = parseFloat(pos.stop) || 0;
+    const stop2N = parseFloat(pos.stop2) || 0;
     const soldShares = parseInt(sellQty) || 0;
     const exitP = parseFloat(sellPrice) || 0;
     const totalShares = parseInt(pos.shares) || 0;
@@ -1494,7 +1529,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     if (sellAddJournal && soldShares > 0 && exitP > 0) {
       const plPct = epN > 0 ? ((exitP - epN) / epN) * 100 : 0;
       const plDollar = (exitP - epN) * soldShares;
-      const initRisk = epN > 0 ? (epN - stopN) / epN : 0;
+      // Weighted initial risk — accounts for dual stops (same formula as enrichment)
+      const isDual = stopN > 0 && stop2N > 0;
+      const h1 = isDual ? Math.ceil(totalShares / 2) : totalShares;
+      const h2 = isDual ? totalShares - h1 : 0;
+      const initRiskD = epN > 0 ? (epN - stopN) * h1 + (isDual ? (epN - stop2N) * h2 : 0) : 0;
+      const initRisk = epN > 0 && totalShares > 0 ? initRiskD / (epN * totalShares) : 0;
       const rMult = initRisk > 0 ? (plPct / 100) / initRisk : 0;
       onJournalTrade({
         id: Date.now(), ticker: pos.sym, entry: pos.entry,
@@ -1506,9 +1546,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     }
 
     if (remaining > 0) {
-      setPositions(prev => prev.map(p => p.id === sellId ? { ...p, shares: String(remaining) } : p));
+      setPositions(prev => prev.map(p => p.id === pos.id ? { ...p, shares: String(remaining) } : p));
     } else {
-      removeRow(sellId);
+      removeRow(pos.id);
     }
     setSellId(null);
   };
@@ -1725,7 +1765,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                       });
                     }
                     if (imported.length > 0) {
-                      setPositions(prev => { const next = [...prev, ...imported]; lastLoadedCount.current = next.length; return next; });
+                      setPositions(prev => { const next = [...prev, ...imported]; if (lastLoadedCountRef) lastLoadedCountRef.current = next.length; return next; });
                       alert(`Imported ${imported.length} position${imported.length > 1 ? "s" : ""}`);
                     } else {
                       alert("No valid positions found in CSV");
@@ -1819,7 +1859,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 
               {/* Sell inline form */}
               {sellId && (() => {
-                const pos = positions.find(p => p.id === sellId);
+                const pos = findSellPos();
                 if (!pos) return null;
                 const totalShares = parseInt(pos.shares) || 0;
                 const qty = parseInt(sellQty) || 0;
@@ -2442,9 +2482,14 @@ export default function App() {
 
   // ─── Helper: save positions to Supabase (insert-first, delete-after, ID-sync) ───
   const isSaving = useRef(false);
+  const pendingSave = useRef(null); // queued save if one was attempted during in-flight save
+  const lastSaveIdMap = useRef(new Map()); // old→new ID mapping from last save, used by DashboardPage to remap sellId
   const savePositionsNow = useCallback(async (uid, posArr) => {
-    // Prevent concurrent saves
-    if (isSaving.current) return;
+    // Prevent concurrent saves — reschedule instead of silently dropping
+    if (isSaving.current) {
+      pendingSave.current = { uid, posArr };
+      return;
+    }
     isSaving.current = true;
     try {
       const rows = posArr.map(p => ({
@@ -2475,15 +2520,25 @@ export default function App() {
       }
 
       // Step 3: Sync local state with real DB IDs so next save doesn't create duplicates
+      // Build old→new ID map and expose it so DashboardPage can remap sellId
+      const idMap = new Map();
       setPositions(prev => {
         if (prev.length !== inserted.length) return prev; // state changed during save, skip sync
+        prev.forEach((p, i) => { if (inserted[i]) idMap.set(p.id, inserted[i].id); });
         return prev.map((p, i) => ({ ...p, id: inserted[i].id }));
       });
+      lastSaveIdMap.current = idMap;
       lastLoadedCount.current = inserted.length;
     } catch (err) {
       console.error("Position save failed:", err.message);
     }
     isSaving.current = false;
+    // If a save was queued while this one was in-flight, run it now with fresh data
+    if (pendingSave.current) {
+      const { uid: pUid, posArr: pArr } = pendingSave.current;
+      pendingSave.current = null;
+      savePositionsNow(pUid, pArr);
+    }
   }, []);
 
   // ─── Helper: save settings to Supabase ───
@@ -2495,21 +2550,7 @@ export default function App() {
     if (error) console.error("Setting save error:", key, error.message);
   }, []);
 
-  // ─── Helper: save trades to Supabase (full replace) ───
-  const saveTradesNow = useCallback(async (uid, tradeArr) => {
-    // Mark all existing as deleted, then insert fresh
-    await supabase.from("trades").update({ is_deleted: true }).eq("user_id", uid);
-    if (tradeArr.length > 0) {
-      const { error } = await supabase.from("trades").insert(tradeArr.map(t => ({
-        user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
-        entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
-        stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
-        pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
-        exit_reason: t.reason || "", notes: t.notes || "",
-      })));
-      if (error) console.error("Trade save error:", error.message);
-    }
-  }, []);
+  // (saveTradesNow removed — was destructive delete-all-then-insert pattern. Trade saves use incremental insert below.)
 
   // ─── Load all data when session is available ───
   useEffect(() => {
@@ -2642,34 +2683,72 @@ export default function App() {
     posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), 2000);
   }, [positions, session]);
 
-  // ─── Auto-save journaled trades to Supabase (only insert NEW trades) ───
+  // ─── Auto-save journaled trades to Supabase (handles inserts, edits, and deletes) ───
   const tradeTimer = useRef(null);
-  const prevTradeCount = useRef(0);
+  const tradeHashRef = useRef(""); // track content changes, not just count
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
-    // Only save when trades are ADDED (count increased), not when deleted
-    if (journaledTrades.length > prevTradeCount.current && prevTradeCount.current > 0) {
-      clearTimeout(tradeTimer.current);
-      tradeTimer.current = setTimeout(async () => {
-        const uid = session.user.id;
-        // Get what's already in DB
+    // Build a lightweight hash of trade state to detect ANY change (add, edit, delete)
+    const hash = journaledTrades.map(t => `${t.id}|${t.ticker}|${t.entry}|${t.exit}|${t.entryP}|${t.exitP}|${t.shares}|${t.stop}|${t.setup}|${(t.tags||[]).join(",")}|${t.reason}|${t.notes}`).join("##");
+    if (hash === tradeHashRef.current) return; // no change
+    tradeHashRef.current = hash;
+
+    clearTimeout(tradeTimer.current);
+    tradeTimer.current = setTimeout(async () => {
+      const uid = session.user.id;
+      try {
+        // Get existing DB trades
         const { data: existing } = await supabase.from("trades").select("id").eq("user_id", uid).eq("is_deleted", false);
         const existingIds = new Set((existing || []).map(t => t.id));
-        // Only insert trades not already in DB (new ones won't have a DB id)
+        const currentIds = new Set(journaledTrades.filter(t => existingIds.has(t.id)).map(t => t.id));
+
+        // Insert new trades (not in DB)
         const newTrades = journaledTrades.filter(t => !existingIds.has(t.id));
+        let didInsert = false;
         if (newTrades.length > 0) {
-          const { error } = await supabase.from("trades").insert(newTrades.map(t => ({
+          const tradeRow = t => ({
             user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
             entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
             stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
             pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
             exit_reason: t.reason || "", notes: t.notes || "",
-          })));
-          if (error) console.error("Trade insert error:", error.message);
+          });
+          const { data: inserted, error } = await supabase.from("trades").insert(newTrades.map(tradeRow)).select("id");
+          if (error) { console.error("Trade insert error:", error.message); return; }
+          didInsert = true;
+          // Sync IDs for newly inserted trades
+          if (inserted && inserted.length === newTrades.length) {
+            setJournaledTrades(prev => {
+              const newIdMap = new Map();
+              newTrades.forEach((t, i) => { if (inserted[i]) newIdMap.set(t.id, inserted[i].id); });
+              return prev.map(t => newIdMap.has(t.id) ? { ...t, id: newIdMap.get(t.id) } : t);
+            });
+          }
         }
-      }, 1500);
-    }
-    prevTradeCount.current = journaledTrades.length;
+
+        // Update existing trades that were edited (batch upsert, not one-by-one)
+        const editedTrades = journaledTrades.filter(t => existingIds.has(t.id));
+        if (editedTrades.length > 0) {
+          const { error } = await supabase.from("trades").upsert(editedTrades.map(t => ({
+            id: t.id, user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
+            entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
+            stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
+            pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
+            exit_reason: t.reason || "", notes: t.notes || "",
+          })), { onConflict: "id" });
+          if (error) console.error("Trade upsert error:", error.message);
+        }
+
+        // Soft-delete trades removed from state — SKIP if we just inserted (IDs haven't synced yet)
+        if (didInsert) return; // let the next autosave cycle handle deletes after IDs are stable
+        const deletedIds = [...existingIds].filter(id => !currentIds.has(id));
+        if (deletedIds.length > 0) {
+          await supabase.from("trades").update({ is_deleted: true }).in("id", deletedIds);
+        }
+      } catch (err) {
+        console.error("Trade save failed:", err.message);
+      }
+    }, 2000);
   }, [journaledTrades, session]);
 
   const appZoom = fontSize === "huge" ? 1.30 : fontSize === "large" ? 1.15 : fontSize === "small" ? 0.88 : 1.0;
@@ -2693,6 +2772,18 @@ export default function App() {
     setSession(null);
     setProfile(null);
     dataLoaded.current = false;
+    // Reset ALL data state to prevent bleed between users
+    setPositions([]);
+    setJournaledTrades([]);
+    setSetupTypes(DEFAULT_SETUP_TYPES);
+    setTags(DEFAULT_TAGS);
+    setExitReasons(DEFAULT_EXIT_REASONS);
+    setPortfolioSize("500000");
+    setFullSizePct(25);
+    setNumStocks(5);
+    setFontSize("standard");
+    lastLoadedCount.current = 0;
+    setPage("dashboard");
   };
 
   // ─── Loading / Auth Gate ───
@@ -2717,7 +2808,7 @@ export default function App() {
 
   const pageContent = (
     <>
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} />}
