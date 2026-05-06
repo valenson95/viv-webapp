@@ -1407,7 +1407,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 // ═══════════════════════════════════════
 const FULL_SIZE_OPTIONS = [10,15,20,25,30,35,40,45,50,55,60];
 let _posId = 100;
-const mkPos = (sym, entry, shares, ep, cp, stop, stop2, setup, tags = [], trailStop = "") => ({ id: _posId++, sym, entry, shares: String(shares), ep: String(ep), cp: String(cp), stop: String(stop), stop2: String(stop2 || ""), trailStop: String(trailStop || ""), setup, tags });
+let _lid = 1; // stable local ID counter — survives autosave ID replacement, used as React key
+const mkPos = (sym, entry, shares, ep, cp, stop, stop2, setup, tags = [], trailStop = "", comm = "") => ({ id: _posId++, _lid: _lid++, sym, entry, shares: String(shares), ep: String(ep), cp: String(cp), stop: String(stop), stop2: String(stop2 || ""), trailStop: String(trailStop || ""), setup, tags, comm: String(comm || "") });
 const INIT_POSITIONS = [
   mkPos("MSGS","4/1/26",612,328.25,302.90,302.90,0,"VCP",["Breakout"]),
   mkPos("DNTH","4/8/26",2100,87.58,81.75,81.75,0,"Pivot",["Momentum"]),
@@ -1482,7 +1483,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const addPosition = useCallback(() => {
     setPositions(prev => {
       const maxId = prev.reduce((m, p) => Math.max(m, p.id || 0), 0);
-      return [...prev, { id: maxId + 1, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [] }];
+      return [...prev, { id: maxId + 1, _lid: _lid++, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [], comm: "" }];
     });
   }, [setupTypes]);
   const removeRow = useCallback((id) => {
@@ -1527,8 +1528,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const remaining = totalShares - soldShares;
 
     if (sellAddJournal && soldShares > 0 && exitP > 0) {
-      const plPct = epN > 0 ? ((exitP - epN) / epN) * 100 : 0;
-      const plDollar = (exitP - epN) * soldShares;
+      const commN = parseFloat(pos.comm) || 0;
+      // Pro-rate commission if partial sell: comm * (soldShares / totalShares)
+      const commPortion = totalShares > 0 ? commN * (soldShares / totalShares) : commN;
+      const plDollar = (exitP - epN) * soldShares - commPortion;
+      const plPct = epN > 0 && soldShares > 0 ? (plDollar / (epN * soldShares)) * 100 : 0;
       // Weighted initial risk — accounts for dual stops (same formula as enrichment)
       const isDual = stopN > 0 && stop2N > 0;
       const h1 = isDual ? Math.ceil(totalShares / 2) : totalShares;
@@ -1555,7 +1559,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 
   // Enriched — dual stop loss: if stop2 is set, 50/50 split. Otherwise stop1 covers 100%.
   const enriched = useMemo(() => positions.map(p => {
-    const epN = parseFloat(p.ep)||0, cpN = parseFloat(p.cp)||0, sharesN = parseInt(p.shares)||0;
+    const epN = parseFloat(p.ep)||0, cpN = parseFloat(p.cp)||0, sharesN = parseInt(p.shares)||0, commN = parseFloat(p.comm)||0;
     const s1 = parseFloat(p.stop)||0;
     const s2 = parseFloat(p.stop2)||0;
     const tsN = parseFloat(p.trailStop)||0; // trailing stop (member-editable)
@@ -1591,9 +1595,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const sbe = canFinanceSBE ? Math.ceil(sharesN * (epN - avgStop) / (cpN - avgStop)) : 0;
     const sbePct = canFinanceSBE && sharesN > 0 ? (sbe / sharesN) * 100 : 0;
 
-    // P/L
-    const plPct = epN > 0 ? ((cpN - epN) / epN) * 100 : 0;
-    const plD = (cpN - epN) * sharesN;
+    // P/L (commission subtracted from dollar P/L)
+    const plD = (cpN - epN) * sharesN - commN;
+    const plPct = epN > 0 && sharesN > 0 ? (plD / (epN * sharesN)) * 100 : 0;
 
     // R-Multiple uses weighted initial risk
     const initRiskD = epN > 0 ? (epN - stop1) * h1 + (isDual ? (epN - stop2) * h2 : 0) : 0;
@@ -1648,7 +1652,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     // RTS in R terms
     const rtsR = rPerShare > 0 && sharesN > 0 ? (rtsD / sharesN) / rPerShare : 0;
 
-    return { ...p, epN, cpN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
+    return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
   }), [positions, sizer, portfolioSize]);
 
   const totals = useMemo(() => {
@@ -1719,9 +1723,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
             </div>
             <GoldBtn onClick={addPosition} small>+ Add Position</GoldBtn>
             <button onClick={() => {
-              const csv = [["Symbol","Entry Date","Shares","Entry Price","Current Price","Stop 1","Stop 2","Trail Stop","Setup","Tags"].join(",")];
+              const csv = [["Symbol","Entry Date","Shares","Entry Price","Commission","Current Price","Stop 1","Stop 2","Trail Stop","Setup","Tags"].join(",")];
               positions.filter(p => p.sym).forEach(p => {
-                csv.push([p.sym, p.entry, p.shares, p.ep, p.cp, p.stop, p.stop2||"", p.trailStop||"", p.setup, (p.tags||[]).join(";")].map(v => `"${String(v||"").replace(/"/g,'""')}"`).join(","));
+                csv.push([p.sym, p.entry, p.shares, p.ep, p.comm||"", p.cp, p.stop, p.stop2||"", p.trailStop||"", p.setup, (p.tags||[]).join(";")].map(v => `"${String(v||"").replace(/"/g,'""')}"`).join(","));
               });
               const blob = new Blob([csv.join("\n")], { type: "text/csv" });
               const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -1748,6 +1752,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     const tsIdx = hdr.findIndex(h => /trail/i.test(h));
                     const setupIdx = hdr.findIndex(h => /setup/i.test(h));
                     const tagsIdx = hdr.findIndex(h => /tags/i.test(h));
+                    const commIdx = hdr.findIndex(h => /commission|comm/i.test(h));
                     if (symIdx < 0) { alert("CSV must have a Symbol column"); return; }
                     const imported = [];
                     for (let i = 1; i < lines.length; i++) {
@@ -1755,13 +1760,14 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                       const sym = vals[symIdx] || "";
                       if (!sym) continue;
                       imported.push({
-                        id: Date.now() + i, sym: sym.toUpperCase(),
+                        id: Date.now() + i, _lid: _lid++, sym: sym.toUpperCase(),
                         entry: vals[entryIdx] || new Date().toLocaleDateString("en-US",{month:"numeric",day:"numeric",year:"2-digit"}),
                         shares: vals[sharesIdx] || "", ep: vals[epIdx] || "", cp: vals[cpIdx] || "",
                         stop: vals[s1Idx] || "", stop2: s2Idx >= 0 ? vals[s2Idx] || "" : "",
                         trailStop: tsIdx >= 0 ? vals[tsIdx] || "" : "",
                         setup: vals[setupIdx] || setupTypes[0] || "VCP",
                         tags: tagsIdx >= 0 && vals[tagsIdx] ? vals[tagsIdx].split(";").map(t => t.trim()).filter(Boolean) : [],
+                        comm: commIdx >= 0 ? vals[commIdx] || "" : "",
                       });
                     }
                     if (imported.length > 0) {
@@ -1799,7 +1805,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Value")}{th("Orig Stop")}{th("Stop 2")}{th("Trail Stop")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{displayMode==="R"&&th("R Suggest")}{displayMode==="R"&&th("Locked")}{displayMode!=="R"&&th("SBE")}{displayMode!=="R"&&th("SBE %")}{th("P/L")}{th("R")}{th("","center")}
+              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Comm")}{th("Value")}{th("Orig Stop")}{th("Stop 2")}{th("Trail Stop")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{displayMode==="R"&&th("R Suggest")}{displayMode==="R"&&th("Locked")}{displayMode!=="R"&&th("SBE")}{displayMode!=="R"&&th("SBE %")}{th("P/L")}{th("R")}{th("","center")}
             </tr></thead>
             <tbody>
               {enriched.map((p, idx) => {
@@ -1813,13 +1819,14 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const rtsDisplay = !p.cpN ? "—" : isR ? `${p.rtsR.toFixed(1)}R` : isDollar ? `$${Math.abs(p.rtsD).toLocaleString(undefined,{maximumFractionDigits:0})}` : `${(p.sharesN>0?(p.rtsD/(p.cpN*p.sharesN)*100):0).toFixed(2)}%`;
                 const plDisplay = !p.epN ? "—" : isR ? `${p.rMult>=0?"+":""}${p.rMult.toFixed(2)}R` : isDollar ? `${p.plD>=0?"+":"-"}${fmt$(Math.abs(p.plD))}` : `${p.plPct>=0?"+":""}${p.plPct.toFixed(2)}%`;
                 return (
-                  <tr key={p.id} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
+                  <tr key={p._lid || p.id} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
                     {/* Risk Status */}
                     <td style={{padding:"8px 4px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
                     <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.54rem",fontWeight:700,background:ts.bg,color:ts.color,border:`1px solid ${ts.border}`}}>{p.tier}</span></td>
                     <td style={{padding:"6px 4px"}}><TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.shares} onChange={v=>updateField(p.id,"shares",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.ep} onChange={v=>updateField(p.id,"ep",v)} /></td>
+                    <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={62} /></td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:C.white,whiteSpace:"nowrap"}}>{p.posValue>0?fmt$(p.posValue):"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={72} /></td>
@@ -1898,11 +1905,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 );
               })()}
 
-              {/* Totals — 21 cols: Status,Tier,Symbol,Shares,AvgCost,Value,OrigStop,Stop2,TrailStop,Current,Setup,Tags,DTS,RTS,ROTE,[RSuggest+Locked|SBE+SBE%],P/L,R,Actions */}
+              {/* Totals — 22 cols: Status,Tier,Symbol,Shares,AvgCost,Comm,Value,OrigStop,Stop2,TrailStop,Current,Setup,Tags,DTS,RTS,ROTE,[RSuggest+Locked|SBE+SBE%],P/L,R,Actions */}
               <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
                 <td colSpan={3} style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.text,fontSize:"0.70rem"}}>{enriched.reduce((s,p)=>s+p.sharesN,0).toLocaleString()}</td>
                 <td />
+                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.muted,fontSize:"0.70rem"}}>{fmt$(enriched.reduce((s,p)=>s+p.commN,0))}</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:C.goldBright}}>{fmt$(enriched.reduce((s,p)=>s+p.posValue,0))}</td>
                 <td colSpan={6} />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD<=0?C.green:C.text}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
@@ -2496,6 +2504,7 @@ export default function App() {
         user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
         entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
         stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
+        commission: p.comm || "",
       }));
 
       if (rows.length === 0) {
@@ -2525,7 +2534,7 @@ export default function App() {
       setPositions(prev => {
         if (prev.length !== inserted.length) return prev; // state changed during save, skip sync
         prev.forEach((p, i) => { if (inserted[i]) idMap.set(p.id, inserted[i].id); });
-        return prev.map((p, i) => ({ ...p, id: inserted[i].id }));
+        return prev.map((p, i) => ({ ...p, id: inserted[i].id })); // _lid preserved via spread
       });
       lastSaveIdMap.current = idMap;
       lastLoadedCount.current = inserted.length;
@@ -2607,7 +2616,7 @@ export default function App() {
         }
         const clean = pos.filter(p => !dupIds.includes(p.id));
         lastLoadedCount.current = clean.length;
-        setPositions(clean.map(p => ({ id: p.id, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [] })));
+        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "" })));
       } else {
         // Check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
@@ -2617,13 +2626,14 @@ export default function App() {
             user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
             entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
             stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
+            commission: p.comm || "",
           })));
           if (!seedErr) {
             // Re-load from DB so positions have real DB ids
             const { data: seeded } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
             if (seeded && seeded.length > 0) {
               lastLoadedCount.current = seeded.length;
-              setPositions(seeded.map(p => ({ id: p.id, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [] })));
+              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "" })));
             }
           }
           await saveSettingNow(uid, "initialized", true);
