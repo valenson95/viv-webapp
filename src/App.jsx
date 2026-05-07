@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 import { supabase } from "./supabaseClient";
 
@@ -1090,7 +1090,7 @@ function parseCSV(text) {
     if (exitP <= 0) continue;
     // Convert numerics
     const entryP = parseFloat(row.entryP) || 0;
-    const shares = parseInt(row.shares) || 0;
+    const shares = parseFloat(row.shares) || 0;
     const stop = parseFloat(row.stop) || 0;
     // Calculate P/L % — use CSV value if present, otherwise derive from prices
     const plPct = row.plPct !== undefined && row.plPct !== "" ? parseFloat(row.plPct) : (entryP > 0 ? ((exitP - entryP) / entryP) * 100 : 0);
@@ -1115,20 +1115,48 @@ function parseCSV(text) {
       plPct: effectivePlPct, plDollar, rMult,
       reason: row.reason || "",
       notes: row.notes || "",
+      chartUrl: "", chartImage: "",
       _imported: true,
     });
   }
   return results;
 }
 
-function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons }) {
+// ─── Notes helpers: backward-compat structured notes ───
+// New trades store JSON: {"right":"...","wrong":"...","lessons":"..."}
+// Old trades store plain string. parseNotes handles both.
+function parseNotes(raw) {
+  if (!raw) return { right: "", wrong: "", lessons: "", _plain: "" };
+  if (typeof raw === "object") return { right: raw.right || "", wrong: raw.wrong || "", lessons: raw.lessons || "", _plain: "" };
+  try { const parsed = JSON.parse(raw); return { right: parsed.right || "", wrong: parsed.wrong || "", lessons: parsed.lessons || "", _plain: "" }; }
+  catch { return { right: "", wrong: "", lessons: "", _plain: raw }; }
+}
+function serializeNotes(obj) {
+  // If only _plain has content (migrating from old format), keep it in "right" field
+  if (obj._plain && !obj.right && !obj.wrong && !obj.lessons) return obj._plain;
+  const has = obj.right || obj.wrong || obj.lessons;
+  if (!has && obj._plain) return obj._plain; // still old format, user hasn't used structured yet
+  if (!has && !obj._plain) return "";
+  return JSON.stringify({ right: obj.right || "", wrong: obj.wrong || "", lessons: obj.lessons || "" });
+}
+function notesPreview(raw) {
+  const n = parseNotes(raw);
+  if (n._plain) return n._plain;
+  const parts = [n.right && `✓ ${n.right}`, n.wrong && `✗ ${n.wrong}`, n.lessons && `💡 ${n.lessons}`].filter(Boolean);
+  return parts.join(" | ") || "";
+}
+
+function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session }) {
   const [filterSetup, setFilterSetup] = useState("All");
   const [filterTag, setFilterTag] = useState("All");
   const [editingId, setEditingId] = useState(null);
   const [editRow, setEditRow] = useState({});
+  const [editNotes, setEditNotes] = useState({ right: "", wrong: "", lessons: "", _plain: "" });
   const [showImportGuide, setShowImportGuide] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [deletedTradeIds, setDeletedTradeIds] = useState([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [expandedTrade, setExpandedTrade] = useState(null); // for expanded view with chart + notes
 
   const allTrades = useMemo(() => journaledTrades.filter(t => !deletedTradeIds.includes(t.id)), [journaledTrades, deletedTradeIds]);
 
@@ -1178,21 +1206,38 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   }, [filtered]);
   const equityData = useMemo(() => { let cum = 0; return filtered.map(t => { cum += t.plDollar; return { trade: t.ticker, equity: cum }; }); }, [filtered]);
 
-  const startEdit = (t) => { setEditingId(t.id); setEditRow({ ...t }); };
+  const startEdit = (t) => { setEditingId(t.id); setEditRow({ ...t }); setEditNotes(parseNotes(t.notes)); };
   const saveEdit = () => {
     if (!editingId) return;
+    const serializedNotes = serializeNotes(editNotes);
     setJournaledTrades(prev => prev.map(t => {
       if (t.id !== editingId) return t;
-      const ep = parseFloat(editRow.entryP) || 0, xp = parseFloat(editRow.exitP) || 0, sh = parseInt(editRow.shares) || 0, st = parseFloat(editRow.stop) || 0;
+      const ep = parseFloat(editRow.entryP) || 0, xp = parseFloat(editRow.exitP) || 0, sh = parseFloat(editRow.shares) || 0, st = parseFloat(editRow.stop) || 0;
       const plPct = ep > 0 ? ((xp - ep) / ep) * 100 : 0;
       const plDollar = (xp - ep) * sh;
       const initRisk = ep > 0 && st > 0 ? (ep - st) / ep : 0;
       const rMult = initRisk > 0 ? (plPct / 100) / initRisk : 0;
-      return { ...editRow, plPct, plDollar, rMult };
+      return { ...editRow, notes: serializedNotes, plPct, plDollar, rMult };
     }));
     setEditingId(null);
   };
-  const cancelEdit = () => setEditingId(null);
+  const cancelEdit = () => { setEditingId(null); setEditNotes({ right: "", wrong: "", lessons: "", _plain: "" }); };
+
+  // Upload chart image to Supabase Storage
+  const uploadChartImage = async (tradeId, file) => {
+    setUploadingImage(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `charts/${tradeId}_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("trade-charts").upload(path, file, { upsert: true });
+      if (uploadErr) { console.error("Upload error:", uploadErr.message); alert("Upload failed: " + uploadErr.message); return; }
+      const { data: urlData } = supabase.storage.from("trade-charts").getPublicUrl(path);
+      const publicUrl = urlData?.publicUrl || "";
+      // Update the trade with the image path
+      setEditRow(r => ({ ...r, chartImage: publicUrl }));
+    } catch (err) { console.error("Upload failed:", err); alert("Upload failed"); }
+    setUploadingImage(false);
+  };
   const deleteTrade = (id) => {
     setDeletedTradeIds(prev => [...prev, id]);
     setJournaledTrades(prev => prev.filter(t => t.id !== id));
@@ -1340,7 +1385,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.72rem" }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                {["Symbol","Entry","Exit","Entry $","Exit $","Shares","Setup","Tags","P/L %","P/L $","R-Mult","Reason","Notes",""].map(h => (
+                {["Symbol","Entry","Exit","Entry $","Exit $","Shares","Setup","Tags","P/L %","P/L $","R-Mult","Reason","Notes","Chart",""].map(h => (
                   <th key={h} style={{ padding: "9px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -1349,8 +1394,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
               {filtered.map(t => {
                 const isEditing = editingId === t.id;
                 if (isEditing) {
-                  return (
-                    <tr key={t.id} style={{ background: "rgba(201,152,42,0.04)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  return (<React.Fragment key={t.id}>
+                    <tr style={{ background: "rgba(201,152,42,0.04)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                       <td style={{ padding: "6px 6px" }}><TickerInput value={editRow.ticker} onChange={v => setEditRow(r => ({...r, ticker: v}))} /></td>
                       <td style={{ padding: "6px 6px" }}><input type="text" value={editRow.entry} onChange={e => setEditRow(r => ({...r, entry: e.target.value}))} style={{width:70,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 7px",color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none"}} /></td>
                       <td style={{ padding: "6px 6px" }}><input type="text" value={editRow.exit} onChange={e => setEditRow(r => ({...r, exit: e.target.value}))} style={{width:70,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 7px",color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none"}} /></td>
@@ -1361,16 +1406,70 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                       <td style={{ padding: "6px 6px" }}><TagSelector selected={editRow.tags || []} allTags={allTags} onChange={v => setEditRow(r => ({...r, tags: v}))} small /></td>
                       <td colSpan={3} />
                       <td style={{ padding: "6px 6px" }}><MiniSelect value={editRow.reason} onChange={v => setEditRow(r => ({...r, reason: v}))} options={exitReasons} width={110} /></td>
-                      <td style={{ padding: "6px 6px" }}><input type="text" value={editRow.notes||""} onChange={e => setEditRow(r => ({...r, notes: e.target.value}))} placeholder="Notes..." style={{width:80,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 7px",color:C.white,fontSize:"0.68rem",fontFamily:font,outline:"none"}} /></td>
+                      <td style={{ padding: "6px 6px", fontSize: "0.58rem", color: C.muted }}>see below</td>
+                      <td style={{ padding: "6px 6px", fontSize: "0.58rem", color: C.muted }}>see below</td>
                       <td style={{ padding: "6px 6px", whiteSpace: "nowrap" }}>
                         <button onClick={saveEdit} style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${C.green}33`,background:C.greenDim,color:C.green,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font,marginRight:4}}>Save</button>
                         <button onClick={cancelEdit} style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontSize:"0.58rem",cursor:"pointer",fontFamily:font,marginRight:4}}>Cancel</button>
                       </td>
                     </tr>
-                  );
+                    {/* Expanded edit area: structured notes + chart URL + image upload */}
+                    <tr style={{ background: "rgba(201,152,42,0.03)", borderBottom: `2px solid ${C.borderGold}` }}>
+                      <td colSpan={15} style={{ padding: "14px 16px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                          {/* Left: Structured Notes */}
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>Trade Review</div>
+                            {editNotes._plain && (
+                              <div style={{ marginBottom: 10, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}` }}>
+                                <div style={{ fontSize: "0.56rem", fontWeight: 700, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.08em" }}>Previous Notes</div>
+                                <div style={{ fontSize: "0.70rem", color: C.text }}>{editNotes._plain}</div>
+                              </div>
+                            )}
+                            {[{key:"right",label:"What Went Right",color:C.green},{key:"wrong",label:"What Went Wrong",color:C.red},{key:"lessons",label:"Lessons Learned",color:C.gold}].map(({key,label,color}) => (
+                              <div key={key} style={{ marginBottom: 8 }}>
+                                <label style={{ display: "block", fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.08em", textTransform: "uppercase", color, marginBottom: 4 }}>{label}</label>
+                                <textarea value={editNotes[key]} onChange={e => setEditNotes(n => ({...n, [key]: e.target.value}))} placeholder={`${label}...`} rows={2}
+                                  style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 10px", color: C.white, fontSize: "0.72rem", fontFamily: font, outline: "none", resize: "vertical" }}
+                                  onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                              </div>
+                            ))}
+                          </div>
+                          {/* Right: Chart Link + Image Upload */}
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>Chart Reference</div>
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={{ display: "block", fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>TradingView Link</label>
+                              <input type="url" value={editRow.chartUrl||""} onChange={e => setEditRow(r => ({...r, chartUrl: e.target.value}))} placeholder="https://www.tradingview.com/chart/..."
+                                style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 10px", color: C.blue, fontSize: "0.72rem", fontFamily: font, outline: "none" }}
+                                onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                            </div>
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={{ display: "block", fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Chart Screenshot</label>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                <label style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.04)", color: C.white, fontWeight: 700, fontSize: "0.66rem", cursor: uploadingImage ? "wait" : "pointer", fontFamily: font, opacity: uploadingImage ? 0.5 : 1 }}>
+                                  {uploadingImage ? "Uploading..." : "Upload Image"}
+                                  <input type="file" accept="image/*" style={{ display: "none" }} disabled={uploadingImage}
+                                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadChartImage(editRow.id, f); e.target.value = ""; }} />
+                                </label>
+                                {editRow.chartImage && <span style={{ fontSize: "0.62rem", color: C.green, fontWeight: 600 }}>✓ Image attached</span>}
+                                {editRow.chartImage && <button onClick={() => setEditRow(r => ({...r, chartImage: ""}))} style={{ padding: "2px 6px", borderRadius: 4, border: `1px solid ${C.border}`, background: "transparent", color: C.red, fontSize: "0.54rem", cursor: "pointer", fontFamily: font }}>Remove</button>}
+                              </div>
+                            </div>
+                            {/* Preview */}
+                            {editRow.chartImage && (
+                              <div style={{ marginTop: 8, borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}` }}>
+                                <img src={editRow.chartImage} alt="Chart" style={{ width: "100%", maxHeight: 200, objectFit: "contain", background: "#111" }} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </React.Fragment>);
                 }
-                return (
-                  <tr key={t.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)", cursor: "pointer" }} onDoubleClick={() => startEdit(t)}>
+                return (<React.Fragment key={t.id}>
+                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.03)", cursor: "pointer" }} onDoubleClick={() => startEdit(t)}>
                     <td style={{ padding: "11px 8px", fontWeight: 700, color: C.gold }}>{t.ticker}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>{t.entry}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>{t.exit||"—"}</td>
@@ -1383,7 +1482,14 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     <td style={{ padding: "11px 8px", fontWeight: 700, color: t.plDollar >= 0 ? C.green : C.red }}>{t.plDollar >= 0 ? "+" : ""}${t.plDollar.toLocaleString()}</td>
                     <td style={{ padding: "11px 8px", fontWeight: 700, color: t.rMult >= 0 ? C.green : C.red }}>{t.rMult.toFixed(2)}R</td>
                     <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.66rem", whiteSpace: "nowrap" }}>{t.reason}</td>
-                    <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.64rem", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.notes}</td>
+                    <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.64rem", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: t.notes ? "pointer" : "default" }} onClick={() => t.notes && setExpandedTrade(expandedTrade === t.id ? null : t.id)} title={t.notes ? "Click to expand" : ""}>{notesPreview(t.notes) || "—"}</td>
+                    <td style={{ padding: "11px 8px", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                        {t.chartUrl && <a href={t.chartUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "0.62rem", color: C.blue, textDecoration: "none", fontWeight: 600 }} title="Open TradingView chart">TV</a>}
+                        {t.chartImage && <span style={{ fontSize: "0.62rem", color: C.green, fontWeight: 700, cursor: "pointer" }} onClick={() => setExpandedTrade(expandedTrade === t.id ? null : t.id)} title="View chart image">📷</span>}
+                        {!t.chartUrl && !t.chartImage && <span style={{ color: C.muted, fontSize: "0.58rem" }}>—</span>}
+                      </div>
+                    </td>
                     <td style={{ padding: "11px 8px", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", gap: 4 }}>
                         <button onClick={() => startEdit(t)} style={{padding:"3px 8px",borderRadius:6,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontSize:"0.54rem",cursor:"pointer",fontFamily:font}}>Edit</button>
@@ -1391,7 +1497,36 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                       </div>
                     </td>
                   </tr>
-                );
+                  {/* Expanded view: notes + chart */}
+                  {expandedTrade === t.id && (
+                    <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: `1px solid ${C.border}` }}>
+                      <td colSpan={15} style={{ padding: "14px 20px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: t.chartImage ? "1fr 1fr" : "1fr", gap: 16 }}>
+                          <div>
+                            {(() => { const n = parseNotes(t.notes);
+                              return n._plain ? (
+                                <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.6 }}>{n._plain}</div>
+                              ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                  {n.right && <div><span style={{ fontWeight: 700, fontSize: "0.58rem", color: C.green, textTransform: "uppercase", letterSpacing: "0.08em" }}>What Went Right</span><div style={{ fontSize: "0.72rem", color: C.text, marginTop: 3, lineHeight: 1.5 }}>{n.right}</div></div>}
+                                  {n.wrong && <div><span style={{ fontWeight: 700, fontSize: "0.58rem", color: C.red, textTransform: "uppercase", letterSpacing: "0.08em" }}>What Went Wrong</span><div style={{ fontSize: "0.72rem", color: C.text, marginTop: 3, lineHeight: 1.5 }}>{n.wrong}</div></div>}
+                                  {n.lessons && <div><span style={{ fontWeight: 700, fontSize: "0.58rem", color: C.gold, textTransform: "uppercase", letterSpacing: "0.08em" }}>Lessons Learned</span><div style={{ fontSize: "0.72rem", color: C.text, marginTop: 3, lineHeight: 1.5 }}>{n.lessons}</div></div>}
+                                  {!n.right && !n.wrong && !n.lessons && <div style={{ fontSize: "0.70rem", color: C.muted }}>No notes yet. Click Edit to add a trade review.</div>}
+                                </div>
+                              );
+                            })()}
+                            {t.chartUrl && <div style={{ marginTop: 10 }}><a href={t.chartUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "0.70rem", color: C.blue, textDecoration: "underline" }}>Open TradingView Chart →</a></div>}
+                          </div>
+                          {t.chartImage && (
+                            <div style={{ borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}` }}>
+                              <img src={t.chartImage} alt={`${t.ticker} chart`} style={{ width: "100%", maxHeight: 280, objectFit: "contain", background: "#111" }} />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>);
               })}
             </tbody>
           </table>
@@ -1522,9 +1657,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     if (!pos) return;
     const epN = parseFloat(pos.ep) || 0, stopN = parseFloat(pos.stop) || 0;
     const stop2N = parseFloat(pos.stop2) || 0;
-    const soldShares = parseInt(sellQty) || 0;
+    const soldShares = parseFloat(sellQty) || 0;
     const exitP = parseFloat(sellPrice) || 0;
-    const totalShares = parseInt(pos.shares) || 0;
+    const totalShares = parseFloat(pos.shares) || 0;
     const remaining = totalShares - soldShares;
 
     if (sellAddJournal && soldShares > 0 && exitP > 0) {
@@ -1545,7 +1680,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         exit: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }),
         entryP: epN, exitP, shares: soldShares, stop: stopN, setup: pos.setup,
         tags: [...(pos.tags || []), ...sellTags], plPct, plDollar, rMult,
-        reason: sellReason, notes: sellNotes, _fromDashboard: true,
+        reason: sellReason, notes: sellNotes, chartUrl: "", chartImage: "", _fromDashboard: true,
       });
     }
 
@@ -1559,7 +1694,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 
   // Enriched — dual stop loss: if stop2 is set, 50/50 split. Otherwise stop1 covers 100%.
   const enriched = useMemo(() => positions.map(p => {
-    const epN = parseFloat(p.ep)||0, cpN = parseFloat(p.cp)||0, sharesN = parseInt(p.shares)||0, commN = parseFloat(p.comm)||0;
+    const epN = parseFloat(p.ep)||0, cpN = parseFloat(p.cp)||0, sharesN = parseFloat(p.shares)||0, commN = parseFloat(p.comm)||0;
     const s1 = parseFloat(p.stop)||0;
     const s2 = parseFloat(p.stop2)||0;
     const tsN = parseFloat(p.trailStop)||0; // trailing stop (member-editable)
@@ -1868,8 +2003,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               {sellId && (() => {
                 const pos = findSellPos();
                 if (!pos) return null;
-                const totalShares = parseInt(pos.shares) || 0;
-                const qty = parseInt(sellQty) || 0;
+                const totalShares = parseFloat(pos.shares) || 0;
+                const qty = parseFloat(sellQty) || 0;
                 const isPartial = qty < totalShares && qty > 0;
                 return (
                   <tr style={{ background:"rgba(239,68,68,0.06)",borderBottom:`2px solid ${C.red}33` }}>
@@ -2647,7 +2782,7 @@ export default function App() {
       // Trades — load (no seeding, journal starts empty)
       const { data: trades } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false });
       if (trades && trades.length > 0) {
-        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, exit: t.exit_date, entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, notes: t.notes })));
+        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, exit: t.exit_date, entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "" })));
       }
 
       dataLoaded.current = true;
@@ -2699,7 +2834,7 @@ export default function App() {
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
     // Build a lightweight hash of trade state to detect ANY change (add, edit, delete)
-    const hash = journaledTrades.map(t => `${t.id}|${t.ticker}|${t.entry}|${t.exit}|${t.entryP}|${t.exitP}|${t.shares}|${t.stop}|${t.setup}|${(t.tags||[]).join(",")}|${t.reason}|${t.notes}`).join("##");
+    const hash = journaledTrades.map(t => `${t.id}|${t.ticker}|${t.entry}|${t.exit}|${t.entryP}|${t.exitP}|${t.shares}|${t.stop}|${t.setup}|${(t.tags||[]).join(",")}|${t.reason}|${t.notes}|${t.chartUrl||""}|${t.chartImage||""}`).join("##");
     if (hash === tradeHashRef.current) return; // no change
     tradeHashRef.current = hash;
 
@@ -2722,6 +2857,7 @@ export default function App() {
             stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
             pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
             exit_reason: t.reason || "", notes: t.notes || "",
+            chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
           });
           const { data: inserted, error } = await supabase.from("trades").insert(newTrades.map(tradeRow)).select("id");
           if (error) { console.error("Trade insert error:", error.message); return; }
@@ -2745,6 +2881,7 @@ export default function App() {
             stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
             pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
             exit_reason: t.reason || "", notes: t.notes || "",
+            chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
           })), { onConflict: "id" });
           if (error) console.error("Trade upsert error:", error.message);
         }
@@ -2820,7 +2957,7 @@ export default function App() {
     <>
       {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
-      {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} />}
+      {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} />}
     </>
   );
