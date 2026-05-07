@@ -1636,7 +1636,6 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const togglePosExpand = useCallback((posId) => {
     setExpandedPosId(prev => {
       if (prev === posId) return null;
-      // Load notes into edit state
       const pos = positions.find(p => p.id === posId);
       if (pos) setPosEditNotes(parseNotes(pos.notes));
       return posId;
@@ -3149,6 +3148,10 @@ export default function App() {
         }
         const clean = pos.filter(p => !dupIds.includes(p.id));
         lastLoadedCount.current = clean.length;
+        // Build snapshot of loaded data for corruption detection before future saves
+        const snap = new Map();
+        clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
+        loadedSnapshot.current = snap;
         setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" })));
       } else {
         // Check if user has been initialized before
@@ -3215,13 +3218,30 @@ export default function App() {
   // ─── Auto-save positions to Supabase (debounced, with safety checks) ───
   const posTimer = useRef(null);
   const lastLoadedCount = useRef(0); // track how many positions were loaded from DB
+  const loadedSnapshot = useRef(new Map()); // snapshot of loaded data: id → {sym, ep, shares} — used to detect corruption before save
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
-    // Safety: if we loaded N positions from DB but state is now empty, don't auto-delete everything.
-    // This prevents accidental wipe from race conditions or re-renders with stale state.
+    // Safety 1: if we loaded N positions from DB but state is now empty, don't auto-delete everything.
     if (positions.length === 0 && lastLoadedCount.current > 0) {
       console.warn("Positions autosave blocked: state is empty but DB had", lastLoadedCount.current, "positions. Skipping to prevent data loss.");
       return;
+    }
+    // Safety 2: Snapshot validation — if positions that had real data now have empty core fields, block save.
+    // This catches state corruption, race conditions, or re-renders with stale/zeroed state.
+    if (loadedSnapshot.current.size > 0 && positions.length > 0) {
+      let corruptCount = 0;
+      for (const pos of positions) {
+        const snap = loadedSnapshot.current.get(pos.id);
+        // Only flag if this position was loaded with real data (sym + ep both non-empty) but now both are empty
+        if (snap && snap.sym && snap.ep && !pos.sym && !pos.ep) {
+          corruptCount++;
+        }
+      }
+      // If >50% of loaded positions lost their core data, something is very wrong — block save
+      if (corruptCount > 0 && corruptCount >= Math.ceil(loadedSnapshot.current.size * 0.5)) {
+        console.error(`AUTOSAVE BLOCKED: ${corruptCount} positions have empty core data that was previously loaded with real values. Possible state corruption. NOT saving to prevent data loss.`);
+        return;
+      }
     }
     clearTimeout(posTimer.current);
     posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), 2000);
