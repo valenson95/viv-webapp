@@ -1584,6 +1584,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const [sellTags, setSellTags] = useState([]);
   const [sellAddJournal, setSellAddJournal] = useState(true);
   const [sellNotes, setSellNotes] = useState("");
+  const [sellComm, setSellComm] = useState("");
+  const [sellChartUrl, setSellChartUrl] = useState("");
+  const [sellNotesStruct, setSellNotesStruct] = useState({ right: "", wrong: "", lessons: "" });
   const [displayMode, setDisplayMode] = useState("%"); // "%", "$", or "R"
   const [priceLoading, setPriceLoading] = useState(false);
   const [lastPriceRefresh, setLastPriceRefresh] = useState(null);
@@ -1673,7 +1676,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   }, [positions]); // fires after setPositions syncs IDs from savePositionsNow
 
   // Sell flow
-  const startSell = (p) => { setSellId(p.id); setSellQty(p.shares); setSellPrice(p.cp); setSellReason(exitReasons[0] || "Sold Into Strength"); setSellTags([]); setSellAddJournal(true); setSellNotes(""); };
+  const startSell = (p) => { setSellId(p.id); setSellQty(p.shares); setSellPrice(p.cp); setSellReason(exitReasons[0] || "Sold Into Strength"); setSellTags([]); setSellAddJournal(true); setSellNotes(""); setSellComm(""); setSellChartUrl(p.chartUrl || ""); const posNotes = parseNotes(p.notes); setSellNotesStruct({ right: posNotes.right || "", wrong: posNotes.wrong || "", lessons: posNotes.lessons || "" }); };
   const cancelSell = () => setSellId(null);
   // Helper: find position by sellId, with ID-map fallback to survive autosave ID sync
   const findSellPos = useCallback(() => {
@@ -1697,9 +1700,10 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const remaining = totalShares - soldShares;
 
     if (sellAddJournal && soldShares > 0 && exitP > 0) {
-      const commN = parseFloat(pos.comm) || 0;
-      // Pro-rate commission if partial sell: comm * (soldShares / totalShares)
-      const commPortion = totalShares > 0 ? commN * (soldShares / totalShares) : commN;
+      // Commission: use sell-form commission if provided, otherwise pro-rate from position commission
+      const sellCommN = parseFloat(sellComm) || 0;
+      const posCommN = parseFloat(pos.comm) || 0;
+      const commPortion = sellCommN > 0 ? sellCommN : (totalShares > 0 ? posCommN * (soldShares / totalShares) : posCommN);
       const plDollar = (exitP - epN) * soldShares - commPortion;
       const plPct = epN > 0 && soldShares > 0 ? (plDollar / (epN * soldShares)) * 100 : 0;
       // Weighted initial risk — accounts for dual stops (same formula as enrichment)
@@ -1709,12 +1713,15 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       const initRiskD = epN > 0 ? (epN - stopN) * h1 + (isDual ? (epN - stop2N) * h2 : 0) : 0;
       const initRisk = epN > 0 && totalShares > 0 ? initRiskD / (epN * totalShares) : 0;
       const rMult = initRisk > 0 ? (plPct / 100) / initRisk : 0;
+      // Build notes: use structured fields if any filled, fall back to plain sellNotes, then position notes
+      const hasStruct = sellNotesStruct.right || sellNotesStruct.wrong || sellNotesStruct.lessons;
+      const finalNotes = hasStruct ? serializeNotes({ ...sellNotesStruct, _plain: "" }) : (sellNotes || pos.notes || "");
       onJournalTrade({
         id: Date.now(), ticker: pos.sym, entry: pos.entry,
         exit: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }),
         entryP: epN, exitP, shares: soldShares, stop: stopN, setup: pos.setup,
         tags: [...(pos.tags || []), ...sellTags], plPct, plDollar, rMult,
-        reason: sellReason, notes: sellNotes || pos.notes || "", chartUrl: pos.chartUrl || "", chartImage: pos.chartImage || "", _fromDashboard: true,
+        reason: sellReason, notes: finalNotes, chartUrl: sellChartUrl || pos.chartUrl || "", chartImage: pos.chartImage || "", _fromDashboard: true,
       });
     }
 
@@ -2109,7 +2116,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 return (
                   <tr style={{ background:"rgba(239,68,68,0.06)",borderBottom:`2px solid ${C.red}33` }}>
                     <td colSpan={24} style={{ padding:"14px 16px" }}>
-                      <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap" }}>
+                      {/* Row 1: Core sell fields */}
+                      <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:10 }}>
                         <span style={{ fontWeight:700,fontSize:"0.68rem",color:C.red,letterSpacing:"0.08em",textTransform:"uppercase" }}>Sell {pos.sym}</span>
                         <div style={{display:"flex",alignItems:"center",gap:5}}>
                           <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Qty</span>
@@ -2120,12 +2128,15 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                           <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Exit $</span>
                           <CellInput value={sellPrice} onChange={setSellPrice} gold width={82} />
                         </div>
+                        <div style={{display:"flex",alignItems:"center",gap:5}}>
+                          <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Comm</span>
+                          <CellInput value={sellComm} onChange={setSellComm} width={62} />
+                        </div>
                         <MiniSelect value={sellReason} onChange={setSellReason} options={exitReasons} width={130} />
                         <div style={{display:"flex",alignItems:"center",gap:5}}>
                           <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Tags</span>
                           <TagSelector selected={sellTags} allTags={allTags} onChange={setSellTags} small />
                         </div>
-                        <input type="text" placeholder="Notes..." value={sellNotes} onChange={e=>setSellNotes(e.target.value)} style={{width:100,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:6,padding:"5px 8px",color:C.white,fontSize:"0.68rem",fontFamily:font,outline:"none"}} />
                         <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontSize:"0.62rem",color:C.muted}}>
                           <input type="checkbox" checked={sellAddJournal} onChange={e=>setSellAddJournal(e.target.checked)} style={{accentColor:C.gold}} />
                           Add to Journal
@@ -2135,6 +2146,25 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                         </button>
                         <button onClick={cancelSell} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontSize:"0.62rem",cursor:"pointer",fontFamily:font}}>Cancel</button>
                       </div>
+                      {/* Row 2: Notes + TV link (collapsible via Journal checkbox) */}
+                      {sellAddJournal && (
+                        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:10,alignItems:"start" }}>
+                          {[{key:"right",label:"What Went Right",color:C.green},{key:"wrong",label:"What Went Wrong",color:C.red},{key:"lessons",label:"What I Learned",color:C.gold}].map(({key,label,color}) => (
+                            <div key={key}>
+                              <label style={{ display:"block",fontWeight:700,fontSize:"0.52rem",letterSpacing:"0.08em",textTransform:"uppercase",color,marginBottom:3 }}>{label}</label>
+                              <textarea value={sellNotesStruct[key]} onChange={e => { const v = e.target.value; setSellNotesStruct(n => ({...n, [key]: v})); }} placeholder={`${label}...`} rows={2}
+                                style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:6,padding:"6px 8px",color:C.white,fontSize:"0.68rem",fontFamily:font,outline:"none",resize:"vertical" }}
+                                onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                            </div>
+                          ))}
+                          <div>
+                            <label style={{ display:"block",fontWeight:700,fontSize:"0.52rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.blue,marginBottom:3 }}>TV Link</label>
+                            <input type="url" value={sellChartUrl} onChange={e=>setSellChartUrl(e.target.value)} placeholder="tradingview.com/..."
+                              style={{ width:140,boxSizing:"border-box",background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:6,padding:"6px 8px",color:C.blue,fontSize:"0.68rem",fontFamily:font,outline:"none" }}
+                              onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                          </div>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
