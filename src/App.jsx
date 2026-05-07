@@ -3064,6 +3064,7 @@ export default function App() {
   // ─── Helper: save positions to Supabase (insert-first, delete-after, ID-sync) ───
   const isSaving = useRef(false);
   const pendingSave = useRef(null); // queued save if one was attempted during in-flight save
+  const skipNextAutosave = useRef(false); // flag to prevent autosave loop after ID sync
   const lastSaveIdMap = useRef(new Map()); // old→new ID mapping from last save, used by DashboardPage to remap sellId
   const savePositionsNow = useCallback(async (uid, posArr) => {
     // Prevent concurrent saves — reschedule instead of silently dropping
@@ -3104,6 +3105,7 @@ export default function App() {
       // Step 3: Sync local state with real DB IDs so next save doesn't create duplicates
       // Build old→new ID map and expose it so DashboardPage can remap sellId
       const idMap = new Map();
+      skipNextAutosave.current = true; // prevent ID sync from triggering another save cycle
       setPositions(prev => {
         if (prev.length !== inserted.length) return prev; // state changed during save, skip sync
         prev.forEach((p, i) => { if (inserted[i]) idMap.set(p.id, inserted[i].id); });
@@ -3263,6 +3265,8 @@ export default function App() {
   const loadedSnapshot = useRef(new Map()); // snapshot of loaded data: id → {sym, ep, shares} — used to detect corruption before save
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
+    // Skip autosave when positions changed only because of ID sync after a save (prevents infinite save loop)
+    if (skipNextAutosave.current) { skipNextAutosave.current = false; return; }
     // Safety 1: if we loaded N positions from DB but state is now empty, don't auto-delete everything.
     if (positions.length === 0 && lastLoadedCount.current > 0) {
       console.warn("Positions autosave blocked: state is empty but DB had", lastLoadedCount.current, "positions. Skipping to prevent data loss.");
