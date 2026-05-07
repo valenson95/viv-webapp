@@ -1543,7 +1543,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 const FULL_SIZE_OPTIONS = [10,15,20,25,30,35,40,45,50,55,60];
 let _posId = 100;
 let _lid = 1; // stable local ID counter — survives autosave ID replacement, used as React key
-const mkPos = (sym, entry, shares, ep, cp, stop, stop2, setup, tags = [], trailStop = "", comm = "") => ({ id: _posId++, _lid: _lid++, sym, entry, shares: String(shares), ep: String(ep), cp: String(cp), stop: String(stop), stop2: String(stop2 || ""), trailStop: String(trailStop || ""), setup, tags, comm: String(comm || "") });
+const mkPos = (sym, entry, shares, ep, cp, stop, stop2, setup, tags = [], trailStop = "", comm = "") => ({ id: _posId++, _lid: _lid++, sym, entry, shares: String(shares), ep: String(ep), cp: String(cp), stop: String(stop), stop2: String(stop2 || ""), trailStop: String(trailStop || ""), setup, tags, comm: String(comm || ""), notes: "", chartUrl: "", chartImage: "" });
 const INIT_POSITIONS = [
   mkPos("MSGS","4/1/26",612,328.25,302.90,302.90,0,"VCP",["Breakout"]),
   mkPos("DNTH","4/8/26",2100,87.58,81.75,81.75,0,"Pivot",["Momentum"]),
@@ -1569,7 +1569,7 @@ const GLOSSARY = [
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
-function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef }) {
+function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session }) {
   const sizer = useMemo(() => {
     const ps = +portfolioSize;
     if (!ps || ps <= 0) return null;
@@ -1587,6 +1587,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const [displayMode, setDisplayMode] = useState("%"); // "%", "$", or "R"
   const [priceLoading, setPriceLoading] = useState(false);
   const [lastPriceRefresh, setLastPriceRefresh] = useState(null);
+  const [expandedPosId, setExpandedPosId] = useState(null);
+  const [posUploadingImage, setPosUploadingImage] = useState(false);
+  const [posEditNotes, setPosEditNotes] = useState({ right: "", wrong: "", lessons: "", _plain: "" });
 
   // Fetch delayed prices from Finnhub via serverless proxy
   const fetchLivePrices = useCallback(async () => {
@@ -1614,11 +1617,43 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     setPriceLoading(false);
   }, [positions, setPositions]);
 
+  // Upload chart image for a position
+  const uploadPosChartImage = async (posId, file) => {
+    setPosUploadingImage(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `positions/${posId}_${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("trade-charts").upload(path, file, { upsert: true });
+      if (uploadErr) { console.error("Upload error:", uploadErr.message); alert("Upload failed: " + uploadErr.message); setPosUploadingImage(false); return; }
+      const { data: urlData } = supabase.storage.from("trade-charts").getPublicUrl(path);
+      const publicUrl = urlData?.publicUrl || "";
+      setPositions(prev => prev.map(p => p.id === posId ? { ...p, chartImage: publicUrl } : p));
+    } catch (err) { console.error("Upload failed:", err); alert("Upload failed"); }
+    setPosUploadingImage(false);
+  };
+
+  // Toggle expand/collapse for position notes/chart
+  const togglePosExpand = useCallback((posId) => {
+    setExpandedPosId(prev => {
+      if (prev === posId) return null;
+      // Load notes into edit state
+      const pos = positions.find(p => p.id === posId);
+      if (pos) setPosEditNotes(parseNotes(pos.notes));
+      return posId;
+    });
+  }, [positions]);
+
+  // Save position notes from edit state
+  const savePosNotes = useCallback((posId) => {
+    const serialized = serializeNotes(posEditNotes);
+    setPositions(prev => prev.map(p => p.id === posId ? { ...p, notes: serialized } : p));
+  }, [posEditNotes]);
+
   const updateField = useCallback((id, field, val) => { setPositions(prev => prev.map(p => p.id === id ? { ...p, [field]: val } : p)); }, []);
   const addPosition = useCallback(() => {
     setPositions(prev => {
       const maxId = prev.reduce((m, p) => Math.max(m, p.id || 0), 0);
-      return [...prev, { id: maxId + 1, _lid: _lid++, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [], comm: "" }];
+      return [...prev, { id: maxId + 1, _lid: _lid++, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [], comm: "", notes: "", chartUrl: "", chartImage: "" }];
     });
   }, [setupTypes]);
   const removeRow = useCallback((id) => {
@@ -1680,7 +1715,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         exit: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }),
         entryP: epN, exitP, shares: soldShares, stop: stopN, setup: pos.setup,
         tags: [...(pos.tags || []), ...sellTags], plPct, plDollar, rMult,
-        reason: sellReason, notes: sellNotes, chartUrl: "", chartImage: "", _fromDashboard: true,
+        reason: sellReason, notes: sellNotes || pos.notes || "", chartUrl: pos.chartUrl || "", chartImage: pos.chartImage || "", _fromDashboard: true,
       });
     }
 
@@ -1940,7 +1975,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Comm")}{th("Value")}{th("Orig Stop")}{th("Stop 2")}{th("Trail Stop")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{displayMode==="R"&&th("R Suggest")}{displayMode==="R"&&th("Locked")}{displayMode!=="R"&&th("SBE")}{displayMode!=="R"&&th("SBE %")}{th("P/L")}{th("R")}{th("","center")}
+              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Comm")}{th("Value")}{th("Orig Stop")}{th("Stop 2")}{th("Trail Stop")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{displayMode==="R"&&th("R Suggest")}{displayMode==="R"&&th("Locked")}{displayMode!=="R"&&th("SBE")}{displayMode!=="R"&&th("SBE %")}{th("P/L")}{th("R")}{th("Notes","center")}{th("","center")}
             </tr></thead>
             <tbody>
               {enriched.map((p, idx) => {
@@ -1953,8 +1988,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const dtsDisplay = !p.cpN ? "—" : isR ? `${p.dtsR.toFixed(1)}R` : isDollar ? `$${Math.abs(p.dtsD).toFixed(2)}` : `${Math.abs(p.dtsPct).toFixed(2)}%`;
                 const rtsDisplay = !p.cpN ? "—" : isR ? `${p.rtsR.toFixed(1)}R` : isDollar ? `$${Math.abs(p.rtsD).toLocaleString(undefined,{maximumFractionDigits:0})}` : `${(p.sharesN>0?(p.rtsD/(p.cpN*p.sharesN)*100):0).toFixed(2)}%`;
                 const plDisplay = !p.epN ? "—" : isR ? `${p.rMult>=0?"+":""}${p.rMult.toFixed(2)}R` : isDollar ? `${p.plD>=0?"+":"-"}${fmt$(Math.abs(p.plD))}` : `${p.plPct>=0?"+":""}${p.plPct.toFixed(2)}%`;
+                const hasNotes = p.notes || p.chartUrl || p.chartImage;
+                const isExpanded = expandedPosId === p.id;
                 return (
-                  <tr key={p._lid || p.id} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
+                  <React.Fragment key={p._lid || p.id}>
+                  <tr style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
                     {/* Risk Status */}
                     <td style={{padding:"8px 4px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
                     <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.54rem",fontWeight:700,background:ts.bg,color:ts.color,border:`1px solid ${ts.border}`}}>{p.tier}</span></td>
@@ -1989,6 +2027,14 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     {/* P/L — respects $ / % toggle */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.plPct>=0?C.green:C.red,fontSize:"0.70rem"}}>{plDisplay}</td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rMult>=2?C.green:p.rMult>=1?C.goldBright:p.rMult>=0?C.white:C.red}}>{p.epN&&(p.stop1||p.stop2)?`${p.rMult.toFixed(2)}R`:"—"}</td>
+                    {/* Notes/Chart indicator */}
+                    <td style={{padding:"6px 4px",textAlign:"center",whiteSpace:"nowrap"}}>
+                      <div style={{display:"flex",gap:3,alignItems:"center",justifyContent:"center"}}>
+                        <button onClick={()=>togglePosExpand(p.id)} title={isExpanded?"Collapse notes":"Expand notes & chart"} style={{padding:"3px 7px",borderRadius:6,border:`1px solid ${isExpanded?C.borderGold:C.border}`,background:isExpanded?C.goldDim:"transparent",color:isExpanded?C.gold:hasNotes?C.gold:C.muted,fontWeight:700,fontSize:"0.54rem",cursor:"pointer",fontFamily:font}}>{isExpanded?"▲":"▼"}{hasNotes?" ✎":""}</button>
+                        {p.chartUrl && <a href={p.chartUrl} target="_blank" rel="noopener noreferrer" style={{fontSize:"0.58rem",color:C.blue,fontWeight:600,textDecoration:"none"}} title="TradingView chart">TV</a>}
+                        {p.chartImage && <span style={{fontSize:"0.58rem",color:C.green,fontWeight:700}} title="Chart attached">📷</span>}
+                      </div>
+                    </td>
                     <td style={{padding:"6px 4px",textAlign:"center",whiteSpace:"nowrap"}}>
                       <div style={{display:"flex",gap:4,justifyContent:"center"}}>
                         <button onClick={()=>startSell(p)} title="Sell shares" style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${C.red}33`,background:"transparent",color:C.red,fontWeight:700,fontSize:"0.58rem",cursor:"pointer",fontFamily:font}}>Sell</button>
@@ -1996,6 +2042,61 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                       </div>
                     </td>
                   </tr>
+                  {/* Expanded notes/chart area */}
+                  {isExpanded && (
+                    <tr style={{ background:"rgba(201,152,42,0.03)",borderBottom:`1px solid ${C.borderGold}` }}>
+                      <td colSpan={24} style={{ padding:"14px 16px" }}>
+                        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
+                          {/* Left: Notes */}
+                          <div>
+                            <div style={{ fontWeight:700,fontSize:"0.60rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.gold,marginBottom:10 }}>Position Notes</div>
+                            {posEditNotes._plain && (
+                              <div style={{ marginBottom:10,padding:"8px 12px",borderRadius:8,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}` }}>
+                                <div style={{ fontSize:"0.56rem",fontWeight:700,color:C.muted,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.08em" }}>Previous Notes</div>
+                                <div style={{ fontSize:"0.70rem",color:C.text }}>{posEditNotes._plain}</div>
+                              </div>
+                            )}
+                            {[{key:"right",label:"What's Going Right",color:C.green},{key:"wrong",label:"What's Going Wrong",color:C.red},{key:"lessons",label:"Trade Plan / Notes",color:C.gold}].map(({key,label,color}) => (
+                              <div key={key} style={{ marginBottom:8 }}>
+                                <label style={{ display:"block",fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.08em",textTransform:"uppercase",color,marginBottom:4 }}>{label}</label>
+                                <textarea value={posEditNotes[key]} onChange={e => { const v = e.target.value; setPosEditNotes(n => ({...n, [key]: v})); }} onBlur={() => savePosNotes(p.id)} placeholder={`${label}...`} rows={2}
+                                  style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 10px",color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none",resize:"vertical" }}
+                                  onFocus={e => e.target.style.borderColor = C.gold} />
+                              </div>
+                            ))}
+                          </div>
+                          {/* Right: Chart Link + Image */}
+                          <div>
+                            <div style={{ fontWeight:700,fontSize:"0.60rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.gold,marginBottom:10 }}>Chart Reference</div>
+                            <div style={{ marginBottom:10 }}>
+                              <label style={{ display:"block",fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>TradingView Link</label>
+                              <input type="url" value={p.chartUrl||""} onChange={e=>updateField(p.id,"chartUrl",e.target.value)} placeholder="https://www.tradingview.com/chart/..."
+                                style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 10px",color:C.blue,fontSize:"0.72rem",fontFamily:font,outline:"none" }}
+                                onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                            </div>
+                            <div style={{ marginBottom:10 }}>
+                              <label style={{ display:"block",fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Chart Screenshot</label>
+                              <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+                                <label style={{ padding:"6px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.white,fontWeight:700,fontSize:"0.66rem",cursor:posUploadingImage?"wait":"pointer",fontFamily:font,opacity:posUploadingImage?0.5:1 }}>
+                                  {posUploadingImage?"Uploading...":"Upload Image"}
+                                  <input type="file" accept="image/*" style={{ display:"none" }} disabled={posUploadingImage}
+                                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadPosChartImage(p.id, f); e.target.value = ""; }} />
+                                </label>
+                                {p.chartImage && <span style={{ fontSize:"0.62rem",color:C.green,fontWeight:600 }}>✓ Image attached</span>}
+                                {p.chartImage && <button onClick={() => updateField(p.id,"chartImage","")} style={{ padding:"2px 6px",borderRadius:4,border:`1px solid ${C.border}`,background:"transparent",color:C.red,fontSize:"0.54rem",cursor:"pointer",fontFamily:font }}>Remove</button>}
+                              </div>
+                            </div>
+                            {p.chartImage && (
+                              <div style={{ marginTop:8,borderRadius:10,overflow:"hidden",border:`1px solid ${C.border}` }}>
+                                <img src={p.chartImage} alt="Chart" style={{ width:"100%",maxHeight:200,objectFit:"contain",background:"#111" }} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })}
 
@@ -2008,7 +2109,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const isPartial = qty < totalShares && qty > 0;
                 return (
                   <tr style={{ background:"rgba(239,68,68,0.06)",borderBottom:`2px solid ${C.red}33` }}>
-                    <td colSpan={22} style={{ padding:"14px 16px" }}>
+                    <td colSpan={24} style={{ padding:"14px 16px" }}>
                       <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap" }}>
                         <span style={{ fontWeight:700,fontSize:"0.68rem",color:C.red,letterSpacing:"0.08em",textTransform:"uppercase" }}>Sell {pos.sym}</span>
                         <div style={{display:"flex",alignItems:"center",gap:5}}>
@@ -2567,10 +2668,305 @@ function AuthPage() {
 }
 
 // ═══════════════════════════════════════
+// ─── COMPOUNDER — LIVE RISK BUDGET ───
+// ═══════════════════════════════════════
+function CompounderPage({ portfolioSize, journaledTrades, positions, targetRote, setTargetRote }) {
+  const [projR, setProjR] = useState("2");
+  const [projWin, setProjWin] = useState("55");
+  const [projBatches, setProjBatches] = useState("12");
+
+  // ─── Realized P/L from closed journal trades ───
+  const realizedPL = useMemo(() => {
+    if (!journaledTrades || journaledTrades.length === 0) return 0;
+    return journaledTrades.reduce((sum, t) => sum + (t.plDollar || 0), 0);
+  }, [journaledTrades]);
+
+  // ─── Current Equity = Portfolio Size + Realized P/L ───
+  const ps = +portfolioSize || 0;
+  const currentEquity = ps + realizedPL;
+
+  // ─── Analyze each open position for risk status ───
+  const posAnalysis = useMemo(() => {
+    if (!positions || positions.length === 0) return [];
+    return positions.filter(p => p.sym).map(p => {
+      const epN = parseFloat(p.ep) || 0;
+      const cpN = parseFloat(p.cp) || 0;
+      const sharesN = parseFloat(p.shares) || 0;
+      const commN = parseFloat(p.comm) || 0;
+      const s1 = parseFloat(p.stop) || 0;
+      const s2 = parseFloat(p.stop2) || 0;
+      const tsN = parseFloat(p.trailStop) || 0;
+      const isDual = s1 > 0 && s2 > 0;
+      const h1 = isDual ? Math.ceil(sharesN / 2) : sharesN;
+      const h2 = isDual ? sharesN - h1 : 0;
+
+      // Initial risk $ (entry to original stops)
+      const initRiskD = (epN - s1) * h1 + (isDual ? (epN - s2) * h2 : 0);
+
+      // Active stop for current risk calc
+      const activeStop = tsN > 0 ? tsN : (isDual ? (s1 * h1 + s2 * h2) / (h1 + h2) : s1);
+
+      // Current risk $ (entry to active stop). Negative = locked profit
+      const currentRiskD = (epN - activeStop) * sharesN;
+
+      // Is this position risk-free? (active stop >= entry)
+      const isRiskFree = activeStop >= epN && epN > 0 && (s1 > 0 || s2 > 0);
+
+      // ROTE = initial risk / portfolio
+      const roteD = initRiskD > 0 ? initRiskD : 0;
+      const rotePct = currentEquity > 0 ? (roteD / currentEquity) * 100 : 0;
+
+      // Current ROTE (using active stop, clamped to 0 if risk-free)
+      const currentRoteD = isRiskFree ? 0 : Math.max(0, currentRiskD);
+      const currentRotePct = currentEquity > 0 ? (currentRoteD / currentEquity) * 100 : 0;
+
+      // Unrealized P/L
+      const unrealizedPL = (cpN - epN) * sharesN - commN;
+
+      return {
+        sym: p.sym, epN, cpN, sharesN, s1, s2, tsN, activeStop,
+        initRiskD: roteD, initRotePct: rotePct,
+        currentRiskD: currentRoteD, currentRotePct,
+        isRiskFree, unrealizedPL, isDual,
+      };
+    });
+  }, [positions, currentEquity]);
+
+  // ─── Aggregate risk budget numbers ───
+  const budget = useMemo(() => {
+    const tgtRote = (+targetRote || 0) / 100;
+    const totalBudget = currentEquity * tgtRote;
+    const deployedRisk = posAnalysis.reduce((s, p) => s + p.currentRiskD, 0); // only "at risk" positions
+    const initialRisk = posAnalysis.reduce((s, p) => s + p.initRiskD, 0); // what was originally risked
+    const freedRisk = initialRisk - deployedRisk; // risk that became free (stops moved up)
+    const available = Math.max(0, totalBudget - deployedRisk);
+    const atRiskCount = posAnalysis.filter(p => !p.isRiskFree && p.initRiskD > 0).length;
+    const freeCount = posAnalysis.filter(p => p.isRiskFree).length;
+    const totalCount = posAnalysis.filter(p => p.initRiskD > 0 || p.isRiskFree).length;
+    const totalUnrealized = posAnalysis.reduce((s, p) => s + p.unrealizedPL, 0);
+    const deployedPct = currentEquity > 0 ? (deployedRisk / currentEquity) * 100 : 0;
+    const availablePct = currentEquity > 0 ? (available / currentEquity) * 100 : 0;
+
+    return { totalBudget, deployedRisk, freedRisk, available, atRiskCount, freeCount, totalCount, totalUnrealized, deployedPct, availablePct, tgtRote };
+  }, [posAnalysis, currentEquity, targetRote]);
+
+  // ─── Projection: compound forward from current equity ───
+  const projection = useMemo(() => {
+    if (currentEquity <= 0) return [];
+    const tgtRote = (+targetRote || 0) / 100;
+    const tgtR = +projR || 1;
+    const wr = (+projWin || 50) / 100;
+    const batches = Math.min(+projBatches || 12, 52);
+    // Expected return per cycle: win%*R*rote - loss%*rote
+    const expectedReturnPerCycle = wr * tgtR * tgtRote - (1 - wr) * tgtRote;
+    const rows = [];
+    let eq = currentEquity;
+    for (let i = 0; i <= batches; i++) {
+      const prevEq = i === 0 ? currentEquity : rows[i - 1].equity;
+      const newEq = i === 0 ? eq : prevEq * (1 + expectedReturnPerCycle);
+      rows.push({
+        cycle: i,
+        equity: newEq,
+        riskBudget: newEq * tgtRote,
+        gain: i === 0 ? 0 : newEq - prevEq,
+        growthPct: i === 0 ? 0 : ((newEq - currentEquity) / currentEquity) * 100,
+      });
+    }
+    return rows;
+  }, [currentEquity, targetRote, projR, projWin, projBatches]);
+
+  // Chart data
+  const chartData = useMemo(() => {
+    if (projection.length === 0) return [];
+    const tgtRote = (+targetRote || 0) / 100;
+    const tgtR = +projR || 1;
+    const batches = Math.min(+projBatches || 12, 52);
+    // Best/worst cases
+    const best = [], worst = [];
+    let bEq = currentEquity, wEq = currentEquity;
+    for (let i = 0; i <= batches; i++) {
+      if (i > 0) { bEq *= (1 + tgtRote * tgtR); wEq *= (1 - tgtRote); }
+      best.push(Math.round(bEq)); worst.push(Math.round(wEq));
+    }
+    return projection.map((d, i) => ({ cycle: i === 0 ? "Now" : `C${d.cycle}`, expected: Math.round(d.equity), best: best[i], worst: worst[i] }));
+  }, [projection, currentEquity, targetRote, projR, projBatches]);
+
+  const finalProj = projection.length > 1 ? projection[projection.length - 1] : null;
+
+  const th = (text, align = "right") => <th style={{padding:"10px 8px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap"}}>{text}</th>;
+
+  return (
+    <div>
+      <Eyebrow>Compounder</Eyebrow>
+      <h1 style={{ fontWeight:800,fontSize:"clamp(1.5rem, 4vw, 2rem)",letterSpacing:"-0.04em",color:C.white,margin:"0 0 8px" }}>Live Risk Budget</h1>
+      <p style={{ fontSize:"0.74rem",color:C.muted,margin:"0 0 24px",lineHeight:1.6 }}>Your real-time compounding command center. When positions become risk-free (stop at breakeven or above), that ROTE frees up for new trades. Closed trade profits compound into your equity — new trades risk more dollars at the same %.</p>
+
+      {/* ─── Equity Overview ─── */}
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(170px, 1fr))",gap:12,marginBottom:20 }}>
+        <StatTile label="Portfolio Size" value={fmt$(ps)} />
+        <StatTile label="Realized P/L" value={`${realizedPL>=0?"+":"-"}${fmt$(Math.abs(realizedPL))}`} color={realizedPL>=0?C.green:C.red} sub="From closed trades" />
+        <StatTile label="Current Equity" value={fmt$(currentEquity)} color={C.goldBright} sub="Portfolio + Realized" />
+        <StatTile label="Unrealized P/L" value={`${budget.totalUnrealized>=0?"+":"-"}${fmt$(Math.abs(budget.totalUnrealized))}`} color={budget.totalUnrealized>=0?C.green:C.red} sub="Open positions" />
+      </div>
+
+      {/* ─── Risk Budget Panel ─── */}
+      <GlassCard style={{ padding:"24px 28px",marginBottom:20 }}>
+        <Eyebrow>ROTE Risk Budget</Eyebrow>
+        <div style={{ display:"flex",alignItems:"center",gap:16,marginBottom:20,flexWrap:"wrap" }}>
+          <CalcInput label="Target Max ROTE" value={targetRote} onChange={setTargetRote} suffix="%" placeholder="2" style={{maxWidth:140}} />
+          <div style={{ padding:"10px 18px",borderRadius:12,background:C.goldDim,border:`1px solid ${C.borderGold}` }}>
+            <span style={{ fontSize:"0.56rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",display:"block" }}>Total Risk Budget</span>
+            <span style={{ fontSize:"1.1rem",fontWeight:800,color:C.goldBright }}>{fmt$(budget.totalBudget)}</span>
+          </div>
+        </div>
+
+        {/* Risk allocation bar */}
+        <div style={{ marginBottom:16 }}>
+          <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
+            <span style={{ fontSize:"0.62rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em" }}>Risk Allocation</span>
+            <span style={{ fontSize:"0.62rem",color:C.muted }}>{budget.deployedPct.toFixed(2)}% deployed / {(+targetRote||0).toFixed(2)}% max</span>
+          </div>
+          <div style={{ height:12,borderRadius:6,background:"rgba(255,255,255,0.05)",position:"relative",overflow:"hidden" }}>
+            {/* Deployed (at risk) portion — red */}
+            <div style={{ position:"absolute",left:0,top:0,bottom:0,borderRadius:6,width:`${Math.min(100, budget.totalBudget > 0 ? (budget.deployedRisk / budget.totalBudget) * 100 : 0)}%`,background:C.red,transition:"width 0.3s",zIndex:2 }} />
+            {/* Available portion — green */}
+            <div style={{ position:"absolute",left:`${budget.totalBudget > 0 ? (budget.deployedRisk / budget.totalBudget) * 100 : 0}%`,top:0,bottom:0,borderRadius:"0 6px 6px 0",width:`${Math.min(100, budget.totalBudget > 0 ? (budget.available / budget.totalBudget) * 100 : 0)}%`,background:C.green,opacity:0.6,transition:"all 0.3s",zIndex:1 }} />
+          </div>
+          <div style={{ display:"flex",gap:16,marginTop:8 }}>
+            <span style={{ fontSize:"0.60rem",color:C.red }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.red,marginRight:4,verticalAlign:"middle"}} />At Risk: {fmt$(budget.deployedRisk)} ({budget.atRiskCount} positions)</span>
+            <span style={{ fontSize:"0.60rem",color:C.green }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.green,opacity:0.6,marginRight:4,verticalAlign:"middle"}} />Available: {fmt$(budget.available)} ({budget.availablePct.toFixed(2)}%)</span>
+            {budget.freeCount > 0 && <span style={{ fontSize:"0.60rem",color:C.blue }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.blue,marginRight:4,verticalAlign:"middle"}} />Risk-Free: {budget.freeCount} positions (freed {fmt$(budget.freedRisk)})</span>}
+          </div>
+        </div>
+
+        {/* Key action: what can you do with available ROTE */}
+        {budget.available > 0 && (
+          <div style={{ padding:"14px 18px",borderRadius:12,background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.20)",marginBottom:8 }}>
+            <div style={{ fontWeight:800,fontSize:"0.76rem",color:C.green,marginBottom:4 }}>You can deploy {fmt$(budget.available)} more risk</div>
+            <div style={{ fontSize:"0.68rem",color:C.text,lineHeight:1.6 }}>
+              That's {budget.availablePct.toFixed(2)}% ROTE available. At current equity, you could enter{" "}
+              <strong style={{color:C.white}}>{Math.floor(budget.available / (budget.totalBudget / 4))} new trades</strong>{" "}
+              at ~{((+targetRote || 2) / 4).toFixed(2)}% ROTE each, or <strong style={{color:C.white}}>{Math.floor(budget.available / (budget.totalBudget / 6))} trades</strong> at ~{((+targetRote || 2) / 6).toFixed(2)}% ROTE each.
+            </div>
+          </div>
+        )}
+        {budget.available <= 0 && budget.totalCount > 0 && (
+          <div style={{ padding:"14px 18px",borderRadius:12,background:C.redDim,border:"1px solid rgba(239,68,68,0.20)" }}>
+            <div style={{ fontWeight:800,fontSize:"0.76rem",color:C.red,marginBottom:4 }}>ROTE Fully Deployed</div>
+            <div style={{ fontSize:"0.68rem",color:C.text,lineHeight:1.6 }}>
+              All {(+targetRote||2)}% ROTE is in use. To enter new trades, move stops to breakeven on existing positions to free up risk, or wait for positions to close.
+            </div>
+          </div>
+        )}
+      </GlassCard>
+
+      {/* ─── Position Risk Breakdown ─── */}
+      {posAnalysis.length > 0 && (
+        <GlassCard style={{ marginBottom:20 }}>
+          <div style={{ padding:"20px 24px 8px" }}>
+            <div style={{ fontWeight:700,fontSize:"0.78rem",color:C.white }}>Position Risk Breakdown</div>
+            <div style={{ fontWeight:400,fontSize:"0.64rem",color:C.muted,marginTop:2 }}>How each open position contributes to your ROTE. Green = risk-free (stop at/above entry).</div>
+          </div>
+          <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
+            <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
+              <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
+                {th("Symbol","left")}{th("Entry")}{th("Current")}{th("Stop")}{th("Shares")}{th("Initial Risk $")}{th("Initial ROTE")}{th("Current Risk $")}{th("Current ROTE")}{th("Status","left")}{th("Unrealized P/L")}
+              </tr></thead>
+              <tbody>
+                {posAnalysis.map((p, i) => (
+                  <tr key={i} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)",background:p.isRiskFree?"rgba(34,197,94,0.03)":i%2?"rgba(255,255,255,0.01)":"transparent" }}>
+                    <td style={{padding:"10px 8px",fontWeight:700,color:C.gold}}>{p.sym}</td>
+                    <td style={{padding:"10px 8px",textAlign:"right",color:C.text}}>${p.epN.toFixed(2)}</td>
+                    <td style={{padding:"10px 8px",textAlign:"right",color:C.white,fontWeight:700}}>${p.cpN.toFixed(2)}</td>
+                    <td style={{padding:"10px 8px",textAlign:"right",color:C.muted}}>${p.activeStop.toFixed(2)}</td>
+                    <td style={{padding:"10px 8px",textAlign:"right",color:C.text}}>{p.sharesN.toLocaleString()}</td>
+                    <td style={{padding:"10px 8px",textAlign:"right",color:C.red,fontWeight:600}}>{fmt$(p.initRiskD)}</td>
+                    <td style={{padding:"10px 8px",textAlign:"right",color:p.initRotePct>1.5?C.red:p.initRotePct>1?C.gold:C.text,fontWeight:600}}>{p.initRotePct.toFixed(2)}%</td>
+                    <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:C.red}}>{p.isRiskFree?"$0 (FREE)":fmt$(p.currentRiskD)}</td>
+                    <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:p.currentRotePct>1.5?C.red:C.text}}>{p.isRiskFree?"0.00%":`${p.currentRotePct.toFixed(2)}%`}</td>
+                    <td style={{padding:"10px 8px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:p.isRiskFree?C.greenDim:C.redDim,color:p.isRiskFree?C.green:C.red,border:`1px solid ${p.isRiskFree?"rgba(34,197,94,0.25)":"rgba(239,68,68,0.25)"}`}}>{p.isRiskFree?"FREE":"AT RISK"}</span></td>
+                    <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.unrealizedPL>=0?C.green:C.red}}>{p.unrealizedPL>=0?"+":"-"}{fmt$(Math.abs(p.unrealizedPL))}</td>
+                  </tr>
+                ))}
+                {/* Total row */}
+                <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
+                  <td style={{padding:"12px 8px",fontWeight:800,fontSize:"0.64rem",color:C.white,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</td>
+                  <td colSpan={4} />
+                  <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.red}}>{fmt$(posAnalysis.reduce((s,p)=>s+p.initRiskD,0))}</td>
+                  <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.muted}}>{currentEquity>0?(posAnalysis.reduce((s,p)=>s+p.initRiskD,0)/currentEquity*100).toFixed(2):0}%</td>
+                  <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.deployedRisk>0?C.red:C.green}}>{budget.deployedRisk>0?fmt$(budget.deployedRisk):"$0 (ALL FREE)"}</td>
+                  <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.muted}}>{budget.deployedPct.toFixed(2)}%</td>
+                  <td />
+                  <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.totalUnrealized>=0?C.green:C.red}}>{budget.totalUnrealized>=0?"+":"-"}{fmt$(Math.abs(budget.totalUnrealized))}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </GlassCard>
+      )}
+
+      {/* ─── Forward Projection ─── */}
+      <GlassCard style={{ padding:"24px 28px",marginBottom:20 }}>
+        <Eyebrow>Compound Projection</Eyebrow>
+        <div style={{ fontWeight:800,fontSize:"1.05rem",color:C.white,marginBottom:6 }}>If You Keep This Up</div>
+        <p style={{ fontSize:"0.68rem",color:C.muted,margin:"0 0 16px" }}>Project forward from your current equity. Each cycle = fully deploying your target ROTE, closing all trades, then redeploying on the new equity.</p>
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))",gap:14,marginBottom:16 }}>
+          <CalcInput label="Target R-Multiple" value={projR} onChange={setProjR} suffix="R" placeholder="2" />
+          <CalcInput label="Win Rate" value={projWin} onChange={setProjWin} suffix="%" placeholder="55" />
+          <CalcInput label="Cycles" value={projBatches} onChange={setProjBatches} suffix="#" placeholder="12" />
+        </div>
+
+        {finalProj && (
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))",gap:12,marginBottom:16 }}>
+            <StatTile label="Current Equity" value={fmt$(currentEquity)} />
+            <StatTile label={`After ${projBatches} Cycles`} value={fmt$(finalProj.equity)} color={C.green} />
+            <StatTile label="Projected Growth" value={`+${finalProj.growthPct.toFixed(1)}%`} color={C.green} sub={`+${fmt$(finalProj.equity - currentEquity)}`} />
+          </div>
+        )}
+
+        {chartData.length > 1 && (
+          <>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={chartData} margin={{ top:10,right:30,left:10,bottom:5 }}>
+                <CartesianGrid stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="cycle" stroke={C.muted} tick={{ fontSize:10 }} />
+                <YAxis stroke={C.muted} tick={{ fontSize:10 }} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} />
+                <Tooltip contentStyle={{ background:"#0c0c14",border:`1px solid ${C.border}`,borderRadius:10,fontSize:"0.72rem" }} formatter={(v) => [`$${Number(v).toLocaleString()}`, ""]} />
+                <Line type="monotone" dataKey="best" stroke={C.gold} strokeWidth={1} strokeDasharray="6 3" dot={false} name="Best" />
+                <Line type="monotone" dataKey="expected" stroke={C.green} strokeWidth={2.5} dot={false} name="Expected" />
+                <Line type="monotone" dataKey="worst" stroke={C.red} strokeWidth={1} strokeDasharray="6 3" dot={false} name="Worst" />
+                <ReferenceLine y={currentEquity} stroke={C.muted} strokeDasharray="3 3" label={{ value:"Now",fill:C.muted,fontSize:10 }} />
+              </LineChart>
+            </ResponsiveContainer>
+            <div style={{ display:"flex",gap:16,justifyContent:"center",marginTop:8 }}>
+              <span style={{ fontSize:"0.60rem",color:C.gold }}>— — Best (100% win)</span>
+              <span style={{ fontSize:"0.60rem",color:C.green }}>— Expected</span>
+              <span style={{ fontSize:"0.60rem",color:C.red }}>— — Worst (0% win)</span>
+            </div>
+          </>
+        )}
+      </GlassCard>
+
+      {/* ─── How It Works ─── */}
+      <GlassCard style={{ padding:"22px 26px" }}>
+        <Eyebrow>How It Works</Eyebrow>
+        <div style={{ fontSize:"0.72rem",color:C.text,lineHeight:1.7 }}>
+          <p style={{margin:"0 0 10px"}}><strong style={{color:C.goldBright}}>Current Equity</strong> = your Portfolio Size + total realized P/L from all closed trades in your Journal. This is your true compounded capital — it grows when you take profits and shrinks when you take losses.</p>
+          <p style={{margin:"0 0 10px"}}><strong style={{color:C.white}}>Risk Budget</strong> = Current Equity × your target ROTE %. This is the maximum dollar amount you should have at risk across all open positions combined.</p>
+          <p style={{margin:"0 0 10px"}}><strong style={{color:C.green}}>Freeing Up Risk</strong> — when you move a position's stop to breakeven (or above entry), its risk becomes $0. That ROTE allocation is now available for new trades. You don't need to close the position — just make it risk-free.</p>
+          <p style={{margin:"0"}}><strong style={{color:C.white}}>Compounding</strong> — when you close a winning trade, the profit adds to your equity. Your next risk budget is bigger (same % of a larger number). Over time, each trade risks more dollars while keeping the same % discipline.</p>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════
 // ─── MAIN APP ───
 // ═══════════════════════════════════════
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "\u{1F4C8}" },
+  { id: "compounder", label: "Compounder", icon: "\u{1F4B0}" },
   { id: "tools", label: "Tools", icon: "\u{26A1}" },
   { id: "journal", label: "Journal", icon: "\u{1F4CA}" },
   { id: "settings", label: "Settings", icon: "\u{2699}" },
@@ -2608,6 +3004,7 @@ export default function App() {
   const [fullSizePct, setFullSizePct] = useState(25);
   const [numStocks, setNumStocks] = useState(5);
   const [fontSize, setFontSize] = useState("standard");
+  const [targetRote, setTargetRote] = useState("2");
   const dataLoaded = useRef(false);
 
   // ─── Auth Listener ───
@@ -2639,7 +3036,7 @@ export default function App() {
         user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
         entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
         stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
-        commission: p.comm || "",
+        commission: p.comm || "", notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
       }));
 
       if (rows.length === 0) {
@@ -2720,6 +3117,7 @@ export default function App() {
           if (s.setting_key === "setup_types" && Array.isArray(s.setting_value)) { setSetupTypes(s.setting_value); hasSetup = true; }
           if (s.setting_key === "tags" && Array.isArray(s.setting_value)) { setTags(s.setting_value); hasTags = true; }
           if (s.setting_key === "exit_reasons" && Array.isArray(s.setting_value)) { setExitReasons(s.setting_value); hasExit = true; }
+          if (s.setting_key === "target_rote" && s.setting_value != null) setTargetRote(String(s.setting_value));
         });
       }
       // First time? Save defaults to DB so they persist
@@ -2751,7 +3149,7 @@ export default function App() {
         }
         const clean = pos.filter(p => !dupIds.includes(p.id));
         lastLoadedCount.current = clean.length;
-        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "" })));
+        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" })));
       } else {
         // Check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
@@ -2812,6 +3210,7 @@ export default function App() {
   useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "setup_types", setupTypes); }, [setupTypes]);
   useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "tags", tags); }, [tags]);
   useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "exit_reasons", exitReasons); }, [exitReasons]);
+  useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "target_rote", targetRote); }, [targetRote]);
 
   // ─── Auto-save positions to Supabase (debounced, with safety checks) ───
   const posTimer = useRef(null);
@@ -2929,6 +3328,7 @@ export default function App() {
     setFullSizePct(25);
     setNumStocks(5);
     setFontSize("standard");
+    setTargetRote("2");
     lastLoadedCount.current = 0;
     setPage("dashboard");
   };
@@ -2955,7 +3355,8 @@ export default function App() {
 
   const pageContent = (
     <>
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} />}
+      {page === "compounder" && <CompounderPage portfolioSize={portfolioSize} journaledTrades={journaledTrades} positions={positions} targetRote={targetRote} setTargetRote={setTargetRote} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} />}
