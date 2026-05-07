@@ -139,19 +139,20 @@ function TagChip({ label, color, onRemove, small }) {
     </span>
   );
 }
-function TagSelector({ selected, allTags, onChange, small }) {
+const TagSelector = React.memo(function TagSelector({ selected, allTags, onChange, small }) {
   const [open, setOpen] = useState(false);
+  const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
   const available = allTags.filter(t => !selected.includes(t));
   return (
     <div style={{ position: "relative", display: "inline-flex", flexWrap: "wrap", gap: 3, alignItems: "center" }}>
-      {selected.map(t => <TagChip key={t} label={t} small={small} onRemove={() => onChange(selected.filter(s => s !== t))} />)}
+      {selected.map(t => <TagChip key={t} label={t} small={small} onRemove={() => onChangeRef.current(selected.filter(s => s !== t))} />)}
       {available.length > 0 && (
         <button onClick={() => setOpen(!open)} style={{ padding: "2px 6px", borderRadius: 6, border: `1px dashed ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.56rem", cursor: "pointer", fontFamily: font }}>+</button>
       )}
       {open && (
         <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 50, marginTop: 4, background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 10, padding: 6, display: "flex", flexDirection: "column", gap: 2, minWidth: 120, maxHeight: 200, overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
           {available.map(t => (
-            <button key={t} onClick={() => { onChange([...selected, t]); setOpen(false); }}
+            <button key={t} onClick={() => { onChangeRef.current([...selected, t]); setOpen(false); }}
               style={{ padding: "6px 10px", borderRadius: 6, border: "none", background: "transparent", color: C.text, fontSize: "0.70rem", fontWeight: 500, cursor: "pointer", fontFamily: font, textAlign: "left" }}
               onMouseEnter={e => e.target.style.background = "rgba(255,255,255,0.06)"} onMouseLeave={e => e.target.style.background = "transparent"}>{t}</button>
           ))}
@@ -159,33 +160,44 @@ function TagSelector({ selected, allTags, onChange, small }) {
       )}
     </div>
   );
-}
+}, (prev, next) => {
+  if (prev.small !== next.small) return false;
+  if (prev.allTags !== next.allTags) return false;
+  const a = prev.selected, b = next.selected;
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+});
 
-// ─── Select Dropdown ───
-function MiniSelect({ value, onChange, options, width = 100 }) {
+// ─── Select Dropdown (memoized to prevent dropdown closing on parent re-render) ───
+const MiniSelect = React.memo(function MiniSelect({ value, onChange, options, width = 100 }) {
+  const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
   return (
-    <select value={value} onChange={e => onChange(e.target.value)} style={{ width, boxSizing: "border-box", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 8px", color: C.white, fontSize: "0.70rem", fontFamily: font, outline: "none" }}>
+    <select value={value} onChange={e => onChangeRef.current(e.target.value)} style={{ width, boxSizing: "border-box", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 8px", color: C.white, fontSize: "0.70rem", fontFamily: font, outline: "none" }}>
       {options.map(o => <option key={o} value={o}>{o}</option>)}
     </select>
   );
-}
+}, (prev, next) => prev.value === next.value && prev.width === next.width && prev.options === next.options);
 
-// ─── Cell Input ───
-function CellInput({ value, onChange, width = 76, gold, placeholder = "0" }) {
+// ─── Cell Input (memoized to prevent losing focus/flicker on parent re-render) ───
+const CellInput = React.memo(function CellInput({ value, onChange, width = 76, gold, placeholder = "0" }) {
+  const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
   return (
-    <input type="number" step="any" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)}
+    <input type="number" step="any" placeholder={placeholder} value={value} onChange={e => onChangeRef.current(e.target.value)}
       style={{ width, boxSizing: "border-box", textAlign: "right", background: gold ? "rgba(201,152,42,0.08)" : "rgba(255,255,255,0.03)", border: `1px solid ${gold ? C.borderGold : "rgba(255,255,255,0.06)"}`, borderRadius: 5, padding: "5px 7px", color: gold ? C.goldBright : C.white, fontSize: "0.73rem", fontWeight: 600, fontFamily: font, outline: "none" }}
       onFocus={e => { e.target.style.borderColor = C.gold; }} onBlur={e => { e.target.style.borderColor = gold ? C.borderGold : "rgba(255,255,255,0.06)"; }}
     />
   );
-}
-function TickerInput({ value, onChange, width = 64 }) {
+}, (prev, next) => prev.value === next.value && prev.width === next.width && prev.gold === next.gold && prev.placeholder === next.placeholder);
+const TickerInput = React.memo(function TickerInput({ value, onChange, width = 64 }) {
+  const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
   return (
-    <input type="text" placeholder="SYM" value={value} onChange={e => onChange(e.target.value.toUpperCase())}
+    <input type="text" placeholder="SYM" value={value} onChange={e => onChangeRef.current(e.target.value.toUpperCase())}
       style={{ width, boxSizing: "border-box", textAlign: "left", background: "rgba(255,255,255,0.03)", border: `1px solid rgba(255,255,255,0.06)`, borderRadius: 5, padding: "5px 7px", textTransform: "uppercase", color: C.gold, fontSize: "0.73rem", fontWeight: 800, fontFamily: font, outline: "none", letterSpacing: "-0.01em" }}
       onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.06)"} />
   );
-}
+}, (prev, next) => prev.value === next.value && prev.width === next.width);
 
 // ─── Tier logic ───
 const TIER_STYLES = {
