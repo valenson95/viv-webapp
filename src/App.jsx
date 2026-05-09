@@ -970,6 +970,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     setUploadingImage(false);
   };
   const deleteTrade = (id) => {
+    const trade = journaledTrades.find(t => t.id === id);
+    if (!window.confirm(`Delete ${trade?.ticker || "this"} trade from journal? This cannot be undone.`)) return;
     setDeletedTradeIds(prev => [...prev, id]);
     setJournaledTrades(prev => prev.filter(t => t.id !== id));
     if (editingId === id) setEditingId(null);
@@ -1392,7 +1394,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       return [...prev, { id: maxId + 1, _lid: _lid++, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [], comm: "", notes: "", chartUrl: "", chartImage: "" }];
     });
   }, [setupTypes]);
-  const removeRow = useCallback((id) => {
+  const removeRow = useCallback((id, skipConfirm) => {
+    if (!skipConfirm) {
+      const pos = positions.find(p => p.id === id);
+      if (!window.confirm(`Remove ${pos?.sym || "this"} position? This will delete it from your open positions.`)) return;
+    }
     setPositions(prev => {
       const next = prev.filter(p => p.id !== id);
       if (lastLoadedCountRef) lastLoadedCountRef.current = next.length; // update so autosave safety check doesn't block intentional removal
@@ -1462,7 +1468,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     if (remaining > 0) {
       setPositions(prev => prev.map(p => p.id === pos.id ? { ...p, shares: String(remaining) } : p));
     } else {
-      removeRow(pos.id);
+      removeRow(pos.id, true); // skip confirm — sell modal already confirmed
     }
     setSellId(null);
   };
