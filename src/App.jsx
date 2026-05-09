@@ -247,312 +247,7 @@ function TierStrip({ sizer }) {
   );
 }
 
-// ─── Exposure Grid (Interactive Allocation Planner) ───
-function ExposureGrid({ sizer, portfolioSize, numStocks, enrichedPositions }) {
-  const sw = useScreenWidth();
-  const isMobile = sw < 768;
-  const [counts, setCounts] = useState({ Pilot: 0, Quarter: 0, Half: 0, Full: 0 });
-
-  if (!sizer) return null;
-  const ps = +portfolioSize || 0;
-  if (ps <= 0) return null;
-
-  const tiers = ["Pilot", "Quarter", "Half", "Full"];
-  const tierAmts = { Pilot: sizer.pilot, Quarter: sizer.quarter, Half: sizer.half, Full: sizer.full };
-  const tierCells = { Pilot: 0.5, Quarter: 1, Half: 2, Full: 4 };
-  const tierMeta = {
-    Pilot:   { color: C.purple, bg: C.purpleDim, border: "rgba(167,139,250,0.40)" },
-    Quarter: { color: C.blue,   bg: C.blueDim,   border: "rgba(59,130,246,0.40)" },
-    Half:    { color: C.gold,   bg: C.goldDim,    border: "rgba(201,152,42,0.40)" },
-    Full:    { color: C.green,  bg: C.greenDim,   border: "rgba(34,197,94,0.40)" },
-  };
-
-  const maxPos = numStocks * 2; // generous cap
-  const totalPicked = counts.Pilot + counts.Quarter + counts.Half + counts.Full;
-  const deployed = tiers.reduce((s, t) => s + counts[t] * tierAmts[t], 0);
-  const deployedPct = ps > 0 ? (deployed / ps) * 100 : 0;
-
-  const adjust = (tier, delta) => {
-    setCounts(prev => {
-      const next = { ...prev, [tier]: Math.max(0, prev[tier] + delta) };
-      const total = tiers.reduce((s, t) => s + next[t], 0);
-      if (total > maxPos) return prev;
-      return next;
-    });
-  };
-
-  // ─── Actual positions from open positions table ───
-  const activePositions = (enrichedPositions || []).filter(p => p.sym && p.epN > 0);
-  const hasPositions = activePositions.length > 0;
-  const actualCounts = { Pilot: 0, Quarter: 0, Half: 0, Full: 0 };
-  activePositions.forEach(p => { if (actualCounts[p.tier] !== undefined) actualCounts[p.tier]++; });
-  const actualDeployed = activePositions.reduce((s, p) => s + p.posValue, 0);
-  const actualPct = ps > 0 ? (actualDeployed / ps) * 100 : 0;
-
-  // ─── 2×2 Block renderer ───
-  const cellSz = isMobile ? 28 : 38;
-  const cellGap = 3;
-  const blockSz = cellSz * 2 + cellGap;
-
-  const renderBlock = (tier, key, ghost) => {
-    const meta = tierMeta[tier];
-    const filled = tierCells[tier];
-    return (
-      <div key={key} style={{
-        display: "grid", gridTemplateColumns: `${cellSz}px ${cellSz}px`, gap: cellGap,
-        opacity: ghost ? 0.35 : 1, transition: "all 0.25s ease",
-      }}>
-        {[0, 1, 2, 3].map(i => {
-          const active = i < Math.floor(filled);
-          const isPilot = tier === "Pilot" && i === 0;
-          return (
-            <div key={i} style={{
-              width: cellSz, height: cellSz, borderRadius: Math.max(4, cellSz * 0.14),
-              background: active ? meta.bg : "transparent",
-              border: active ? `2px solid ${meta.border}` : `1.5px dashed rgba(255,255,255,0.06)`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              {isPilot && <div style={{
-                width: cellSz * 0.48, height: cellSz * 0.48, borderRadius: Math.max(2, cellSz * 0.10),
-                background: meta.bg, border: `2px solid ${meta.border}`,
-              }} />}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  // ─── Stepper button ───
-  const Stepper = ({ tier }) => {
-    const meta = tierMeta[tier];
-    const count = counts[tier];
-    const amt = tierAmts[tier];
-    const pctEach = ((amt / ps) * 100).toFixed(2);
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", gap: isMobile ? 8 : 12,
-        padding: "10px 14px", borderRadius: 12,
-        background: count > 0 ? meta.bg : "rgba(255,255,255,0.015)",
-        border: `1px solid ${count > 0 ? meta.border : C.border}`,
-        transition: "all 0.2s",
-      }}>
-        {/* Mini block preview */}
-        <div style={{ display: "grid", gridTemplateColumns: "11px 11px", gap: 1, flexShrink: 0 }}>
-          {[0,1,2,3].map(i => {
-            const on = i < Math.floor(tierCells[tier]);
-            const isPlt = tier === "Pilot" && i === 0;
-            return (
-              <div key={i} style={{
-                width: 11, height: 11, borderRadius: 2,
-                background: on ? meta.bg : "transparent",
-                border: on ? `1.5px solid ${meta.border}` : `1px dashed rgba(255,255,255,0.06)`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {isPlt && <div style={{ width: 5, height: 5, borderRadius: 1, background: meta.bg, border: `1.5px solid ${meta.border}` }} />}
-              </div>
-            );
-          })}
-        </div>
-        {/* Tier info */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 800, fontSize: "0.84rem", color: meta.color }}>{tier}</div>
-          <div style={{ fontWeight: 500, fontSize: "0.66rem", color: C.muted }}>{fmt$(amt)} · {pctEach}%</div>
-        </div>
-        {/* +/- buttons and count */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <button onClick={() => adjust(tier, -1)} disabled={count === 0} style={{
-            width: 28, height: 28, borderRadius: 8, border: `1px solid ${C.border}`,
-            background: "rgba(255,255,255,0.04)", color: count === 0 ? "rgba(255,255,255,0.15)" : C.white,
-            fontWeight: 800, fontSize: "1rem", cursor: count === 0 ? "default" : "pointer",
-            fontFamily: font, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1,
-          }}>{"\u2212"}</button>
-          <div style={{ fontWeight: 900, fontSize: "1.1rem", color: count > 0 ? C.white : C.muted, minWidth: 22, textAlign: "center" }}>{count}</div>
-          <button onClick={() => adjust(tier, 1)} style={{
-            width: 28, height: 28, borderRadius: 8, border: `1px solid ${meta.border}`,
-            background: meta.bg, color: meta.color,
-            fontWeight: 800, fontSize: "1rem", cursor: "pointer",
-            fontFamily: font, display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1,
-          }}>+</button>
-        </div>
-      </div>
-    );
-  };
-
-  // ─── Build flat block list for visual ───
-  const planBlocks = [];
-  tiers.forEach(t => { for (let i = 0; i < counts[t]; i++) planBlocks.push(t); });
-  // Sort: Full first (biggest visual), then Half, Quarter, Pilot
-  planBlocks.sort((a, b) => tierCells[b] - tierCells[a]);
-
-  const actualBlocks = [];
-  tiers.forEach(t => { for (let i = 0; i < actualCounts[t]; i++) actualBlocks.push(t); });
-  actualBlocks.sort((a, b) => tierCells[b] - tierCells[a]);
-
-  // ─── Render a block grid ───
-  const renderBlockGrid = (blocks, label, pct, amount, emptySlots) => (
-    <div style={{
-      flex: 1, padding: isMobile ? "16px" : "20px", borderRadius: 16,
-      background: "rgba(255,255,255,0.015)", border: `1px solid ${C.border}`,
-      display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0,
-    }}>
-      <div style={{ fontWeight: 700, fontSize: "0.62rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontWeight: 800, fontSize: "1.6rem", letterSpacing: "-0.04em", color: C.white }}>{pct.toFixed(1)}%</div>
-      <div style={{ fontSize: "0.68rem", fontWeight: 500, color: C.muted, marginBottom: 14 }}>{fmt$(amount)} deployed</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", minHeight: blockSz + 4 }}>
-        {blocks.map((t, i) => renderBlock(t, `${label}-${i}`, false))}
-        {emptySlots > 0 && Array(emptySlots).fill(0).map((_, i) => (
-          <div key={`empty-${i}`} style={{
-            width: blockSz, height: blockSz, borderRadius: 10,
-            border: `1.5px dashed rgba(255,255,255,0.06)`, display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <span style={{ fontSize: "0.52rem", color: "rgba(255,255,255,0.10)" }}>{"\u2014"}</span>
-          </div>
-        ))}
-        {blocks.length === 0 && emptySlots === 0 && (
-          <div style={{ padding: "20px 0", fontSize: "0.72rem", color: C.muted, textAlign: "center" }}>No positions</div>
-        )}
-      </div>
-      {/* Tier count summary */}
-      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", justifyContent: "center" }}>
-        {tiers.map(t => {
-          const c = blocks.filter(b => b === t).length;
-          if (c === 0) return null;
-          const meta = tierMeta[t];
-          return (
-            <div key={t} style={{ padding: "3px 9px", borderRadius: 6, background: meta.bg, border: `1px solid ${meta.border}` }}>
-              <span style={{ fontWeight: 700, fontSize: "0.64rem", color: meta.color }}>{c} {"\u00D7"} {t}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={{ marginTop: 24, borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
-      {/* Header */}
-      <div style={{ fontWeight: 700, fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>Exposure Framework</div>
-      <div style={{ fontWeight: 800, fontSize: "1.15rem", letterSpacing: "-0.03em", color: C.white, marginBottom: 4 }}>Plan Your Allocation</div>
-      <div style={{ fontWeight: 300, fontSize: "0.80rem", color: C.muted, lineHeight: 1.5, marginBottom: 18 }}>
-        Each block is a position. 4 filled cells = Full. 2 = Half. 1 = Quarter. {"\u00BD"} = Pilot. Pick how many of each.
-      </div>
-
-      {/* Tier steppers — always visible */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 20 }}>
-        {tiers.map(t => <Stepper key={t} tier={t} />)}
-      </div>
-
-      {/* Deployed bar */}
-      {totalPicked > 0 && (
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-            <span style={{ fontWeight: 700, fontSize: "0.64rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Planned Deployment</span>
-            <span style={{ fontWeight: 800, fontSize: "0.90rem", color: C.goldBright }}>
-              {fmt$(deployed)} <span style={{ fontWeight: 500, fontSize: "0.76rem", color: C.muted }}>/ {fmt$(ps)} ({deployedPct.toFixed(1)}%)</span>
-            </span>
-          </div>
-          <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
-            <div style={{ height: "100%", borderRadius: 3, width: `${Math.min(100, deployedPct)}%`, background: deployedPct > 60 ? `linear-gradient(90deg, ${C.gold}, ${C.green})` : `linear-gradient(90deg, ${C.purple}, ${C.blue})`, transition: "width 0.3s" }} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-            <span style={{ fontSize: "0.62rem", color: C.muted }}>{totalPicked} of {maxPos} max positions</span>
-            <span style={{ fontSize: "0.62rem", color: deployedPct > 100 ? C.red : C.muted }}>{deployedPct > 100 ? "Over-allocated!" : deployedPct > 50 ? "Aggressive" : "Conservative"}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Visual comparison */}
-      {totalPicked > 0 && hasPositions && (
-        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 12 }}>
-          {renderBlockGrid(planBlocks, "Your Plan", deployedPct, deployed, Math.max(0, numStocks - totalPicked))}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: isMobile ? "6px 0" : "0 4px" }}>
-            <span style={{ fontWeight: 900, fontSize: "1.2rem", color: C.gold, transform: isMobile ? "rotate(90deg)" : "none" }}>vs</span>
-          </div>
-          {renderBlockGrid(actualBlocks, "Current Positions", actualPct, actualDeployed, 0)}
-        </div>
-      )}
-      {/* Plan only — no open positions */}
-      {totalPicked > 0 && !hasPositions && (
-        <div>{renderBlockGrid(planBlocks, "Planned Allocation", deployedPct, deployed, Math.max(0, numStocks - totalPicked))}</div>
-      )}
-      {/* Current positions only — no plan set */}
-      {totalPicked === 0 && hasPositions && (
-        <div>{renderBlockGrid(actualBlocks, "Current Positions", actualPct, actualDeployed, 0)}</div>
-      )}
-
-      {/* Risk Exposure Breakdown — under current positions */}
-      {hasPositions && (() => {
-        const withStops = activePositions.filter(p => p.stop1 > 0 || p.stop2 > 0);
-        if (withStops.length === 0) return null;
-        const totalVal = withStops.reduce((s,p) => s + p.posValue, 0);
-        const freeVal = withStops.reduce((s,p) => s + p.posValue * (p.riskFreePct / 100), 0);
-        const riskVal = totalVal - freeVal;
-        const freePct = totalVal > 0 ? (freeVal / totalVal) * 100 : 0;
-        const riskPct = 100 - freePct;
-        return (
-          <div style={{ marginTop: 14, padding: isMobile ? "14px" : "18px 22px", borderRadius: 14, background: "rgba(255,255,255,0.015)", border: `1px solid ${C.border}` }}>
-            <div style={{ fontWeight: 700, fontSize: "0.62rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 10 }}>Position Exposure Breakdown</div>
-            {/* Bar */}
-            <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", height: 22, marginBottom: 10 }}>
-              {freePct > 0 && <div style={{ width: `${freePct}%`, background: `linear-gradient(90deg, ${C.green}, rgba(34,197,94,0.7))`, display: "flex", alignItems: "center", justifyContent: "center", transition: "width 0.3s" }}>
-                <span style={{ fontWeight: 800, fontSize: "0.58rem", color: "#000" }}>{freePct.toFixed(0)}%</span>
-              </div>}
-              {riskPct > 0 && <div style={{ width: `${riskPct}%`, background: `linear-gradient(90deg, rgba(239,68,68,0.7), ${C.red})`, display: "flex", alignItems: "center", justifyContent: "center", transition: "width 0.3s" }}>
-                <span style={{ fontWeight: 800, fontSize: "0.58rem", color: "#fff" }}>{riskPct.toFixed(0)}%</span>
-              </div>}
-            </div>
-            {/* Labels */}
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 10, height: 10, borderRadius: 3, background: C.green }} />
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: "0.72rem", color: C.green }}>Risk-Free: {fmt$(freeVal)}</div>
-                  <div style={{ fontSize: "0.60rem", color: C.muted }}>Stop above entry — profit locked in</div>
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 10, height: 10, borderRadius: 3, background: C.red }} />
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 700, fontSize: "0.72rem", color: C.red }}>At Risk: {fmt$(riskVal)}</div>
-                  <div style={{ fontSize: "0.60rem", color: C.muted }}>Stop below entry — capital exposed</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Empty state — nothing picked, no positions */}
-      {totalPicked === 0 && !hasPositions && (
-        <div style={{
-          padding: "28px 20px", borderRadius: 16, background: "rgba(255,255,255,0.015)",
-          border: `1px solid ${C.border}`, textAlign: "center",
-        }}>
-          <div style={{ fontSize: "2rem", marginBottom: 8, opacity: 0.3 }}>{"\u{1F4CA}"}</div>
-          <div style={{ fontWeight: 600, fontSize: "0.82rem", color: C.muted, marginBottom: 4 }}>Use the buttons above to plan your allocation</div>
-          <div style={{ fontWeight: 400, fontSize: "0.68rem", color: "rgba(255,255,255,0.25)", lineHeight: 1.5 }}>
-            Pick how many Pilot, Quarter, Half, and Full positions you want.<br />
-            The visual below will show you exactly how your capital gets deployed.
-          </div>
-        </div>
-      )}
-
-      {/* Quick tips */}
-      {totalPicked > 0 && (
-        <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 10, background: C.goldDim, border: `1px solid ${C.borderGold}` }}>
-          <div style={{ fontSize: "0.66rem", fontWeight: 600, color: C.goldBright, lineHeight: 1.7 }}>
-            {deployedPct < 20 && "Cautious allocation. Good when the market is uncertain or you're building a new watchlist."}
-            {deployedPct >= 20 && deployedPct < 50 && "Moderate exposure. A balanced approach — room to add if setups trigger, room to cut if they don't."}
-            {deployedPct >= 50 && deployedPct < 80 && "Aggressive. You should be in a confirmed uptrend with multiple positions working before deploying this much."}
-            {deployedPct >= 80 && "Full conviction. Only appropriate when your existing positions are profitable and stops are above entry. If not — scale back."}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
+// ExposureGrid removed — Compounder now embedded in DashboardPage
 // ─── Gold CTA Button ───
 function GoldBtn({ children, onClick, small }) {
   return (
@@ -1212,7 +907,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 
   const stats = useMemo(() => {
     const trades = filtered;
-    if (trades.length === 0) return { ba:0,avgGain:0,avgLoss:0,glRatio:0,ev:0,avgR:0,largestLoss:0,totalPL:0,total:0 };
+    if (trades.length === 0) return { ba:0,avgGain:0,avgLoss:0,glRatio:0,ev:0,avgR:0,largestLoss:0,totalPL:0,total:0,avgHoldWin:0,avgHoldLoss:0,holdRatio:0 };
     const wins = trades.filter(t => t.plPct > 0), losses = trades.filter(t => t.plPct <= 0);
     const ba = (wins.length / trades.length) * 100;
     const avgGain = wins.length ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
@@ -1220,7 +915,19 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     const glRatio = avgLoss > 0 ? avgGain / avgLoss : 0;
     const ev = (ba / 100) * avgGain - ((100 - ba) / 100) * avgLoss;
     const avgR = trades.reduce((s, t) => s + t.rMult, 0) / trades.length;
-    return { ba, avgGain, avgLoss, glRatio, ev, avgR, largestLoss: Math.min(...trades.map(t => t.plPct)), totalPL: trades.reduce((s, t) => s + t.plDollar, 0), total: trades.length };
+    // Holding duration (days) — entry and exit dates already captured per trade
+    const holdDays = (t) => {
+      if (!t.entry || !t.exit) return null;
+      const d1 = new Date(t.entry), d2 = new Date(t.exit);
+      if (isNaN(d1) || isNaN(d2)) return null;
+      return Math.max(0, Math.round((d2 - d1) / 86400000));
+    };
+    const winDays = wins.map(holdDays).filter(d => d !== null);
+    const lossDays = losses.map(holdDays).filter(d => d !== null);
+    const avgHoldWin = winDays.length > 0 ? winDays.reduce((s,d) => s + d, 0) / winDays.length : 0;
+    const avgHoldLoss = lossDays.length > 0 ? lossDays.reduce((s,d) => s + d, 0) / lossDays.length : 0;
+    const holdRatio = avgHoldLoss > 0 ? avgHoldWin / avgHoldLoss : 0;
+    return { ba, avgGain, avgLoss, glRatio, ev, avgR, largestLoss: Math.min(...trades.map(t => t.plPct)), totalPL: trades.reduce((s, t) => s + t.plDollar, 0), total: trades.length, avgHoldWin, avgHoldLoss, holdRatio };
   }, [filtered]);
 
   const distData = useMemo(() => {
@@ -1384,6 +1091,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
         <StatTile label="Expectancy" value={`${stats.ev >= 0 ? "+" : ""}${stats.ev.toFixed(2)}%`} color={stats.ev >= 0 ? C.green : C.red} />
         <StatTile label="Avg R-Mult" value={`${stats.avgR.toFixed(2)}R`} color={stats.avgR >= 0 ? C.green : C.red} />
         <StatTile label="Largest Loss" value={`${stats.largestLoss.toFixed(1)}%`} color={stats.largestLoss < -10 ? C.red : C.gold} />
+        <StatTile label="Avg Hold (Win)" value={`${stats.avgHoldWin.toFixed(1)}d`} color={C.green} sub="days" />
+        <StatTile label="Avg Hold (Loss)" value={`${stats.avgHoldLoss.toFixed(1)}d`} color={C.red} sub="days" />
+        <StatTile label="Hold Ratio (W/L)" value={stats.holdRatio.toFixed(2)} color={stats.holdRatio >= 2 ? C.green : stats.holdRatio >= 1 ? C.gold : C.red} sub={stats.holdRatio >= 2 ? "Holding winners longer" : stats.holdRatio >= 1 ? "Acceptable" : "Cutting winners too early"} />
       </div>
 
       {/* Charts */}
@@ -1593,7 +1303,7 @@ const GLOSSARY = [
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
-function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session }) {
+function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades }) {
   const sizer = useMemo(() => {
     const ps = +portfolioSize;
     if (!ps || ps <= 0) return null;
@@ -1861,9 +1571,21 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     // Total DTS in dollars (current-to-stop across all positions)
     const totalDtsD = active.reduce((s,p) => s + p.dtsTotalD, 0);
     const avgDtsPct = totalValue > 0 ? (totalDtsD / totalValue) * 100 : 0;
-    const totalRoteD = enriched.reduce((s,p) => s + p.roteD, 0);
+    const totalRoteD = enriched.reduce((s,p) => s + p.roteD, 0); // initial ROTE (original stops)
     const ps = +portfolioSize || 0;
     const totalRotePct = ps > 0 ? (totalRoteD / ps) * 100 : 0;
+    // Current ROTE — uses active stops (trail stop if set). Only counts positions still at risk.
+    const realizedPL = journaledTrades ? journaledTrades.reduce((s,t) => s + (t.plDollar || 0), 0) : 0;
+    const currentEquity = ps + realizedPL;
+    const currentRoteD = enriched.reduce((s,p) => {
+      if (!p.epN || (!p.stop1 && !p.stop2)) return s;
+      const isRiskFree = p.activeStop >= p.epN;
+      if (isRiskFree) return s;
+      const risk = (p.epN - p.activeStop) * p.sharesN;
+      return s + Math.max(0, risk);
+    }, 0);
+    const currentRotePct = currentEquity > 0 ? (currentRoteD / currentEquity) * 100 : 0;
+    const tgtRotePct = +(targetRote || 0);
     return {
       totalPL: enriched.reduce((s,p) => s + p.plD, 0),
       totalRTS: enriched.reduce((s,p) => s + p.rtsD, 0),
@@ -1873,8 +1595,103 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       count: enriched.filter(p => p.sym).length,
       totalRoteD,
       totalRotePct,
+      currentRoteD,
+      currentRotePct,
+      currentEquity,
+      tgtRotePct,
     };
-  }, [enriched]);
+  }, [enriched, journaledTrades, targetRote]);
+
+  // ─── Compounder: state & calculations (embedded from former CompounderPage) ───
+  const [projR, setProjR] = useState("2");
+  const [projWin, setProjWin] = useState("55");
+  const [projBatches, setProjBatches] = useState("12");
+
+  const compRealizedPL = useMemo(() => {
+    if (!journaledTrades || journaledTrades.length === 0) return 0;
+    return journaledTrades.reduce((sum, t) => sum + (t.plDollar || 0), 0);
+  }, [journaledTrades]);
+
+  const compPs = +portfolioSize || 0;
+  const compEquity = compPs + compRealizedPL;
+
+  const posAnalysis = useMemo(() => {
+    if (!positions || positions.length === 0) return [];
+    return positions.filter(p => p.sym).map(p => {
+      const epN = parseFloat(p.ep) || 0;
+      const cpN = parseFloat(p.cp) || 0;
+      const sharesN = parseFloat(p.shares) || 0;
+      const commN = parseFloat(p.comm) || 0;
+      const s1 = parseFloat(p.stop) || 0;
+      const s2 = parseFloat(p.stop2) || 0;
+      const tsN = parseFloat(p.trailStop) || 0;
+      const isDual = s1 > 0 && s2 > 0;
+      const h1 = isDual ? Math.ceil(sharesN / 2) : sharesN;
+      const h2 = isDual ? sharesN - h1 : 0;
+      const initRiskD = (epN - s1) * h1 + (isDual ? (epN - s2) * h2 : 0);
+      const activeStop = tsN > 0 ? tsN : (isDual ? (s1 * h1 + s2 * h2) / (h1 + h2) : s1);
+      const currentRiskD = (epN - activeStop) * sharesN;
+      const isRiskFree = activeStop >= epN && epN > 0 && (s1 > 0 || s2 > 0);
+      const roteD = initRiskD > 0 ? initRiskD : 0;
+      const rotePct = compEquity > 0 ? (roteD / compEquity) * 100 : 0;
+      const currentRoteD = isRiskFree ? 0 : Math.max(0, currentRiskD);
+      const currentRotePct = compEquity > 0 ? (currentRoteD / compEquity) * 100 : 0;
+      const unrealizedPL = (cpN - epN) * sharesN - commN;
+      return { sym: p.sym, epN, cpN, sharesN, s1, s2, tsN, activeStop, initRiskD: roteD, initRotePct: rotePct, currentRiskD: currentRoteD, currentRotePct, isRiskFree, unrealizedPL, isDual };
+    });
+  }, [positions, compEquity]);
+
+  const budget = useMemo(() => {
+    const tgtRote = (+targetRote || 0) / 100;
+    const totalBudget = compEquity * tgtRote;
+    const deployedRisk = posAnalysis.reduce((s, p) => s + p.currentRiskD, 0);
+    const initialRisk = posAnalysis.reduce((s, p) => s + p.initRiskD, 0);
+    const freedRisk = initialRisk - deployedRisk;
+    const available = Math.max(0, totalBudget - deployedRisk);
+    const atRiskCount = posAnalysis.filter(p => !p.isRiskFree && p.initRiskD > 0).length;
+    const freeCount = posAnalysis.filter(p => p.isRiskFree).length;
+    const totalCount = posAnalysis.filter(p => p.initRiskD > 0 || p.isRiskFree).length;
+    const totalUnrealized = posAnalysis.reduce((s, p) => s + p.unrealizedPL, 0);
+    const deployedPct = compEquity > 0 ? (deployedRisk / compEquity) * 100 : 0;
+    const availablePct = compEquity > 0 ? (available / compEquity) * 100 : 0;
+    const initialRotePct = compEquity > 0 ? (initialRisk / compEquity) * 100 : 0;
+    return { totalBudget, deployedRisk, initialRisk, freedRisk, available, atRiskCount, freeCount, totalCount, totalUnrealized, deployedPct, availablePct, initialRotePct, tgtRote };
+  }, [posAnalysis, compEquity, targetRote]);
+
+  const projection = useMemo(() => {
+    if (compEquity <= 0) return [];
+    const tgtRote = (+targetRote || 0) / 100;
+    const tgtR = +projR || 1;
+    const wr = (+projWin || 50) / 100;
+    const batches = Math.min(+projBatches || 12, 52);
+    const expectedReturnPerCycle = wr * tgtR * tgtRote - (1 - wr) * tgtRote;
+    const rows = [];
+    let eq = compEquity;
+    for (let i = 0; i <= batches; i++) {
+      const prevEq = i === 0 ? compEquity : rows[i - 1].equity;
+      const newEq = i === 0 ? eq : prevEq * (1 + expectedReturnPerCycle);
+      rows.push({ cycle: i, equity: newEq, riskBudget: newEq * tgtRote, gain: i === 0 ? 0 : newEq - prevEq, growthPct: i === 0 ? 0 : ((newEq - compEquity) / compEquity) * 100 });
+    }
+    return rows;
+  }, [compEquity, targetRote, projR, projWin, projBatches]);
+
+  const chartData = useMemo(() => {
+    if (projection.length === 0) return [];
+    const tgtRote = (+targetRote || 0) / 100;
+    const tgtR = +projR || 1;
+    const batches = Math.min(+projBatches || 12, 52);
+    const best = [], worst = [];
+    let bEq = compEquity, wEq = compEquity;
+    for (let i = 0; i <= batches; i++) {
+      if (i > 0) { bEq *= (1 + tgtRote * tgtR); wEq *= (1 - tgtRote); }
+      best.push(Math.round(bEq)); worst.push(Math.round(wEq));
+    }
+    return projection.map((d, i) => ({ cycle: i === 0 ? "Now" : `C${d.cycle}`, expected: Math.round(d.equity), best: best[i], worst: worst[i] }));
+  }, [projection, compEquity, targetRote, projR, projBatches]);
+
+  const finalProj = projection.length > 1 ? projection[projection.length - 1] : null;
+
+  const compTh = (text, align = "right") => <th style={{padding:"10px 8px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap"}}>{text}</th>;
 
   const th = (text, align = "right") => <th style={{ padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap" }}>{text}</th>;
 
@@ -1898,7 +1715,6 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <SliderRow label="Full Allocation" min={10} max={60} step={5} value={fullSizePct} onChange={setFullSizePct} suffix="%" calcText={sizer?fmt$(sizer.fullSizeAmt):""} />
         <SliderRow label="Max Positions" min={1} max={12} step={1} value={numStocks} onChange={setNumStocks} calcText={sizer?`${fmt$(sizer.full)} / stock`:""} />
         <TierStrip sizer={sizer} />
-        <ExposureGrid sizer={sizer} portfolioSize={portfolioSize} numStocks={numStocks} enrichedPositions={enriched} />
       </GlassCard>
 
       {/* Open Positions */}
@@ -2204,7 +2020,10 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 <td colSpan={6} />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD<=0?C.green:C.text}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.74rem",color:totals.totalRTS<=0?C.green:C.red,animation:totals.totalRTS>0?"rtsGlow 2.5s ease-in-out infinite":"rtsGlowGreen 3s ease-in-out infinite"}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
-                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalRotePct>1.5?C.red:totals.totalRotePct>1.0?C.gold:C.green,whiteSpace:"nowrap"}}>{totals.totalRotePct.toFixed(2)}%{totals.totalRotePct>1.5&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</td>
+                <td style={{padding:"8px 6px",textAlign:"right",whiteSpace:"nowrap"}}>
+                  <div style={{fontWeight:800,fontSize:"0.72rem",color:totals.currentRotePct>totals.tgtRotePct?C.red:totals.currentRotePct>(totals.tgtRotePct*0.8)?C.gold:C.green}}>{totals.currentRotePct.toFixed(2)}%{totals.currentRotePct>totals.tgtRotePct&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</div>
+                  <div style={{fontSize:"0.50rem",color:C.muted,marginTop:1}}>Init: {totals.totalRotePct.toFixed(2)}%</div>
+                </td>
                 {displayMode==="R" ? <><td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,fontSize:"0.68rem",color:C.muted}}>—</td><td /></> : <td colSpan={2} />}
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{displayMode==="R"?`${totals.totalPL>=0?"+":""}${fmt$(Math.abs(totals.totalPL))}`:`${totals.totalPL>=0?"+":"-"}${fmt$(Math.abs(totals.totalPL))}`}</td>
                 <td />
@@ -2234,12 +2053,19 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               );
             })()}
           </div>
-          {/* ROTE Warning */}
-          {totals.totalRotePct > 1.5 && (
-            <div style={{ display:"flex",alignItems:"center",gap:8,padding:"10px 0 0",marginTop:8,borderTop:`1px solid rgba(239,68,68,0.15)` }}>
+          {/* ROTE Warning — triggers when current ROTE exceeds target, or initial exceeds 1.5x target */}
+          {(totals.currentRotePct > totals.tgtRotePct || totals.totalRotePct > totals.tgtRotePct * 1.5) && (
+            <div style={{ display:"flex",alignItems:"flex-start",gap:8,padding:"10px 0 0",marginTop:8,borderTop:`1px solid rgba(239,68,68,0.15)` }}>
               <span style={{ fontSize:"1rem" }}>⚠</span>
-              <span style={{ fontWeight:700,fontSize:"0.68rem",color:C.red }}>ROTE Warning: {totals.totalRotePct.toFixed(2)}% of total equity at risk</span>
-              <span style={{ fontSize:"0.62rem",color:C.muted,marginLeft:4 }}>Ideal: keep total ROTE under 1.5%. Consider reducing position sizes or tightening stops.</span>
+              <div>
+                {totals.currentRotePct > totals.tgtRotePct && (
+                  <div style={{ fontWeight:700,fontSize:"0.68rem",color:C.red }}>Current ROTE: {totals.currentRotePct.toFixed(2)}% exceeds your {totals.tgtRotePct.toFixed(1)}% target</div>
+                )}
+                {totals.currentRotePct <= totals.tgtRotePct && totals.totalRotePct > totals.tgtRotePct * 1.5 && (
+                  <div style={{ fontWeight:700,fontSize:"0.68rem",color:C.gold }}>Initial ROTE: {totals.totalRotePct.toFixed(2)}% — trail stops have reduced current to {totals.currentRotePct.toFixed(2)}%</div>
+                )}
+                <div style={{ fontSize:"0.62rem",color:C.muted,marginTop:2 }}>Target: {totals.tgtRotePct.toFixed(1)}% (set in Compounder). Current uses active stops. Initial uses original stops.</div>
+              </div>
             </div>
           )}
         </div>
@@ -2260,6 +2086,175 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           </tbody>
         </table>
       </GlassCard>
+
+      {/* ═══════════════════════════════════════ */}
+      {/* ─── LIVE RISK BUDGET (Compounder) ─── */}
+      {/* ═══════════════════════════════════════ */}
+
+      <div style={{ marginTop: 32, borderTop: `1px solid ${C.border}`, paddingTop: 28 }}>
+        <Eyebrow>Compounder</Eyebrow>
+        <h2 style={{ fontWeight:800,fontSize:"clamp(1.2rem, 3vw, 1.6rem)",letterSpacing:"-0.04em",color:C.white,margin:"0 0 8px" }}>Live Risk Budget</h2>
+        <p style={{ fontSize:"0.74rem",color:C.muted,margin:"0 0 24px",lineHeight:1.6 }}>Your real-time compounding command center. When positions become risk-free (stop at breakeven or above), that ROTE frees up for new trades. Closed trade profits compound into your equity — new trades risk more dollars at the same %.</p>
+
+        {/* Equity Overview */}
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(170px, 1fr))",gap:12,marginBottom:20 }}>
+          <StatTile label="Portfolio Size" value={fmt$(compPs)} />
+          <StatTile label="Realized P/L" value={`${compRealizedPL>=0?"+":"-"}${fmt$(Math.abs(compRealizedPL))}`} color={compRealizedPL>=0?C.green:C.red} sub="From closed trades" />
+          <StatTile label="Current Equity" value={fmt$(compEquity)} color={C.goldBright} sub="Portfolio + Realized" />
+          <StatTile label="Unrealized P/L" value={`${budget.totalUnrealized>=0?"+":"-"}${fmt$(Math.abs(budget.totalUnrealized))}`} color={budget.totalUnrealized>=0?C.green:C.red} sub="Open positions" />
+        </div>
+
+        {/* Risk Budget Panel */}
+        <GlassCard style={{ padding:"24px 28px",marginBottom:20 }}>
+          <Eyebrow>ROTE Risk Budget</Eyebrow>
+          <div style={{ display:"flex",alignItems:"center",gap:16,marginBottom:20,flexWrap:"wrap" }}>
+            <CalcInput label="Target Max ROTE" value={targetRote} onChange={setTargetRote} suffix="%" placeholder="2" style={{maxWidth:140}} />
+            <div style={{ padding:"10px 18px",borderRadius:12,background:C.goldDim,border:`1px solid ${C.borderGold}` }}>
+              <span style={{ fontSize:"0.56rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",display:"block" }}>Total Risk Budget</span>
+              <span style={{ fontSize:"1.1rem",fontWeight:800,color:C.goldBright }}>{fmt$(budget.totalBudget)}</span>
+            </div>
+          </div>
+
+          {/* Risk allocation bar */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6,flexWrap:"wrap",gap:4 }}>
+              <span style={{ fontSize:"0.62rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em" }}>Risk Allocation</span>
+              <div style={{ display:"flex",gap:12,alignItems:"center" }}>
+                <span style={{ fontSize:"0.62rem",color:budget.deployedPct > (+targetRote||0) ? C.red : C.muted,fontWeight:budget.deployedPct > (+targetRote||0) ? 700 : 400 }}>Current: {budget.deployedPct.toFixed(2)}% / {(+targetRote||0).toFixed(2)}% max</span>
+                {budget.initialRotePct !== budget.deployedPct && <span style={{ fontSize:"0.58rem",color:C.muted }}>Initial: {budget.initialRotePct.toFixed(2)}%</span>}
+              </div>
+            </div>
+            <div style={{ height:12,borderRadius:6,background:"rgba(255,255,255,0.05)",position:"relative",overflow:"hidden" }}>
+              <div style={{ position:"absolute",left:0,top:0,bottom:0,borderRadius:6,width:`${Math.min(100, budget.totalBudget > 0 ? (budget.deployedRisk / budget.totalBudget) * 100 : 0)}%`,background:C.red,transition:"width 0.3s",zIndex:2 }} />
+              <div style={{ position:"absolute",left:`${budget.totalBudget > 0 ? (budget.deployedRisk / budget.totalBudget) * 100 : 0}%`,top:0,bottom:0,borderRadius:"0 6px 6px 0",width:`${Math.min(100, budget.totalBudget > 0 ? (budget.available / budget.totalBudget) * 100 : 0)}%`,background:C.green,opacity:0.6,transition:"all 0.3s",zIndex:1 }} />
+            </div>
+            <div style={{ display:"flex",gap:16,marginTop:8 }}>
+              <span style={{ fontSize:"0.60rem",color:C.red }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.red,marginRight:4,verticalAlign:"middle"}} />At Risk: {fmt$(budget.deployedRisk)} ({budget.atRiskCount} positions)</span>
+              <span style={{ fontSize:"0.60rem",color:C.green }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.green,opacity:0.6,marginRight:4,verticalAlign:"middle"}} />Available: {fmt$(budget.available)} ({budget.availablePct.toFixed(2)}%)</span>
+              {budget.freeCount > 0 && <span style={{ fontSize:"0.60rem",color:C.blue }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.blue,marginRight:4,verticalAlign:"middle"}} />Risk-Free: {budget.freeCount} positions (freed {fmt$(budget.freedRisk)})</span>}
+            </div>
+          </div>
+
+          {/* Key action */}
+          {budget.available > 0 && (
+            <div style={{ padding:"14px 18px",borderRadius:12,background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.20)",marginBottom:8 }}>
+              <div style={{ fontWeight:800,fontSize:"0.76rem",color:C.green,marginBottom:4 }}>You can deploy {fmt$(budget.available)} more risk</div>
+              <div style={{ fontSize:"0.68rem",color:C.text,lineHeight:1.6 }}>
+                That's {budget.availablePct.toFixed(2)}% ROTE available. At current equity, you could enter{" "}
+                <strong style={{color:C.white}}>{Math.floor(budget.available / (budget.totalBudget / 4))} new trades</strong>{" "}
+                at ~{((+targetRote || 2) / 4).toFixed(2)}% ROTE each, or <strong style={{color:C.white}}>{Math.floor(budget.available / (budget.totalBudget / 6))} trades</strong> at ~{((+targetRote || 2) / 6).toFixed(2)}% ROTE each.
+              </div>
+            </div>
+          )}
+          {budget.available <= 0 && budget.totalCount > 0 && (
+            <div style={{ padding:"14px 18px",borderRadius:12,background:C.redDim,border:"1px solid rgba(239,68,68,0.20)" }}>
+              <div style={{ fontWeight:800,fontSize:"0.76rem",color:C.red,marginBottom:4 }}>ROTE Fully Deployed</div>
+              <div style={{ fontSize:"0.68rem",color:C.text,lineHeight:1.6 }}>
+                All {(+targetRote||2)}% ROTE is in use. To enter new trades, move stops to breakeven on existing positions to free up risk, or wait for positions to close.
+              </div>
+            </div>
+          )}
+        </GlassCard>
+
+        {/* Position Risk Breakdown */}
+        {posAnalysis.length > 0 && (
+          <GlassCard style={{ marginBottom:20 }}>
+            <div style={{ padding:"20px 24px 8px" }}>
+              <div style={{ fontWeight:700,fontSize:"0.78rem",color:C.white }}>Position Risk Breakdown</div>
+              <div style={{ fontWeight:400,fontSize:"0.64rem",color:C.muted,marginTop:2 }}>How each open position contributes to your ROTE. Green = risk-free (stop at/above entry).</div>
+            </div>
+            <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
+              <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
+                <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
+                  {compTh("Symbol","left")}{compTh("Entry")}{compTh("Current")}{compTh("Stop")}{compTh("Shares")}{compTh("Initial Risk $")}{compTh("Initial ROTE")}{compTh("Current Risk $")}{compTh("Current ROTE")}{compTh("Status","left")}{compTh("Unrealized P/L")}
+                </tr></thead>
+                <tbody>
+                  {posAnalysis.map((p, i) => (
+                    <tr key={i} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)",background:p.isRiskFree?"rgba(34,197,94,0.03)":i%2?"rgba(255,255,255,0.01)":"transparent" }}>
+                      <td style={{padding:"10px 8px",fontWeight:700,color:C.gold}}>{p.sym}</td>
+                      <td style={{padding:"10px 8px",textAlign:"right",color:C.text}}>${p.epN.toFixed(2)}</td>
+                      <td style={{padding:"10px 8px",textAlign:"right",color:C.white,fontWeight:700}}>${p.cpN.toFixed(2)}</td>
+                      <td style={{padding:"10px 8px",textAlign:"right",color:C.muted}}>${p.activeStop.toFixed(2)}</td>
+                      <td style={{padding:"10px 8px",textAlign:"right",color:C.text}}>{p.sharesN.toLocaleString()}</td>
+                      <td style={{padding:"10px 8px",textAlign:"right",color:C.red,fontWeight:600}}>{fmt$(p.initRiskD)}</td>
+                      <td style={{padding:"10px 8px",textAlign:"right",color:p.initRotePct>1.5?C.red:p.initRotePct>1?C.gold:C.text,fontWeight:600}}>{p.initRotePct.toFixed(2)}%</td>
+                      <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:C.red}}>{p.isRiskFree?"$0 (FREE)":fmt$(p.currentRiskD)}</td>
+                      <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:p.currentRotePct>1.5?C.red:C.text}}>{p.isRiskFree?"0.00%":`${p.currentRotePct.toFixed(2)}%`}</td>
+                      <td style={{padding:"10px 8px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:p.isRiskFree?C.greenDim:C.redDim,color:p.isRiskFree?C.green:C.red,border:`1px solid ${p.isRiskFree?"rgba(34,197,94,0.25)":"rgba(239,68,68,0.25)"}`}}>{p.isRiskFree?"FREE":"AT RISK"}</span></td>
+                      <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.unrealizedPL>=0?C.green:C.red}}>{p.unrealizedPL>=0?"+":"-"}{fmt$(Math.abs(p.unrealizedPL))}</td>
+                    </tr>
+                  ))}
+                  {/* Total row */}
+                  <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
+                    <td style={{padding:"12px 8px",fontWeight:800,fontSize:"0.64rem",color:C.white,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</td>
+                    <td colSpan={4} />
+                    <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.red}}>{fmt$(posAnalysis.reduce((s,p)=>s+p.initRiskD,0))}</td>
+                    <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.muted}}>{compEquity>0?(posAnalysis.reduce((s,p)=>s+p.initRiskD,0)/compEquity*100).toFixed(2):0}%</td>
+                    <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.deployedRisk>0?C.red:C.green}}>{budget.deployedRisk>0?fmt$(budget.deployedRisk):"$0 (ALL FREE)"}</td>
+                    <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.muted}}>{budget.deployedPct.toFixed(2)}%</td>
+                    <td />
+                    <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.totalUnrealized>=0?C.green:C.red}}>{budget.totalUnrealized>=0?"+":"-"}{fmt$(Math.abs(budget.totalUnrealized))}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </GlassCard>
+        )}
+
+        {/* Forward Projection */}
+        <GlassCard style={{ padding:"24px 28px",marginBottom:20 }}>
+          <Eyebrow>Compound Projection</Eyebrow>
+          <div style={{ fontWeight:800,fontSize:"1.05rem",color:C.white,marginBottom:6 }}>If You Keep This Up</div>
+          <p style={{ fontSize:"0.68rem",color:C.muted,margin:"0 0 16px" }}>Project forward from your current equity. Each cycle = fully deploying your target ROTE, closing all trades, then redeploying on the new equity.</p>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))",gap:14,marginBottom:16 }}>
+            <CalcInput label="Target R-Multiple" value={projR} onChange={setProjR} suffix="R" placeholder="2" />
+            <CalcInput label="Win Rate" value={projWin} onChange={setProjWin} suffix="%" placeholder="55" />
+            <CalcInput label="Cycles" value={projBatches} onChange={setProjBatches} suffix="#" placeholder="12" />
+          </div>
+
+          {finalProj && (
+            <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))",gap:12,marginBottom:16 }}>
+              <StatTile label="Current Equity" value={fmt$(compEquity)} />
+              <StatTile label={`After ${projBatches} Cycles`} value={fmt$(finalProj.equity)} color={C.green} />
+              <StatTile label="Projected Growth" value={`+${finalProj.growthPct.toFixed(1)}%`} color={C.green} sub={`+${fmt$(finalProj.equity - compEquity)}`} />
+            </div>
+          )}
+
+          {chartData.length > 1 && (
+            <>
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={chartData} margin={{ top:10,right:30,left:10,bottom:5 }}>
+                  <CartesianGrid stroke="rgba(255,255,255,0.04)" />
+                  <XAxis dataKey="cycle" stroke={C.muted} tick={{ fontSize:10 }} />
+                  <YAxis stroke={C.muted} tick={{ fontSize:10 }} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} />
+                  <Tooltip contentStyle={{ background:"#0c0c14",border:`1px solid ${C.border}`,borderRadius:10,fontSize:"0.72rem" }} formatter={(v) => [`$${Number(v).toLocaleString()}`, ""]} />
+                  <Line type="monotone" dataKey="best" stroke={C.gold} strokeWidth={1} strokeDasharray="6 3" dot={false} name="Best" />
+                  <Line type="monotone" dataKey="expected" stroke={C.green} strokeWidth={2.5} dot={false} name="Expected" />
+                  <Line type="monotone" dataKey="worst" stroke={C.red} strokeWidth={1} strokeDasharray="6 3" dot={false} name="Worst" />
+                  <ReferenceLine y={compEquity} stroke={C.muted} strokeDasharray="3 3" label={{ value:"Now",fill:C.muted,fontSize:10 }} />
+                </LineChart>
+              </ResponsiveContainer>
+              <div style={{ display:"flex",gap:16,justifyContent:"center",marginTop:8 }}>
+                <span style={{ fontSize:"0.60rem",color:C.gold }}>— — Best (100% win)</span>
+                <span style={{ fontSize:"0.60rem",color:C.green }}>— Expected</span>
+                <span style={{ fontSize:"0.60rem",color:C.red }}>— — Worst (0% win)</span>
+              </div>
+            </>
+          )}
+        </GlassCard>
+
+        {/* How It Works */}
+        <GlassCard style={{ padding:"22px 26px" }}>
+          <Eyebrow>How It Works</Eyebrow>
+          <div style={{ fontSize:"0.72rem",color:C.text,lineHeight:1.7 }}>
+            <p style={{margin:"0 0 10px"}}><strong style={{color:C.goldBright}}>Current Equity</strong> = your Portfolio Size + total realized P/L from all closed trades in your Journal. This is your true compounded capital — it grows when you take profits and shrinks when you take losses.</p>
+            <p style={{margin:"0 0 10px"}}><strong style={{color:C.white}}>Risk Budget</strong> = Current Equity x your target ROTE %. This is the maximum dollar amount you should have at risk across all open positions combined.</p>
+            <p style={{margin:"0 0 10px"}}><strong style={{color:C.green}}>Freeing Up Risk</strong> — when you move a position's stop to breakeven (or above entry), its risk becomes $0. That ROTE allocation is now available for new trades. You don't need to close the position — just make it risk-free.</p>
+            <p style={{margin:"0"}}><strong style={{color:C.white}}>Compounding</strong> — when you close a winning trade, the profit adds to your equity. Your next risk budget is bigger (same % of a larger number). Over time, each trade risks more dollars while keeping the same % discipline.</p>
+          </div>
+        </GlassCard>
+      </div>
+
     </div>
   );
 }
@@ -2720,306 +2715,12 @@ function AuthPage() {
   );
 }
 
-// ═══════════════════════════════════════
-// ─── COMPOUNDER — LIVE RISK BUDGET ───
-// ═══════════════════════════════════════
-function CompounderPage({ portfolioSize, journaledTrades, positions, targetRote, setTargetRote }) {
-  const [projR, setProjR] = useState("2");
-  const [projWin, setProjWin] = useState("55");
-  const [projBatches, setProjBatches] = useState("12");
-
-  // ─── Realized P/L from closed journal trades ───
-  const realizedPL = useMemo(() => {
-    if (!journaledTrades || journaledTrades.length === 0) return 0;
-    return journaledTrades.reduce((sum, t) => sum + (t.plDollar || 0), 0);
-  }, [journaledTrades]);
-
-  // ─── Current Equity = Portfolio Size + Realized P/L ───
-  const ps = +portfolioSize || 0;
-  const currentEquity = ps + realizedPL;
-
-  // ─── Analyze each open position for risk status ───
-  const posAnalysis = useMemo(() => {
-    if (!positions || positions.length === 0) return [];
-    return positions.filter(p => p.sym).map(p => {
-      const epN = parseFloat(p.ep) || 0;
-      const cpN = parseFloat(p.cp) || 0;
-      const sharesN = parseFloat(p.shares) || 0;
-      const commN = parseFloat(p.comm) || 0;
-      const s1 = parseFloat(p.stop) || 0;
-      const s2 = parseFloat(p.stop2) || 0;
-      const tsN = parseFloat(p.trailStop) || 0;
-      const isDual = s1 > 0 && s2 > 0;
-      const h1 = isDual ? Math.ceil(sharesN / 2) : sharesN;
-      const h2 = isDual ? sharesN - h1 : 0;
-
-      // Initial risk $ (entry to original stops)
-      const initRiskD = (epN - s1) * h1 + (isDual ? (epN - s2) * h2 : 0);
-
-      // Active stop for current risk calc
-      const activeStop = tsN > 0 ? tsN : (isDual ? (s1 * h1 + s2 * h2) / (h1 + h2) : s1);
-
-      // Current risk $ (entry to active stop). Negative = locked profit
-      const currentRiskD = (epN - activeStop) * sharesN;
-
-      // Is this position risk-free? (active stop >= entry)
-      const isRiskFree = activeStop >= epN && epN > 0 && (s1 > 0 || s2 > 0);
-
-      // ROTE = initial risk / portfolio
-      const roteD = initRiskD > 0 ? initRiskD : 0;
-      const rotePct = currentEquity > 0 ? (roteD / currentEquity) * 100 : 0;
-
-      // Current ROTE (using active stop, clamped to 0 if risk-free)
-      const currentRoteD = isRiskFree ? 0 : Math.max(0, currentRiskD);
-      const currentRotePct = currentEquity > 0 ? (currentRoteD / currentEquity) * 100 : 0;
-
-      // Unrealized P/L
-      const unrealizedPL = (cpN - epN) * sharesN - commN;
-
-      return {
-        sym: p.sym, epN, cpN, sharesN, s1, s2, tsN, activeStop,
-        initRiskD: roteD, initRotePct: rotePct,
-        currentRiskD: currentRoteD, currentRotePct,
-        isRiskFree, unrealizedPL, isDual,
-      };
-    });
-  }, [positions, currentEquity]);
-
-  // ─── Aggregate risk budget numbers ───
-  const budget = useMemo(() => {
-    const tgtRote = (+targetRote || 0) / 100;
-    const totalBudget = currentEquity * tgtRote;
-    const deployedRisk = posAnalysis.reduce((s, p) => s + p.currentRiskD, 0); // only "at risk" positions
-    const initialRisk = posAnalysis.reduce((s, p) => s + p.initRiskD, 0); // what was originally risked
-    const freedRisk = initialRisk - deployedRisk; // risk that became free (stops moved up)
-    const available = Math.max(0, totalBudget - deployedRisk);
-    const atRiskCount = posAnalysis.filter(p => !p.isRiskFree && p.initRiskD > 0).length;
-    const freeCount = posAnalysis.filter(p => p.isRiskFree).length;
-    const totalCount = posAnalysis.filter(p => p.initRiskD > 0 || p.isRiskFree).length;
-    const totalUnrealized = posAnalysis.reduce((s, p) => s + p.unrealizedPL, 0);
-    const deployedPct = currentEquity > 0 ? (deployedRisk / currentEquity) * 100 : 0;
-    const availablePct = currentEquity > 0 ? (available / currentEquity) * 100 : 0;
-
-    return { totalBudget, deployedRisk, freedRisk, available, atRiskCount, freeCount, totalCount, totalUnrealized, deployedPct, availablePct, tgtRote };
-  }, [posAnalysis, currentEquity, targetRote]);
-
-  // ─── Projection: compound forward from current equity ───
-  const projection = useMemo(() => {
-    if (currentEquity <= 0) return [];
-    const tgtRote = (+targetRote || 0) / 100;
-    const tgtR = +projR || 1;
-    const wr = (+projWin || 50) / 100;
-    const batches = Math.min(+projBatches || 12, 52);
-    // Expected return per cycle: win%*R*rote - loss%*rote
-    const expectedReturnPerCycle = wr * tgtR * tgtRote - (1 - wr) * tgtRote;
-    const rows = [];
-    let eq = currentEquity;
-    for (let i = 0; i <= batches; i++) {
-      const prevEq = i === 0 ? currentEquity : rows[i - 1].equity;
-      const newEq = i === 0 ? eq : prevEq * (1 + expectedReturnPerCycle);
-      rows.push({
-        cycle: i,
-        equity: newEq,
-        riskBudget: newEq * tgtRote,
-        gain: i === 0 ? 0 : newEq - prevEq,
-        growthPct: i === 0 ? 0 : ((newEq - currentEquity) / currentEquity) * 100,
-      });
-    }
-    return rows;
-  }, [currentEquity, targetRote, projR, projWin, projBatches]);
-
-  // Chart data
-  const chartData = useMemo(() => {
-    if (projection.length === 0) return [];
-    const tgtRote = (+targetRote || 0) / 100;
-    const tgtR = +projR || 1;
-    const batches = Math.min(+projBatches || 12, 52);
-    // Best/worst cases
-    const best = [], worst = [];
-    let bEq = currentEquity, wEq = currentEquity;
-    for (let i = 0; i <= batches; i++) {
-      if (i > 0) { bEq *= (1 + tgtRote * tgtR); wEq *= (1 - tgtRote); }
-      best.push(Math.round(bEq)); worst.push(Math.round(wEq));
-    }
-    return projection.map((d, i) => ({ cycle: i === 0 ? "Now" : `C${d.cycle}`, expected: Math.round(d.equity), best: best[i], worst: worst[i] }));
-  }, [projection, currentEquity, targetRote, projR, projBatches]);
-
-  const finalProj = projection.length > 1 ? projection[projection.length - 1] : null;
-
-  const th = (text, align = "right") => <th style={{padding:"10px 8px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap"}}>{text}</th>;
-
-  return (
-    <div>
-      <Eyebrow>Compounder</Eyebrow>
-      <h1 style={{ fontWeight:800,fontSize:"clamp(1.5rem, 4vw, 2rem)",letterSpacing:"-0.04em",color:C.white,margin:"0 0 8px" }}>Live Risk Budget</h1>
-      <p style={{ fontSize:"0.74rem",color:C.muted,margin:"0 0 24px",lineHeight:1.6 }}>Your real-time compounding command center. When positions become risk-free (stop at breakeven or above), that ROTE frees up for new trades. Closed trade profits compound into your equity — new trades risk more dollars at the same %.</p>
-
-      {/* ─── Equity Overview ─── */}
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(170px, 1fr))",gap:12,marginBottom:20 }}>
-        <StatTile label="Portfolio Size" value={fmt$(ps)} />
-        <StatTile label="Realized P/L" value={`${realizedPL>=0?"+":"-"}${fmt$(Math.abs(realizedPL))}`} color={realizedPL>=0?C.green:C.red} sub="From closed trades" />
-        <StatTile label="Current Equity" value={fmt$(currentEquity)} color={C.goldBright} sub="Portfolio + Realized" />
-        <StatTile label="Unrealized P/L" value={`${budget.totalUnrealized>=0?"+":"-"}${fmt$(Math.abs(budget.totalUnrealized))}`} color={budget.totalUnrealized>=0?C.green:C.red} sub="Open positions" />
-      </div>
-
-      {/* ─── Risk Budget Panel ─── */}
-      <GlassCard style={{ padding:"24px 28px",marginBottom:20 }}>
-        <Eyebrow>ROTE Risk Budget</Eyebrow>
-        <div style={{ display:"flex",alignItems:"center",gap:16,marginBottom:20,flexWrap:"wrap" }}>
-          <CalcInput label="Target Max ROTE" value={targetRote} onChange={setTargetRote} suffix="%" placeholder="2" style={{maxWidth:140}} />
-          <div style={{ padding:"10px 18px",borderRadius:12,background:C.goldDim,border:`1px solid ${C.borderGold}` }}>
-            <span style={{ fontSize:"0.56rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",display:"block" }}>Total Risk Budget</span>
-            <span style={{ fontSize:"1.1rem",fontWeight:800,color:C.goldBright }}>{fmt$(budget.totalBudget)}</span>
-          </div>
-        </div>
-
-        {/* Risk allocation bar */}
-        <div style={{ marginBottom:16 }}>
-          <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
-            <span style={{ fontSize:"0.62rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em" }}>Risk Allocation</span>
-            <span style={{ fontSize:"0.62rem",color:C.muted }}>{budget.deployedPct.toFixed(2)}% deployed / {(+targetRote||0).toFixed(2)}% max</span>
-          </div>
-          <div style={{ height:12,borderRadius:6,background:"rgba(255,255,255,0.05)",position:"relative",overflow:"hidden" }}>
-            {/* Deployed (at risk) portion — red */}
-            <div style={{ position:"absolute",left:0,top:0,bottom:0,borderRadius:6,width:`${Math.min(100, budget.totalBudget > 0 ? (budget.deployedRisk / budget.totalBudget) * 100 : 0)}%`,background:C.red,transition:"width 0.3s",zIndex:2 }} />
-            {/* Available portion — green */}
-            <div style={{ position:"absolute",left:`${budget.totalBudget > 0 ? (budget.deployedRisk / budget.totalBudget) * 100 : 0}%`,top:0,bottom:0,borderRadius:"0 6px 6px 0",width:`${Math.min(100, budget.totalBudget > 0 ? (budget.available / budget.totalBudget) * 100 : 0)}%`,background:C.green,opacity:0.6,transition:"all 0.3s",zIndex:1 }} />
-          </div>
-          <div style={{ display:"flex",gap:16,marginTop:8 }}>
-            <span style={{ fontSize:"0.60rem",color:C.red }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.red,marginRight:4,verticalAlign:"middle"}} />At Risk: {fmt$(budget.deployedRisk)} ({budget.atRiskCount} positions)</span>
-            <span style={{ fontSize:"0.60rem",color:C.green }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.green,opacity:0.6,marginRight:4,verticalAlign:"middle"}} />Available: {fmt$(budget.available)} ({budget.availablePct.toFixed(2)}%)</span>
-            {budget.freeCount > 0 && <span style={{ fontSize:"0.60rem",color:C.blue }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.blue,marginRight:4,verticalAlign:"middle"}} />Risk-Free: {budget.freeCount} positions (freed {fmt$(budget.freedRisk)})</span>}
-          </div>
-        </div>
-
-        {/* Key action: what can you do with available ROTE */}
-        {budget.available > 0 && (
-          <div style={{ padding:"14px 18px",borderRadius:12,background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.20)",marginBottom:8 }}>
-            <div style={{ fontWeight:800,fontSize:"0.76rem",color:C.green,marginBottom:4 }}>You can deploy {fmt$(budget.available)} more risk</div>
-            <div style={{ fontSize:"0.68rem",color:C.text,lineHeight:1.6 }}>
-              That's {budget.availablePct.toFixed(2)}% ROTE available. At current equity, you could enter{" "}
-              <strong style={{color:C.white}}>{Math.floor(budget.available / (budget.totalBudget / 4))} new trades</strong>{" "}
-              at ~{((+targetRote || 2) / 4).toFixed(2)}% ROTE each, or <strong style={{color:C.white}}>{Math.floor(budget.available / (budget.totalBudget / 6))} trades</strong> at ~{((+targetRote || 2) / 6).toFixed(2)}% ROTE each.
-            </div>
-          </div>
-        )}
-        {budget.available <= 0 && budget.totalCount > 0 && (
-          <div style={{ padding:"14px 18px",borderRadius:12,background:C.redDim,border:"1px solid rgba(239,68,68,0.20)" }}>
-            <div style={{ fontWeight:800,fontSize:"0.76rem",color:C.red,marginBottom:4 }}>ROTE Fully Deployed</div>
-            <div style={{ fontSize:"0.68rem",color:C.text,lineHeight:1.6 }}>
-              All {(+targetRote||2)}% ROTE is in use. To enter new trades, move stops to breakeven on existing positions to free up risk, or wait for positions to close.
-            </div>
-          </div>
-        )}
-      </GlassCard>
-
-      {/* ─── Position Risk Breakdown ─── */}
-      {posAnalysis.length > 0 && (
-        <GlassCard style={{ marginBottom:20 }}>
-          <div style={{ padding:"20px 24px 8px" }}>
-            <div style={{ fontWeight:700,fontSize:"0.78rem",color:C.white }}>Position Risk Breakdown</div>
-            <div style={{ fontWeight:400,fontSize:"0.64rem",color:C.muted,marginTop:2 }}>How each open position contributes to your ROTE. Green = risk-free (stop at/above entry).</div>
-          </div>
-          <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
-            <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
-              <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-                {th("Symbol","left")}{th("Entry")}{th("Current")}{th("Stop")}{th("Shares")}{th("Initial Risk $")}{th("Initial ROTE")}{th("Current Risk $")}{th("Current ROTE")}{th("Status","left")}{th("Unrealized P/L")}
-              </tr></thead>
-              <tbody>
-                {posAnalysis.map((p, i) => (
-                  <tr key={i} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)",background:p.isRiskFree?"rgba(34,197,94,0.03)":i%2?"rgba(255,255,255,0.01)":"transparent" }}>
-                    <td style={{padding:"10px 8px",fontWeight:700,color:C.gold}}>{p.sym}</td>
-                    <td style={{padding:"10px 8px",textAlign:"right",color:C.text}}>${p.epN.toFixed(2)}</td>
-                    <td style={{padding:"10px 8px",textAlign:"right",color:C.white,fontWeight:700}}>${p.cpN.toFixed(2)}</td>
-                    <td style={{padding:"10px 8px",textAlign:"right",color:C.muted}}>${p.activeStop.toFixed(2)}</td>
-                    <td style={{padding:"10px 8px",textAlign:"right",color:C.text}}>{p.sharesN.toLocaleString()}</td>
-                    <td style={{padding:"10px 8px",textAlign:"right",color:C.red,fontWeight:600}}>{fmt$(p.initRiskD)}</td>
-                    <td style={{padding:"10px 8px",textAlign:"right",color:p.initRotePct>1.5?C.red:p.initRotePct>1?C.gold:C.text,fontWeight:600}}>{p.initRotePct.toFixed(2)}%</td>
-                    <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:C.red}}>{p.isRiskFree?"$0 (FREE)":fmt$(p.currentRiskD)}</td>
-                    <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:p.currentRotePct>1.5?C.red:C.text}}>{p.isRiskFree?"0.00%":`${p.currentRotePct.toFixed(2)}%`}</td>
-                    <td style={{padding:"10px 8px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:p.isRiskFree?C.greenDim:C.redDim,color:p.isRiskFree?C.green:C.red,border:`1px solid ${p.isRiskFree?"rgba(34,197,94,0.25)":"rgba(239,68,68,0.25)"}`}}>{p.isRiskFree?"FREE":"AT RISK"}</span></td>
-                    <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.unrealizedPL>=0?C.green:C.red}}>{p.unrealizedPL>=0?"+":"-"}{fmt$(Math.abs(p.unrealizedPL))}</td>
-                  </tr>
-                ))}
-                {/* Total row */}
-                <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
-                  <td style={{padding:"12px 8px",fontWeight:800,fontSize:"0.64rem",color:C.white,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</td>
-                  <td colSpan={4} />
-                  <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.red}}>{fmt$(posAnalysis.reduce((s,p)=>s+p.initRiskD,0))}</td>
-                  <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.muted}}>{currentEquity>0?(posAnalysis.reduce((s,p)=>s+p.initRiskD,0)/currentEquity*100).toFixed(2):0}%</td>
-                  <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.deployedRisk>0?C.red:C.green}}>{budget.deployedRisk>0?fmt$(budget.deployedRisk):"$0 (ALL FREE)"}</td>
-                  <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.muted}}>{budget.deployedPct.toFixed(2)}%</td>
-                  <td />
-                  <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.totalUnrealized>=0?C.green:C.red}}>{budget.totalUnrealized>=0?"+":"-"}{fmt$(Math.abs(budget.totalUnrealized))}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </GlassCard>
-      )}
-
-      {/* ─── Forward Projection ─── */}
-      <GlassCard style={{ padding:"24px 28px",marginBottom:20 }}>
-        <Eyebrow>Compound Projection</Eyebrow>
-        <div style={{ fontWeight:800,fontSize:"1.05rem",color:C.white,marginBottom:6 }}>If You Keep This Up</div>
-        <p style={{ fontSize:"0.68rem",color:C.muted,margin:"0 0 16px" }}>Project forward from your current equity. Each cycle = fully deploying your target ROTE, closing all trades, then redeploying on the new equity.</p>
-        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))",gap:14,marginBottom:16 }}>
-          <CalcInput label="Target R-Multiple" value={projR} onChange={setProjR} suffix="R" placeholder="2" />
-          <CalcInput label="Win Rate" value={projWin} onChange={setProjWin} suffix="%" placeholder="55" />
-          <CalcInput label="Cycles" value={projBatches} onChange={setProjBatches} suffix="#" placeholder="12" />
-        </div>
-
-        {finalProj && (
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))",gap:12,marginBottom:16 }}>
-            <StatTile label="Current Equity" value={fmt$(currentEquity)} />
-            <StatTile label={`After ${projBatches} Cycles`} value={fmt$(finalProj.equity)} color={C.green} />
-            <StatTile label="Projected Growth" value={`+${finalProj.growthPct.toFixed(1)}%`} color={C.green} sub={`+${fmt$(finalProj.equity - currentEquity)}`} />
-          </div>
-        )}
-
-        {chartData.length > 1 && (
-          <>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={chartData} margin={{ top:10,right:30,left:10,bottom:5 }}>
-                <CartesianGrid stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="cycle" stroke={C.muted} tick={{ fontSize:10 }} />
-                <YAxis stroke={C.muted} tick={{ fontSize:10 }} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} />
-                <Tooltip contentStyle={{ background:"#0c0c14",border:`1px solid ${C.border}`,borderRadius:10,fontSize:"0.72rem" }} formatter={(v) => [`$${Number(v).toLocaleString()}`, ""]} />
-                <Line type="monotone" dataKey="best" stroke={C.gold} strokeWidth={1} strokeDasharray="6 3" dot={false} name="Best" />
-                <Line type="monotone" dataKey="expected" stroke={C.green} strokeWidth={2.5} dot={false} name="Expected" />
-                <Line type="monotone" dataKey="worst" stroke={C.red} strokeWidth={1} strokeDasharray="6 3" dot={false} name="Worst" />
-                <ReferenceLine y={currentEquity} stroke={C.muted} strokeDasharray="3 3" label={{ value:"Now",fill:C.muted,fontSize:10 }} />
-              </LineChart>
-            </ResponsiveContainer>
-            <div style={{ display:"flex",gap:16,justifyContent:"center",marginTop:8 }}>
-              <span style={{ fontSize:"0.60rem",color:C.gold }}>— — Best (100% win)</span>
-              <span style={{ fontSize:"0.60rem",color:C.green }}>— Expected</span>
-              <span style={{ fontSize:"0.60rem",color:C.red }}>— — Worst (0% win)</span>
-            </div>
-          </>
-        )}
-      </GlassCard>
-
-      {/* ─── How It Works ─── */}
-      <GlassCard style={{ padding:"22px 26px" }}>
-        <Eyebrow>How It Works</Eyebrow>
-        <div style={{ fontSize:"0.72rem",color:C.text,lineHeight:1.7 }}>
-          <p style={{margin:"0 0 10px"}}><strong style={{color:C.goldBright}}>Current Equity</strong> = your Portfolio Size + total realized P/L from all closed trades in your Journal. This is your true compounded capital — it grows when you take profits and shrinks when you take losses.</p>
-          <p style={{margin:"0 0 10px"}}><strong style={{color:C.white}}>Risk Budget</strong> = Current Equity × your target ROTE %. This is the maximum dollar amount you should have at risk across all open positions combined.</p>
-          <p style={{margin:"0 0 10px"}}><strong style={{color:C.green}}>Freeing Up Risk</strong> — when you move a position's stop to breakeven (or above entry), its risk becomes $0. That ROTE allocation is now available for new trades. You don't need to close the position — just make it risk-free.</p>
-          <p style={{margin:"0"}}><strong style={{color:C.white}}>Compounding</strong> — when you close a winning trade, the profit adds to your equity. Your next risk budget is bigger (same % of a larger number). Over time, each trade risks more dollars while keeping the same % discipline.</p>
-        </div>
-      </GlassCard>
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════
 // ─── MAIN APP ───
 // ═══════════════════════════════════════
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "\u{1F4C8}" },
-  { id: "compounder", label: "Compounder", icon: "\u{1F4B0}" },
   { id: "tools", label: "Tools", icon: "\u{26A1}" },
   { id: "journal", label: "Journal", icon: "\u{1F4CA}" },
   { id: "settings", label: "Settings", icon: "\u{2699}" },
@@ -3433,8 +3134,7 @@ export default function App() {
 
   const pageContent = (
     <>
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} />}
-      {page === "compounder" && <CompounderPage portfolioSize={portfolioSize} journaledTrades={journaledTrades} positions={positions} targetRote={targetRote} setTargetRote={setTargetRote} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} />}
