@@ -1306,6 +1306,10 @@ const GLOSSARY = [
 ];
 
 function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades }) {
+  const [sizerMode, setSizerMode] = useState("R"); // "R" = risk-based (default), "%" = position size
+  const [rNumStocks, setRNumStocks] = useState(4);
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
+
   const sizer = useMemo(() => {
     const ps = +portfolioSize;
     if (!ps || ps <= 0) return null;
@@ -1313,6 +1317,17 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const perStock = fullSizeAmt / numStocks;
     return { fullSizeAmt, full: perStock, half: perStock / 2, quarter: perStock / 4, pilot: perStock / 8 };
   }, [portfolioSize, fullSizePct, numStocks]);
+
+  // R-based sizer: Account × ROTE% = total risk budget, ÷ max positions = R$ per trade
+  const rSizer = useMemo(() => {
+    const ps = +portfolioSize;
+    if (!ps || ps <= 0) return null;
+    const rotePct = +(targetRote || 0);
+    const totalBudget = ps * (rotePct / 100);
+    const n = rNumStocks || 1;
+    const fullR = totalBudget / n;
+    return { totalBudget, fullR, halfR: fullR / 2, quarterR: fullR / 4, pilotR: fullR / 8, rotePct, n };
+  }, [portfolioSize, targetRote, rNumStocks]);
   const [sellId, setSellId] = useState(null);
   const [sellQty, setSellQty] = useState("");
   const [sellPrice, setSellPrice] = useState("");
@@ -1715,12 +1730,66 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 
       {/* Position Sizer */}
       <GlassCard style={{ padding: "28px", marginBottom: 20 }}>
-        <Eyebrow>Position Sizer</Eyebrow>
-        <div style={{ fontWeight:800,fontSize:"1.05rem",letterSpacing:"-0.03em",color:C.white,marginBottom:20 }}>Portfolio Allocation Framework</div>
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10 }}>
+          <div>
+            <Eyebrow>Position Sizer</Eyebrow>
+            <div style={{ fontWeight:800,fontSize:"1.05rem",letterSpacing:"-0.03em",color:C.white }}>{sizerMode === "R" ? "Risk-Based Sizing (R)" : "Portfolio Allocation Framework"}</div>
+          </div>
+          <div style={{ display:"flex",borderRadius:10,overflow:"hidden",border:`1px solid ${C.border}` }}>
+            {[{k:"R",label:"R Mode"},{k:"%",label:"% Mode"}].map(({k,label})=>(
+              <button key={k} onClick={()=>setSizerMode(k)} style={{padding:"8px 18px",background:sizerMode===k?C.goldDim:"rgba(255,255,255,0.03)",border:"none",color:sizerMode===k?C.gold:C.muted,fontWeight:800,fontSize:"0.72rem",cursor:"pointer",fontFamily:font,transition:"all 0.15s"}}>{label}</button>
+            ))}
+          </div>
+        </div>
+
         <CalcInput label="Account Size" value={portfolioSize} onChange={setPortfolioSize} style={{ maxWidth:300,marginBottom:24 }} />
-        <SliderRow label="Full Allocation" min={10} max={60} step={5} value={fullSizePct} onChange={setFullSizePct} suffix="%" calcText={sizer?fmt$(sizer.fullSizeAmt):""} />
-        <SliderRow label="Max Positions" min={1} max={12} step={1} value={numStocks} onChange={setNumStocks} calcText={sizer?`${fmt$(sizer.full)} / stock`:""} />
-        <TierStrip sizer={sizer} />
+
+        {sizerMode === "%" ? (
+          <>
+            <SliderRow label="Full Allocation" min={10} max={60} step={5} value={fullSizePct} onChange={setFullSizePct} suffix="%" calcText={sizer?fmt$(sizer.fullSizeAmt):""} />
+            <SliderRow label="Max Positions" min={1} max={12} step={1} value={numStocks} onChange={setNumStocks} calcText={sizer?`${fmt$(sizer.full)} / stock`:""} />
+            <TierStrip sizer={sizer} />
+          </>
+        ) : (
+          <>
+            <div style={{ display:"flex",gap:16,alignItems:"flex-end",flexWrap:"wrap",marginBottom:20 }}>
+              <CalcInput label="Target ROTE" value={targetRote} onChange={setTargetRote} suffix="%" placeholder="2" style={{maxWidth:140}} />
+              <div style={{ flex:"0 0 auto" }}>
+                <div style={{ fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:6 }}>Max Positions</div>
+                <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+                  <button onClick={()=>setRNumStocks(Math.max(1,rNumStocks-1))} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.white,fontWeight:800,fontSize:"1rem",cursor:"pointer",fontFamily:font,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                  <span style={{ fontWeight:800,fontSize:"1.1rem",color:C.white,minWidth:28,textAlign:"center" }}>{rNumStocks}</span>
+                  <button onClick={()=>setRNumStocks(Math.min(20,rNumStocks+1))} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.white,fontWeight:800,fontSize:"1rem",cursor:"pointer",fontFamily:font,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                </div>
+              </div>
+            </div>
+
+            {rSizer && (
+              <>
+                <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))",gap:12,marginBottom:16 }}>
+                  <StatTile label="Total Risk Budget" value={fmt$(rSizer.totalBudget)} color={C.goldBright} sub={`${rSizer.rotePct}% of ${fmt$(+portfolioSize)}`} />
+                  <StatTile label="R per Trade (Full)" value={fmt$(rSizer.fullR)} color={C.green} sub={`${(rSizer.rotePct / rSizer.n).toFixed(2)}% ROTE each`} />
+                </div>
+                <div style={{ display:"flex",gap:6,marginTop:4 }}>
+                  {[
+                    { label: "Full R", amount: rSizer.fullR, color: C.green, bg: C.greenDim },
+                    { label: "Half R", amount: rSizer.halfR, color: C.gold, bg: C.goldDim },
+                    { label: "Quarter R", amount: rSizer.quarterR, color: C.blue, bg: C.blueDim },
+                    { label: "Pilot R", amount: rSizer.pilotR, color: C.purple, bg: C.purpleDim },
+                  ].map(t => (
+                    <div key={t.label} style={{ flex:1,padding:"10px 12px",borderRadius:10,background:t.bg,borderLeft:`3px solid ${t.color}`,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                      <span style={{ fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.10em",textTransform:"uppercase",color:t.color }}>{t.label}</span>
+                      <span style={{ fontWeight:800,fontSize:"0.82rem",letterSpacing:"-0.03em",color:C.white }}>{fmt$(t.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop:12,fontSize:"0.64rem",color:C.muted,lineHeight:1.6 }}>
+                  Risk {fmt$(rSizer.fullR)} per full-size trade. If your stop is $2 below entry, buy {rSizer.fullR > 0 ? Math.floor(rSizer.fullR / 2) : 0} shares. Adjust share count so (Entry − Stop) × Shares = R$.
+                </div>
+              </>
+            )}
+          </>
+        )}
       </GlassCard>
 
       {/* Open Positions */}
@@ -2077,20 +2146,25 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         </div>
       </GlassCard>
 
-      {/* Glossary */}
-      <GlassCard style={{ padding:"22px 26px" }}>
-        <Eyebrow>Glossary</Eyebrow>
-        <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.72rem" }}>
-          <tbody>
-            {GLOSSARY.map(([abbr,full,desc],i)=>(
-              <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
-                <td style={{padding:"9px 10px",fontWeight:700,color:C.gold,fontSize:"0.72rem",width:60,whiteSpace:"nowrap"}}>{abbr}</td>
-                <td style={{padding:"9px 10px",color:C.text,width:150}}>{full}</td>
-                <td style={{padding:"9px 10px",color:C.muted,lineHeight:1.5}}>{desc}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Glossary — collapsible */}
+      <GlassCard style={{ padding: glossaryOpen ? "22px 26px" : "14px 26px", cursor:"pointer" }} onClick={() => setGlossaryOpen(g => !g)}>
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+          <Eyebrow>Glossary</Eyebrow>
+          <span style={{ fontSize:"0.72rem",color:C.muted,transform:glossaryOpen?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s" }}>▼</span>
+        </div>
+        {glossaryOpen && (
+          <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.72rem",marginTop:10 }} onClick={e => e.stopPropagation()}>
+            <tbody>
+              {GLOSSARY.map(([abbr,full,desc],i)=>(
+                <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
+                  <td style={{padding:"9px 10px",fontWeight:700,color:C.gold,fontSize:"0.72rem",width:60,whiteSpace:"nowrap"}}>{abbr}</td>
+                  <td style={{padding:"9px 10px",color:C.text,width:150}}>{full}</td>
+                  <td style={{padding:"9px 10px",color:C.muted,lineHeight:1.5}}>{desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </GlassCard>
 
       {/* ═══════════════════════════════════════ */}
@@ -2121,23 +2195,40 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
             </div>
           </div>
 
+          {/* ROTE breakdown — prominent stat tiles */}
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))",gap:10,marginBottom:16 }}>
+            <div style={{ padding:"12px 16px",borderRadius:12,background:budget.deployedPct>(+targetRote||0)?"rgba(239,68,68,0.08)":"rgba(255,255,255,0.03)",border:`1px solid ${budget.deployedPct>(+targetRote||0)?"rgba(239,68,68,0.30)":C.border}` }}>
+              <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4 }}>Current ROTE</div>
+              <div style={{ fontSize:"1.15rem",fontWeight:800,color:budget.deployedPct>(+targetRote||0)?C.red:C.green }}>{budget.deployedPct.toFixed(2)}%</div>
+              <div style={{ fontSize:"0.62rem",color:C.muted,marginTop:2 }}>Target: {(+targetRote||0).toFixed(2)}% max</div>
+            </div>
+            {budget.initialRotePct !== budget.deployedPct && (
+              <div style={{ padding:"12px 16px",borderRadius:12,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}` }}>
+                <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4 }}>Initial ROTE</div>
+                <div style={{ fontSize:"1.15rem",fontWeight:800,color:C.gold }}>{budget.initialRotePct.toFixed(2)}%</div>
+                <div style={{ fontSize:"0.62rem",color:C.muted,marginTop:2 }}>Before trail stops</div>
+              </div>
+            )}
+            <div style={{ padding:"12px 16px",borderRadius:12,background:"rgba(34,197,94,0.05)",border:"1px solid rgba(34,197,94,0.15)" }}>
+              <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4 }}>Available</div>
+              <div style={{ fontSize:"1.15rem",fontWeight:800,color:C.green }}>{fmt$(budget.available)}</div>
+              <div style={{ fontSize:"0.62rem",color:C.muted,marginTop:2 }}>{budget.availablePct.toFixed(2)}% remaining</div>
+            </div>
+          </div>
+
           {/* Risk allocation bar */}
           <div style={{ marginBottom:16 }}>
-            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6,flexWrap:"wrap",gap:4 }}>
+            <div style={{ display:"flex",justifyContent:"space-between",marginBottom:6 }}>
               <span style={{ fontSize:"0.62rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em" }}>Risk Allocation</span>
-              <div style={{ display:"flex",gap:12,alignItems:"center" }}>
-                <span style={{ fontSize:"0.62rem",color:budget.deployedPct > (+targetRote||0) ? C.red : C.muted,fontWeight:budget.deployedPct > (+targetRote||0) ? 700 : 400 }}>Current: {budget.deployedPct.toFixed(2)}% / {(+targetRote||0).toFixed(2)}% max</span>
-                {budget.initialRotePct !== budget.deployedPct && <span style={{ fontSize:"0.58rem",color:C.muted }}>Initial: {budget.initialRotePct.toFixed(2)}%</span>}
-              </div>
             </div>
-            <div style={{ height:12,borderRadius:6,background:"rgba(255,255,255,0.05)",position:"relative",overflow:"hidden" }}>
-              <div style={{ position:"absolute",left:0,top:0,bottom:0,borderRadius:6,width:`${Math.min(100, budget.totalBudget > 0 ? (budget.deployedRisk / budget.totalBudget) * 100 : 0)}%`,background:C.red,transition:"width 0.3s",zIndex:2 }} />
-              <div style={{ position:"absolute",left:`${budget.totalBudget > 0 ? (budget.deployedRisk / budget.totalBudget) * 100 : 0}%`,top:0,bottom:0,borderRadius:"0 6px 6px 0",width:`${Math.min(100, budget.totalBudget > 0 ? (budget.available / budget.totalBudget) * 100 : 0)}%`,background:C.green,opacity:0.6,transition:"all 0.3s",zIndex:1 }} />
+            <div style={{ height:14,borderRadius:7,background:"rgba(255,255,255,0.05)",position:"relative",overflow:"hidden" }}>
+              <div style={{ position:"absolute",left:0,top:0,bottom:0,borderRadius:7,width:`${Math.min(100, budget.totalBudget > 0 ? (budget.deployedRisk / budget.totalBudget) * 100 : 0)}%`,background:C.red,transition:"width 0.3s",zIndex:2 }} />
+              <div style={{ position:"absolute",left:`${budget.totalBudget > 0 ? (budget.deployedRisk / budget.totalBudget) * 100 : 0}%`,top:0,bottom:0,borderRadius:"0 7px 7px 0",width:`${Math.min(100, budget.totalBudget > 0 ? (budget.available / budget.totalBudget) * 100 : 0)}%`,background:C.green,opacity:0.6,transition:"all 0.3s",zIndex:1 }} />
             </div>
-            <div style={{ display:"flex",gap:16,marginTop:8 }}>
-              <span style={{ fontSize:"0.60rem",color:C.red }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.red,marginRight:4,verticalAlign:"middle"}} />At Risk: {fmt$(budget.deployedRisk)} ({budget.atRiskCount} positions)</span>
-              <span style={{ fontSize:"0.60rem",color:C.green }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.green,opacity:0.6,marginRight:4,verticalAlign:"middle"}} />Available: {fmt$(budget.available)} ({budget.availablePct.toFixed(2)}%)</span>
-              {budget.freeCount > 0 && <span style={{ fontSize:"0.60rem",color:C.blue }}><span style={{display:"inline-block",width:8,height:8,borderRadius:2,background:C.blue,marginRight:4,verticalAlign:"middle"}} />Risk-Free: {budget.freeCount} positions (freed {fmt$(budget.freedRisk)})</span>}
+            <div style={{ display:"flex",gap:16,marginTop:8,flexWrap:"wrap" }}>
+              <span style={{ fontSize:"0.68rem",fontWeight:600,color:C.red }}><span style={{display:"inline-block",width:10,height:10,borderRadius:3,background:C.red,marginRight:5,verticalAlign:"middle"}} />At Risk: {fmt$(budget.deployedRisk)} ({budget.atRiskCount})</span>
+              <span style={{ fontSize:"0.68rem",fontWeight:600,color:C.green }}><span style={{display:"inline-block",width:10,height:10,borderRadius:3,background:C.green,opacity:0.6,marginRight:5,verticalAlign:"middle"}} />Available: {fmt$(budget.available)}</span>
+              {budget.freeCount > 0 && <span style={{ fontSize:"0.68rem",fontWeight:600,color:C.blue }}><span style={{display:"inline-block",width:10,height:10,borderRadius:3,background:C.blue,marginRight:5,verticalAlign:"middle"}} />Risk-Free: {budget.freeCount} (freed {fmt$(budget.freedRisk)})</span>}
             </div>
           </div>
 
@@ -2146,9 +2237,20 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
             <div style={{ padding:"14px 18px",borderRadius:12,background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.20)",marginBottom:8 }}>
               <div style={{ fontWeight:800,fontSize:"0.76rem",color:C.green,marginBottom:4 }}>You can deploy {fmt$(budget.available)} more risk</div>
               <div style={{ fontSize:"0.68rem",color:C.text,lineHeight:1.6 }}>
-                That's {budget.availablePct.toFixed(2)}% ROTE available. At current equity, you could enter{" "}
-                <strong style={{color:C.white}}>{Math.floor(budget.available / (budget.totalBudget / 4))} new trades</strong>{" "}
-                at ~{((+targetRote || 2) / 4).toFixed(2)}% ROTE each, or <strong style={{color:C.white}}>{Math.floor(budget.available / (budget.totalBudget / 6))} trades</strong> at ~{((+targetRote || 2) / 6).toFixed(2)}% ROTE each.
+                {(() => {
+                  const n = rNumStocks || 4;
+                  const fullR = budget.totalBudget / n;
+                  const halfR = fullR / 2;
+                  const fullCount = fullR > 0 ? Math.floor(budget.available / fullR) : 0;
+                  const halfCount = halfR > 0 ? Math.floor(budget.available / halfR) : 0;
+                  const fullPct = compEquity > 0 ? (fullR / compEquity * 100).toFixed(2) : "0.00";
+                  const halfPct = compEquity > 0 ? (halfR / compEquity * 100).toFixed(2) : "0.00";
+                  return <>That's {budget.availablePct.toFixed(2)}% ROTE available. You could enter{" "}
+                    <strong style={{color:C.white}}>{fullCount} full-R {fullCount === 1 ? "trade" : "trades"}</strong>{" "}
+                    at {fmt$(fullR)} (~{fullPct}% each), or{" "}
+                    <strong style={{color:C.white}}>{halfCount} half-R {halfCount === 1 ? "trade" : "trades"}</strong>{" "}
+                    at {fmt$(halfR)} (~{halfPct}% each).</>;
+                })()}
               </div>
             </div>
           )}
