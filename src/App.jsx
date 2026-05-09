@@ -1557,10 +1557,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     // Risk Status
     const anyStop = hasS1 || hasS2;
     const riskStatus = !epN || !anyStop ? "—"
-      : riskFreePct === 100 ? "Free"
-      : riskFreePct === 50 ? "Profit"
-      : plPct > 5 ? "Profit"
-      : plPct >= -2 ? "Even"
+      : rtsD < 0 ? "Profit Locked"
+      : rtsD === 0 ? "Risk-Free"
       : "At Risk";
 
     // R-based fields — ALWAYS use original stops for R calculation
@@ -1896,13 +1894,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left")}{th("Tier","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Comm")}{th("Value")}{th("Orig Stop")}{th("Stop 2")}{th("Trail Stop")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{displayMode==="R"&&th("R Suggest")}{displayMode==="R"&&th("Locked")}{displayMode!=="R"&&th("SBE")}{displayMode!=="R"&&th("SBE %")}{th("P/L")}{th("R")}{th("Notes","center")}{th("","center")}
+              {th("Status","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Comm")}{th("Value")}{th("Orig Stop")}{th("Stop 2")}{th("Trail Stop")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{displayMode==="R"&&th("R Suggest")}{displayMode==="R"&&th("Locked")}{displayMode!=="R"&&th("SBE")}{displayMode!=="R"&&th("SBE %")}{th("P/L")}{th("R")}{th("Notes","center")}{th("","center")}
             </tr></thead>
             <tbody>
               {enriched.map((p, idx) => {
-                const ts = TIER_STYLES[p.tier] || TIER_STYLES.Pilot;
                 const isSelling = sellId === p.id;
-                const RISK_BADGE = { Free:{bg:C.greenDim,color:C.green,border:"rgba(34,197,94,0.25)"}, Profit:{bg:C.blueDim,color:C.blue,border:"rgba(59,130,246,0.25)"}, Even:{bg:C.goldDim,color:C.gold,border:C.borderGold}, "At Risk":{bg:C.redDim,color:C.red,border:"rgba(239,68,68,0.25)"}, "—":{bg:"transparent",color:C.muted,border:C.border} };
+                const RISK_BADGE = { "At Risk":{bg:C.redDim,color:C.red,border:"rgba(239,68,68,0.25)"}, "Risk-Free":{bg:C.greenDim,color:C.green,border:"rgba(34,197,94,0.25)"}, "Profit Locked":{bg:C.blueDim,color:C.blue,border:"rgba(59,130,246,0.25)"}, "—":{bg:"transparent",color:C.muted,border:C.border} };
                 const rb = RISK_BADGE[p.riskStatus] || RISK_BADGE["—"];
                 const isDollar = displayMode === "$";
                 const isR = displayMode === "R";
@@ -1915,8 +1912,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                   <React.Fragment key={p._lid || p.id}>
                   <tr style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
                     {/* Risk Status */}
-                    <td style={{padding:"8px 4px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
-                    <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.54rem",fontWeight:700,background:ts.bg,color:ts.color,border:`1px solid ${ts.border}`}}>{p.tier}</span></td>
+                    <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
                     <td style={{padding:"6px 4px"}}><TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.shares} onChange={v=>updateField(p.id,"shares",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.ep} onChange={v=>updateField(p.id,"ep",v)} /></td>
@@ -1933,7 +1929,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     {/* RTS — respects $ / % toggle. >0 = risk, <=0 = free. Glows to draw attention. */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.rtsD<=0?C.green:C.red,fontSize:"0.72rem",animation:p.cpN&&(p.stop1||p.stop2)?(p.rtsD>0?"rtsGlow 2.5s ease-in-out infinite":"rtsGlowGreen 3s ease-in-out infinite"):"none"}}>{rtsDisplay}</td>
                     {/* ROTE — Risk of Total Equity. Warning if >1.5% */}
-                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rotePct>1.5?C.red:p.rotePct>1.0?C.gold:C.green,whiteSpace:"nowrap"}}>{p.epN&&(p.stop1||p.stop2)?<>{p.rotePct.toFixed(2)}%{p.rotePct>1.5&&<span title="ROTE exceeds 1.5% — consider reducing size" style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</>:"—"}</td>
+                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rotePct>0?C.red:C.green,whiteSpace:"nowrap"}}>{p.epN&&(p.stop1||p.stop2)?<>{p.rotePct.toFixed(2)}%</>:"—"}</td>
                     {isR ? (
                       <>
                         <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rSuggestedStop>p.epN?C.green:p.rSuggestedStop===p.epN?C.goldBright:C.muted}}>{p.rPerShare>0?(p.rSuggestedStop>=p.epN&&p.currentRLevel>=1?`$${p.rSuggestedStop.toFixed(2)} (${p.currentRLevel-1===0?"BE":(p.currentRLevel-1)+"R"})`:`$${p.rSuggestedStop.toFixed(2)}`):"—"}</td>
@@ -2085,9 +2081,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 );
               })()}
 
-              {/* Totals — 22 cols: Status,Tier,Symbol,Shares,AvgCost,Comm,Value,OrigStop,Stop2,TrailStop,Current,Setup,Tags,DTS,RTS,ROTE,[RSuggest+Locked|SBE+SBE%],P/L,R,Actions */}
+              {/* Totals — 21 cols: Status,Symbol,Shares,AvgCost,Comm,Value,OrigStop,Stop2,TrailStop,Current,Setup,Tags,DTS,RTS,ROTE,[RSuggest+Locked|SBE+SBE%],P/L,R,Actions */}
               <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
-                <td colSpan={3} style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
+                <td colSpan={2} style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.text,fontSize:"0.70rem"}}>{enriched.reduce((s,p)=>s+p.sharesN,0).toLocaleString()}</td>
                 <td />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.muted,fontSize:"0.70rem"}}>{fmt$(enriched.reduce((s,p)=>s+p.commN,0))}</td>
@@ -2097,7 +2093,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.74rem",color:totals.totalRTS<=0?C.green:C.red,animation:totals.totalRTS>0?"rtsGlow 2.5s ease-in-out infinite":"rtsGlowGreen 3s ease-in-out infinite"}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
                 <td style={{padding:"8px 6px",textAlign:"right",whiteSpace:"nowrap"}}>
                   <div style={{fontWeight:800,fontSize:"0.72rem",color:totals.currentRotePct>totals.tgtRotePct?C.red:totals.currentRotePct>(totals.tgtRotePct*0.8)?C.gold:C.green}}>{totals.currentRotePct.toFixed(2)}%{totals.currentRotePct>totals.tgtRotePct&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</div>
-                  <div style={{fontSize:"0.50rem",color:C.muted,marginTop:1}}>Init: {totals.totalRotePct.toFixed(2)}%</div>
+                  <div style={{fontSize:"0.58rem",color:C.muted,marginTop:1}}>Init: {totals.totalRotePct.toFixed(2)}%</div>
                 </td>
                 {displayMode==="R" ? <><td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,fontSize:"0.68rem",color:C.muted}}>—</td><td /></> : <td colSpan={2} />}
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{displayMode==="R"?`${totals.totalPL>=0?"+":""}${fmt$(Math.abs(totals.totalPL))}`:`${totals.totalPL>=0?"+":"-"}${fmt$(Math.abs(totals.totalPL))}`}</td>
@@ -2147,13 +2143,13 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       </GlassCard>
 
       {/* Glossary — collapsible */}
-      <GlassCard style={{ padding: glossaryOpen ? "22px 26px" : "14px 26px", cursor:"pointer" }} onClick={() => setGlossaryOpen(g => !g)}>
-        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+      <GlassCard style={{ padding: glossaryOpen ? "22px 26px" : "14px 26px", cursor:"pointer" }}>
+        <div onClick={() => setGlossaryOpen(g => !g)} style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
           <Eyebrow>Glossary</Eyebrow>
           <span style={{ fontSize:"0.72rem",color:C.muted,transform:glossaryOpen?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s" }}>▼</span>
         </div>
         {glossaryOpen && (
-          <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.72rem",marginTop:10 }} onClick={e => e.stopPropagation()}>
+          <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.72rem",marginTop:10 }}>
             <tbody>
               {GLOSSARY.map(([abbr,full,desc],i)=>(
                 <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.03)"}}>
@@ -2868,6 +2864,7 @@ export default function App() {
   const [fontSize, setFontSize] = useState("standard");
   const [targetRote, setTargetRote] = useState("2");
   const dataLoaded = useRef(false);
+  const loadFailed = useRef(false); // tracks if data load had errors — blocks autosave to prevent data loss
 
   // ─── Auth Listener ───
   useEffect(() => {
@@ -2877,7 +2874,7 @@ export default function App() {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
-      if (!s) { setAuthLoading(false); dataLoaded.current = false; }
+      if (!s) { setAuthLoading(false); dataLoaded.current = false; loadFailed.current = false; }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -2903,6 +2900,12 @@ export default function App() {
       }));
 
       if (rows.length === 0) {
+        // Only delete if user genuinely has no positions — guard against accidental empty state
+        if (lastLoadedCount.current > 0) {
+          console.error("savePositionsNow called with 0 positions but lastLoadedCount was", lastLoadedCount.current, "— BLOCKING delete to prevent data loss.");
+          isSaving.current = false;
+          return;
+        }
         // User intentionally cleared all — safe to delete
         await supabase.from("positions").delete().eq("user_id", uid);
         isSaving.current = false;
@@ -2963,8 +2966,9 @@ export default function App() {
     const load = async () => {
       const uid = session.user.id;
 
-      // Profile
-      const { data: prof } = await supabase.from("profiles").select("*").eq("id", uid).single();
+      // Profile — MUST check for errors to prevent overwriting with defaults
+      const { data: prof, error: profErr } = await supabase.from("profiles").select("*").eq("id", uid).single();
+      if (profErr) { console.error("Profile load failed:", profErr.message); loadFailed.current = true; }
       if (prof) {
         setProfile(prof);
         if (prof.portfolio_size) setPortfolioSize(String(prof.portfolio_size));
@@ -2973,8 +2977,9 @@ export default function App() {
         if (prof.font_size) setFontSize(prof.font_size);
       }
 
-      // Settings — load or seed defaults
-      const { data: settings } = await supabase.from("user_settings").select("*").eq("user_id", uid);
+      // Settings — MUST check for errors. If query fails, do NOT overwrite with defaults.
+      const { data: settings, error: settingsErr } = await supabase.from("user_settings").select("*").eq("user_id", uid);
+      if (settingsErr) { console.error("Settings load failed:", settingsErr.message); loadFailed.current = true; }
       let hasSetup = false, hasTags = false, hasExit = false;
       if (settings) {
         settings.forEach(s => {
@@ -2984,14 +2989,21 @@ export default function App() {
           if (s.setting_key === "target_rote" && s.setting_value != null) setTargetRote(String(s.setting_value));
         });
       }
-      // First time? Save defaults to DB so they persist
-      if (!hasSetup) await saveSettingNow(uid, "setup_types", DEFAULT_SETUP_TYPES);
-      if (!hasTags) await saveSettingNow(uid, "tags", DEFAULT_TAGS);
-      if (!hasExit) await saveSettingNow(uid, "exit_reasons", DEFAULT_EXIT_REASONS);
+      // First time? Save defaults to DB so they persist — ONLY if settings loaded successfully (no error)
+      if (!settingsErr) {
+        if (!hasSetup) await saveSettingNow(uid, "setup_types", DEFAULT_SETUP_TYPES);
+        if (!hasTags) await saveSettingNow(uid, "tags", DEFAULT_TAGS);
+        if (!hasExit) await saveSettingNow(uid, "exit_reasons", DEFAULT_EXIT_REASONS);
+      }
 
-      // Positions — load from DB, deduplicate, seed only on very first login
-      const { data: pos } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
-      if (pos && pos.length > 0) {
+      // Positions — CRITICAL: check for query errors. A failed query MUST NOT trigger position deletion.
+      const { data: pos, error: posErr } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
+      if (posErr) {
+        // ABORT position loading — do NOT touch state, do NOT set lastLoadedCount to 0.
+        // This prevents autosave from wiping the DB when a network blip returns null data.
+        console.error("CRITICAL: Positions load failed:", posErr.message, "— keeping existing state to prevent data loss.");
+        loadFailed.current = true; // block all autosaves until next successful load
+      } else if (pos && pos.length > 0) {
         // Deduplicate: if same symbol+entry_date+entry_price+shares appears multiple times, keep only the latest (highest id)
         const seen = new Map();
         const dupIds = [];
@@ -3018,8 +3030,8 @@ export default function App() {
         clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
         loadedSnapshot.current = snap;
         setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" })));
-      } else {
-        // Check if user has been initialized before
+      } else if (!posErr) {
+        // Query succeeded but returned empty — check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
         if (!initFlag) {
           // Very first login — seed demo positions, save to DB, then load back with DB ids
@@ -3045,8 +3057,9 @@ export default function App() {
         }
       }
 
-      // Trades — load (no seeding, journal starts empty)
-      const { data: trades } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false });
+      // Trades — check for errors, don't clear state on failure
+      const { data: trades, error: tradesErr } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false });
+      if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       if (trades && trades.length > 0) {
         setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, exit: t.exit_date, entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "" })));
       }
@@ -3069,16 +3082,16 @@ export default function App() {
     }, 1000);
   }, [session]);
 
-  useEffect(() => { if (dataLoaded.current) saveProfile("portfolio_size", +portfolioSize || 0); }, [portfolioSize]);
-  useEffect(() => { if (dataLoaded.current) saveProfile("full_size_pct", fullSizePct); }, [fullSizePct]);
-  useEffect(() => { if (dataLoaded.current) saveProfile("num_stocks", numStocks); }, [numStocks]);
-  useEffect(() => { if (dataLoaded.current) saveProfile("font_size", fontSize); }, [fontSize]);
+  useEffect(() => { if (dataLoaded.current && !loadFailed.current) saveProfile("portfolio_size", +portfolioSize || 0); }, [portfolioSize]);
+  useEffect(() => { if (dataLoaded.current && !loadFailed.current) saveProfile("full_size_pct", fullSizePct); }, [fullSizePct]);
+  useEffect(() => { if (dataLoaded.current && !loadFailed.current) saveProfile("num_stocks", numStocks); }, [numStocks]);
+  useEffect(() => { if (dataLoaded.current && !loadFailed.current) saveProfile("font_size", fontSize); }, [fontSize]);
 
-  // ─── Auto-save settings to Supabase ───
-  useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "setup_types", setupTypes); }, [setupTypes]);
-  useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "tags", tags); }, [tags]);
-  useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "exit_reasons", exitReasons); }, [exitReasons]);
-  useEffect(() => { if (dataLoaded.current && session) saveSettingNow(session.user.id, "target_rote", targetRote); }, [targetRote]);
+  // ─── Auto-save settings to Supabase — blocked if data load failed to prevent overwriting with defaults ───
+  useEffect(() => { if (dataLoaded.current && !loadFailed.current && session) saveSettingNow(session.user.id, "setup_types", setupTypes); }, [setupTypes]);
+  useEffect(() => { if (dataLoaded.current && !loadFailed.current && session) saveSettingNow(session.user.id, "tags", tags); }, [tags]);
+  useEffect(() => { if (dataLoaded.current && !loadFailed.current && session) saveSettingNow(session.user.id, "exit_reasons", exitReasons); }, [exitReasons]);
+  useEffect(() => { if (dataLoaded.current && !loadFailed.current && session) saveSettingNow(session.user.id, "target_rote", targetRote); }, [targetRote]);
 
   // ─── Auto-save positions to Supabase (debounced, with safety checks) ───
   const posTimer = useRef(null);
@@ -3086,6 +3099,8 @@ export default function App() {
   const loadedSnapshot = useRef(new Map()); // snapshot of loaded data: id → {sym, ep, shares} — used to detect corruption before save
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
+    // Safety 0: if the initial data load had errors, NEVER autosave — prevents wiping DB after network failure
+    if (loadFailed.current) { console.warn("Autosave blocked: data load had errors. Refusing to save to prevent data loss."); return; }
     // Skip autosave when positions changed only because of ID sync after a save (prevents infinite save loop)
     if (skipNextAutosave.current) { skipNextAutosave.current = false; return; }
     // Safety 1: if we loaded N positions from DB but state is now empty, don't auto-delete everything.
@@ -3205,6 +3220,7 @@ export default function App() {
     setSession(null);
     setProfile(null);
     dataLoaded.current = false;
+    loadFailed.current = false;
     // Reset ALL data state to prevent bleed between users
     setPositions([]);
     setJournaledTrades([]);
