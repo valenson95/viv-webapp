@@ -3095,8 +3095,12 @@ export default function App() {
 
   // ─── Auto-save positions to Supabase (debounced, with safety checks) ───
   const posTimer = useRef(null);
+  const tradeTimer = useRef(null); // declared here so flush handlers below can access it
   const lastLoadedCount = useRef(0); // track how many positions were loaded from DB
   const loadedSnapshot = useRef(new Map()); // snapshot of loaded data: id → {sym, ep, shares} — used to detect corruption before save
+  const positionsRef = useRef(positions); // always-current ref for beforeunload/visibilitychange handlers
+  const lastPosCountRef = useRef(positions.length); // track count changes for faster save on add/remove
+  positionsRef.current = positions; // sync on every render — no useEffect needed for refs
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
     // Safety 0: if the initial data load had errors, NEVER autosave — prevents wiping DB after network failure
@@ -3125,12 +3129,40 @@ export default function App() {
         return;
       }
     }
+    // Structural change (add/remove position) → save faster (500ms). Field edits → normal debounce (2s).
+    const isStructuralChange = positions.length !== lastPosCountRef.current;
+    lastPosCountRef.current = positions.length;
     clearTimeout(posTimer.current);
-    posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), 2000);
+    posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), isStructuralChange ? 500 : 2000);
   }, [positions, session]);
 
+  // ─── CRITICAL: Flush pending saves on page unload / tab hide (prevents data loss on refresh) ───
+  useEffect(() => {
+    const flushSave = () => {
+      if (!dataLoaded.current || !session || loadFailed.current) return;
+      const pos = positionsRef.current;
+      if (!pos || pos.length === 0) return;
+      // Cancel pending debounce timers
+      clearTimeout(posTimer.current);
+      clearTimeout(tradeTimer.current);
+      // Save immediately — savePositionsNow handles concurrency (queues if isSaving)
+      savePositionsNow(session.user.id, pos);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flushSave();
+    };
+    window.addEventListener("beforeunload", flushSave);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    // pagehide is more reliable on mobile Safari
+    window.addEventListener("pagehide", flushSave);
+    return () => {
+      window.removeEventListener("beforeunload", flushSave);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", flushSave);
+    };
+  }, [session]);
+
   // ─── Auto-save journaled trades to Supabase (handles inserts, edits, and deletes) ───
-  const tradeTimer = useRef(null);
   const tradeHashRef = useRef(""); // track content changes, not just count
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
