@@ -2,6 +2,26 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 
+// ─── Error Boundary — catches rendering crashes so the page doesn't go blank ───
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null, errorInfo: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, errorInfo) { this.setState({ errorInfo }); console.error("ErrorBoundary caught:", error, errorInfo); }
+  render() {
+    if (this.state.hasError) {
+      return React.createElement("div", { style: { padding: 40, background: "#08080e", minHeight: "100vh", color: "#fff", fontFamily: "'Manrope', sans-serif" } },
+        React.createElement("h2", { style: { color: "#ef4444", marginBottom: 16 } }, "Something went wrong"),
+        React.createElement("p", { style: { color: "rgba(255,255,255,0.6)", marginBottom: 16 } }, "The app hit an error. Your data is safe — refresh to try again."),
+        React.createElement("pre", { style: { background: "rgba(255,255,255,0.05)", padding: 16, borderRadius: 10, overflow: "auto", fontSize: "0.72rem", color: "#f0c050", maxHeight: 300 } },
+          String(this.state.error) + "\n\n" + (this.state.errorInfo?.componentStack || "")
+        ),
+        React.createElement("button", { onClick: () => window.location.reload(), style: { marginTop: 16, padding: "10px 24px", borderRadius: 980, border: "1px solid rgba(201,152,42,0.3)", background: "rgba(201,152,42,0.15)", color: "#c9982a", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" } }, "Reload App")
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ─── Responsive Hook ───
 function useScreenWidth() {
   const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
@@ -1522,7 +1542,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   };
 
   // Enriched — dual stop loss: if stop2 is set, 50/50 split. Otherwise stop1 covers 100%.
-  const enriched = useMemo(() => positions.map(p => {
+  const enriched = useMemo(() => positions.map(p => { try {
     const epN = parseFloat(p.ep)||0, cpN = parseFloat(p.cp)||0, sharesN = parseFloat(p.shares)||0, commN = parseFloat(p.comm)||0;
     const s1 = parseFloat(p.stop)||0;
     const s2 = parseFloat(p.stop2)||0;
@@ -1615,6 +1635,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const rtsR = rPerShare > 0 && sharesN > 0 ? (rtsD / sharesN) / rPerShare : 0;
 
     return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
+  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0 }; }
   }), [positions, sizer, portfolioSize]);
 
   const totals = useMemo(() => {
@@ -2877,7 +2898,7 @@ function useSupabaseSave(table, userId, field, value, mapFn) {
   }, [value, userId]);
 }
 
-export default function App() {
+function AppInner() {
   const screenW = useScreenWidth();
   const isMobile = screenW < 768;
   const isTablet = screenW >= 768 && screenW < 1024;
@@ -3753,5 +3774,13 @@ export default function App() {
       </div>
       <div style={{ flex: 1, padding: `${contentPadV}px ${contentPadH}px`, overflowY: "auto", minWidth: 0 }}>{pageContent}</div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
