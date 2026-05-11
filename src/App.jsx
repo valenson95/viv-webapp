@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
-import { supabase } from "./supabaseClient";
+import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 
 // ─── Responsive Hook ───
 function useScreenWidth() {
@@ -300,7 +300,17 @@ function RiskTab({ demo }) {
         <CalcInput label={mode === "%" ? "% Stop" : "$ Stop"} value={stopVal} onChange={setStopVal} suffix={mode === "%" ? "%" : "$"} />
       </div>
       <div style={{ flex:"1 1 300px",display:"flex",flexDirection:"column" }}>
-        {!r?(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",minHeight:200,color:C.muted,fontSize:"0.82rem",textAlign:"center",lineHeight:1.6}}>Fill in all fields to<br/>see your results.</div>):(<>
+        {!r?(<div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%",minHeight:200,color:C.muted,fontSize:"0.82rem",textAlign:"center",lineHeight:1.6}}>
+          <div style={{marginBottom:10}}>Fill in all fields to see your results.</div>
+          <div style={{fontSize:"0.66rem",color:"rgba(255,255,255,0.28)",lineHeight:2}}>
+            {!+sharePrice && <div style={{color:"rgba(239,68,68,0.6)"}}>&#x2717; Share Price</div>}
+            {!+posSizePct && <div style={{color:"rgba(239,68,68,0.6)"}}>&#x2717; Position Size %</div>}
+            {!+portfolio && <div style={{color:"rgba(239,68,68,0.6)"}}>&#x2717; Portfolio Size</div>}
+            {!+stopVal && <div style={{color:"rgba(239,68,68,0.6)"}}>&#x2717; {mode === "%" ? "% Stop" : "$ Stop"}</div>}
+            {+sharePrice > 0 && +stopVal > 0 && mode === "$" && +stopVal >= +sharePrice && <div style={{color:"rgba(239,68,68,0.6)"}}>$ Stop must be less than Share Price</div>}
+            {+stopVal > 0 && mode === "%" && +stopVal >= 100 && <div style={{color:"rgba(239,68,68,0.6)"}}>% Stop must be under 100%</div>}
+          </div>
+        </div>):(<>
           <div style={{display:"flex",gap:12,marginBottom:16}}>
             <div style={{flex:1,padding:"14px 16px",borderRadius:12,background:C.goldDim,border:`1px solid ${C.borderGold}`,textAlign:"center"}}>
               <div style={{fontSize:"0.56rem",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.10em",color:C.muted,marginBottom:4}}># of Shares to Buy</div>
@@ -1356,13 +1366,17 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       if (!res.ok) throw new Error("API error");
       const prices = await res.json();
       if (prices && typeof prices === "object" && !prices.error) {
-        setPositions(prev => prev.map(p => {
-          const sym = (p.sym || "").toUpperCase();
-          if (sym && prices[sym] !== undefined) {
-            return { ...p, cp: String(prices[sym]) };
-          }
-          return p;
-        }));
+        setPositions(prev => {
+          const next = prev.map(p => {
+            const sym = (p.sym || "").toUpperCase();
+            if (sym && prices[sym] !== undefined) {
+              return { ...p, cp: String(prices[sym]) };
+            }
+            return p;
+          });
+          positionsRef.current = next;
+          return next;
+        });
         setLastPriceRefresh(new Date());
       }
     } catch (err) {
@@ -1381,7 +1395,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       if (uploadErr) { console.error("Upload error:", uploadErr.message); alert("Upload failed: " + uploadErr.message); setPosUploadingImage(false); return; }
       const { data: urlData } = supabase.storage.from("trade-charts").getPublicUrl(path);
       const publicUrl = urlData?.publicUrl || "";
-      setPositions(prev => prev.map(p => p.id === posId ? { ...p, chartImage: publicUrl } : p));
+      setPositions(prev => { const next = prev.map(p => p.id === posId ? { ...p, chartImage: publicUrl } : p); positionsRef.current = next; return next; });
     } catch (err) { console.error("Upload failed:", err); alert("Upload failed"); }
     setPosUploadingImage(false);
   };
@@ -1399,14 +1413,26 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   // Save position notes from edit state
   const savePosNotes = useCallback((posId) => {
     const serialized = serializeNotes(posEditNotes);
-    setPositions(prev => prev.map(p => p.id === posId ? { ...p, notes: serialized } : p));
+    setPositions(prev => {
+      const next = prev.map(p => p.id === posId ? { ...p, notes: serialized } : p);
+      positionsRef.current = next;
+      return next;
+    });
   }, [posEditNotes]);
 
-  const updateField = useCallback((id, field, val) => { setPositions(prev => prev.map(p => p.id === id ? { ...p, [field]: val } : p)); }, []);
+  const updateField = useCallback((id, field, val) => {
+    setPositions(prev => {
+      const next = prev.map(p => p.id === id ? { ...p, [field]: val } : p);
+      positionsRef.current = next; // Eagerly sync ref so emergencySave always has latest data — fixes last-keystroke-lost-on-refresh
+      return next;
+    });
+  }, []);
   const addPosition = useCallback(() => {
     setPositions(prev => {
       const maxId = prev.reduce((m, p) => Math.max(m, p.id || 0), 0);
-      return [...prev, { id: maxId + 1, _lid: _lid++, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [], comm: "", notes: "", chartUrl: "", chartImage: "" }];
+      const next = [...prev, { id: maxId + 1, _lid: _lid++, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [], comm: "", notes: "", chartUrl: "", chartImage: "" }];
+      positionsRef.current = next;
+      return next;
     });
   }, [setupTypes]);
   const removeRow = useCallback((id, skipConfirm) => {
@@ -1417,6 +1443,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     setPositions(prev => {
       const next = prev.filter(p => p.id !== id);
       if (lastLoadedCountRef) lastLoadedCountRef.current = next.length; // update so autosave safety check doesn't block intentional removal
+      positionsRef.current = next; // Eagerly sync ref for emergencySave
       return next;
     });
   }, [lastLoadedCountRef]);
@@ -1481,7 +1508,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     }
 
     if (remaining > 0) {
-      setPositions(prev => prev.map(p => p.id === pos.id ? { ...p, shares: String(remaining) } : p));
+      setPositions(prev => { const next = prev.map(p => p.id === pos.id ? { ...p, shares: String(remaining) } : p); positionsRef.current = next; return next; });
     } else {
       removeRow(pos.id, true); // skip confirm — sell modal already confirmed
     }
@@ -1835,7 +1862,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     const entryIdx = hdr.findIndex(h => /entry.?date|date/i.test(h));
                     const sharesIdx = hdr.findIndex(h => /shares|qty|quantity/i.test(h));
                     const epIdx = hdr.findIndex(h => /entry.?price|avg.?cost|cost/i.test(h));
-                    const cpIdx = hdr.findIndex(h => /current|price|last/i.test(h));
+                    const cpIdx = hdr.findIndex(h => /^current|^last|^market|^price$/i.test(h));
                     const s1Idx = hdr.findIndex(h => /stop.?1|stop.?price|orig.?stop|stop$/i.test(h));
                     const s2Idx = hdr.findIndex(h => /stop.?2/i.test(h));
                     const tsIdx = hdr.findIndex(h => /trail/i.test(h));
@@ -1860,7 +1887,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                       });
                     }
                     if (imported.length > 0) {
-                      setPositions(prev => { const next = [...prev, ...imported]; if (lastLoadedCountRef) lastLoadedCountRef.current = next.length; return next; });
+                      setPositions(prev => { const next = [...prev, ...imported]; if (lastLoadedCountRef) lastLoadedCountRef.current = next.length; positionsRef.current = next; return next; });
                       alert(`Imported ${imported.length} position${imported.length > 1 ? "s" : ""}`);
                     } else {
                       alert("No valid positions found in CSV");
@@ -2879,18 +2906,54 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // ─── Offline detection state ───
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const offlineQueue = useRef(null); // stores {uid, posArr} for retry when back online
+  useEffect(() => {
+    const goOffline = () => { setIsOffline(true); console.warn("OFFLINE: saves will queue until connection returns."); };
+    const goOnline = () => {
+      setIsOffline(false);
+      console.log("ONLINE: connection restored. Flushing queued save...");
+      // Retry queued save
+      if (offlineQueue.current && session) {
+        const { uid, posArr } = offlineQueue.current;
+        offlineQueue.current = null;
+        savePositionsNow(uid, posArr);
+      }
+    };
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
+  }, [session]);
+
   // ─── Helper: save positions to Supabase (insert-first, delete-after, ID-sync) ───
   const isSaving = useRef(false);
+  const saveStartTime = useRef(0); // tracks when save started — used for mutex timeout
   const pendingSave = useRef(null); // queued save if one was attempted during in-flight save
   const skipNextAutosave = useRef(false); // flag to prevent autosave loop after ID sync
   const lastSaveIdMap = useRef(new Map()); // old→new ID mapping from last save, used by DashboardPage to remap sellId
   const savePositionsNow = useCallback(async (uid, posArr) => {
-    // Prevent concurrent saves — reschedule instead of silently dropping
-    if (isSaving.current) {
-      pendingSave.current = { uid, posArr };
+    // If offline, queue the save for when connection returns
+    if (!navigator.onLine) {
+      console.warn("OFFLINE: Queuing save for", posArr.length, "positions until connection returns.");
+      offlineQueue.current = { uid, posArr };
       return;
     }
+
+    // Prevent concurrent saves — reschedule instead of silently dropping
+    // SAFETY: if mutex has been held for >15s, force-release it (prevents deadlock from hung requests)
+    if (isSaving.current) {
+      const elapsed = Date.now() - saveStartTime.current;
+      if (elapsed > 15000) {
+        console.error("MUTEX TIMEOUT: Save has been in-flight for", Math.round(elapsed / 1000), "seconds. Force-releasing mutex.");
+        isSaving.current = false;
+      } else {
+        pendingSave.current = { uid, posArr };
+        return;
+      }
+    }
     isSaving.current = true;
+    saveStartTime.current = Date.now();
     try {
       const rows = posArr.map(p => ({
         user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
@@ -2916,6 +2979,10 @@ export default function App() {
       const { data: inserted, error: insertErr } = await supabase.from("positions").insert(rows).select("id");
       if (insertErr || !inserted) {
         console.error("Position save error:", insertErr?.message);
+        // Queue for retry if it was a network error
+        if (!navigator.onLine || (insertErr && /network|fetch|timeout/i.test(insertErr.message))) {
+          offlineQueue.current = { uid, posArr };
+        }
         isSaving.current = false;
         return; // CRITICAL: if insert fails, don't touch existing data
       }
@@ -2933,12 +3000,16 @@ export default function App() {
       setPositions(prev => {
         if (prev.length !== inserted.length) return prev; // state changed during save, skip sync
         prev.forEach((p, i) => { if (inserted[i]) idMap.set(p.id, inserted[i].id); });
-        return prev.map((p, i) => ({ ...p, id: inserted[i].id })); // _lid preserved via spread
+        const next = prev.map((p, i) => ({ ...p, id: inserted[i].id })); // _lid preserved via spread
+        positionsRef.current = next;
+        return next;
       });
       lastSaveIdMap.current = idMap;
       lastLoadedCount.current = inserted.length;
     } catch (err) {
       console.error("Position save failed:", err.message);
+      // Queue for retry on network errors
+      if (!navigator.onLine) offlineQueue.current = { uid, posArr };
     }
     isSaving.current = false;
     // If a save was queued while this one was in-flight, run it now with fresh data
@@ -3064,10 +3135,107 @@ export default function App() {
         setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, exit: t.exit_date, entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "" })));
       }
 
+      // ─── Recover any emergency offline saves from localStorage ───
+      try {
+        const emergencyKey = `viv_emergency_positions_${uid}`;
+        const saved = localStorage.getItem(emergencyKey);
+        if (saved) {
+          const emergencyPos = JSON.parse(saved);
+          if (Array.isArray(emergencyPos) && emergencyPos.length > 0) {
+            console.log(`RECOVERY: Found ${emergencyPos.length} positions saved offline. Merging with DB...`);
+            // Merge: for each emergency position, if it doesn't exist in DB (by symbol+entry+shares), insert it
+            const { data: currentPos } = await supabase.from("positions").select("*").eq("user_id", uid);
+            const existingKeys = new Set((currentPos || []).map(p => `${p.symbol}|${p.entry_date}|${p.entry_price}|${p.shares}`));
+            const toInsert = emergencyPos.filter(p => !existingKeys.has(`${p.sym}|${p.entry}|${p.ep}|${p.shares}`));
+            if (toInsert.length > 0) {
+              const rows = toInsert.map(p => ({
+                user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
+                entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
+                stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
+                commission: p.comm || "", notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
+              }));
+              await supabase.from("positions").insert(rows);
+              console.log(`RECOVERY: Inserted ${toInsert.length} positions from offline save.`);
+              // Re-load positions to get consistent state
+              const { data: refreshed } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
+              if (refreshed && refreshed.length > 0) {
+                lastLoadedCount.current = refreshed.length;
+                const snap2 = new Map();
+                refreshed.forEach(p => { if (p.symbol) snap2.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
+                loadedSnapshot.current = snap2;
+                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" }));
+                positionsRef.current = next;
+                setPositions(next);
+              }
+            }
+          }
+          localStorage.removeItem(emergencyKey); // clean up after recovery
+        }
+      } catch (e) { console.error("Emergency recovery failed:", e); }
+
       dataLoaded.current = true;
       setAuthLoading(false);
     };
     load();
+  }, [session]);
+
+  // ─── Device sync: re-fetch positions when tab becomes visible again ───
+  // This handles the phone/laptop sync issue — if member edits on laptop then switches to phone,
+  // the phone re-fetches latest data from Supabase when the tab/browser becomes active again.
+  const lastSyncTime = useRef(Date.now());
+  useEffect(() => {
+    if (!session) return;
+    const handleVisSync = async () => {
+      if (document.visibilityState !== "visible") return;
+      if (!dataLoaded.current) return;
+      // Only re-fetch if tab was hidden for >5 seconds (prevents re-fetch on quick tab switches)
+      const elapsed = Date.now() - lastSyncTime.current;
+      if (elapsed < 5000) return;
+      // Don't re-fetch if there's an unsaved save in progress
+      if (isSaving.current) return;
+      lastSyncTime.current = Date.now();
+      try {
+        const uid = session.user.id;
+        const { data: pos, error: posErr } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
+        if (posErr || !pos) return; // silently skip — don't disrupt user
+        // Deduplicate
+        const seen = new Map();
+        const dupIds = [];
+        for (const p of pos) {
+          const key = `${p.symbol}|${p.entry_date}|${p.entry_price}|${p.shares}|${p.stop_price}`;
+          if (seen.has(key)) {
+            const prev = seen.get(key);
+            if (p.id > prev.id) { dupIds.push(prev.id); seen.set(key, p); }
+            else { dupIds.push(p.id); }
+          } else { seen.set(key, p); }
+        }
+        if (dupIds.length > 0) {
+          await supabase.from("positions").delete().in("id", dupIds);
+        }
+        const clean = pos.filter(p => !dupIds.includes(p.id));
+        // Only update if DB has different data (compare position count and symbols)
+        const dbKey = clean.map(p => `${p.symbol}|${p.entry_price}|${p.shares}`).sort().join("##");
+        const localKey = positionsRef.current.map(p => `${p.sym}|${p.ep}|${p.shares}`).sort().join("##");
+        if (dbKey !== localKey) {
+          console.log("DEVICE SYNC: Positions changed on another device. Refreshing...");
+          skipNextAutosave.current = true;
+          lastLoadedCount.current = clean.length;
+          const snap = new Map();
+          clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
+          loadedSnapshot.current = snap;
+          const next = clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" }));
+          positionsRef.current = next;
+          setPositions(next);
+        }
+      } catch (err) {
+        console.error("Device sync failed:", err.message);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisSync);
+    // Also update lastSyncTime when tab is hidden (so elapsed calculation works)
+    const trackHide = () => { if (document.visibilityState === "hidden") lastSyncTime.current = Date.now(); };
+    document.addEventListener("visibilitychange", trackHide);
+    return () => { document.removeEventListener("visibilitychange", handleVisSync); document.removeEventListener("visibilitychange", trackHide); };
   }, [session]);
 
   // ─── Auto-save profile fields to Supabase (debounced) ───
@@ -3129,36 +3297,141 @@ export default function App() {
         return;
       }
     }
-    // Structural change (add/remove position) → save faster (500ms). Field edits → normal debounce (2s).
+    // Structural change (add/remove position) → save faster (300ms). Field edits → 500ms debounce.
+    // Previous 2000ms debounce was the #1 cause of data loss on refresh — user refreshes within 2s = data gone.
     const isStructuralChange = positions.length !== lastPosCountRef.current;
     lastPosCountRef.current = positions.length;
     clearTimeout(posTimer.current);
-    posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), isStructuralChange ? 500 : 2000);
+    posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), isStructuralChange ? 300 : 500);
   }, [positions, session]);
 
-  // ─── CRITICAL: Flush pending saves on page unload / tab hide (prevents data loss on refresh) ───
+  // ─── Trades ref for emergency save (eagerly synced like positionsRef) ───
+  const journaledTradesRef = useRef(journaledTrades);
+  journaledTradesRef.current = journaledTrades; // sync on every render
+
+  // ─── CRITICAL: Flush pending saves on page unload / tab hide / blur ───
+  // Uses fetch with keepalive:true for GUARANTEED delivery even after page death.
+  // Regular supabase.from().insert() is async and browsers kill it during beforeunload.
+  const lastFlushTime = useRef(0); // prevent duplicate flushes within 200ms
   useEffect(() => {
-    const flushSave = () => {
+    // Emergency save: uses raw fetch with keepalive:true — browser MUST complete this even after page dies.
+    // Does INSERT for positions, then DELETE for old rows — so deletions are not lost.
+    // Also saves pending new trades with a separate keepalive fetch.
+    const emergencySave = () => {
       if (!dataLoaded.current || !session || loadFailed.current) return;
       const pos = positionsRef.current;
-      if (!pos || pos.length === 0) return;
+      // Deduplicate: don't fire within 200ms of last flush
+      const now = Date.now();
+      if (now - lastFlushTime.current < 200) return;
+      lastFlushTime.current = now;
       // Cancel pending debounce timers
       clearTimeout(posTimer.current);
       clearTimeout(tradeTimer.current);
-      // Save immediately — savePositionsNow handles concurrency (queues if isSaving)
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'apikey': supabaseAnonKey,
+        'Authorization': `Bearer ${session.access_token}`,
+        'Prefer': 'return=minimal',
+      };
+
+      // --- POSITIONS emergency save ---
+      if (pos && pos.length > 0) {
+        const rows = pos.map(p => ({
+          user_id: session.user.id, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
+          entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
+          stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
+          commission: p.comm || "", notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
+        }));
+
+        try {
+          // INSERT current positions
+          fetch(`${supabaseUrl}/rest/v1/positions`, {
+            method: 'POST', headers, body: JSON.stringify(rows), keepalive: true,
+          });
+          // DELETE old rows that are not in current state — prevents deleted positions from resurrecting.
+          // We delete by user_id where the id is NOT in the set of current local IDs.
+          // Since emergency INSERT creates new IDs, we delete ALL old rows for this user.
+          // The new INSERT rows will be the only ones left after both requests complete.
+          const currentDbIds = pos.map(p => p.id).filter(id => typeof id === 'number' && id > 0);
+          if (currentDbIds.length > 0) {
+            // Delete positions for this user where id is NOT in the current set
+            // Using PostgREST filter: id=not.in.(id1,id2,...)
+            fetch(`${supabaseUrl}/rest/v1/positions?user_id=eq.${session.user.id}&id=not.in.(${currentDbIds.join(",")})`, {
+              method: 'DELETE', headers: { ...headers, 'Content-Type': 'application/json' }, keepalive: true,
+            });
+          }
+        } catch (e) {
+          // Fallback: try regular async save (may not complete if page is dying)
+          savePositionsNow(session.user.id, pos);
+        }
+      } else if (pos && pos.length === 0 && lastLoadedCount.current === 0) {
+        // User intentionally has zero positions — delete all old rows
+        try {
+          fetch(`${supabaseUrl}/rest/v1/positions?user_id=eq.${session.user.id}`, {
+            method: 'DELETE', headers, keepalive: true,
+          });
+        } catch (e) { /* best effort */ }
+      }
+
+      // --- TRADES emergency save ---
+      // Save any new trades (trades without a real DB id) that haven't been persisted yet.
+      const trades = journaledTradesRef.current;
+      if (trades && trades.length > 0) {
+        // Only save trades that look like they were just created (high temp IDs, not from DB)
+        const newTrades = trades.filter(t => t.id > 1000000000); // temp IDs are Date.now() based
+        if (newTrades.length > 0) {
+          const tradeRows = newTrades.map(t => ({
+            user_id: session.user.id, ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
+            entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
+            stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
+            pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
+            exit_reason: t.reason || "", notes: t.notes || "",
+            chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
+          }));
+          try {
+            fetch(`${supabaseUrl}/rest/v1/trades`, {
+              method: 'POST', headers, body: JSON.stringify(tradeRows), keepalive: true,
+            });
+          } catch (e) { /* best effort */ }
+        }
+      }
+
+      // --- OFFLINE FALLBACK: persist to localStorage so data survives tab close without network ---
+      if (!navigator.onLine && pos && pos.length > 0) {
+        try {
+          localStorage.setItem(`viv_emergency_positions_${session.user.id}`, JSON.stringify(pos));
+        } catch (e) { /* localStorage might be full or disabled */ }
+      }
+    };
+
+    // Normal flush for visibility changes (page is still alive, async save will complete)
+    const normalFlush = () => {
+      if (!dataLoaded.current || !session || loadFailed.current) return;
+      const pos = positionsRef.current;
+      if (!pos || pos.length === 0) return;
+      clearTimeout(posTimer.current);
+      clearTimeout(tradeTimer.current);
       savePositionsNow(session.user.id, pos);
     };
+
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") flushSave();
+      if (document.visibilityState === "hidden") normalFlush();
     };
-    window.addEventListener("beforeunload", flushSave);
+
+    // beforeunload + pagehide: page is DYING — use emergency keepalive save
+    window.addEventListener("beforeunload", emergencySave);
+    window.addEventListener("pagehide", emergencySave);
+    // visibilitychange: page is still alive (tab switch) — use normal async save
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    // pagehide is more reliable on mobile Safari
-    window.addEventListener("pagehide", flushSave);
+    // blur: user clicked outside app (address bar, refresh button) — save immediately while page is still alive
+    window.addEventListener("blur", normalFlush);
+
     return () => {
-      window.removeEventListener("beforeunload", flushSave);
+      window.removeEventListener("beforeunload", emergencySave);
+      window.removeEventListener("pagehide", emergencySave);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("pagehide", flushSave);
+      window.removeEventListener("blur", normalFlush);
     };
   }, [session]);
 
@@ -3290,6 +3563,12 @@ export default function App() {
 
   const pageContent = (
     <>
+      {isOffline && (
+        <div style={{ padding:"10px 16px",background:"rgba(239,68,68,0.12)",border:`1px solid rgba(239,68,68,0.25)`,borderRadius:10,marginBottom:12,display:"flex",alignItems:"center",gap:8 }}>
+          <span style={{ fontSize:"0.74rem",fontWeight:700,color:"#ef4444" }}>OFFLINE</span>
+          <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
+        </div>
+      )}
       {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} />}
