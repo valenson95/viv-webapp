@@ -2922,6 +2922,9 @@ export default function App() {
   // ─── Save status indicator ───
   const [saveStatus, setSaveStatus] = useState(null); // null | "saving" | "saved" | "error"
   const saveStatusTimer = useRef(null);
+
+  // ─── Dirty tracking: are there unsaved changes? ───
+  const hasPendingChanges = useRef(false); // set true when data changes, cleared after save completes
   useEffect(() => {
     const goOffline = () => { setIsOffline(true); console.warn("OFFLINE: saves will queue until connection returns."); };
     const goOnline = () => {
@@ -3028,6 +3031,7 @@ export default function App() {
       lastSaveIdMap.current = idMap;
       lastLoadedCount.current = inserted.length;
       // Show "saved" indicator briefly
+      hasPendingChanges.current = false;
       setSaveStatus("saved");
       if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
       saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 2500);
@@ -3336,6 +3340,7 @@ export default function App() {
     const isStructuralChange = positions.length !== lastPosCountRef.current;
     lastPosCountRef.current = positions.length;
     clearTimeout(posTimer.current);
+    hasPendingChanges.current = true; // mark dirty until save completes
     posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), isStructuralChange ? 300 : 500);
   }, [positions, session]);
 
@@ -3479,8 +3484,21 @@ export default function App() {
       if (document.visibilityState === "hidden") normalFlush();
     };
 
-    // beforeunload + pagehide: page is DYING — use emergency keepalive save
-    window.addEventListener("beforeunload", emergencySave);
+    // Warn user before closing if there are unsaved changes
+    const warnBeforeClose = (e) => {
+      if (hasPendingChanges.current || isSaving.current) {
+        e.preventDefault();
+        e.returnValue = "You have unsaved changes. Are you sure you want to leave?";
+        return e.returnValue;
+      }
+    };
+
+    // beforeunload: warn + emergency save. pagehide: emergency save only.
+    const handleBeforeUnload = (e) => {
+      warnBeforeClose(e);
+      emergencySave();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("pagehide", emergencySave);
     // visibilitychange: page is still alive (tab switch) — use normal async save
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -3488,7 +3506,7 @@ export default function App() {
     window.addEventListener("blur", normalFlush);
 
     return () => {
-      window.removeEventListener("beforeunload", emergencySave);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("pagehide", emergencySave);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("blur", normalFlush);
@@ -3503,6 +3521,7 @@ export default function App() {
     const hash = journaledTrades.map(t => `${t.id}|${t.ticker}|${t.entry}|${t.exit}|${t.entryP}|${t.exitP}|${t.shares}|${t.stop}|${t.setup}|${(t.tags||[]).join(",")}|${t.reason}|${t.notes}|${t.chartUrl||""}|${t.chartImage||""}`).join("##");
     if (hash === tradeHashRef.current) return; // no change
     tradeHashRef.current = hash;
+    hasPendingChanges.current = true; // mark dirty until trade save completes
 
     clearTimeout(tradeTimer.current);
     tradeTimer.current = setTimeout(async () => {
@@ -3558,6 +3577,7 @@ export default function App() {
         if (deletedIds.length > 0) {
           await supabase.from("trades").update({ is_deleted: true }).in("id", deletedIds);
         }
+        hasPendingChanges.current = false; // trade save completed
       } catch (err) {
         console.error("Trade save failed:", err.message);
       }
@@ -3598,6 +3618,7 @@ export default function App() {
           id: t.id, ...tradeRow(t),
         })), { onConflict: "id" });
       }
+      hasPendingChanges.current = false;
       setSaveStatus("saved");
       if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
       saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 2500);
