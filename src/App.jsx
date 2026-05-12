@@ -1338,7 +1338,7 @@ const GLOSSARY = [
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
-function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, onManualSave, saveStatus, positionsRef }) {
+function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg }) {
   const [sizerMode, setSizerMode] = useState("R"); // "R" = risk-based (default), "%" = position size
   const [rNumStocks, setRNumStocks] = useState(4);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
@@ -1865,8 +1865,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               {[{k:"%",label:"% Mode"},{k:"$",label:"$ Mode"},{k:"R",label:"R Mode"}].map(({k,label})=>(<button key={k} onClick={()=>setDisplayMode(k)} style={{padding:"8px 16px",background:displayMode===k?(k==="R"?C.goldDim:C.goldDim):"rgba(255,255,255,0.03)",border:"none",color:displayMode===k?C.gold:C.muted,fontWeight:800,fontSize:"0.72rem",cursor:"pointer",fontFamily:font,letterSpacing:k==="R"?"0.04em":"0",transition:"all 0.15s"}}>{label}</button>))}
             </div>
             <GoldBtn onClick={addPosition} small>+ Add Position</GoldBtn>
-            <button onClick={onManualSave} disabled={saveStatus === "saving"} style={{ padding:"8px 16px",borderRadius:980,border:`1px solid ${saveStatus === "saved" ? "rgba(34,197,94,0.4)" : saveStatus === "error" ? "rgba(239,68,68,0.4)" : C.borderGold}`,background:saveStatus === "saved" ? "rgba(34,197,94,0.12)" : saveStatus === "error" ? "rgba(239,68,68,0.12)" : C.goldDim,color:saveStatus === "saved" ? C.green : saveStatus === "error" ? C.red : C.gold,fontWeight:700,fontSize:"0.72rem",cursor:saveStatus === "saving" ? "wait" : "pointer",fontFamily:font,transition:"all 0.2s",display:"flex",alignItems:"center",gap:6 }}>
-              {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Save Failed" : "Save"}
+            <button onClick={() => { if (saveStatus === "error" && saveErrorMsg) { alert("Save error: " + saveErrorMsg); } else { onManualSave(); } }} disabled={saveStatus === "saving"} title={saveStatus === "error" && saveErrorMsg ? "Error: " + saveErrorMsg : "Save all positions to database"} style={{ padding:"8px 16px",borderRadius:980,border:`1px solid ${saveStatus === "saved" ? "rgba(34,197,94,0.4)" : saveStatus === "error" ? "rgba(239,68,68,0.4)" : C.borderGold}`,background:saveStatus === "saved" ? "rgba(34,197,94,0.12)" : saveStatus === "error" ? "rgba(239,68,68,0.12)" : C.goldDim,color:saveStatus === "saved" ? C.green : saveStatus === "error" ? C.red : C.gold,fontWeight:700,fontSize:"0.72rem",cursor:saveStatus === "saving" ? "wait" : "pointer",fontFamily:font,transition:"all 0.2s",display:"flex",alignItems:"center",gap:6 }}>
+              {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Save Failed ⓘ" : "Save"}
             </button>
             <button onClick={() => {
               const csv = [["Symbol","Entry Date","Shares","Entry Price","Commission","Current Price","Stop 1","Stop 2","Trail Stop","Setup","Tags"].join(",")];
@@ -2942,6 +2942,7 @@ function AppInner() {
 
   // ─── Save status indicator ───
   const [saveStatus, setSaveStatus] = useState(null); // null | "saving" | "saved" | "error"
+  const [saveErrorMsg, setSaveErrorMsg] = useState(""); // actual error message for debugging
   const saveStatusTimer = useRef(null);
 
   // ─── Dirty tracking: are there unsaved changes? ───
@@ -2997,7 +2998,7 @@ function AppInner() {
         user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
         entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
         stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
-        commission: p.comm || "", notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
+        commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
       }));
 
       if (rows.length === 0) {
@@ -3020,12 +3021,14 @@ function AppInner() {
       // Step 1: INSERT all current positions as fresh rows (get back real DB IDs)
       const { data: inserted, error: insertErr } = await supabase.from("positions").insert(rows).select("id");
       if (insertErr || !inserted) {
-        console.error("Position save error:", insertErr?.message);
+        const errMsg = insertErr?.message || "Insert returned no data";
+        console.error("Position save error:", errMsg, "| Full error:", JSON.stringify(insertErr));
+        setSaveErrorMsg(errMsg);
         setSaveStatus("error");
         if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
-        saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 4000);
+        saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 8000);
         // Queue for retry if it was a network error
-        if (!navigator.onLine || (insertErr && /network|fetch|timeout/i.test(insertErr.message))) {
+        if (!navigator.onLine || (insertErr && /network|fetch|timeout/i.test(errMsg))) {
           offlineQueue.current = { uid, posArr };
         }
         isSaving.current = false;
@@ -3057,10 +3060,11 @@ function AppInner() {
       if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
       saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 2500);
     } catch (err) {
-      console.error("Position save failed:", err.message);
+      console.error("Position save failed:", err.message, err);
+      setSaveErrorMsg(err.message || "Unknown error");
       setSaveStatus("error");
       if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
-      saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 4000);
+      saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 8000);
       // Queue for retry on network errors
       if (!navigator.onLine) offlineQueue.current = { uid, posArr };
     }
@@ -3169,7 +3173,7 @@ function AppInner() {
             user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
             entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
             stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
-            commission: p.comm || "",
+            commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null,
           })));
           if (!seedErr) {
             // Re-load from DB so positions have real DB ids
@@ -3211,7 +3215,7 @@ function AppInner() {
                 user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
                 entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
                 stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
-                commission: p.comm || "", notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
+                commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
               }));
               await supabase.from("positions").insert(rows);
               console.log(`RECOVERY: Inserted ${toInsert.length} positions from offline save.`);
@@ -3401,7 +3405,7 @@ function AppInner() {
           user_id: session.user.id, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
           entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
           stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
-          commission: p.comm || "", notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
+          commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
         }));
 
         try {
@@ -3716,7 +3720,7 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} onManualSave={handleManualSave} saveStatus={saveStatus} positionsRef={positionsRef} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} onManualSave={handleManualSave} saveStatus={saveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={saveStatus} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} />}
