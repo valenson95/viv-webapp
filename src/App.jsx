@@ -981,6 +981,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       return { ...editRow, notes: serializedNotes, plPct, plDollar, rMult };
     }));
     setEditingId(null);
+    // Trigger immediate save instead of waiting for 2s autosave debounce
+    setTimeout(() => onManualSave(), 50);
   };
   const cancelEdit = () => { setEditingId(null); setEditNotes({ right: "", wrong: "", lessons: "", _plain: "" }); };
 
@@ -3180,7 +3182,7 @@ function AppInner() {
             const { data: seeded } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
             if (seeded && seeded.length > 0) {
               lastLoadedCount.current = seeded.length;
-              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "" })));
+              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" })));
             }
           }
           await saveSettingNow(uid, "initialized", true);
@@ -3409,22 +3411,14 @@ function AppInner() {
         }));
 
         try {
-          // INSERT current positions
+          // INSERT current positions (keepalive survives page death)
+          // NOTE: Do NOT delete old rows here. The INSERT and DELETE are fire-and-forget (keepalive),
+          // so there's a race condition: if DELETE arrives before INSERT completes, it kills the new rows.
+          // Instead, accept temporary duplicates — the dedup logic on next load (line 3143) cleans them up.
+          // This is safer: duplicates are harmless, data loss is not.
           fetch(`${supabaseUrl}/rest/v1/positions`, {
             method: 'POST', headers, body: JSON.stringify(rows), keepalive: true,
           });
-          // DELETE old rows that are not in current state — prevents deleted positions from resurrecting.
-          // We delete by user_id where the id is NOT in the set of current local IDs.
-          // Since emergency INSERT creates new IDs, we delete ALL old rows for this user.
-          // The new INSERT rows will be the only ones left after both requests complete.
-          const currentDbIds = pos.map(p => p.id).filter(id => typeof id === 'number' && id > 0);
-          if (currentDbIds.length > 0) {
-            // Delete positions for this user where id is NOT in the current set
-            // Using PostgREST filter: id=not.in.(id1,id2,...)
-            fetch(`${supabaseUrl}/rest/v1/positions?user_id=eq.${session.user.id}&id=not.in.(${currentDbIds.join(",")})`, {
-              method: 'DELETE', headers: { ...headers, 'Content-Type': 'application/json' }, keepalive: true,
-            });
-          }
         } catch (e) {
           // Fallback: try regular async save (may not complete if page is dying)
           savePositionsNow(session.user.id, pos);
@@ -3639,9 +3633,17 @@ function AppInner() {
       }
       const editedTrades = journaledTrades.filter(t => existingIds.has(t.id));
       if (editedTrades.length > 0) {
-        await supabase.from("trades").upsert(editedTrades.map(t => ({
+        const { error: upsertErr } = await supabase.from("trades").upsert(editedTrades.map(t => ({
           id: t.id, ...tradeRow(t),
         })), { onConflict: "id" });
+        if (upsertErr) {
+          console.error("Trade upsert error:", upsertErr.message);
+          setSaveErrorMsg(upsertErr.message);
+          setSaveStatus("error");
+          if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
+          saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 8000);
+          return;
+        }
       }
       hasPendingChanges.current = false;
       setSaveStatus("saved");
@@ -3649,9 +3651,10 @@ function AppInner() {
       saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 2500);
     } catch (err) {
       console.error("Manual trade save failed:", err.message);
+      setSaveErrorMsg(err.message || "Unknown error");
       setSaveStatus("error");
       if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
-      saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 4000);
+      saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 8000);
     }
   }, [session, journaledTrades]);
 
