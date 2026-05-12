@@ -2709,17 +2709,37 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
 
                     let restored = { positions: 0, trades: 0 };
 
-                    // Restore positions — upsert by id (safe, non-destructive)
+                    // Restore positions — update existing by id, insert new ones (upsert fails because id is GENERATED ALWAYS)
                     if (backup.positions.length > 0) {
-                      const { error } = await supabase.from("positions").upsert(backup.positions, { onConflict: "id" });
-                      if (error) { setBackupStatus("Position restore error: " + error.message); return; }
+                      const withId = backup.positions.filter(p => p.id);
+                      const withoutId = backup.positions.filter(p => !p.id);
+                      for (const p of withId) {
+                        const { id, ...rest } = p;
+                        const { error } = await supabase.from("positions").update(rest).eq("id", id);
+                        if (error && error.code !== 'PGRST116') { setBackupStatus("Position restore error: " + error.message); return; }
+                      }
+                      if (withoutId.length > 0) {
+                        const inserts = withoutId.map(p => { const { id, ...rest } = p; return rest; });
+                        const { error } = await supabase.from("positions").insert(inserts);
+                        if (error) { setBackupStatus("Position restore error: " + error.message); return; }
+                      }
                       restored.positions = backup.positions.length;
                     }
 
-                    // Restore trades — upsert by id (safe, non-destructive)
+                    // Restore trades — update existing by id, insert new ones (upsert fails because id is GENERATED ALWAYS)
                     if (backup.trades.length > 0) {
-                      const { error } = await supabase.from("trades").upsert(backup.trades, { onConflict: "id" });
-                      if (error) { setBackupStatus("Trade restore error: " + error.message); return; }
+                      // Separate: trades with real IDs (update) vs without (insert)
+                      const withId = backup.trades.filter(t => t.id);
+                      const withoutId = backup.trades.filter(t => !t.id);
+                      for (const t of withId) {
+                        const { id, ...rest } = t;
+                        const { error } = await supabase.from("trades").update(rest).eq("id", id);
+                        if (error && error.code !== 'PGRST116') { setBackupStatus("Trade restore error: " + error.message); return; }
+                      }
+                      if (withoutId.length > 0) {
+                        const { error } = await supabase.from("trades").insert(withoutId);
+                        if (error) { setBackupStatus("Trade restore error: " + error.message); return; }
+                      }
                       restored.trades = backup.trades.length;
                     }
 
@@ -3454,29 +3474,24 @@ function AppInner() {
             });
           } catch (e) { /* best effort */ }
         }
-        // Existing trades: upsert ALL with real DB IDs to catch any unsaved edits.
-        // keepalive body limit is 64KB — each trade ~500 bytes, so safe up to ~120 trades.
+        // Existing trades: PATCH each with real DB IDs to catch any unsaved edits.
+        // Cannot use upsert (POST with on_conflict) because trades.id is GENERATED ALWAYS.
+        // keepalive PATCH requests are small (~500 bytes each), safe for page-death scenario.
         const existingTrades = trades.filter(t => t.id <= 1000000000 && typeof t.id === 'number');
-        if (existingTrades.length > 0) {
-          const upsertRows = existingTrades.map(t => ({
-            id: t.id, user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
-            entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
-            stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
-            pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
-            exit_reason: t.reason || "", notes: t.notes || "",
-            chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
-          }));
-          // Only send if body fits in keepalive limit (~64KB)
-          const body = JSON.stringify(upsertRows);
-          if (body.length < 60000) {
-            try {
-              fetch(`${supabaseUrl}/rest/v1/trades?on_conflict=id`, {
-                method: 'POST',
-                headers: { ...headers, 'Prefer': 'resolution=merge-duplicates' },
-                body, keepalive: true,
-              });
-            } catch (e) { /* best effort */ }
-          }
+        for (const t of existingTrades) {
+          try {
+            const updateBody = JSON.stringify({
+              ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
+              entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
+              stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
+              pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
+              exit_reason: t.reason || "", notes: t.notes || "",
+              chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
+            });
+            fetch(`${supabaseUrl}/rest/v1/trades?id=eq.${t.id}`, {
+              method: 'PATCH', headers, body: updateBody, keepalive: true,
+            });
+          } catch (e) { /* best effort */ }
         }
       }
 
@@ -3576,18 +3591,20 @@ function AppInner() {
           }
         }
 
-        // Update existing trades that were edited (batch upsert, not one-by-one)
+        // Update existing trades that were edited (individual updates — upsert fails because id column is GENERATED ALWAYS)
         const editedTrades = journaledTrades.filter(t => existingIds.has(t.id));
         if (editedTrades.length > 0) {
-          const { error } = await supabase.from("trades").upsert(editedTrades.map(t => ({
-            id: t.id, user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
-            entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
-            stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
-            pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
-            exit_reason: t.reason || "", notes: t.notes || "",
-            chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
-          })), { onConflict: "id" });
-          if (error) console.error("Trade upsert error:", error.message);
+          const updateResults = await Promise.all(editedTrades.map(t =>
+            supabase.from("trades").update({
+              ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
+              entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
+              stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
+              pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
+              exit_reason: t.reason || "", notes: t.notes || "",
+              chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
+            }).eq("id", t.id)
+          ));
+          updateResults.forEach((r, i) => { if (r.error) console.error("Trade update error:", editedTrades[i].id, r.error.message); });
         }
 
         // Soft-delete trades removed from state — SKIP if we just inserted (IDs haven't synced yet)
@@ -3633,12 +3650,14 @@ function AppInner() {
       }
       const editedTrades = journaledTrades.filter(t => existingIds.has(t.id));
       if (editedTrades.length > 0) {
-        const { error: upsertErr } = await supabase.from("trades").upsert(editedTrades.map(t => ({
-          id: t.id, ...tradeRow(t),
-        })), { onConflict: "id" });
-        if (upsertErr) {
-          console.error("Trade upsert error:", upsertErr.message);
-          setSaveErrorMsg(upsertErr.message);
+        // Use individual updates — upsert fails because trades.id is GENERATED ALWAYS
+        const updateResults = await Promise.all(editedTrades.map(t =>
+          supabase.from("trades").update(tradeRow(t)).eq("id", t.id)
+        ));
+        const firstErr = updateResults.find(r => r.error);
+        if (firstErr?.error) {
+          console.error("Trade update error:", firstErr.error.message);
+          setSaveErrorMsg(firstErr.error.message);
           setSaveStatus("error");
           if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
           saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 8000);
