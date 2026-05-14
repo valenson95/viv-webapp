@@ -993,7 +993,7 @@ function notesPreview(raw) {
   return parts.join(" | ") || "";
 }
 
-function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, saveStatus, positions }) {
+function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, saveStatus, positions, portfolioSize }) {
   const [filterSetup, setFilterSetup] = useState("All");
   const [filterTag, setFilterTag] = useState("All");
   const [editingId, setEditingId] = useState(null);
@@ -1083,25 +1083,41 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   }, [filtered]);
   // Equity curve data — supports $ vs % and trades vs months
   const equityData = useMemo(() => {
+    const startingCapital = +(portfolioSize || 0);
+    // Sort trades chronologically by exit date
+    const sorted = [...filtered].sort((a, b) => {
+      const da = new Date(a.exit || a.entry || 0), db = new Date(b.exit || b.entry || 0);
+      return da - db;
+    });
     if (eqXAxis === "months") {
-      // Group by exit month
+      // Group by exit month, chronological
       const monthMap = {};
-      filtered.forEach(t => {
+      sorted.forEach(t => {
         const m = (t.exit || t.entry || "").replace(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/, (_, mo, d, y) => `${y.length===2?"20"+y:y}-${mo.padStart(2,"0")}`).slice(0, 7) || "Unknown";
         if (!monthMap[m]) monthMap[m] = { dollar: 0, pct: 0, count: 0 };
         monthMap[m].dollar += t.plDollar;
         monthMap[m].pct += t.plPct;
         monthMap[m].count++;
       });
-      let cum = 0; let cumPct = 0;
-      return Object.keys(monthMap).sort().map(m => {
-        cum += monthMap[m].dollar; cumPct += monthMap[m].pct;
-        return { trade: m, equity: cum, equityPct: cumPct };
+      let cumEquity = startingCapital; let cumPct = 0;
+      const points = [{ trade: "Start", equity: startingCapital, equityPct: 0 }];
+      Object.keys(monthMap).sort().forEach(m => {
+        cumEquity += monthMap[m].dollar; cumPct += monthMap[m].pct;
+        points.push({ trade: m, equity: cumEquity, equityPct: cumPct });
       });
+      return points;
     }
-    let cum = 0; let cumPct = 0;
-    return filtered.map(t => { cum += t.plDollar; cumPct += t.plPct; return { trade: t.ticker, equity: cum, equityPct: cumPct }; });
-  }, [filtered, eqXAxis]);
+    // By trade — chronological by exit date
+    let cumEquity = startingCapital; let cumPct = 0;
+    const points = [{ trade: "Start", equity: startingCapital, equityPct: 0 }];
+    sorted.forEach(t => {
+      cumEquity += t.plDollar; cumPct += t.plPct;
+      // Format exit date for x-axis label
+      const dateStr = (t.exit || t.entry || "").replace(/\/\d{2}$/, m => m); // keep short date
+      points.push({ trade: dateStr || t.ticker, equity: cumEquity, equityPct: cumPct });
+    });
+    return points;
+  }, [filtered, eqXAxis, portfolioSize]);
 
   // Monthly performance table data
   const monthlyPerf = useMemo(() => {
@@ -1301,12 +1317,12 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                 {["$","%"].map(v=>(<button key={v} onClick={()=>setEqYAxis(v)} style={{padding:"3px 10px",background:eqYAxis===v?C.goldDim:"transparent",border:"none",color:eqYAxis===v?C.gold:C.muted,fontWeight:700,fontSize:"0.56rem",cursor:"pointer",fontFamily:font}}>{v}</button>))}
               </div>
               <div style={{display:"flex",borderRadius:6,overflow:"hidden",border:`1px solid ${C.border}`}}>
-                {[["trades","Trades"],["months","Months"]].map(([k,l])=>(<button key={k} onClick={()=>setEqXAxis(k)} style={{padding:"3px 10px",background:eqXAxis===k?C.goldDim:"transparent",border:"none",color:eqXAxis===k?C.gold:C.muted,fontWeight:700,fontSize:"0.56rem",cursor:"pointer",fontFamily:font}}>{l}</button>))}
+                {[["trades","By Date"],["months","By Month"]].map(([k,l])=>(<button key={k} onClick={()=>setEqXAxis(k)} style={{padding:"3px 10px",background:eqXAxis===k?C.goldDim:"transparent",border:"none",color:eqXAxis===k?C.gold:C.muted,fontWeight:700,fontSize:"0.56rem",cursor:"pointer",fontFamily:font}}>{l}</button>))}
               </div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={170}>
-            <LineChart data={equityData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="trade" tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={eqYAxis==="$" ? (v=>`$${(v/1000).toFixed(0)}k`) : (v=>`${v.toFixed(1)}%`)} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v)=>eqYAxis==="$"?[`$${Number(v).toLocaleString()}`,"P/L"]:[`${Number(v).toFixed(2)}%`,"P/L"]} /><ReferenceLine y={0} stroke={C.border} /><Line type="monotone" dataKey={eqYAxis==="$"?"equity":"equityPct"} stroke={C.gold} strokeWidth={2} dot={{fill:C.gold,r:3.5}} /></LineChart>
+            <LineChart data={equityData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="trade" tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={eqYAxis==="$" ? (v=>v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1000).toFixed(0)}k`:`$${v}`) : (v=>`${v.toFixed(1)}%`)} domain={eqYAxis==="$"?['auto','auto']:undefined} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v)=>eqYAxis==="$"?[`$${Number(v).toLocaleString()}`,"Portfolio"]:[`${Number(v).toFixed(2)}%`,"Cumulative"]} />{eqYAxis==="%"&&<ReferenceLine y={0} stroke={C.border} />}<Line type="monotone" dataKey={eqYAxis==="$"?"equity":"equityPct"} stroke={C.gold} strokeWidth={2} dot={{fill:C.gold,r:3.5}} /></LineChart>
           </ResponsiveContainer>
         </GlassCard>
         <GlassCard style={{ padding: "18px 22px" }}>
@@ -2006,17 +2022,17 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const tgtRote = (+targetRote || 0) / 100;
     const tgtR = +projR || 1;
     const batches = Math.min(+projBatches || 12, 52);
-    const best = [], worst = [], actual = [];
-    let bEq = compEquity, wEq = compEquity, aEq = compEquity;
+    const actual = [];
+    let aEq = compEquity;
     // Actual projection uses actual win rate & avg R from journal
     const actualWr = (actualStats.winRate || 0) / 100;
     const actualR = actualStats.avgR || 0;
     const actualReturnPerCycle = actualWr * actualR * tgtRote - (1 - actualWr) * tgtRote;
     for (let i = 0; i <= batches; i++) {
-      if (i > 0) { bEq *= (1 + tgtRote * tgtR); wEq *= (1 - tgtRote); aEq *= (1 + actualReturnPerCycle); }
-      best.push(Math.round(bEq)); worst.push(Math.round(wEq)); actual.push(Math.round(aEq));
+      if (i > 0) { aEq *= (1 + actualReturnPerCycle); }
+      actual.push(Math.round(aEq));
     }
-    return projection.map((d, i) => ({ cycle: i === 0 ? "Now" : `C${d.cycle}`, expected: Math.round(d.equity), best: best[i], worst: worst[i], actual: actual[i] }));
+    return projection.map((d, i) => ({ cycle: i === 0 ? "Now" : `C${d.cycle}`, expected: Math.round(d.equity), actual: actual[i] }));
   }, [projection, compEquity, targetRote, projR, projBatches, actualStats]);
 
   const finalProj = projection.length > 1 ? projection[projection.length - 1] : null;
@@ -2241,7 +2257,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.shares} onChange={v=>updateField(p.id,"shares",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.ep} onChange={v=>updateField(p.id,"ep",v)} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={62} /></td>
-                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:C.white,whiteSpace:"nowrap"}}>{p.posValue>0?fmt$(p.posValue):"—"}</td>
+                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0?<><div style={{fontWeight:700,fontSize:"0.70rem",color:C.white}}>{fmt$(p.posValue)}</div>{+portfolioSize>0&&<div style={{fontSize:"0.52rem",fontWeight:600,color:C.muted}}>{((p.posValue/(+portfolioSize))*100).toFixed(1)}%</div>}</>:"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.trailStop||""} onChange={v=>updateField(p.id,"trailStop",v)} width={78} gold /></td>
@@ -2411,7 +2427,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.text,fontSize:"0.70rem"}}>{enriched.reduce((s,p)=>s+p.sharesN,0).toLocaleString()}</td>
                 <td />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.muted,fontSize:"0.70rem"}}>{fmt$(enriched.reduce((s,p)=>s+p.commN,0))}</td>
-                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:C.goldBright}}>{fmt$(enriched.reduce((s,p)=>s+p.posValue,0))}</td>
+                <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{(()=>{const tv=enriched.reduce((s,p)=>s+p.posValue,0);const ps=+portfolioSize;const expPct=ps>0?(tv/ps)*100:0;return<><div style={{fontWeight:800,fontSize:"0.72rem",color:C.goldBright}}>{fmt$(tv)}</div>{ps>0&&<div style={{fontSize:"0.54rem",fontWeight:700,color:expPct>100?C.red:expPct>80?C.gold:C.muted}}>{expPct.toFixed(1)}%{expPct>100&&<span style={{marginLeft:3}}>{(expPct/100).toFixed(1)}x</span>}</div>}</>})()}</td>
                 <td colSpan={6} />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD<=0?C.green:C.text}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.74rem",color:totals.totalRTS<=0?C.green:C.red,animation:totals.totalRTS>0?"rtsGlow 2.5s ease-in-out infinite":"rtsGlowGreen 3s ease-in-out infinite"}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
@@ -2688,18 +2704,14 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                   <XAxis dataKey="cycle" stroke={C.muted} tick={{ fontSize:10 }} />
                   <YAxis stroke={C.muted} tick={{ fontSize:10 }} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} />
                   <Tooltip contentStyle={{ background:"#0c0c14",border:`1px solid ${C.border}`,borderRadius:10,fontSize:"0.72rem" }} formatter={(v) => [`$${Number(v).toLocaleString()}`, ""]} />
-                  <Line type="monotone" dataKey="best" stroke={C.gold} strokeWidth={1} strokeDasharray="6 3" dot={false} name="Best" />
                   <Line type="monotone" dataKey="expected" stroke={C.green} strokeWidth={2.5} dot={false} name="Target" />
                   {actualStats.count > 0 && <Line type="monotone" dataKey="actual" stroke={C.blue} strokeWidth={2.5} dot={false} name="Actual" />}
-                  <Line type="monotone" dataKey="worst" stroke={C.red} strokeWidth={1} strokeDasharray="6 3" dot={false} name="Worst" />
                   <ReferenceLine y={compEquity} stroke={C.muted} strokeDasharray="3 3" label={{ value:"Now",fill:C.muted,fontSize:10 }} />
                 </LineChart>
               </ResponsiveContainer>
               <div style={{ display:"flex",gap:16,justifyContent:"center",marginTop:8,flexWrap:"wrap" }}>
-                <span style={{ fontSize:"0.60rem",color:C.gold }}>— — Best (100% win)</span>
                 <span style={{ fontSize:"0.60rem",color:C.green }}>— Target</span>
                 {actualStats.count > 0 && <span style={{ fontSize:"0.60rem",color:C.blue }}>— Actual</span>}
-                <span style={{ fontSize:"0.60rem",color:C.red }}>— — Worst (0% win)</span>
               </div>
             </>
           )}
@@ -4098,7 +4110,7 @@ function AppInner() {
       )}
       {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
-      {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} />}
+      {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} portfolioSize={portfolioSize} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} />}
     </>
   );
