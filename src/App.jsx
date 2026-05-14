@@ -1799,6 +1799,14 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     setTimeout(() => onManualSaveRef.current(), 50); // ref avoids stale closure
   };
 
+  // Compute compEquity BEFORE enriched so expPct can be sorted
+  const compRealizedPL = useMemo(() => {
+    if (!journaledTrades || journaledTrades.length === 0) return 0;
+    return journaledTrades.reduce((sum, t) => sum + (t.plDollar || 0), 0);
+  }, [journaledTrades]);
+  const compPs = +portfolioSize || 0;
+  const compEquity = compPs + compRealizedPL;
+
   // Enriched — dual stop loss: if stop2 is set, 50/50 split. Otherwise stop1 covers 100%.
   const enriched = useMemo(() => positions.map(p => { try {
     const epN = parseFloat(p.ep)||0, cpN = parseFloat(p.cp)||0, sharesN = parseFloat(p.shares)||0, commN = parseFloat(p.comm)||0;
@@ -1892,9 +1900,10 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     // RTS in R terms
     const rtsR = rPerShare > 0 && sharesN > 0 ? (rtsD / sharesN) / rPerShare : 0;
 
-    return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
-  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0 }; }
-  }), [positions, sizer, portfolioSize]);
+    const expPct = compEquity > 0 ? (posValue / compEquity) * 100 : 0;
+    return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
+  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0 }; }
+  }), [positions, sizer, portfolioSize, compEquity]);
 
   const totals = useMemo(() => {
     const active = enriched.filter(p => p.sym && p.cpN > 0);
@@ -1951,14 +1960,6 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const rewardRisk = avgLoss > 0 ? avgGain / avgLoss : 0;
     return { winRate, avgR, avgGain, avgLoss, rewardRisk, count: journaledTrades.length };
   }, [journaledTrades]);
-
-  const compRealizedPL = useMemo(() => {
-    if (!journaledTrades || journaledTrades.length === 0) return 0;
-    return journaledTrades.reduce((sum, t) => sum + (t.plDollar || 0), 0);
-  }, [journaledTrades]);
-
-  const compPs = +portfolioSize || 0;
-  const compEquity = compPs + compRealizedPL;
 
   const posAnalysis = useMemo(() => {
     if (!positions || positions.length === 0) return [];
@@ -2238,7 +2239,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left","riskStatus")}{th("Symbol","left","sym")}{th("Shares","right","sharesN")}{th("Avg. Cost","right","epN")}{th("Comm","right","commN")}{th("Pos. Size","right","posValue")}{th("Exp %","right")}{th("Orig Stop","right","stop1")}{th("Stop 2","right","stop2")}{th("Trail Stop","right","tsN")}{th("Current","right","cpN")}{th("Setup","left","setup")}{th("Tags","left")}{th("DTS","right","dtsPct")}{th("RTS","right","rtsD")}{th("ROTE","right","rotePct")}{displayMode==="R"&&th("R Suggest","right","rSuggestedStop")}{displayMode==="R"&&th("Locked","right","rLockedProfit")}{displayMode!=="R"&&th("SBE","right","sbe")}{displayMode!=="R"&&th("SBE %","right","sbePct")}{th("P/L","right","plPct")}{th("R","right","rMult")}{th("Notes","center")}{th("","center")}
+              {th("Status","left","riskStatus")}{th("Symbol","left","sym")}{th("Shares","right","sharesN")}{th("Avg. Cost","right","epN")}{th("Comm","right","commN")}{th("Pos. Size","right","posValue")}{th("Exp %","right","expPct")}{th("Orig Stop","right","stop1")}{th("Stop 2","right","stop2")}{th("Trail Stop","right","tsN")}{th("Current","right","cpN")}{th("Setup","left","setup")}{th("Tags","left")}{th("DTS","right","dtsPct")}{th("RTS","right","rtsD")}{th("ROTE","right","rotePct")}{displayMode==="R"&&th("R Suggest","right","rSuggestedStop")}{displayMode==="R"&&th("Locked","right","rLockedProfit")}{displayMode!=="R"&&th("SBE","right","sbe")}{displayMode!=="R"&&th("SBE %","right","sbePct")}{th("P/L","right","plPct")}{th("R","right","rMult")}{th("Notes","center")}{th("","center")}
             </tr></thead>
             <tbody>
               {(posSorts.length > 0 ? multiSort(enriched, posSorts) : enriched).map((p, idx) => {
@@ -2262,7 +2263,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.ep} onChange={v=>updateField(p.id,"ep",v)} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={62} /></td>
                     <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0?<div style={{fontWeight:700,fontSize:"0.70rem",color:C.white}}>{fmt$(p.posValue)}</div>:"—"}</td>
-                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0&&compEquity>0?<div style={{fontWeight:600,fontSize:"0.70rem",color:((p.posValue/compEquity)*100)>100?C.red:C.white}}>{((p.posValue/compEquity)*100).toFixed(1)}%</div>:"—"}</td>
+                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0&&compEquity>0?<div style={{fontWeight:600,fontSize:"0.70rem",color:p.expPct>100?C.red:C.white}}>{p.expPct.toFixed(1)}%</div>:"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.trailStop||""} onChange={v=>updateField(p.id,"trailStop",v)} width={78} gold /></td>
