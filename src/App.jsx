@@ -1047,8 +1047,11 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     if (trades.length === 0) return { ba:0,avgGain:0,avgLoss:0,glRatio:0,ev:0,avgR:0,largestLoss:0,totalPL:0,total:0,avgHoldWin:0,avgHoldLoss:0,holdRatio:0 };
     const wins = trades.filter(t => t.plPct > 0), losses = trades.filter(t => t.plPct <= 0);
     const ba = (wins.length / trades.length) * 100;
-    const avgGain = wins.length ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
-    const avgLoss = losses.length ? Math.abs(losses.reduce((s, t) => s + t.plPct, 0) / losses.length) : 0;
+    // Dollar-weighted avg gain/loss: weight each trade's % by its position size (entryP × shares)
+    const winSize = wins.reduce((s, t) => s + (t.entryP || 0) * (t.shares || 0), 0);
+    const lossSize = losses.reduce((s, t) => s + (t.entryP || 0) * (t.shares || 0), 0);
+    const avgGain = winSize > 0 ? wins.reduce((s, t) => s + t.plPct * (t.entryP || 0) * (t.shares || 0), 0) / winSize : 0;
+    const avgLoss = lossSize > 0 ? Math.abs(losses.reduce((s, t) => s + t.plPct * (t.entryP || 0) * (t.shares || 0), 0) / lossSize) : 0;
     const glRatio = avgLoss > 0 ? avgGain / avgLoss : 0;
     const ev = (ba / 100) * avgGain - ((100 - ba) / 100) * avgLoss;
     const avgR = trades.reduce((s, t) => s + t.rMult, 0) / trades.length;
@@ -1904,10 +1907,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const initRiskPct = epN > 0 && sharesN > 0 ? initRiskD / (epN * sharesN) : 0;
     const rMult = initRiskPct > 0 ? (plPct / 100) / initRiskPct : 0;
 
-    // ROTE
+    // ROTE — initial (original stops) and current (active stop = trail if set)
     const ps = +portfolioSize || 0;
     const roteD = initRiskD > 0 ? initRiskD : 0;
     const rotePct = ps > 0 ? (roteD / ps) * 100 : 0;
+    const currentRoteD = activeStop >= epN ? 0 : Math.max(0, (epN - activeStop) * sharesN);
+    const currentRotePct = compEquity > 0 ? (currentRoteD / compEquity) * 100 : 0;
 
     // Risk-free exposure: use trail stop if set, otherwise original stops
     let riskFreePct = 0;
@@ -1955,8 +1960,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const realizedPL = realizedByTicker[p.sym] || 0;
     // Cost financed = realized profits >= initial risk (playing with house money)
     const costFinanced = realizedPL > 0 && initRiskD > 0 && realizedPL >= initRiskD;
-    return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
-  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0 }; }
+    return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
+  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0 }; }
   }), [positions, sizer, portfolioSize, compEquity, realizedByTicker]);
 
   const totals = useMemo(() => {
@@ -2009,8 +2014,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const losses = journaledTrades.filter(t => (t.plDollar || 0) < 0);
     const winRate = (wins.length / journaledTrades.length) * 100;
     const avgR = journaledTrades.reduce((s, t) => s + (t.rMult || 0), 0) / journaledTrades.length;
-    const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + (t.plPct || 0), 0) / wins.length : 0;
-    const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + (t.plPct || 0), 0) / losses.length) : 0;
+    // Dollar-weighted avg gain/loss
+    const winSize = wins.reduce((s, t) => s + (t.entryP || 0) * (t.shares || 0), 0);
+    const lossSize = losses.reduce((s, t) => s + (t.entryP || 0) * (t.shares || 0), 0);
+    const avgGain = winSize > 0 ? wins.reduce((s, t) => s + (t.plPct || 0) * (t.entryP || 0) * (t.shares || 0), 0) / winSize : 0;
+    const avgLoss = lossSize > 0 ? Math.abs(losses.reduce((s, t) => s + (t.plPct || 0) * (t.entryP || 0) * (t.shares || 0), 0) / lossSize) : 0;
     const rewardRisk = avgLoss > 0 ? avgGain / avgLoss : 0;
     return { winRate, avgR, avgGain, avgLoss, rewardRisk, count: journaledTrades.length };
   }, [journaledTrades]);
@@ -2330,7 +2338,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     {/* RTS — respects $ / % toggle. >0 = risk, <=0 = free. Glows to draw attention. */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.rtsD<=0?C.green:C.red,fontSize:"0.72rem",animation:p.cpN&&(p.stop1||p.stop2)?(p.rtsD>0?"rtsGlow 2.5s ease-in-out infinite":"rtsGlowGreen 3s ease-in-out infinite"):"none"}}>{rtsDisplay}</td>
                     {/* ROTE — Risk of Total Equity. Warning if >1.5% */}
-                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rotePct>0?C.red:C.green,whiteSpace:"nowrap"}}>{p.epN&&(p.stop1||p.stop2)?<>{p.rotePct.toFixed(2)}%</>:"—"}</td>
+                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",whiteSpace:"nowrap"}}>{p.epN&&(p.stop1||p.stop2)?<><div style={{color:p.currentRotePct>0?C.red:C.green}}>{p.currentRotePct.toFixed(2)}%</div>{p.currentRotePct!==p.rotePct&&<div style={{fontSize:"0.50rem",color:C.muted,fontWeight:500}}>Init: {p.rotePct.toFixed(2)}%</div>}</>:"—"}</td>
                     {isR ? (
                       <>
                         <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rSuggestedStop>p.epN?C.green:p.rSuggestedStop===p.epN?C.goldBright:C.muted}}>{p.rPerShare>0?(p.rSuggestedStop>=p.epN&&p.currentRLevel>=1?`$${p.rSuggestedStop.toFixed(2)} (${p.currentRLevel-1===0?"BE":(p.currentRLevel-1)+"R"})`:`$${p.rSuggestedStop.toFixed(2)}`):"—"}</td>
