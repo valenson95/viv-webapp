@@ -1094,27 +1094,26 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       const monthMap = {};
       sorted.forEach(t => {
         const m = (t.exit || t.entry || "").replace(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/, (_, mo, d, y) => `${y.length===2?"20"+y:y}-${mo.padStart(2,"0")}`).slice(0, 7) || "Unknown";
-        if (!monthMap[m]) monthMap[m] = { dollar: 0, pct: 0, count: 0 };
+        if (!monthMap[m]) monthMap[m] = { dollar: 0, count: 0 };
         monthMap[m].dollar += t.plDollar;
-        monthMap[m].pct += t.plPct;
         monthMap[m].count++;
       });
-      let cumEquity = startingCapital; let cumPct = 0;
+      let cumEquity = startingCapital;
       const points = [{ trade: "Start", equity: startingCapital, equityPct: 0 }];
       Object.keys(monthMap).sort().forEach(m => {
-        cumEquity += monthMap[m].dollar; cumPct += monthMap[m].pct;
-        points.push({ trade: m, equity: cumEquity, equityPct: cumPct });
+        cumEquity += monthMap[m].dollar;
+        points.push({ trade: m, equity: cumEquity, equityPct: startingCapital > 0 ? ((cumEquity - startingCapital) / startingCapital) * 100 : 0 });
       });
       return points;
     }
     // By trade — chronological by exit date
-    let cumEquity = startingCapital; let cumPct = 0;
+    let cumEquity = startingCapital;
     const points = [{ trade: "Start", equity: startingCapital, equityPct: 0 }];
     sorted.forEach(t => {
-      cumEquity += t.plDollar; cumPct += t.plPct;
+      cumEquity += t.plDollar;
       // Format exit date for x-axis label
       const dateStr = (t.exit || t.entry || "").replace(/\/\d{2}$/, m => m); // keep short date
-      points.push({ trade: dateStr || t.ticker, equity: cumEquity, equityPct: cumPct });
+      points.push({ trade: dateStr || t.ticker, equity: cumEquity, equityPct: startingCapital > 0 ? ((cumEquity - startingCapital) / startingCapital) * 100 : 0 });
     });
     return points;
   }, [filtered, eqXAxis, portfolioSize]);
@@ -1942,11 +1941,15 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 
   // Actual stats from journal trades
   const actualStats = useMemo(() => {
-    if (!journaledTrades || journaledTrades.length === 0) return { winRate: 0, avgR: 0, count: 0 };
+    if (!journaledTrades || journaledTrades.length === 0) return { winRate: 0, avgR: 0, avgGain: 0, avgLoss: 0, rewardRisk: 0, count: 0 };
     const wins = journaledTrades.filter(t => (t.plDollar || 0) > 0);
+    const losses = journaledTrades.filter(t => (t.plDollar || 0) < 0);
     const winRate = (wins.length / journaledTrades.length) * 100;
     const avgR = journaledTrades.reduce((s, t) => s + (t.rMult || 0), 0) / journaledTrades.length;
-    return { winRate, avgR, count: journaledTrades.length };
+    const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + (t.plPct || 0), 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + (t.plPct || 0), 0) / losses.length) : 0;
+    const rewardRisk = avgLoss > 0 ? avgGain / avgLoss : 0;
+    return { winRate, avgR, avgGain, avgLoss, rewardRisk, count: journaledTrades.length };
   }, [journaledTrades]);
 
   const compRealizedPL = useMemo(() => {
@@ -2024,10 +2027,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const batches = Math.min(+projBatches || 12, 52);
     const actual = [];
     let aEq = compEquity;
-    // Actual projection uses actual win rate & avg R from journal
+    // Actual projection uses actual win rate & avg gain/loss from journal (reward/risk based, not R-mult)
     const actualWr = (actualStats.winRate || 0) / 100;
-    const actualR = actualStats.avgR || 0;
-    const actualReturnPerCycle = actualWr * actualR * tgtRote - (1 - actualWr) * tgtRote;
+    const actualAvgGainPct = (actualStats.avgGain || 0) / 100;
+    const actualAvgLossPct = (actualStats.avgLoss || 0) / 100;
+    const actualReturnPerCycle = actualWr * actualAvgGainPct * tgtRote - (1 - actualWr) * actualAvgLossPct * tgtRote;
     for (let i = 0; i <= batches; i++) {
       if (i > 0) { aEq *= (1 + actualReturnPerCycle); }
       actual.push(Math.round(aEq));
@@ -2660,14 +2664,26 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
             </div>
             <div>
               <div style={{ fontWeight:700,fontSize:"0.58rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.blue,marginBottom:10 }}>Actual <span style={{color:C.muted,fontWeight:400,textTransform:"none"}}>({actualStats.count} trades)</span></div>
-              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
-                <div style={{ padding:"10px 14px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:"0.52rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4 }}>R-Multiple</div>
-                  <div style={{ fontSize:"1rem",fontWeight:800,color:actualStats.avgR >= (+projR||1) ? C.green : C.red }}>{actualStats.avgR.toFixed(2)}R</div>
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(100px, 1fr))",gap:8 }}>
+                <div style={{ padding:"8px 12px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
+                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Win Rate</div>
+                  <div style={{ fontSize:"0.92rem",fontWeight:800,color:actualStats.winRate >= (+projWin||50) ? C.green : C.red }}>{actualStats.winRate.toFixed(0)}%</div>
                 </div>
-                <div style={{ padding:"10px 14px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:"0.52rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4 }}>Win Rate</div>
-                  <div style={{ fontSize:"1rem",fontWeight:800,color:actualStats.winRate >= (+projWin||50) ? C.green : C.red }}>{actualStats.winRate.toFixed(0)}%</div>
+                <div style={{ padding:"8px 12px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
+                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Avg Gain</div>
+                  <div style={{ fontSize:"0.92rem",fontWeight:800,color:C.green }}>+{actualStats.avgGain.toFixed(1)}%</div>
+                </div>
+                <div style={{ padding:"8px 12px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
+                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Avg Loss</div>
+                  <div style={{ fontSize:"0.92rem",fontWeight:800,color:C.red }}>-{actualStats.avgLoss.toFixed(1)}%</div>
+                </div>
+                <div style={{ padding:"8px 12px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
+                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Reward/Risk</div>
+                  <div style={{ fontSize:"0.92rem",fontWeight:800,color:actualStats.rewardRisk >= 2 ? C.green : actualStats.rewardRisk >= 1 ? C.gold : C.red }}>{actualStats.rewardRisk.toFixed(2)}</div>
+                </div>
+                <div style={{ padding:"8px 12px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
+                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Exp. Return/Cycle</div>
+                  {(()=>{const tgtRote=(+targetRote||0)/100;const wr=actualStats.winRate/100;const retPerCycle=wr*actualStats.avgGain/100*tgtRote-(1-wr)*actualStats.avgLoss/100*tgtRote;return<div style={{ fontSize:"0.92rem",fontWeight:800,color:retPerCycle>=0?C.green:C.red }}>{(retPerCycle*100).toFixed(2)}%</div>})()}
                 </div>
               </div>
             </div>
