@@ -1118,8 +1118,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     return points;
   }, [filtered, eqXAxis, portfolioSize]);
 
-  // Monthly performance table data
+  // Monthly performance table data — P/L % = dollar P/L ÷ portfolio size (portfolio-weighted return)
   const monthlyPerf = useMemo(() => {
+    const ps = +(portfolioSize || 0);
     const months = {};
     filtered.forEach(t => {
       const raw = t.exit || t.entry || "";
@@ -1129,14 +1130,13 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       const y = match[3].length === 2 ? "20" + match[3] : match[3];
       const mo = match[1].padStart(2, "0");
       const key = `${y}-${mo}`;
-      if (!months[key]) months[key] = { dollar: 0, pct: 0, wins: 0, losses: 0, count: 0 };
+      if (!months[key]) months[key] = { dollar: 0, wins: 0, losses: 0, count: 0 };
       months[key].dollar += t.plDollar;
-      months[key].pct += t.plPct;
       months[key].count++;
       if (t.plDollar >= 0) months[key].wins++; else months[key].losses++;
     });
-    return Object.keys(months).sort().map(k => ({ month: k, label: new Date(k + "-15").toLocaleString("default", { month: "short", year: "numeric" }), ...months[k] }));
-  }, [filtered]);
+    return Object.keys(months).sort().map(k => ({ month: k, label: new Date(k + "-15").toLocaleString("default", { month: "short", year: "numeric" }), ...months[k], pct: ps > 0 ? (months[k].dollar / ps) * 100 : 0 }));
+  }, [filtered, portfolioSize]);
 
   const startEdit = (t) => { setEditingId(t.id); setEditRow({ ...t }); setEditNotes(parseNotes(t.notes)); };
   const saveEdit = () => {
