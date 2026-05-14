@@ -161,10 +161,13 @@ function Alert({ type, children }) {
   return <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: "0.74rem", fontWeight: 500, lineHeight: 1.5, marginTop: 8, background: isRed ? C.redDim : C.goldDim, border: `1px solid ${isRed ? "rgba(239,68,68,0.2)" : C.borderGold}`, color: isRed ? "#fca5a5" : C.goldBright }}>{children}</div>;
 }
 function StatTile({ label, value, color, prefix, sub }) {
+  const display = `${prefix || ""}${value}`;
+  const len = display.length;
+  const fs = len > 12 ? "0.88rem" : len > 9 ? "1.0rem" : len > 7 ? "1.12rem" : "1.3rem";
   return (
     <GlassCard small style={{ padding: "16px 18px" }}>
       <div style={{ fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted, marginBottom: 8 }}>{label}</div>
-      <div style={{ fontWeight: 800, fontSize: "1.3rem", letterSpacing: "-0.04em", color: color || C.white, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{prefix}{value}</div>
+      <div style={{ fontWeight: 800, fontSize: fs, letterSpacing: "-0.04em", color: color || C.white, whiteSpace: "nowrap" }}>{display}</div>
       {sub && <div style={{ fontWeight: 500, fontSize: "0.64rem", color: C.muted, marginTop: 4 }}>{sub}</div>}
     </GlassCard>
   );
@@ -1080,13 +1083,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   }, [filtered]);
 
   const distData = useMemo(() => {
-    // Dollar-weighted return distribution: weight each trade by position size (entryP × shares)
     const buckets = []; for (let i = -16; i <= 20; i += 2) buckets.push({ range: `${i}%`, gains: 0, losses: 0 });
-    filtered.forEach(t => {
-      const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor((t.plPct + 16) / 2)));
-      const weight = ((t.entryP || 0) * (t.shares || 0)) / 1000; // normalize to thousands for readable bar heights
-      if (buckets[idx]) t.plPct >= 0 ? buckets[idx].gains += (weight || 1) : buckets[idx].losses += (weight || 1);
-    });
+    filtered.forEach(t => { const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor((t.plPct + 16) / 2))); if (buckets[idx]) t.plPct >= 0 ? buckets[idx].gains++ : buckets[idx].losses++; });
     return buckets;
   }, [filtered]);
   // Equity curve data — supports $ vs % and trades vs months
@@ -1375,9 +1373,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           </ResponsiveContainer>
         </GlassCard>
         <GlassCard style={{ padding: "18px 22px" }}>
-          <div style={{ display:"flex",alignItems:"baseline",gap:8,marginBottom:14 }}><div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Return Distribution</div><div style={{fontSize:"0.50rem",color:C.muted,fontWeight:500}}>Dollar-Weighted</div></div>
+          <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white, marginBottom: 14 }}>Return Distribution</div>
           <ResponsiveContainer width="100%" height={170}>
-            <BarChart data={distData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>`$${v.toFixed(0)}k`} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[`$${Number(v).toFixed(1)}k`,name==="gains"?"Gains":"Losses"]} /><Bar dataKey="losses" fill={C.red} radius={[0,0,2,2]} /><Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} /></BarChart>
+            <BarChart data={distData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[v,name==="gains"?"Wins":"Losses"]} /><Bar dataKey="losses" fill={C.red} radius={[0,0,2,2]} /><Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} /></BarChart>
           </ResponsiveContainer>
         </GlassCard>
       </div>
