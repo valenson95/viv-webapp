@@ -907,6 +907,11 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const [uploadingImage, setUploadingImage] = useState(false);
   const [expandedTrade, setExpandedTrade] = useState(null); // for expanded view with chart + notes
 
+  // Ref to always hold the latest onManualSave — fixes stale closure when
+  // setTimeout fires after setJournaledTrades (state update hasn't rendered yet)
+  const onManualSaveRef = useRef(onManualSave);
+  useEffect(() => { onManualSaveRef.current = onManualSave; }, [onManualSave]);
+
   const allTrades = useMemo(() => journaledTrades.filter(t => !deletedTradeIds.includes(t.id)), [journaledTrades, deletedTradeIds]);
 
   const handleImport = (e) => {
@@ -981,8 +986,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       return { ...editRow, notes: serializedNotes, plPct, plDollar, rMult };
     }));
     setEditingId(null);
-    // Trigger immediate save instead of waiting for 2s autosave debounce
-    setTimeout(() => onManualSave(), 50);
+    // Trigger immediate save via ref — avoids stale closure from pre-setState render
+    setTimeout(() => onManualSaveRef.current(), 50);
   };
   const cancelEdit = () => { setEditingId(null); setEditNotes({ right: "", wrong: "", lessons: "", _plain: "" }); };
 
@@ -1345,6 +1350,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const [rNumStocks, setRNumStocks] = useState(4);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
 
+  // Ref to always hold the latest onManualSave — fixes stale closure when
+  // setTimeout fires after setPositions (state update hasn't rendered yet)
+  const onManualSaveRef = useRef(onManualSave);
+  useEffect(() => { onManualSaveRef.current = onManualSave; }, [onManualSave]);
+
   const sizer = useMemo(() => {
     const ps = +portfolioSize;
     if (!ps || ps <= 0) return null;
@@ -1540,7 +1550,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     setSellId(null);
     // CRITICAL: trigger immediate save after sell — don't wait for debounce.
     // Without this, refreshing before autosave fires resurrects the sold position from DB.
-    setTimeout(() => onManualSave(), 50); // tiny delay to let React state settle
+    setTimeout(() => onManualSaveRef.current(), 50); // ref avoids stale closure
   };
 
   // Enriched — dual stop loss: if stop2 is set, 50/50 split. Otherwise stop1 covers 100%.
@@ -2962,10 +2972,13 @@ function AppInner() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const offlineQueue = useRef(null); // stores {uid, posArr} for retry when back online
 
-  // ─── Save status indicator ───
-  const [saveStatus, setSaveStatus] = useState(null); // null | "saving" | "saved" | "error"
+  // ─── Save status indicators (SPLIT: positions and trades are independent) ───
+  const [positionSaveStatus, setPositionSaveStatus] = useState(null); // null | "saving" | "saved" | "error"
+  const [tradeSaveStatus, setTradeSaveStatus] = useState(null); // null | "saving" | "saved" | "error"
   const [saveErrorMsg, setSaveErrorMsg] = useState(""); // actual error message for debugging
-  const saveStatusTimer = useRef(null);
+  const [tradeSaveErrorMsg, setTradeSaveErrorMsg] = useState(""); // trade-specific error message
+  const positionSaveTimer = useRef(null);
+  const tradeSaveTimer = useRef(null);
 
   // ─── Dirty tracking: are there unsaved changes? ───
   const hasPendingChanges = useRef(false); // set true when data changes, cleared after save completes
@@ -3014,7 +3027,7 @@ function AppInner() {
     }
     isSaving.current = true;
     saveStartTime.current = Date.now();
-    setSaveStatus("saving");
+    setPositionSaveStatus("saving");
     try {
       const rows = posArr.map(p => ({
         user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
@@ -3028,15 +3041,15 @@ function AppInner() {
         if (lastLoadedCount.current > 0) {
           console.error("savePositionsNow called with 0 positions but lastLoadedCount was", lastLoadedCount.current, "— BLOCKING delete to prevent data loss.");
           isSaving.current = false;
-          setSaveStatus(null);
+          setPositionSaveStatus(null);
           return;
         }
         // User intentionally cleared all — safe to delete
         await supabase.from("positions").delete().eq("user_id", uid);
         isSaving.current = false;
-        setSaveStatus("saved");
-        if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
-        saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 2500);
+        setPositionSaveStatus("saved");
+        if (positionSaveTimer.current) clearTimeout(positionSaveTimer.current);
+        positionSaveTimer.current = setTimeout(() => setPositionSaveStatus(null), 2500);
         return;
       }
 
@@ -3046,9 +3059,9 @@ function AppInner() {
         const errMsg = insertErr?.message || "Insert returned no data";
         console.error("Position save error:", errMsg, "| Full error:", JSON.stringify(insertErr));
         setSaveErrorMsg(errMsg);
-        setSaveStatus("error");
-        if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
-        saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 8000);
+        setPositionSaveStatus("error");
+        if (positionSaveTimer.current) clearTimeout(positionSaveTimer.current);
+        positionSaveTimer.current = setTimeout(() => setPositionSaveStatus(null), 8000);
         // Queue for retry if it was a network error
         if (!navigator.onLine || (insertErr && /network|fetch|timeout/i.test(errMsg))) {
           offlineQueue.current = { uid, posArr };
@@ -3078,15 +3091,15 @@ function AppInner() {
       lastLoadedCount.current = inserted.length;
       // Show "saved" indicator briefly
       hasPendingChanges.current = false;
-      setSaveStatus("saved");
-      if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
-      saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 2500);
+      setPositionSaveStatus("saved");
+      if (positionSaveTimer.current) clearTimeout(positionSaveTimer.current);
+      positionSaveTimer.current = setTimeout(() => setPositionSaveStatus(null), 2500);
     } catch (err) {
       console.error("Position save failed:", err.message, err);
       setSaveErrorMsg(err.message || "Unknown error");
-      setSaveStatus("error");
-      if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
-      saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 8000);
+      setPositionSaveStatus("error");
+      if (positionSaveTimer.current) clearTimeout(positionSaveTimer.current);
+      positionSaveTimer.current = setTimeout(() => setPositionSaveStatus(null), 8000);
       // Queue for retry on network errors
       if (!navigator.onLine) offlineQueue.current = { uid, posArr };
     }
@@ -3624,7 +3637,7 @@ function AppInner() {
   const handleManualTradeSave = useCallback(async () => {
     if (!session || !dataLoaded.current) return;
     const uid = session.user.id;
-    setSaveStatus("saving");
+    setTradeSaveStatus("saving");
     try {
       const { data: existing } = await supabase.from("trades").select("id").eq("user_id", uid).eq("is_deleted", false);
       const existingIds = new Set((existing || []).map(t => t.id));
@@ -3657,23 +3670,23 @@ function AppInner() {
         const firstErr = updateResults.find(r => r.error);
         if (firstErr?.error) {
           console.error("Trade update error:", firstErr.error.message);
-          setSaveErrorMsg(firstErr.error.message);
-          setSaveStatus("error");
-          if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
-          saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 8000);
+          setTradeSaveErrorMsg(firstErr.error.message);
+          setTradeSaveStatus("error");
+          if (tradeSaveTimer.current) clearTimeout(tradeSaveTimer.current);
+          tradeSaveTimer.current = setTimeout(() => setTradeSaveStatus(null), 8000);
           return;
         }
       }
       hasPendingChanges.current = false;
-      setSaveStatus("saved");
-      if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
-      saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 2500);
+      setTradeSaveStatus("saved");
+      if (tradeSaveTimer.current) clearTimeout(tradeSaveTimer.current);
+      tradeSaveTimer.current = setTimeout(() => setTradeSaveStatus(null), 2500);
     } catch (err) {
       console.error("Manual trade save failed:", err.message);
-      setSaveErrorMsg(err.message || "Unknown error");
-      setSaveStatus("error");
-      if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
-      saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 8000);
+      setTradeSaveErrorMsg(err.message || "Unknown error");
+      setTradeSaveStatus("error");
+      if (tradeSaveTimer.current) clearTimeout(tradeSaveTimer.current);
+      tradeSaveTimer.current = setTimeout(() => setTradeSaveStatus(null), 8000);
     }
   }, [session, journaledTrades]);
 
@@ -3742,9 +3755,9 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} onManualSave={handleManualSave} saveStatus={saveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
-      {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={saveStatus} />}
+      {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} />}
     </>
   );
