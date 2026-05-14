@@ -46,6 +46,50 @@ const C = {
 const font = "'Manrope', -apple-system, sans-serif";
 const fmt$ = (v, dec = 0) => `$${Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
 
+// ─── Multi-sort helper ───
+// sorts = [{key, dir}] where dir is "asc" or "desc"
+function multiSort(arr, sorts) {
+  if (!sorts || sorts.length === 0) return arr;
+  return [...arr].sort((a, b) => {
+    for (const { key, dir } of sorts) {
+      let av = a[key], bv = b[key];
+      // Normalize: treat null/undefined/"" as -Infinity for numbers
+      if (typeof av === "string" && typeof bv === "string") {
+        const cmp = av.localeCompare(bv, undefined, { sensitivity: "base" });
+        if (cmp !== 0) return dir === "asc" ? cmp : -cmp;
+      } else {
+        av = av == null || av === "" ? -Infinity : Number(av) || 0;
+        bv = bv == null || bv === "" ? -Infinity : Number(bv) || 0;
+        if (av !== bv) return dir === "asc" ? av - bv : bv - av;
+      }
+    }
+    return 0;
+  });
+}
+// Toggle sort: click = set single sort, shift+click = add/toggle multi-sort
+function toggleSort(sorts, key, shiftKey) {
+  const existing = sorts.findIndex(s => s.key === key);
+  if (shiftKey) {
+    const next = [...sorts];
+    if (existing >= 0) {
+      if (next[existing].dir === "asc") next[existing] = { key, dir: "desc" };
+      else next.splice(existing, 1);
+    } else { next.push({ key, dir: "asc" }); }
+    return next;
+  }
+  if (existing >= 0 && sorts.length === 1) {
+    return sorts[0].dir === "asc" ? [{ key, dir: "desc" }] : [];
+  }
+  return [{ key, dir: "asc" }];
+}
+// Sort indicator arrow
+function sortArrow(sorts, key) {
+  const s = sorts.find(s => s.key === key);
+  if (!s) return "";
+  const idx = sorts.length > 1 ? sorts.indexOf(s) + 1 : "";
+  return s.dir === "asc" ? ` ▲${idx}` : ` ▼${idx}`;
+}
+
 // ─── Slider CSS ───
 const sliderCSS = `
 input[type=range].viv-slider{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;outline:none;cursor:pointer}
@@ -757,11 +801,13 @@ const SAMPLE_TRADES = [
 ];
 
 // ─── CSV Helpers ───
-const CSV_HEADERS = ["Symbol","Entry Date","Exit Date","Entry Price","Exit Price","Shares","Stop","Setup","Tags","P/L %","P/L $","R-Multiple","Exit Reason","Notes"];
+const CSV_HEADERS = ["Symbol","Entry Date","Entry Time","Exit Date","Exit Time","Entry Price","Exit Price","Shares","Stop","Setup","Tags","P/L %","P/L $","R-Multiple","Exit Reason","Notes"];
 const HEADER_ALIASES = {
   "symbol":"ticker","ticker":"ticker","sym":"ticker","stock":"ticker",
   "entry date":"entry","entry":"entry","open date":"entry","date opened":"entry","entrydate":"entry",
+  "entry time":"entryTime","entrytime":"entryTime","time in":"entryTime",
   "exit date":"exit","exit":"exit","close date":"exit","date closed":"exit","exitdate":"exit",
+  "exit time":"exitTime","exittime":"exitTime","time out":"exitTime",
   "entry price":"entryP","entryprice":"entryP","entry $":"entryP","buy price":"entryP","avg cost":"entryP","avgcost":"entryP",
   "exit price":"exitP","exitprice":"exitP","exit $":"exitP","sell price":"exitP","close price":"exitP",
   "shares":"shares","qty":"shares","quantity":"shares","size":"shares",
@@ -779,7 +825,7 @@ function exportTradesCSV(trades) {
   const rows = [CSV_HEADERS.join(",")];
   trades.forEach(t => {
     rows.push([
-      t.ticker, t.entry, t.exit || "", t.entryP, t.exitP, t.shares, t.stop || "",
+      t.ticker, t.entry, t.entryTime || "", t.exit || "", t.exitTime || "", t.entryP, t.exitP, t.shares, t.stop || "",
       `"${t.setup || ""}"`, `"${(t.tags || []).join("; ")}"`,
       t.plPct?.toFixed(2) || "", t.plDollar?.toFixed(2) || "", t.rMult?.toFixed(2) || "",
       `"${t.reason || ""}"`, `"${(t.notes || "").replace(/"/g, '""')}"`
@@ -789,6 +835,58 @@ function exportTradesCSV(trades) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = `VIV_Trades_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportPositionsCSV(positions) {
+  const headers = ["Symbol","Entry Date","Entry Time","Shares","Entry Price","Current Price","Stop","Trailing Stop","Setup","Tags","Commission","Notes","Chart URL"];
+  const rows = [headers.join(",")];
+  positions.forEach(p => {
+    rows.push([
+      p.sym || "", p.entry || "", p.entryTime || "", p.shares || "", p.ep || "", p.cp || "",
+      p.stop || "", p.trailStop || "", `"${p.setup || ""}"`,
+      `"${(p.tags || []).join("; ")}"`, p.comm || "",
+      `"${(p.notes || "").replace(/"/g, '""')}"`, `"${p.chartUrl || ""}"`
+    ].join(","));
+  });
+  const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `VIV_Positions_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Master CSV export — downloads both positions and trades in a single file
+function exportMasterCSV(positions, trades) {
+  const lines = [];
+  // Section 1: Open Positions
+  lines.push("=== OPEN POSITIONS ===");
+  const posHeaders = ["Symbol","Entry Date","Entry Time","Shares","Entry Price","Current Price","Stop","Trailing Stop","Setup","Tags","Commission","Notes","Chart URL"];
+  lines.push(posHeaders.join(","));
+  (positions || []).filter(p => p.sym).forEach(p => {
+    lines.push([
+      p.sym || "", p.entry || "", p.entryTime || "", p.shares || "", p.ep || "", p.cp || "",
+      p.stop || "", p.trailStop || "", `"${p.setup || ""}"`,
+      `"${(p.tags || []).join("; ")}"`, p.comm || "",
+      `"${(p.notes || "").replace(/"/g, '""')}"`, `"${p.chartUrl || ""}"`
+    ].join(","));
+  });
+  lines.push(""); // blank separator
+  // Section 2: Closed Trades
+  lines.push("=== CLOSED TRADES ===");
+  lines.push(CSV_HEADERS.join(","));
+  (trades || []).forEach(t => {
+    lines.push([
+      t.ticker, t.entry, t.entryTime || "", t.exit || "", t.exitTime || "", t.entryP, t.exitP, t.shares, t.stop || "",
+      `"${t.setup || ""}"`, `"${(t.tags || []).join("; ")}"`,
+      t.plPct?.toFixed(2) || "", t.plDollar?.toFixed(2) || "", t.rMult?.toFixed(2) || "",
+      `"${t.reason || ""}"`, `"${(t.notes || "").replace(/"/g, '""')}"`
+    ].join(","));
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `VIV_Master_Export_${new Date().toISOString().slice(0,10)}.csv`; a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -856,8 +954,8 @@ function parseCSV(text) {
     results.push({
       id: Date.now() + i,
       ticker: row.ticker.toUpperCase(),
-      entry: entryDate,
-      exit: exitDate,
+      entry: entryDate, entryTime: row.entryTime || "",
+      exit: exitDate, exitTime: row.exitTime || "",
       entryP: effectiveEntryP, exitP, shares, stop,
       setup: row.setup || "VCP",
       tags: row.tags ? row.tags.split(/[;,]/).map(t => t.trim()).filter(Boolean) : [],
@@ -895,7 +993,7 @@ function notesPreview(raw) {
   return parts.join(" | ") || "";
 }
 
-function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, saveStatus }) {
+function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, saveStatus, positions }) {
   const [filterSetup, setFilterSetup] = useState("All");
   const [filterTag, setFilterTag] = useState("All");
   const [editingId, setEditingId] = useState(null);
@@ -906,6 +1004,10 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const [deletedTradeIds, setDeletedTradeIds] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [expandedTrade, setExpandedTrade] = useState(null); // for expanded view with chart + notes
+  const [tradeSorts, setTradeSorts] = useState([]); // [{key, dir}] multi-sort for trades
+  const [eqYAxis, setEqYAxis] = useState("$"); // "$" or "%"
+  const [eqXAxis, setEqXAxis] = useState("trades"); // "trades" or "months"
+  const [perfToggle, setPerfToggle] = useState("$"); // "$" or "%" for monthly perf table
 
   // Ref to always hold the latest onManualSave — fixes stale closure when
   // setTimeout fires after setJournaledTrades (state update hasn't rendered yet)
@@ -950,11 +1052,20 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     const glRatio = avgLoss > 0 ? avgGain / avgLoss : 0;
     const ev = (ba / 100) * avgGain - ((100 - ba) / 100) * avgLoss;
     const avgR = trades.reduce((s, t) => s + t.rMult, 0) / trades.length;
-    // Holding duration (days) — entry and exit dates already captured per trade
+    // Holding duration (days) — uses time fields for fractional-day accuracy when available
     const holdDays = (t) => {
       if (!t.entry || !t.exit) return null;
       const d1 = new Date(t.entry), d2 = new Date(t.exit);
       if (isNaN(d1) || isNaN(d2)) return null;
+      // If time fields exist, add hours+minutes for fractional day precision
+      if (t.entryTime && t.exitTime) {
+        const [eh, em] = t.entryTime.split(":").map(Number);
+        const [xh, xm] = t.exitTime.split(":").map(Number);
+        if (!isNaN(eh) && !isNaN(em)) { d1.setHours(eh, em, 0, 0); }
+        if (!isNaN(xh) && !isNaN(xm)) { d2.setHours(xh, xm, 0, 0); }
+        const diffMs = Math.max(0, d2 - d1);
+        return +(diffMs / 86400000).toFixed(1);
+      }
       return Math.max(0, Math.round((d2 - d1) / 86400000));
     };
     const winDays = wins.map(holdDays).filter(d => d !== null);
@@ -970,7 +1081,47 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     filtered.forEach(t => { const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor((t.plPct + 16) / 2))); if (buckets[idx]) t.plPct >= 0 ? buckets[idx].gains++ : buckets[idx].losses++; });
     return buckets;
   }, [filtered]);
-  const equityData = useMemo(() => { let cum = 0; return filtered.map(t => { cum += t.plDollar; return { trade: t.ticker, equity: cum }; }); }, [filtered]);
+  // Equity curve data — supports $ vs % and trades vs months
+  const equityData = useMemo(() => {
+    if (eqXAxis === "months") {
+      // Group by exit month
+      const monthMap = {};
+      filtered.forEach(t => {
+        const m = (t.exit || t.entry || "").replace(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/, (_, mo, d, y) => `${y.length===2?"20"+y:y}-${mo.padStart(2,"0")}`).slice(0, 7) || "Unknown";
+        if (!monthMap[m]) monthMap[m] = { dollar: 0, pct: 0, count: 0 };
+        monthMap[m].dollar += t.plDollar;
+        monthMap[m].pct += t.plPct;
+        monthMap[m].count++;
+      });
+      let cum = 0; let cumPct = 0;
+      return Object.keys(monthMap).sort().map(m => {
+        cum += monthMap[m].dollar; cumPct += monthMap[m].pct;
+        return { trade: m, equity: cum, equityPct: cumPct };
+      });
+    }
+    let cum = 0; let cumPct = 0;
+    return filtered.map(t => { cum += t.plDollar; cumPct += t.plPct; return { trade: t.ticker, equity: cum, equityPct: cumPct }; });
+  }, [filtered, eqXAxis]);
+
+  // Monthly performance table data
+  const monthlyPerf = useMemo(() => {
+    const months = {};
+    filtered.forEach(t => {
+      const raw = t.exit || t.entry || "";
+      // Parse M/D/YY or M/D/YYYY
+      const match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+      if (!match) return;
+      const y = match[3].length === 2 ? "20" + match[3] : match[3];
+      const mo = match[1].padStart(2, "0");
+      const key = `${y}-${mo}`;
+      if (!months[key]) months[key] = { dollar: 0, pct: 0, wins: 0, losses: 0, count: 0 };
+      months[key].dollar += t.plDollar;
+      months[key].pct += t.plPct;
+      months[key].count++;
+      if (t.plDollar >= 0) months[key].wins++; else months[key].losses++;
+    });
+    return Object.keys(months).sort().map(k => ({ month: k, label: new Date(k + "-15").toLocaleString("default", { month: "short", year: "numeric" }), ...months[k] }));
+  }, [filtered]);
 
   const startEdit = (t) => { setEditingId(t.id); setEditRow({ ...t }); setEditNotes(parseNotes(t.notes)); };
   const saveEdit = () => {
@@ -1031,7 +1182,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           <button onClick={onManualSave} disabled={saveStatus === "saving"} style={{ padding:"8px 16px",borderRadius:980,border:`1px solid ${saveStatus === "saved" ? "rgba(34,197,94,0.4)" : saveStatus === "error" ? "rgba(239,68,68,0.4)" : C.borderGold}`,background:saveStatus === "saved" ? "rgba(34,197,94,0.12)" : saveStatus === "error" ? "rgba(239,68,68,0.12)" : C.goldDim,color:saveStatus === "saved" ? C.green : saveStatus === "error" ? C.red : C.gold,fontWeight:700,fontSize:"0.72rem",cursor:saveStatus === "saving" ? "wait" : "pointer",fontFamily:font,transition:"all 0.2s",display:"flex",alignItems:"center",gap:6 }}>
             {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Save Failed" : "Save"}
           </button>
-          <GoldBtn onClick={() => exportTradesCSV(filtered)} small>Export CSV</GoldBtn>
+          <GoldBtn onClick={() => exportMasterCSV(positions, filtered)} small>Export CSV</GoldBtn>
           <label style={{ padding: "8px 16px", borderRadius: 980, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.05)", color: C.white, fontWeight: 700, fontSize: "0.72rem", cursor: "pointer", fontFamily: font }}>
             Import CSV
             <input type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} />
@@ -1073,7 +1224,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   {[
                     ["Symbol", "Symbol, Ticker, Sym, Stock", "Yes"],
                     ["Entry Date", "Entry Date, Entry, Open Date", "No"],
+                    ["Entry Time", "Entry Time, Time In (HH:MM)", "No"],
                     ["Exit Date", "Exit Date, Exit, Close Date", "No"],
+                    ["Exit Time", "Exit Time, Time Out (HH:MM)", "No"],
                     ["Entry Price", "Entry Price, Buy Price, Avg Cost", "Recommended"],
                     ["Exit Price", "Exit Price, Sell Price, Close Price", "Recommended"],
                     ["Shares", "Shares, Qty, Quantity, Size", "Recommended"],
@@ -1126,10 +1279,10 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       {/* Stats — recalculate based on filter */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
         <StatTile label="Total P/L" value={`$${stats.totalPL.toLocaleString()}`} color={stats.totalPL >= 0 ? C.green : C.red} prefix={stats.totalPL >= 0 ? "+" : ""} />
-        <StatTile label="Batting Avg" value={`${stats.ba.toFixed(0)}%`} color={stats.ba >= 50 ? C.green : C.red} />
+        <StatTile label="Win Rate" value={`${stats.ba.toFixed(0)}%`} color={stats.ba >= 50 ? C.green : C.red} />
         <StatTile label="Avg Gain" value={`${stats.avgGain.toFixed(1)}%`} color={C.green} prefix="+" />
         <StatTile label="Avg Loss" value={`${stats.avgLoss.toFixed(1)}%`} color={C.red} prefix="-" />
-        <StatTile label="G/L Ratio" value={stats.glRatio.toFixed(2)} color={stats.glRatio >= 2 ? C.green : stats.glRatio >= 1 ? C.gold : C.red} />
+        <StatTile label="Reward/Risk" value={stats.glRatio.toFixed(2)} color={stats.glRatio >= 2 ? C.green : stats.glRatio >= 1 ? C.gold : C.red} />
         <StatTile label="Expectancy" value={`${stats.ev >= 0 ? "+" : ""}${stats.ev.toFixed(2)}%`} color={stats.ev >= 0 ? C.green : C.red} />
         <StatTile label="Avg R-Mult" value={`${stats.avgR.toFixed(2)}R`} color={stats.avgR >= 0 ? C.green : C.red} />
         <StatTile label="Largest Loss" value={`${stats.largestLoss.toFixed(1)}%`} color={stats.largestLoss < -10 ? C.red : C.gold} />
@@ -1141,9 +1294,19 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       {/* Charts */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14, marginBottom: 20 }}>
         <GlassCard style={{ padding: "18px 22px" }}>
-          <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white, marginBottom: 14 }}>Equity Curve</div>
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
+            <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Equity Curve</div>
+            <div style={{ display:"flex",gap:6 }}>
+              <div style={{display:"flex",borderRadius:6,overflow:"hidden",border:`1px solid ${C.border}`}}>
+                {["$","%"].map(v=>(<button key={v} onClick={()=>setEqYAxis(v)} style={{padding:"3px 10px",background:eqYAxis===v?C.goldDim:"transparent",border:"none",color:eqYAxis===v?C.gold:C.muted,fontWeight:700,fontSize:"0.56rem",cursor:"pointer",fontFamily:font}}>{v}</button>))}
+              </div>
+              <div style={{display:"flex",borderRadius:6,overflow:"hidden",border:`1px solid ${C.border}`}}>
+                {[["trades","Trades"],["months","Months"]].map(([k,l])=>(<button key={k} onClick={()=>setEqXAxis(k)} style={{padding:"3px 10px",background:eqXAxis===k?C.goldDim:"transparent",border:"none",color:eqXAxis===k?C.gold:C.muted,fontWeight:700,fontSize:"0.56rem",cursor:"pointer",fontFamily:font}}>{l}</button>))}
+              </div>
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={170}>
-            <LineChart data={equityData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="trade" tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>`$${(v/1000).toFixed(0)}k`} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} /><ReferenceLine y={0} stroke={C.border} /><Line type="monotone" dataKey="equity" stroke={C.gold} strokeWidth={2} dot={{fill:C.gold,r:3.5}} /></LineChart>
+            <LineChart data={equityData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="trade" tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={eqYAxis==="$" ? (v=>`$${(v/1000).toFixed(0)}k`) : (v=>`${v.toFixed(1)}%`)} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v)=>eqYAxis==="$"?[`$${Number(v).toLocaleString()}`,"P/L"]:[`${Number(v).toFixed(2)}%`,"P/L"]} /><ReferenceLine y={0} stroke={C.border} /><Line type="monotone" dataKey={eqYAxis==="$"?"equity":"equityPct"} stroke={C.gold} strokeWidth={2} dot={{fill:C.gold,r:3.5}} /></LineChart>
           </ResponsiveContainer>
         </GlassCard>
         <GlassCard style={{ padding: "18px 22px" }}>
@@ -1154,6 +1317,65 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
         </GlassCard>
       </div>
 
+      {/* Monthly Performance Table */}
+      {monthlyPerf.length > 0 && (
+        <GlassCard style={{ marginBottom: 20 }}>
+          <div style={{ padding: "18px 22px 6px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Monthly Performance</div>
+            <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: `1px solid ${C.border}` }}>
+              {["$", "%"].map(v => (
+                <button key={v} onClick={() => setPerfToggle(v)} style={{ padding: "3px 10px", background: perfToggle === v ? C.goldDim : "transparent", border: "none", color: perfToggle === v ? C.gold : C.muted, fontWeight: 700, fontSize: "0.56rem", cursor: "pointer", fontFamily: font }}>{v}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ overflowX: "auto", padding: "0 22px 18px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.72rem" }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <th style={{ padding: "9px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Month</th>
+                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>P/L</th>
+                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Trades</th>
+                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Wins</th>
+                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Losses</th>
+                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Win Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyPerf.map(m => {
+                  const val = perfToggle === "$" ? m.dollar : m.pct;
+                  const isPos = val >= 0;
+                  const bgColor = isPos ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.06)";
+                  const wr = m.count > 0 ? (m.wins / m.count * 100) : 0;
+                  return (
+                    <tr key={m.month} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, background: bgColor }}>
+                      <td style={{ padding: "8px 8px", fontWeight: 600, color: C.white }}>{m.label}</td>
+                      <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, color: isPos ? C.green : C.red }}>{isPos ? "+" : ""}{perfToggle === "$" ? `$${Math.abs(val).toLocaleString(undefined, {minimumFractionDigits:0,maximumFractionDigits:0})}` : `${val.toFixed(2)}%`}</td>
+                      <td style={{ padding: "8px 8px", textAlign: "right", color: C.text }}>{m.count}</td>
+                      <td style={{ padding: "8px 8px", textAlign: "right", color: C.green }}>{m.wins}</td>
+                      <td style={{ padding: "8px 8px", textAlign: "right", color: C.red }}>{m.losses}</td>
+                      <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 600, color: wr >= 50 ? C.green : C.red }}>{wr.toFixed(0)}%</td>
+                    </tr>
+                  );
+                })}
+                {/* Totals row */}
+                <tr style={{ borderTop: `2px solid ${C.border}`, background: "rgba(255,255,255,0.02)" }}>
+                  <td style={{ padding: "10px 8px", fontWeight: 800, color: C.white, textTransform: "uppercase", fontSize: "0.64rem", letterSpacing: "0.06em" }}>Total</td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: (perfToggle === "$" ? monthlyPerf.reduce((s,m)=>s+m.dollar,0) : monthlyPerf.reduce((s,m)=>s+m.pct,0)) >= 0 ? C.green : C.red }}>
+                    {(() => { const tot = perfToggle === "$" ? monthlyPerf.reduce((s,m)=>s+m.dollar,0) : monthlyPerf.reduce((s,m)=>s+m.pct,0); return `${tot >= 0 ? "+" : ""}${perfToggle === "$" ? `$${Math.abs(tot).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}` : `${tot.toFixed(2)}%`}`; })()}
+                  </td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.text }}>{monthlyPerf.reduce((s,m)=>s+m.count,0)}</td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.green }}>{monthlyPerf.reduce((s,m)=>s+m.wins,0)}</td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.red }}>{monthlyPerf.reduce((s,m)=>s+m.losses,0)}</td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.muted }}>
+                    {(() => { const tw = monthlyPerf.reduce((s,m)=>s+m.wins,0), tc = monthlyPerf.reduce((s,m)=>s+m.count,0); return tc > 0 ? `${(tw/tc*100).toFixed(0)}%` : "–"; })()}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </GlassCard>
+      )}
+
       {/* Closed Trades Table — editable */}
       <GlassCard>
         <div style={{ padding: "18px 22px 6px" }}><div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Closed Trades</div></div>
@@ -1161,26 +1383,28 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.72rem" }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                {["Symbol","Entry","Exit","Entry $","Exit $","Shares","Setup","Tags","P/L %","P/L $","R-Mult","Reason","Notes","Chart",""].map(h => (
-                  <th key={h} style={{ padding: "9px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>{h}</th>
+                {[["Symbol","ticker"],["Entry","entry"],["Time","entryTime"],["Exit","exit"],["Time","exitTime"],["Entry $","entryP"],["Exit $","exitP"],["Shares","shares"],["Setup","setup"],["Tags",null],["P/L %","plPct"],["P/L $","plDollar"],["R-Mult","rMult"],["Reason","reason"],["Notes",null],["Chart",null],["",null]].map(([h,k],hi) => (
+                  <th key={`${h}-${hi}`} onClick={k ? (e) => setTradeSorts(s => toggleSort(s, k, e.shiftKey)) : undefined} style={{ padding: "9px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: tradeSorts.find(s=>s.key===k)?C.gold:C.muted, whiteSpace: "nowrap", cursor:k?"pointer":"default", userSelect:"none" }}>{h}{k ? sortArrow(tradeSorts, k) : ""}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map(t => {
+              {(tradeSorts.length > 0 ? multiSort(filtered, tradeSorts) : filtered).map(t => {
                 const isEditing = editingId === t.id;
                 if (isEditing) {
                   return (<React.Fragment key={t.id}>
                     <tr style={{ background: "rgba(201,152,42,0.04)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                       <td style={{ padding: "6px 6px" }}><TickerInput value={editRow.ticker} onChange={v => setEditRow(r => ({...r, ticker: v}))} /></td>
                       <td style={{ padding: "6px 6px" }}><input type="text" value={editRow.entry} onChange={e => setEditRow(r => ({...r, entry: e.target.value}))} style={{width:70,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 7px",color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none"}} /></td>
+                      <td style={{ padding: "6px 6px" }}><input type="text" value={editRow.entryTime||""} onChange={e => setEditRow(r => ({...r, entryTime: e.target.value}))} placeholder="HH:MM" style={{width:50,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 5px",color:C.white,fontSize:"0.66rem",fontFamily:font,outline:"none",textAlign:"center"}} /></td>
                       <td style={{ padding: "6px 6px" }}><input type="text" value={editRow.exit} onChange={e => setEditRow(r => ({...r, exit: e.target.value}))} style={{width:70,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 7px",color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none"}} /></td>
+                      <td style={{ padding: "6px 6px" }}><input type="text" value={editRow.exitTime||""} onChange={e => setEditRow(r => ({...r, exitTime: e.target.value}))} placeholder="HH:MM" style={{width:50,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 5px",color:C.white,fontSize:"0.66rem",fontFamily:font,outline:"none",textAlign:"center"}} /></td>
                       <td style={{ padding: "6px 6px" }}><CellInput value={editRow.entryP} onChange={v => setEditRow(r => ({...r, entryP: +v}))} width={72} /></td>
                       <td style={{ padding: "6px 6px" }}><CellInput value={editRow.exitP} onChange={v => setEditRow(r => ({...r, exitP: +v}))} width={72} /></td>
                       <td style={{ padding: "6px 6px" }}><CellInput value={editRow.shares} onChange={v => setEditRow(r => ({...r, shares: +v}))} width={60} /></td>
                       <td style={{ padding: "6px 6px" }}><MiniSelect value={editRow.setup} onChange={v => setEditRow(r => ({...r, setup: v}))} options={setupTypes} width={90} /></td>
                       <td style={{ padding: "6px 6px" }}><TagSelector selected={editRow.tags || []} allTags={allTags} onChange={v => setEditRow(r => ({...r, tags: v}))} small /></td>
-                      <td colSpan={3} />
+                      <td colSpan={3} style={{ fontSize:"0.54rem",color:C.muted,textAlign:"center" }} />
                       <td style={{ padding: "6px 6px" }}><MiniSelect value={editRow.reason} onChange={v => setEditRow(r => ({...r, reason: v}))} options={exitReasons} width={110} /></td>
                       <td style={{ padding: "6px 6px", fontSize: "0.58rem", color: C.muted }}>see below</td>
                       <td style={{ padding: "6px 6px", fontSize: "0.58rem", color: C.muted }}>see below</td>
@@ -1191,7 +1415,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     </tr>
                     {/* Expanded edit area: structured notes + chart URL + image upload */}
                     <tr style={{ background: "rgba(201,152,42,0.03)", borderBottom: `2px solid ${C.borderGold}` }}>
-                      <td colSpan={15} style={{ padding: "14px 16px" }}>
+                      <td colSpan={17} style={{ padding: "14px 16px" }}>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                           {/* Left: Structured Notes */}
                           <div>
@@ -1248,7 +1472,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.03)", cursor: "pointer" }} onDoubleClick={() => startEdit(t)}>
                     <td style={{ padding: "11px 8px", fontWeight: 700, color: C.gold }}>{t.ticker}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>{t.entry}</td>
+                    <td style={{ padding: "11px 6px", color: C.muted, fontSize: "0.62rem" }}>{t.entryTime||"—"}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>{t.exit||"—"}</td>
+                    <td style={{ padding: "11px 6px", color: C.muted, fontSize: "0.62rem" }}>{t.exitTime||"—"}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>${t.entryP.toFixed(2)}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>${t.exitP.toFixed(2)}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>{t.shares.toLocaleString()}</td>
@@ -1276,7 +1502,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   {/* Expanded view: notes + chart */}
                   {expandedTrade === t.id && (
                     <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: `1px solid ${C.border}` }}>
-                      <td colSpan={15} style={{ padding: "14px 20px" }}>
+                      <td colSpan={17} style={{ padding: "14px 20px" }}>
                         <div style={{ display: "grid", gridTemplateColumns: t.chartImage ? "1fr 1fr" : "1fr", gap: 16 }}>
                           <div>
                             {(() => { const n = parseNotes(t.notes);
@@ -1349,6 +1575,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const [sizerMode, setSizerMode] = useState("R"); // "R" = risk-based (default), "%" = position size
   const [rNumStocks, setRNumStocks] = useState(4);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const [posSorts, setPosSorts] = useState([]); // [{key, dir}] multi-sort for positions
+  const [posColWidths, setPosColWidths] = useState({}); // {colKey: width} for resizable columns
 
   // Ref to always hold the latest onManualSave — fixes stale closure when
   // setTimeout fires after setPositions (state update hasn't rendered yet)
@@ -1465,7 +1693,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const addPosition = useCallback(() => {
     setPositions(prev => {
       const maxId = prev.reduce((m, p) => Math.max(m, p.id || 0), 0);
-      const next = [...prev, { id: maxId + 1, _lid: _lid++, sym: "", entry: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [], comm: "", notes: "", chartUrl: "", chartImage: "" }];
+      const now = new Date();
+      const next = [...prev, { id: maxId + 1, _lid: _lid++, sym: "", entry: now.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), entryTime: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [], comm: "", notes: "", chartUrl: "", chartImage: "" }];
       positionsRef.current = next;
       return next;
     });
@@ -1533,9 +1762,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       // Build notes: use structured fields if any filled, fall back to plain sellNotes, then position notes
       const hasStruct = sellNotesStruct.right || sellNotesStruct.wrong || sellNotesStruct.lessons;
       const finalNotes = hasStruct ? serializeNotes({ ...sellNotesStruct, _plain: "" }) : (sellNotes || pos.notes || "");
+      const nowSell = new Date();
       onJournalTrade({
-        id: Date.now(), ticker: pos.sym, entry: pos.entry,
-        exit: new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }),
+        id: Date.now(), ticker: pos.sym, entry: pos.entry, entryTime: pos.entryTime || "",
+        exit: nowSell.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }),
+        exitTime: nowSell.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
         entryP: epN, exitP, shares: soldShares, stop: stopN, setup: pos.setup,
         tags: [...(pos.tags || []), ...sellTags], plPct, plDollar, rMult,
         reason: sellReason, notes: finalNotes, chartUrl: sellChartUrl || pos.chartUrl || "", chartImage: pos.chartImage || "", _fromDashboard: true,
@@ -1691,6 +1922,16 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const [projR, setProjR] = useState("2");
   const [projWin, setProjWin] = useState("55");
   const [projBatches, setProjBatches] = useState("12");
+  const [targetAnnualReturn, setTargetAnnualReturn] = useState("");
+
+  // Actual stats from journal trades
+  const actualStats = useMemo(() => {
+    if (!journaledTrades || journaledTrades.length === 0) return { winRate: 0, avgR: 0, count: 0 };
+    const wins = journaledTrades.filter(t => (t.plDollar || 0) > 0);
+    const winRate = (wins.length / journaledTrades.length) * 100;
+    const avgR = journaledTrades.reduce((s, t) => s + (t.rMult || 0), 0) / journaledTrades.length;
+    return { winRate, avgR, count: journaledTrades.length };
+  }, [journaledTrades]);
 
   const compRealizedPL = useMemo(() => {
     if (!journaledTrades || journaledTrades.length === 0) return 0;
@@ -1765,20 +2006,40 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const tgtRote = (+targetRote || 0) / 100;
     const tgtR = +projR || 1;
     const batches = Math.min(+projBatches || 12, 52);
-    const best = [], worst = [];
-    let bEq = compEquity, wEq = compEquity;
+    const best = [], worst = [], actual = [];
+    let bEq = compEquity, wEq = compEquity, aEq = compEquity;
+    // Actual projection uses actual win rate & avg R from journal
+    const actualWr = (actualStats.winRate || 0) / 100;
+    const actualR = actualStats.avgR || 0;
+    const actualReturnPerCycle = actualWr * actualR * tgtRote - (1 - actualWr) * tgtRote;
     for (let i = 0; i <= batches; i++) {
-      if (i > 0) { bEq *= (1 + tgtRote * tgtR); wEq *= (1 - tgtRote); }
-      best.push(Math.round(bEq)); worst.push(Math.round(wEq));
+      if (i > 0) { bEq *= (1 + tgtRote * tgtR); wEq *= (1 - tgtRote); aEq *= (1 + actualReturnPerCycle); }
+      best.push(Math.round(bEq)); worst.push(Math.round(wEq)); actual.push(Math.round(aEq));
     }
-    return projection.map((d, i) => ({ cycle: i === 0 ? "Now" : `C${d.cycle}`, expected: Math.round(d.equity), best: best[i], worst: worst[i] }));
-  }, [projection, compEquity, targetRote, projR, projBatches]);
+    return projection.map((d, i) => ({ cycle: i === 0 ? "Now" : `C${d.cycle}`, expected: Math.round(d.equity), best: best[i], worst: worst[i], actual: actual[i] }));
+  }, [projection, compEquity, targetRote, projR, projBatches, actualStats]);
 
   const finalProj = projection.length > 1 ? projection[projection.length - 1] : null;
 
+  // Target annual return → back-calculate required cycles
+  const annualGoal = useMemo(() => {
+    const annRet = +(targetAnnualReturn || 0) / 100;
+    if (annRet <= 0 || compEquity <= 0) return null;
+    const tgtRote = (+targetRote || 0) / 100;
+    const wr = (+projWin || 50) / 100;
+    const tgtR = +projR || 1;
+    const expectedReturnPerCycle = wr * tgtR * tgtRote - (1 - wr) * tgtRote;
+    if (expectedReturnPerCycle <= 0) return { requiredCycles: Infinity, targetEquity: compEquity * (1 + annRet), returnPerCycle: expectedReturnPerCycle };
+    const requiredCycles = Math.ceil(Math.log(1 + annRet) / Math.log(1 + expectedReturnPerCycle));
+    return { requiredCycles, targetEquity: compEquity * (1 + annRet), returnPerCycle: expectedReturnPerCycle };
+  }, [targetAnnualReturn, compEquity, targetRote, projWin, projR]);
+
+  // Completed cycles = total journal trades (each trade is one deployment within a cycle)
+  const completedCycles = actualStats.count;
+
   const compTh = (text, align = "right") => <th style={{padding:"10px 8px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap"}}>{text}</th>;
 
-  const th = (text, align = "right") => <th style={{ padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap" }}>{text}</th>;
+  const th = (text, align = "right", sortKey = null) => <th onClick={sortKey ? (e) => setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)) : undefined} style={{ padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"default",userSelect:"none" }}>{text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>;
 
   return (
     <div>
@@ -1880,15 +2141,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
             <button onClick={() => { if (saveStatus === "error" && saveErrorMsg) { alert("Save error: " + saveErrorMsg); } else { onManualSave(); } }} disabled={saveStatus === "saving"} title={saveStatus === "error" && saveErrorMsg ? "Error: " + saveErrorMsg : "Save all positions to database"} style={{ padding:"8px 16px",borderRadius:980,border:`1px solid ${saveStatus === "saved" ? "rgba(34,197,94,0.4)" : saveStatus === "error" ? "rgba(239,68,68,0.4)" : C.borderGold}`,background:saveStatus === "saved" ? "rgba(34,197,94,0.12)" : saveStatus === "error" ? "rgba(239,68,68,0.12)" : C.goldDim,color:saveStatus === "saved" ? C.green : saveStatus === "error" ? C.red : C.gold,fontWeight:700,fontSize:"0.72rem",cursor:saveStatus === "saving" ? "wait" : "pointer",fontFamily:font,transition:"all 0.2s",display:"flex",alignItems:"center",gap:6 }}>
               {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Save Failed ⓘ" : "Save"}
             </button>
-            <button onClick={() => {
-              const csv = [["Symbol","Entry Date","Shares","Entry Price","Commission","Current Price","Stop 1","Stop 2","Trail Stop","Setup","Tags"].join(",")];
-              positions.filter(p => p.sym).forEach(p => {
-                csv.push([p.sym, p.entry, p.shares, p.ep, p.comm||"", p.cp, p.stop, p.stop2||"", p.trailStop||"", p.setup, (p.tags||[]).join(";")].map(v => `"${String(v||"").replace(/"/g,'""')}"`).join(","));
-              });
-              const blob = new Blob([csv.join("\n")], { type: "text/csv" });
-              const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-              a.download = `VIV_Positions_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-            }} style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.muted,fontWeight:700,fontSize:"0.62rem",cursor:"pointer",fontFamily:font }}>Export</button>
+            <button onClick={() => exportMasterCSV(positions.filter(p => p.sym), journaledTrades)} style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.muted,fontWeight:700,fontSize:"0.62rem",cursor:"pointer",fontFamily:font }}>Export CSV</button>
             <label style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.muted,fontWeight:700,fontSize:"0.62rem",cursor:"pointer",fontFamily:font }}>
               Import
               <input type="file" accept=".csv" style={{ display:"none" }} onChange={(e) => {
@@ -1911,6 +2164,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     const setupIdx = hdr.findIndex(h => /setup/i.test(h));
                     const tagsIdx = hdr.findIndex(h => /tags/i.test(h));
                     const commIdx = hdr.findIndex(h => /commission|comm/i.test(h));
+                    const entryTimeIdx = hdr.findIndex(h => /entry.?time|time.?in/i.test(h));
                     if (symIdx < 0) { alert("CSV must have a Symbol column"); return; }
                     const imported = [];
                     for (let i = 1; i < lines.length; i++) {
@@ -1926,6 +2180,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                         setup: vals[setupIdx] || setupTypes[0] || "VCP",
                         tags: tagsIdx >= 0 && vals[tagsIdx] ? vals[tagsIdx].split(";").map(t => t.trim()).filter(Boolean) : [],
                         comm: commIdx >= 0 ? vals[commIdx] || "" : "",
+                        entryTime: entryTimeIdx >= 0 ? vals[entryTimeIdx] || "" : "",
                       });
                     }
                     if (imported.length > 0) {
@@ -1963,10 +2218,10 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left")}{th("Symbol","left")}{th("Shares")}{th("Avg. Cost")}{th("Comm")}{th("Value")}{th("Orig Stop")}{th("Stop 2")}{th("Trail Stop")}{th("Current")}{th("Setup","left")}{th("Tags","left")}{th("DTS")}{th("RTS")}{th("ROTE")}{displayMode==="R"&&th("R Suggest")}{displayMode==="R"&&th("Locked")}{displayMode!=="R"&&th("SBE")}{displayMode!=="R"&&th("SBE %")}{th("P/L")}{th("R")}{th("Notes","center")}{th("","center")}
+              {th("Status","left","riskStatus")}{th("Symbol","left","sym")}{th("Shares","right","sharesN")}{th("Avg. Cost","right","epN")}{th("Comm","right","commN")}{th("Value","right","posValue")}{th("Orig Stop","right","stop1")}{th("Stop 2","right","stop2")}{th("Trail Stop","right","tsN")}{th("Current","right","cpN")}{th("Setup","left","setup")}{th("Tags","left")}{th("DTS","right","dtsPct")}{th("RTS","right","rtsD")}{th("ROTE","right","rotePct")}{displayMode==="R"&&th("R Suggest","right","rSuggestedStop")}{displayMode==="R"&&th("Locked","right","rLockedProfit")}{displayMode!=="R"&&th("SBE","right","sbe")}{displayMode!=="R"&&th("SBE %","right","sbePct")}{th("P/L","right","plPct")}{th("R","right","rMult")}{th("Notes","center")}{th("","center")}
             </tr></thead>
             <tbody>
-              {enriched.map((p, idx) => {
+              {(posSorts.length > 0 ? multiSort(enriched, posSorts) : enriched).map((p, idx) => {
                 const isSelling = sellId === p.id;
                 const RISK_BADGE = { "At Risk":{bg:C.redDim,color:C.red,border:"rgba(239,68,68,0.25)"}, "Risk-Free":{bg:C.greenDim,color:C.green,border:"rgba(34,197,94,0.25)"}, "Profit Locked":{bg:C.blueDim,color:C.blue,border:"rgba(59,130,246,0.25)"}, "—":{bg:"transparent",color:C.muted,border:C.border} };
                 const rb = RISK_BADGE[p.riskStatus] || RISK_BADGE["—"];
@@ -2377,19 +2632,51 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         {/* Forward Projection */}
         <GlassCard style={{ padding:"24px 28px",marginBottom:20 }}>
           <Eyebrow>Compound Projection</Eyebrow>
-          <div style={{ fontWeight:800,fontSize:"1.05rem",color:C.white,marginBottom:6 }}>If You Keep This Up</div>
-          <p style={{ fontSize:"0.68rem",color:C.muted,margin:"0 0 16px" }}>Project forward from your current equity. Each cycle = fully deploying your target ROTE, closing all trades, then redeploying on the new equity.</p>
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))",gap:14,marginBottom:16 }}>
-            <CalcInput label="Target R-Multiple" value={projR} onChange={setProjR} suffix="R" placeholder="2" />
-            <CalcInput label="Win Rate" value={projWin} onChange={setProjWin} suffix="%" placeholder="55" />
+          <div style={{ fontWeight:800,fontSize:"1.05rem",color:C.white,marginBottom:6 }}>Target vs Actual</div>
+          <p style={{ fontSize:"0.68rem",color:C.muted,margin:"0 0 16px" }}>Project forward from your current equity. Each cycle = fully deploying your target ROTE, closing all trades, then redeploying on the new equity. Your actual stats are pulled from your Trade Journal.</p>
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:16 }}>
+            <div>
+              <div style={{ fontWeight:700,fontSize:"0.58rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.gold,marginBottom:10 }}>Target</div>
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
+                <CalcInput label="R-Multiple" value={projR} onChange={setProjR} suffix="R" placeholder="2" />
+                <CalcInput label="Win Rate" value={projWin} onChange={setProjWin} suffix="%" placeholder="55" />
+              </div>
+            </div>
+            <div>
+              <div style={{ fontWeight:700,fontSize:"0.58rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.blue,marginBottom:10 }}>Actual <span style={{color:C.muted,fontWeight:400,textTransform:"none"}}>({actualStats.count} trades)</span></div>
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
+                <div style={{ padding:"10px 14px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
+                  <div style={{ fontSize:"0.52rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4 }}>R-Multiple</div>
+                  <div style={{ fontSize:"1rem",fontWeight:800,color:actualStats.avgR >= (+projR||1) ? C.green : C.red }}>{actualStats.avgR.toFixed(2)}R</div>
+                </div>
+                <div style={{ padding:"10px 14px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
+                  <div style={{ fontSize:"0.52rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4 }}>Win Rate</div>
+                  <div style={{ fontSize:"1rem",fontWeight:800,color:actualStats.winRate >= (+projWin||50) ? C.green : C.red }}>{actualStats.winRate.toFixed(0)}%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))",gap:10,marginBottom:16 }}>
+            <CalcInput label="Target Annual Return" value={targetAnnualReturn} onChange={setTargetAnnualReturn} suffix="%" placeholder="50" />
             <CalcInput label="Cycles" value={projBatches} onChange={setProjBatches} suffix="#" placeholder="12" />
           </div>
+          {annualGoal && (
+            <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))",gap:12,marginBottom:16 }}>
+              <StatTile label="Annual Target" value={fmt$(annualGoal.targetEquity)} color={C.gold} sub={`+${targetAnnualReturn}% from ${fmt$(compEquity)}`} />
+              <StatTile label="Cycles Required" value={annualGoal.requiredCycles === Infinity ? "∞" : String(annualGoal.requiredCycles)} color={C.gold} sub={`${(annualGoal.returnPerCycle * 100).toFixed(2)}% per cycle`} />
+              <StatTile label="Cycles Completed" value={String(completedCycles)} color={completedCycles >= (annualGoal.requiredCycles || 0) ? C.green : C.blue} sub={annualGoal.requiredCycles !== Infinity ? `${Math.min(100, (completedCycles / annualGoal.requiredCycles * 100)).toFixed(0)}% of target` : "—"} />
+              <StatTile label="Cycles Remaining" value={annualGoal.requiredCycles === Infinity ? "∞" : String(Math.max(0, annualGoal.requiredCycles - completedCycles))} color={completedCycles >= (annualGoal.requiredCycles || 0) ? C.green : C.red} sub={completedCycles >= (annualGoal.requiredCycles || 0) ? "Goal reached" : "to hit annual target"} />
+            </div>
+          )}
 
           {finalProj && (
             <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))",gap:12,marginBottom:16 }}>
               <StatTile label="Current Equity" value={fmt$(compEquity)} />
-              <StatTile label={`After ${projBatches} Cycles`} value={fmt$(finalProj.equity)} color={C.green} />
-              <StatTile label="Projected Growth" value={`+${finalProj.growthPct.toFixed(1)}%`} color={C.green} sub={`+${fmt$(finalProj.equity - compEquity)}`} />
+              <StatTile label={`Target (${projBatches} Cycles)`} value={fmt$(finalProj.equity)} color={C.green} />
+              <StatTile label="Target Growth" value={`+${finalProj.growthPct.toFixed(1)}%`} color={C.green} sub={`+${fmt$(finalProj.equity - compEquity)}`} />
+              {actualStats.count > 0 && chartData.length > 1 && (
+                <StatTile label={`Actual (${projBatches} Cycles)`} value={fmt$(chartData[chartData.length-1].actual)} color={chartData[chartData.length-1].actual >= finalProj.equity ? C.green : C.red} sub={compEquity > 0 ? `${chartData[chartData.length-1].actual >= compEquity ? "+" : ""}${(((chartData[chartData.length-1].actual - compEquity)/compEquity)*100).toFixed(1)}%` : ""} />
+              )}
             </div>
           )}
 
@@ -2402,14 +2689,16 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                   <YAxis stroke={C.muted} tick={{ fontSize:10 }} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} />
                   <Tooltip contentStyle={{ background:"#0c0c14",border:`1px solid ${C.border}`,borderRadius:10,fontSize:"0.72rem" }} formatter={(v) => [`$${Number(v).toLocaleString()}`, ""]} />
                   <Line type="monotone" dataKey="best" stroke={C.gold} strokeWidth={1} strokeDasharray="6 3" dot={false} name="Best" />
-                  <Line type="monotone" dataKey="expected" stroke={C.green} strokeWidth={2.5} dot={false} name="Expected" />
+                  <Line type="monotone" dataKey="expected" stroke={C.green} strokeWidth={2.5} dot={false} name="Target" />
+                  {actualStats.count > 0 && <Line type="monotone" dataKey="actual" stroke={C.blue} strokeWidth={2.5} dot={false} name="Actual" />}
                   <Line type="monotone" dataKey="worst" stroke={C.red} strokeWidth={1} strokeDasharray="6 3" dot={false} name="Worst" />
                   <ReferenceLine y={compEquity} stroke={C.muted} strokeDasharray="3 3" label={{ value:"Now",fill:C.muted,fontSize:10 }} />
                 </LineChart>
               </ResponsiveContainer>
-              <div style={{ display:"flex",gap:16,justifyContent:"center",marginTop:8 }}>
+              <div style={{ display:"flex",gap:16,justifyContent:"center",marginTop:8,flexWrap:"wrap" }}>
                 <span style={{ fontSize:"0.60rem",color:C.gold }}>— — Best (100% win)</span>
-                <span style={{ fontSize:"0.60rem",color:C.green }}>— Expected</span>
+                <span style={{ fontSize:"0.60rem",color:C.green }}>— Target</span>
+                {actualStats.count > 0 && <span style={{ fontSize:"0.60rem",color:C.blue }}>— Actual</span>}
                 <span style={{ fontSize:"0.60rem",color:C.red }}>— — Worst (0% win)</span>
               </div>
             </>
@@ -2699,6 +2988,49 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
                 cursor: "pointer", fontFamily: font, letterSpacing: "0.02em",
               }}>Export Full Backup</button>
 
+              <button onClick={async () => {
+                try {
+                  setBackupStatus("Exporting CSV...");
+                  const [posRes, tradeRes] = await Promise.all([
+                    supabase.from("positions").select("*"),
+                    supabase.from("trades").select("*").eq("is_deleted", false),
+                  ]);
+                  const pos = posRes.data || [];
+                  const trades = tradeRes.data || [];
+                  // Positions CSV
+                  const posHeaders = ["Symbol","Entry Date","Entry Time","Shares","Entry Price","Current Price","Stop","Trailing Stop","Setup","Tags","Commission","Notes","Chart URL"];
+                  const posRows = [posHeaders.join(",")];
+                  pos.forEach(p => {
+                    posRows.push([p.symbol, p.entry_date, p.entry_time||"", p.shares, p.entry_price, p.current_price, p.stop_price, p.trailing_stop||"", `"${p.setup||""}"`, `"${(p.tags||[]).join("; ")}"`, p.commission!=null?p.commission:"", `"${(p.notes||"").replace(/"/g,'""')}"`, `"${p.chart_url||""}"`].join(","));
+                  });
+                  const posBlob = new Blob([posRows.join("\n")], { type: "text/csv" });
+                  const posUrl = URL.createObjectURL(posBlob);
+                  const a1 = document.createElement("a"); a1.href = posUrl;
+                  a1.download = `VIV_Positions_${new Date().toISOString().slice(0,10)}.csv`; a1.click();
+                  URL.revokeObjectURL(posUrl);
+                  // Trades CSV
+                  const trHeaders = ["Symbol","Entry Date","Entry Time","Exit Date","Exit Time","Entry Price","Exit Price","Shares","Stop","Setup","Tags","P/L %","P/L $","R-Multiple","Exit Reason","Notes","Chart URL"];
+                  const trRows = [trHeaders.join(",")];
+                  trades.forEach(t => {
+                    trRows.push([t.ticker, t.entry_date, t.entry_time||"", t.exit_date||"", t.exit_time||"", t.entry_price, t.exit_price, t.shares, t.stop_price||"", `"${t.setup||""}"`, `"${(t.tags||[]).join("; ")}"`, t.pl_pct!=null?Number(t.pl_pct).toFixed(2):"", t.pl_dollar!=null?Number(t.pl_dollar).toFixed(2):"", t.r_mult!=null?Number(t.r_mult).toFixed(2):"", `"${t.exit_reason||""}"`, `"${(t.notes||"").replace(/"/g,'""')}"`, `"${t.chart_url||""}"`].join(","));
+                  });
+                  // Small delay so browser doesn't block second download
+                  await new Promise(r => setTimeout(r, 500));
+                  const trBlob = new Blob([trRows.join("\n")], { type: "text/csv" });
+                  const trUrl = URL.createObjectURL(trBlob);
+                  const a2 = document.createElement("a"); a2.href = trUrl;
+                  a2.download = `VIV_Trades_${new Date().toISOString().slice(0,10)}.csv`; a2.click();
+                  URL.revokeObjectURL(trUrl);
+                  setBackupStatus(`CSV exported: ${pos.length} positions + ${trades.length} trades (2 files downloaded)`);
+                } catch (err) {
+                  setBackupStatus("CSV export failed: " + err.message);
+                }
+              }} style={{
+                padding: "10px 20px", borderRadius: 10, border: `1px solid ${C.borderGold}`,
+                background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.78rem",
+                cursor: "pointer", fontFamily: font, letterSpacing: "0.02em",
+              }}>Export CSV (Excel)</button>
+
               <label style={{
                 padding: "10px 20px", borderRadius: 10, border: `1px solid ${C.borderGold}`,
                 background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.78rem",
@@ -2719,14 +3051,20 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
 
                     let restored = { positions: 0, trades: 0 };
 
-                    // Restore positions — update existing by id, insert new ones (upsert fails because id is GENERATED ALWAYS)
+                    // Restore positions — try update by id first; if row doesn't exist, insert without id
+                    // (upsert fails because id is GENERATED ALWAYS AS IDENTITY)
                     if (backup.positions.length > 0) {
                       const withId = backup.positions.filter(p => p.id);
                       const withoutId = backup.positions.filter(p => !p.id);
                       for (const p of withId) {
                         const { id, ...rest } = p;
-                        const { error } = await supabase.from("positions").update(rest).eq("id", id);
+                        const { data: updated, error } = await supabase.from("positions").update(rest).eq("id", id).select("id");
                         if (error && error.code !== 'PGRST116') { setBackupStatus("Position restore error: " + error.message); return; }
+                        // If update found 0 rows (deleted since backup), insert as new row
+                        if (!updated || updated.length === 0) {
+                          const { error: insErr } = await supabase.from("positions").insert(rest);
+                          if (insErr) { setBackupStatus("Position restore (re-insert) error: " + insErr.message); return; }
+                        }
                       }
                       if (withoutId.length > 0) {
                         const inserts = withoutId.map(p => { const { id, ...rest } = p; return rest; });
@@ -2736,15 +3074,19 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
                       restored.positions = backup.positions.length;
                     }
 
-                    // Restore trades — update existing by id, insert new ones (upsert fails because id is GENERATED ALWAYS)
+                    // Restore trades — try update by id first; if row doesn't exist, insert without id
                     if (backup.trades.length > 0) {
-                      // Separate: trades with real IDs (update) vs without (insert)
                       const withId = backup.trades.filter(t => t.id);
                       const withoutId = backup.trades.filter(t => !t.id);
                       for (const t of withId) {
                         const { id, ...rest } = t;
-                        const { error } = await supabase.from("trades").update(rest).eq("id", id);
+                        const { data: updated, error } = await supabase.from("trades").update(rest).eq("id", id).select("id");
                         if (error && error.code !== 'PGRST116') { setBackupStatus("Trade restore error: " + error.message); return; }
+                        // If update found 0 rows (deleted since backup), insert as new row
+                        if (!updated || updated.length === 0) {
+                          const { error: insErr } = await supabase.from("trades").insert(rest);
+                          if (insErr) { setBackupStatus("Trade restore (re-insert) error: " + insErr.message); return; }
+                        }
                       }
                       if (withoutId.length > 0) {
                         const { error } = await supabase.from("trades").insert(withoutId);
@@ -2919,16 +3261,6 @@ const NAV = [
   { id: "settings", label: "Settings", icon: "\u{2699}" },
 ];
 
-// Debounce helper — saves to Supabase after user stops typing
-function useSupabaseSave(table, userId, field, value, mapFn) {
-  const timeout = useRef(null);
-  useEffect(() => {
-    if (!userId) return;
-    clearTimeout(timeout.current);
-    timeout.current = setTimeout(() => { mapFn(value); }, 800);
-    return () => clearTimeout(timeout.current);
-  }, [value, userId]);
-}
 
 function AppInner() {
   const screenW = useScreenWidth();
@@ -3030,7 +3362,7 @@ function AppInner() {
     setPositionSaveStatus("saving");
     try {
       const rows = posArr.map(p => ({
-        user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
+        user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", entry_time: p.entryTime || "", shares: p.shares || "",
         entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
         stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
         commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
@@ -3198,14 +3530,14 @@ function AppInner() {
         const snap = new Map();
         clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
         loadedSnapshot.current = snap;
-        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" })));
+        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" })));
       } else if (!posErr) {
         // Query succeeded but returned empty — check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
         if (!initFlag) {
           // Very first login — seed demo positions, save to DB, then load back with DB ids
           const { error: seedErr } = await supabase.from("positions").insert(INIT_POSITIONS.map(p => ({
-            user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
+            user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", entry_time: p.entryTime || "", shares: p.shares || "",
             entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
             stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
             commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null,
@@ -3215,7 +3547,7 @@ function AppInner() {
             const { data: seeded } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
             if (seeded && seeded.length > 0) {
               lastLoadedCount.current = seeded.length;
-              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" })));
+              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" })));
             }
           }
           await saveSettingNow(uid, "initialized", true);
@@ -3230,7 +3562,8 @@ function AppInner() {
       const { data: trades, error: tradesErr } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false });
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       if (trades && trades.length > 0) {
-        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, exit: t.exit_date, entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "" })));
+        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "" })));
+        lastLoadedTradeCount.current = trades.length;
       }
 
       // ─── Recover any emergency offline saves from localStorage ───
@@ -3247,7 +3580,7 @@ function AppInner() {
             const toInsert = emergencyPos.filter(p => !existingKeys.has(`${p.sym}|${p.entry}|${p.ep}|${p.shares}`));
             if (toInsert.length > 0) {
               const rows = toInsert.map(p => ({
-                user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
+                user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", entry_time: p.entryTime || "", shares: p.shares || "",
                 entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
                 stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
                 commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
@@ -3261,7 +3594,7 @@ function AppInner() {
                 const snap2 = new Map();
                 refreshed.forEach(p => { if (p.symbol) snap2.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
                 loadedSnapshot.current = snap2;
-                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" }));
+                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" }));
                 positionsRef.current = next;
                 setPositions(next);
               }
@@ -3321,7 +3654,7 @@ function AppInner() {
           const snap = new Map();
           clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
           loadedSnapshot.current = snap;
-          const next = clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" }));
+          const next = clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" }));
           positionsRef.current = next;
           setPositions(next);
         }
@@ -3363,6 +3696,7 @@ function AppInner() {
   const posTimer = useRef(null);
   const tradeTimer = useRef(null); // declared here so flush handlers below can access it
   const lastLoadedCount = useRef(0); // track how many positions were loaded from DB
+  const lastLoadedTradeCount = useRef(0); // track how many trades were loaded from DB — guards against accidental mass soft-delete
   const loadedSnapshot = useRef(new Map()); // snapshot of loaded data: id → {sym, ep, shares} — used to detect corruption before save
   const positionsRef = useRef(positions); // always-current ref for beforeunload/visibilitychange handlers
   const lastPosCountRef = useRef(positions.length); // track count changes for faster save on add/remove
@@ -3437,7 +3771,7 @@ function AppInner() {
       // --- POSITIONS emergency save ---
       if (pos && pos.length > 0) {
         const rows = pos.map(p => ({
-          user_id: session.user.id, symbol: p.sym || "", entry_date: p.entry || "", shares: p.shares || "",
+          user_id: session.user.id, symbol: p.sym || "", entry_date: p.entry || "", entry_time: p.entryTime || "", shares: p.shares || "",
           entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
           stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
           commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
@@ -3474,7 +3808,7 @@ function AppInner() {
         const newTrades = trades.filter(t => t.id > 1000000000);
         if (newTrades.length > 0) {
           const tradeRows = newTrades.map(t => ({
-            user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
+            user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", entry_time: t.entryTime || "", exit_date: t.exit || "", exit_time: t.exitTime || "",
             entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
             stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
             pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
@@ -3494,7 +3828,7 @@ function AppInner() {
         for (const t of existingTrades) {
           try {
             const updateBody = JSON.stringify({
-              ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
+              ticker: t.ticker || "", entry_date: t.entry || "", entry_time: t.entryTime || "", exit_date: t.exit || "", exit_time: t.exitTime || "",
               entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
               stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
               pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
@@ -3565,7 +3899,7 @@ function AppInner() {
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
     // Build a lightweight hash of trade state to detect ANY change (add, edit, delete)
-    const hash = journaledTrades.map(t => `${t.id}|${t.ticker}|${t.entry}|${t.exit}|${t.entryP}|${t.exitP}|${t.shares}|${t.stop}|${t.setup}|${(t.tags||[]).join(",")}|${t.reason}|${t.notes}|${t.chartUrl||""}|${t.chartImage||""}`).join("##");
+    const hash = journaledTrades.map(t => `${t.id}|${t.ticker}|${t.entry}|${t.entryTime||""}|${t.exit}|${t.exitTime||""}|${t.entryP}|${t.exitP}|${t.shares}|${t.stop}|${t.setup}|${(t.tags||[]).join(",")}|${t.reason}|${t.notes}|${t.chartUrl||""}|${t.chartImage||""}`).join("##");
     if (hash === tradeHashRef.current) return; // no change
     tradeHashRef.current = hash;
     hasPendingChanges.current = true; // mark dirty until trade save completes
@@ -3584,7 +3918,7 @@ function AppInner() {
         let didInsert = false;
         if (newTrades.length > 0) {
           const tradeRow = t => ({
-            user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
+            user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", entry_time: t.entryTime || "", exit_date: t.exit || "", exit_time: t.exitTime || "",
             entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
             stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
             pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
@@ -3609,7 +3943,7 @@ function AppInner() {
         if (editedTrades.length > 0) {
           const updateResults = await Promise.all(editedTrades.map(t =>
             supabase.from("trades").update({
-              ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
+              ticker: t.ticker || "", entry_date: t.entry || "", entry_time: t.entryTime || "", exit_date: t.exit || "", exit_time: t.exitTime || "",
               entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
               stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
               pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
@@ -3622,15 +3956,21 @@ function AppInner() {
 
         // Soft-delete trades removed from state — SKIP if we just inserted (IDs haven't synced yet)
         if (didInsert) return; // let the next autosave cycle handle deletes after IDs are stable
+        // Safety guard: if journaledTrades is empty but DB had trades, block mass soft-delete (mirrors position guard)
+        if (journaledTrades.length === 0 && lastLoadedTradeCount.current > 0) {
+          console.error("Trade autosave: state is empty but DB had", lastLoadedTradeCount.current, "trades — BLOCKING mass soft-delete to prevent data loss.");
+          return;
+        }
         const deletedIds = [...existingIds].filter(id => !currentIds.has(id));
         if (deletedIds.length > 0) {
           await supabase.from("trades").update({ is_deleted: true }).in("id", deletedIds);
         }
+        lastLoadedTradeCount.current = journaledTrades.length; // keep in sync after successful save
         hasPendingChanges.current = false; // trade save completed
       } catch (err) {
         console.error("Trade save failed:", err.message);
       }
-    }, 2000);
+    }, 500);
   }, [journaledTrades, session]);
 
   // ─── Manual trade save (bypasses debounce, reuses same logic) ───
@@ -3643,7 +3983,7 @@ function AppInner() {
       const existingIds = new Set((existing || []).map(t => t.id));
       const currentIds = new Set(journaledTrades.filter(t => existingIds.has(t.id)).map(t => t.id));
       const tradeRow = t => ({
-        user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", exit_date: t.exit || "",
+        user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", entry_time: t.entryTime || "", exit_date: t.exit || "", exit_time: t.exitTime || "",
         entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
         stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
         pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
@@ -3724,6 +4064,7 @@ function AppInner() {
     setFontSize("standard");
     setTargetRote("2");
     lastLoadedCount.current = 0;
+    lastLoadedTradeCount.current = 0;
     setPage("dashboard");
   };
 
@@ -3757,7 +4098,7 @@ function AppInner() {
       )}
       {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
-      {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} />}
+      {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} />}
     </>
   );
