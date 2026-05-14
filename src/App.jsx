@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
+import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 
 // ─── Error Boundary — catches rendering crashes so the page doesn't go blank ───
@@ -164,7 +164,7 @@ function StatTile({ label, value, color, prefix, sub }) {
   return (
     <GlassCard small style={{ padding: "16px 18px" }}>
       <div style={{ fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted, marginBottom: 8 }}>{label}</div>
-      <div style={{ fontWeight: 800, fontSize: "1.3rem", letterSpacing: "-0.04em", color: color || C.white }}>{prefix}{value}</div>
+      <div style={{ fontWeight: 800, fontSize: "1.3rem", letterSpacing: "-0.04em", color: color || C.white, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{prefix}{value}</div>
       {sub && <div style={{ fontWeight: 500, fontSize: "0.64rem", color: C.muted, marginTop: 4 }}>{sub}</div>}
     </GlassCard>
   );
@@ -1080,8 +1080,13 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   }, [filtered]);
 
   const distData = useMemo(() => {
+    // Dollar-weighted return distribution: weight each trade by position size (entryP × shares)
     const buckets = []; for (let i = -16; i <= 20; i += 2) buckets.push({ range: `${i}%`, gains: 0, losses: 0 });
-    filtered.forEach(t => { const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor((t.plPct + 16) / 2))); if (buckets[idx]) t.plPct >= 0 ? buckets[idx].gains++ : buckets[idx].losses++; });
+    filtered.forEach(t => {
+      const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor((t.plPct + 16) / 2)));
+      const weight = ((t.entryP || 0) * (t.shares || 0)) / 1000; // normalize to thousands for readable bar heights
+      if (buckets[idx]) t.plPct >= 0 ? buckets[idx].gains += (weight || 1) : buckets[idx].losses += (weight || 1);
+    });
     return buckets;
   }, [filtered]);
   // Equity curve data — supports $ vs % and trades vs months
@@ -1133,12 +1138,19 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       const y = match[3].length === 2 ? "20" + match[3] : match[3];
       const mo = match[1].padStart(2, "0");
       const key = `${y}-${mo}`;
-      if (!months[key]) months[key] = { dollar: 0, wins: 0, losses: 0, count: 0 };
+      if (!months[key]) months[key] = { dollar: 0, wins: 0, losses: 0, count: 0, totalR: 0 };
       months[key].dollar += t.plDollar;
       months[key].count++;
+      months[key].totalR += (t.rMult || 0);
       if (t.plDollar >= 0) months[key].wins++; else months[key].losses++;
     });
-    return Object.keys(months).sort().map(k => ({ month: k, label: new Date(k + "-15").toLocaleString("default", { month: "short", year: "numeric" }), ...months[k], pct: ps > 0 ? (months[k].dollar / ps) * 100 : 0 }));
+    return Object.keys(months).sort().map(k => ({
+      month: k,
+      label: new Date(k + "-15").toLocaleString("default", { month: "short", year: "numeric" }),
+      ...months[k],
+      pct: ps > 0 ? (months[k].dollar / ps) * 100 : 0,
+      avgR: months[k].count > 0 ? months[k].totalR / months[k].count : 0
+    }));
   }, [filtered, portfolioSize]);
 
   const startEdit = (t) => { setEditingId(t.id); setEditRow({ ...t }); setEditNotes(parseNotes(t.notes)); };
@@ -1296,7 +1308,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 
       {/* Stats — recalculate based on filter */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
-        <StatTile label="Total P/L" value={`$${stats.totalPL.toLocaleString()}`} color={stats.totalPL >= 0 ? C.green : C.red} prefix={stats.totalPL >= 0 ? "+" : ""} />
+        <StatTile label="Total P/L" value={`$${Math.abs(stats.totalPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`} color={stats.totalPL >= 0 ? C.green : C.red} prefix={stats.totalPL >= 0 ? "+" : "-"} />
         <StatTile label="Win Rate" value={`${stats.ba.toFixed(0)}%`} color={stats.ba >= 50 ? C.green : C.red} />
         <StatTile label="Avg Gain" value={`${stats.avgGain.toFixed(1)}%`} color={C.green} prefix="+" />
         <StatTile label="Avg Loss" value={`${stats.avgLoss.toFixed(1)}%`} color={C.red} prefix="-" />
@@ -1324,13 +1336,48 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
             </div>
           </div>
           <ResponsiveContainer width="100%" height={170}>
-            <LineChart data={equityData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="trade" tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={eqYAxis==="$" ? (v=>v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1000).toFixed(0)}k`:`$${v}`) : (v=>`${v.toFixed(1)}%`)} domain={eqYAxis==="$"?['auto','auto']:undefined} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v)=>eqYAxis==="$"?[`$${Number(v).toLocaleString()}`,"Portfolio"]:[`${Number(v).toFixed(2)}%`,"Cumulative"]} />{eqYAxis==="%"&&<ReferenceLine y={0} stroke={C.border} />}<Line type="monotone" dataKey={eqYAxis==="$"?"equity":"equityPct"} stroke={C.gold} strokeWidth={2} dot={{fill:C.gold,r:3.5}} /></LineChart>
+            {(() => {
+              const dataKey = eqYAxis === "$" ? "equity" : "equityPct";
+              const baseline = eqYAxis === "$" ? +(portfolioSize || 0) : 0;
+              const vals = equityData.map(d => d[dataKey]).filter(v => v != null);
+              const maxVal = Math.max(...vals), minVal = Math.min(...vals);
+              const range = maxVal - minVal;
+              // Gradient offset: where baseline sits in the 0-1 range of the chart area
+              const gradientOffset = range > 0 ? Math.max(0, Math.min(1, (maxVal - baseline) / range)) : 0;
+              const allAbove = minVal >= baseline;
+              const allBelow = maxVal <= baseline;
+              return (
+                <AreaChart data={equityData}>
+                  <defs>
+                    <linearGradient id="eqGradientFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={C.gold} stopOpacity={allBelow ? 0 : 0.25} />
+                      <stop offset={`${(gradientOffset * 100).toFixed(1)}%`} stopColor={allBelow ? "rgba(239,68,68,0.08)" : allAbove ? C.gold : C.gold} stopOpacity={allBelow ? 0.05 : allAbove ? 0.08 : 0.05} />
+                      <stop offset={`${(gradientOffset * 100).toFixed(1)}%`} stopColor={allAbove ? C.gold : C.red} stopOpacity={allAbove ? 0.08 : 0.05} />
+                      <stop offset="100%" stopColor={C.red} stopOpacity={allAbove ? 0 : 0.25} />
+                    </linearGradient>
+                    <linearGradient id="eqGradientStroke" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={C.gold} />
+                      <stop offset={`${(gradientOffset * 100).toFixed(1)}%`} stopColor={C.gold} />
+                      <stop offset={`${(gradientOffset * 100).toFixed(1)}%`} stopColor={C.red} />
+                      <stop offset="100%" stopColor={C.red} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="trade" tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} />
+                  <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={eqYAxis==="$" ? (v=>v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1000).toFixed(0)}k`:`$${v}`) : (v=>`${v.toFixed(1)}%`)} domain={eqYAxis==="$"?['auto','auto']:undefined} />
+                  <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v)=>eqYAxis==="$"?[`$${Number(v).toLocaleString()}`,"Portfolio"]:[`${Number(v).toFixed(2)}%`,"Cumulative"]} />
+                  {eqYAxis==="%"&&<ReferenceLine y={0} stroke={C.border} />}
+                  {eqYAxis==="$"&&<ReferenceLine y={+(portfolioSize||0)} stroke={C.border} strokeDasharray="3 3" />}
+                  <Area type="monotone" dataKey={dataKey} stroke="url(#eqGradientStroke)" strokeWidth={2} fill="url(#eqGradientFill)" dot={{fill:C.gold,r:3.5,stroke:C.gold}} />
+                </AreaChart>
+              );
+            })()}
           </ResponsiveContainer>
         </GlassCard>
         <GlassCard style={{ padding: "18px 22px" }}>
-          <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white, marginBottom: 14 }}>Return Distribution</div>
+          <div style={{ display:"flex",alignItems:"baseline",gap:8,marginBottom:14 }}><div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Return Distribution</div><div style={{fontSize:"0.50rem",color:C.muted,fontWeight:500}}>Dollar-Weighted</div></div>
           <ResponsiveContainer width="100%" height={170}>
-            <BarChart data={distData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} /><Bar dataKey="losses" fill={C.red} radius={[0,0,2,2]} /><Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} /></BarChart>
+            <BarChart data={distData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>`$${v.toFixed(0)}k`} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[`$${Number(v).toFixed(1)}k`,name==="gains"?"Gains":"Losses"]} /><Bar dataKey="losses" fill={C.red} radius={[0,0,2,2]} /><Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} /></BarChart>
           </ResponsiveContainer>
         </GlassCard>
       </div>
@@ -1352,10 +1399,12 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                 <tr style={{ borderBottom: `1px solid ${C.border}` }}>
                   <th style={{ padding: "9px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Month</th>
                   <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>P/L</th>
+                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>% Return</th>
                   <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Trades</th>
                   <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Wins</th>
                   <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Losses</th>
                   <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Win Rate</th>
+                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Avg R</th>
                 </tr>
               </thead>
               <tbody>
@@ -1368,10 +1417,12 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     <tr key={m.month} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, background: bgColor }}>
                       <td style={{ padding: "8px 8px", fontWeight: 600, color: C.white }}>{m.label}</td>
                       <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, color: isPos ? C.green : C.red }}>{isPos ? "+" : ""}{perfToggle === "$" ? `$${Math.abs(val).toLocaleString(undefined, {minimumFractionDigits:0,maximumFractionDigits:0})}` : `${val.toFixed(2)}%`}</td>
+                      <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, color: m.pct >= 0 ? C.green : C.red }}>{m.pct >= 0 ? "+" : ""}{m.pct.toFixed(2)}%</td>
                       <td style={{ padding: "8px 8px", textAlign: "right", color: C.text }}>{m.count}</td>
                       <td style={{ padding: "8px 8px", textAlign: "right", color: C.green }}>{m.wins}</td>
                       <td style={{ padding: "8px 8px", textAlign: "right", color: C.red }}>{m.losses}</td>
                       <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 600, color: wr >= 50 ? C.green : C.red }}>{wr.toFixed(0)}%</td>
+                      <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 600, color: m.avgR >= 0 ? C.green : C.red }}>{m.avgR >= 0 ? "+" : ""}{m.avgR.toFixed(2)}R</td>
                     </tr>
                   );
                 })}
@@ -1381,11 +1432,17 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: (perfToggle === "$" ? monthlyPerf.reduce((s,m)=>s+m.dollar,0) : monthlyPerf.reduce((s,m)=>s+m.pct,0)) >= 0 ? C.green : C.red }}>
                     {(() => { const tot = perfToggle === "$" ? monthlyPerf.reduce((s,m)=>s+m.dollar,0) : monthlyPerf.reduce((s,m)=>s+m.pct,0); return `${tot >= 0 ? "+" : ""}${perfToggle === "$" ? `$${Math.abs(tot).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}` : `${tot.toFixed(2)}%`}`; })()}
                   </td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800 }}>
+                    {(() => { const totPct = monthlyPerf.reduce((s,m)=>s+m.pct,0); return <span style={{color:totPct>=0?C.green:C.red}}>{totPct>=0?"+":""}{totPct.toFixed(2)}%</span>; })()}
+                  </td>
                   <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.text }}>{monthlyPerf.reduce((s,m)=>s+m.count,0)}</td>
                   <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.green }}>{monthlyPerf.reduce((s,m)=>s+m.wins,0)}</td>
                   <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.red }}>{monthlyPerf.reduce((s,m)=>s+m.losses,0)}</td>
                   <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.muted }}>
                     {(() => { const tw = monthlyPerf.reduce((s,m)=>s+m.wins,0), tc = monthlyPerf.reduce((s,m)=>s+m.count,0); return tc > 0 ? `${(tw/tc*100).toFixed(0)}%` : "–"; })()}
+                  </td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800 }}>
+                    {(() => { const tc = monthlyPerf.reduce((s,m)=>s+m.count,0), totR = monthlyPerf.reduce((s,m)=>s+m.totalR,0); const avg = tc > 0 ? totR / tc : 0; return <span style={{color:avg>=0?C.green:C.red}}>{avg>=0?"+":""}{avg.toFixed(2)}R</span>; })()}
                   </td>
                 </tr>
               </tbody>
