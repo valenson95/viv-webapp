@@ -2238,7 +2238,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left","riskStatus")}{th("Symbol","left","sym")}{th("Shares","right","sharesN")}{th("Avg. Cost","right","epN")}{th("Comm","right","commN")}{th("Value","right","posValue")}{th("Orig Stop","right","stop1")}{th("Stop 2","right","stop2")}{th("Trail Stop","right","tsN")}{th("Current","right","cpN")}{th("Setup","left","setup")}{th("Tags","left")}{th("DTS","right","dtsPct")}{th("RTS","right","rtsD")}{th("ROTE","right","rotePct")}{displayMode==="R"&&th("R Suggest","right","rSuggestedStop")}{displayMode==="R"&&th("Locked","right","rLockedProfit")}{displayMode!=="R"&&th("SBE","right","sbe")}{displayMode!=="R"&&th("SBE %","right","sbePct")}{th("P/L","right","plPct")}{th("R","right","rMult")}{th("Notes","center")}{th("","center")}
+              {th("Status","left","riskStatus")}{th("Symbol","left","sym")}{th("Shares","right","sharesN")}{th("Avg. Cost","right","epN")}{th("Comm","right","commN")}{th("Pos. Size","right","posValue")}{th("Exp %","right")}{th("Orig Stop","right","stop1")}{th("Stop 2","right","stop2")}{th("Trail Stop","right","tsN")}{th("Current","right","cpN")}{th("Setup","left","setup")}{th("Tags","left")}{th("DTS","right","dtsPct")}{th("RTS","right","rtsD")}{th("ROTE","right","rotePct")}{displayMode==="R"&&th("R Suggest","right","rSuggestedStop")}{displayMode==="R"&&th("Locked","right","rLockedProfit")}{displayMode!=="R"&&th("SBE","right","sbe")}{displayMode!=="R"&&th("SBE %","right","sbePct")}{th("P/L","right","plPct")}{th("R","right","rMult")}{th("Notes","center")}{th("","center")}
             </tr></thead>
             <tbody>
               {(posSorts.length > 0 ? multiSort(enriched, posSorts) : enriched).map((p, idx) => {
@@ -2261,7 +2261,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.shares} onChange={v=>updateField(p.id,"shares",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.ep} onChange={v=>updateField(p.id,"ep",v)} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={62} /></td>
-                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0?<><div style={{fontWeight:700,fontSize:"0.70rem",color:C.white}}>{fmt$(p.posValue)}</div>{+portfolioSize>0&&<div style={{fontSize:"0.52rem",fontWeight:600,color:C.muted}}>{((p.posValue/(+portfolioSize))*100).toFixed(1)}%</div>}</>:"—"}</td>
+                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0?<div style={{fontWeight:700,fontSize:"0.70rem",color:C.white}}>{fmt$(p.posValue)}</div>:"—"}</td>
+                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0&&compEquity>0?<div style={{fontWeight:600,fontSize:"0.70rem",color:((p.posValue/compEquity)*100)>100?C.red:C.white}}>{((p.posValue/compEquity)*100).toFixed(1)}%</div>:"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.trailStop||""} onChange={v=>updateField(p.id,"trailStop",v)} width={78} gold /></td>
@@ -2306,7 +2307,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                   {/* Expanded notes/chart area */}
                   {isExpanded && (
                     <tr style={{ background:"rgba(201,152,42,0.03)",borderBottom:`1px solid ${C.borderGold}` }}>
-                      <td colSpan={24} style={{ padding:"14px 16px" }}>
+                      <td colSpan={25} style={{ padding:"14px 16px" }}>
                         <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
                           {/* Left: Notes */}
                           <div>
@@ -2370,7 +2371,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const isPartial = qty < totalShares && qty > 0;
                 return (
                   <tr style={{ background:"rgba(239,68,68,0.06)",borderBottom:`2px solid ${C.red}33` }}>
-                    <td colSpan={24} style={{ padding:"14px 16px" }}>
+                    <td colSpan={25} style={{ padding:"14px 16px" }}>
                       {/* Row 1: Core sell fields */}
                       <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:10 }}>
                         <span style={{ fontWeight:700,fontSize:"0.68rem",color:C.red,letterSpacing:"0.08em",textTransform:"uppercase" }}>Sell {pos.sym}</span>
@@ -2425,13 +2426,14 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 );
               })()}
 
-              {/* Totals — 21 cols: Status,Symbol,Shares,AvgCost,Comm,Value,OrigStop,Stop2,TrailStop,Current,Setup,Tags,DTS,RTS,ROTE,[RSuggest+Locked|SBE+SBE%],P/L,R,Actions */}
+              {/* Totals — 22 cols: Status,Symbol,Shares,AvgCost,Comm,PosSize,Exp%,OrigStop,Stop2,TrailStop,Current,Setup,Tags,DTS,RTS,ROTE,[RSuggest+Locked|SBE+SBE%],P/L,R,Notes,Actions */}
               <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
                 <td colSpan={2} style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.text,fontSize:"0.70rem"}}>{enriched.reduce((s,p)=>s+p.sharesN,0).toLocaleString()}</td>
                 <td />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.muted,fontSize:"0.70rem"}}>{fmt$(enriched.reduce((s,p)=>s+p.commN,0))}</td>
-                <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{(()=>{const tv=enriched.reduce((s,p)=>s+p.posValue,0);const ps=+portfolioSize;const expPct=ps>0?(tv/ps)*100:0;return<><div style={{fontWeight:800,fontSize:"0.72rem",color:C.goldBright}}>{fmt$(tv)}</div>{ps>0&&<div style={{fontSize:"0.54rem",fontWeight:700,color:expPct>100?C.red:expPct>80?C.gold:C.muted}}>{expPct.toFixed(1)}%{expPct>100&&<span style={{marginLeft:3}}>{(expPct/100).toFixed(1)}x</span>}</div>}</>})()}</td>
+                <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}><div style={{fontWeight:800,fontSize:"0.72rem",color:C.goldBright}}>{fmt$(enriched.reduce((s,p)=>s+p.posValue,0))}</div></td>
+                <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{(()=>{const tv=enriched.reduce((s,p)=>s+p.posValue,0);const expPct=compEquity>0?(tv/compEquity)*100:0;return<div style={{fontWeight:800,fontSize:"0.72rem",color:expPct>100?C.red:expPct>80?C.gold:C.green}}>{expPct.toFixed(1)}%{expPct>100&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>{(expPct/100).toFixed(1)}x</span>}</div>})()}</td>
                 <td colSpan={6} />
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD<=0?C.green:C.text}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.74rem",color:totals.totalRTS<=0?C.green:C.red,animation:totals.totalRTS>0?"rtsGlow 2.5s ease-in-out infinite":"rtsGlowGreen 3s ease-in-out infinite"}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
