@@ -1615,14 +1615,14 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                 <AreaChart data={equityData}>
                   <defs>
                     <linearGradient id="eqGradientFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={C.gold} stopOpacity={allBelow ? 0 : 0.25} />
-                      <stop offset={`${(gradientOffset * 100).toFixed(1)}%`} stopColor={allBelow ? "rgba(239,68,68,0.08)" : allAbove ? C.gold : C.gold} stopOpacity={allBelow ? 0.05 : allAbove ? 0.08 : 0.05} />
-                      <stop offset={`${(gradientOffset * 100).toFixed(1)}%`} stopColor={allAbove ? C.gold : C.red} stopOpacity={allAbove ? 0.08 : 0.05} />
+                      <stop offset="0%" stopColor={C.green} stopOpacity={allBelow ? 0 : 0.25} />
+                      <stop offset={`${(gradientOffset * 100).toFixed(1)}%`} stopColor={allBelow ? "rgba(239,68,68,0.08)" : allAbove ? C.green : C.green} stopOpacity={allBelow ? 0.05 : allAbove ? 0.08 : 0.05} />
+                      <stop offset={`${(gradientOffset * 100).toFixed(1)}%`} stopColor={allAbove ? C.green : C.red} stopOpacity={allAbove ? 0.08 : 0.05} />
                       <stop offset="100%" stopColor={C.red} stopOpacity={allAbove ? 0 : 0.25} />
                     </linearGradient>
                     <linearGradient id="eqGradientStroke" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={C.gold} />
-                      <stop offset={`${(gradientOffset * 100).toFixed(1)}%`} stopColor={C.gold} />
+                      <stop offset="0%" stopColor={C.green} />
+                      <stop offset={`${(gradientOffset * 100).toFixed(1)}%`} stopColor={C.green} />
                       <stop offset={`${(gradientOffset * 100).toFixed(1)}%`} stopColor={C.red} />
                       <stop offset="100%" stopColor={C.red} />
                     </linearGradient>
@@ -1633,7 +1633,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v)=>eqYAxis==="$"?[`$${Number(v).toLocaleString()}`,"Portfolio"]:[`${Number(v).toFixed(2)}%`,"Cumulative"]} />
                   {eqYAxis==="%"&&<ReferenceLine y={0} stroke={C.border} />}
                   {eqYAxis==="$"&&<ReferenceLine y={+(portfolioSize||0)} stroke={C.border} strokeDasharray="3 3" />}
-                  <Area type="monotone" dataKey={dataKey} stroke="url(#eqGradientStroke)" strokeWidth={2} fill="url(#eqGradientFill)" dot={(props) => { const val = props.payload[dataKey]; const below = val < baseline; return <circle key={props.index} cx={props.cx} cy={props.cy} r={3.5} fill={below ? C.red : C.gold} stroke={below ? C.red : C.gold} />; }} />
+                  <Area type="monotone" dataKey={dataKey} stroke="url(#eqGradientStroke)" strokeWidth={2} fill="url(#eqGradientFill)" dot={(props) => { const val = props.payload[dataKey]; const below = val < baseline; return <circle key={props.index} cx={props.cx} cy={props.cy} r={3.5} fill={below ? C.red : C.green} stroke={below ? C.red : C.green} />; }} />
                 </AreaChart>
               );
             })()}
@@ -4450,7 +4450,7 @@ function AppInner() {
             entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
             stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
             pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
-            exit_reason: t.reason || "", notes: t.notes || "",
+            exit_reason: t.reason || "", commission: t.commission != null ? Number(t.commission) : null, notes: t.notes || "",
             chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
           }));
           try {
@@ -4470,7 +4470,7 @@ function AppInner() {
               entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
               stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
               pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
-              exit_reason: t.reason || "", notes: t.notes || "",
+              exit_reason: t.reason || "", commission: t.commission != null ? Number(t.commission) : null, notes: t.notes || "",
               chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
             });
             fetch(`${supabaseUrl}/rest/v1/trades?id=eq.${t.id}`, {
@@ -4560,7 +4560,7 @@ function AppInner() {
             entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
             stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
             pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
-            exit_reason: t.reason || "", notes: t.notes || "",
+            exit_reason: t.reason || "", commission: t.commission != null ? Number(t.commission) : null, notes: t.notes || "",
             chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
           });
           const { data: inserted, error } = await supabase.from("trades").insert(newTrades.map(tradeRow)).select("id");
@@ -4625,7 +4625,7 @@ function AppInner() {
         entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
         stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
         pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
-        exit_reason: t.reason || "", notes: t.notes || "",
+        exit_reason: t.reason || "", commission: t.commission != null ? Number(t.commission) : null, notes: t.notes || "",
         chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
       });
       const newTrades = journaledTrades.filter(t => !existingIds.has(t.id));
