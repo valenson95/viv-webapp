@@ -1603,7 +1603,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="trade" tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} />
                   <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={eqYAxis==="$" ? (v=>v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1000).toFixed(0)}k`:`$${v}`) : (v=>`${v.toFixed(1)}%`)} domain={eqYAxis==="$"?['auto','auto']:undefined} />
-                  <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v)=>eqYAxis==="$"?[`$${Number(v).toLocaleString()}`,"Portfolio"]:[`${Number(v).toFixed(2)}%`,"Cumulative"]} />
+                  <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v)=>eqYAxis==="$"?[`$${Number(v).toLocaleString()}`,"Portfolio"]:[`${Number(v).toFixed(2)}%`,"Cumulative"]} />
                   {eqYAxis==="%"&&<ReferenceLine y={0} stroke={C.border} />}
                   {eqYAxis==="$"&&<ReferenceLine y={+(portfolioSize||0)} stroke={C.border} strokeDasharray="3 3" />}
                   <Area type="monotone" dataKey={dataKey} stroke="url(#eqGradientStroke)" strokeWidth={2} fill="url(#eqGradientFill)" dot={{fill:C.gold,r:3.5,stroke:C.gold}} />
@@ -1627,7 +1627,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={2} />
               <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
-              <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name,props)=>[v, props.payload.type==="loss"?"Losses":"Wins"]} />
+              <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v,name,props)=>[v, props.payload.type==="loss"?"Losses":"Wins"]} />
               <Bar dataKey="count" radius={[2,2,0,0]}>
                 {distAnalysis.butterflyData.map((entry, idx) => (
                   <Cell key={idx} fill={entry.type === "loss" ? C.red : C.green} />
@@ -1795,7 +1795,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                         <XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} />
                         <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
-                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name,props)=>[v, props.payload.type==="loss"?"Losses":"Wins"]} />
+                        <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v,name,props)=>[v, props.payload.type==="loss"?"Losses":"Wins"]} />
                         <Bar dataKey="count" radius={[2,2,0,0]}>
                           {(activeDistData.butterflyData||[]).map((entry, idx) => (
                             <Cell key={idx} fill={entry.type === "loss" ? C.red : C.green} />
@@ -1813,8 +1813,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                       <BarChart data={activeDistData.butterflyDrma}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                         <XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} />
-                        <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>`${v.toFixed(2)}%`} />
-                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v)=>[`${Number(v).toFixed(3)}%`,"Return Contribution"]} />
+                        <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>v.toFixed(1)} />
+                        <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v)=>[Number(v).toFixed(3),"Return Contribution"]} />
                         <ReferenceLine y={0} stroke={C.border} strokeDasharray="3 3" />
                         <Bar dataKey="contribution" radius={[2,2,0,0]} barSize={8}>
                           {(activeDistData.butterflyDrma||[]).map((entry, idx) => (
