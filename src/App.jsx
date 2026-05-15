@@ -112,9 +112,9 @@ const DEMO_FINANCE = { buyPrice: "142.50", shares: "575", stopPrice: "133.80", s
 // ═══════════════════════════════════════
 // ─── Shared UI Components ───
 // ═══════════════════════════════════════
-function GlassCard({ children, style, small }) {
+function GlassCard({ children, style, small, onClick, className }) {
   return (
-    <div style={{ background: C.glass, backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", border: `1px solid ${C.border}`, borderRadius: small ? 13 : 22, position: "relative", overflow: "hidden", ...style }}>
+    <div onClick={onClick} className={className} style={{ background: C.glass, backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", border: `1px solid ${C.border}`, borderRadius: small ? 13 : 22, position: "relative", overflow: "hidden", ...style }}>
       <div style={{ position: "absolute", inset: 0, borderRadius: small ? 13 : 22, background: "linear-gradient(135deg, rgba(255,255,255,0.055) 0%, transparent 50%, rgba(255,255,255,0.02) 100%)", pointerEvents: "none" }} />
       <div style={{ position: "relative", zIndex: 1 }}>{children}</div>
     </div>
@@ -1116,7 +1116,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     });
 
     // Bar chart data — gains and losses per magnitude bucket
-    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: b.losses }));
+    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: -b.losses }));
 
     // Distribution table with Net%, DRMA, G↑%, L↓%
     let cumDRMA = 0;
@@ -1170,7 +1170,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       if (t.plPct > 0) { buckets[idx].gains++; buckets[idx].gainPcts.push(t.plPct); }
       else { buckets[idx].losses++; buckets[idx].lossPcts.push(t.plPct); }
     });
-    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: b.losses }));
+    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: -b.losses }));
     let cumDRMA = 0;
     const tableData = buckets.map(b => {
       const gPct = total > 0 ? (b.gains / total) * 100 : 0;
@@ -1516,15 +1516,16 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
               <span style={{ color:C.muted,fontSize:"0.70rem" }}>▼</span>
             </div>
           </div>
-          {/* Mini preview chart — standard vertical bars matching M360 */}
+          {/* Mini preview chart — butterfly: gains up, losses down */}
           <ResponsiveContainer width="100%" height={170}>
-            <BarChart data={distAnalysis.barData} barGap={0} barCategoryGap="20%">
+            <BarChart data={distAnalysis.barData} barGap={0} barCategoryGap="20%" stackOffset="sign">
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
-              <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
-              <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[v,name==="gains"?"Wins":"Losses"]} />
-              <Bar dataKey="losses" fill={C.red} radius={[2,2,0,0]} />
-              <Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} />
+              <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} tickFormatter={v=>Math.abs(v)} />
+              <ReferenceLine y={0} stroke={C.border} />
+              <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[Math.abs(v),name==="gains"?"Wins":"Losses"]} />
+              <Bar dataKey="losses" stackId="a" fill={C.red} radius={[0,0,2,2]} />
+              <Bar dataKey="gains" stackId="a" fill={C.green} radius={[2,2,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         </GlassCard>
@@ -1680,17 +1681,18 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:24 }}>
                 {/* LEFT COLUMN — Charts */}
                 <div>
-                  {/* Gains and Losses — Standard vertical bars matching M360 */}
+                  {/* Gains and Losses — Butterfly: gains up, losses down */}
                   <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
                     <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:10 }}>Gains and Losses</div>
                     <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={activeDistData.barData} barGap={0} barCategoryGap="20%">
+                      <BarChart data={activeDistData.barData} barGap={0} barCategoryGap="20%" stackOffset="sign">
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                         <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
-                        <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
-                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[v,name==="gains"?"Wins":"Losses"]} />
-                        <Bar dataKey="losses" fill={C.red} radius={[2,2,0,0]} />
-                        <Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} />
+                        <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} tickFormatter={v=>Math.abs(v)} />
+                        <ReferenceLine y={0} stroke={C.border} />
+                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[Math.abs(v),name==="gains"?"Wins":"Losses"]} />
+                        <Bar dataKey="losses" stackId="a" fill={C.red} radius={[0,0,2,2]} />
+                        <Bar dataKey="gains" stackId="a" fill={C.green} radius={[2,2,0,0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
