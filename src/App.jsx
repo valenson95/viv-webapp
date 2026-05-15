@@ -1013,6 +1013,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const [distExpanded, setDistExpanded] = useState(false); // expand/collapse distribution analysis
   const [hypoOpen, setHypoOpen] = useState(false); // hypothetical scenario simulator
   const [hypo, setHypo] = useState({ winRate: "", avgGain: "", avgLoss: "", totalTrades: "" }); // override fields
+  const [hypoCap, setHypoCap] = useState(""); // Cap Losses at X%
+  const [hypoMode, setHypoMode] = useState("override"); // "override" | "cap" | "custom"
+  const [hypoCustom, setHypoCustom] = useState([]); // [{pct:"", count:"", side:"win"}, ...] custom distribution rows
   // perfToggle removed — monthly tracker now shows all stats inline
 
   // Ref to always hold the latest onManualSave — fixes stale closure when
@@ -1133,8 +1136,72 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     return { barData, tableData, drmaData, gainMag, lossMag, returnPerTrade: cumDRMA };
   }, [filtered]);
 
-  // Hypothetical scenario stats — recomputes all stats with user overrides
+  // Hypothetical scenario stats — supports 3 modes: override, cap losses, custom distribution
   const hypoStats = useMemo(() => {
+    if (hypoMode === "cap") {
+      // Cap Losses: clamp all losses at -capPct%, recompute everything
+      const capVal = parseFloat(hypoCap);
+      if (isNaN(capVal) || capVal <= 0) return null;
+      const trades = filtered;
+      if (trades.length === 0) return null;
+      const cappedTrades = trades.map(t => {
+        if (t.plPct <= 0 && Math.abs(t.plPct) > capVal) return { ...t, plPct: -capVal };
+        return t;
+      });
+      const wins = cappedTrades.filter(t => t.plPct > 0);
+      const losses = cappedTrades.filter(t => t.plPct <= 0);
+      const total = cappedTrades.length;
+      const wr = (wins.length / total) * 100;
+      const ag = wins.length > 0 ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
+      const al = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.plPct, 0) / losses.length) : 0;
+      const glRatio = al > 0 ? ag / al : 0;
+      const adjustedGL = al > 0 ? ((wr / 100) * ag) / (((100 - wr) / 100) * al) : 0;
+      const ev = (wr / 100) * ag - ((100 - wr) / 100) * al;
+      // Also rebuild distribution for capped scenario
+      const maxAbs = Math.max(...cappedTrades.map(t => Math.abs(t.plPct)));
+      const bHi = Math.max(Math.ceil(maxAbs / 2) * 2, 20);
+      const bkts = [];
+      for (let i = 0; i < bHi; i += 2) bkts.push({ lo: i, hi: i + 2, gains: 0, losses: 0, gainPcts: [], lossPcts: [] });
+      cappedTrades.forEach(t => {
+        const abs = Math.abs(t.plPct);
+        const idx = Math.max(0, Math.min(bkts.length - 1, Math.floor(abs / 2)));
+        if (t.plPct > 0) { bkts[idx].gains++; bkts[idx].gainPcts.push(t.plPct); }
+        else { bkts[idx].losses++; bkts[idx].lossPcts.push(t.plPct); }
+      });
+      let cumD = 0;
+      const tblData = bkts.map(b => {
+        const gP = (b.gains / total) * 100, lP = (b.losses / total) * 100;
+        const netP = ((b.gains - b.losses) / total) * 100;
+        const bkRet = [...b.gainPcts, ...b.lossPcts].reduce((s, v) => s + v, 0) / total;
+        cumD += bkRet;
+        return { range: `${b.lo} - ${b.hi}%`, lo: b.lo, gains: b.gains, losses: b.losses, gPct: gP, lPct: lP, netPct: netP, drma: cumD, bucketRetContrib: bkRet };
+      });
+      const barD = bkts.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: b.losses }));
+      return { winRate: wr, avgGain: ag, avgLoss: al, total, wins: wins.length, losses: losses.length, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, ev, tableData: tblData, barData: barD, mode: "cap" };
+    }
+    if (hypoMode === "custom" && hypoCustom.length > 0) {
+      // Custom distribution: user specifies rows of {pct, count, side}
+      const validRows = hypoCustom.filter(r => r.pct !== "" && r.count !== "" && !isNaN(parseFloat(r.pct)) && !isNaN(parseInt(r.count)));
+      if (validRows.length === 0) return null;
+      let allPcts = [];
+      validRows.forEach(r => {
+        const pct = parseFloat(r.pct);
+        const count = parseInt(r.count);
+        for (let i = 0; i < count; i++) allPcts.push(r.side === "win" ? Math.abs(pct) : -Math.abs(pct));
+      });
+      const total = allPcts.length;
+      if (total === 0) return null;
+      const wins = allPcts.filter(p => p > 0);
+      const losses = allPcts.filter(p => p <= 0);
+      const wr = (wins.length / total) * 100;
+      const ag = wins.length > 0 ? wins.reduce((s, v) => s + v, 0) / wins.length : 0;
+      const al = losses.length > 0 ? Math.abs(losses.reduce((s, v) => s + v, 0) / losses.length) : 0;
+      const glRatio = al > 0 ? ag / al : 0;
+      const adjustedGL = al > 0 ? ((wr / 100) * ag) / (((100 - wr) / 100) * al) : 0;
+      const ev = (wr / 100) * ag - ((100 - wr) / 100) * al;
+      return { winRate: wr, avgGain: ag, avgLoss: al, total, wins: wins.length, losses: losses.length, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, ev, mode: "custom" };
+    }
+    // Default: override mode
     const wr = hypo.winRate !== "" ? parseFloat(hypo.winRate) : stats.ba;
     const ag = hypo.avgGain !== "" ? parseFloat(hypo.avgGain) : stats.avgGain;
     const al = hypo.avgLoss !== "" ? parseFloat(hypo.avgLoss) : stats.avgLoss;
@@ -1147,8 +1214,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     const adjustedGL = adjDenom > 0 ? ((wr / 100) * ag) / adjDenom : (ag > 0 ? Infinity : 0);
     const ev = (wr / 100) * ag - ((100 - wr) / 100) * al;
     const estPL = tt * ev / 100;
-    return { winRate: wr, avgGain: ag, avgLoss: al, total: tt, wins: winCount, losses: lossCount, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, ev, estPL };
-  }, [hypo, stats]);
+    return { winRate: wr, avgGain: ag, avgLoss: al, total: tt, wins: winCount, losses: lossCount, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, ev, estPL, mode: "override" };
+  }, [hypo, hypoCap, hypoMode, hypoCustom, stats, filtered]);
 
   // Equity curve data — supports $ vs % and trades vs months
   const equityData = useMemo(() => {
@@ -1251,8 +1318,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     setJournaledTrades(prev => prev.map(t => {
       if (t.id !== editingId) return t;
       const ep = parseFloat(editRow.entryP) || 0, xp = parseFloat(editRow.exitP) || 0, sh = parseFloat(editRow.shares) || 0, st = parseFloat(editRow.stop) || 0;
-      const plPct = ep > 0 ? ((xp - ep) / ep) * 100 : 0;
-      const plDollar = (xp - ep) * sh;
+      const isShort = (editRow.tradeType || t.tradeType || "Long") === "Short";
+      const plPct = ep > 0 ? (isShort ? ((ep - xp) / ep) * 100 : ((xp - ep) / ep) * 100) : 0;
+      const plDollar = isShort ? (ep - xp) * sh : (xp - ep) * sh;
       const initRisk = ep > 0 && st > 0 ? (ep - st) / ep : 0;
       const rMult = initRisk > 0 ? (plPct / 100) / initRisk : 0;
       return { ...editRow, notes: serializedNotes, plPct, plDollar, rMult };
@@ -1469,142 +1537,257 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
         {/* ─── Distribution Analysis ─── */}
         <GlassCard style={{ padding: "18px 22px" }}>
           <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,cursor:"pointer" }} onClick={()=>setDistExpanded(e=>!e)}>
-            <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Distribution Analysis</div>
-            <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-              {distAnalysis.returnPerTrade !== undefined && <span style={{ fontSize:"0.60rem",color:C.muted }}>Return/Trade: <span style={{ color: distAnalysis.returnPerTrade >= 0 ? C.green : C.red, fontWeight:700 }}>{distAnalysis.returnPerTrade.toFixed(2)}%</span></span>}
+            <div style={{ fontWeight: 800, fontSize: "0.88rem", color: C.white, letterSpacing:"-0.02em" }}>Distribution</div>
+            <div style={{ display:"flex",alignItems:"center",gap:12 }}>
+              {distAnalysis.returnPerTrade !== undefined && <span style={{ fontSize:"0.64rem",color:C.muted }}>Return/Trade: <span style={{ color: distAnalysis.returnPerTrade >= 0 ? C.green : C.red, fontWeight:700 }}>{distAnalysis.returnPerTrade.toFixed(2)}%</span></span>}
               <span style={{ color:C.muted,fontSize:"0.70rem",transition:"transform 0.2s",transform:distExpanded?"rotate(180deg)":"rotate(0deg)" }}>▼</span>
             </div>
           </div>
-          {/* Always show Gains/Losses bar chart */}
-          <div style={{ marginBottom: distExpanded ? 20 : 0 }}>
-            <div style={{ fontSize:"0.56rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:8 }}>Gains / Losses</div>
-            <ResponsiveContainer width="100%" height={170}>
-              <BarChart data={distAnalysis.barData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={2} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[v,name==="gains"?"Wins":"Losses"]} /><Bar dataKey="losses" fill={C.red} radius={[0,0,2,2]} /><Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} /></BarChart>
-            </ResponsiveContainer>
-          </div>
 
           {distExpanded && <>
-            {/* Explainer card */}
-            <div style={{ background:"rgba(201,152,42,0.06)",border:`1px solid ${C.borderGold}`,borderRadius:10,padding:"12px 16px",marginBottom:20,fontSize:"0.56rem",color:C.muted,lineHeight:1.6 }}>
-              <span style={{ color:C.gold,fontWeight:700 }}>What is this?</span> Distribution Analysis breaks down your trade returns by magnitude to show <em>where</em> your edge comes from. The DRMA curve reveals whether your profits are driven by high win rate on small trades or by large winners. Use the Hypothetical Simulator at the bottom to model "what if" scenarios on your stats.
-            </div>
-
-            {/* DRMA Curve */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize:"0.56rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>DRMA Curve <span style={{ fontWeight:400,letterSpacing:"0",textTransform:"none",fontSize:"0.50rem" }}>(Distribution Return Moving Average)</span></div>
-              <div style={{ fontSize:"0.46rem",color:C.muted,marginBottom:8 }}>Cumulative return contribution by trade magnitude. Shows where in the % range your system makes or loses money. Converges to your Return Per Trade.</div>
-              <ResponsiveContainer width="100%" height={170}>
-                <AreaChart data={distAnalysis.drmaData}>
-                  <defs>
-                    <linearGradient id="drmaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={C.gold} stopOpacity={0.3} />
-                      <stop offset="100%" stopColor={C.gold} stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={2} />
-                  <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>`${v.toFixed(1)}%`} />
-                  <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[`${Number(v).toFixed(2)}%`,name==="drma"?"DRMA":"Net"]} />
-                  <ReferenceLine y={0} stroke={C.border} />
-                  <Area type="monotone" dataKey="drma" stroke={C.gold} strokeWidth={2} fill="url(#drmaGrad)" dot={{fill:C.gold,r:2.5}} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Gain & Loss Magnitude side by side */}
-            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20 }}>
-              <div>
-                <div style={{ fontSize:"0.56rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Gain Magnitude</div>
-                <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your winning trades cluster by size.</div>
-                <ResponsiveContainer width="100%" height={140}>
-                  <BarChart data={distAnalysis.gainMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Wins"]} /><Bar dataKey="count" fill={C.green} radius={[2,2,0,0]} /></BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div>
-                <div style={{ fontSize:"0.56rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Loss Magnitude</div>
-                <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your losing trades cluster by size.</div>
-                <ResponsiveContainer width="100%" height={140}>
-                  <BarChart data={distAnalysis.lossMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Losses"]} /><Bar dataKey="count" fill={C.red} radius={[2,2,0,0]} /></BarChart>
-                </ResponsiveContainer>
+            {/* ── Summary Card (3x2 grid matching M360) ── */}
+            <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"16px 22px",marginBottom:24 }}>
+              <div style={{ fontSize:"0.62rem",fontWeight:700,color:C.white,marginBottom:12 }}>Summary</div>
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px 32px" }}>
+                {[
+                  { label:"Total # of Trades:", val: stats.total },
+                  { label:"Average Gain:", val: `${stats.avgGain.toFixed(2)}%` },
+                  { label:"# of Wins:", val: filtered.filter(t=>t.plPct>0).length },
+                  { label:"Win Rate:", val: `${stats.ba.toFixed(2)}%` },
+                  { label:"Average Loss:", val: `${stats.avgLoss.toFixed(2)}%` },
+                  { label:"# of Losses:", val: filtered.filter(t=>t.plPct<=0).length },
+                  { label:"Return Per Trade:", val: `${(distAnalysis.returnPerTrade||0).toFixed(2)}%`, color: (distAnalysis.returnPerTrade||0) >= 0 ? C.green : C.red },
+                  { label:"Win/Loss Ratio:", val: stats.glRatio.toFixed(2) },
+                  { label:"Adjusted Win/Loss Ratio:", val: stats.adjustedGL.toFixed(2) },
+                ].map((s,i) => (
+                  <div key={i} style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                    <span style={{ fontSize:"0.62rem",color:C.muted }}>{s.label}</span>
+                    <span style={{ fontSize:"0.68rem",fontWeight:700,color:s.color||C.white }}>{s.val}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Distribution Table */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize:"0.56rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Distribution Table</div>
-              <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>Per-bucket breakdown: G↑% and L↓% = frequency as % of total trades. Net% = net win/loss frequency. DRMA = per-bucket return contribution (sum of trade P&L% in bucket ÷ total trades).</div>
-              <div style={{ overflowX:"auto" }}>
-                <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.64rem" }}>
-                  <thead>
-                    <tr style={{ borderBottom:`1px solid ${C.border}` }}>
-                      {["Range","#Gains","#Losses","G↑%","L↓%","Net%","DRMA"].map(h => (
-                        <th key={h} style={{ padding:"7px 6px",textAlign:h==="Range"?"left":"right",fontWeight:700,fontSize:"0.46rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {distAnalysis.tableData.filter(r => r.gains > 0 || r.losses > 0).map((r, i) => (
-                      <tr key={i} style={{ borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
-                        <td style={{ padding:"5px 6px",color:C.white,fontWeight:600,fontSize:"0.62rem" }}>{r.range}</td>
-                        <td style={{ padding:"5px 6px",textAlign:"right",color:C.green,fontWeight:600 }}>{r.gains}</td>
-                        <td style={{ padding:"5px 6px",textAlign:"right",color:C.red,fontWeight:600 }}>{r.losses}</td>
-                        <td style={{ padding:"5px 6px",textAlign:"right",color:C.muted }}>{Math.round(r.gPct)}%</td>
-                        <td style={{ padding:"5px 6px",textAlign:"right",color:C.muted }}>{Math.round(r.lPct)}%</td>
-                        <td style={{ padding:"5px 6px",textAlign:"right",color:r.netPct>0?C.green:r.netPct<0?C.red:C.text,fontWeight:700 }}>{r.netPct.toFixed(2)}%</td>
-                        <td style={{ padding:"5px 6px",textAlign:"right",color:r.bucketRetContrib>=0?C.gold:C.red,fontWeight:700 }}>{r.bucketRetContrib.toFixed(2)}%</td>
+            {/* ── Two-column layout: Charts (left) + Table (right) ── */}
+            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:24 }}>
+              {/* LEFT COLUMN — Charts */}
+              <div>
+                {/* Gains and Losses */}
+                <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
+                  <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:10 }}>Gains and Losses</div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={distAnalysis.barData} barGap={0} barCategoryGap="20%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
+                      <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
+                      <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[v,name==="gains"?"Wins":"Losses"]} />
+                      <Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} />
+                      <Bar dataKey="losses" fill={C.red} radius={[2,2,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* DRMA Curve */}
+                <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
+                  <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:2 }}>DRMA Curve <span style={{ fontWeight:400,fontSize:"0.52rem",color:C.muted }}>(Distribution Return Moving Average)</span></div>
+                  <div style={{ fontSize:"0.48rem",color:C.muted,marginBottom:10 }}>Cumulative return contribution by trade magnitude. Shows where in the % range your system makes or loses money. Converges to your Return Per Trade.</div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <AreaChart data={distAnalysis.drmaData}>
+                      <defs>
+                        <linearGradient id="drmaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={C.gold} stopOpacity={0.3} />
+                          <stop offset="100%" stopColor={C.gold} stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
+                      <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>`${v.toFixed(1)}%`} />
+                      <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[`${Number(v).toFixed(2)}%`,name==="drma"?"DRMA":"Net"]} />
+                      <ReferenceLine y={0} stroke={C.border} />
+                      <Area type="monotone" dataKey="drma" stroke={C.gold} strokeWidth={2} fill="url(#drmaGrad)" dot={{fill:C.gold,r:3}} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Gain & Loss Magnitude side by side */}
+                <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
+                  <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 14px" }}>
+                    <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.white,marginBottom:2 }}>Gain Magnitude</div>
+                    <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your winning trades cluster by size.</div>
+                    <ResponsiveContainer width="100%" height={150}>
+                      <BarChart data={distAnalysis.gainMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Wins"]} /><Bar dataKey="count" fill={C.green} radius={[2,2,0,0]} /></BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 14px" }}>
+                    <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.white,marginBottom:2 }}>Loss Magnitude</div>
+                    <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your losing trades cluster by size.</div>
+                    <ResponsiveContainer width="100%" height={150}>
+                      <BarChart data={distAnalysis.lossMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Losses"]} /><Bar dataKey="count" fill={C.red} radius={[2,2,0,0]} /></BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN — Distribution Table */}
+              <div>
+                <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",height:"100%",overflowY:"auto" }}>
+                  <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.68rem" }}>
+                    <thead>
+                      <tr style={{ borderBottom:`1px solid ${C.border}` }}>
+                        {["Range","# Gains","# Losses","↑ %","↓ %","Net","DRMA"].map(h => (
+                          <th key={h} style={{ padding:"8px 6px",textAlign:h==="Range"?"left":"center",fontWeight:700,fontSize:"0.54rem",color:C.white,whiteSpace:"nowrap",borderBottom:`2px solid ${C.border}` }}>{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {distAnalysis.tableData.map((r, i) => {
+                        const hasData = r.gains > 0 || r.losses > 0;
+                        return (
+                          <tr key={i} style={{ borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
+                            <td style={{ padding:"6px 6px",color:C.white,fontWeight:600,fontSize:"0.66rem" }}>{r.range}</td>
+                            <td style={{ padding:"6px 6px",textAlign:"center",color:hasData?C.white:C.muted,fontWeight:600 }}>{r.gains}</td>
+                            <td style={{ padding:"6px 6px",textAlign:"center",color:hasData?C.white:C.muted,fontWeight:600 }}>{r.losses}</td>
+                            {hasData ? <>
+                              <td style={{ padding:"6px 6px",textAlign:"center",color:C.muted }}>{Math.round(r.gPct)}%</td>
+                              <td style={{ padding:"6px 6px",textAlign:"center",color:C.muted }}>{Math.round(r.lPct)}%</td>
+                              <td style={{ padding:"6px 6px",textAlign:"center",color:r.netPct>0?C.green:r.netPct<0?C.red:C.text,fontWeight:700 }}>{r.netPct.toFixed(2)}%</td>
+                              <td style={{ padding:"6px 6px",textAlign:"center",color:r.bucketRetContrib>=0?C.green:C.red,fontWeight:700 }}>{r.bucketRetContrib.toFixed(2)}</td>
+                            </> : <>
+                              <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
+                              <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
+                              <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
+                              <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
+                            </>}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
             {/* ─── Hypothetical Scenario Simulator ─── */}
-            <div style={{ borderTop:`1px solid ${C.border}`,paddingTop:16 }}>
+            <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"16px 20px" }}>
               <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:hypoOpen?14:0,cursor:"pointer" }} onClick={()=>setHypoOpen(h=>!h)}>
-                <div style={{ fontSize:"0.60rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.gold }}>Hypothetical Scenario Simulator</div>
+                <div style={{ fontSize:"0.68rem",fontWeight:700,color:C.gold }}>Hypothetical Scenario Simulator</div>
                 <span style={{ color:C.muted,fontSize:"0.60rem",transition:"transform 0.2s",transform:hypoOpen?"rotate(180deg)":"rotate(0deg)" }}>▼</span>
               </div>
               {hypoOpen && (
                 <div>
-                  <div style={{ fontSize:"0.50rem",color:C.muted,marginBottom:12,lineHeight:1.5 }}>Model how improving specific stats would change your overall performance. Override any field to see the impact — leave blank to keep your actual value. Use this to set realistic targets for your trading plan.</div>
-                  <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16 }}>
+                  {/* Mode tabs */}
+                  <div style={{ display:"flex",gap:6,marginBottom:16 }}>
                     {[
-                      { label:"Win Rate %", key:"winRate", actual:stats.ba.toFixed(2) },
-                      { label:"Avg Gain %", key:"avgGain", actual:stats.avgGain.toFixed(2) },
-                      { label:"Avg Loss %", key:"avgLoss", actual:stats.avgLoss.toFixed(2) },
-                      { label:"Total Trades", key:"totalTrades", actual:stats.total },
-                    ].map(f => (
-                      <div key={f.key}>
-                        <div style={{ fontSize:"0.46rem",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>{f.label}</div>
-                        <input
-                          type="number" step="any"
-                          placeholder={String(f.actual)}
-                          value={hypo[f.key]}
-                          onChange={e => setHypo(h => ({ ...h, [f.key]: e.target.value }))}
-                          style={{ width:"100%",padding:"6px 8px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:6,color:C.white,fontSize:"0.68rem",fontFamily:font,outline:"none" }}
-                        />
-                        <div style={{ fontSize:"0.42rem",color:C.muted,marginTop:2 }}>Actual: {f.actual}</div>
-                      </div>
+                      { key:"override", label:"Override Stats" },
+                      { key:"cap", label:"Cap Losses" },
+                      { key:"custom", label:"Custom Distribution" },
+                    ].map(m => (
+                      <button key={m.key} onClick={() => setHypoMode(m.key)} style={{ padding:"6px 14px",borderRadius:8,border:`1px solid ${hypoMode===m.key?C.gold:C.border}`,background:hypoMode===m.key?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.03)",color:hypoMode===m.key?C.gold:C.muted,fontSize:"0.56rem",fontWeight:700,cursor:"pointer",fontFamily:font,transition:"all 0.15s" }}>{m.label}</button>
                     ))}
                   </div>
-                  {hypoStats && (
-                    <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10 }}>
+
+                  {/* ── Override Stats Mode ── */}
+                  {hypoMode === "override" && <>
+                    <div style={{ fontSize:"0.52rem",color:C.muted,marginBottom:14,lineHeight:1.6 }}>Override any stat to model a different scenario. Leave blank to keep your actual value.</div>
+                    <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16 }}>
                       {[
+                        { label:"Win Rate %", key:"winRate", actual:stats.ba.toFixed(2) },
+                        { label:"Avg Gain %", key:"avgGain", actual:stats.avgGain.toFixed(2) },
+                        { label:"Avg Loss %", key:"avgLoss", actual:stats.avgLoss.toFixed(2) },
+                        { label:"Total Trades", key:"totalTrades", actual:stats.total },
+                      ].map(f => (
+                        <div key={f.key}>
+                          <div style={{ fontSize:"0.50rem",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>{f.label}</div>
+                          <input type="number" step="any" placeholder={String(f.actual)} value={hypo[f.key]} onChange={e => setHypo(h => ({ ...h, [f.key]: e.target.value }))} style={{ width:"100%",padding:"8px 10px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none" }} />
+                          <div style={{ fontSize:"0.46rem",color:C.muted,marginTop:3 }}>Actual: {f.actual}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </>}
+
+                  {/* ── Cap Losses Mode ── */}
+                  {hypoMode === "cap" && <>
+                    <div style={{ fontSize:"0.52rem",color:C.muted,marginBottom:14,lineHeight:1.6 }}>Cap all losses at a maximum percentage. Shows how your stats would look if no single trade lost more than the cap. Uses your actual trade data.</div>
+                    <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:16 }}>
+                      <div>
+                        <div style={{ fontSize:"0.50rem",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Max Loss %</div>
+                        <input type="number" step="0.5" min="0.5" placeholder={stats.avgLoss.toFixed(1)} value={hypoCap} onChange={e => setHypoCap(e.target.value)} style={{ width:120,padding:"8px 10px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none" }} />
+                        <div style={{ fontSize:"0.46rem",color:C.muted,marginTop:3 }}>Your worst loss: {Math.abs(stats.largestLoss||0).toFixed(2)}%</div>
+                      </div>
+                      {hypoCap !== "" && <div style={{ fontSize:"0.52rem",color:C.gold,marginTop:12 }}>
+                        {filtered.filter(t => t.plPct <= 0 && Math.abs(t.plPct) > parseFloat(hypoCap||999)).length} trades would be capped
+                      </div>}
+                    </div>
+                  </>}
+
+                  {/* ── Custom Distribution Mode ── */}
+                  {hypoMode === "custom" && <>
+                    <div style={{ fontSize:"0.52rem",color:C.muted,marginBottom:14,lineHeight:1.6 }}>Build a custom trade distribution. Specify the % gain/loss and number of trades for each row to model any scenario.</div>
+                    <div style={{ marginBottom:12 }}>
+                      {hypoCustom.map((row, i) => (
+                        <div key={i} style={{ display:"flex",gap:8,alignItems:"center",marginBottom:6 }}>
+                          <select value={row.side} onChange={e => setHypoCustom(prev => prev.map((r,j) => j===i ? {...r, side:e.target.value} : r))} style={{ padding:"6px 8px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:8,color:row.side==="win"?C.green:C.red,fontSize:"0.64rem",fontFamily:font,outline:"none",cursor:"pointer" }}>
+                            <option value="win">Win</option>
+                            <option value="loss">Loss</option>
+                          </select>
+                          <input type="number" step="0.5" min="0" placeholder="%" value={row.pct} onChange={e => setHypoCustom(prev => prev.map((r,j) => j===i ? {...r, pct:e.target.value} : r))} style={{ width:80,padding:"6px 8px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:"0.64rem",fontFamily:font,outline:"none" }} />
+                          <span style={{ fontSize:"0.52rem",color:C.muted }}>% ×</span>
+                          <input type="number" step="1" min="1" placeholder="#" value={row.count} onChange={e => setHypoCustom(prev => prev.map((r,j) => j===i ? {...r, count:e.target.value} : r))} style={{ width:60,padding:"6px 8px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:"0.64rem",fontFamily:font,outline:"none" }} />
+                          <span style={{ fontSize:"0.52rem",color:C.muted }}>trades</span>
+                          <button onClick={() => setHypoCustom(prev => prev.filter((_,j) => j!==i))} style={{ padding:"4px 8px",background:"rgba(239,68,68,0.1)",border:"none",borderRadius:6,color:C.red,fontSize:"0.60rem",cursor:"pointer",fontFamily:font }}>×</button>
+                        </div>
+                      ))}
+                      <button onClick={() => setHypoCustom(prev => [...prev, { pct:"", count:"", side:"win" }])} style={{ padding:"6px 14px",background:"rgba(201,152,42,0.1)",border:`1px solid ${C.borderGold||"rgba(201,152,42,0.22)"}`,borderRadius:8,color:C.gold,fontSize:"0.56rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>+ Add Row</button>
+                    </div>
+                  </>}
+
+                  {/* ── Results (all modes) ── */}
+                  {hypoStats && (
+                    <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:12 }}>
+                      {[
+                        { label:"Win Rate", val:`${hypoStats.winRate.toFixed(2)}%`, color: C.text },
+                        { label:"Avg Gain", val:`${hypoStats.avgGain.toFixed(2)}%`, color: C.green },
+                        { label:"Avg Loss", val:`${hypoStats.avgLoss.toFixed(2)}%`, color: C.red },
                         { label:"Win/Loss Ratio", val:hypoStats.glRatio.toFixed(2), color: C.text },
                         { label:"Adj. W/L Ratio", val:hypoStats.adjustedGL.toFixed(2), color:hypoStats.adjustedGL>=1?C.green:C.red },
-                        { label:"Expected Value", val:`${hypoStats.ev.toFixed(2)}%`, color:hypoStats.ev>=0?C.green:C.red },
-                        { label:"Projected Wins/Losses", val:`${hypoStats.wins}W / ${hypoStats.losses}L`, color:C.text },
+                        { label:"Return Per Trade", val:`${hypoStats.ev.toFixed(2)}%`, color:hypoStats.ev>=0?C.green:C.red },
+                        { label:"Wins / Losses", val:`${hypoStats.wins}W / ${hypoStats.losses}L`, color:C.text },
+                        { label:"Total Trades", val:hypoStats.total, color:C.text },
                       ].map(s => (
-                        <div key={s.label} style={{ background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"10px 12px" }}>
-                          <div style={{ fontSize:"0.44rem",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>{s.label}</div>
+                        <div key={s.label} style={{ background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"10px 12px" }}>
+                          <div style={{ fontSize:"0.46rem",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>{s.label}</div>
                           <div style={{ fontSize:"0.80rem",fontWeight:800,color:s.color }}>{s.val}</div>
                         </div>
                       ))}
                     </div>
                   )}
-                  {(hypo.winRate !== "" || hypo.avgGain !== "" || hypo.avgLoss !== "" || hypo.totalTrades !== "") && (
-                    <button onClick={() => setHypo({ winRate: "", avgGain: "", avgLoss: "", totalTrades: "" })} style={{ marginTop:10,padding:"5px 14px",background:"rgba(239,68,68,0.12)",border:`1px solid rgba(239,68,68,0.3)`,borderRadius:6,color:C.red,fontSize:"0.56rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Reset to Actual</button>
+
+                  {/* ── Cap Losses distribution table (shows modified distribution) ── */}
+                  {hypoStats && hypoStats.mode === "cap" && hypoStats.tableData && (
+                    <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px",marginBottom:12 }}>
+                      <div style={{ fontSize:"0.56rem",fontWeight:700,color:C.white,marginBottom:8 }}>Capped Distribution</div>
+                      <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.62rem" }}>
+                        <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
+                          {["Range","# Gains","# Losses","Net","DRMA"].map(h => (
+                            <th key={h} style={{ padding:"6px 4px",textAlign:h==="Range"?"left":"center",fontWeight:700,fontSize:"0.50rem",color:C.white,borderBottom:`2px solid ${C.border}` }}>{h}</th>
+                          ))}
+                        </tr></thead>
+                        <tbody>{hypoStats.tableData.filter(r => r.gains > 0 || r.losses > 0).map((r,i) => (
+                          <tr key={i} style={{ borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
+                            <td style={{ padding:"5px 4px",color:C.white,fontWeight:600 }}>{r.range}</td>
+                            <td style={{ padding:"5px 4px",textAlign:"center",color:C.white }}>{r.gains}</td>
+                            <td style={{ padding:"5px 4px",textAlign:"center",color:C.white }}>{r.losses}</td>
+                            <td style={{ padding:"5px 4px",textAlign:"center",color:r.netPct>0?C.green:r.netPct<0?C.red:C.text,fontWeight:700 }}>{r.netPct.toFixed(2)}%</td>
+                            <td style={{ padding:"5px 4px",textAlign:"center",color:r.bucketRetContrib>=0?C.green:C.red,fontWeight:700 }}>{r.bucketRetContrib.toFixed(2)}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Clear button */}
+                  {((hypoMode === "override" && (hypo.winRate !== "" || hypo.avgGain !== "" || hypo.avgLoss !== "" || hypo.totalTrades !== "")) || (hypoMode === "cap" && hypoCap !== "") || (hypoMode === "custom" && hypoCustom.length > 0)) && (
+                    <button onClick={() => { setHypo({ winRate: "", avgGain: "", avgLoss: "", totalTrades: "" }); setHypoCap(""); setHypoCustom([]); }} style={{ padding:"7px 18px",background:"rgba(239,68,68,0.12)",border:`1px solid rgba(239,68,68,0.3)`,borderRadius:8,color:C.red,fontSize:"0.60rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Clear</button>
                   )}
                 </div>
               )}
@@ -1915,7 +2098,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 const FULL_SIZE_OPTIONS = [10,15,20,25,30,35,40,45,50,55,60];
 let _posId = 100;
 let _lid = 1; // stable local ID counter — survives autosave ID replacement, used as React key
-const mkPos = (sym, entry, shares, ep, cp, stop, stop2, setup, tags = [], trailStop = "", comm = "") => ({ id: _posId++, _lid: _lid++, sym, entry, shares: String(shares), ep: String(ep), cp: String(cp), stop: String(stop), stop2: String(stop2 || ""), trailStop: String(trailStop || ""), setup, tags, comm: String(comm || ""), notes: "", chartUrl: "", chartImage: "" });
+const mkPos = (sym, entry, shares, ep, cp, stop, stop2, setup, tags = [], trailStop = "", comm = "", tradeType = "Long") => ({ id: _posId++, _lid: _lid++, sym, entry, shares: String(shares), ep: String(ep), cp: String(cp), stop: String(stop), stop2: String(stop2 || ""), trailStop: String(trailStop || ""), setup, tags, comm: String(comm || ""), notes: "", chartUrl: "", chartImage: "", tradeType });
 const INIT_POSITIONS = [
   mkPos("MSGS","4/1/26",612,328.25,302.90,302.90,0,"VCP",["Breakout"]),
   mkPos("DNTH","4/8/26",2100,87.58,81.75,81.75,0,"Pivot",["Momentum"]),
@@ -2064,7 +2247,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     setPositions(prev => {
       const maxId = prev.reduce((m, p) => Math.max(m, p.id || 0), 0);
       const now = new Date();
-      const next = [...prev, { id: maxId + 1, _lid: _lid++, sym: "", entry: now.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), entryTime: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [], comm: "", notes: "", chartUrl: "", chartImage: "" }];
+      const next = [...prev, { id: maxId + 1, _lid: _lid++, sym: "", entry: now.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }), entryTime: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }), shares: "", ep: "", cp: "", stop: "", stop2: "", trailStop: "", setup: setupTypes[0] || "VCP", tags: [], comm: "", notes: "", chartUrl: "", chartImage: "", tradeType: "Long" }];
       positionsRef.current = next;
       return next;
     });
@@ -2120,9 +2303,10 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       const sellCommN = parseFloat(sellComm) || 0;
       const posCommN = parseFloat(pos.comm) || 0;
       const commPortion = sellCommN > 0 ? sellCommN : (totalShares > 0 ? posCommN * (soldShares / totalShares) : posCommN);
-      // P/L without commission — matches M360 methodology and edit flow
-      const plDollar = (exitP - epN) * soldShares;
-      const plPct = epN > 0 ? ((exitP - epN) / epN) * 100 : 0;
+      // P/L without commission — matches M360 methodology and edit flow. Short inverts direction.
+      const isShort = (pos.tradeType || "Long") === "Short";
+      const plDollar = isShort ? (epN - exitP) * soldShares : (exitP - epN) * soldShares;
+      const plPct = epN > 0 ? (isShort ? ((epN - exitP) / epN) * 100 : ((exitP - epN) / epN) * 100) : 0;
       // Weighted initial risk — accounts for dual stops (same formula as enrichment)
       const isDual = stopN > 0 && stop2N > 0;
       const h1 = isDual ? Math.ceil(totalShares / 2) : totalShares;
@@ -2140,7 +2324,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         exitTime: nowSell.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
         entryP: epN, exitP, shares: soldShares, stop: stopN, setup: pos.setup,
         tags: [...(pos.tags || []), ...sellTags], plPct, plDollar, rMult,
-        commission: commPortion,
+        commission: commPortion, tradeType: pos.tradeType || "Long",
         reason: sellReason, notes: finalNotes, chartUrl: sellChartUrl || pos.chartUrl || "", chartImage: pos.chartImage || "", _fromDashboard: true,
       });
     }
@@ -2211,8 +2395,10 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const sbe = canFinanceSBE ? Math.ceil(sharesN * (epN - avgStop) / (cpN - avgStop)) : 0;
     const sbePct = canFinanceSBE && sharesN > 0 ? (sbe / sharesN) * 100 : 0;
 
-    // P/L (commission subtracted from dollar P/L)
-    const plD = (cpN - epN) * sharesN - commN;
+    // P/L (commission subtracted from dollar P/L) — Short inverts direction
+    const isShort = (p.tradeType || "Long") === "Short";
+    const rawPL = isShort ? (epN - cpN) * sharesN : (cpN - epN) * sharesN;
+    const plD = rawPL - commN;
     const plPct = epN > 0 && sharesN > 0 ? (plD / (epN * sharesN)) * 100 : 0;
 
     // R-Multiple uses weighted initial risk
@@ -2612,7 +2798,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left","riskStatus")}{th("Symbol","left","sym")}{th("Shares","right","sharesN")}{th("Avg. Cost","right","epN")}{th("Comm","right","commN")}{th("Pos. Size","right","posValue")}{th("Exp %","right","expPct")}{th("Realized","right","realizedPL")}{th("Orig Stop","right","stop1")}{th("Stop 2","right","stop2")}{th("Trail Stop","right","tsN")}{th("Current","right","cpN")}{th("Setup","left","setup")}{th("Tags","left")}{th("DTS","right","dtsPct")}{th("RTS","right","rtsD")}{th("ROTE","right","rotePct")}{displayMode==="R"&&th("R Suggest","right","rSuggestedStop")}{displayMode==="R"&&th("Locked","right","rLockedProfit")}{displayMode!=="R"&&th("SBE","right","sbe")}{displayMode!=="R"&&th("SBE %","right","sbePct")}{th("P/L","right","plPct")}{th("R","right","rMult")}{th("Notes","center")}{th("","center")}
+              {th("Status","left","riskStatus")}{th("Symbol","left","sym")}{th("L/S","center")}{th("Shares","right","sharesN")}{th("Avg. Cost","right","epN")}{th("Comm","right","commN")}{th("Pos. Size","right","posValue")}{th("Exp %","right","expPct")}{th("Realized","right","realizedPL")}{th("Orig Stop","right","stop1")}{th("Stop 2","right","stop2")}{th("Trail Stop","right","tsN")}{th("Current","right","cpN")}{th("Setup","left","setup")}{th("Tags","left")}{th("DTS","right","dtsPct")}{th("RTS","right","rtsD")}{th("ROTE","right","rotePct")}{displayMode==="R"&&th("R Suggest","right","rSuggestedStop")}{displayMode==="R"&&th("Locked","right","rLockedProfit")}{displayMode!=="R"&&th("SBE","right","sbe")}{displayMode!=="R"&&th("SBE %","right","sbePct")}{th("P/L","right","plPct")}{th("R","right","rMult")}{th("Notes","center")}{th("","center")}
             </tr></thead>
             <tbody>
               {(posSorts.length > 0 ? multiSort(enriched, posSorts) : enriched).map((p, idx) => {
@@ -2632,6 +2818,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     {/* Risk Status */}
                     <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
                     <td style={{padding:"6px 4px"}}><TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></td>
+                    <td style={{padding:"6px 2px",textAlign:"center"}}><select value={p.tradeType||"Long"} onChange={e=>updateField(p.id,"tradeType",e.target.value)} style={{padding:"3px 4px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,color:(p.tradeType||"Long")==="Short"?C.red:C.green,fontSize:"0.52rem",fontWeight:700,fontFamily:font,cursor:"pointer",outline:"none"}}><option value="Long">L</option><option value="Short">S</option></select></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.shares} onChange={v=>updateField(p.id,"shares",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.ep} onChange={v=>updateField(p.id,"ep",v)} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={62} /></td>
@@ -2801,7 +2988,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 );
               })()}
 
-              {/* Totals — 23 cols: Status,Symbol,Shares,AvgCost,Comm,PosSize,Exp%,Realized,OrigStop,Stop2,TrailStop,Current,Setup,Tags,DTS,RTS,ROTE,[RSuggest+Locked|SBE+SBE%],P/L,R,Notes,Actions */}
+              {/* Totals — 24 cols: Status,Symbol,L/S,Shares,AvgCost,Comm,PosSize,Exp%,Realized,OrigStop,Stop2,TrailStop,Current,Setup,Tags,DTS,RTS,ROTE,[RSuggest+Locked|SBE+SBE%],P/L,R,Notes,Actions */}
               <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
                 <td colSpan={2} style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.text,fontSize:"0.70rem"}}>{enriched.reduce((s,p)=>s+p.sharesN,0).toLocaleString()}</td>
@@ -3772,6 +3959,7 @@ function AppInner() {
         entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
         stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
         commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
+        trade_type: p.tradeType || "Long",
       }));
 
       if (rows.length === 0) {
@@ -3936,7 +4124,7 @@ function AppInner() {
         const snap = new Map();
         clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
         loadedSnapshot.current = snap;
-        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" })));
+        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long" })));
       } else if (!posErr) {
         // Query succeeded but returned empty — check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
@@ -3946,14 +4134,14 @@ function AppInner() {
             user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", entry_time: p.entryTime || "", shares: p.shares || "",
             entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
             stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
-            commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null,
+            commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, trade_type: p.tradeType || "Long",
           })));
           if (!seedErr) {
             // Re-load from DB so positions have real DB ids
             const { data: seeded } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
             if (seeded && seeded.length > 0) {
               lastLoadedCount.current = seeded.length;
-              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" })));
+              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long" })));
             }
           }
           await saveSettingNow(uid, "initialized", true);
@@ -3968,7 +4156,7 @@ function AppInner() {
       const { data: trades, error: tradesErr } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false });
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       if (trades && trades.length > 0) {
-        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "" })));
+        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long" })));
         lastLoadedTradeCount.current = trades.length;
       }
 
@@ -3990,6 +4178,7 @@ function AppInner() {
                 entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
                 stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
                 commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
+                trade_type: p.tradeType || "Long",
               }));
               await supabase.from("positions").insert(rows);
               console.log(`RECOVERY: Inserted ${toInsert.length} positions from offline save.`);
@@ -4000,7 +4189,7 @@ function AppInner() {
                 const snap2 = new Map();
                 refreshed.forEach(p => { if (p.symbol) snap2.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
                 loadedSnapshot.current = snap2;
-                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" }));
+                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long" }));
                 positionsRef.current = next;
                 setPositions(next);
               }
@@ -4060,7 +4249,7 @@ function AppInner() {
           const snap = new Map();
           clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
           loadedSnapshot.current = snap;
-          const next = clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "" }));
+          const next = clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long" }));
           positionsRef.current = next;
           setPositions(next);
         }
@@ -4181,6 +4370,7 @@ function AppInner() {
           entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
           stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
           commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
+          trade_type: p.tradeType || "Long",
         }));
 
         try {
@@ -4219,7 +4409,7 @@ function AppInner() {
             stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
             pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
             exit_reason: t.reason || "", notes: t.notes || "",
-            chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
+            chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
           }));
           try {
             fetch(`${supabaseUrl}/rest/v1/trades`, {
@@ -4239,7 +4429,7 @@ function AppInner() {
               stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
               pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
               exit_reason: t.reason || "", notes: t.notes || "",
-              chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
+              chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
             });
             fetch(`${supabaseUrl}/rest/v1/trades?id=eq.${t.id}`, {
               method: 'PATCH', headers, body: updateBody, keepalive: true,
@@ -4329,7 +4519,7 @@ function AppInner() {
             stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
             pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
             exit_reason: t.reason || "", notes: t.notes || "",
-            chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
+            chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
           });
           const { data: inserted, error } = await supabase.from("trades").insert(newTrades.map(tradeRow)).select("id");
           if (error) { console.error("Trade insert error:", error.message); return; }
@@ -4354,7 +4544,7 @@ function AppInner() {
               stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
               pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
               exit_reason: t.reason || "", notes: t.notes || "",
-              chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
+              chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
             }).eq("id", t.id)
           ));
           updateResults.forEach((r, i) => { if (r.error) console.error("Trade update error:", editedTrades[i].id, r.error.message); });
@@ -4394,7 +4584,7 @@ function AppInner() {
         stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
         pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
         exit_reason: t.reason || "", notes: t.notes || "",
-        chart_url: t.chartUrl || "", chart_image: t.chartImage || "",
+        chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
       });
       const newTrades = journaledTrades.filter(t => !existingIds.has(t.id));
       if (newTrades.length > 0) {
