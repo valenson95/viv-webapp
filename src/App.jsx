@@ -1010,7 +1010,10 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const [tradeSorts, setTradeSorts] = useState([]); // [{key, dir}] multi-sort for trades
   const [eqYAxis, setEqYAxis] = useState("$"); // "$" or "%"
   const [eqXAxis, setEqXAxis] = useState("trades"); // "trades" or "months"
-  const [perfToggle, setPerfToggle] = useState("$"); // "$" or "%" for monthly perf table
+  const [distExpanded, setDistExpanded] = useState(false); // expand/collapse distribution analysis
+  const [hypoOpen, setHypoOpen] = useState(false); // hypothetical scenario simulator
+  const [hypo, setHypo] = useState({ winRate: "", avgGain: "", avgLoss: "", totalTrades: "" }); // override fields
+  // perfToggle removed — monthly tracker now shows all stats inline
 
   // Ref to always hold the latest onManualSave — fixes stale closure when
   // setTimeout fires after setJournaledTrades (state update hasn't rendered yet)
@@ -1047,15 +1050,15 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 
   const stats = useMemo(() => {
     const trades = filtered;
-    if (trades.length === 0) return { ba:0,avgGain:0,avgLoss:0,glRatio:0,ev:0,avgR:0,largestLoss:0,totalPL:0,total:0,avgHoldWin:0,avgHoldLoss:0,holdRatio:0 };
+    if (trades.length === 0) return { ba:0,avgGain:0,avgLoss:0,glRatio:0,adjustedGL:0,ev:0,avgR:0,largestLoss:0,largestWin:0,totalPL:0,total:0,avgHoldWin:0,avgHoldLoss:0,holdRatio:0 };
     const wins = trades.filter(t => t.plPct > 0), losses = trades.filter(t => t.plPct <= 0);
     const ba = (wins.length / trades.length) * 100;
-    // Dollar-weighted avg gain/loss: weight each trade's % by its position size (entryP × shares)
-    const winSize = wins.reduce((s, t) => s + (t.entryP || 0) * (t.shares || 0), 0);
-    const lossSize = losses.reduce((s, t) => s + (t.entryP || 0) * (t.shares || 0), 0);
-    const avgGain = winSize > 0 ? wins.reduce((s, t) => s + t.plPct * (t.entryP || 0) * (t.shares || 0), 0) / winSize : 0;
-    const avgLoss = lossSize > 0 ? Math.abs(losses.reduce((s, t) => s + t.plPct * (t.entryP || 0) * (t.shares || 0), 0) / lossSize) : 0;
+    // Equal-weighted avg gain/loss: simple average of trade percentages
+    const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.plPct, 0) / losses.length) : 0;
     const glRatio = avgLoss > 0 ? avgGain / avgLoss : 0;
+    // Adjusted G/L Ratio: factors in win rate — above 1.0 = net profitable
+    const adjustedGL = avgLoss > 0 ? ((ba / 100) * avgGain) / (((100 - ba) / 100) * avgLoss) : 0;
     const ev = (ba / 100) * avgGain - ((100 - ba) / 100) * avgLoss;
     const avgR = trades.reduce((s, t) => s + t.rMult, 0) / trades.length;
     // Holding duration (days) — uses time fields for fractional-day accuracy when available
@@ -1063,7 +1066,6 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       if (!t.entry || !t.exit) return null;
       const d1 = new Date(t.entry), d2 = new Date(t.exit);
       if (isNaN(d1) || isNaN(d2)) return null;
-      // If time fields exist, add hours+minutes for fractional day precision
       if (t.entryTime && t.exitTime) {
         const [eh, em] = t.entryTime.split(":").map(Number);
         const [xh, xm] = t.exitTime.split(":").map(Number);
@@ -1079,14 +1081,75 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     const avgHoldWin = winDays.length > 0 ? winDays.reduce((s,d) => s + d, 0) / winDays.length : 0;
     const avgHoldLoss = lossDays.length > 0 ? lossDays.reduce((s,d) => s + d, 0) / lossDays.length : 0;
     const holdRatio = avgHoldLoss > 0 ? avgHoldWin / avgHoldLoss : 0;
-    return { ba, avgGain, avgLoss, glRatio, ev, avgR, largestLoss: Math.min(...trades.map(t => t.plPct)), totalPL: trades.reduce((s, t) => s + t.plDollar, 0), total: trades.length, avgHoldWin, avgHoldLoss, holdRatio };
+    return { ba, avgGain, avgLoss, glRatio, adjustedGL, ev, avgR, largestLoss: Math.min(...trades.map(t => t.plPct)), largestWin: Math.max(...trades.map(t => t.plPct)), totalPL: trades.reduce((s, t) => s + t.plDollar, 0), total: trades.length, avgHoldWin, avgHoldLoss, holdRatio };
   }, [filtered]);
 
-  const distData = useMemo(() => {
-    const buckets = []; for (let i = -16; i <= 20; i += 2) buckets.push({ range: `${i}%`, gains: 0, losses: 0 });
-    filtered.forEach(t => { const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor((t.plPct + 16) / 2))); if (buckets[idx]) t.plPct >= 0 ? buckets[idx].gains++ : buckets[idx].losses++; });
-    return buckets;
+  // ─── Distribution Analysis Data ───
+  // Uses ABSOLUTE VALUE buckets (0-2%, 2-4%, etc.) matching M360 methodology.
+  // Gains and losses are placed in the same magnitude bucket.
+  const distAnalysis = useMemo(() => {
+    const trades = filtered;
+    const total = trades.length;
+    if (total === 0) return { barData: [], tableData: [], drmaData: [], gainMag: [], lossMag: [] };
+
+    // Find max absolute P&L% to determine bucket range
+    const maxAbsPct = Math.max(...trades.map(t => Math.abs(t.plPct)));
+    const bucketHi = Math.max(Math.ceil(maxAbsPct / 2) * 2, 20); // at least 0-20%
+
+    // Build absolute-value buckets: 0-2%, 2-4%, ..., up to bucketHi
+    const buckets = [];
+    for (let i = 0; i < bucketHi; i += 2) buckets.push({ lo: i, hi: i + 2, range: `${i} - ${i+2}%`, gains: 0, losses: 0, gainPcts: [], lossPcts: [] });
+
+    trades.forEach(t => {
+      const absPct = Math.abs(t.plPct);
+      const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor(absPct / 2)));
+      if (t.plPct > 0) { buckets[idx].gains++; buckets[idx].gainPcts.push(t.plPct); }
+      else { buckets[idx].losses++; buckets[idx].lossPcts.push(t.plPct); }
+    });
+
+    // Bar chart data — gains and losses per magnitude bucket
+    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: b.losses }));
+
+    // Distribution table with Net%, DRMA, G↑%, L↓%
+    let cumDRMA = 0;
+    const tableData = buckets.map(b => {
+      const gPct = total > 0 ? (b.gains / total) * 100 : 0;
+      const lPct = total > 0 ? (b.losses / total) * 100 : 0;
+      const netPct = total > 0 ? ((b.gains - b.losses) / total) * 100 : 0;
+      // Per-bucket return contribution = sum(all trade plPcts in bucket) / total trades
+      const bucketRetContrib = [...b.gainPcts, ...b.lossPcts].reduce((s, v) => s + v, 0) / (total || 1);
+      cumDRMA += bucketRetContrib;
+      return { range: b.range, lo: b.lo, gains: b.gains, losses: b.losses, gPct, lPct, netPct, drma: cumDRMA, bucketRetContrib };
+    });
+
+    // DRMA curve data — uses cumulative DRMA for the chart
+    const drmaData = tableData.map(r => ({ range: `${r.lo}%`, drma: r.drma, net: r.netPct }));
+
+    // Gain Magnitude: per-bucket count of gains
+    const gainMag = buckets.map(b => ({ range: `${b.lo}%`, count: b.gains }));
+    // Loss Magnitude: per-bucket count of losses
+    const lossMag = buckets.map(b => ({ range: `${b.lo}%`, count: b.losses }));
+
+    return { barData, tableData, drmaData, gainMag, lossMag, returnPerTrade: cumDRMA };
   }, [filtered]);
+
+  // Hypothetical scenario stats — recomputes all stats with user overrides
+  const hypoStats = useMemo(() => {
+    const wr = hypo.winRate !== "" ? parseFloat(hypo.winRate) : stats.ba;
+    const ag = hypo.avgGain !== "" ? parseFloat(hypo.avgGain) : stats.avgGain;
+    const al = hypo.avgLoss !== "" ? parseFloat(hypo.avgLoss) : stats.avgLoss;
+    const tt = hypo.totalTrades !== "" ? parseInt(hypo.totalTrades) : stats.total;
+    if (isNaN(wr) || isNaN(ag) || isNaN(al) || isNaN(tt)) return null;
+    const winCount = Math.round(tt * (wr / 100));
+    const lossCount = tt - winCount;
+    const glRatio = al > 0 ? ag / al : 0;
+    const adjDenom = ((100 - wr) / 100) * al;
+    const adjustedGL = adjDenom > 0 ? ((wr / 100) * ag) / adjDenom : (ag > 0 ? Infinity : 0);
+    const ev = (wr / 100) * ag - ((100 - wr) / 100) * al;
+    const estPL = tt * ev / 100;
+    return { winRate: wr, avgGain: ag, avgLoss: al, total: tt, wins: winCount, losses: lossCount, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, ev, estPL };
+  }, [hypo, stats]);
+
   // Equity curve data — supports $ vs % and trades vs months
   const equityData = useMemo(() => {
     const startingCapital = +(portfolioSize || 0);
@@ -1126,30 +1189,60 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 
   // Monthly performance table data — P/L % = dollar P/L ÷ portfolio size (portfolio-weighted return)
   const monthlyPerf = useMemo(() => {
-    const ps = +(portfolioSize || 0);
+    const holdDaysCalc = (t) => {
+      if (!t.entry || !t.exit) return null;
+      const d1 = new Date(t.entry), d2 = new Date(t.exit);
+      if (isNaN(d1) || isNaN(d2)) return null;
+      if (t.entryTime && t.exitTime) {
+        const [eh, em] = t.entryTime.split(":").map(Number);
+        const [xh, xm] = t.exitTime.split(":").map(Number);
+        if (!isNaN(eh) && !isNaN(em)) d1.setHours(eh, em, 0, 0);
+        if (!isNaN(xh) && !isNaN(xm)) d2.setHours(xh, xm, 0, 0);
+        return +(Math.max(0, d2 - d1) / 86400000).toFixed(1);
+      }
+      return Math.max(0, Math.round((d2 - d1) / 86400000));
+    };
     const months = {};
     filtered.forEach(t => {
       const raw = t.exit || t.entry || "";
-      // Parse M/D/YY or M/D/YYYY
       const match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
       if (!match) return;
       const y = match[3].length === 2 ? "20" + match[3] : match[3];
       const mo = match[1].padStart(2, "0");
       const key = `${y}-${mo}`;
-      if (!months[key]) months[key] = { dollar: 0, wins: 0, losses: 0, count: 0, totalR: 0 };
-      months[key].dollar += t.plDollar;
-      months[key].count++;
-      months[key].totalR += (t.rMult || 0);
-      if (t.plDollar >= 0) months[key].wins++; else months[key].losses++;
+      if (!months[key]) months[key] = [];
+      months[key].push(t);
     });
-    return Object.keys(months).sort().map(k => ({
-      month: k,
-      label: new Date(k + "-15").toLocaleString("default", { month: "short", year: "numeric" }),
-      ...months[k],
-      pct: ps > 0 ? (months[k].dollar / ps) * 100 : 0,
-      avgR: months[k].count > 0 ? months[k].totalR / months[k].count : 0
-    }));
-  }, [filtered, portfolioSize]);
+    return Object.keys(months).sort().map(k => {
+      const trades = months[k];
+      const wins = trades.filter(t => t.plPct > 0);
+      const losses = trades.filter(t => t.plPct <= 0);
+      const be = trades.filter(t => t.plPct === 0);
+      const count = trades.length;
+      const dollar = trades.reduce((s, t) => s + t.plDollar, 0);
+      const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
+      const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.plPct, 0) / losses.length) : 0;
+      const net = avgGain - avgLoss;
+      const ratio = avgLoss > 0 ? avgGain / avgLoss : 0;
+      const winPct = count > 0 ? (wins.length / count) * 100 : 0;
+      const lossPct = count > 0 ? (losses.length / count) * 100 : 0;
+      const lgGain = wins.length > 0 ? Math.max(...wins.map(t => t.plPct)) : 0;
+      const lgLoss = losses.length > 0 ? Math.min(...losses.map(t => t.plPct)) : 0;
+      const lgNet = lgGain + lgLoss;
+      const lgRatio = Math.abs(lgLoss) > 0 ? lgGain / Math.abs(lgLoss) : 0;
+      const winDays = wins.map(holdDaysCalc).filter(d => d !== null);
+      const lossDays = losses.map(holdDaysCalc).filter(d => d !== null);
+      const avgDaysWin = winDays.length > 0 ? winDays.reduce((s, d) => s + d, 0) / winDays.length : 0;
+      const avgDaysLoss = lossDays.length > 0 ? lossDays.reduce((s, d) => s + d, 0) / lossDays.length : 0;
+      const comm = trades.reduce((s, t) => s + (parseFloat(t.commission) || 0), 0);
+      return {
+        month: k, label: new Date(k + "-15").toLocaleString("default", { month: "short", year: "numeric" }),
+        dollar, count, wins: wins.length, losses: losses.length, be: be.length,
+        avgGain, avgLoss, net, ratio, winPct, lossPct,
+        lgGain, lgLoss, lgNet, lgRatio, avgDaysWin, avgDaysLoss, comm
+      };
+    });
+  }, [filtered]);
 
   const startEdit = (t) => { setEditingId(t.id); setEditRow({ ...t }); setEditNotes(parseNotes(t.notes)); };
   const saveEdit = () => {
@@ -1307,13 +1400,14 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       {/* Stats — recalculate based on filter */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
         <StatTile label="Total P/L" value={`$${Math.abs(stats.totalPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`} color={stats.totalPL >= 0 ? C.green : C.red} prefix={stats.totalPL >= 0 ? "+" : "-"} />
-        <StatTile label="Win Rate" value={`${stats.ba.toFixed(0)}%`} color={stats.ba >= 50 ? C.green : C.red} />
-        <StatTile label="Avg Gain" value={`${stats.avgGain.toFixed(1)}%`} color={C.green} prefix="+" />
-        <StatTile label="Avg Loss" value={`${stats.avgLoss.toFixed(1)}%`} color={C.red} prefix="-" />
-        <StatTile label="Reward/Risk" value={stats.glRatio.toFixed(2)} color={stats.glRatio >= 2 ? C.green : stats.glRatio >= 1 ? C.gold : C.red} />
-        <StatTile label="Expectancy" value={`${stats.ev >= 0 ? "+" : ""}${stats.ev.toFixed(2)}%`} color={stats.ev >= 0 ? C.green : C.red} />
+        <StatTile label="Win Rate" value={`${stats.ba.toFixed(2)}%`} color={stats.ba >= 50 ? C.green : C.red} />
+        <StatTile label="Avg Gain" value={`${stats.avgGain.toFixed(2)}%`} color={C.green} prefix="+" />
+        <StatTile label="Avg Loss" value={`${stats.avgLoss.toFixed(2)}%`} color={C.red} prefix="-" />
+        <StatTile label="Win/Loss Ratio" value={stats.glRatio.toFixed(2)} color={stats.glRatio >= 2 ? C.green : stats.glRatio >= 1 ? C.gold : C.red} />
+        <StatTile label="Adj. W/L Ratio" value={stats.adjustedGL.toFixed(2)} color={stats.adjustedGL >= 1 ? C.green : C.red} sub={stats.adjustedGL >= 1 ? "Net profitable" : "Net unprofitable"} />
+        <StatTile label="Largest Win" value={`${stats.largestWin.toFixed(2)}%`} color={C.green} prefix="+" />
+        <StatTile label="Largest Loss" value={`${stats.largestLoss.toFixed(2)}%`} color={C.red} />
         <StatTile label="Avg R-Mult" value={`${stats.avgR.toFixed(2)}R`} color={stats.avgR >= 0 ? C.green : C.red} />
-        <StatTile label="Largest Loss" value={`${stats.largestLoss.toFixed(1)}%`} color={stats.largestLoss < -10 ? C.red : C.gold} />
         <StatTile label="Avg Hold (Win)" value={`${stats.avgHoldWin.toFixed(1)}d`} color={C.green} sub="days" />
         <StatTile label="Avg Hold (Loss)" value={`${stats.avgHoldLoss.toFixed(1)}d`} color={C.red} sub="days" />
         <StatTile label="Hold Ratio (W/L)" value={stats.holdRatio.toFixed(2)} color={stats.holdRatio >= 2 ? C.green : stats.holdRatio >= 1 ? C.gold : C.red} sub={stats.holdRatio >= 2 ? "Holding winners longer" : stats.holdRatio >= 1 ? "Acceptable" : "Cutting winners too early"} />
@@ -1372,82 +1466,244 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
             })()}
           </ResponsiveContainer>
         </GlassCard>
+        {/* ─── Distribution Analysis ─── */}
         <GlassCard style={{ padding: "18px 22px" }}>
-          <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white, marginBottom: 14 }}>Return Distribution</div>
-          <ResponsiveContainer width="100%" height={170}>
-            <BarChart data={distData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[v,name==="gains"?"Wins":"Losses"]} /><Bar dataKey="losses" fill={C.red} radius={[0,0,2,2]} /><Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} /></BarChart>
-          </ResponsiveContainer>
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,cursor:"pointer" }} onClick={()=>setDistExpanded(e=>!e)}>
+            <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Distribution Analysis</div>
+            <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+              {distAnalysis.returnPerTrade !== undefined && <span style={{ fontSize:"0.60rem",color:C.muted }}>Return/Trade: <span style={{ color: distAnalysis.returnPerTrade >= 0 ? C.green : C.red, fontWeight:700 }}>{distAnalysis.returnPerTrade.toFixed(2)}%</span></span>}
+              <span style={{ color:C.muted,fontSize:"0.70rem",transition:"transform 0.2s",transform:distExpanded?"rotate(180deg)":"rotate(0deg)" }}>▼</span>
+            </div>
+          </div>
+          {/* Always show Gains/Losses bar chart */}
+          <div style={{ marginBottom: distExpanded ? 20 : 0 }}>
+            <div style={{ fontSize:"0.56rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:8 }}>Gains / Losses</div>
+            <ResponsiveContainer width="100%" height={170}>
+              <BarChart data={distAnalysis.barData}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={2} /><YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[v,name==="gains"?"Wins":"Losses"]} /><Bar dataKey="losses" fill={C.red} radius={[0,0,2,2]} /><Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} /></BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {distExpanded && <>
+            {/* Explainer card */}
+            <div style={{ background:"rgba(201,152,42,0.06)",border:`1px solid ${C.borderGold}`,borderRadius:10,padding:"12px 16px",marginBottom:20,fontSize:"0.56rem",color:C.muted,lineHeight:1.6 }}>
+              <span style={{ color:C.gold,fontWeight:700 }}>What is this?</span> Distribution Analysis breaks down your trade returns by magnitude to show <em>where</em> your edge comes from. The DRMA curve reveals whether your profits are driven by high win rate on small trades or by large winners. Use the Hypothetical Simulator at the bottom to model "what if" scenarios on your stats.
+            </div>
+
+            {/* DRMA Curve */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize:"0.56rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>DRMA Curve <span style={{ fontWeight:400,letterSpacing:"0",textTransform:"none",fontSize:"0.50rem" }}>(Distribution Return Moving Average)</span></div>
+              <div style={{ fontSize:"0.46rem",color:C.muted,marginBottom:8 }}>Cumulative return contribution by trade magnitude. Shows where in the % range your system makes or loses money. Converges to your Return Per Trade.</div>
+              <ResponsiveContainer width="100%" height={170}>
+                <AreaChart data={distAnalysis.drmaData}>
+                  <defs>
+                    <linearGradient id="drmaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={C.gold} stopOpacity={0.3} />
+                      <stop offset="100%" stopColor={C.gold} stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={2} />
+                  <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>`${v.toFixed(1)}%`} />
+                  <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[`${Number(v).toFixed(2)}%`,name==="drma"?"DRMA":"Net"]} />
+                  <ReferenceLine y={0} stroke={C.border} />
+                  <Area type="monotone" dataKey="drma" stroke={C.gold} strokeWidth={2} fill="url(#drmaGrad)" dot={{fill:C.gold,r:2.5}} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Gain & Loss Magnitude side by side */}
+            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:20 }}>
+              <div>
+                <div style={{ fontSize:"0.56rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Gain Magnitude</div>
+                <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your winning trades cluster by size.</div>
+                <ResponsiveContainer width="100%" height={140}>
+                  <BarChart data={distAnalysis.gainMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Wins"]} /><Bar dataKey="count" fill={C.green} radius={[2,2,0,0]} /></BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div>
+                <div style={{ fontSize:"0.56rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Loss Magnitude</div>
+                <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your losing trades cluster by size.</div>
+                <ResponsiveContainer width="100%" height={140}>
+                  <BarChart data={distAnalysis.lossMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Losses"]} /><Bar dataKey="count" fill={C.red} radius={[2,2,0,0]} /></BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Distribution Table */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize:"0.56rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Distribution Table</div>
+              <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>Per-bucket breakdown: G↑% and L↓% = frequency as % of total trades. Net% = net win/loss frequency. DRMA = per-bucket return contribution (sum of trade P&L% in bucket ÷ total trades).</div>
+              <div style={{ overflowX:"auto" }}>
+                <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.64rem" }}>
+                  <thead>
+                    <tr style={{ borderBottom:`1px solid ${C.border}` }}>
+                      {["Range","#Gains","#Losses","G↑%","L↓%","Net%","DRMA"].map(h => (
+                        <th key={h} style={{ padding:"7px 6px",textAlign:h==="Range"?"left":"right",fontWeight:700,fontSize:"0.46rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {distAnalysis.tableData.filter(r => r.gains > 0 || r.losses > 0).map((r, i) => (
+                      <tr key={i} style={{ borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
+                        <td style={{ padding:"5px 6px",color:C.white,fontWeight:600,fontSize:"0.62rem" }}>{r.range}</td>
+                        <td style={{ padding:"5px 6px",textAlign:"right",color:C.green,fontWeight:600 }}>{r.gains}</td>
+                        <td style={{ padding:"5px 6px",textAlign:"right",color:C.red,fontWeight:600 }}>{r.losses}</td>
+                        <td style={{ padding:"5px 6px",textAlign:"right",color:C.muted }}>{Math.round(r.gPct)}%</td>
+                        <td style={{ padding:"5px 6px",textAlign:"right",color:C.muted }}>{Math.round(r.lPct)}%</td>
+                        <td style={{ padding:"5px 6px",textAlign:"right",color:r.netPct>0?C.green:r.netPct<0?C.red:C.text,fontWeight:700 }}>{r.netPct.toFixed(2)}%</td>
+                        <td style={{ padding:"5px 6px",textAlign:"right",color:r.bucketRetContrib>=0?C.gold:C.red,fontWeight:700 }}>{r.bucketRetContrib.toFixed(2)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ─── Hypothetical Scenario Simulator ─── */}
+            <div style={{ borderTop:`1px solid ${C.border}`,paddingTop:16 }}>
+              <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:hypoOpen?14:0,cursor:"pointer" }} onClick={()=>setHypoOpen(h=>!h)}>
+                <div style={{ fontSize:"0.60rem",fontWeight:700,letterSpacing:"0.10em",textTransform:"uppercase",color:C.gold }}>Hypothetical Scenario Simulator</div>
+                <span style={{ color:C.muted,fontSize:"0.60rem",transition:"transform 0.2s",transform:hypoOpen?"rotate(180deg)":"rotate(0deg)" }}>▼</span>
+              </div>
+              {hypoOpen && (
+                <div>
+                  <div style={{ fontSize:"0.50rem",color:C.muted,marginBottom:12,lineHeight:1.5 }}>Model how improving specific stats would change your overall performance. Override any field to see the impact — leave blank to keep your actual value. Use this to set realistic targets for your trading plan.</div>
+                  <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16 }}>
+                    {[
+                      { label:"Win Rate %", key:"winRate", actual:stats.ba.toFixed(2) },
+                      { label:"Avg Gain %", key:"avgGain", actual:stats.avgGain.toFixed(2) },
+                      { label:"Avg Loss %", key:"avgLoss", actual:stats.avgLoss.toFixed(2) },
+                      { label:"Total Trades", key:"totalTrades", actual:stats.total },
+                    ].map(f => (
+                      <div key={f.key}>
+                        <div style={{ fontSize:"0.46rem",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>{f.label}</div>
+                        <input
+                          type="number" step="any"
+                          placeholder={String(f.actual)}
+                          value={hypo[f.key]}
+                          onChange={e => setHypo(h => ({ ...h, [f.key]: e.target.value }))}
+                          style={{ width:"100%",padding:"6px 8px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:6,color:C.white,fontSize:"0.68rem",fontFamily:font,outline:"none" }}
+                        />
+                        <div style={{ fontSize:"0.42rem",color:C.muted,marginTop:2 }}>Actual: {f.actual}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {hypoStats && (
+                    <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10 }}>
+                      {[
+                        { label:"Win/Loss Ratio", val:hypoStats.glRatio.toFixed(2), color: C.text },
+                        { label:"Adj. W/L Ratio", val:hypoStats.adjustedGL.toFixed(2), color:hypoStats.adjustedGL>=1?C.green:C.red },
+                        { label:"Expected Value", val:`${hypoStats.ev.toFixed(2)}%`, color:hypoStats.ev>=0?C.green:C.red },
+                        { label:"Projected Wins/Losses", val:`${hypoStats.wins}W / ${hypoStats.losses}L`, color:C.text },
+                      ].map(s => (
+                        <div key={s.label} style={{ background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"10px 12px" }}>
+                          <div style={{ fontSize:"0.44rem",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>{s.label}</div>
+                          <div style={{ fontSize:"0.80rem",fontWeight:800,color:s.color }}>{s.val}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {(hypo.winRate !== "" || hypo.avgGain !== "" || hypo.avgLoss !== "" || hypo.totalTrades !== "") && (
+                    <button onClick={() => setHypo({ winRate: "", avgGain: "", avgLoss: "", totalTrades: "" })} style={{ marginTop:10,padding:"5px 14px",background:"rgba(239,68,68,0.12)",border:`1px solid rgba(239,68,68,0.3)`,borderRadius:6,color:C.red,fontSize:"0.56rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Reset to Actual</button>
+                  )}
+                </div>
+              )}
+            </div>
+          </>}
         </GlassCard>
       </div>
 
       {/* Monthly Performance Table */}
-      {monthlyPerf.length > 0 && (
+      {monthlyPerf.length > 0 && (() => {
+        const mTh = (text) => <th style={{ padding:"9px 6px",textAlign:"right",fontWeight:700,fontSize:"0.48rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap" }}>{text}</th>;
+        const mTd = (val, opts = {}) => {
+          const { color, fw = 600, align = "right" } = opts;
+          return <td style={{ padding:"7px 6px",textAlign:align,fontWeight:fw,fontSize:"0.68rem",color:color||C.text,whiteSpace:"nowrap" }}>{val}</td>;
+        };
+        const pf = (v, dp = 2) => `${v.toFixed(dp)}%`;
+        const clr = (v, inv) => inv ? (v > 0 ? C.red : v < 0 ? C.green : C.text) : (v > 0 ? C.green : v < 0 ? C.red : C.text);
+        // Aggregate totals
+        const allTr = filtered;
+        const allWins = allTr.filter(t => t.plPct > 0), allLosses = allTr.filter(t => t.plPct <= 0);
+        const totAvgGain = allWins.length > 0 ? allWins.reduce((s,t) => s + t.plPct, 0) / allWins.length : 0;
+        const totAvgLoss = allLosses.length > 0 ? Math.abs(allLosses.reduce((s,t) => s + t.plPct, 0) / allLosses.length) : 0;
+        const totNet = totAvgGain - totAvgLoss;
+        const totRatio = totAvgLoss > 0 ? totAvgGain / totAvgLoss : 0;
+        const totCount = allTr.length, totWins = allWins.length, totLosses = allLosses.length;
+        const totWinPct = totCount > 0 ? (totWins/totCount)*100 : 0;
+        const totLossPct = totCount > 0 ? (totLosses/totCount)*100 : 0;
+        const totBe = allTr.filter(t => t.plPct === 0).length;
+        const totLgGain = allWins.length > 0 ? Math.max(...allWins.map(t => t.plPct)) : 0;
+        const totLgLoss = allLosses.length > 0 ? Math.min(...allLosses.map(t => t.plPct)) : 0;
+        const totLgNet = totLgGain + totLgLoss;
+        const totLgRatio = Math.abs(totLgLoss) > 0 ? totLgGain / Math.abs(totLgLoss) : 0;
+        const totComm = monthlyPerf.reduce((s,m) => s + m.comm, 0);
+        return (
         <GlassCard style={{ marginBottom: 20 }}>
-          <div style={{ padding: "18px 22px 6px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Monthly Performance</div>
-            <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: `1px solid ${C.border}` }}>
-              {["$", "%"].map(v => (
-                <button key={v} onClick={() => setPerfToggle(v)} style={{ padding: "3px 10px", background: perfToggle === v ? C.goldDim : "transparent", border: "none", color: perfToggle === v ? C.gold : C.muted, fontWeight: 700, fontSize: "0.56rem", cursor: "pointer", fontFamily: font }}>{v}</button>
-              ))}
-            </div>
+          <div style={{ padding: "18px 22px 6px" }}>
+            <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Tracker</div>
           </div>
           <div style={{ overflowX: "auto", padding: "0 22px 18px" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.72rem" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.68rem" }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <th style={{ padding: "9px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Month</th>
-                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>P/L</th>
-                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>% Return</th>
-                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Trades</th>
-                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Wins</th>
-                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Losses</th>
-                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Win Rate</th>
-                  <th style={{ padding: "9px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted }}>Avg R</th>
+                  <th style={{ padding:"9px 6px",textAlign:"left",fontWeight:700,fontSize:"0.48rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap" }}>Date</th>
+                  {mTh("Avg Gain")}{mTh("Avg Loss")}{mTh("Net")}{mTh("Ratio")}{mTh("Win %")}{mTh("Loss %")}{mTh("Wins")}{mTh("Losses")}{mTh("BE")}{mTh("# Trades")}{mTh("LG Gain")}{mTh("LG Loss")}{mTh("LG Net")}{mTh("Ratio")}{mTh("Avg Days Win")}{mTh("Avg Days Loss")}{mTh("Comm")}
                 </tr>
               </thead>
               <tbody>
                 {monthlyPerf.map(m => {
-                  const val = perfToggle === "$" ? m.dollar : m.pct;
-                  const isPos = val >= 0;
-                  const bgColor = isPos ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.06)";
-                  const wr = m.count > 0 ? (m.wins / m.count * 100) : 0;
+                  const bgColor = m.net >= 0 ? "rgba(34,197,94,0.04)" : "rgba(239,68,68,0.04)";
                   return (
                     <tr key={m.month} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, background: bgColor }}>
-                      <td style={{ padding: "8px 8px", fontWeight: 600, color: C.white }}>{m.label}</td>
-                      <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, color: isPos ? C.green : C.red }}>{isPos ? "+" : ""}{perfToggle === "$" ? `$${Math.abs(val).toLocaleString(undefined, {minimumFractionDigits:0,maximumFractionDigits:0})}` : `${val.toFixed(2)}%`}</td>
-                      <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, color: m.pct >= 0 ? C.green : C.red }}>{m.pct >= 0 ? "+" : ""}{m.pct.toFixed(2)}%</td>
-                      <td style={{ padding: "8px 8px", textAlign: "right", color: C.text }}>{m.count}</td>
-                      <td style={{ padding: "8px 8px", textAlign: "right", color: C.green }}>{m.wins}</td>
-                      <td style={{ padding: "8px 8px", textAlign: "right", color: C.red }}>{m.losses}</td>
-                      <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 600, color: wr >= 50 ? C.green : C.red }}>{wr.toFixed(0)}%</td>
-                      <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 600, color: m.avgR >= 0 ? C.green : C.red }}>{m.avgR >= 0 ? "+" : ""}{m.avgR.toFixed(2)}R</td>
+                      <td style={{ padding:"7px 6px",fontWeight:600,color:C.white,whiteSpace:"nowrap",fontSize:"0.68rem" }}>{m.label}</td>
+                      {mTd(pf(m.avgGain), { color: C.green })}
+                      {mTd(`-${pf(m.avgLoss)}`, { color: C.red })}
+                      {mTd(pf(m.net), { color: clr(m.net), fw: 700 })}
+                      {mTd(m.ratio.toFixed(2))}
+                      {mTd(pf(m.winPct))}
+                      {mTd(pf(m.lossPct))}
+                      {mTd(m.wins, { color: C.green })}
+                      {mTd(m.losses, { color: C.red })}
+                      {mTd(m.be)}
+                      {mTd(m.count, { fw: 700 })}
+                      {mTd(pf(m.lgGain), { color: C.green })}
+                      {mTd(pf(m.lgLoss), { color: C.red })}
+                      {mTd(pf(m.lgNet), { color: clr(m.lgNet) })}
+                      {mTd(m.lgRatio.toFixed(2))}
+                      {mTd(m.avgDaysWin > 0 ? m.avgDaysWin.toFixed(0) : "0")}
+                      {mTd(m.avgDaysLoss > 0 ? m.avgDaysLoss.toFixed(0) : "0")}
+                      {mTd(`$${m.comm.toFixed(2)}`)}
                     </tr>
                   );
                 })}
                 {/* Totals row */}
                 <tr style={{ borderTop: `2px solid ${C.border}`, background: "rgba(255,255,255,0.02)" }}>
-                  <td style={{ padding: "10px 8px", fontWeight: 800, color: C.white, textTransform: "uppercase", fontSize: "0.64rem", letterSpacing: "0.06em" }}>Total</td>
-                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: (perfToggle === "$" ? monthlyPerf.reduce((s,m)=>s+m.dollar,0) : monthlyPerf.reduce((s,m)=>s+m.pct,0)) >= 0 ? C.green : C.red }}>
-                    {(() => { const tot = perfToggle === "$" ? monthlyPerf.reduce((s,m)=>s+m.dollar,0) : monthlyPerf.reduce((s,m)=>s+m.pct,0); return `${tot >= 0 ? "+" : ""}${perfToggle === "$" ? `$${Math.abs(tot).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}` : `${tot.toFixed(2)}%`}`; })()}
-                  </td>
-                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800 }}>
-                    {(() => { const totPct = monthlyPerf.reduce((s,m)=>s+m.pct,0); return <span style={{color:totPct>=0?C.green:C.red}}>{totPct>=0?"+":""}{totPct.toFixed(2)}%</span>; })()}
-                  </td>
-                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.text }}>{monthlyPerf.reduce((s,m)=>s+m.count,0)}</td>
-                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.green }}>{monthlyPerf.reduce((s,m)=>s+m.wins,0)}</td>
-                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.red }}>{monthlyPerf.reduce((s,m)=>s+m.losses,0)}</td>
-                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800, color: C.muted }}>
-                    {(() => { const tw = monthlyPerf.reduce((s,m)=>s+m.wins,0), tc = monthlyPerf.reduce((s,m)=>s+m.count,0); return tc > 0 ? `${(tw/tc*100).toFixed(0)}%` : "–"; })()}
-                  </td>
-                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 800 }}>
-                    {(() => { const tc = monthlyPerf.reduce((s,m)=>s+m.count,0), totR = monthlyPerf.reduce((s,m)=>s+m.totalR,0); const avg = tc > 0 ? totR / tc : 0; return <span style={{color:avg>=0?C.green:C.red}}>{avg>=0?"+":""}{avg.toFixed(2)}R</span>; })()}
-                  </td>
+                  <td style={{ padding:"8px 6px",fontWeight:800,color:C.white,textTransform:"uppercase",fontSize:"0.60rem",letterSpacing:"0.06em" }}>Total</td>
+                  {mTd(pf(totAvgGain), { color: C.green, fw: 800 })}
+                  {mTd(`-${pf(totAvgLoss)}`, { color: C.red, fw: 800 })}
+                  {mTd(pf(totNet), { color: clr(totNet), fw: 800 })}
+                  {mTd(totRatio.toFixed(2), { fw: 800 })}
+                  {mTd(pf(totWinPct), { fw: 800 })}
+                  {mTd(pf(totLossPct), { fw: 800 })}
+                  {mTd(totWins, { color: C.green, fw: 800 })}
+                  {mTd(totLosses, { color: C.red, fw: 800 })}
+                  {mTd(totBe, { fw: 800 })}
+                  {mTd(totCount, { fw: 800 })}
+                  {mTd(pf(totLgGain), { color: C.green, fw: 800 })}
+                  {mTd(pf(totLgLoss), { color: C.red, fw: 800 })}
+                  {mTd(pf(totLgNet), { color: clr(totLgNet), fw: 800 })}
+                  {mTd(totLgRatio.toFixed(2), { fw: 800 })}
+                  {mTd("", { fw: 800 })}
+                  {mTd("", { fw: 800 })}
+                  {mTd(`$${totComm.toFixed(2)}`, { fw: 800 })}
                 </tr>
               </tbody>
             </table>
           </div>
         </GlassCard>
-      )}
+        );
+      })()}
 
       {/* Closed Trades Table — editable */}
       <GlassCard>
@@ -1864,8 +2120,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       const sellCommN = parseFloat(sellComm) || 0;
       const posCommN = parseFloat(pos.comm) || 0;
       const commPortion = sellCommN > 0 ? sellCommN : (totalShares > 0 ? posCommN * (soldShares / totalShares) : posCommN);
-      const plDollar = (exitP - epN) * soldShares - commPortion;
-      const plPct = epN > 0 && soldShares > 0 ? (plDollar / (epN * soldShares)) * 100 : 0;
+      // P/L without commission — matches M360 methodology and edit flow
+      const plDollar = (exitP - epN) * soldShares;
+      const plPct = epN > 0 ? ((exitP - epN) / epN) * 100 : 0;
       // Weighted initial risk — accounts for dual stops (same formula as enrichment)
       const isDual = stopN > 0 && stop2N > 0;
       const h1 = isDual ? Math.ceil(totalShares / 2) : totalShares;
@@ -1883,6 +2140,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         exitTime: nowSell.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
         entryP: epN, exitP, shares: soldShares, stop: stopN, setup: pos.setup,
         tags: [...(pos.tags || []), ...sellTags], plPct, plDollar, rMult,
+        commission: commPortion,
         reason: sellReason, notes: finalNotes, chartUrl: sellChartUrl || pos.chartUrl || "", chartImage: pos.chartImage || "", _fromDashboard: true,
       });
     }
@@ -2065,15 +2323,13 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   // Actual stats from journal trades
   const actualStats = useMemo(() => {
     if (!journaledTrades || journaledTrades.length === 0) return { winRate: 0, avgR: 0, avgGain: 0, avgLoss: 0, rewardRisk: 0, count: 0 };
-    const wins = journaledTrades.filter(t => (t.plDollar || 0) > 0);
-    const losses = journaledTrades.filter(t => (t.plDollar || 0) < 0);
+    const wins = journaledTrades.filter(t => (t.plPct || 0) > 0);
+    const losses = journaledTrades.filter(t => (t.plPct || 0) <= 0);
     const winRate = (wins.length / journaledTrades.length) * 100;
     const avgR = journaledTrades.reduce((s, t) => s + (t.rMult || 0), 0) / journaledTrades.length;
-    // Dollar-weighted avg gain/loss
-    const winSize = wins.reduce((s, t) => s + (t.entryP || 0) * (t.shares || 0), 0);
-    const lossSize = losses.reduce((s, t) => s + (t.entryP || 0) * (t.shares || 0), 0);
-    const avgGain = winSize > 0 ? wins.reduce((s, t) => s + (t.plPct || 0) * (t.entryP || 0) * (t.shares || 0), 0) / winSize : 0;
-    const avgLoss = lossSize > 0 ? Math.abs(losses.reduce((s, t) => s + (t.plPct || 0) * (t.entryP || 0) * (t.shares || 0), 0) / lossSize) : 0;
+    // Equal-weighted avg gain/loss: simple average of trade percentages
+    const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + (t.plPct || 0), 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + (t.plPct || 0), 0) / losses.length) : 0;
     const rewardRisk = avgLoss > 0 ? avgGain / avgLoss : 0;
     return { winRate, avgR, avgGain, avgLoss, rewardRisk, count: journaledTrades.length };
   }, [journaledTrades]);
