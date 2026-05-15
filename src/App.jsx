@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from "recharts";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
+import html2canvas from "html2canvas";
 
 // ─── Error Boundary — catches rendering crashes so the page doesn't go blank ───
 class ErrorBoundary extends React.Component {
@@ -1052,6 +1053,31 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const tradeDrag = useDragReorder(17); // 17 trade journal columns
   const monthDrag = useDragReorder(18); // 18 monthly performance columns
   const distDrag = useDragReorder(7); // 7 distribution table columns
+  const screenshotRef = useRef(null);
+  const [screenshotting, setScreenshotting] = useState(false);
+  const captureStats = useCallback(async () => {
+    if (!screenshotRef.current || screenshotting) return;
+    setScreenshotting(true);
+    try {
+      const el = screenshotRef.current;
+      const canvas = await html2canvas(el, { backgroundColor: "#08080e", scale: 2, useCORS: true, logging: false });
+      // Add watermark
+      const ctx = canvas.getContext("2d");
+      const wmHeight = 48 * 2; // scaled
+      ctx.fillStyle = "rgba(8,8,14,0.85)";
+      ctx.fillRect(0, canvas.height - wmHeight, canvas.width, wmHeight);
+      ctx.fillStyle = "#c9982a";
+      ctx.font = "bold 28px Manrope, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("www.valensontrades.com  |  VIV Swing Trading", canvas.width / 2, canvas.height - wmHeight / 2 + 10);
+      // Download
+      const link = document.createElement("a");
+      link.download = `VIV-Performance-${new Date().toISOString().slice(0,10)}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (e) { console.error("Screenshot failed:", e); }
+    setScreenshotting(false);
+  }, [screenshotting]);
   // perfToggle removed — monthly tracker now shows all stats inline
 
   // Ref to always hold the latest onManualSave — fixes stale closure when
@@ -1175,15 +1201,15 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       ...trimmed.map(b => ({ range: `${b.lo}%`, count: b.gains, type: "gain" }))
     ];
 
-    // DRMA on same signed axis — per-bucket return contribution
+    // DRMA butterfly — losses left (reversed), gains right, range labels
     const butterflyDrma = [
-      ...trimmed.slice().reverse().map(b => {
+      ...trimmed.slice().reverse().filter(b => b.losses > 0).map(b => {
         const c = b.lossPcts.reduce((s, v) => s + v, 0) / (total || 1);
-        return { range: `-${b.hi}%`, contribution: c, type: "loss" };
+        return { range: `${b.lo}-${b.hi}%`, contribution: c, type: "loss" };
       }),
-      ...trimmed.map(b => {
+      ...trimmed.filter(b => b.gains > 0).map(b => {
         const c = b.gainPcts.reduce((s, v) => s + v, 0) / (total || 1);
-        return { range: `${b.lo}%`, contribution: c, type: "gain" };
+        return { range: `${b.lo}-${b.hi}%`, contribution: c, type: "gain" };
       })
     ];
 
@@ -1265,13 +1291,13 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       ...trimmed.map(b => ({ range: `${b.lo}%`, count: b.gains, type: "gain" }))
     ];
     const butterflyDrma = [
-      ...trimmed.slice().reverse().map(b => {
+      ...trimmed.slice().reverse().filter(b => b.losses > 0).map(b => {
         const c = b.lossPcts.reduce((s, v) => s + v, 0) / (editedTotal || 1);
-        return { range: `-${b.hi}%`, contribution: c, type: "loss" };
+        return { range: `${b.lo}-${b.hi}%`, contribution: c, type: "loss" };
       }),
-      ...trimmed.map(b => {
+      ...trimmed.filter(b => b.gains > 0).map(b => {
         const c = b.gainPcts.reduce((s, v) => s + v, 0) / (editedTotal || 1);
-        return { range: `${b.lo}%`, contribution: c, type: "gain" };
+        return { range: `${b.lo}-${b.hi}%`, contribution: c, type: "gain" };
       })
     ];
 
@@ -1435,6 +1461,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           <h1 style={{ fontWeight: 800, fontSize: "clamp(1.5rem, 4vw, 2rem)", letterSpacing: "-0.04em", color: C.white, margin: 0 }}>Performance Tracker{activeFilterLabel && <span style={{ fontSize: "0.6em", color: C.muted, fontWeight: 400 }}>{activeFilterLabel}</span>}</h1>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={captureStats} disabled={screenshotting} title="Screenshot Stats" style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.borderGold}`,background:C.goldDim,color:C.gold,fontWeight:700,fontSize:"0.72rem",cursor:screenshotting?"wait":"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:5 }}>
+            {screenshotting ? "Capturing..." : "📸 Share Stats"}
+          </button>
           <button onClick={onManualSave} disabled={saveStatus === "saving"} style={{ padding:"8px 16px",borderRadius:980,border:`1px solid ${saveStatus === "saved" ? "rgba(34,197,94,0.4)" : saveStatus === "error" ? "rgba(239,68,68,0.4)" : C.borderGold}`,background:saveStatus === "saved" ? "rgba(34,197,94,0.12)" : saveStatus === "error" ? "rgba(239,68,68,0.12)" : C.goldDim,color:saveStatus === "saved" ? C.green : saveStatus === "error" ? C.red : C.gold,fontWeight:700,fontSize:"0.72rem",cursor:saveStatus === "saving" ? "wait" : "pointer",fontFamily:font,transition:"all 0.2s",display:"flex",alignItems:"center",gap:6 }}>
             {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Save Failed" : "Save"}
           </button>
@@ -1515,6 +1544,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       )}
 
       {/* Filter Bar */}
+      <div ref={screenshotRef} style={{ background: C.bg }}>
       <GlassCard small style={{ padding: "12px 18px", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <span style={{ fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted }}>Filter</span>
@@ -1728,6 +1758,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
         </GlassCard>
         );
       })()}
+      </div>{/* end screenshotRef */}
 
       {/* ═══════════════════════════════════════════════════════════════
           FULL DISTRIBUTION SECTION — scrolls here when preview clicked
@@ -1805,20 +1836,20 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     </ResponsiveContainer>
                   </div>
 
-                  {/* DRMA Curve — M360 range format */}
+                  {/* DRMA Curve — butterfly: losses left, gains right */}
                   <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
                     <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:2 }}>DRMA Curve <span style={{ fontWeight:400,fontSize:"0.52rem",color:C.muted }}>(Distribution Return Moving Average)</span></div>
-                    <div style={{ fontSize:"0.48rem",color:C.muted,marginBottom:10 }}>Per-bucket return contribution. Shows where your system generates or bleeds returns.</div>
+                    <div style={{ fontSize:"0.48rem",color:C.muted,marginBottom:10 }}>Losses on the left, gains on the right. Per-bucket return contribution shows where your system bleeds or generates returns.</div>
                     <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={(activeDistData.tableData||[]).filter(b=>b.gains>0||b.losses>0).map(b=>({range:b.range,contribution:b.bucketRetContrib}))}>
+                      <BarChart data={activeDistData.butterflyDrma}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                         <XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={0} angle={-35} textAnchor="end" height={40} />
                         <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>v.toFixed(1)} />
-                        <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v)=>[Number(v).toFixed(3),"Return Contribution"]} />
+                        <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v,name,props)=>[Number(v).toFixed(3), props.payload.type === "loss" ? "Loss Contribution" : "Gain Contribution"]} />
                         <ReferenceLine y={0} stroke={C.border} strokeDasharray="3 3" />
                         <Bar dataKey="contribution" radius={[2,2,0,0]} barSize={8}>
-                          {(activeDistData.tableData||[]).filter(b=>b.gains>0||b.losses>0).map((b, idx) => (
-                            <Cell key={idx} fill={b.bucketRetContrib >= 0 ? C.green : C.red} />
+                          {(activeDistData.butterflyDrma||[]).map((entry, idx) => (
+                            <Cell key={idx} fill={entry.type === "loss" ? C.red : C.green} />
                           ))}
                         </Bar>
                       </BarChart>
@@ -2598,12 +2629,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const tgtR = +projR || 1;
     const wr = (+projWin || 50) / 100;
     const batches = Math.min(+projBatches || 12, 52);
-    const expectedReturnPerCycle = wr * tgtR * tgtRote - (1 - wr) * tgtRote;
+    const expectedReturnPerTrade = wr * tgtR * tgtRote - (1 - wr) * tgtRote;
     const rows = [];
     let eq = compEquity;
     for (let i = 0; i <= batches; i++) {
       const prevEq = i === 0 ? compEquity : rows[i - 1].equity;
-      const newEq = i === 0 ? eq : prevEq * (1 + expectedReturnPerCycle);
+      const newEq = i === 0 ? eq : prevEq * (1 + expectedReturnPerTrade);
       rows.push({ cycle: i, equity: newEq, riskBudget: newEq * tgtRote, gain: i === 0 ? 0 : newEq - prevEq, growthPct: i === 0 ? 0 : ((newEq - compEquity) / compEquity) * 100 });
     }
     return rows;
@@ -2620,31 +2651,31 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const actualWr = (actualStats.winRate || 0) / 100;
     const actualAvgGainPct = (actualStats.avgGain || 0) / 100;
     const actualAvgLossPct = (actualStats.avgLoss || 0) / 100;
-    const actualReturnPerCycle = actualWr * actualAvgGainPct * tgtRote - (1 - actualWr) * actualAvgLossPct * tgtRote;
+    const actualReturnPerTrade = actualWr * actualAvgGainPct * tgtRote - (1 - actualWr) * actualAvgLossPct * tgtRote;
     for (let i = 0; i <= batches; i++) {
-      if (i > 0) { aEq *= (1 + actualReturnPerCycle); }
+      if (i > 0) { aEq *= (1 + actualReturnPerTrade); }
       actual.push(Math.round(aEq));
     }
-    return projection.map((d, i) => ({ cycle: i === 0 ? "Now" : `C${d.cycle}`, expected: Math.round(d.equity), actual: actual[i] }));
+    return projection.map((d, i) => ({ cycle: i === 0 ? "Now" : `T${d.cycle}`, expected: Math.round(d.equity), actual: actual[i] }));
   }, [projection, compEquity, targetRote, projR, projBatches, actualStats]);
 
   const finalProj = projection.length > 1 ? projection[projection.length - 1] : null;
 
-  // Target annual return → back-calculate required cycles
+  // Target annual return → back-calculate required trades
   const annualGoal = useMemo(() => {
     const annRet = +(targetAnnualReturn || 0) / 100;
     if (annRet <= 0 || compEquity <= 0) return null;
     const tgtRote = (+targetRote || 0) / 100;
     const wr = (+projWin || 50) / 100;
     const tgtR = +projR || 1;
-    const expectedReturnPerCycle = wr * tgtR * tgtRote - (1 - wr) * tgtRote;
-    if (expectedReturnPerCycle <= 0) return { requiredCycles: Infinity, targetEquity: compEquity * (1 + annRet), returnPerCycle: expectedReturnPerCycle };
-    const requiredCycles = Math.ceil(Math.log(1 + annRet) / Math.log(1 + expectedReturnPerCycle));
-    return { requiredCycles, targetEquity: compEquity * (1 + annRet), returnPerCycle: expectedReturnPerCycle };
+    const expectedReturnPerTrade = wr * tgtR * tgtRote - (1 - wr) * tgtRote;
+    if (expectedReturnPerTrade <= 0) return { requiredTrades: Infinity, targetEquity: compEquity * (1 + annRet), returnPerTrade: expectedReturnPerTrade };
+    const requiredTrades = Math.ceil(Math.log(1 + annRet) / Math.log(1 + expectedReturnPerTrade));
+    return { requiredTrades, targetEquity: compEquity * (1 + annRet), returnPerTrade: expectedReturnPerTrade };
   }, [targetAnnualReturn, compEquity, targetRote, projWin, projR]);
 
-  // Completed cycles = total journal trades (each trade is one deployment within a cycle)
-  const completedCycles = actualStats.count;
+  // Completed trades = total journal trades
+  const completedTrades = actualStats.count;
 
   const compTh = (text, align = "right") => <th style={{padding:"10px 8px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap"}}>{text}</th>;
 
@@ -3232,7 +3263,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <GlassCard style={{ padding:"24px 28px",marginBottom:20 }}>
           <Eyebrow>Compound Projection</Eyebrow>
           <div style={{ fontWeight:800,fontSize:"1.05rem",color:C.white,marginBottom:6 }}>Target vs Actual</div>
-          <p style={{ fontSize:"0.68rem",color:C.muted,margin:"0 0 16px" }}>Project forward from your current equity. Each cycle = fully deploying your target ROTE, closing all trades, then redeploying on the new equity. Your actual stats are pulled from your Trade Journal.</p>
+          <p style={{ fontSize:"0.68rem",color:C.muted,margin:"0 0 16px" }}>Project forward from your current equity. Each trade = deploying your target ROTE, taking the trade, then redeploying on the new equity. Your actual stats are pulled from your Trade Journal.</p>
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:16 }}>
             <div>
               <div style={{ fontWeight:700,fontSize:"0.58rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.gold,marginBottom:10 }}>Target</div>
@@ -3261,32 +3292,32 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                   <div style={{ fontSize:"0.92rem",fontWeight:800,color:actualStats.rewardRisk >= 2 ? C.green : actualStats.rewardRisk >= 1 ? C.gold : C.red }}>{actualStats.rewardRisk.toFixed(2)}</div>
                 </div>
                 <div style={{ padding:"8px 12px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Exp. Return/Cycle</div>
-                  {(()=>{const tgtRote=(+targetRote||0)/100;const wr=actualStats.winRate/100;const retPerCycle=wr*actualStats.avgGain/100*tgtRote-(1-wr)*actualStats.avgLoss/100*tgtRote;return<div style={{ fontSize:"0.92rem",fontWeight:800,color:retPerCycle>=0?C.green:C.red }}>{(retPerCycle*100).toFixed(2)}%</div>})()}
+                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Exp. Return/Trade</div>
+                  {(()=>{const tgtRote=(+targetRote||0)/100;const wr=actualStats.winRate/100;const retPerTrade=wr*actualStats.avgGain/100*tgtRote-(1-wr)*actualStats.avgLoss/100*tgtRote;return<div style={{ fontSize:"0.92rem",fontWeight:800,color:retPerTrade>=0?C.green:C.red }}>{(retPerTrade*100).toFixed(2)}%</div>})()}
                 </div>
               </div>
             </div>
           </div>
           <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))",gap:10,marginBottom:16 }}>
             <CalcInput label="Target Annual Return" value={targetAnnualReturn} onChange={setTargetAnnualReturn} suffix="%" placeholder="50" />
-            <CalcInput label="Cycles" value={projBatches} onChange={setProjBatches} suffix="#" placeholder="12" />
+            <CalcInput label="No. of Trades" value={projBatches} onChange={setProjBatches} suffix="#" placeholder="12" />
           </div>
           {annualGoal && (
             <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))",gap:12,marginBottom:16 }}>
               <StatTile label="Annual Target" value={fmt$(annualGoal.targetEquity)} color={C.gold} sub={`+${targetAnnualReturn}% from ${fmt$(compEquity)}`} />
-              <StatTile label="Cycles Required" value={annualGoal.requiredCycles === Infinity ? "∞" : String(annualGoal.requiredCycles)} color={C.gold} sub={`${(annualGoal.returnPerCycle * 100).toFixed(2)}% per cycle`} />
-              <StatTile label="Cycles Completed" value={String(completedCycles)} color={completedCycles >= (annualGoal.requiredCycles || 0) ? C.green : C.blue} sub={annualGoal.requiredCycles !== Infinity ? `${Math.min(100, (completedCycles / annualGoal.requiredCycles * 100)).toFixed(0)}% of target` : "—"} />
-              <StatTile label="Cycles Remaining" value={annualGoal.requiredCycles === Infinity ? "∞" : String(Math.max(0, annualGoal.requiredCycles - completedCycles))} color={completedCycles >= (annualGoal.requiredCycles || 0) ? C.green : C.red} sub={completedCycles >= (annualGoal.requiredCycles || 0) ? "Goal reached" : "to hit annual target"} />
+              <StatTile label="Trades Required" value={annualGoal.requiredTrades === Infinity ? "∞" : String(annualGoal.requiredTrades)} color={C.gold} sub={`${(annualGoal.returnPerTrade * 100).toFixed(2)}% per trade`} />
+              <StatTile label="Trades Completed" value={String(completedTrades)} color={completedTrades >= (annualGoal.requiredTrades || 0) ? C.green : C.blue} sub={annualGoal.requiredTrades !== Infinity ? `${Math.min(100, (completedTrades / annualGoal.requiredTrades * 100)).toFixed(0)}% of target` : "—"} />
+              <StatTile label="Trades Remaining" value={annualGoal.requiredTrades === Infinity ? "∞" : String(Math.max(0, annualGoal.requiredTrades - completedTrades))} color={completedTrades >= (annualGoal.requiredTrades || 0) ? C.green : C.red} sub={completedTrades >= (annualGoal.requiredTrades || 0) ? "Goal reached" : "to hit annual target"} />
             </div>
           )}
 
           {finalProj && (
             <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))",gap:12,marginBottom:16 }}>
               <StatTile label="Current Equity" value={fmt$(compEquity)} />
-              <StatTile label={`Target (${projBatches} Cycles)`} value={fmt$(finalProj.equity)} color={C.green} />
+              <StatTile label={`Target (${projBatches} Trades)`} value={fmt$(finalProj.equity)} color={C.green} />
               <StatTile label="Target Growth" value={`+${finalProj.growthPct.toFixed(1)}%`} color={C.green} sub={`+${fmt$(finalProj.equity - compEquity)}`} />
               {actualStats.count > 0 && chartData.length > 1 && (
-                <StatTile label={`Actual (${projBatches} Cycles)`} value={fmt$(chartData[chartData.length-1].actual)} color={chartData[chartData.length-1].actual >= finalProj.equity ? C.green : C.red} sub={compEquity > 0 ? `${chartData[chartData.length-1].actual >= compEquity ? "+" : ""}${(((chartData[chartData.length-1].actual - compEquity)/compEquity)*100).toFixed(1)}%` : ""} />
+                <StatTile label={`Actual (${projBatches} Trades)`} value={fmt$(chartData[chartData.length-1].actual)} color={chartData[chartData.length-1].actual >= finalProj.equity ? C.green : C.red} sub={compEquity > 0 ? `${chartData[chartData.length-1].actual >= compEquity ? "+" : ""}${(((chartData[chartData.length-1].actual - compEquity)/compEquity)*100).toFixed(1)}%` : ""} />
               )}
             </div>
           )}
