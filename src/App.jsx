@@ -160,6 +160,37 @@ function Alert({ type, children }) {
   const isRed = type === "red";
   return <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: "0.74rem", fontWeight: 500, lineHeight: 1.5, marginTop: 8, background: isRed ? C.redDim : C.goldDim, border: `1px solid ${isRed ? "rgba(239,68,68,0.2)" : C.borderGold}`, color: isRed ? "#fca5a5" : C.goldBright }}>{children}</div>;
 }
+// ─── Drag Reorder Utility ───
+// Makes any list of elements reorderable via HTML5 drag-and-drop.
+// Usage: spread dragProps(visualIndex) on each draggable element, render items via order array.
+function useDragReorder(length) {
+  const [order, setOrder] = useState(() => Array.from({ length }, (_, i) => i));
+  const dragFrom = useRef(null);
+  // Reset if length changes
+  useEffect(() => { setOrder(prev => prev.length === length ? prev : Array.from({ length }, (_, i) => i)); }, [length]);
+  const dragProps = (vi) => ({
+    draggable: true,
+    onDragStart: (e) => { dragFrom.current = vi; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", ""); },
+    onDragOver: (e) => e.preventDefault(),
+    onDrop: (e) => {
+      e.preventDefault();
+      const from = dragFrom.current;
+      if (from === null || from === vi) return;
+      setOrder(prev => { const n = [...prev]; const [r] = n.splice(from, 1); n.splice(vi, 0, r); return n; });
+      dragFrom.current = null;
+    },
+    style: { cursor: "grab" }
+  });
+  return { order, dragProps, setOrder };
+}
+
+// Reorderable table row — reorders direct <td> children by index array
+function DragTr({ order, children, ...props }) {
+  if (!order) return <tr {...props}>{children}</tr>;
+  const arr = React.Children.toArray(children);
+  return <tr {...props}>{order.map(i => arr[i]).filter(Boolean)}</tr>;
+}
+
 function StatTile({ label, value, color, prefix, sub }) {
   const display = `${prefix || ""}${value}`;
   const len = display.length;
@@ -1014,6 +1045,14 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const distRef = useRef(null); // scroll target for full Distribution section
   const [distMode, setDistMode] = useState("actual"); // "actual" | "cap" | "cleared"
   const [distCapVal, setDistCapVal] = useState(""); // Cap Losses at X%
+  const [distTableEdits, setDistTableEdits] = useState({}); // {bucketIdx: {gains, losses}} manual overrides
+  const [drmaExplainerOpen, setDrmaExplainerOpen] = useState(false);
+  // Drag reorder hooks — stat tiles, trade journal columns, open positions columns
+  const statDrag = useDragReorder(12); // 12 stat tiles
+  const tradeDrag = useDragReorder(17); // 17 trade journal columns
+  const posDrag = useDragReorder(24); // ~24 open positions columns
+  const monthDrag = useDragReorder(18); // 18 monthly performance columns
+  const distDrag = useDragReorder(7); // 7 distribution table columns
   // perfToggle removed — monthly tracker now shows all stats inline
 
   // Ref to always hold the latest onManualSave — fixes stale closure when
@@ -1115,8 +1154,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       else { buckets[idx].losses++; buckets[idx].lossPcts.push(t.plPct); }
     });
 
-    // Bar chart data — gains and losses per magnitude bucket
-    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: -b.losses }));
+    // Bar chart data — gains and losses per magnitude bucket (for table)
+    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: b.losses }));
 
     // Distribution table with Net%, DRMA, G↑%, L↓%
     let cumDRMA = 0;
@@ -1124,26 +1163,41 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       const gPct = total > 0 ? (b.gains / total) * 100 : 0;
       const lPct = total > 0 ? (b.losses / total) * 100 : 0;
       const netPct = total > 0 ? ((b.gains - b.losses) / total) * 100 : 0;
-      // Per-bucket return contribution = sum(all trade plPcts in bucket) / total trades
       const bucketRetContrib = [...b.gainPcts, ...b.lossPcts].reduce((s, v) => s + v, 0) / (total || 1);
       cumDRMA += bucketRetContrib;
-      return { range: b.range, lo: b.lo, gains: b.gains, losses: b.losses, gPct, lPct, netPct, drma: cumDRMA, bucketRetContrib };
+      return { range: b.range, lo: b.lo, hi: b.hi, gains: b.gains, losses: b.losses, gPct, lPct, netPct, drma: cumDRMA, bucketRetContrib };
     });
 
-    // DRMA curve data — uses cumulative DRMA for the chart
-    const drmaData = tableData.map(r => ({ range: `${r.lo}%`, drma: r.drma, net: r.netPct }));
+    // Butterfly chart data — losses on LEFT (negative ranges), gains on RIGHT (positive ranges)
+    const maxDataIdx = buckets.reduce((m, b, i) => (b.gains > 0 || b.losses > 0) ? i : m, 0);
+    const trimmed = buckets.slice(0, maxDataIdx + 1);
+    const butterflyData = [
+      ...trimmed.slice().reverse().map(b => ({ range: `-${b.hi}%`, count: b.losses, type: "loss" })),
+      ...trimmed.map(b => ({ range: `${b.lo}%`, count: b.gains, type: "gain" }))
+    ];
+
+    // DRMA on same signed axis — per-bucket return contribution
+    const butterflyDrma = [
+      ...trimmed.slice().reverse().map(b => {
+        const c = b.lossPcts.reduce((s, v) => s + v, 0) / (total || 1);
+        return { range: `-${b.hi}%`, contribution: c, type: "loss" };
+      }),
+      ...trimmed.map(b => {
+        const c = b.gainPcts.reduce((s, v) => s + v, 0) / (total || 1);
+        return { range: `${b.lo}%`, contribution: c, type: "gain" };
+      })
+    ];
 
     // Gain Magnitude: per-bucket count of gains
     const gainMag = buckets.map(b => ({ range: `${b.lo}%`, count: b.gains }));
-    // Loss Magnitude: per-bucket count of losses
     const lossMag = buckets.map(b => ({ range: `${b.lo}%`, count: b.losses }));
 
-    return { barData, tableData, drmaData, gainMag, lossMag, returnPerTrade: cumDRMA };
+    return { barData, tableData, butterflyData, butterflyDrma, gainMag, lossMag, returnPerTrade: cumDRMA };
   }, [filtered]);
 
-  // Active distribution data — handles actual, cap losses, and cleared modes
+  // Active distribution data — handles actual, cap losses, cleared modes, and table edits
   const activeDistData = useMemo(() => {
-    if (distMode === "cleared") return { barData: [], tableData: [], drmaData: [], gainMag: [], lossMag: [], returnPerTrade: 0, stats: null };
+    if (distMode === "cleared") return { barData: [], tableData: [], butterflyData: [], butterflyDrma: [], gainMag: [], lossMag: [], returnPerTrade: 0, stats: null };
     let trades = filtered;
     if (distMode === "cap") {
       const capVal = parseFloat(distCapVal);
@@ -1152,14 +1206,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       }
     }
     const total = trades.length;
-    if (total === 0) return { barData: [], tableData: [], drmaData: [], gainMag: [], lossMag: [], returnPerTrade: 0, stats: null };
-    const wins = trades.filter(t => t.plPct > 0), losses = trades.filter(t => t.plPct <= 0);
-    const ba = (wins.length / total) * 100;
-    const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
-    const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.plPct, 0) / losses.length) : 0;
-    const glRatio = avgLoss > 0 ? avgGain / avgLoss : 0;
-    const adjustedGL = avgLoss > 0 ? ((ba / 100) * avgGain) / (((100 - ba) / 100) * avgLoss) : 0;
-    const ev = (ba / 100) * avgGain - ((100 - ba) / 100) * avgLoss;
+    if (total === 0) return { barData: [], tableData: [], butterflyData: [], butterflyDrma: [], gainMag: [], lossMag: [], returnPerTrade: 0, stats: null };
+
     const maxAbsPct = Math.max(...trades.map(t => Math.abs(t.plPct)));
     const bucketHi = Math.max(Math.ceil(maxAbsPct / 2) * 2, 20);
     const buckets = [];
@@ -1170,25 +1218,72 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       if (t.plPct > 0) { buckets[idx].gains++; buckets[idx].gainPcts.push(t.plPct); }
       else { buckets[idx].losses++; buckets[idx].lossPcts.push(t.plPct); }
     });
-    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: -b.losses }));
+
+    // Apply manual table edits — override gains/losses counts with synthetic midpoint trades
+    const hasEdits = Object.keys(distTableEdits).length > 0;
+    if (hasEdits) {
+      Object.entries(distTableEdits).forEach(([idx, ov]) => {
+        const i = parseInt(idx);
+        if (i < 0 || i >= buckets.length) return;
+        const mid = (buckets[i].lo + buckets[i].hi) / 2;
+        if (ov.gains !== undefined && ov.gains !== buckets[i].gains) {
+          buckets[i].gains = Math.max(0, ov.gains);
+          buckets[i].gainPcts = Array(buckets[i].gains).fill(mid);
+        }
+        if (ov.losses !== undefined && ov.losses !== buckets[i].losses) {
+          buckets[i].losses = Math.max(0, ov.losses);
+          buckets[i].lossPcts = Array(buckets[i].losses).fill(-mid);
+        }
+      });
+    }
+
+    // Recalculate stats from (possibly edited) buckets
+    const allGainPcts = buckets.flatMap(b => b.gainPcts);
+    const allLossPcts = buckets.flatMap(b => b.lossPcts);
+    const editedTotal = allGainPcts.length + allLossPcts.length;
+    const ba = editedTotal > 0 ? (allGainPcts.length / editedTotal) * 100 : 0;
+    const avgGain = allGainPcts.length > 0 ? allGainPcts.reduce((s, v) => s + v, 0) / allGainPcts.length : 0;
+    const avgLoss = allLossPcts.length > 0 ? Math.abs(allLossPcts.reduce((s, v) => s + v, 0) / allLossPcts.length) : 0;
+    const glRatio = avgLoss > 0 ? avgGain / avgLoss : 0;
+    const adjustedGL = avgLoss > 0 ? ((ba / 100) * avgGain) / (((100 - ba) / 100) * avgLoss) : 0;
+
+    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: b.losses }));
     let cumDRMA = 0;
     const tableData = buckets.map(b => {
-      const gPct = total > 0 ? (b.gains / total) * 100 : 0;
-      const lPct = total > 0 ? (b.losses / total) * 100 : 0;
-      const netPct = total > 0 ? ((b.gains - b.losses) / total) * 100 : 0;
-      const bucketRetContrib = [...b.gainPcts, ...b.lossPcts].reduce((s, v) => s + v, 0) / (total || 1);
+      const gPct = editedTotal > 0 ? (b.gains / editedTotal) * 100 : 0;
+      const lPct = editedTotal > 0 ? (b.losses / editedTotal) * 100 : 0;
+      const netPct = editedTotal > 0 ? ((b.gains - b.losses) / editedTotal) * 100 : 0;
+      const bucketRetContrib = [...b.gainPcts, ...b.lossPcts].reduce((s, v) => s + v, 0) / (editedTotal || 1);
       cumDRMA += bucketRetContrib;
-      return { range: b.range, lo: b.lo, gains: b.gains, losses: b.losses, gPct, lPct, netPct, drma: cumDRMA, bucketRetContrib };
+      return { range: b.range, lo: b.lo, hi: b.hi, gains: b.gains, losses: b.losses, gPct, lPct, netPct, drma: cumDRMA, bucketRetContrib };
     });
-    const drmaData = tableData.map(r => ({ range: `${r.lo}%`, contribution: r.bucketRetContrib }));
+
+    // Butterfly chart data — losses LEFT, gains RIGHT
+    const maxDataIdx = buckets.reduce((m, b, i) => (b.gains > 0 || b.losses > 0) ? i : m, 0);
+    const trimmed = buckets.slice(0, maxDataIdx + 1);
+    const butterflyData = [
+      ...trimmed.slice().reverse().map(b => ({ range: `-${b.hi}%`, count: b.losses, type: "loss" })),
+      ...trimmed.map(b => ({ range: `${b.lo}%`, count: b.gains, type: "gain" }))
+    ];
+    const butterflyDrma = [
+      ...trimmed.slice().reverse().map(b => {
+        const c = b.lossPcts.reduce((s, v) => s + v, 0) / (editedTotal || 1);
+        return { range: `-${b.hi}%`, contribution: c, type: "loss" };
+      }),
+      ...trimmed.map(b => {
+        const c = b.gainPcts.reduce((s, v) => s + v, 0) / (editedTotal || 1);
+        return { range: `${b.lo}%`, contribution: c, type: "gain" };
+      })
+    ];
+
     const gainMag = buckets.map(b => ({ range: `${b.lo}%`, count: b.gains }));
     const lossMag = buckets.map(b => ({ range: `${b.lo}%`, count: b.losses }));
     const cappedCount = distMode === "cap" && distCapVal !== "" ? filtered.filter(t => t.plPct <= 0 && Math.abs(t.plPct) > parseFloat(distCapVal || 999)).length : 0;
     return {
-      barData, tableData, drmaData, gainMag, lossMag, returnPerTrade: cumDRMA, cappedCount,
-      stats: { ba, avgGain, avgLoss, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, ev, total, wins: wins.length, losses: losses.length }
+      barData, tableData, butterflyData, butterflyDrma, gainMag, lossMag, returnPerTrade: cumDRMA, cappedCount,
+      stats: { ba, avgGain, avgLoss, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, total: editedTotal, wins: allGainPcts.length, losses: allLossPcts.length }
     };
-  }, [filtered, distMode, distCapVal]);
+  }, [filtered, distMode, distCapVal, distTableEdits]);
 
   // Equity curve data — supports $ vs % and trades vs months
   const equityData = useMemo(() => {
@@ -1438,21 +1533,32 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
         </div>
       </GlassCard>
 
-      {/* Stats — recalculate based on filter */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
-        <StatTile label="Total P/L" value={`$${Math.abs(stats.totalPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`} color={stats.totalPL >= 0 ? C.green : C.red} prefix={stats.totalPL >= 0 ? "+" : "-"} />
-        <StatTile label="Win Rate" value={`${stats.ba.toFixed(2)}%`} color={stats.ba >= 50 ? C.green : C.red} />
-        <StatTile label="Avg Gain" value={`${stats.avgGain.toFixed(2)}%`} color={C.green} prefix="+" />
-        <StatTile label="Avg Loss" value={`${stats.avgLoss.toFixed(2)}%`} color={C.red} prefix="-" />
-        <StatTile label="Win/Loss Ratio" value={stats.glRatio.toFixed(2)} color={stats.glRatio >= 2 ? C.green : stats.glRatio >= 1 ? C.gold : C.red} />
-        <StatTile label="Adj. W/L Ratio" value={stats.adjustedGL.toFixed(2)} color={stats.adjustedGL >= 1 ? C.green : C.red} sub={stats.adjustedGL >= 1 ? "Net profitable" : "Net unprofitable"} />
-        <StatTile label="Largest Win" value={`${stats.largestWin.toFixed(2)}%`} color={C.green} prefix="+" />
-        <StatTile label="Largest Loss" value={`${stats.largestLoss.toFixed(2)}%`} color={C.red} />
-        <StatTile label="Avg R-Mult" value={`${stats.avgR.toFixed(2)}R`} color={stats.avgR >= 0 ? C.green : C.red} />
-        <StatTile label="Avg Hold (Win)" value={`${stats.avgHoldWin.toFixed(1)}d`} color={C.green} sub="days" />
-        <StatTile label="Avg Hold (Loss)" value={`${stats.avgHoldLoss.toFixed(1)}d`} color={C.red} sub="days" />
-        <StatTile label="Hold Ratio (W/L)" value={stats.holdRatio.toFixed(2)} color={stats.holdRatio >= 2 ? C.green : stats.holdRatio >= 1 ? C.gold : C.red} sub={stats.holdRatio >= 2 ? "Holding winners longer" : stats.holdRatio >= 1 ? "Acceptable" : "Cutting winners too early"} />
-      </div>
+      {/* Stats — draggable tiles, recalculate based on filter */}
+      {(() => {
+        const tiles = [
+          { label:"Total P/L", value:`$${Math.abs(stats.totalPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`, color:stats.totalPL>=0?C.green:C.red, prefix:stats.totalPL>=0?"+":"-" },
+          { label:"Win Rate", value:`${stats.ba.toFixed(2)}%`, color:stats.ba>=50?C.green:C.red },
+          { label:"Avg Gain", value:`${stats.avgGain.toFixed(2)}%`, color:C.green, prefix:"+" },
+          { label:"Avg Loss", value:`${stats.avgLoss.toFixed(2)}%`, color:C.red, prefix:"-" },
+          { label:"Win/Loss Ratio", value:stats.glRatio.toFixed(2), color:stats.glRatio>=2?C.green:stats.glRatio>=1?C.gold:C.red },
+          { label:"Adj. W/L Ratio", value:stats.adjustedGL.toFixed(2), color:stats.adjustedGL>=1?C.green:C.red, sub:stats.adjustedGL>=1?"Net profitable":"Net unprofitable" },
+          { label:"Largest Win", value:`${stats.largestWin.toFixed(2)}%`, color:C.green, prefix:"+" },
+          { label:"Largest Loss", value:`${stats.largestLoss.toFixed(2)}%`, color:C.red },
+          { label:"Avg R-Mult", value:`${stats.avgR.toFixed(2)}R`, color:stats.avgR>=0?C.green:C.red },
+          { label:"Avg Hold (Win)", value:`${stats.avgHoldWin.toFixed(1)}d`, color:C.green, sub:"days" },
+          { label:"Avg Hold (Loss)", value:`${stats.avgHoldLoss.toFixed(1)}d`, color:C.red, sub:"days" },
+          { label:"Hold Ratio (W/L)", value:stats.holdRatio.toFixed(2), color:stats.holdRatio>=2?C.green:stats.holdRatio>=1?C.gold:C.red, sub:stats.holdRatio>=2?"Holding winners longer":stats.holdRatio>=1?"Acceptable":"Cutting winners too early" },
+        ];
+        return (
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))",gap:10,marginBottom:20 }}>
+            {statDrag.order.map((di, vi) => {
+              const t = tiles[di];
+              if (!t) return null;
+              return <div key={di} {...statDrag.dragProps(vi)}><StatTile label={t.label} value={t.value} color={t.color} prefix={t.prefix} sub={t.sub} /></div>;
+            })}
+          </div>
+        );
+      })()}
 
       {/* Charts */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14, marginBottom: 20 }}>
@@ -1516,16 +1622,18 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
               <span style={{ color:C.muted,fontSize:"0.70rem" }}>▼</span>
             </div>
           </div>
-          {/* Mini preview chart — butterfly: gains up, losses down */}
+          {/* Mini preview — losses LEFT, gains RIGHT (M360 distribution) */}
           <ResponsiveContainer width="100%" height={170}>
-            <BarChart data={distAnalysis.barData} barGap={0} barCategoryGap="20%" stackOffset="sign">
+            <BarChart data={distAnalysis.butterflyData} barCategoryGap="8%">
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
-              <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} tickFormatter={v=>Math.abs(v)} />
-              <ReferenceLine y={0} stroke={C.border} />
-              <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[Math.abs(v),name==="gains"?"Wins":"Losses"]} />
-              <Bar dataKey="losses" stackId="a" fill={C.red} radius={[0,0,2,2]} />
-              <Bar dataKey="gains" stackId="a" fill={C.green} radius={[2,2,0,0]} />
+              <XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={2} />
+              <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
+              <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name,props)=>[v, props.payload.type==="loss"?"Losses":"Wins"]} />
+              <Bar dataKey="count" radius={[2,2,0,0]}>
+                {distAnalysis.butterflyData.map((entry, idx) => (
+                  <Cell key={idx} fill={entry.type === "loss" ? C.red : C.green} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </GlassCard>
@@ -1565,15 +1673,14 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.68rem" }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <th style={{ padding:"9px 6px",textAlign:"left",fontWeight:700,fontSize:"0.48rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap" }}>Date</th>
-                  {mTh("Avg Gain")}{mTh("Avg Loss")}{mTh("Net")}{mTh("Ratio")}{mTh("Win %")}{mTh("Loss %")}{mTh("Wins")}{mTh("Losses")}{mTh("BE")}{mTh("# Trades")}{mTh("LG Gain")}{mTh("LG Loss")}{mTh("LG Net")}{mTh("Ratio")}{mTh("Avg Days Win")}{mTh("Avg Days Loss")}{mTh("Comm")}
+                  {(() => { const defs = ["Date","Avg Gain","Avg Loss","Net","Ratio","Win %","Loss %","Wins","Losses","BE","# Trades","LG Gain","LG Loss","LG Net","Ratio","Avg Days Win","Avg Days Loss","Comm"]; return monthDrag.order.map((ci, vi) => <th key={`mh-${ci}`} {...monthDrag.dragProps(vi)} style={{padding:"9px 6px",textAlign:ci===0?"left":"right",fontWeight:700,fontSize:"0.48rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none"}}>{defs[ci]}</th>); })()}
                 </tr>
               </thead>
               <tbody>
                 {monthlyPerf.map(m => {
                   const bgColor = m.net >= 0 ? "rgba(34,197,94,0.04)" : "rgba(239,68,68,0.04)";
                   return (
-                    <tr key={m.month} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, background: bgColor }}>
+                    <DragTr key={m.month} order={monthDrag.order} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, background: bgColor }}>
                       <td style={{ padding:"7px 6px",fontWeight:600,color:C.white,whiteSpace:"nowrap",fontSize:"0.68rem" }}>{m.label}</td>
                       {mTd(pf(m.avgGain), { color: C.green })}
                       {mTd(`-${pf(m.avgLoss)}`, { color: C.red })}
@@ -1592,11 +1699,11 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                       {mTd(m.avgDaysWin > 0 ? m.avgDaysWin.toFixed(0) : "0")}
                       {mTd(m.avgDaysLoss > 0 ? m.avgDaysLoss.toFixed(0) : "0")}
                       {mTd(`$${m.comm.toFixed(2)}`)}
-                    </tr>
+                    </DragTr>
                   );
                 })}
                 {/* Totals row */}
-                <tr style={{ borderTop: `2px solid ${C.border}`, background: "rgba(255,255,255,0.02)" }}>
+                <DragTr order={monthDrag.order} style={{ borderTop: `2px solid ${C.border}`, background: "rgba(255,255,255,0.02)" }}>
                   <td style={{ padding:"8px 6px",fontWeight:800,color:C.white,textTransform:"uppercase",fontSize:"0.60rem",letterSpacing:"0.06em" }}>Total</td>
                   {mTd(pf(totAvgGain), { color: C.green, fw: 800 })}
                   {mTd(`-${pf(totAvgLoss)}`, { color: C.red, fw: 800 })}
@@ -1615,7 +1722,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   {mTd("", { fw: 800 })}
                   {mTd("", { fw: 800 })}
                   {mTd(`$${totComm.toFixed(2)}`, { fw: 800 })}
-                </tr>
+                </DragTr>
               </tbody>
             </table>
           </div>
@@ -1640,8 +1747,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 
               {/* ── Toolbar — Refill Data | Clear | Cap Losses ── */}
               <div style={{ display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:20 }}>
-                <button onClick={() => { setDistMode("actual"); setDistCapVal(""); }} style={{ padding:"8px 16px",borderRadius:8,border:`1px solid ${distMode==="actual"?C.gold:C.border}`,background:distMode==="actual"?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.04)",color:distMode==="actual"?C.gold:C.muted,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Refill Data</button>
-                <button onClick={() => { setDistMode("cleared"); setDistCapVal(""); }} style={{ padding:"8px 16px",borderRadius:8,border:`1px solid ${distMode==="cleared"?C.gold:C.border}`,background:distMode==="cleared"?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.04)",color:distMode==="cleared"?C.gold:C.muted,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Clear</button>
+                <button onClick={() => { setDistMode("actual"); setDistCapVal(""); setDistTableEdits({}); }} style={{ padding:"8px 16px",borderRadius:8,border:`1px solid ${distMode==="actual"&&Object.keys(distTableEdits).length===0?C.gold:C.border}`,background:distMode==="actual"&&Object.keys(distTableEdits).length===0?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.04)",color:distMode==="actual"&&Object.keys(distTableEdits).length===0?C.gold:C.muted,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Refill Data</button>
+                <button onClick={() => { setDistMode("cleared"); setDistCapVal(""); setDistTableEdits({}); }} style={{ padding:"8px 16px",borderRadius:8,border:`1px solid ${distMode==="cleared"?C.gold:C.border}`,background:distMode==="cleared"?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.04)",color:distMode==="cleared"?C.gold:C.muted,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Clear</button>
                 <button onClick={() => setDistMode(distMode==="cap"?"actual":"cap")} style={{ padding:"8px 16px",borderRadius:8,border:`1px solid ${distMode==="cap"?C.gold:C.border}`,background:distMode==="cap"?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.04)",color:distMode==="cap"?C.gold:C.muted,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Cap Losses</button>
                 {distMode === "cap" && (
                   <div style={{ display:"flex",alignItems:"center",gap:8 }}>
@@ -1681,40 +1788,63 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:24 }}>
                 {/* LEFT COLUMN — Charts */}
                 <div>
-                  {/* Gains and Losses — Butterfly: gains up, losses down */}
+                  {/* Gains and Losses — Losses LEFT, Gains RIGHT (M360 layout) */}
                   <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
                     <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:10 }}>Gains and Losses</div>
                     <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={activeDistData.barData} barGap={0} barCategoryGap="20%" stackOffset="sign">
+                      <BarChart data={activeDistData.butterflyData} barCategoryGap="8%">
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                        <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
-                        <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} tickFormatter={v=>Math.abs(v)} />
-                        <ReferenceLine y={0} stroke={C.border} />
-                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[Math.abs(v),name==="gains"?"Wins":"Losses"]} />
-                        <Bar dataKey="losses" stackId="a" fill={C.red} radius={[0,0,2,2]} />
-                        <Bar dataKey="gains" stackId="a" fill={C.green} radius={[2,2,0,0]} />
+                        <XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} />
+                        <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
+                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name,props)=>[v, props.payload.type==="loss"?"Losses":"Wins"]} />
+                        <Bar dataKey="count" radius={[2,2,0,0]}>
+                          {(activeDistData.butterflyData||[]).map((entry, idx) => (
+                            <Cell key={idx} fill={entry.type === "loss" ? C.red : C.green} />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
 
-                  {/* DRMA — Per-bucket return contribution bars */}
+                  {/* DRMA Curve — signed axis matching M360 */}
                   <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
-                    <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:2 }}>DRMA <span style={{ fontWeight:400,fontSize:"0.52rem",color:C.muted }}>(Distribution Return Moving Average)</span></div>
-                    <div style={{ fontSize:"0.48rem",color:C.muted,marginBottom:10 }}>Per-bucket return contribution. Shows where in the % range your system makes or loses money.</div>
+                    <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:2 }}>DRMA Curve <span style={{ fontWeight:400,fontSize:"0.52rem",color:C.muted }}>(Distribution Return Moving Average)</span></div>
+                    <div style={{ fontSize:"0.48rem",color:C.muted,marginBottom:10 }}>Per-bucket return contribution on the same loss/gain axis. Shows where your system generates or bleeds returns.</div>
                     <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={activeDistData.drmaData}>
+                      <BarChart data={activeDistData.butterflyDrma}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                        <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
-                        <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>`${v.toFixed(1)}%`} />
-                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v)=>[`${Number(v).toFixed(2)}%`,"Return Contribution"]} />
-                        <ReferenceLine y={0} stroke={C.border} />
-                        <Bar dataKey="contribution" radius={[2,2,0,0]}>
-                          {activeDistData.drmaData.map((entry, idx) => (
+                        <XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} />
+                        <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>`${v.toFixed(2)}%`} />
+                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v)=>[`${Number(v).toFixed(3)}%`,"Return Contribution"]} />
+                        <ReferenceLine y={0} stroke={C.border} strokeDasharray="3 3" />
+                        <Bar dataKey="contribution" radius={[2,2,0,0]} barSize={8}>
+                          {(activeDistData.butterflyDrma||[]).map((entry, idx) => (
                             <Cell key={idx} fill={entry.contribution >= 0 ? C.green : C.red} />
                           ))}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
+                  </div>
+
+                  {/* DRMA Explainer — collapsible */}
+                  <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 14px",marginBottom:16 }}>
+                    <div onClick={() => setDrmaExplainerOpen(p => !p)} style={{ display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer" }}>
+                      <span style={{ fontSize:"0.58rem",fontWeight:700,color:C.gold }}>How to Use DRMA Effectively</span>
+                      <span style={{ fontSize:"0.52rem",color:C.muted,transform:drmaExplainerOpen?"rotate(180deg)":"none",transition:"transform 0.2s" }}>▼</span>
+                    </div>
+                    {drmaExplainerOpen && (
+                      <div style={{ marginTop:12,fontSize:"0.60rem",color:C.text,lineHeight:1.7 }}>
+                        <p style={{ marginBottom:10 }}><strong style={{ color:C.white }}>What DRMA shows:</strong> Each bar represents how much return a specific loss/gain bucket contributes to your overall Return Per Trade. Tall green bars = where your system prints money. Tall red bars = where it bleeds.</p>
+                        <p style={{ marginBottom:10 }}><strong style={{ color:C.white }}>Reading the chart:</strong> The left side shows loss contributions (negative ranges), the right side shows gain contributions. The further right a green bar is, the bigger winner it represents. The further left a red bar is, the bigger loser.</p>
+                        <p style={{ marginBottom:10 }}><strong style={{ color:C.white }}>Example:</strong> If your 0-2% loss bucket has a -0.30% bar, and your 12-14% gain bucket has a +1.50% bar, your big winners in the 12-14% range are contributing 5x more to your return than your small losses are taking away. That's excellent edge asymmetry.</p>
+                        <p style={{ marginBottom:10 }}><strong style={{ color:C.white }}>What to look for:</strong></p>
+                        <p style={{ marginBottom:6,paddingLeft:12 }}>1. <strong style={{ color:C.green }}>Right-skewed green bars</strong> — your biggest returns come from larger winners. This means you're letting winners run.</p>
+                        <p style={{ marginBottom:6,paddingLeft:12 }}>2. <strong style={{ color:C.red }}>Left-side red bars should be small</strong> — small red bars on the loss side mean you're cutting losses quickly. If your -6% to -8% bucket has a large red bar, you're holding losers too long.</p>
+                        <p style={{ marginBottom:6,paddingLeft:12 }}>3. <strong style={{ color:C.white }}>Net positive sum</strong> — all bars combined should sum to your Return Per Trade. If the green outweighs the red, your system has edge.</p>
+                        <p style={{ marginBottom:10 }}><strong style={{ color:C.white }}>Action steps:</strong> Use "Cap Losses" to simulate what happens if you cut your biggest losers earlier. If capping losses at your average loss % dramatically improves Return Per Trade, your loss management is the problem. If it barely moves, your win rate or win size is the issue.</p>
+                        <p style={{ marginBottom:0,color:C.muted,fontStyle:"italic" }}>DRMA turns your distribution from a static picture into a diagnostic tool. Every bar tells you where to tighten or where to let ride.</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Gain & Loss Magnitude side by side */}
@@ -1742,31 +1872,33 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.68rem" }}>
                       <thead>
                         <tr style={{ borderBottom:`1px solid ${C.border}` }}>
-                          {["Range","# Gains","# Losses","↑ %","↓ %","Net","DRMA"].map(h => (
-                            <th key={h} style={{ padding:"8px 6px",textAlign:h==="Range"?"left":"center",fontWeight:700,fontSize:"0.54rem",color:C.white,whiteSpace:"nowrap",borderBottom:`2px solid ${C.border}` }}>{h}</th>
-                          ))}
+                          {(() => { const defs = ["Range","# Gains","# Losses","↑ %","↓ %","Net","DRMA"]; return distDrag.order.map((ci, vi) => <th key={`dh-${ci}`} {...distDrag.dragProps(vi)} style={{ padding:"8px 6px",textAlign:defs[ci]==="Range"?"left":"center",fontWeight:700,fontSize:"0.54rem",color:C.white,whiteSpace:"nowrap",borderBottom:`2px solid ${C.border}`,cursor:"grab",userSelect:"none" }}>{defs[ci]}</th>); })()}
                         </tr>
                       </thead>
                       <tbody>
                         {activeDistData.tableData.map((r, i) => {
                           const hasData = r.gains > 0 || r.losses > 0;
+                          const editCell = (field, val) => {
+                            const num = parseInt(val);
+                            if (isNaN(num) || num < 0) return;
+                            setDistTableEdits(prev => ({ ...prev, [i]: { ...prev[i], [field]: num } }));
+                          };
+                          const cellInput = (field, value) => (
+                            <input type="number" min="0" step="1" value={distTableEdits[i]?.[field] !== undefined ? distTableEdits[i][field] : value}
+                              onChange={e => editCell(field, e.target.value)}
+                              style={{ width:42,padding:"3px 4px",background:"rgba(255,255,255,0.05)",border:`1px solid ${distTableEdits[i]?.[field] !== undefined ? C.gold : "rgba(255,255,255,0.08)"}`,borderRadius:4,color:C.white,fontSize:"0.66rem",fontFamily:font,textAlign:"center",outline:"none" }}
+                            />
+                          );
                           return (
-                            <tr key={i} style={{ borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
+                            <DragTr key={i} order={distDrag.order} style={{ borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
                               <td style={{ padding:"6px 6px",color:C.white,fontWeight:600,fontSize:"0.66rem" }}>{r.range}</td>
-                              <td style={{ padding:"6px 6px",textAlign:"center",color:hasData?C.white:C.muted,fontWeight:600 }}>{r.gains}</td>
-                              <td style={{ padding:"6px 6px",textAlign:"center",color:hasData?C.white:C.muted,fontWeight:600 }}>{r.losses}</td>
-                              {hasData ? <>
-                                <td style={{ padding:"6px 6px",textAlign:"center",color:C.muted }}>{Math.round(r.gPct)}%</td>
-                                <td style={{ padding:"6px 6px",textAlign:"center",color:C.muted }}>{Math.round(r.lPct)}%</td>
-                                <td style={{ padding:"6px 6px",textAlign:"center",color:r.netPct>0?C.green:r.netPct<0?C.red:C.text,fontWeight:700 }}>{r.netPct.toFixed(2)}%</td>
-                                <td style={{ padding:"6px 6px",textAlign:"center",color:r.bucketRetContrib>=0?C.green:C.red,fontWeight:700 }}>{r.bucketRetContrib.toFixed(2)}</td>
-                              </> : <>
-                                <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
-                                <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
-                                <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
-                                <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
-                              </>}
-                            </tr>
+                              <td style={{ padding:"4px 4px",textAlign:"center" }}>{cellInput("gains", r.gains)}</td>
+                              <td style={{ padding:"4px 4px",textAlign:"center" }}>{cellInput("losses", r.losses)}</td>
+                              {hasData ? <td style={{ padding:"6px 6px",textAlign:"center",color:C.muted }}>{Math.round(r.gPct)}%</td> : <td style={{ padding:"6px 6px",textAlign:"center" }}></td>}
+                              {hasData ? <td style={{ padding:"6px 6px",textAlign:"center",color:C.muted }}>{Math.round(r.lPct)}%</td> : <td style={{ padding:"6px 6px",textAlign:"center" }}></td>}
+                              {hasData ? <td style={{ padding:"6px 6px",textAlign:"center",color:r.netPct>0?C.green:r.netPct<0?C.red:C.text,fontWeight:700 }}>{r.netPct.toFixed(2)}%</td> : <td style={{ padding:"6px 6px",textAlign:"center" }}></td>}
+                              {hasData ? <td style={{ padding:"6px 6px",textAlign:"center",color:r.bucketRetContrib>=0?C.green:C.red,fontWeight:700 }}>{r.bucketRetContrib.toFixed(2)}</td> : <td style={{ padding:"6px 6px",textAlign:"center" }}></td>}
+                            </DragTr>
                           );
                         })}
                       </tbody>
@@ -1785,11 +1917,17 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.72rem" }}>
             <thead>
-              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                {[["Symbol","ticker"],["Entry","entry"],["Time","entryTime"],["Exit","exit"],["Time","exitTime"],["Entry $","entryP"],["Exit $","exitP"],["Shares","shares"],["Setup","setup"],["Tags",null],["P/L %","plPct"],["P/L $","plDollar"],["R-Mult","rMult"],["Reason","reason"],["Notes",null],["Chart",null],["",null]].map(([h,k],hi) => (
-                  <th key={`${h}-${hi}`} onClick={k ? (e) => setTradeSorts(s => toggleSort(s, k, e.shiftKey)) : undefined} style={{ padding: "9px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.52rem", letterSpacing: "0.10em", textTransform: "uppercase", color: tradeSorts.find(s=>s.key===k)?C.gold:C.muted, whiteSpace: "nowrap", cursor:k?"pointer":"default", userSelect:"none" }}>{h}{k ? sortArrow(tradeSorts, k) : ""}</th>
-                ))}
-              </tr>
+              {(() => {
+                const tradeHeaderDefs = [["Symbol","ticker"],["Entry","entry"],["Time","entryTime"],["Exit","exit"],["Time","exitTime"],["Entry $","entryP"],["Exit $","exitP"],["Shares","shares"],["Setup","setup"],["Tags",null],["P/L %","plPct"],["P/L $","plDollar"],["R-Mult","rMult"],["Reason","reason"],["Notes",null],["Chart",null],["",null]];
+                return (
+                  <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                    {tradeDrag.order.map((ci, vi) => {
+                      const [h, k] = tradeHeaderDefs[ci] || ["",""];
+                      return <th key={`${h}-${ci}`} {...tradeDrag.dragProps(vi)} onClick={k ? (e) => { e.stopPropagation(); setTradeSorts(s => toggleSort(s, k, e.shiftKey)); } : undefined} style={{ padding:"9px 8px",textAlign:"left",fontWeight:700,fontSize:"0.52rem",letterSpacing:"0.10em",textTransform:"uppercase",color:tradeSorts.find(s=>s.key===k)?C.gold:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none" }}>{h}{k ? sortArrow(tradeSorts, k) : ""}</th>;
+                    })}
+                  </tr>
+                );
+              })()}
             </thead>
             <tbody>
               {(() => {
@@ -1891,7 +2029,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   </React.Fragment>);
                 }
                 return (<React.Fragment key={t.id}>
-                  <tr style={{ borderBottom: isGroup && !isLastInGroup ? "1px dashed rgba(201,152,42,0.20)" : "1px solid rgba(255,255,255,0.03)", cursor: "pointer", borderLeft: groupBorder }} onDoubleClick={() => startEdit(t)}>
+                  <DragTr order={tradeDrag.order} style={{ borderBottom: isGroup && !isLastInGroup ? "1px dashed rgba(201,152,42,0.20)" : "1px solid rgba(255,255,255,0.03)", cursor: "pointer", borderLeft: groupBorder }} onDoubleClick={() => startEdit(t)}>
                     <td style={{ padding: "11px 8px", fontWeight: 700, color: C.gold }}>{isGroup && !isFirstInGroup ? <span style={{color:C.muted,fontSize:"0.56rem"}}>↳</span> : null} {t.ticker}{isGroup && isFirstInGroup ? <span style={{marginLeft:4,fontSize:"0.48rem",fontWeight:600,color:C.muted,verticalAlign:"middle"}}>({groupSize})</span> : null}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>{t.entry}</td>
                     <td style={{ padding: "11px 6px", color: C.muted, fontSize: "0.62rem" }}>{t.entryTime||"—"}</td>
@@ -1920,7 +2058,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                         <button onClick={() => deleteTrade(t.id)} title="Delete trade" style={{padding:"3px 6px",borderRadius:6,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontWeight:700,fontSize:"0.58rem",cursor:"pointer",fontFamily:font}}>×</button>
                       </div>
                     </td>
-                  </tr>
+                  </DragTr>
                   {/* Expanded view: notes + chart */}
                   {expandedTrade === t.id && (
                     <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: `1px solid ${C.border}` }}>
@@ -2689,7 +2827,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {th("Status","left","riskStatus")}{th("Symbol","left","sym")}{th("L/S","center")}{th("Shares","right","sharesN")}{th("Avg. Cost","right","epN")}{th("Comm","right","commN")}{th("Pos. Size","right","posValue")}{th("Exp %","right","expPct")}{th("Realized","right","realizedPL")}{th("Orig Stop","right","stop1")}{th("Stop 2","right","stop2")}{th("Trail Stop","right","tsN")}{th("Current","right","cpN")}{th("Setup","left","setup")}{th("Tags","left")}{th("DTS","right","dtsPct")}{th("RTS","right","rtsD")}{th("ROTE","right","rotePct")}{displayMode==="R"&&th("R Suggest","right","rSuggestedStop")}{displayMode==="R"&&th("Locked","right","rLockedProfit")}{displayMode!=="R"&&th("SBE","right","sbe")}{displayMode!=="R"&&th("SBE %","right","sbePct")}{th("P/L","right","plPct")}{th("R","right","rMult")}{th("Notes","center")}{th("","center")}
+              {(() => { const defs = [["Status","left","riskStatus"],["Symbol","left","sym"],["L/S","center",null],["Shares","right","sharesN"],["Avg. Cost","right","epN"],["Comm","right","commN"],["Pos. Size","right","posValue"],["Exp %","right","expPct"],["Realized","right","realizedPL"],["Orig Stop","right","stop1"],["Stop 2","right","stop2"],["Trail Stop","right","tsN"],["Current","right","cpN"],["Setup","left","setup"],["Tags","left",null],["DTS","right","dtsPct"],["RTS","right","rtsD"],["ROTE","right","rotePct"],displayMode==="R"?["R Suggest","right","rSuggestedStop"]:["SBE","right","sbe"],displayMode==="R"?["Locked","right","rLockedProfit"]:["SBE %","right","sbePct"],["P/L","right","plPct"],["R","right","rMult"],["Notes","center",null],["","center",null]]; return posDrag.order.map((ci, vi) => { const [text, align, sortKey] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none"}}>{text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
             </tr></thead>
             <tbody>
               {(posSorts.length > 0 ? multiSort(enriched, posSorts) : enriched).map((p, idx) => {
@@ -2705,8 +2843,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const isExpanded = expandedPosId === p.id;
                 return (
                   <React.Fragment key={p._lid || p.id}>
-                  <tr style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
-                    {/* Risk Status */}
+                  <DragTr order={posDrag.order} style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
                     <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
                     <td style={{padding:"6px 4px"}}><TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></td>
                     <td style={{padding:"6px 2px",textAlign:"center"}}><select value={p.tradeType||"Long"} onChange={e=>updateField(p.id,"tradeType",e.target.value)} style={{padding:"3px 4px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,color:(p.tradeType||"Long")==="Short"?C.red:C.green,fontSize:"0.52rem",fontWeight:700,fontFamily:font,cursor:"pointer",outline:"none"}}><option value="Long">L</option><option value="Short">S</option></select></td>
@@ -2722,27 +2859,13 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.cp} onChange={v=>updateField(p.id,"cp",v)} gold width={82} /></td>
                     <td style={{padding:"6px 4px"}}><MiniSelect value={p.setup} onChange={v=>updateField(p.id,"setup",v)} options={setupTypes} width={85} /></td>
                     <td style={{padding:"6px 4px"}}><TagSelector selected={p.tags||[]} allTags={allTags} onChange={v=>updateField(p.id,"tags",v)} small /></td>
-                    {/* DTS — respects $ / % toggle */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:p.dtsD<=0?C.green:C.text,fontSize:"0.70rem"}}>{dtsDisplay}</td>
-                    {/* RTS — respects $ / % toggle. >0 = risk, <=0 = free. Glows to draw attention. */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.rtsD<=0?C.green:C.red,fontSize:"0.72rem",animation:p.cpN&&(p.stop1||p.stop2)?(p.rtsD>0?"rtsGlow 2.5s ease-in-out infinite":"rtsGlowGreen 3s ease-in-out infinite"):"none"}}>{rtsDisplay}</td>
-                    {/* ROTE — Risk of Total Equity. Warning if >1.5% */}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",whiteSpace:"nowrap"}}>{p.epN&&(p.stop1||p.stop2)?<><div style={{color:p.currentRotePct>0?C.red:C.green}}>{p.currentRotePct.toFixed(2)}%</div>{p.currentRotePct!==p.rotePct&&<div style={{fontSize:"0.50rem",color:C.muted,fontWeight:500}}>Init: {p.rotePct.toFixed(2)}%</div>}</>:"—"}</td>
-                    {isR ? (
-                      <>
-                        <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rSuggestedStop>p.epN?C.green:p.rSuggestedStop===p.epN?C.goldBright:C.muted}}>{p.rPerShare>0?(p.rSuggestedStop>=p.epN&&p.currentRLevel>=1?`$${p.rSuggestedStop.toFixed(2)} (${p.currentRLevel-1===0?"BE":(p.currentRLevel-1)+"R"})`:`$${p.rSuggestedStop.toFixed(2)}`):"—"}</td>
-                        <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rLockedProfit>0?C.green:C.muted}}>{p.rLockedProfit>0?`$${p.rLockedProfit.toFixed(2)}/sh`:"$0"}</td>
-                      </>
-                    ) : (
-                      <>
-                        <td style={{padding:"8px 6px",textAlign:"right",color:p.sbe>0?C.text:C.muted,fontSize:"0.70rem"}}>{p.sbe>0?p.sbe.toLocaleString():"—"}</td>
-                        <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:!p.sbe?C.muted:p.sbePct>100?C.red:p.sbePct>80?C.gold:C.green,fontSize:"0.70rem"}}>{p.sbe>0?`${p.sbePct.toFixed(1)}%`:"—"}</td>
-                      </>
-                    )}
-                    {/* P/L — respects $ / % toggle */}
+                    {isR ? <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rSuggestedStop>p.epN?C.green:p.rSuggestedStop===p.epN?C.goldBright:C.muted}}>{p.rPerShare>0?(p.rSuggestedStop>=p.epN&&p.currentRLevel>=1?`$${p.rSuggestedStop.toFixed(2)} (${p.currentRLevel-1===0?"BE":(p.currentRLevel-1)+"R"})`:`$${p.rSuggestedStop.toFixed(2)}`):"—"}</td> : <td style={{padding:"8px 6px",textAlign:"right",color:p.sbe>0?C.text:C.muted,fontSize:"0.70rem"}}>{p.sbe>0?p.sbe.toLocaleString():"—"}</td>}
+                    {isR ? <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rLockedProfit>0?C.green:C.muted}}>{p.rLockedProfit>0?`$${p.rLockedProfit.toFixed(2)}/sh`:"$0"}</td> : <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:!p.sbe?C.muted:p.sbePct>100?C.red:p.sbePct>80?C.gold:C.green,fontSize:"0.70rem"}}>{p.sbe>0?`${p.sbePct.toFixed(1)}%`:"—"}</td>}
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.plPct>=0?C.green:C.red,fontSize:"0.70rem"}}>{plDisplay}</td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rMult>=2?C.green:p.rMult>=1?C.goldBright:p.rMult>=0?C.white:C.red}}>{p.epN&&(p.stop1||p.stop2)?`${p.rMult.toFixed(2)}R`:"—"}</td>
-                    {/* Notes/Chart indicator */}
                     <td style={{padding:"6px 4px",textAlign:"center",whiteSpace:"nowrap"}}>
                       <div style={{display:"flex",gap:3,alignItems:"center",justifyContent:"center"}}>
                         <button onClick={()=>togglePosExpand(p.id)} title={isExpanded?"Collapse notes":"Expand notes & chart"} style={{padding:"3px 7px",borderRadius:6,border:`1px solid ${isExpanded?C.borderGold:C.border}`,background:isExpanded?C.goldDim:"transparent",color:isExpanded?C.gold:hasNotes?C.gold:C.muted,fontWeight:700,fontSize:"0.54rem",cursor:"pointer",fontFamily:font}}>{isExpanded?"▲":"▼"}{hasNotes?" ✎":""}</button>
@@ -2756,7 +2879,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                         <button onClick={()=>removeRow(p.id)} title="Remove" style={{padding:"4px 6px",borderRadius:6,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontWeight:700,fontSize:"0.58rem",cursor:"pointer",fontFamily:font}}>×</button>
                       </div>
                     </td>
-                  </tr>
+                  </DragTr>
                   {/* Expanded notes/chart area */}
                   {isExpanded && (
                     <tr style={{ background:"rgba(201,152,42,0.03)",borderBottom:`1px solid ${C.borderGold}` }}>
