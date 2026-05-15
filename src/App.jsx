@@ -1021,6 +1021,13 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const onManualSaveRef = useRef(onManualSave);
   useEffect(() => { onManualSaveRef.current = onManualSave; }, [onManualSave]);
 
+  // Scroll to full Distribution section when expanded
+  useEffect(() => {
+    if (distExpanded && distRef.current) {
+      distRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [distExpanded]);
+
   const allTrades = useMemo(() => journaledTrades.filter(t => !deletedTradeIds.includes(t.id)), [journaledTrades, deletedTradeIds]);
 
   const handleImport = (e) => {
@@ -1163,7 +1170,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       if (t.plPct > 0) { buckets[idx].gains++; buckets[idx].gainPcts.push(t.plPct); }
       else { buckets[idx].losses++; buckets[idx].lossPcts.push(t.plPct); }
     });
-    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: -b.losses }));
+    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: b.losses }));
     let cumDRMA = 0;
     const tableData = buckets.map(b => {
       const gPct = total > 0 ? (b.gains / total) * 100 : 0;
@@ -1501,7 +1508,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           </ResponsiveContainer>
         </GlassCard>
         {/* ─── Distribution Analysis Preview ─── */}
-        <GlassCard style={{ padding: "18px 22px", cursor:"pointer" }} onClick={() => { setDistExpanded(true); setTimeout(() => distRef.current?.scrollIntoView({ behavior:"smooth", block:"start" }), 100); }}>
+        <GlassCard style={{ padding: "18px 22px", cursor:"pointer" }} onClick={() => setDistExpanded(true)}>
           <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
             <div style={{ fontWeight: 800, fontSize: "0.88rem", color: C.white, letterSpacing:"-0.02em" }}>Distribution</div>
             <div style={{ display:"flex",alignItems:"center",gap:12 }}>
@@ -1509,15 +1516,15 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
               <span style={{ color:C.muted,fontSize:"0.70rem" }}>▼</span>
             </div>
           </div>
-          {/* Mini preview chart — butterfly style */}
+          {/* Mini preview chart — standard vertical bars matching M360 */}
           <ResponsiveContainer width="100%" height={170}>
-            <BarChart layout="vertical" data={distAnalysis.barData.map(b => ({ ...b, losses: -b.losses }))} barGap={-2} barCategoryGap="15%" stackOffset="sign">
+            <BarChart data={distAnalysis.barData} barGap={0} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis type="number" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} />
-              <YAxis type="category" dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} width={36} />
-              <ReferenceLine x={0} stroke={C.border} />
-              <Bar dataKey="losses" stackId="a" fill={C.red} radius={[2,2,2,2]} />
-              <Bar dataKey="gains" stackId="a" fill={C.green} radius={[2,2,2,2]} />
+              <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
+              <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
+              <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[v,name==="gains"?"Wins":"Losses"]} />
+              <Bar dataKey="losses" fill={C.red} radius={[2,2,0,0]} />
+              <Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         </GlassCard>
@@ -1673,18 +1680,17 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:24 }}>
                 {/* LEFT COLUMN — Charts */}
                 <div>
-                  {/* Gains and Losses — Butterfly Chart (losses LEFT, gains RIGHT) */}
+                  {/* Gains and Losses — Standard vertical bars matching M360 */}
                   <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
                     <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:10 }}>Gains and Losses</div>
-                    <ResponsiveContainer width="100%" height={Math.max(200, activeDistData.barData.length * 22)}>
-                      <BarChart layout="vertical" data={activeDistData.barData} barGap={-2} barCategoryGap="15%" stackOffset="sign">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={activeDistData.barData} barGap={0} barCategoryGap="20%">
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                        <XAxis type="number" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} />
-                        <YAxis type="category" dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} width={36} />
-                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[Math.abs(v),name==="gains"?"Wins":"Losses"]} />
-                        <ReferenceLine x={0} stroke={C.border} />
-                        <Bar dataKey="losses" stackId="a" fill={C.red} radius={[2,2,2,2]} />
-                        <Bar dataKey="gains" stackId="a" fill={C.green} radius={[2,2,2,2]} />
+                        <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
+                        <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
+                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[v,name==="gains"?"Wins":"Losses"]} />
+                        <Bar dataKey="losses" fill={C.red} radius={[2,2,0,0]} />
+                        <Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
