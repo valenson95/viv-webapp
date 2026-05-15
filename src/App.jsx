@@ -1055,34 +1055,58 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const distDrag = useDragReorder(7); // 7 distribution table columns
   const screenshotRef = useRef(null);
   const [screenshotting, setScreenshotting] = useState(false);
-  const captureStats = useCallback(async () => {
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [shareStatus, setShareStatus] = useState(null); // "copied" | "downloaded" | null
+  const buildScreenshotCanvas = useCallback(async () => {
+    const el = screenshotRef.current;
+    if (!el) return null;
+    const brandEl = el.querySelector(".viv-screenshot-brand");
+    if (brandEl) brandEl.style.display = "block";
+    const canvas = await html2canvas(el, { backgroundColor: "#08080e", scale: 2, useCORS: true, logging: false });
+    if (brandEl) brandEl.style.display = "none";
+    const ctx = canvas.getContext("2d");
+    const wmHeight = 48 * 2;
+    ctx.fillStyle = "rgba(8,8,14,0.85)";
+    ctx.fillRect(0, canvas.height - wmHeight, canvas.width, wmHeight);
+    ctx.fillStyle = "#c9982a";
+    ctx.font = "bold 28px Manrope, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("www.valensontrades.com  |  VIV Swing Trading", canvas.width / 2, canvas.height - wmHeight / 2 + 10);
+    return canvas;
+  }, []);
+  const captureStats = useCallback(async (mode) => {
     if (!screenshotRef.current || screenshotting) return;
     setScreenshotting(true);
+    setShareMenuOpen(false);
     try {
-      const el = screenshotRef.current;
-      // Show branding header for capture
-      const brandEl = el.querySelector(".viv-screenshot-brand");
-      if (brandEl) brandEl.style.display = "block";
-      const canvas = await html2canvas(el, { backgroundColor: "#08080e", scale: 2, useCORS: true, logging: false });
-      // Hide branding header again
-      if (brandEl) brandEl.style.display = "none";
-      // Add watermark footer
-      const ctx = canvas.getContext("2d");
-      const wmHeight = 48 * 2;
-      ctx.fillStyle = "rgba(8,8,14,0.85)";
-      ctx.fillRect(0, canvas.height - wmHeight, canvas.width, wmHeight);
-      ctx.fillStyle = "#c9982a";
-      ctx.font = "bold 28px Manrope, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("www.valensontrades.com  |  VIV Swing Trading", canvas.width / 2, canvas.height - wmHeight / 2 + 10);
-      // Download
-      const link = document.createElement("a");
-      link.download = `VIV-Performance-${new Date().toISOString().slice(0,10)}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
+      const canvas = await buildScreenshotCanvas();
+      if (!canvas) throw new Error("Canvas failed");
+      if (mode === "copy") {
+        canvas.toBlob(async (blob) => {
+          if (blob && navigator.clipboard && navigator.clipboard.write) {
+            await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+            setShareStatus("copied");
+          } else {
+            // Fallback: download if clipboard API not available
+            const link = document.createElement("a");
+            link.download = `VIV-Performance-${new Date().toISOString().slice(0,10)}.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+            setShareStatus("downloaded");
+          }
+          setTimeout(() => setShareStatus(null), 2500);
+        }, "image/png");
+      } else {
+        const link = document.createElement("a");
+        link.download = `VIV-Performance-${new Date().toISOString().slice(0,10)}.png`;
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+        setShareStatus("downloaded");
+        setTimeout(() => setShareStatus(null), 2500);
+      }
     } catch (e) { console.error("Screenshot failed:", e); }
     setScreenshotting(false);
-  }, [screenshotting]);
+  }, [screenshotting, buildScreenshotCanvas]);
   // perfToggle removed — monthly tracker now shows all stats inline
 
   // Ref to always hold the latest onManualSave — fixes stale closure when
@@ -1463,9 +1487,21 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           <h1 style={{ fontWeight: 800, fontSize: "clamp(1.5rem, 4vw, 2rem)", letterSpacing: "-0.04em", color: C.white, margin: 0 }}>Performance Tracker{activeFilterLabel && <span style={{ fontSize: "0.6em", color: C.muted, fontWeight: 400 }}>{activeFilterLabel}</span>}</h1>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <button onClick={captureStats} disabled={screenshotting} title="Screenshot Stats" style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.borderGold}`,background:C.goldDim,color:C.gold,fontWeight:700,fontSize:"0.72rem",cursor:screenshotting?"wait":"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:5 }}>
-            {screenshotting ? "Capturing..." : "📸 Share Stats"}
-          </button>
+          <div style={{ position:"relative" }}>
+            <button onClick={() => setShareMenuOpen(p => !p)} disabled={screenshotting} title="Screenshot Stats" style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.borderGold}`,background:C.goldDim,color:C.gold,fontWeight:700,fontSize:"0.72rem",cursor:screenshotting?"wait":"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:5 }}>
+              {screenshotting ? "Capturing..." : shareStatus === "copied" ? "Copied ✓" : shareStatus === "downloaded" ? "Downloaded ✓" : "📸 Share Stats"}
+            </button>
+            {shareMenuOpen && !screenshotting && (
+              <div style={{ position:"absolute",top:"calc(100% + 6px)",right:0,background:"rgba(12,12,20,0.97)",border:`1px solid ${C.borderGold}`,borderRadius:10,padding:6,zIndex:100,minWidth:180,boxShadow:"0 8px 32px rgba(0,0,0,0.6)" }}>
+                <button onClick={() => captureStats("copy")} style={{ display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",border:"none",background:"transparent",color:C.white,fontSize:"0.72rem",fontWeight:600,cursor:"pointer",fontFamily:font,borderRadius:8,textAlign:"left" }} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.06)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  📋 Copy to Clipboard
+                </button>
+                <button onClick={() => captureStats("download")} style={{ display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",border:"none",background:"transparent",color:C.white,fontSize:"0.72rem",fontWeight:600,cursor:"pointer",fontFamily:font,borderRadius:8,textAlign:"left" }} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.06)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  💾 Download PNG
+                </button>
+              </div>
+            )}
+          </div>
           <button onClick={onManualSave} disabled={saveStatus === "saving"} style={{ padding:"8px 16px",borderRadius:980,border:`1px solid ${saveStatus === "saved" ? "rgba(34,197,94,0.4)" : saveStatus === "error" ? "rgba(239,68,68,0.4)" : C.borderGold}`,background:saveStatus === "saved" ? "rgba(34,197,94,0.12)" : saveStatus === "error" ? "rgba(239,68,68,0.12)" : C.goldDim,color:saveStatus === "saved" ? C.green : saveStatus === "error" ? C.red : C.gold,fontWeight:700,fontSize:"0.72rem",cursor:saveStatus === "saving" ? "wait" : "pointer",fontFamily:font,transition:"all 0.2s",display:"flex",alignItems:"center",gap:6 }}>
             {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Save Failed" : "Save"}
           </button>
