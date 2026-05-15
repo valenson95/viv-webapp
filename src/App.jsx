@@ -1054,11 +1054,17 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const monthDrag = useDragReorder(18); // 18 monthly performance columns
   const distDrag = useDragReorder(7); // 7 distribution table columns
   const screenshotRef = useRef(null);
+  const closedTradesRef = useRef(null);
+  const distScreenRef = useRef(null);
   const [screenshotting, setScreenshotting] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [shareStatus, setShareStatus] = useState(null); // "copied" | "downloaded" | null
-  const buildScreenshotCanvas = useCallback(async () => {
-    const el = screenshotRef.current;
+  const [closedShareOpen, setClosedShareOpen] = useState(false);
+  const [closedShareStatus, setClosedShareStatus] = useState(null);
+  const [distShareOpen, setDistShareOpen] = useState(false);
+  const [distShareStatus, setDistShareStatus] = useState(null);
+  const buildCanvasFromRef = useCallback(async (ref) => {
+    const el = ref.current;
     if (!el) return null;
     const brandEl = el.querySelector(".viv-screenshot-brand");
     if (brandEl) brandEl.style.display = "block";
@@ -1074,40 +1080,62 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     ctx.fillText("www.valensontrades.com  |  VIV Swing Trading", canvas.width / 2, canvas.height - wmHeight / 2 + 10);
     return canvas;
   }, []);
-  const captureStats = useCallback(async (mode) => {
-    if (!screenshotRef.current || screenshotting) return;
+  const captureSection = useCallback(async (mode, ref, setMenu, setStatus, filename) => {
+    if (!ref.current || screenshotting) return;
     setScreenshotting(true);
-    setShareMenuOpen(false);
+    setMenu(false);
     try {
-      const canvas = await buildScreenshotCanvas();
+      const canvas = await buildCanvasFromRef(ref);
       if (!canvas) throw new Error("Canvas failed");
+      const fname = `VIV-${filename}-${new Date().toISOString().slice(0,10)}.png`;
       if (mode === "copy") {
         canvas.toBlob(async (blob) => {
           if (blob && navigator.clipboard && navigator.clipboard.write) {
             await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-            setShareStatus("copied");
+            setStatus("copied");
           } else {
-            // Fallback: download if clipboard API not available
             const link = document.createElement("a");
-            link.download = `VIV-Performance-${new Date().toISOString().slice(0,10)}.png`;
+            link.download = fname;
             link.href = canvas.toDataURL("image/png");
             link.click();
-            setShareStatus("downloaded");
+            setStatus("downloaded");
           }
-          setTimeout(() => setShareStatus(null), 2500);
+          setTimeout(() => setStatus(null), 2500);
         }, "image/png");
       } else {
         const link = document.createElement("a");
-        link.download = `VIV-Performance-${new Date().toISOString().slice(0,10)}.png`;
+        link.download = fname;
         link.href = canvas.toDataURL("image/png");
         link.click();
-        setShareStatus("downloaded");
-        setTimeout(() => setShareStatus(null), 2500);
+        setStatus("downloaded");
+        setTimeout(() => setStatus(null), 2500);
       }
     } catch (e) { console.error("Screenshot failed:", e); }
     setScreenshotting(false);
-  }, [screenshotting, buildScreenshotCanvas]);
+  }, [screenshotting, buildCanvasFromRef]);
+  const captureStats = useCallback(async (mode) => captureSection(mode, screenshotRef, setShareMenuOpen, setShareStatus, "Performance"), [captureSection]);
+  const captureClosedTrades = useCallback(async (mode) => captureSection(mode, closedTradesRef, setClosedShareOpen, setClosedShareStatus, "ClosedTrades"), [captureSection]);
+  const captureDist = useCallback(async (mode) => captureSection(mode, distScreenRef, setDistShareOpen, setDistShareStatus, "Distribution"), [captureSection]);
   // perfToggle removed — monthly tracker now shows all stats inline
+
+  // Reusable Share dropdown button
+  const ShareDropdown = useCallback(({ menuOpen, setMenuOpen, status, captureFn, label }) => (
+    <div style={{ position:"relative" }}>
+      <button onClick={() => setMenuOpen(p => !p)} disabled={screenshotting} title={`Screenshot ${label}`} style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.borderGold}`,background:C.goldDim,color:C.gold,fontWeight:700,fontSize:"0.72rem",cursor:screenshotting?"wait":"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:5 }}>
+        {screenshotting ? "Capturing..." : status === "copied" ? "Copied ✓" : status === "downloaded" ? "Downloaded ✓" : `📸 Share ${label}`}
+      </button>
+      {menuOpen && !screenshotting && (
+        <div style={{ position:"absolute",top:"calc(100% + 6px)",right:0,background:"rgba(12,12,20,0.97)",border:`1px solid ${C.borderGold}`,borderRadius:10,padding:6,zIndex:100,minWidth:180,boxShadow:"0 8px 32px rgba(0,0,0,0.6)" }}>
+          <button onClick={() => captureFn("copy")} style={{ display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",border:"none",background:"transparent",color:C.white,fontSize:"0.72rem",fontWeight:600,cursor:"pointer",fontFamily:font,borderRadius:8,textAlign:"left" }} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.06)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            📋 Copy to Clipboard
+          </button>
+          <button onClick={() => captureFn("download")} style={{ display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",border:"none",background:"transparent",color:C.white,fontSize:"0.72rem",fontWeight:600,cursor:"pointer",fontFamily:font,borderRadius:8,textAlign:"left" }} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.06)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            💾 Download PNG
+          </button>
+        </div>
+      )}
+    </div>
+  ), [screenshotting]);
 
   // Ref to always hold the latest onManualSave — fixes stale closure when
   // setTimeout fires after setJournaledTrades (state update hasn't rendered yet)
@@ -1487,21 +1515,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           <h1 style={{ fontWeight: 800, fontSize: "clamp(1.5rem, 4vw, 2rem)", letterSpacing: "-0.04em", color: C.white, margin: 0 }}>Performance Tracker{activeFilterLabel && <span style={{ fontSize: "0.6em", color: C.muted, fontWeight: 400 }}>{activeFilterLabel}</span>}</h1>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ position:"relative" }}>
-            <button onClick={() => setShareMenuOpen(p => !p)} disabled={screenshotting} title="Screenshot Stats" style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.borderGold}`,background:C.goldDim,color:C.gold,fontWeight:700,fontSize:"0.72rem",cursor:screenshotting?"wait":"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:5 }}>
-              {screenshotting ? "Capturing..." : shareStatus === "copied" ? "Copied ✓" : shareStatus === "downloaded" ? "Downloaded ✓" : "📸 Share Stats"}
-            </button>
-            {shareMenuOpen && !screenshotting && (
-              <div style={{ position:"absolute",top:"calc(100% + 6px)",right:0,background:"rgba(12,12,20,0.97)",border:`1px solid ${C.borderGold}`,borderRadius:10,padding:6,zIndex:100,minWidth:180,boxShadow:"0 8px 32px rgba(0,0,0,0.6)" }}>
-                <button onClick={() => captureStats("copy")} style={{ display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",border:"none",background:"transparent",color:C.white,fontSize:"0.72rem",fontWeight:600,cursor:"pointer",fontFamily:font,borderRadius:8,textAlign:"left" }} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.06)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                  📋 Copy to Clipboard
-                </button>
-                <button onClick={() => captureStats("download")} style={{ display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",border:"none",background:"transparent",color:C.white,fontSize:"0.72rem",fontWeight:600,cursor:"pointer",fontFamily:font,borderRadius:8,textAlign:"left" }} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.06)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                  💾 Download PNG
-                </button>
-              </div>
-            )}
-          </div>
+          <ShareDropdown menuOpen={shareMenuOpen} setMenuOpen={setShareMenuOpen} status={shareStatus} captureFn={captureStats} label="Stats" />
           <button onClick={onManualSave} disabled={saveStatus === "saving"} style={{ padding:"8px 16px",borderRadius:980,border:`1px solid ${saveStatus === "saved" ? "rgba(34,197,94,0.4)" : saveStatus === "error" ? "rgba(239,68,68,0.4)" : C.borderGold}`,background:saveStatus === "saved" ? "rgba(34,197,94,0.12)" : saveStatus === "error" ? "rgba(239,68,68,0.12)" : C.goldDim,color:saveStatus === "saved" ? C.green : saveStatus === "error" ? C.red : C.gold,fontWeight:700,fontSize:"0.72rem",cursor:saveStatus === "saving" ? "wait" : "pointer",fontFamily:font,transition:"all 0.2s",display:"flex",alignItems:"center",gap:6 }}>
             {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Save Failed" : "Save"}
           </button>
@@ -1817,11 +1831,25 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           ═══════════════════════════════════════════════════════════════ */}
       {distExpanded && (
         <div ref={distRef} style={{ scrollMarginTop: 20 }}>
+          <div ref={distScreenRef} style={{ background: C.bg }}>
+          <div className="viv-screenshot-brand" style={{ display:"none",padding:"20px 24px 12px",marginBottom:8 }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+              <div style={{ display:"flex",alignItems:"center",gap:14 }}>
+                <div style={{ width:40,height:40,borderRadius:10,background:`linear-gradient(135deg, ${C.gold}, ${C.goldBright})`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:"1.1rem",color:"#08080e",letterSpacing:"-0.04em",fontFamily:font }}>V</div>
+                <div>
+                  <div style={{ fontWeight:800,fontSize:"1.1rem",color:C.white,letterSpacing:"-0.03em" }}>VIV Swing Trading</div>
+                  <div style={{ fontWeight:500,fontSize:"0.58rem",color:C.muted,letterSpacing:"0.04em" }}>www.valensontrades.com</div>
+                </div>
+              </div>
+              <div style={{ fontWeight:600,fontSize:"0.58rem",color:C.muted }}>{new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</div>
+            </div>
+          </div>
           <GlassCard style={{ marginBottom: 20 }}>
             <div style={{ padding: "18px 22px 6px" }}>
               <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6 }}>
                 <div style={{ fontWeight: 800, fontSize: "0.88rem", color: C.white, letterSpacing:"-0.02em" }}>Distribution Return</div>
                 <div style={{ display:"flex",alignItems:"center",gap:12 }}>
+                  <ShareDropdown menuOpen={distShareOpen} setMenuOpen={setDistShareOpen} status={distShareStatus} captureFn={captureDist} label="Distribution" />
                   {activeDistData.returnPerTrade !== undefined && <span style={{ fontSize:"0.82rem",fontWeight:700,background:"rgba(255,255,255,0.06)",border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 12px",letterSpacing:"-0.02em" }}>Return/Trade: <span style={{ color: activeDistData.returnPerTrade >= 0 ? C.green : C.red, fontWeight:800 }}>{activeDistData.returnPerTrade.toFixed(2)}%</span></span>}
                   <span style={{ color:C.muted,fontSize:"0.70rem",cursor:"pointer",transition:"transform 0.2s",transform:"rotate(180deg)" }} onClick={()=>setDistExpanded(false)}>▼</span>
                 </div>
@@ -1990,12 +2018,29 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
               </div>
             </div>
           </GlassCard>
+          </div>{/* end distScreenRef */}
         </div>
       )}
 
       {/* Closed Trades Table — editable */}
+      <div ref={closedTradesRef} style={{ background: C.bg }}>
+      <div className="viv-screenshot-brand" style={{ display:"none",padding:"20px 24px 12px",marginBottom:8 }}>
+        <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:14 }}>
+            <div style={{ width:40,height:40,borderRadius:10,background:`linear-gradient(135deg, ${C.gold}, ${C.goldBright})`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:"1.1rem",color:"#08080e",letterSpacing:"-0.04em",fontFamily:font }}>V</div>
+            <div>
+              <div style={{ fontWeight:800,fontSize:"1.1rem",color:C.white,letterSpacing:"-0.03em" }}>VIV Swing Trading</div>
+              <div style={{ fontWeight:500,fontSize:"0.58rem",color:C.muted,letterSpacing:"0.04em" }}>www.valensontrades.com</div>
+            </div>
+          </div>
+          <div style={{ fontWeight:600,fontSize:"0.58rem",color:C.muted }}>{new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</div>
+        </div>
+      </div>
       <GlassCard>
-        <div style={{ padding: "18px 22px 6px" }}><div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Closed Trades</div></div>
+        <div style={{ padding: "18px 22px 6px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Closed Trades</div>
+          <ShareDropdown menuOpen={closedShareOpen} setMenuOpen={setClosedShareOpen} status={closedShareStatus} captureFn={captureClosedTrades} label="Trades" />
+        </div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.72rem" }}>
             <thead>
@@ -2199,6 +2244,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
         </div>
         <div style={{ padding: "10px 22px 14px", fontSize: "0.62rem", color: C.muted }}>Double-click any row to edit. Changes auto-save.</div>
       </GlassCard>
+      </div>{/* end closedTradesRef */}
     </div>
   );
 }
@@ -3946,8 +3992,8 @@ function AuthPage() {
 // ═══════════════════════════════════════
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "\u{1F4C8}" },
-  { id: "tools", label: "Tools", icon: "\u{26A1}" },
   { id: "journal", label: "Journal", icon: "\u{1F4CA}" },
+  { id: "tools", label: "Tools", icon: "\u{26A1}" },
   { id: "settings", label: "Settings", icon: "\u{2699}" },
 ];
 
