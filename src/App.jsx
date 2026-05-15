@@ -1068,8 +1068,12 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     if (!el) return null;
     const brandEl = el.querySelector(".viv-screenshot-brand");
     if (brandEl) brandEl.style.display = "block";
+    // Hide share buttons and filter bar during capture
+    const hideEls = el.querySelectorAll(".viv-share-btn, .viv-filter-bar, .viv-hide-screenshot");
+    hideEls.forEach(e => e.style.display = "none");
     const canvas = await html2canvas(el, { backgroundColor: "#08080e", scale: 2, useCORS: true, logging: false });
     if (brandEl) brandEl.style.display = "none";
+    hideEls.forEach(e => e.style.display = "");
     const ctx = canvas.getContext("2d");
     const wmHeight = 48 * 2;
     ctx.fillStyle = "rgba(8,8,14,0.85)";
@@ -1120,7 +1124,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 
   // Reusable Share dropdown button
   const ShareDropdown = useCallback(({ menuOpen, setMenuOpen, status, captureFn, label }) => (
-    <div style={{ position:"relative" }}>
+    <div className="viv-share-btn" style={{ position:"relative" }}>
       <button onClick={() => setMenuOpen(p => !p)} disabled={screenshotting} title={`Screenshot ${label}`} style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.borderGold}`,background:C.goldDim,color:C.gold,fontWeight:700,fontSize:"0.72rem",cursor:screenshotting?"wait":"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:5 }}>
         {screenshotting ? "Capturing..." : status === "copied" ? "Copied ✓" : status === "downloaded" ? "Downloaded ✓" : `📸 Share ${label}`}
       </button>
@@ -1856,7 +1860,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
               </div>
 
               {/* ── Toolbar — Refill Data | Clear | Cap Losses ── */}
-              <div style={{ display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:20 }}>
+              <div className="viv-hide-screenshot" style={{ display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:20 }}>
                 <button onClick={() => { setDistMode("actual"); setDistCapVal(""); setDistTableEdits({}); }} style={{ padding:"8px 16px",borderRadius:8,border:`1px solid ${distMode==="actual"&&Object.keys(distTableEdits).length===0?C.gold:C.border}`,background:distMode==="actual"&&Object.keys(distTableEdits).length===0?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.04)",color:distMode==="actual"&&Object.keys(distTableEdits).length===0?C.gold:C.muted,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Refill Data</button>
                 <button onClick={() => { setDistMode("cleared"); setDistCapVal(""); setDistTableEdits({}); }} style={{ padding:"8px 16px",borderRadius:8,border:`1px solid ${distMode==="cleared"?C.gold:C.border}`,background:distMode==="cleared"?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.04)",color:distMode==="cleared"?C.gold:C.muted,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Clear</button>
                 <button onClick={() => setDistMode(distMode==="cap"?"actual":"cap")} style={{ padding:"8px 16px",borderRadius:8,border:`1px solid ${distMode==="cap"?C.gold:C.border}`,background:distMode==="cap"?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.04)",color:distMode==="cap"?C.gold:C.muted,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Cap Losses</button>
