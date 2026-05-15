@@ -1050,7 +1050,6 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   // Drag reorder hooks — stat tiles, trade journal columns, open positions columns
   const statDrag = useDragReorder(12); // 12 stat tiles
   const tradeDrag = useDragReorder(17); // 17 trade journal columns
-  const posDrag = useDragReorder(24); // ~24 open positions columns
   const monthDrag = useDragReorder(18); // 18 monthly performance columns
   const distDrag = useDragReorder(7); // 7 distribution table columns
   // perfToggle removed — monthly tracker now shows all stats inline
@@ -2159,6 +2158,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [posSorts, setPosSorts] = useState([]); // [{key, dir}] multi-sort for positions
   const [posColWidths, setPosColWidths] = useState({}); // {colKey: width} for resizable columns
+  const posDrag = useDragReorder(24); // ~24 open positions columns
 
   // Ref to always hold the latest onManualSave — fixes stale closure when
   // setTimeout fires after setPositions (state update hasn't rendered yet)
