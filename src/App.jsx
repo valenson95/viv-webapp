@@ -194,13 +194,11 @@ function DragTr({ order, children, ...props }) {
 
 function StatTile({ label, value, color, prefix, sub }) {
   const display = `${prefix || ""}${value}`;
-  const len = display.length;
-  const fs = len > 12 ? "0.88rem" : len > 9 ? "1.0rem" : len > 7 ? "1.12rem" : "1.3rem";
   return (
-    <GlassCard small style={{ padding: "16px 18px" }}>
-      <div style={{ fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted, marginBottom: 8 }}>{label}</div>
-      <div style={{ fontWeight: 800, fontSize: fs, letterSpacing: "-0.04em", color: color || C.white, whiteSpace: "nowrap" }}>{display}</div>
-      {sub && <div style={{ fontWeight: 500, fontSize: "0.64rem", color: C.muted, marginTop: 4 }}>{sub}</div>}
+    <GlassCard small style={{ padding: "18px 20px", minHeight: 88, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+      <div style={{ fontWeight: 700, fontSize: "0.54rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted, marginBottom: 8 }}>{label}</div>
+      <div style={{ fontWeight: 800, fontSize: "1.18rem", letterSpacing: "-0.04em", color: color || C.white, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{display}</div>
+      {sub && <div style={{ fontWeight: 500, fontSize: "0.62rem", color: C.muted, marginTop: 6 }}>{sub}</div>}
     </GlassCard>
   );
 }
@@ -1645,20 +1643,20 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
         {/* ─── Distribution Analysis Preview ─── */}
         <GlassCard style={{ padding: "18px 22px", cursor:"pointer" }} onClick={() => setDistExpanded(true)}>
           <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
-            <div style={{ fontWeight: 800, fontSize: "0.88rem", color: C.white, letterSpacing:"-0.02em" }}>Distribution</div>
+            <div style={{ fontWeight: 800, fontSize: "0.88rem", color: C.white, letterSpacing:"-0.02em" }}>Distribution Return</div>
             <div style={{ display:"flex",alignItems:"center",gap:12 }}>
-              {distAnalysis.returnPerTrade !== undefined && <span style={{ fontSize:"0.64rem",color:C.muted }}>Return/Trade: <span style={{ color: distAnalysis.returnPerTrade >= 0 ? C.green : C.red, fontWeight:700 }}>{distAnalysis.returnPerTrade.toFixed(2)}%</span></span>}
+              {distAnalysis.returnPerTrade !== undefined && <span style={{ fontSize:"0.82rem",fontWeight:700,background:"rgba(255,255,255,0.06)",border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 12px",letterSpacing:"-0.02em" }}>Return/Trade: <span style={{ color: distAnalysis.returnPerTrade >= 0 ? C.green : C.red, fontWeight:800 }}>{distAnalysis.returnPerTrade.toFixed(2)}%</span></span>}
               <span style={{ color:C.muted,fontSize:"0.70rem" }}>▼</span>
             </div>
           </div>
           {/* Mini preview — losses LEFT, gains RIGHT (M360 distribution) */}
           <ResponsiveContainer width="100%" height={170}>
-            <BarChart data={distAnalysis.butterflyData} barCategoryGap="8%">
+            <BarChart data={distAnalysis.butterflyData} barCategoryGap="12%">
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={2} />
               <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
               <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v,name,props)=>[v, props.payload.type==="loss"?"Losses":"Wins"]} />
-              <Bar dataKey="count" radius={[2,2,0,0]}>
+              <Bar dataKey="count" radius={[2,2,0,0]} barSize={5}>
                 {distAnalysis.butterflyData.map((entry, idx) => (
                   <Cell key={idx} fill={entry.type === "loss" ? C.red : C.green} />
                 ))}
@@ -1768,9 +1766,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           <GlassCard style={{ marginBottom: 20 }}>
             <div style={{ padding: "18px 22px 6px" }}>
               <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6 }}>
-                <div style={{ fontWeight: 800, fontSize: "0.88rem", color: C.white, letterSpacing:"-0.02em" }}>Distribution</div>
+                <div style={{ fontWeight: 800, fontSize: "0.88rem", color: C.white, letterSpacing:"-0.02em" }}>Distribution Return</div>
                 <div style={{ display:"flex",alignItems:"center",gap:12 }}>
-                  {activeDistData.returnPerTrade !== undefined && <span style={{ fontSize:"0.64rem",color:C.muted }}>Return/Trade: <span style={{ color: activeDistData.returnPerTrade >= 0 ? C.green : C.red, fontWeight:700 }}>{activeDistData.returnPerTrade.toFixed(2)}%</span></span>}
+                  {activeDistData.returnPerTrade !== undefined && <span style={{ fontSize:"0.82rem",fontWeight:700,background:"rgba(255,255,255,0.06)",border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 12px",letterSpacing:"-0.02em" }}>Return/Trade: <span style={{ color: activeDistData.returnPerTrade >= 0 ? C.green : C.red, fontWeight:800 }}>{activeDistData.returnPerTrade.toFixed(2)}%</span></span>}
                   <span style={{ color:C.muted,fontSize:"0.70rem",cursor:"pointer",transition:"transform 0.2s",transform:"rotate(180deg)" }} onClick={()=>setDistExpanded(false)}>▼</span>
                 </div>
               </div>
@@ -1822,12 +1820,12 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
                     <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:10 }}>Gains and Losses</div>
                     <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={activeDistData.butterflyData} barCategoryGap="8%">
+                      <BarChart data={activeDistData.butterflyData} barCategoryGap="12%">
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                         <XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} />
                         <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
                         <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v,name,props)=>[v, props.payload.type==="loss"?"Losses":"Wins"]} />
-                        <Bar dataKey="count" radius={[2,2,0,0]}>
+                        <Bar dataKey="count" radius={[2,2,0,0]} barSize={5}>
                           {(activeDistData.butterflyData||[]).map((entry, idx) => (
                             <Cell key={idx} fill={entry.type === "loss" ? C.red : C.green} />
                           ))}
@@ -1847,7 +1845,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                         <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>v.toFixed(1)} />
                         <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v,name,props)=>[Number(v).toFixed(3), props.payload.type === "loss" ? "Loss Contribution" : "Gain Contribution"]} />
                         <ReferenceLine y={0} stroke={C.border} strokeDasharray="3 3" />
-                        <Bar dataKey="contribution" radius={[2,2,0,0]} barSize={8}>
+                        <Bar dataKey="contribution" radius={[2,2,0,0]} barSize={5}>
                           {(activeDistData.butterflyDrma||[]).map((entry, idx) => (
                             <Cell key={idx} fill={entry.type === "loss" ? C.red : C.green} />
                           ))}
@@ -1883,14 +1881,14 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                       <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.white,marginBottom:2 }}>Gain Magnitude</div>
                       <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your winning trades cluster by size.</div>
                       <ResponsiveContainer width="100%" height={150}>
-                        <BarChart data={activeDistData.gainMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Wins"]} /><Bar dataKey="count" fill={C.green} radius={[2,2,0,0]} /></BarChart>
+                        <BarChart data={activeDistData.gainMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Wins"]} /><Bar dataKey="count" fill={C.green} radius={[2,2,0,0]} barSize={4} /></BarChart>
                       </ResponsiveContainer>
                     </div>
                     <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 14px" }}>
                       <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.white,marginBottom:2 }}>Loss Magnitude</div>
                       <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your losing trades cluster by size.</div>
                       <ResponsiveContainer width="100%" height={150}>
-                        <BarChart data={activeDistData.lossMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Losses"]} /><Bar dataKey="count" fill={C.red} radius={[2,2,0,0]} /></BarChart>
+                        <BarChart data={activeDistData.lossMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Losses"]} /><Bar dataKey="count" fill={C.red} radius={[2,2,0,0]} barSize={4} /></BarChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
