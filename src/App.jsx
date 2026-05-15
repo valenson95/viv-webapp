@@ -2545,7 +2545,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     return pos;
   }, [sellId, positions, lastSaveIdMapRef]);
 
-  const confirmSell = () => {
+  const confirmSell = async () => {
     const pos = findSellPos();
     if (!pos) return;
     const epN = parseFloat(pos.ep) || 0, stopN = parseFloat(pos.stop) || 0;
@@ -2575,15 +2575,40 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       const hasStruct = sellNotesStruct.right || sellNotesStruct.wrong || sellNotesStruct.lessons;
       const finalNotes = hasStruct ? serializeNotes({ ...sellNotesStruct, _plain: "" }) : (sellNotes || pos.notes || "");
       const nowSell = new Date();
-      onJournalTrade({
-        id: Date.now(), ticker: pos.sym, entry: pos.entry, entryTime: pos.entryTime || "",
+      const tradeObj = {
+        ticker: pos.sym, entry: pos.entry, entryTime: pos.entryTime || "",
         exit: nowSell.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }),
         exitTime: nowSell.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
         entryP: epN, exitP, shares: soldShares, stop: stopN, setup: pos.setup,
         tags: [...(pos.tags || []), ...sellTags], plPct, plDollar, rMult,
         commission: commPortion, tradeType: pos.tradeType || "Long",
         reason: sellReason, notes: finalNotes, chartUrl: sellChartUrl || pos.chartUrl || "", chartImage: pos.chartImage || "", _fromDashboard: true,
-      });
+      };
+
+      // ATOMIC: Write trade directly to Supabase so it survives refresh
+      if (session) {
+        const uid = session.user.id;
+        const dbRow = {
+          user_id: uid, ticker: tradeObj.ticker, entry_date: tradeObj.entry, entry_time: tradeObj.entryTime,
+          exit_date: tradeObj.exit, exit_time: tradeObj.exitTime,
+          entry_price: tradeObj.entryP, exit_price: tradeObj.exitP, shares: tradeObj.shares,
+          stop_price: tradeObj.stop, setup: tradeObj.setup, tags: tradeObj.tags,
+          pl_pct: tradeObj.plPct, pl_dollar: tradeObj.plDollar, r_mult: tradeObj.rMult,
+          exit_reason: tradeObj.reason, notes: tradeObj.notes,
+          chart_url: tradeObj.chartUrl, chart_image: tradeObj.chartImage, trade_type: tradeObj.tradeType,
+        };
+        const { data: inserted, error } = await supabase.from("trades").insert([dbRow]).select("id");
+        if (!error && inserted && inserted.length > 0) {
+          // Use real DB id so it won't be re-inserted on next trade save
+          onJournalTrade({ ...tradeObj, id: inserted[0].id });
+        } else {
+          console.error("Sell trade insert failed:", error?.message);
+          // Fallback: add to state with temp id — manual save will pick it up
+          onJournalTrade({ ...tradeObj, id: Date.now() });
+        }
+      } else {
+        onJournalTrade({ ...tradeObj, id: Date.now() });
+      }
     }
 
     if (remaining > 0) {
@@ -2592,8 +2617,8 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       removeRow(pos.id, true); // skip confirm — sell modal already confirmed
     }
     setSellId(null);
-    // CRITICAL: trigger immediate save after sell — don't wait for debounce.
-    // Without this, refreshing before autosave fires resurrects the sold position from DB.
+    // CRITICAL: trigger immediate save after sell — saves position changes to Supabase.
+    // Trade is already saved atomically above, so only position state needs saving here.
     setTimeout(() => onManualSaveRef.current(), 50); // ref avoids stale closure
   };
 
