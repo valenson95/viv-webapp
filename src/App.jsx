@@ -949,7 +949,7 @@ function parseMasterCSV(text) {
       const entryIdx = hdr.findIndex(h => /entry.?date|date/i.test(h));
       const sharesIdx = hdr.findIndex(h => /shares|qty|quantity/i.test(h));
       const epIdx = hdr.findIndex(h => /entry.?price|avg.?cost|cost/i.test(h));
-      const cpIdx = hdr.findIndex(h => /current|last|market|price/i.test(h));
+      const cpIdx = hdr.findIndex(h => /^current|^last|^market|^price$/i.test(h));
       const s1Idx = hdr.findIndex(h => /^stop$|stop.?price|orig.?stop/i.test(h));
       const tsIdx = hdr.findIndex(h => /trail/i.test(h));
       const setupIdx = hdr.findIndex(h => /setup/i.test(h));
@@ -1098,7 +1098,7 @@ function notesPreview(raw) {
   return parts.join(" | ") || "";
 }
 
-function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, saveStatus, positions, portfolioSize }) {
+function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, saveStatus, positions, setPositions, positionsRef, portfolioSize }) {
   const [filterSetup, setFilterSetup] = useState("All");
   const [filterTag, setFilterTag] = useState("All");
   const [editingId, setEditingId] = useState(null);
@@ -2380,7 +2380,7 @@ const GLOSSARY = [
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
-function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg }) {
+function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg }) {
   const [sizerMode, setSizerMode] = useState("R"); // "R" = risk-based (default), "%" = position size
   const [rNumStocks, setRNumStocks] = useState(4);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
@@ -2605,14 +2605,35 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const compPs = +portfolioSize || 0;
   const compEquity = compPs + compRealizedPL;
 
-  // Realized P/L by ticker — sums all journal entries for each ticker (from partial sells)
-  const realizedByTicker = useMemo(() => {
+  // Parse date string (M/D/YY, M/D/YYYY, YYYY-MM-DD) to ms timestamp for comparison
+  const parseDateMs = useCallback((d) => {
+    if (!d) return 0;
+    const s = d.trim();
+    // M/D/YY or M/D/YYYY
+    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (m) { const y = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]); return new Date(y, parseInt(m[1])-1, parseInt(m[2])).getTime(); }
+    // YYYY-MM-DD
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) return new Date(parseInt(iso[1]), parseInt(iso[2])-1, parseInt(iso[3])).getTime();
+    return 0;
+  }, []);
+
+  // Realized P/L per position — only counts journal trades that are partial sells of the CURRENT position
+  // Match: same ticker AND trade entry date >= position entry date (old trades of same ticker are excluded)
+  const realizedByPosition = useMemo(() => {
     const map = {};
-    if (journaledTrades) journaledTrades.forEach(t => {
-      if (t.ticker) map[t.ticker] = (map[t.ticker] || 0) + (t.plDollar || 0);
+    if (!journaledTrades || !positions) return map;
+    positions.forEach(p => {
+      if (!p.sym) return;
+      const posEntryMs = parseDateMs(p.entry);
+      const realized = journaledTrades
+        .filter(t => t.ticker === p.sym && parseDateMs(t.entry) >= posEntryMs)
+        .reduce((sum, t) => sum + (t.plDollar || 0), 0);
+      // Use position id as key (not ticker) to handle multiple positions of same ticker
+      map[p.id] = realized;
     });
     return map;
-  }, [journaledTrades]);
+  }, [journaledTrades, positions, parseDateMs]);
 
   // Enriched — dual stop loss: if stop2 is set, 50/50 split. Otherwise stop1 covers 100%.
   const enriched = useMemo(() => positions.map(p => { try {
@@ -2712,13 +2733,13 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const rtsR = rPerShare > 0 && sharesN > 0 ? (rtsD / sharesN) / rPerShare : 0;
 
     const expPct = compEquity > 0 ? (posValue / compEquity) * 100 : 0;
-    // Realized P/L from partial sells of this ticker
-    const realizedPL = realizedByTicker[p.sym] || 0;
+    // Realized P/L from partial sells of THIS position (not all trades of same ticker)
+    const realizedPL = realizedByPosition[p.id] || 0;
     // Cost financed = realized profits >= initial risk (playing with house money)
     const costFinanced = realizedPL > 0 && initRiskD > 0 && realizedPL >= initRiskD;
     return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
   } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0 }; }
-  }), [positions, sizer, portfolioSize, compEquity, realizedByTicker]);
+  }), [positions, sizer, portfolioSize, compEquity, realizedByPosition]);
 
   const totals = useMemo(() => {
     const active = enriched.filter(p => p.sym && p.cpN > 0);
@@ -4710,9 +4731,9 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} />}
       {page === "tools" && <PremiumToolsPage demo={false} />}
-      {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} portfolioSize={portfolioSize} />}
+      {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} />}
     </>
   );
