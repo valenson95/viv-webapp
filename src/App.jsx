@@ -1805,20 +1805,20 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     </ResponsiveContainer>
                   </div>
 
-                  {/* DRMA Curve — signed axis matching M360 */}
+                  {/* DRMA Curve — M360 range format */}
                   <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
                     <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:2 }}>DRMA Curve <span style={{ fontWeight:400,fontSize:"0.52rem",color:C.muted }}>(Distribution Return Moving Average)</span></div>
-                    <div style={{ fontSize:"0.48rem",color:C.muted,marginBottom:10 }}>Per-bucket return contribution on the same loss/gain axis. Shows where your system generates or bleeds returns.</div>
+                    <div style={{ fontSize:"0.48rem",color:C.muted,marginBottom:10 }}>Per-bucket return contribution. Shows where your system generates or bleeds returns.</div>
                     <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={activeDistData.butterflyDrma}>
+                      <BarChart data={(activeDistData.tableData||[]).filter(b=>b.gains>0||b.losses>0).map(b=>({range:b.range,contribution:b.bucketRetContrib}))}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                        <XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} />
+                        <XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={0} angle={-35} textAnchor="end" height={40} />
                         <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>v.toFixed(1)} />
                         <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v)=>[Number(v).toFixed(3),"Return Contribution"]} />
                         <ReferenceLine y={0} stroke={C.border} strokeDasharray="3 3" />
                         <Bar dataKey="contribution" radius={[2,2,0,0]} barSize={8}>
-                          {(activeDistData.butterflyDrma||[]).map((entry, idx) => (
-                            <Cell key={idx} fill={entry.contribution >= 0 ? C.green : C.red} />
+                          {(activeDistData.tableData||[]).filter(b=>b.gains>0||b.losses>0).map((b, idx) => (
+                            <Cell key={idx} fill={b.bucketRetContrib >= 0 ? C.green : C.red} />
                           ))}
                         </Bar>
                       </BarChart>
