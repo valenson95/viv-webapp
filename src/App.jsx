@@ -1060,10 +1060,15 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     setScreenshotting(true);
     try {
       const el = screenshotRef.current;
+      // Show branding header for capture
+      const brandEl = el.querySelector(".viv-screenshot-brand");
+      if (brandEl) brandEl.style.display = "block";
       const canvas = await html2canvas(el, { backgroundColor: "#08080e", scale: 2, useCORS: true, logging: false });
-      // Add watermark
+      // Hide branding header again
+      if (brandEl) brandEl.style.display = "none";
+      // Add watermark footer
       const ctx = canvas.getContext("2d");
-      const wmHeight = 48 * 2; // scaled
+      const wmHeight = 48 * 2;
       ctx.fillStyle = "rgba(8,8,14,0.85)";
       ctx.fillRect(0, canvas.height - wmHeight, canvas.width, wmHeight);
       ctx.fillStyle = "#c9982a";
@@ -1541,7 +1546,6 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       )}
 
       {/* Filter Bar */}
-      <div ref={screenshotRef} style={{ background: C.bg }}>
       <GlassCard small style={{ padding: "12px 18px", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <span style={{ fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted }}>Filter</span>
@@ -1558,6 +1562,21 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           )}
         </div>
       </GlassCard>
+
+      <div ref={screenshotRef} style={{ background: C.bg }}>
+      {/* Branding header — visible only in screenshot */}
+      <div className="viv-screenshot-brand" style={{ display:"none",padding:"20px 24px 12px",marginBottom:8 }}>
+        <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:14 }}>
+            <div style={{ width:40,height:40,borderRadius:10,background:`linear-gradient(135deg, ${C.gold}, ${C.goldBright})`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:"1.1rem",color:"#08080e",letterSpacing:"-0.04em",fontFamily:font }}>V</div>
+            <div>
+              <div style={{ fontWeight:800,fontSize:"1.1rem",color:C.white,letterSpacing:"-0.03em" }}>VIV Swing Trading</div>
+              <div style={{ fontWeight:500,fontSize:"0.58rem",color:C.muted,letterSpacing:"0.04em" }}>www.valensontrades.com</div>
+            </div>
+          </div>
+          <div style={{ fontWeight:600,fontSize:"0.58rem",color:C.muted }}>{new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</div>
+        </div>
+      </div>
 
       {/* Stats — draggable tiles, recalculate based on filter */}
       {(() => {
