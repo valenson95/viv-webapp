@@ -836,7 +836,7 @@ const SAMPLE_TRADES = [
 ];
 
 // ─── CSV Helpers ───
-const CSV_HEADERS = ["Symbol","Entry Date","Entry Time","Exit Date","Exit Time","Entry Price","Exit Price","Shares","Stop","Setup","Tags","P/L %","P/L $","R-Multiple","Exit Reason","Notes"];
+const CSV_HEADERS = ["Symbol","Entry Date","Entry Time","Exit Date","Exit Time","Entry Price","Exit Price","Shares","Stop","Setup","Tags","P/L %","P/L $","R-Multiple","Exit Reason","Commission","Notes"];
 const HEADER_ALIASES = {
   "symbol":"ticker","ticker":"ticker","sym":"ticker","stock":"ticker",
   "entry date":"entry","entry":"entry","open date":"entry","date opened":"entry","entrydate":"entry",
@@ -853,6 +853,7 @@ const HEADER_ALIASES = {
   "p/l $":"plDollar","pl$":"plDollar","pl $":"plDollar","p/l":"plDollar","pnl$":"plDollar","pnl $":"plDollar","profit":"plDollar","profit/loss":"plDollar",
   "r-multiple":"rMult","r-mult":"rMult","rmult":"rMult","r multiple":"rMult","r":"rMult",
   "exit reason":"reason","reason":"reason","exitreason":"reason","close reason":"reason",
+  "commission":"commission","comm":"commission",
   "notes":"notes","note":"notes","comment":"notes","comments":"notes",
 };
 
@@ -863,7 +864,8 @@ function exportTradesCSV(trades) {
       t.ticker, t.entry, t.entryTime || "", t.exit || "", t.exitTime || "", t.entryP, t.exitP, t.shares, t.stop || "",
       `"${t.setup || ""}"`, `"${(t.tags || []).join("; ")}"`,
       t.plPct?.toFixed(2) || "", t.plDollar?.toFixed(2) || "", t.rMult?.toFixed(2) || "",
-      `"${t.reason || ""}"`, `"${(t.notes || "").replace(/"/g, '""')}"`
+      `"${t.reason || ""}"`, t.commission != null && t.commission !== "" ? t.commission : "",
+      `"${(t.notes || "").replace(/"/g, '""')}"`
     ].join(","));
   });
   const blob = new Blob([rows.join("\n")], { type: "text/csv" });
@@ -915,7 +917,8 @@ function exportMasterCSV(positions, trades) {
       t.ticker, t.entry, t.entryTime || "", t.exit || "", t.exitTime || "", t.entryP, t.exitP, t.shares, t.stop || "",
       `"${t.setup || ""}"`, `"${(t.tags || []).join("; ")}"`,
       t.plPct?.toFixed(2) || "", t.plDollar?.toFixed(2) || "", t.rMult?.toFixed(2) || "",
-      `"${t.reason || ""}"`, `"${(t.notes || "").replace(/"/g, '""')}"`
+      `"${t.reason || ""}"`, t.commission != null && t.commission !== "" ? t.commission : "",
+      `"${(t.notes || "").replace(/"/g, '""')}"`
     ].join(","));
   });
   const blob = new Blob([lines.join("\n")], { type: "text/csv" });
@@ -923,6 +926,72 @@ function exportMasterCSV(positions, trades) {
   const a = document.createElement("a");
   a.href = url; a.download = `VIV_Master_Export_${new Date().toISOString().slice(0,10)}.csv`; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ─── Master CSV import — detects section markers and parses both positions + trades ───
+// Returns { positions: [...], trades: [...] } or null if not a master export
+function parseMasterCSV(text) {
+  const lines = text.split(/\r?\n/);
+  const posMarker = lines.findIndex(l => /^=== OPEN POSITIONS ===$/.test(l.trim()));
+  const tradeMarker = lines.findIndex(l => /^=== CLOSED TRADES ===$/.test(l.trim()));
+  if (posMarker < 0 && tradeMarker < 0) return null; // not a master export
+
+  const positions = [];
+  const trades = [];
+
+  // Parse positions section (between posMarker and tradeMarker)
+  if (posMarker >= 0) {
+    const posEnd = tradeMarker >= 0 ? tradeMarker : lines.length;
+    const posLines = lines.slice(posMarker + 1, posEnd).filter(l => l.trim());
+    if (posLines.length >= 2) {
+      const hdr = posLines[0].split(",").map(h => h.replace(/"/g, "").trim().toLowerCase());
+      const symIdx = hdr.findIndex(h => /symbol|ticker/i.test(h));
+      const entryIdx = hdr.findIndex(h => /entry.?date|date/i.test(h));
+      const sharesIdx = hdr.findIndex(h => /shares|qty|quantity/i.test(h));
+      const epIdx = hdr.findIndex(h => /entry.?price|avg.?cost|cost/i.test(h));
+      const cpIdx = hdr.findIndex(h => /current|last|market|price/i.test(h));
+      const s1Idx = hdr.findIndex(h => /^stop$|stop.?price|orig.?stop/i.test(h));
+      const tsIdx = hdr.findIndex(h => /trail/i.test(h));
+      const setupIdx = hdr.findIndex(h => /setup/i.test(h));
+      const tagsIdx = hdr.findIndex(h => /tags/i.test(h));
+      const commIdx = hdr.findIndex(h => /commission|comm/i.test(h));
+      const entryTimeIdx = hdr.findIndex(h => /entry.?time|time.?in/i.test(h));
+      const notesIdx = hdr.findIndex(h => /notes/i.test(h));
+      const chartIdx = hdr.findIndex(h => /chart.?url/i.test(h));
+      for (let i = 1; i < posLines.length; i++) {
+        const vals = posLines[i].match(/("(?:[^"]|"")*"|[^,]*)/g)?.map(v => v.replace(/^"|"$/g, "").replace(/""/g, '"').trim()) || [];
+        const sym = symIdx >= 0 ? (vals[symIdx] || "").toUpperCase() : "";
+        if (!sym) continue;
+        positions.push({
+          id: Date.now() + i, _lid: Date.now() + i, sym,
+          entry: entryIdx >= 0 ? vals[entryIdx] || "" : "",
+          entryTime: entryTimeIdx >= 0 ? vals[entryTimeIdx] || "" : "",
+          shares: sharesIdx >= 0 ? vals[sharesIdx] || "" : "",
+          ep: epIdx >= 0 ? vals[epIdx] || "" : "",
+          cp: cpIdx >= 0 ? vals[cpIdx] || "" : "",
+          stop: s1Idx >= 0 ? vals[s1Idx] || "" : "",
+          stop2: "", trailStop: tsIdx >= 0 ? vals[tsIdx] || "" : "",
+          setup: setupIdx >= 0 ? vals[setupIdx] || "VCP" : "VCP",
+          tags: tagsIdx >= 0 && vals[tagsIdx] ? vals[tagsIdx].split(/[;,]/).map(t => t.trim()).filter(Boolean) : [],
+          comm: commIdx >= 0 ? vals[commIdx] || "" : "",
+          notes: notesIdx >= 0 ? vals[notesIdx] || "" : "",
+          chartUrl: chartIdx >= 0 ? vals[chartIdx] || "" : "",
+        });
+      }
+    }
+  }
+
+  // Parse trades section (after tradeMarker)
+  if (tradeMarker >= 0) {
+    const tradeLines = lines.slice(tradeMarker + 1).filter(l => l.trim());
+    // Join and re-parse using the existing parseCSV function (it expects header + data lines)
+    if (tradeLines.length >= 2) {
+      const parsed = parseCSV(tradeLines.join("\n"));
+      trades.push(...parsed);
+    }
+  }
+
+  return { positions, trades };
 }
 
 // Normalize dates: detect DD/MM/YYYY or D/MM/YYYY and convert to YYYY-MM-DD
@@ -996,6 +1065,7 @@ function parseCSV(text) {
       tags: row.tags ? row.tags.split(/[;,]/).map(t => t.trim()).filter(Boolean) : [],
       plPct: effectivePlPct, plDollar, rMult,
       reason: row.reason || "",
+      commission: row.commission !== undefined && row.commission !== "" ? parseFloat(row.commission) : null,
       notes: row.notes || "",
       chartUrl: "", chartImage: "",
       _imported: true,
@@ -1160,12 +1230,33 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const parsed = parseCSV(ev.target.result);
-      if (parsed.length > 0) {
-        setJournaledTrades(prev => [...prev, ...parsed]);
-        setImportResult({ success: true, count: parsed.length });
+      const text = ev.target.result;
+      // Detect master export format (has section markers)
+      const master = parseMasterCSV(text);
+      if (master) {
+        let count = 0;
+        if (master.trades.length > 0) {
+          setJournaledTrades(prev => [...prev, ...master.trades]);
+          count += master.trades.length;
+        }
+        if (master.positions.length > 0) {
+          setPositions(prev => { const next = [...prev, ...master.positions]; positionsRef.current = next; return next; });
+          count += master.positions.length;
+        }
+        if (count > 0) {
+          setImportResult({ success: true, count, master: true, posCount: master.positions.length, tradeCount: master.trades.length });
+        } else {
+          setImportResult({ success: false, count: 0 });
+        }
       } else {
-        setImportResult({ success: false, count: 0 });
+        // Standard single-section CSV (trades only)
+        const parsed = parseCSV(text);
+        if (parsed.length > 0) {
+          setJournaledTrades(prev => [...prev, ...parsed]);
+          setImportResult({ success: true, count: parsed.length });
+        } else {
+          setImportResult({ success: false, count: 0 });
+        }
       }
       setTimeout(() => setImportResult(null), 5000);
     };
@@ -1537,7 +1628,11 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       {/* Import result toast */}
       {importResult && (
         <Alert type={importResult.success ? "gold" : "red"}>
-          {importResult.success ? `Successfully imported ${importResult.count} trade${importResult.count > 1 ? "s" : ""}. They now appear in your closed trades below.` : "Import failed — could not parse any trades. Check that your CSV has a header row with recognizable column names."}
+          {importResult.success
+            ? importResult.master
+              ? `Master import: ${importResult.posCount} position${importResult.posCount !== 1 ? "s" : ""} + ${importResult.tradeCount} trade${importResult.tradeCount !== 1 ? "s" : ""} imported. Remember to Save on both Dashboard and Journal.`
+              : `Successfully imported ${importResult.count} trade${importResult.count > 1 ? "s" : ""}. They now appear in your closed trades below.`
+            : "Import failed — could not parse any trades. Check that your CSV has a header row with recognizable column names."}
         </Alert>
       )}
 
@@ -2892,44 +2987,67 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const reader = new FileReader();
                 reader.onload = (ev) => {
                   try {
-                    const lines = ev.target.result.split("\n").map(l => l.trim()).filter(Boolean);
-                    if (lines.length < 2) return;
-                    const hdr = lines[0].split(",").map(h => h.replace(/"/g,"").trim().toLowerCase());
-                    const symIdx = hdr.findIndex(h => /symbol|ticker/i.test(h));
-                    const entryIdx = hdr.findIndex(h => /entry.?date|date/i.test(h));
-                    const sharesIdx = hdr.findIndex(h => /shares|qty|quantity/i.test(h));
-                    const epIdx = hdr.findIndex(h => /entry.?price|avg.?cost|cost/i.test(h));
-                    const cpIdx = hdr.findIndex(h => /^current|^last|^market|^price$/i.test(h));
-                    const s1Idx = hdr.findIndex(h => /stop.?1|stop.?price|orig.?stop|stop$/i.test(h));
-                    const s2Idx = hdr.findIndex(h => /stop.?2/i.test(h));
-                    const tsIdx = hdr.findIndex(h => /trail/i.test(h));
-                    const setupIdx = hdr.findIndex(h => /setup/i.test(h));
-                    const tagsIdx = hdr.findIndex(h => /tags/i.test(h));
-                    const commIdx = hdr.findIndex(h => /commission|comm/i.test(h));
-                    const entryTimeIdx = hdr.findIndex(h => /entry.?time|time.?in/i.test(h));
-                    if (symIdx < 0) { alert("CSV must have a Symbol column"); return; }
-                    const imported = [];
-                    for (let i = 1; i < lines.length; i++) {
-                      const vals = lines[i].match(/("(?:[^"]|"")*"|[^,]*)/g)?.map(v => v.replace(/^"|"$/g,"").replace(/""/g,'"').trim()) || [];
-                      const sym = vals[symIdx] || "";
-                      if (!sym) continue;
-                      imported.push({
-                        id: Date.now() + i, _lid: _lid++, sym: sym.toUpperCase(),
-                        entry: vals[entryIdx] || new Date().toLocaleDateString("en-US",{month:"numeric",day:"numeric",year:"2-digit"}),
-                        shares: vals[sharesIdx] || "", ep: vals[epIdx] || "", cp: vals[cpIdx] || "",
-                        stop: vals[s1Idx] || "", stop2: s2Idx >= 0 ? vals[s2Idx] || "" : "",
-                        trailStop: tsIdx >= 0 ? vals[tsIdx] || "" : "",
-                        setup: vals[setupIdx] || setupTypes[0] || "VCP",
-                        tags: tagsIdx >= 0 && vals[tagsIdx] ? vals[tagsIdx].split(";").map(t => t.trim()).filter(Boolean) : [],
-                        comm: commIdx >= 0 ? vals[commIdx] || "" : "",
-                        entryTime: entryTimeIdx >= 0 ? vals[entryTimeIdx] || "" : "",
-                      });
-                    }
-                    if (imported.length > 0) {
-                      setPositions(prev => { const next = [...prev, ...imported]; if (lastLoadedCountRef) lastLoadedCountRef.current = next.length; positionsRef.current = next; return next; });
-                      alert(`Imported ${imported.length} position${imported.length > 1 ? "s" : ""}`);
+                    const text = ev.target.result;
+                    // Detect master export format
+                    const master = parseMasterCSV(text);
+                    if (master) {
+                      if (master.positions.length > 0) {
+                        // Assign _lid for each position
+                        master.positions.forEach(p => { p._lid = _lid++; });
+                        setPositions(prev => { const next = [...prev, ...master.positions]; if (lastLoadedCountRef) lastLoadedCountRef.current = next.length; positionsRef.current = next; return next; });
+                      }
+                      if (master.trades.length > 0) {
+                        setJournaledTrades(prev => [...prev, ...master.trades]);
+                      }
+                      const parts = [];
+                      if (master.positions.length > 0) parts.push(`${master.positions.length} position${master.positions.length !== 1 ? "s" : ""}`);
+                      if (master.trades.length > 0) parts.push(`${master.trades.length} trade${master.trades.length !== 1 ? "s" : ""}`);
+                      if (parts.length > 0) {
+                        alert(`Master import: ${parts.join(" + ")} imported. Remember to Save.`);
+                      } else {
+                        alert("No valid data found in master export");
+                      }
                     } else {
-                      alert("No valid positions found in CSV");
+                      // Standard single-section CSV (positions only)
+                      const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+                      if (lines.length < 2) return;
+                      const hdr = lines[0].split(",").map(h => h.replace(/"/g,"").trim().toLowerCase());
+                      const symIdx = hdr.findIndex(h => /symbol|ticker/i.test(h));
+                      const entryIdx = hdr.findIndex(h => /entry.?date|date/i.test(h));
+                      const sharesIdx = hdr.findIndex(h => /shares|qty|quantity/i.test(h));
+                      const epIdx = hdr.findIndex(h => /entry.?price|avg.?cost|cost/i.test(h));
+                      const cpIdx = hdr.findIndex(h => /^current|^last|^market|^price$/i.test(h));
+                      const s1Idx = hdr.findIndex(h => /stop.?1|stop.?price|orig.?stop|stop$/i.test(h));
+                      const s2Idx = hdr.findIndex(h => /stop.?2/i.test(h));
+                      const tsIdx = hdr.findIndex(h => /trail/i.test(h));
+                      const setupIdx = hdr.findIndex(h => /setup/i.test(h));
+                      const tagsIdx = hdr.findIndex(h => /tags/i.test(h));
+                      const commIdx = hdr.findIndex(h => /commission|comm/i.test(h));
+                      const entryTimeIdx = hdr.findIndex(h => /entry.?time|time.?in/i.test(h));
+                      if (symIdx < 0) { alert("CSV must have a Symbol column"); return; }
+                      const imported = [];
+                      for (let i = 1; i < lines.length; i++) {
+                        const vals = lines[i].match(/("(?:[^"]|"")*"|[^,]*)/g)?.map(v => v.replace(/^"|"$/g,"").replace(/""/g,'"').trim()) || [];
+                        const sym = vals[symIdx] || "";
+                        if (!sym) continue;
+                        imported.push({
+                          id: Date.now() + i, _lid: _lid++, sym: sym.toUpperCase(),
+                          entry: vals[entryIdx] || new Date().toLocaleDateString("en-US",{month:"numeric",day:"numeric",year:"2-digit"}),
+                          shares: vals[sharesIdx] || "", ep: vals[epIdx] || "", cp: vals[cpIdx] || "",
+                          stop: vals[s1Idx] || "", stop2: s2Idx >= 0 ? vals[s2Idx] || "" : "",
+                          trailStop: tsIdx >= 0 ? vals[tsIdx] || "" : "",
+                          setup: vals[setupIdx] || setupTypes[0] || "VCP",
+                          tags: tagsIdx >= 0 && vals[tagsIdx] ? vals[tagsIdx].split(";").map(t => t.trim()).filter(Boolean) : [],
+                          comm: commIdx >= 0 ? vals[commIdx] || "" : "",
+                          entryTime: entryTimeIdx >= 0 ? vals[entryTimeIdx] || "" : "",
+                        });
+                      }
+                      if (imported.length > 0) {
+                        setPositions(prev => { const next = [...prev, ...imported]; if (lastLoadedCountRef) lastLoadedCountRef.current = next.length; positionsRef.current = next; return next; });
+                        alert(`Imported ${imported.length} position${imported.length > 1 ? "s" : ""}`);
+                      } else {
+                        alert("No valid positions found in CSV");
+                      }
                     }
                   } catch (err) { alert("Import error: " + err.message); }
                   e.target.value = "";
@@ -4053,7 +4171,7 @@ function AppInner() {
   const tradeSaveTimer = useRef(null);
 
   // ─── Dirty tracking: are there unsaved changes? ───
-  const hasPendingChanges = useRef(false); // set true when data changes, cleared after save completes
+  // hasPendingChanges removed — replaced by posDirty/tradesDirty refs
   useEffect(() => {
     const goOffline = () => { setIsOffline(true); console.warn("OFFLINE: saves will queue until connection returns."); };
     const goOnline = () => {
@@ -4163,7 +4281,7 @@ function AppInner() {
       lastSaveIdMap.current = idMap;
       lastLoadedCount.current = inserted.length;
       // Show "saved" indicator briefly
-      hasPendingChanges.current = false;
+      posDirty.current = false;
       setPositionSaveStatus("saved");
       if (positionSaveTimer.current) clearTimeout(positionSaveTimer.current);
       positionSaveTimer.current = setTimeout(() => setPositionSaveStatus(null), 2500);
@@ -4435,285 +4553,38 @@ function AppInner() {
   useEffect(() => { if (dataLoaded.current && !loadFailed.current && session) saveSettingNow(session.user.id, "target_rote", targetRote); }, [targetRote]);
 
   // ─── Auto-save positions to Supabase (debounced, with safety checks) ───
-  const posTimer = useRef(null);
-  const tradeTimer = useRef(null); // declared here so flush handlers below can access it
+  // posTimer/tradeTimer removed — no more autosave debouncing
   const lastLoadedCount = useRef(0); // track how many positions were loaded from DB
   const lastLoadedTradeCount = useRef(0); // track how many trades were loaded from DB — guards against accidental mass soft-delete
   const loadedSnapshot = useRef(new Map()); // snapshot of loaded data: id → {sym, ep, shares} — used to detect corruption before save
-  const positionsRef = useRef(positions); // always-current ref for beforeunload/visibilitychange handlers
-  const lastPosCountRef = useRef(positions.length); // track count changes for faster save on add/remove
-  positionsRef.current = positions; // sync on every render — no useEffect needed for refs
+  const positionsRef = useRef(positions); // always-current ref for unsaved-changes tracking
+  positionsRef.current = positions; // sync on every render
+  // Track dirty state — set true on any position/trade change, cleared on manual save
+  const posDirty = useRef(false);
+  const tradesDirty = useRef(false);
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
-    // Safety 0: if the initial data load had errors, NEVER autosave — prevents wiping DB after network failure
-    if (loadFailed.current) { console.warn("Autosave blocked: data load had errors. Refusing to save to prevent data loss."); return; }
-    // Skip autosave when positions changed only because of ID sync after a save (prevents infinite save loop)
     if (skipNextAutosave.current) { skipNextAutosave.current = false; return; }
-    // Safety 1: if we loaded N positions from DB but state is now empty, don't auto-delete everything.
-    if (positions.length === 0 && lastLoadedCount.current > 0) {
-      console.warn("Positions autosave blocked: state is empty but DB had", lastLoadedCount.current, "positions. Skipping to prevent data loss.");
-      return;
-    }
-    // Safety 2: Snapshot validation — if positions that had real data now have empty core fields, block save.
-    // This catches state corruption, race conditions, or re-renders with stale/zeroed state.
-    if (loadedSnapshot.current.size > 0 && positions.length > 0) {
-      let corruptCount = 0;
-      for (const pos of positions) {
-        const snap = loadedSnapshot.current.get(pos.id);
-        // Only flag if this position was loaded with real data (sym + ep both non-empty) but now both are empty
-        if (snap && snap.sym && snap.ep && !pos.sym && !pos.ep) {
-          corruptCount++;
-        }
-      }
-      // If >50% of loaded positions lost their core data, something is very wrong — block save
-      if (corruptCount > 0 && corruptCount >= Math.ceil(loadedSnapshot.current.size * 0.5)) {
-        console.error(`AUTOSAVE BLOCKED: ${corruptCount} positions have empty core data that was previously loaded with real values. Possible state corruption. NOT saving to prevent data loss.`);
-        return;
-      }
-    }
-    // Structural change (add/remove position) → save faster (300ms). Field edits → 500ms debounce.
-    // Previous 2000ms debounce was the #1 cause of data loss on refresh — user refreshes within 2s = data gone.
-    const isStructuralChange = positions.length !== lastPosCountRef.current;
-    lastPosCountRef.current = positions.length;
-    clearTimeout(posTimer.current);
-    hasPendingChanges.current = true; // mark dirty until save completes
-    posTimer.current = setTimeout(() => savePositionsNow(session.user.id, positions), isStructuralChange ? 300 : 500);
+    posDirty.current = true;
   }, [positions, session]);
 
-  // ─── Trades ref for emergency save (eagerly synced like positionsRef) ───
-  const journaledTradesRef = useRef(journaledTrades);
-  journaledTradesRef.current = journaledTrades; // sync on every render
-
-  // ─── CRITICAL: Flush pending saves on page unload / tab hide / blur ───
-  // Uses fetch with keepalive:true for GUARANTEED delivery even after page death.
-  // Regular supabase.from().insert() is async and browsers kill it during beforeunload.
-  const lastFlushTime = useRef(0); // prevent duplicate flushes within 200ms
+  // ─── Warn user before leaving with unsaved changes (NO auto-save, NO emergency save) ───
   useEffect(() => {
-    // Emergency save: uses raw fetch with keepalive:true — browser MUST complete this even after page dies.
-    // Does INSERT for positions, then DELETE for old rows — so deletions are not lost.
-    // Also saves pending new trades with a separate keepalive fetch.
-    const emergencySave = () => {
-      if (!dataLoaded.current || !session || loadFailed.current) return;
-      const pos = positionsRef.current;
-      // Deduplicate: don't fire within 200ms of last flush
-      const now = Date.now();
-      if (now - lastFlushTime.current < 200) return;
-      lastFlushTime.current = now;
-      // Cancel pending debounce timers
-      clearTimeout(posTimer.current);
-      clearTimeout(tradeTimer.current);
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'apikey': supabaseAnonKey,
-        'Authorization': `Bearer ${session.access_token}`,
-        'Prefer': 'return=minimal',
-      };
-
-      // --- POSITIONS emergency save ---
-      if (pos && pos.length > 0) {
-        const rows = pos.map(p => ({
-          user_id: session.user.id, symbol: p.sym || "", entry_date: p.entry || "", entry_time: p.entryTime || "", shares: p.shares || "",
-          entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
-          stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
-          commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
-          trade_type: p.tradeType || "Long",
-        }));
-
-        try {
-          // INSERT current positions (keepalive survives page death)
-          // NOTE: Do NOT delete old rows here. The INSERT and DELETE are fire-and-forget (keepalive),
-          // so there's a race condition: if DELETE arrives before INSERT completes, it kills the new rows.
-          // Instead, accept temporary duplicates — the dedup logic on next load (line 3143) cleans them up.
-          // This is safer: duplicates are harmless, data loss is not.
-          fetch(`${supabaseUrl}/rest/v1/positions`, {
-            method: 'POST', headers, body: JSON.stringify(rows), keepalive: true,
-          });
-        } catch (e) {
-          // Fallback: try regular async save (may not complete if page is dying)
-          savePositionsNow(session.user.id, pos);
-        }
-      } else if (pos && pos.length === 0 && lastLoadedCount.current === 0) {
-        // User intentionally has zero positions — delete all old rows
-        try {
-          fetch(`${supabaseUrl}/rest/v1/positions?user_id=eq.${session.user.id}`, {
-            method: 'DELETE', headers, keepalive: true,
-          });
-        } catch (e) { /* best effort */ }
-      }
-
-      // --- TRADES emergency save ---
-      // Save new trades (INSERT) and edited existing trades (UPSERT) via keepalive.
-      const trades = journaledTradesRef.current;
-      if (trades && trades.length > 0) {
-        const uid = session.user.id;
-        // New trades: temp IDs are Date.now() based (> 1 billion)
-        const newTrades = trades.filter(t => t.id > 1000000000);
-        if (newTrades.length > 0) {
-          const tradeRows = newTrades.map(t => ({
-            user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", entry_time: t.entryTime || "", exit_date: t.exit || "", exit_time: t.exitTime || "",
-            entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
-            stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
-            pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
-            exit_reason: t.reason || "", commission: t.commission != null ? Number(t.commission) : null, notes: t.notes || "",
-            chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
-          }));
-          try {
-            fetch(`${supabaseUrl}/rest/v1/trades`, {
-              method: 'POST', headers, body: JSON.stringify(tradeRows), keepalive: true,
-            });
-          } catch (e) { /* best effort */ }
-        }
-        // Existing trades: PATCH each with real DB IDs to catch any unsaved edits.
-        // Cannot use upsert (POST with on_conflict) because trades.id is GENERATED ALWAYS.
-        // keepalive PATCH requests are small (~500 bytes each), safe for page-death scenario.
-        const existingTrades = trades.filter(t => t.id <= 1000000000 && typeof t.id === 'number');
-        for (const t of existingTrades) {
-          try {
-            const updateBody = JSON.stringify({
-              ticker: t.ticker || "", entry_date: t.entry || "", entry_time: t.entryTime || "", exit_date: t.exit || "", exit_time: t.exitTime || "",
-              entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
-              stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
-              pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
-              exit_reason: t.reason || "", commission: t.commission != null ? Number(t.commission) : null, notes: t.notes || "",
-              chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
-            });
-            fetch(`${supabaseUrl}/rest/v1/trades?id=eq.${t.id}`, {
-              method: 'PATCH', headers, body: updateBody, keepalive: true,
-            });
-          } catch (e) { /* best effort */ }
-        }
-      }
-
-      // --- OFFLINE FALLBACK: persist to localStorage so data survives tab close without network ---
-      if (!navigator.onLine && pos && pos.length > 0) {
-        try {
-          localStorage.setItem(`viv_emergency_positions_${session.user.id}`, JSON.stringify(pos));
-        } catch (e) { /* localStorage might be full or disabled */ }
-      }
-    };
-
-    // Normal flush for visibility changes (page is still alive, async save will complete)
-    const normalFlush = () => {
-      if (!dataLoaded.current || !session || loadFailed.current) return;
-      const pos = positionsRef.current;
-      if (!pos || pos.length === 0) return;
-      clearTimeout(posTimer.current);
-      // NOTE: do NOT clear tradeTimer — let pending trade saves complete on their own.
-      // Clearing it would lose unsaved trade edits with no way to re-trigger.
-      savePositionsNow(session.user.id, pos);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") normalFlush();
-    };
-
-    // Warn user before closing if there are unsaved changes
-    const warnBeforeClose = (e) => {
-      if (hasPendingChanges.current || isSaving.current) {
+    const handleBeforeUnload = (e) => {
+      if (posDirty.current || tradesDirty.current) {
         e.preventDefault();
-        e.returnValue = "You have unsaved changes. Are you sure you want to leave?";
+        e.returnValue = "You have unsaved changes. Click Save before leaving!";
         return e.returnValue;
       }
     };
-
-    // beforeunload: warn + emergency save. pagehide: emergency save only.
-    const handleBeforeUnload = (e) => {
-      warnBeforeClose(e);
-      emergencySave();
-    };
     window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("pagehide", emergencySave);
-    // visibilitychange: page is still alive (tab switch) — use normal async save
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    // blur: user clicked outside app (address bar, refresh button) — save immediately while page is still alive
-    window.addEventListener("blur", normalFlush);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("pagehide", emergencySave);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("blur", normalFlush);
-    };
-  }, [session]);
-
-  // ─── Auto-save journaled trades to Supabase (handles inserts, edits, and deletes) ───
-  const tradeHashRef = useRef(""); // track content changes, not just count
+  // ─── Trades dirty tracking (NO auto-save) ───
   useEffect(() => {
     if (!dataLoaded.current || !session) return;
-    // Build a lightweight hash of trade state to detect ANY change (add, edit, delete)
-    const hash = journaledTrades.map(t => `${t.id}|${t.ticker}|${t.entry}|${t.entryTime||""}|${t.exit}|${t.exitTime||""}|${t.entryP}|${t.exitP}|${t.shares}|${t.stop}|${t.setup}|${(t.tags||[]).join(",")}|${t.reason}|${t.notes}|${t.chartUrl||""}|${t.chartImage||""}`).join("##");
-    if (hash === tradeHashRef.current) return; // no change
-    tradeHashRef.current = hash;
-    hasPendingChanges.current = true; // mark dirty until trade save completes
-
-    clearTimeout(tradeTimer.current);
-    tradeTimer.current = setTimeout(async () => {
-      const uid = session.user.id;
-      try {
-        // Get existing DB trades
-        const { data: existing } = await supabase.from("trades").select("id").eq("user_id", uid).eq("is_deleted", false);
-        const existingIds = new Set((existing || []).map(t => t.id));
-        const currentIds = new Set(journaledTrades.filter(t => existingIds.has(t.id)).map(t => t.id));
-
-        // Insert new trades (not in DB)
-        const newTrades = journaledTrades.filter(t => !existingIds.has(t.id));
-        let didInsert = false;
-        if (newTrades.length > 0) {
-          const tradeRow = t => ({
-            user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", entry_time: t.entryTime || "", exit_date: t.exit || "", exit_time: t.exitTime || "",
-            entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
-            stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
-            pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
-            exit_reason: t.reason || "", commission: t.commission != null ? Number(t.commission) : null, notes: t.notes || "",
-            chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
-          });
-          const { data: inserted, error } = await supabase.from("trades").insert(newTrades.map(tradeRow)).select("id");
-          if (error) { console.error("Trade insert error:", error.message); return; }
-          didInsert = true;
-          // Sync IDs for newly inserted trades
-          if (inserted && inserted.length === newTrades.length) {
-            setJournaledTrades(prev => {
-              const newIdMap = new Map();
-              newTrades.forEach((t, i) => { if (inserted[i]) newIdMap.set(t.id, inserted[i].id); });
-              return prev.map(t => newIdMap.has(t.id) ? { ...t, id: newIdMap.get(t.id) } : t);
-            });
-          }
-        }
-
-        // Update existing trades that were edited (individual updates — upsert fails because id column is GENERATED ALWAYS)
-        const editedTrades = journaledTrades.filter(t => existingIds.has(t.id));
-        if (editedTrades.length > 0) {
-          const updateResults = await Promise.all(editedTrades.map(t =>
-            supabase.from("trades").update({
-              ticker: t.ticker || "", entry_date: t.entry || "", entry_time: t.entryTime || "", exit_date: t.exit || "", exit_time: t.exitTime || "",
-              entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
-              stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
-              pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
-              exit_reason: t.reason || "", notes: t.notes || "",
-              chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
-            }).eq("id", t.id)
-          ));
-          updateResults.forEach((r, i) => { if (r.error) console.error("Trade update error:", editedTrades[i].id, r.error.message); });
-        }
-
-        // Soft-delete trades removed from state — SKIP if we just inserted (IDs haven't synced yet)
-        if (didInsert) return; // let the next autosave cycle handle deletes after IDs are stable
-        // Safety guard: if journaledTrades is empty but DB had trades, block mass soft-delete (mirrors position guard)
-        if (journaledTrades.length === 0 && lastLoadedTradeCount.current > 0) {
-          console.error("Trade autosave: state is empty but DB had", lastLoadedTradeCount.current, "trades — BLOCKING mass soft-delete to prevent data loss.");
-          return;
-        }
-        const deletedIds = [...existingIds].filter(id => !currentIds.has(id));
-        if (deletedIds.length > 0) {
-          await supabase.from("trades").update({ is_deleted: true }).in("id", deletedIds);
-        }
-        lastLoadedTradeCount.current = journaledTrades.length; // keep in sync after successful save
-        hasPendingChanges.current = false; // trade save completed
-      } catch (err) {
-        console.error("Trade save failed:", err.message);
-      }
-    }, 500);
+    tradesDirty.current = true;
   }, [journaledTrades, session]);
 
   // ─── Manual trade save (bypasses debounce, reuses same logic) ───
@@ -4760,7 +4631,7 @@ function AppInner() {
           return;
         }
       }
-      hasPendingChanges.current = false;
+      tradesDirty.current = false;
       setTradeSaveStatus("saved");
       if (tradeSaveTimer.current) clearTimeout(tradeSaveTimer.current);
       tradeSaveTimer.current = setTimeout(() => setTradeSaveStatus(null), 2500);
