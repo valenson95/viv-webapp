@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
+import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from "recharts";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 
 // ─── Error Boundary — catches rendering crashes so the page doesn't go blank ───
@@ -1011,11 +1011,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const [eqYAxis, setEqYAxis] = useState("$"); // "$" or "%"
   const [eqXAxis, setEqXAxis] = useState("trades"); // "trades" or "months"
   const [distExpanded, setDistExpanded] = useState(false); // expand/collapse distribution analysis
-  const [hypoOpen, setHypoOpen] = useState(false); // hypothetical scenario simulator
-  const [hypo, setHypo] = useState({ winRate: "", avgGain: "", avgLoss: "", totalTrades: "" }); // override fields
-  const [hypoCap, setHypoCap] = useState(""); // Cap Losses at X%
-  const [hypoMode, setHypoMode] = useState("override"); // "override" | "cap" | "custom"
-  const [hypoCustom, setHypoCustom] = useState([]); // [{pct:"", count:"", side:"win"}, ...] custom distribution rows
+  const distRef = useRef(null); // scroll target for full Distribution section
+  const [distMode, setDistMode] = useState("actual"); // "actual" | "cap" | "cleared"
+  const [distCapVal, setDistCapVal] = useState(""); // Cap Losses at X%
   // perfToggle removed — monthly tracker now shows all stats inline
 
   // Ref to always hold the latest onManualSave — fixes stale closure when
@@ -1136,86 +1134,54 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     return { barData, tableData, drmaData, gainMag, lossMag, returnPerTrade: cumDRMA };
   }, [filtered]);
 
-  // Hypothetical scenario stats — supports 3 modes: override, cap losses, custom distribution
-  const hypoStats = useMemo(() => {
-    if (hypoMode === "cap") {
-      // Cap Losses: clamp all losses at -capPct%, recompute everything
-      const capVal = parseFloat(hypoCap);
-      if (isNaN(capVal) || capVal <= 0) return null;
-      const trades = filtered;
-      if (trades.length === 0) return null;
-      const cappedTrades = trades.map(t => {
-        if (t.plPct <= 0 && Math.abs(t.plPct) > capVal) return { ...t, plPct: -capVal };
-        return t;
-      });
-      const wins = cappedTrades.filter(t => t.plPct > 0);
-      const losses = cappedTrades.filter(t => t.plPct <= 0);
-      const total = cappedTrades.length;
-      const wr = (wins.length / total) * 100;
-      const ag = wins.length > 0 ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
-      const al = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.plPct, 0) / losses.length) : 0;
-      const glRatio = al > 0 ? ag / al : 0;
-      const adjustedGL = al > 0 ? ((wr / 100) * ag) / (((100 - wr) / 100) * al) : 0;
-      const ev = (wr / 100) * ag - ((100 - wr) / 100) * al;
-      // Also rebuild distribution for capped scenario
-      const maxAbs = Math.max(...cappedTrades.map(t => Math.abs(t.plPct)));
-      const bHi = Math.max(Math.ceil(maxAbs / 2) * 2, 20);
-      const bkts = [];
-      for (let i = 0; i < bHi; i += 2) bkts.push({ lo: i, hi: i + 2, gains: 0, losses: 0, gainPcts: [], lossPcts: [] });
-      cappedTrades.forEach(t => {
-        const abs = Math.abs(t.plPct);
-        const idx = Math.max(0, Math.min(bkts.length - 1, Math.floor(abs / 2)));
-        if (t.plPct > 0) { bkts[idx].gains++; bkts[idx].gainPcts.push(t.plPct); }
-        else { bkts[idx].losses++; bkts[idx].lossPcts.push(t.plPct); }
-      });
-      let cumD = 0;
-      const tblData = bkts.map(b => {
-        const gP = (b.gains / total) * 100, lP = (b.losses / total) * 100;
-        const netP = ((b.gains - b.losses) / total) * 100;
-        const bkRet = [...b.gainPcts, ...b.lossPcts].reduce((s, v) => s + v, 0) / total;
-        cumD += bkRet;
-        return { range: `${b.lo} - ${b.hi}%`, lo: b.lo, gains: b.gains, losses: b.losses, gPct: gP, lPct: lP, netPct: netP, drma: cumD, bucketRetContrib: bkRet };
-      });
-      const barD = bkts.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: b.losses }));
-      return { winRate: wr, avgGain: ag, avgLoss: al, total, wins: wins.length, losses: losses.length, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, ev, tableData: tblData, barData: barD, mode: "cap" };
+  // Active distribution data — handles actual, cap losses, and cleared modes
+  const activeDistData = useMemo(() => {
+    if (distMode === "cleared") return { barData: [], tableData: [], drmaData: [], gainMag: [], lossMag: [], returnPerTrade: 0, stats: null };
+    let trades = filtered;
+    if (distMode === "cap") {
+      const capVal = parseFloat(distCapVal);
+      if (!isNaN(capVal) && capVal > 0) {
+        trades = trades.map(t => t.plPct <= 0 && Math.abs(t.plPct) > capVal ? { ...t, plPct: -capVal } : t);
+      }
     }
-    if (hypoMode === "custom" && hypoCustom.length > 0) {
-      // Custom distribution: user specifies rows of {pct, count, side}
-      const validRows = hypoCustom.filter(r => r.pct !== "" && r.count !== "" && !isNaN(parseFloat(r.pct)) && !isNaN(parseInt(r.count)));
-      if (validRows.length === 0) return null;
-      let allPcts = [];
-      validRows.forEach(r => {
-        const pct = parseFloat(r.pct);
-        const count = parseInt(r.count);
-        for (let i = 0; i < count; i++) allPcts.push(r.side === "win" ? Math.abs(pct) : -Math.abs(pct));
-      });
-      const total = allPcts.length;
-      if (total === 0) return null;
-      const wins = allPcts.filter(p => p > 0);
-      const losses = allPcts.filter(p => p <= 0);
-      const wr = (wins.length / total) * 100;
-      const ag = wins.length > 0 ? wins.reduce((s, v) => s + v, 0) / wins.length : 0;
-      const al = losses.length > 0 ? Math.abs(losses.reduce((s, v) => s + v, 0) / losses.length) : 0;
-      const glRatio = al > 0 ? ag / al : 0;
-      const adjustedGL = al > 0 ? ((wr / 100) * ag) / (((100 - wr) / 100) * al) : 0;
-      const ev = (wr / 100) * ag - ((100 - wr) / 100) * al;
-      return { winRate: wr, avgGain: ag, avgLoss: al, total, wins: wins.length, losses: losses.length, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, ev, mode: "custom" };
-    }
-    // Default: override mode
-    const wr = hypo.winRate !== "" ? parseFloat(hypo.winRate) : stats.ba;
-    const ag = hypo.avgGain !== "" ? parseFloat(hypo.avgGain) : stats.avgGain;
-    const al = hypo.avgLoss !== "" ? parseFloat(hypo.avgLoss) : stats.avgLoss;
-    const tt = hypo.totalTrades !== "" ? parseInt(hypo.totalTrades) : stats.total;
-    if (isNaN(wr) || isNaN(ag) || isNaN(al) || isNaN(tt)) return null;
-    const winCount = Math.round(tt * (wr / 100));
-    const lossCount = tt - winCount;
-    const glRatio = al > 0 ? ag / al : 0;
-    const adjDenom = ((100 - wr) / 100) * al;
-    const adjustedGL = adjDenom > 0 ? ((wr / 100) * ag) / adjDenom : (ag > 0 ? Infinity : 0);
-    const ev = (wr / 100) * ag - ((100 - wr) / 100) * al;
-    const estPL = tt * ev / 100;
-    return { winRate: wr, avgGain: ag, avgLoss: al, total: tt, wins: winCount, losses: lossCount, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, ev, estPL, mode: "override" };
-  }, [hypo, hypoCap, hypoMode, hypoCustom, stats, filtered]);
+    const total = trades.length;
+    if (total === 0) return { barData: [], tableData: [], drmaData: [], gainMag: [], lossMag: [], returnPerTrade: 0, stats: null };
+    const wins = trades.filter(t => t.plPct > 0), losses = trades.filter(t => t.plPct <= 0);
+    const ba = (wins.length / total) * 100;
+    const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.plPct, 0) / losses.length) : 0;
+    const glRatio = avgLoss > 0 ? avgGain / avgLoss : 0;
+    const adjustedGL = avgLoss > 0 ? ((ba / 100) * avgGain) / (((100 - ba) / 100) * avgLoss) : 0;
+    const ev = (ba / 100) * avgGain - ((100 - ba) / 100) * avgLoss;
+    const maxAbsPct = Math.max(...trades.map(t => Math.abs(t.plPct)));
+    const bucketHi = Math.max(Math.ceil(maxAbsPct / 2) * 2, 20);
+    const buckets = [];
+    for (let i = 0; i < bucketHi; i += 2) buckets.push({ lo: i, hi: i + 2, range: `${i} - ${i+2}%`, gains: 0, losses: 0, gainPcts: [], lossPcts: [] });
+    trades.forEach(t => {
+      const absPct = Math.abs(t.plPct);
+      const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor(absPct / 2)));
+      if (t.plPct > 0) { buckets[idx].gains++; buckets[idx].gainPcts.push(t.plPct); }
+      else { buckets[idx].losses++; buckets[idx].lossPcts.push(t.plPct); }
+    });
+    const barData = buckets.map(b => ({ range: `${b.lo}%`, gains: b.gains, losses: -b.losses }));
+    let cumDRMA = 0;
+    const tableData = buckets.map(b => {
+      const gPct = total > 0 ? (b.gains / total) * 100 : 0;
+      const lPct = total > 0 ? (b.losses / total) * 100 : 0;
+      const netPct = total > 0 ? ((b.gains - b.losses) / total) * 100 : 0;
+      const bucketRetContrib = [...b.gainPcts, ...b.lossPcts].reduce((s, v) => s + v, 0) / (total || 1);
+      cumDRMA += bucketRetContrib;
+      return { range: b.range, lo: b.lo, gains: b.gains, losses: b.losses, gPct, lPct, netPct, drma: cumDRMA, bucketRetContrib };
+    });
+    const drmaData = tableData.map(r => ({ range: `${r.lo}%`, contribution: r.bucketRetContrib }));
+    const gainMag = buckets.map(b => ({ range: `${b.lo}%`, count: b.gains }));
+    const lossMag = buckets.map(b => ({ range: `${b.lo}%`, count: b.losses }));
+    const cappedCount = distMode === "cap" && distCapVal !== "" ? filtered.filter(t => t.plPct <= 0 && Math.abs(t.plPct) > parseFloat(distCapVal || 999)).length : 0;
+    return {
+      barData, tableData, drmaData, gainMag, lossMag, returnPerTrade: cumDRMA, cappedCount,
+      stats: { ba, avgGain, avgLoss, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, ev, total, wins: wins.length, losses: losses.length }
+    };
+  }, [filtered, distMode, distCapVal]);
 
   // Equity curve data — supports $ vs % and trades vs months
   const equityData = useMemo(() => {
@@ -1534,265 +1500,26 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
             })()}
           </ResponsiveContainer>
         </GlassCard>
-        {/* ─── Distribution Analysis ─── */}
-        <GlassCard style={{ padding: "18px 22px" }}>
-          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,cursor:"pointer" }} onClick={()=>setDistExpanded(e=>!e)}>
+        {/* ─── Distribution Analysis Preview ─── */}
+        <GlassCard style={{ padding: "18px 22px", cursor:"pointer" }} onClick={() => { setDistExpanded(true); setTimeout(() => distRef.current?.scrollIntoView({ behavior:"smooth", block:"start" }), 100); }}>
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
             <div style={{ fontWeight: 800, fontSize: "0.88rem", color: C.white, letterSpacing:"-0.02em" }}>Distribution</div>
             <div style={{ display:"flex",alignItems:"center",gap:12 }}>
               {distAnalysis.returnPerTrade !== undefined && <span style={{ fontSize:"0.64rem",color:C.muted }}>Return/Trade: <span style={{ color: distAnalysis.returnPerTrade >= 0 ? C.green : C.red, fontWeight:700 }}>{distAnalysis.returnPerTrade.toFixed(2)}%</span></span>}
-              <span style={{ color:C.muted,fontSize:"0.70rem",transition:"transform 0.2s",transform:distExpanded?"rotate(180deg)":"rotate(0deg)" }}>▼</span>
+              <span style={{ color:C.muted,fontSize:"0.70rem" }}>▼</span>
             </div>
           </div>
-
-          {distExpanded && <>
-            {/* ── Summary Card (3x2 grid matching M360) ── */}
-            <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"16px 22px",marginBottom:24 }}>
-              <div style={{ fontSize:"0.62rem",fontWeight:700,color:C.white,marginBottom:12 }}>Summary</div>
-              <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px 32px" }}>
-                {[
-                  { label:"Total # of Trades:", val: stats.total },
-                  { label:"Average Gain:", val: `${stats.avgGain.toFixed(2)}%` },
-                  { label:"# of Wins:", val: filtered.filter(t=>t.plPct>0).length },
-                  { label:"Win Rate:", val: `${stats.ba.toFixed(2)}%` },
-                  { label:"Average Loss:", val: `${stats.avgLoss.toFixed(2)}%` },
-                  { label:"# of Losses:", val: filtered.filter(t=>t.plPct<=0).length },
-                  { label:"Return Per Trade:", val: `${(distAnalysis.returnPerTrade||0).toFixed(2)}%`, color: (distAnalysis.returnPerTrade||0) >= 0 ? C.green : C.red },
-                  { label:"Win/Loss Ratio:", val: stats.glRatio.toFixed(2) },
-                  { label:"Adjusted Win/Loss Ratio:", val: stats.adjustedGL.toFixed(2) },
-                ].map((s,i) => (
-                  <div key={i} style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                    <span style={{ fontSize:"0.62rem",color:C.muted }}>{s.label}</span>
-                    <span style={{ fontSize:"0.68rem",fontWeight:700,color:s.color||C.white }}>{s.val}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Two-column layout: Charts (left) + Table (right) ── */}
-            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:24 }}>
-              {/* LEFT COLUMN — Charts */}
-              <div>
-                {/* Gains and Losses */}
-                <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
-                  <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:10 }}>Gains and Losses</div>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={distAnalysis.barData} barGap={0} barCategoryGap="20%">
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                      <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
-                      <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} allowDecimals={false} />
-                      <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[v,name==="gains"?"Wins":"Losses"]} />
-                      <Bar dataKey="gains" fill={C.green} radius={[2,2,0,0]} />
-                      <Bar dataKey="losses" fill={C.red} radius={[2,2,0,0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* DRMA Curve */}
-                <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
-                  <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:2 }}>DRMA Curve <span style={{ fontWeight:400,fontSize:"0.52rem",color:C.muted }}>(Distribution Return Moving Average)</span></div>
-                  <div style={{ fontSize:"0.48rem",color:C.muted,marginBottom:10 }}>Cumulative return contribution by trade magnitude. Shows where in the % range your system makes or loses money. Converges to your Return Per Trade.</div>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <AreaChart data={distAnalysis.drmaData}>
-                      <defs>
-                        <linearGradient id="drmaGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={C.gold} stopOpacity={0.3} />
-                          <stop offset="100%" stopColor={C.gold} stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                      <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
-                      <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>`${v.toFixed(1)}%`} />
-                      <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[`${Number(v).toFixed(2)}%`,name==="drma"?"DRMA":"Net"]} />
-                      <ReferenceLine y={0} stroke={C.border} />
-                      <Area type="monotone" dataKey="drma" stroke={C.gold} strokeWidth={2} fill="url(#drmaGrad)" dot={{fill:C.gold,r:3}} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Gain & Loss Magnitude side by side */}
-                <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
-                  <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 14px" }}>
-                    <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.white,marginBottom:2 }}>Gain Magnitude</div>
-                    <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your winning trades cluster by size.</div>
-                    <ResponsiveContainer width="100%" height={150}>
-                      <BarChart data={distAnalysis.gainMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Wins"]} /><Bar dataKey="count" fill={C.green} radius={[2,2,0,0]} /></BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 14px" }}>
-                    <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.white,marginBottom:2 }}>Loss Magnitude</div>
-                    <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your losing trades cluster by size.</div>
-                    <ResponsiveContainer width="100%" height={150}>
-                      <BarChart data={distAnalysis.lossMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Losses"]} /><Bar dataKey="count" fill={C.red} radius={[2,2,0,0]} /></BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT COLUMN — Distribution Table */}
-              <div>
-                <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",height:"100%",overflowY:"auto" }}>
-                  <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.68rem" }}>
-                    <thead>
-                      <tr style={{ borderBottom:`1px solid ${C.border}` }}>
-                        {["Range","# Gains","# Losses","↑ %","↓ %","Net","DRMA"].map(h => (
-                          <th key={h} style={{ padding:"8px 6px",textAlign:h==="Range"?"left":"center",fontWeight:700,fontSize:"0.54rem",color:C.white,whiteSpace:"nowrap",borderBottom:`2px solid ${C.border}` }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {distAnalysis.tableData.map((r, i) => {
-                        const hasData = r.gains > 0 || r.losses > 0;
-                        return (
-                          <tr key={i} style={{ borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
-                            <td style={{ padding:"6px 6px",color:C.white,fontWeight:600,fontSize:"0.66rem" }}>{r.range}</td>
-                            <td style={{ padding:"6px 6px",textAlign:"center",color:hasData?C.white:C.muted,fontWeight:600 }}>{r.gains}</td>
-                            <td style={{ padding:"6px 6px",textAlign:"center",color:hasData?C.white:C.muted,fontWeight:600 }}>{r.losses}</td>
-                            {hasData ? <>
-                              <td style={{ padding:"6px 6px",textAlign:"center",color:C.muted }}>{Math.round(r.gPct)}%</td>
-                              <td style={{ padding:"6px 6px",textAlign:"center",color:C.muted }}>{Math.round(r.lPct)}%</td>
-                              <td style={{ padding:"6px 6px",textAlign:"center",color:r.netPct>0?C.green:r.netPct<0?C.red:C.text,fontWeight:700 }}>{r.netPct.toFixed(2)}%</td>
-                              <td style={{ padding:"6px 6px",textAlign:"center",color:r.bucketRetContrib>=0?C.green:C.red,fontWeight:700 }}>{r.bucketRetContrib.toFixed(2)}</td>
-                            </> : <>
-                              <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
-                              <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
-                              <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
-                              <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
-                            </>}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* ─── Hypothetical Scenario Simulator ─── */}
-            <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"16px 20px" }}>
-              <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:hypoOpen?14:0,cursor:"pointer" }} onClick={()=>setHypoOpen(h=>!h)}>
-                <div style={{ fontSize:"0.68rem",fontWeight:700,color:C.gold }}>Hypothetical Scenario Simulator</div>
-                <span style={{ color:C.muted,fontSize:"0.60rem",transition:"transform 0.2s",transform:hypoOpen?"rotate(180deg)":"rotate(0deg)" }}>▼</span>
-              </div>
-              {hypoOpen && (
-                <div>
-                  {/* Mode tabs */}
-                  <div style={{ display:"flex",gap:6,marginBottom:16 }}>
-                    {[
-                      { key:"override", label:"Override Stats" },
-                      { key:"cap", label:"Cap Losses" },
-                      { key:"custom", label:"Custom Distribution" },
-                    ].map(m => (
-                      <button key={m.key} onClick={() => setHypoMode(m.key)} style={{ padding:"6px 14px",borderRadius:8,border:`1px solid ${hypoMode===m.key?C.gold:C.border}`,background:hypoMode===m.key?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.03)",color:hypoMode===m.key?C.gold:C.muted,fontSize:"0.56rem",fontWeight:700,cursor:"pointer",fontFamily:font,transition:"all 0.15s" }}>{m.label}</button>
-                    ))}
-                  </div>
-
-                  {/* ── Override Stats Mode ── */}
-                  {hypoMode === "override" && <>
-                    <div style={{ fontSize:"0.52rem",color:C.muted,marginBottom:14,lineHeight:1.6 }}>Override any stat to model a different scenario. Leave blank to keep your actual value.</div>
-                    <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16 }}>
-                      {[
-                        { label:"Win Rate %", key:"winRate", actual:stats.ba.toFixed(2) },
-                        { label:"Avg Gain %", key:"avgGain", actual:stats.avgGain.toFixed(2) },
-                        { label:"Avg Loss %", key:"avgLoss", actual:stats.avgLoss.toFixed(2) },
-                        { label:"Total Trades", key:"totalTrades", actual:stats.total },
-                      ].map(f => (
-                        <div key={f.key}>
-                          <div style={{ fontSize:"0.50rem",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>{f.label}</div>
-                          <input type="number" step="any" placeholder={String(f.actual)} value={hypo[f.key]} onChange={e => setHypo(h => ({ ...h, [f.key]: e.target.value }))} style={{ width:"100%",padding:"8px 10px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none" }} />
-                          <div style={{ fontSize:"0.46rem",color:C.muted,marginTop:3 }}>Actual: {f.actual}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </>}
-
-                  {/* ── Cap Losses Mode ── */}
-                  {hypoMode === "cap" && <>
-                    <div style={{ fontSize:"0.52rem",color:C.muted,marginBottom:14,lineHeight:1.6 }}>Cap all losses at a maximum percentage. Shows how your stats would look if no single trade lost more than the cap. Uses your actual trade data.</div>
-                    <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:16 }}>
-                      <div>
-                        <div style={{ fontSize:"0.50rem",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Max Loss %</div>
-                        <input type="number" step="0.5" min="0.5" placeholder={stats.avgLoss.toFixed(1)} value={hypoCap} onChange={e => setHypoCap(e.target.value)} style={{ width:120,padding:"8px 10px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none" }} />
-                        <div style={{ fontSize:"0.46rem",color:C.muted,marginTop:3 }}>Your worst loss: {Math.abs(stats.largestLoss||0).toFixed(2)}%</div>
-                      </div>
-                      {hypoCap !== "" && <div style={{ fontSize:"0.52rem",color:C.gold,marginTop:12 }}>
-                        {filtered.filter(t => t.plPct <= 0 && Math.abs(t.plPct) > parseFloat(hypoCap||999)).length} trades would be capped
-                      </div>}
-                    </div>
-                  </>}
-
-                  {/* ── Custom Distribution Mode ── */}
-                  {hypoMode === "custom" && <>
-                    <div style={{ fontSize:"0.52rem",color:C.muted,marginBottom:14,lineHeight:1.6 }}>Build a custom trade distribution. Specify the % gain/loss and number of trades for each row to model any scenario.</div>
-                    <div style={{ marginBottom:12 }}>
-                      {hypoCustom.map((row, i) => (
-                        <div key={i} style={{ display:"flex",gap:8,alignItems:"center",marginBottom:6 }}>
-                          <select value={row.side} onChange={e => setHypoCustom(prev => prev.map((r,j) => j===i ? {...r, side:e.target.value} : r))} style={{ padding:"6px 8px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:8,color:row.side==="win"?C.green:C.red,fontSize:"0.64rem",fontFamily:font,outline:"none",cursor:"pointer" }}>
-                            <option value="win">Win</option>
-                            <option value="loss">Loss</option>
-                          </select>
-                          <input type="number" step="0.5" min="0" placeholder="%" value={row.pct} onChange={e => setHypoCustom(prev => prev.map((r,j) => j===i ? {...r, pct:e.target.value} : r))} style={{ width:80,padding:"6px 8px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:"0.64rem",fontFamily:font,outline:"none" }} />
-                          <span style={{ fontSize:"0.52rem",color:C.muted }}>% ×</span>
-                          <input type="number" step="1" min="1" placeholder="#" value={row.count} onChange={e => setHypoCustom(prev => prev.map((r,j) => j===i ? {...r, count:e.target.value} : r))} style={{ width:60,padding:"6px 8px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:"0.64rem",fontFamily:font,outline:"none" }} />
-                          <span style={{ fontSize:"0.52rem",color:C.muted }}>trades</span>
-                          <button onClick={() => setHypoCustom(prev => prev.filter((_,j) => j!==i))} style={{ padding:"4px 8px",background:"rgba(239,68,68,0.1)",border:"none",borderRadius:6,color:C.red,fontSize:"0.60rem",cursor:"pointer",fontFamily:font }}>×</button>
-                        </div>
-                      ))}
-                      <button onClick={() => setHypoCustom(prev => [...prev, { pct:"", count:"", side:"win" }])} style={{ padding:"6px 14px",background:"rgba(201,152,42,0.1)",border:`1px solid ${C.borderGold||"rgba(201,152,42,0.22)"}`,borderRadius:8,color:C.gold,fontSize:"0.56rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>+ Add Row</button>
-                    </div>
-                  </>}
-
-                  {/* ── Results (all modes) ── */}
-                  {hypoStats && (
-                    <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:12 }}>
-                      {[
-                        { label:"Win Rate", val:`${hypoStats.winRate.toFixed(2)}%`, color: C.text },
-                        { label:"Avg Gain", val:`${hypoStats.avgGain.toFixed(2)}%`, color: C.green },
-                        { label:"Avg Loss", val:`${hypoStats.avgLoss.toFixed(2)}%`, color: C.red },
-                        { label:"Win/Loss Ratio", val:hypoStats.glRatio.toFixed(2), color: C.text },
-                        { label:"Adj. W/L Ratio", val:hypoStats.adjustedGL.toFixed(2), color:hypoStats.adjustedGL>=1?C.green:C.red },
-                        { label:"Return Per Trade", val:`${hypoStats.ev.toFixed(2)}%`, color:hypoStats.ev>=0?C.green:C.red },
-                        { label:"Wins / Losses", val:`${hypoStats.wins}W / ${hypoStats.losses}L`, color:C.text },
-                        { label:"Total Trades", val:hypoStats.total, color:C.text },
-                      ].map(s => (
-                        <div key={s.label} style={{ background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"10px 12px" }}>
-                          <div style={{ fontSize:"0.46rem",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>{s.label}</div>
-                          <div style={{ fontSize:"0.80rem",fontWeight:800,color:s.color }}>{s.val}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* ── Cap Losses distribution table (shows modified distribution) ── */}
-                  {hypoStats && hypoStats.mode === "cap" && hypoStats.tableData && (
-                    <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px",marginBottom:12 }}>
-                      <div style={{ fontSize:"0.56rem",fontWeight:700,color:C.white,marginBottom:8 }}>Capped Distribution</div>
-                      <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.62rem" }}>
-                        <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-                          {["Range","# Gains","# Losses","Net","DRMA"].map(h => (
-                            <th key={h} style={{ padding:"6px 4px",textAlign:h==="Range"?"left":"center",fontWeight:700,fontSize:"0.50rem",color:C.white,borderBottom:`2px solid ${C.border}` }}>{h}</th>
-                          ))}
-                        </tr></thead>
-                        <tbody>{hypoStats.tableData.filter(r => r.gains > 0 || r.losses > 0).map((r,i) => (
-                          <tr key={i} style={{ borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
-                            <td style={{ padding:"5px 4px",color:C.white,fontWeight:600 }}>{r.range}</td>
-                            <td style={{ padding:"5px 4px",textAlign:"center",color:C.white }}>{r.gains}</td>
-                            <td style={{ padding:"5px 4px",textAlign:"center",color:C.white }}>{r.losses}</td>
-                            <td style={{ padding:"5px 4px",textAlign:"center",color:r.netPct>0?C.green:r.netPct<0?C.red:C.text,fontWeight:700 }}>{r.netPct.toFixed(2)}%</td>
-                            <td style={{ padding:"5px 4px",textAlign:"center",color:r.bucketRetContrib>=0?C.green:C.red,fontWeight:700 }}>{r.bucketRetContrib.toFixed(2)}</td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {/* Clear button */}
-                  {((hypoMode === "override" && (hypo.winRate !== "" || hypo.avgGain !== "" || hypo.avgLoss !== "" || hypo.totalTrades !== "")) || (hypoMode === "cap" && hypoCap !== "") || (hypoMode === "custom" && hypoCustom.length > 0)) && (
-                    <button onClick={() => { setHypo({ winRate: "", avgGain: "", avgLoss: "", totalTrades: "" }); setHypoCap(""); setHypoCustom([]); }} style={{ padding:"7px 18px",background:"rgba(239,68,68,0.12)",border:`1px solid rgba(239,68,68,0.3)`,borderRadius:8,color:C.red,fontSize:"0.60rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Clear</button>
-                  )}
-                </div>
-              )}
-            </div>
-          </>}
+          {/* Mini preview chart — butterfly style */}
+          <ResponsiveContainer width="100%" height={170}>
+            <BarChart layout="vertical" data={distAnalysis.barData.map(b => ({ ...b, losses: -b.losses }))} barGap={-2} barCategoryGap="15%" stackOffset="sign">
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis type="number" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} />
+              <YAxis type="category" dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} width={36} />
+              <ReferenceLine x={0} stroke={C.border} />
+              <Bar dataKey="losses" stackId="a" fill={C.red} radius={[2,2,2,2]} />
+              <Bar dataKey="gains" stackId="a" fill={C.green} radius={[2,2,2,2]} />
+            </BarChart>
+          </ResponsiveContainer>
         </GlassCard>
       </div>
 
@@ -1887,6 +1614,162 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
         </GlassCard>
         );
       })()}
+
+      {/* ═══════════════════════════════════════════════════════════════
+          FULL DISTRIBUTION SECTION — scrolls here when preview clicked
+          ═══════════════════════════════════════════════════════════════ */}
+      {distExpanded && (
+        <div ref={distRef} style={{ scrollMarginTop: 20 }}>
+          <GlassCard style={{ marginBottom: 20 }}>
+            <div style={{ padding: "18px 22px 6px" }}>
+              <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6 }}>
+                <div style={{ fontWeight: 800, fontSize: "0.88rem", color: C.white, letterSpacing:"-0.02em" }}>Distribution</div>
+                <div style={{ display:"flex",alignItems:"center",gap:12 }}>
+                  {activeDistData.returnPerTrade !== undefined && <span style={{ fontSize:"0.64rem",color:C.muted }}>Return/Trade: <span style={{ color: activeDistData.returnPerTrade >= 0 ? C.green : C.red, fontWeight:700 }}>{activeDistData.returnPerTrade.toFixed(2)}%</span></span>}
+                  <span style={{ color:C.muted,fontSize:"0.70rem",cursor:"pointer",transition:"transform 0.2s",transform:"rotate(180deg)" }} onClick={()=>setDistExpanded(false)}>▼</span>
+                </div>
+              </div>
+
+              {/* ── Toolbar — Refill Data | Clear | Cap Losses ── */}
+              <div style={{ display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:20 }}>
+                <button onClick={() => { setDistMode("actual"); setDistCapVal(""); }} style={{ padding:"8px 16px",borderRadius:8,border:`1px solid ${distMode==="actual"?C.gold:C.border}`,background:distMode==="actual"?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.04)",color:distMode==="actual"?C.gold:C.muted,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Refill Data</button>
+                <button onClick={() => { setDistMode("cleared"); setDistCapVal(""); }} style={{ padding:"8px 16px",borderRadius:8,border:`1px solid ${distMode==="cleared"?C.gold:C.border}`,background:distMode==="cleared"?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.04)",color:distMode==="cleared"?C.gold:C.muted,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Clear</button>
+                <button onClick={() => setDistMode(distMode==="cap"?"actual":"cap")} style={{ padding:"8px 16px",borderRadius:8,border:`1px solid ${distMode==="cap"?C.gold:C.border}`,background:distMode==="cap"?"rgba(201,152,42,0.15)":"rgba(255,255,255,0.04)",color:distMode==="cap"?C.gold:C.muted,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Cap Losses</button>
+                {distMode === "cap" && (
+                  <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                    <input type="number" step="0.5" min="0.5" placeholder={stats.avgLoss.toFixed(1)} value={distCapVal} onChange={e => setDistCapVal(e.target.value)} style={{ width:90,padding:"7px 10px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.gold}`,borderRadius:8,color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none" }} />
+                    <span style={{ fontSize:"0.52rem",color:C.muted }}>max %</span>
+                    {distCapVal !== "" && activeDistData.cappedCount > 0 && <span style={{ fontSize:"0.52rem",color:C.gold,fontWeight:700 }}>{activeDistData.cappedCount} capped</span>}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Summary Card ── */}
+              {activeDistData.stats && (
+                <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"16px 22px",marginBottom:24 }}>
+                  <div style={{ fontSize:"0.62rem",fontWeight:700,color:C.white,marginBottom:12 }}>Summary{distMode==="cap"&&distCapVal!==""?" (Capped)":""}</div>
+                  <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px 32px" }}>
+                    {[
+                      { label:"Total # of Trades:", val: activeDistData.stats.total },
+                      { label:"Average Gain:", val: `${activeDistData.stats.avgGain.toFixed(2)}%` },
+                      { label:"# of Wins:", val: activeDistData.stats.wins },
+                      { label:"Win Rate:", val: `${activeDistData.stats.ba.toFixed(2)}%` },
+                      { label:"Average Loss:", val: `${activeDistData.stats.avgLoss.toFixed(2)}%` },
+                      { label:"# of Losses:", val: activeDistData.stats.losses },
+                      { label:"Return Per Trade:", val: `${activeDistData.returnPerTrade.toFixed(2)}%`, color: activeDistData.returnPerTrade >= 0 ? C.green : C.red },
+                      { label:"Win/Loss Ratio:", val: activeDistData.stats.glRatio.toFixed(2) },
+                      { label:"Adjusted Win/Loss Ratio:", val: activeDistData.stats.adjustedGL.toFixed(2) },
+                    ].map((s,i) => (
+                      <div key={i} style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                        <span style={{ fontSize:"0.62rem",color:C.muted }}>{s.label}</span>
+                        <span style={{ fontSize:"0.68rem",fontWeight:700,color:s.color||C.white }}>{s.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Two-column layout: Charts (left) + Table (right) ── */}
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,marginBottom:24 }}>
+                {/* LEFT COLUMN — Charts */}
+                <div>
+                  {/* Gains and Losses — Butterfly Chart (losses LEFT, gains RIGHT) */}
+                  <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
+                    <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:10 }}>Gains and Losses</div>
+                    <ResponsiveContainer width="100%" height={Math.max(200, activeDistData.barData.length * 22)}>
+                      <BarChart layout="vertical" data={activeDistData.barData} barGap={-2} barCategoryGap="15%" stackOffset="sign">
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                        <XAxis type="number" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} />
+                        <YAxis type="category" dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} width={36} />
+                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v,name)=>[Math.abs(v),name==="gains"?"Wins":"Losses"]} />
+                        <ReferenceLine x={0} stroke={C.border} />
+                        <Bar dataKey="losses" stackId="a" fill={C.red} radius={[2,2,2,2]} />
+                        <Bar dataKey="gains" stackId="a" fill={C.green} radius={[2,2,2,2]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* DRMA — Per-bucket return contribution bars */}
+                  <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",marginBottom:16 }}>
+                    <div style={{ fontSize:"0.64rem",fontWeight:700,color:C.white,marginBottom:2 }}>DRMA <span style={{ fontWeight:400,fontSize:"0.52rem",color:C.muted }}>(Distribution Return Moving Average)</span></div>
+                    <div style={{ fontSize:"0.48rem",color:C.muted,marginBottom:10 }}>Per-bucket return contribution. Shows where in the % range your system makes or loses money.</div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={activeDistData.drmaData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                        <XAxis dataKey="range" tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} interval={1} />
+                        <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={v=>`${v.toFixed(1)}%`} />
+                        <Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:font}} formatter={(v)=>[`${Number(v).toFixed(2)}%`,"Return Contribution"]} />
+                        <ReferenceLine y={0} stroke={C.border} />
+                        <Bar dataKey="contribution" radius={[2,2,0,0]}>
+                          {activeDistData.drmaData.map((entry, idx) => (
+                            <Cell key={idx} fill={entry.contribution >= 0 ? C.green : C.red} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Gain & Loss Magnitude side by side */}
+                  <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
+                    <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 14px" }}>
+                      <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.white,marginBottom:2 }}>Gain Magnitude</div>
+                      <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your winning trades cluster by size.</div>
+                      <ResponsiveContainer width="100%" height={150}>
+                        <BarChart data={activeDistData.gainMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Wins"]} /><Bar dataKey="count" fill={C.green} radius={[2,2,0,0]} /></BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 14px" }}>
+                      <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.white,marginBottom:2 }}>Loss Magnitude</div>
+                      <div style={{ fontSize:"0.42rem",color:C.muted,marginBottom:8 }}>How your losing trades cluster by size.</div>
+                      <ResponsiveContainer width="100%" height={150}>
+                        <BarChart data={activeDistData.lossMag}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="range" tick={{fill:C.muted,fontSize:8}} axisLine={{stroke:C.border}} interval={1} /><YAxis tick={{fill:C.muted,fontSize:9}} axisLine={{stroke:C.border}} allowDecimals={false} /><Tooltip contentStyle={{background:C.bg2,border:`1px solid ${C.border}`,borderRadius:10,fontSize:11,fontFamily:font}} formatter={(v)=>[v,"Losses"]} /><Bar dataKey="count" fill={C.red} radius={[2,2,0,0]} /></BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN — Distribution Table */}
+                <div>
+                  <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:13,padding:"14px 16px",height:"100%",overflowY:"auto" }}>
+                    <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.68rem" }}>
+                      <thead>
+                        <tr style={{ borderBottom:`1px solid ${C.border}` }}>
+                          {["Range","# Gains","# Losses","↑ %","↓ %","Net","DRMA"].map(h => (
+                            <th key={h} style={{ padding:"8px 6px",textAlign:h==="Range"?"left":"center",fontWeight:700,fontSize:"0.54rem",color:C.white,whiteSpace:"nowrap",borderBottom:`2px solid ${C.border}` }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeDistData.tableData.map((r, i) => {
+                          const hasData = r.gains > 0 || r.losses > 0;
+                          return (
+                            <tr key={i} style={{ borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
+                              <td style={{ padding:"6px 6px",color:C.white,fontWeight:600,fontSize:"0.66rem" }}>{r.range}</td>
+                              <td style={{ padding:"6px 6px",textAlign:"center",color:hasData?C.white:C.muted,fontWeight:600 }}>{r.gains}</td>
+                              <td style={{ padding:"6px 6px",textAlign:"center",color:hasData?C.white:C.muted,fontWeight:600 }}>{r.losses}</td>
+                              {hasData ? <>
+                                <td style={{ padding:"6px 6px",textAlign:"center",color:C.muted }}>{Math.round(r.gPct)}%</td>
+                                <td style={{ padding:"6px 6px",textAlign:"center",color:C.muted }}>{Math.round(r.lPct)}%</td>
+                                <td style={{ padding:"6px 6px",textAlign:"center",color:r.netPct>0?C.green:r.netPct<0?C.red:C.text,fontWeight:700 }}>{r.netPct.toFixed(2)}%</td>
+                                <td style={{ padding:"6px 6px",textAlign:"center",color:r.bucketRetContrib>=0?C.green:C.red,fontWeight:700 }}>{r.bucketRetContrib.toFixed(2)}</td>
+                              </> : <>
+                                <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
+                                <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
+                                <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
+                                <td style={{ padding:"6px 6px",textAlign:"center" }}></td>
+                              </>}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+      )}
 
       {/* Closed Trades Table — editable */}
       <GlassCard>
