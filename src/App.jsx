@@ -194,10 +194,12 @@ function DragTr({ order, children, ...props }) {
 
 function StatTile({ label, value, color, prefix, sub }) {
   const display = `${prefix || ""}${value}`;
+  const len = display.length;
+  const fs = len > 14 ? "0.82rem" : len > 11 ? "0.94rem" : len > 8 ? "1.06rem" : "1.18rem";
   return (
-    <GlassCard small style={{ padding: "18px 20px", minHeight: 88, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+    <GlassCard small style={{ padding: "18px 20px", height: 88, display: "flex", flexDirection: "column", justifyContent: "center", boxSizing: "border-box" }}>
       <div style={{ fontWeight: 700, fontSize: "0.54rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted, marginBottom: 8 }}>{label}</div>
-      <div style={{ fontWeight: 800, fontSize: "1.18rem", letterSpacing: "-0.04em", color: color || C.white, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{display}</div>
+      <div style={{ fontWeight: 800, fontSize: fs, letterSpacing: "-0.04em", color: color || C.white, whiteSpace: "nowrap" }}>{display}</div>
       {sub && <div style={{ fontWeight: 500, fontSize: "0.62rem", color: C.muted, marginTop: 6 }}>{sub}</div>}
     </GlassCard>
   );
@@ -1151,7 +1153,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     const avgHoldWin = winDays.length > 0 ? winDays.reduce((s,d) => s + d, 0) / winDays.length : 0;
     const avgHoldLoss = lossDays.length > 0 ? lossDays.reduce((s,d) => s + d, 0) / lossDays.length : 0;
     const holdRatio = avgHoldLoss > 0 ? avgHoldWin / avgHoldLoss : 0;
-    return { ba, avgGain, avgLoss, glRatio, adjustedGL, ev, avgR, largestLoss: Math.min(...trades.map(t => t.plPct)), largestWin: Math.max(...trades.map(t => t.plPct)), totalPL: trades.reduce((s, t) => s + t.plDollar, 0), total: trades.length, avgHoldWin, avgHoldLoss, holdRatio };
+    const totalComm = trades.reduce((s, t) => s + (parseFloat(t.commission) || 0), 0);
+    return { ba, avgGain, avgLoss, glRatio, adjustedGL, ev, avgR, largestLoss: Math.min(...trades.map(t => t.plPct)), largestWin: Math.max(...trades.map(t => t.plPct)), totalPL: trades.reduce((s, t) => s + t.plDollar, 0), total: trades.length, avgHoldWin, avgHoldLoss, holdRatio, totalComm };
   }, [filtered]);
 
   // ─── Distribution Analysis Data ───
@@ -1191,22 +1194,20 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       return { range: b.range, lo: b.lo, hi: b.hi, gains: b.gains, losses: b.losses, gPct, lPct, netPct, drma: cumDRMA, bucketRetContrib };
     });
 
-    // Butterfly chart data — losses on LEFT (negative ranges), gains on RIGHT (positive ranges)
-    const maxDataIdx = buckets.reduce((m, b, i) => (b.gains > 0 || b.losses > 0) ? i : m, 0);
-    const trimmed = buckets.slice(0, maxDataIdx + 1);
+    // Butterfly chart data — ALL buckets: losses on LEFT (negative ranges), gains on RIGHT (positive ranges)
     const butterflyData = [
-      ...trimmed.slice().reverse().map(b => ({ range: `-${b.hi}%`, count: b.losses, type: "loss" })),
-      ...trimmed.map(b => ({ range: `${b.lo}%`, count: b.gains, type: "gain" }))
+      ...buckets.slice().reverse().map(b => ({ range: `-${b.hi}%`, count: b.losses, type: "loss" })),
+      ...buckets.map(b => ({ range: `${b.lo}%`, count: b.gains, type: "gain" }))
     ];
 
-    // DRMA butterfly — losses left (reversed), gains right, range labels
+    // DRMA butterfly — ALL buckets: losses left (reversed), gains right, range labels
     const butterflyDrma = [
-      ...trimmed.slice().reverse().filter(b => b.losses > 0).map(b => {
-        const c = b.lossPcts.reduce((s, v) => s + v, 0) / (total || 1);
+      ...buckets.slice().reverse().map(b => {
+        const c = b.lossPcts.length > 0 ? b.lossPcts.reduce((s, v) => s + v, 0) / (total || 1) : 0;
         return { range: `${b.lo}-${b.hi}%`, contribution: c, type: "loss" };
       }),
-      ...trimmed.filter(b => b.gains > 0).map(b => {
-        const c = b.gainPcts.reduce((s, v) => s + v, 0) / (total || 1);
+      ...buckets.map(b => {
+        const c = b.gainPcts.length > 0 ? b.gainPcts.reduce((s, v) => s + v, 0) / (total || 1) : 0;
         return { range: `${b.lo}-${b.hi}%`, contribution: c, type: "gain" };
       })
     ];
@@ -1281,20 +1282,18 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       return { range: b.range, lo: b.lo, hi: b.hi, gains: b.gains, losses: b.losses, gPct, lPct, netPct, drma: cumDRMA, bucketRetContrib };
     });
 
-    // Butterfly chart data — losses LEFT, gains RIGHT
-    const maxDataIdx = buckets.reduce((m, b, i) => (b.gains > 0 || b.losses > 0) ? i : m, 0);
-    const trimmed = buckets.slice(0, maxDataIdx + 1);
+    // Butterfly chart data — ALL buckets: losses LEFT, gains RIGHT
     const butterflyData = [
-      ...trimmed.slice().reverse().map(b => ({ range: `-${b.hi}%`, count: b.losses, type: "loss" })),
-      ...trimmed.map(b => ({ range: `${b.lo}%`, count: b.gains, type: "gain" }))
+      ...buckets.slice().reverse().map(b => ({ range: `-${b.hi}%`, count: b.losses, type: "loss" })),
+      ...buckets.map(b => ({ range: `${b.lo}%`, count: b.gains, type: "gain" }))
     ];
     const butterflyDrma = [
-      ...trimmed.slice().reverse().filter(b => b.losses > 0).map(b => {
-        const c = b.lossPcts.reduce((s, v) => s + v, 0) / (editedTotal || 1);
+      ...buckets.slice().reverse().map(b => {
+        const c = b.lossPcts.length > 0 ? b.lossPcts.reduce((s, v) => s + v, 0) / (editedTotal || 1) : 0;
         return { range: `${b.lo}-${b.hi}%`, contribution: c, type: "loss" };
       }),
-      ...trimmed.filter(b => b.gains > 0).map(b => {
-        const c = b.gainPcts.reduce((s, v) => s + v, 0) / (editedTotal || 1);
+      ...buckets.map(b => {
+        const c = b.gainPcts.length > 0 ? b.gainPcts.reduce((s, v) => s + v, 0) / (editedTotal || 1) : 0;
         return { range: `${b.lo}-${b.hi}%`, contribution: c, type: "gain" };
       })
     ];
@@ -1634,7 +1633,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v)=>eqYAxis==="$"?[`$${Number(v).toLocaleString()}`,"Portfolio"]:[`${Number(v).toFixed(2)}%`,"Cumulative"]} />
                   {eqYAxis==="%"&&<ReferenceLine y={0} stroke={C.border} />}
                   {eqYAxis==="$"&&<ReferenceLine y={+(portfolioSize||0)} stroke={C.border} strokeDasharray="3 3" />}
-                  <Area type="monotone" dataKey={dataKey} stroke="url(#eqGradientStroke)" strokeWidth={2} fill="url(#eqGradientFill)" dot={{fill:C.gold,r:3.5,stroke:C.gold}} />
+                  <Area type="monotone" dataKey={dataKey} stroke="url(#eqGradientStroke)" strokeWidth={2} fill="url(#eqGradientFill)" dot={(props) => { const val = props.payload[dataKey]; const below = val < baseline; return <circle key={props.index} cx={props.cx} cy={props.cy} r={3.5} fill={below ? C.red : C.gold} stroke={below ? C.red : C.gold} />; }} />
                 </AreaChart>
               );
             })()}
@@ -4199,7 +4198,7 @@ function AppInner() {
       const { data: trades, error: tradesErr } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false });
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       if (trades && trades.length > 0) {
-        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long" })));
+        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long" })));
         lastLoadedTradeCount.current = trades.length;
       }
 
