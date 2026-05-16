@@ -186,20 +186,58 @@ function useDragReorder(length) {
 }
 
 // Reorderable table row — reorders direct <td> children by index array
-function DragTr({ order, children, ...props }) {
+function DragTr({ order, hiddenSet, children, ...props }) {
   if (!order) return <tr {...props}>{children}</tr>;
   const arr = React.Children.toArray(children);
-  return <tr {...props}>{order.map(i => arr[i]).filter(Boolean)}</tr>;
+  const indices = hiddenSet ? order.filter(i => !hiddenSet.has(i)) : order;
+  return <tr {...props}>{indices.map(i => arr[i]).filter(Boolean)}</tr>;
+}
+
+// ─── Count-Up Animation Hook ───
+function useCountUp(target, duration = 900) {
+  const [display, setDisplay] = useState(target);
+  const prevRef = useRef(target);
+  const rafRef = useRef(null);
+  useEffect(() => {
+    const from = prevRef.current;
+    const to = target;
+    prevRef.current = to;
+    // Only animate if both are finite numbers
+    const fromN = parseFloat(String(from).replace(/[^0-9.\-]/g, ""));
+    const toN = parseFloat(String(to).replace(/[^0-9.\-]/g, ""));
+    if (!isFinite(fromN) || !isFinite(toN) || fromN === toN) { setDisplay(to); return; }
+    // Detect decimal places from target string
+    const decMatch = String(to).match(/\.(\d+)/);
+    const decimals = decMatch ? decMatch[1].length : 0;
+    const startTime = performance.now();
+    const animate = (now) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = fromN + (toN - fromN) * eased;
+      // Reconstruct string format: preserve prefix/suffix from target
+      const numStr = current.toFixed(decimals);
+      // Replace the numeric part in target string
+      const formatted = String(to).replace(/[\d,]+\.?\d*/, numStr.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+      setDisplay(formatted);
+      if (progress < 1) rafRef.current = requestAnimationFrame(animate);
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [target, duration]);
+  return display;
 }
 
 function StatTile({ label, value, color, prefix, sub }) {
   const display = `${prefix || ""}${value}`;
+  const animated = useCountUp(display);
   const len = display.length;
   const fs = len > 14 ? "0.82rem" : len > 11 ? "0.94rem" : len > 8 ? "1.06rem" : "1.18rem";
   return (
     <GlassCard small style={{ padding: "18px 20px", height: 88, display: "flex", flexDirection: "column", justifyContent: "center", boxSizing: "border-box" }}>
       <div style={{ fontWeight: 700, fontSize: "0.54rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted, marginBottom: 8 }}>{label}</div>
-      <div style={{ fontWeight: 800, fontSize: fs, letterSpacing: "-0.04em", color: color || C.white, whiteSpace: "nowrap" }}>{display}</div>
+      <div style={{ fontWeight: 800, fontSize: fs, letterSpacing: "-0.04em", color: color || C.white, whiteSpace: "nowrap", transition: "color 0.3s" }}>{animated}</div>
       {sub && <div style={{ fontWeight: 500, fontSize: "0.62rem", color: C.muted, marginTop: 6 }}>{sub}</div>}
     </GlassCard>
   );
@@ -280,6 +318,10 @@ function CellInput({ value, onChange, width = 76, gold, placeholder = "0" }) {
     />
   );
 }
+// Ticker → company domain for logo lookup (Clearbit)
+const TICKER_DOMAINS = {AAPL:"apple.com",MSFT:"microsoft.com",GOOGL:"google.com",GOOG:"google.com",AMZN:"amazon.com",NVDA:"nvidia.com",META:"meta.com",TSLA:"tesla.com",AVGO:"broadcom.com",TSM:"tsmc.com",CRWD:"crowdstrike.com",KLAC:"kla.com",ASML:"asml.com",GLW:"corning.com",S:"sentinelone.com",MS:"morganstanley.com",FN:"fabrinet.com",GEV:"ge.com",IREN:"irenergy.com",DDOG:"datadoghq.com",FSLR:"firstsolar.com",CRCL:"circle.com",CAT:"caterpillar.com",AKAM:"akamai.com",NBIS:"nebius.com",MRVL:"marvell.com",ARM:"arm.com",FORM:"formfactor.com",CRDO:"credo.ai",AEHR:"aehr.com",AZZ:"azz.com",AMD:"amd.com",INTC:"intel.com",QCOM:"qualcomm.com",CRM:"salesforce.com",ORCL:"oracle.com",ADBE:"adobe.com",NFLX:"netflix.com",DIS:"disney.com",PYPL:"paypal.com",SQ:"squareup.com",SHOP:"shopify.com",SNOW:"snowflake.com",NET:"cloudflare.com",PLTR:"palantir.com",COIN:"coinbase.com",SOFI:"sofi.com",HOOD:"robinhood.com",ROKU:"roku.com",ZS:"zscaler.com",PANW:"paloaltonetworks.com",FTNT:"fortinet.com",ABNB:"airbnb.com",UBER:"uber.com",LYFT:"lyft.com",SNAP:"snap.com",PINS:"pinterest.com",TTD:"thetradedesk.com",RBLX:"roblox.com",U:"unity.com",SE:"sea.com",BABA:"alibaba.com",JD:"jd.com",PDD:"pinduoduo.com",NIO:"nio.com",LI:"li-auto.com",XPEV:"xpeng.com",RIVN:"rivian.com",LCID:"lucidmotors.com",F:"ford.com",GM:"gm.com",TM:"toyota.com",BA:"boeing.com",LMT:"lockheedmartin.com",RTX:"rtx.com",NOC:"northropgrumman.com",GD:"gd.com",JPM:"jpmorgan.com",BAC:"bankofamerica.com",WFC:"wellsfargo.com",C:"citigroup.com",GS:"goldmansachs.com",V:"visa.com",MA:"mastercard.com",AXP:"americanexpress.com",BLK:"blackrock.com",SCHW:"schwab.com",CME:"cmegroup.com",ICE:"ice.com",SPGI:"spglobal.com",MCO:"moodys.com",MSCI:"msci.com",NDAQ:"nasdaq.com"};
+function getTickerLogo(ticker) { const d = TICKER_DOMAINS[ticker]; return d ? `https://logo.clearbit.com/${d}` : null; }
+
 function TickerInput({ value, onChange, width = 64 }) {
   return (
     <input type="text" placeholder="SYM" value={value} onChange={e => onChange(e.target.value.toUpperCase())}
@@ -350,7 +392,10 @@ function TierStrip({ sizer }) {
 // ─── Gold CTA Button ───
 function GoldBtn({ children, onClick, small }) {
   return (
-    <button onClick={onClick} style={{ background: `linear-gradient(135deg, #a06800, ${C.goldBright}, #a06800)`, color: "#000", fontWeight: 800, fontSize: small ? "0.72rem" : "0.82rem", padding: small ? "8px 16px" : "12px 28px", borderRadius: 980, border: "none", cursor: "pointer", fontFamily: font }}>{children}</button>
+    <button onClick={onClick} style={{ background: `linear-gradient(135deg, #a06800, ${C.goldBright}, #a06800)`, color: "#000", fontWeight: 800, fontSize: small ? "0.72rem" : "0.82rem", padding: small ? "8px 16px" : "12px 28px", borderRadius: 980, border: "none", cursor: "pointer", fontFamily: font, boxShadow: `0 0 12px rgba(201,152,42,0.25), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.3)`, transition: "all 0.2s ease", position: "relative", overflow: "hidden" }}
+    onMouseEnter={e => { e.target.style.boxShadow = "0 0 20px rgba(201,152,42,0.4), 0 4px 12px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.4)"; e.target.style.transform = "translateY(-1px)"; }}
+    onMouseLeave={e => { e.target.style.boxShadow = "0 0 12px rgba(201,152,42,0.25), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.3)"; e.target.style.transform = "translateY(0)"; }}
+    >{children}</button>
   );
 }
 
@@ -3020,6 +3065,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
             <div style={{display:"flex",borderRadius:10,overflow:"hidden",border:`1px solid ${displayMode==="R"?C.borderGold:C.border}`,transition:"border-color 0.2s"}}>
               {[{k:"%",label:"% Mode"},{k:"$",label:"$ Mode"},{k:"R",label:"R Mode"}].map(({k,label})=>(<button key={k} onClick={()=>setDisplayMode(k)} style={{padding:"8px 16px",background:displayMode===k?(k==="R"?C.goldDim:C.goldDim):"rgba(255,255,255,0.03)",border:"none",color:displayMode===k?C.gold:C.muted,fontWeight:800,fontSize:"0.72rem",cursor:"pointer",fontFamily:font,letterSpacing:k==="R"?"0.04em":"0",transition:"all 0.15s"}}>{label}</button>))}
             </div>
+            <button onClick={() => setCompactTable(c => !c)} style={{padding:"8px 14px",borderRadius:980,border:`1px solid ${compactTable?C.borderGold:C.border}`,background:compactTable?C.goldDim:"rgba(255,255,255,0.04)",color:compactTable?C.gold:C.muted,fontWeight:700,fontSize:"0.62rem",cursor:"pointer",fontFamily:font,transition:"all 0.15s"}}>{compactTable?"Full View":"Compact"}</button>
             <GoldBtn onClick={addPosition} small>+ Add Position</GoldBtn>
             <button onClick={() => { if (saveStatus === "error" && saveErrorMsg) { alert("Save error: " + saveErrorMsg); } else { onManualSave(); } }} disabled={saveStatus === "saving"} title={saveStatus === "error" && saveErrorMsg ? "Error: " + saveErrorMsg : "Save all positions to database"} style={{ padding:"8px 16px",borderRadius:980,border:`1px solid ${saveStatus === "saved" ? "rgba(34,197,94,0.4)" : saveStatus === "error" ? "rgba(239,68,68,0.4)" : C.borderGold}`,background:saveStatus === "saved" ? "rgba(34,197,94,0.12)" : saveStatus === "error" ? "rgba(239,68,68,0.12)" : C.goldDim,color:saveStatus === "saved" ? C.green : saveStatus === "error" ? C.red : C.gold,fontWeight:700,fontSize:"0.72rem",cursor:saveStatus === "saving" ? "wait" : "pointer",fontFamily:font,transition:"all 0.2s",display:"flex",alignItems:"center",gap:6 }}>
               {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Save Failed ⓘ" : "Save"}
@@ -3124,7 +3170,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {(() => { const defs = [["Status","left","riskStatus"],["Symbol","left","sym"],["L/S","center",null],["Shares","right","sharesN"],["Avg. Cost","right","epN"],["Comm","right","commN"],["Pos. Size","right","posValue"],["Exp %","right","expPct"],["Realized","right","realizedPL"],["Orig Stop","right","stop1"],["Stop 2","right","stop2"],["Trail Stop","right","tsN"],["Current","right","cpN"],["Setup","left","setup"],["Tags","left",null],["DTS","right","dtsPct"],["RTS","right","rtsD"],["ROTE","right","rotePct"],displayMode==="R"?["R Suggest","right","rSuggestedStop"]:["SBE","right","sbe"],displayMode==="R"?["Locked","right","rLockedProfit"]:["SBE %","right","sbePct"],["P/L","right","plPct"],["R","right","rMult"],["Notes","center",null],["","center",null]]; return posDrag.order.map((ci, vi) => { const [text, align, sortKey] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none"}}>{text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
+              {(() => { const defs = [["Status","left","riskStatus"],["Symbol","left","sym"],["L/S","center",null],["Shares","right","sharesN"],["Avg. Cost","right","epN"],["Comm","right","commN"],["Pos. Size","right","posValue"],["Exp %","right","expPct"],["Realized","right","realizedPL"],["Orig Stop","right","stop1"],["Stop 2","right","stop2"],["Trail Stop","right","tsN"],["Current","right","cpN"],["Setup","left","setup"],["Tags","left",null],["DTS","right","dtsPct"],["RTS","right","rtsD"],["ROTE","right","rotePct"],displayMode==="R"?["R Suggest","right","rSuggestedStop"]:["SBE","right","sbe"],displayMode==="R"?["Locked","right","rLockedProfit"]:["SBE %","right","sbePct"],["P/L","right","plPct"],["R","right","rMult"],["Notes","center",null],["","center",null]]; const compactHide = new Set([2,5,9,10,13,18,19]); return posDrag.order.filter(ci => !compactTable || !compactHide.has(ci)).map((ci, vi) => { const [text, align, sortKey] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none"}}>{text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
             </tr></thead>
             <tbody>
               {(posSorts.length > 0 ? multiSort(enriched, posSorts) : enriched).map((p, idx) => {
@@ -3140,9 +3186,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const isExpanded = expandedPosId === p.id;
                 return (
                   <React.Fragment key={p._lid || p.id}>
-                  <DragTr order={posDrag.order} style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
+                  <DragTr order={posDrag.order} hiddenSet={compactTable ? new Set([2,5,9,10,13,18,19]) : null} style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
                     <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
-                    <td style={{padding:"6px 4px"}}><TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></td>
+                    <td style={{padding:"6px 4px"}}><div style={{display:"flex",alignItems:"center",gap:4}}>{p.sym && getTickerLogo(p.sym) && <img src={getTickerLogo(p.sym)} alt="" style={{width:18,height:18,borderRadius:4,flexShrink:0}} onError={e=>{e.target.style.display="none"}} />}<TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></div></td>
                     <td style={{padding:"6px 2px",textAlign:"center"}}><select value={p.tradeType||"Long"} onChange={e=>updateField(p.id,"tradeType",e.target.value)} style={{padding:"3px 4px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,color:(p.tradeType||"Long")==="Short"?C.red:C.green,fontSize:"0.52rem",fontWeight:700,fontFamily:font,cursor:"pointer",outline:"none"}}><option value="Long">L</option><option value="Short">S</option></select></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.shares} onChange={v=>updateField(p.id,"shares",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.ep} onChange={v=>updateField(p.id,"ep",v)} /></td>
@@ -3300,7 +3346,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               })()}
 
               {/* Totals — 24 cols via DragTr for drag-reorder alignment: Status(0),Symbol(1),L/S(2),Shares(3),AvgCost(4),Comm(5),PosSize(6),Exp%(7),Realized(8),OrigStop(9),Stop2(10),TrailStop(11),Current(12),Setup(13),Tags(14),DTS(15),RTS(16),ROTE(17),SBE/RSuggest(18),SBE%/Locked(19),P/L(20),R(21),Notes(22),Actions(23) */}
-              <DragTr order={posDrag.order} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
+              <DragTr order={posDrag.order} hiddenSet={compactTable ? new Set([2,5,9,10,13,18,19]) : null} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
                 {/* 0: Status */}
                 <td style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 {/* 1: Symbol */}
@@ -3518,48 +3564,56 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           )}
         </GlassCard>
 
-        {/* Position Risk Breakdown */}
+        {/* Position Risk Breakdown — collapsible */}
         {posAnalysis.length > 0 && (
           <GlassCard style={{ marginBottom:20 }}>
-            <div style={{ padding:"20px 24px 8px" }}>
-              <div style={{ fontWeight:700,fontSize:"0.78rem",color:C.white }}>Position Risk Breakdown</div>
-              <div style={{ fontWeight:400,fontSize:"0.64rem",color:C.muted,marginTop:2 }}>How each open position contributes to your ROTE. Green = risk-free (stop at/above entry).</div>
+            <div onClick={() => setRiskBreakdownOpen(o => !o)} style={{ padding:"20px 24px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",userSelect:"none" }}>
+              <div>
+                <div style={{ fontWeight:700,fontSize:"0.78rem",color:C.white }}>Position Risk Breakdown</div>
+                <div style={{ fontWeight:400,fontSize:"0.64rem",color:C.muted,marginTop:2 }}>How each open position contributes to your ROTE. Green = risk-free (stop at/above entry).</div>
+              </div>
+              <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+                <span style={{ fontSize:"0.62rem",fontWeight:700,color:C.muted }}>{posAnalysis.length} positions</span>
+                <span style={{ fontSize:"0.9rem",color:C.gold,transform:riskBreakdownOpen?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s",display:"inline-block" }}>▼</span>
+              </div>
             </div>
-            <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
-              <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
-                <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-                  {compTh("Symbol","left")}{compTh("Entry")}{compTh("Current")}{compTh("Stop")}{compTh("Shares")}{compTh("Initial Risk $")}{compTh("Initial ROTE")}{compTh("Current Risk $")}{compTh("Current ROTE")}{compTh("Status","left")}{compTh("Unrealized P/L")}
-                </tr></thead>
-                <tbody>
-                  {posAnalysis.map((p, i) => (
-                    <tr key={i} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)",background:p.isRiskFree?"rgba(34,197,94,0.03)":i%2?"rgba(255,255,255,0.01)":"transparent" }}>
-                      <td style={{padding:"10px 8px",fontWeight:700,color:C.gold}}>{p.sym}</td>
-                      <td style={{padding:"10px 8px",textAlign:"right",color:C.text}}>${p.epN.toFixed(2)}</td>
-                      <td style={{padding:"10px 8px",textAlign:"right",color:C.white,fontWeight:700}}>${p.cpN.toFixed(2)}</td>
-                      <td style={{padding:"10px 8px",textAlign:"right",color:C.muted}}>${p.activeStop.toFixed(2)}</td>
-                      <td style={{padding:"10px 8px",textAlign:"right",color:C.text}}>{p.sharesN.toLocaleString()}</td>
-                      <td style={{padding:"10px 8px",textAlign:"right",color:C.red,fontWeight:600}}>{fmt$(p.initRiskD)}</td>
-                      <td style={{padding:"10px 8px",textAlign:"right",color:p.initRotePct>1.5?C.red:p.initRotePct>1?C.gold:C.text,fontWeight:600}}>{p.initRotePct.toFixed(2)}%</td>
-                      <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:C.red}}>{p.isRiskFree?"$0 (FREE)":fmt$(p.currentRiskD)}</td>
-                      <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:p.currentRotePct>1.5?C.red:C.text}}>{p.isRiskFree?"0.00%":`${p.currentRotePct.toFixed(2)}%`}</td>
-                      <td style={{padding:"10px 8px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:p.isRiskFree?C.greenDim:C.redDim,color:p.isRiskFree?C.green:C.red,border:`1px solid ${p.isRiskFree?"rgba(34,197,94,0.25)":"rgba(239,68,68,0.25)"}`}}>{p.isRiskFree?"FREE":"AT RISK"}</span></td>
-                      <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.unrealizedPL>=0?C.green:C.red}}>{p.unrealizedPL>=0?"+":"-"}{fmt$(Math.abs(p.unrealizedPL))}</td>
+            {riskBreakdownOpen && (
+              <div style={{ overflowX:"auto",padding:"0 0 4px",borderTop:`1px solid ${C.border}` }}>
+                <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
+                  <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
+                    {compTh("Symbol","left")}{compTh("Entry")}{compTh("Current")}{compTh("Stop")}{compTh("Shares")}{compTh("Initial Risk $")}{compTh("Initial ROTE")}{compTh("Current Risk $")}{compTh("Current ROTE")}{compTh("Status","left")}{compTh("Unrealized P/L")}
+                  </tr></thead>
+                  <tbody>
+                    {posAnalysis.map((p, i) => (
+                      <tr key={i} style={{ borderBottom:"1px solid rgba(255,255,255,0.04)",background:p.isRiskFree?"rgba(34,197,94,0.03)":i%2?"rgba(255,255,255,0.01)":"transparent" }}>
+                        <td style={{padding:"10px 8px",fontWeight:700,color:C.gold}}>{p.sym}</td>
+                        <td style={{padding:"10px 8px",textAlign:"right",color:C.text}}>${p.epN.toFixed(2)}</td>
+                        <td style={{padding:"10px 8px",textAlign:"right",color:C.white,fontWeight:700}}>${p.cpN.toFixed(2)}</td>
+                        <td style={{padding:"10px 8px",textAlign:"right",color:C.muted}}>${p.activeStop.toFixed(2)}</td>
+                        <td style={{padding:"10px 8px",textAlign:"right",color:C.text}}>{p.sharesN.toLocaleString()}</td>
+                        <td style={{padding:"10px 8px",textAlign:"right",color:C.red,fontWeight:600}}>{fmt$(p.initRiskD)}</td>
+                        <td style={{padding:"10px 8px",textAlign:"right",color:p.initRotePct>1.5?C.red:p.initRotePct>1?C.gold:C.text,fontWeight:600}}>{p.initRotePct.toFixed(2)}%</td>
+                        <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:C.red}}>{p.isRiskFree?"$0 (FREE)":fmt$(p.currentRiskD)}</td>
+                        <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:p.currentRotePct>1.5?C.red:C.text}}>{p.isRiskFree?"0.00%":`${p.currentRotePct.toFixed(2)}%`}</td>
+                        <td style={{padding:"10px 8px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:p.isRiskFree?C.greenDim:C.redDim,color:p.isRiskFree?C.green:C.red,border:`1px solid ${p.isRiskFree?"rgba(34,197,94,0.25)":"rgba(239,68,68,0.25)"}`}}>{p.isRiskFree?"FREE":"AT RISK"}</span></td>
+                        <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.unrealizedPL>=0?C.green:C.red}}>{p.unrealizedPL>=0?"+":"-"}{fmt$(Math.abs(p.unrealizedPL))}</td>
+                      </tr>
+                    ))}
+                    {/* Total row */}
+                    <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
+                      <td style={{padding:"12px 8px",fontWeight:800,fontSize:"0.64rem",color:C.white,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</td>
+                      <td colSpan={4} />
+                      <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.red}}>{fmt$(posAnalysis.reduce((s,p)=>s+p.initRiskD,0))}</td>
+                      <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.muted}}>{compEquity>0?(posAnalysis.reduce((s,p)=>s+p.initRiskD,0)/compEquity*100).toFixed(2):0}%</td>
+                      <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.deployedRisk>0?C.red:C.green}}>{budget.deployedRisk>0?fmt$(budget.deployedRisk):"$0 (ALL FREE)"}</td>
+                      <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.muted}}>{budget.deployedPct.toFixed(2)}%</td>
+                      <td />
+                      <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.totalUnrealized>=0?C.green:C.red}}>{budget.totalUnrealized>=0?"+":"-"}{fmt$(Math.abs(budget.totalUnrealized))}</td>
                     </tr>
-                  ))}
-                  {/* Total row */}
-                  <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
-                    <td style={{padding:"12px 8px",fontWeight:800,fontSize:"0.64rem",color:C.white,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</td>
-                    <td colSpan={4} />
-                    <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.red}}>{fmt$(posAnalysis.reduce((s,p)=>s+p.initRiskD,0))}</td>
-                    <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.muted}}>{compEquity>0?(posAnalysis.reduce((s,p)=>s+p.initRiskD,0)/compEquity*100).toFixed(2):0}%</td>
-                    <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.deployedRisk>0?C.red:C.green}}>{budget.deployedRisk>0?fmt$(budget.deployedRisk):"$0 (ALL FREE)"}</td>
-                    <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.muted}}>{budget.deployedPct.toFixed(2)}%</td>
-                    <td />
-                    <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.totalUnrealized>=0?C.green:C.red}}>{budget.totalUnrealized>=0?"+":"-"}{fmt$(Math.abs(budget.totalUnrealized))}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </GlassCard>
         )}
 
@@ -3629,19 +3683,29 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           {chartData.length > 1 && (
             <>
               <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={chartData} margin={{ top:10,right:30,left:10,bottom:5 }}>
+                <AreaChart data={chartData} margin={{ top:10,right:30,left:10,bottom:5 }}>
+                  <defs>
+                    <linearGradient id="gradTarget" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={C.green} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={C.green} stopOpacity={0.02} />
+                    </linearGradient>
+                    <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={C.blue} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={C.blue} stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid stroke="rgba(255,255,255,0.04)" />
                   <XAxis dataKey="cycle" stroke={C.muted} tick={{ fontSize:10 }} />
                   <YAxis stroke={C.muted} tick={{ fontSize:10 }} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} />
                   <Tooltip contentStyle={{ background:"#0c0c14",border:`1px solid ${C.border}`,borderRadius:10,fontSize:"0.72rem" }} formatter={(v) => [`$${Number(v).toLocaleString()}`, ""]} />
-                  <Line type="monotone" dataKey="expected" stroke={C.green} strokeWidth={2.5} dot={false} name="Target" />
-                  {actualStats.count > 0 && <Line type="monotone" dataKey="actual" stroke={C.blue} strokeWidth={2.5} dot={false} name="Actual" />}
+                  <Area type="monotone" dataKey="expected" stroke={C.green} strokeWidth={2.5} fill="url(#gradTarget)" dot={false} name="Target" />
+                  {actualStats.count > 0 && <Area type="monotone" dataKey="actual" stroke={C.blue} strokeWidth={2.5} fill="url(#gradActual)" dot={false} name="Actual" />}
                   <ReferenceLine y={compEquity} stroke={C.muted} strokeDasharray="3 3" label={{ value:"Now",fill:C.muted,fontSize:10 }} />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
               <div style={{ display:"flex",gap:16,justifyContent:"center",marginTop:8,flexWrap:"wrap" }}>
-                <span style={{ fontSize:"0.60rem",color:C.green }}>— Target</span>
-                {actualStats.count > 0 && <span style={{ fontSize:"0.60rem",color:C.blue }}>— Actual</span>}
+                <span style={{ fontSize:"0.60rem",color:C.green }}>■ Target</span>
+                {actualStats.count > 0 && <span style={{ fontSize:"0.60rem",color:C.blue }}>■ Actual</span>}
               </div>
             </>
           )}
@@ -4080,6 +4144,59 @@ const ADMIN_EMAIL = "vc-lv@live.com";
 // ═══════════════════════════════════════
 // ─── AUTH PAGE (Login / Register / Forgot Password) ───
 // ═══════════════════════════════════════
+// ─── Smokey Particle Background for Login ───
+function SmokeBackground() {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    let animId;
+    let particles = [];
+    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    resize();
+    window.addEventListener("resize", resize);
+    // Gold smoke particles
+    class Particle {
+      constructor() { this.reset(); }
+      reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = canvas.height + Math.random() * 100;
+        this.vx = (Math.random() - 0.5) * 0.4;
+        this.vy = -(Math.random() * 0.8 + 0.3);
+        this.radius = Math.random() * 80 + 40;
+        this.opacity = Math.random() * 0.08 + 0.02;
+        this.fadeRate = Math.random() * 0.0003 + 0.0001;
+        this.hue = Math.random() > 0.5 ? "201,152,42" : "240,192,80"; // gold tones
+      }
+      update() {
+        this.x += this.vx + Math.sin(Date.now() * 0.0005 + this.y * 0.01) * 0.2;
+        this.y += this.vy;
+        this.opacity -= this.fadeRate;
+        if (this.opacity <= 0 || this.y < -this.radius) this.reset();
+      }
+      draw() {
+        const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+        g.addColorStop(0, `rgba(${this.hue},${this.opacity})`);
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    for (let i = 0; i < 35; i++) { const p = new Particle(); p.y = Math.random() * canvas.height; particles.push(p); }
+    const loop = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => { p.update(); p.draw(); });
+      animId = requestAnimationFrame(loop);
+    };
+    loop();
+    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
+  }, []);
+  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,zIndex:0,pointerEvents:"none" }} />;
+}
+
 function AuthPage() {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -4132,9 +4249,14 @@ function AuthPage() {
   const inp = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 16px", color: C.white, fontSize: "0.88rem", fontWeight: 500, fontFamily: font, outline: "none" };
 
   return (
-    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased", color: C.text }}>
-      <div style={{ width: "100%", maxWidth: 420, padding: "0 24px" }}>
+    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased", color: C.text, position: "relative", overflow: "hidden" }}>
+      <SmokeBackground />
+      {/* Radial vignette overlay */}
+      <div style={{ position:"absolute",inset:0,zIndex:1,background:"radial-gradient(ellipse at center, transparent 30%, rgba(8,8,14,0.85) 100%)",pointerEvents:"none" }} />
+      <div style={{ width: "100%", maxWidth: 420, padding: "0 24px", position: "relative", zIndex: 2 }}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
+          {/* VIV Logo mark */}
+          <div style={{ width:56,height:56,borderRadius:16,background:`linear-gradient(135deg, ${C.gold}, ${C.goldBright})`,display:"inline-flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:"1.5rem",color:"#08080e",letterSpacing:"-0.04em",fontFamily:font,marginBottom:16,boxShadow:"0 0 30px rgba(201,152,42,0.3), 0 0 60px rgba(201,152,42,0.15)" }}>V</div>
           <div style={{ fontWeight: 800, fontSize: "1.6rem", letterSpacing: "-0.03em", color: C.gold, marginBottom: 8, textShadow: `0 0 12px rgba(201,152,42,0.4), 0 0 28px rgba(201,152,42,0.2)`, lineHeight: 1.2 }}>Valen Insiders Vault</div>
           <div style={{ fontWeight: 400, fontSize: "0.82rem", color: C.muted, lineHeight: 1.6 }}>
             {mode === "login" ? "Members-only trading dashboard." : mode === "register" ? "Create your account to get started." : "Reset your password."}
@@ -4214,6 +4336,9 @@ function AppInner() {
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [compactTable, setCompactTable] = useState(false);
+  const [riskBreakdownOpen, setRiskBreakdownOpen] = useState(false);
 
   // ─── Data State (starts with defaults, loaded from Supabase after auth) ───
   const [setupTypes, setSetupTypes] = useState(DEFAULT_SETUP_TYPES);
@@ -4782,7 +4907,9 @@ function AppInner() {
 
   const userEmail = session.user.email;
   const displayName = displayNameState || profile?.display_name || userEmail.split("@")[0];
-  const sidebarW = isTablet ? 200 : 220;
+  const sidebarCollapsedW = 56;
+  const sidebarExpandedW = isTablet ? 200 : 220;
+  const sidebarW = sidebarOpen ? sidebarExpandedW : sidebarCollapsedW;
   const contentPadH = isMobile ? 16 : isTablet ? 24 : 36;
   const contentPadV = isMobile ? 16 : 28;
 
@@ -4830,27 +4957,37 @@ function AppInner() {
   // ─── DESKTOP / TABLET LAYOUT ───
   return (
     <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text, zoom: appZoom }}>
-      <div style={{ width: sidebarW, minHeight: "100vh", padding: "24px 14px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, alignSelf: "flex-start" }}>
-        <div style={{ fontWeight: 800, fontSize: "0.95rem", letterSpacing: "-0.02em", color: C.gold, marginBottom: 24, padding: "0 8px", lineHeight: 1.2, textShadow: `0 0 8px rgba(201,152,42,0.35), 0 0 16px rgba(201,152,42,0.15)` }}>Valen Insiders Vault</div>
+      <div onMouseEnter={() => setSidebarOpen(true)} onMouseLeave={() => setSidebarOpen(false)} style={{ width: sidebarW, minHeight: "100vh", padding: sidebarOpen ? "24px 14px" : "24px 8px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, alignSelf: "flex-start", transition: "width 0.2s ease, padding 0.2s ease", overflow: "hidden", position: "relative", zIndex: 50 }}>
+        <div style={{ fontWeight: 800, fontSize: sidebarOpen ? "0.95rem" : "1.1rem", letterSpacing: "-0.02em", color: C.gold, marginBottom: 24, padding: "0 4px", lineHeight: 1.2, textShadow: `0 0 8px rgba(201,152,42,0.35), 0 0 16px rgba(201,152,42,0.15)`, textAlign: sidebarOpen ? "left" : "center", whiteSpace: "nowrap", overflow: "hidden" }}>{sidebarOpen ? "Valen Insiders Vault" : "V"}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV.map(item => (
             <button key={item.id} onClick={() => setPage(item.id)} style={{
-              display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10,
+              display: "flex", alignItems: "center", gap: 10, padding: sidebarOpen ? "10px 12px" : "10px 0", borderRadius: 10,
               border: "none", cursor: "pointer", fontFamily: font, width: "100%", textAlign: "left",
+              justifyContent: sidebarOpen ? "flex-start" : "center",
               background: page === item.id ? C.goldDim : "transparent",
               color: page === item.id ? C.gold : C.muted,
               fontWeight: page === item.id ? 700 : 500, fontSize: "0.78rem", transition: "all 0.15s",
-            }}><span style={{ fontSize: "0.82rem", width: 18, textAlign: "center" }}>{item.icon}</span>{item.label}</button>
+              whiteSpace: "nowrap", overflow: "hidden",
+            }}><span style={{ fontSize: sidebarOpen ? "0.82rem" : "1.1rem", width: sidebarOpen ? 18 : "auto", textAlign: "center", flexShrink: 0 }}>{item.icon}</span>{sidebarOpen && <span>{item.label}</span>}</button>
           ))}
         </div>
         <div style={{ flex: 1 }} />
-        <div style={{ padding: "10px 12px", borderRadius: 10, background: C.glass, border: `1px solid ${C.border}` }}>
-          <div style={{ fontWeight: 700, fontSize: "0.72rem", color: C.white, marginBottom: 2 }}>{displayName}</div>
-          <div style={{ fontSize: "0.56rem", color: C.muted, marginBottom: 6, wordBreak: "break-all" }}>{userEmail}</div>
-          <button onClick={handleLogout} style={{ width: "100%", padding: "5px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
-        </div>
+        {sidebarOpen ? (
+          <div style={{ padding: "10px 12px", borderRadius: 10, background: C.glass, border: `1px solid ${C.border}` }}>
+            <div style={{ fontWeight: 700, fontSize: "0.72rem", color: C.white, marginBottom: 2 }}>{displayName}</div>
+            <div style={{ fontSize: "0.56rem", color: C.muted, marginBottom: 6, wordBreak: "break-all" }}>{userEmail}</div>
+            <button onClick={handleLogout} style={{ width: "100%", padding: "5px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
+          </div>
+        ) : (
+          <button onClick={handleLogout} title="Sign Out" style={{ padding: "8px 0", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.70rem", cursor: "pointer", fontFamily: font, width: "100%", textAlign: "center" }}>↩</button>
+        )}
       </div>
-      <div style={{ flex: 1, padding: `${contentPadV}px ${contentPadH}px`, overflowY: "auto", minWidth: 0 }}>{pageContent}</div>
+      <div style={{ flex: 1, padding: `${contentPadV}px ${contentPadH}px`, overflowY: "auto", minWidth: 0, position: "relative" }}>
+        {/* Subtle grid background */}
+        <div style={{ position:"fixed",top:0,left:sidebarW,right:0,bottom:0,zIndex:0,pointerEvents:"none",backgroundImage:`linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px)`,backgroundSize:"40px 40px",maskImage:"radial-gradient(ellipse at center, rgba(0,0,0,0.4), transparent 80%)",WebkitMaskImage:"radial-gradient(ellipse at center, rgba(0,0,0,0.4), transparent 80%)" }} />
+        <div style={{ position:"relative",zIndex:1 }}>{pageContent}</div>
+      </div>
     </div>
   );
 }
