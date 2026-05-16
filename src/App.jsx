@@ -3172,7 +3172,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {(() => { const defs = [["Status","left","riskStatus"],["Symbol","left","sym"],["L/S","center",null],["Shares","right","sharesN"],["Avg. Cost","right","epN"],["Comm","right","commN"],["Pos. Size","right","posValue"],["Exp %","right","expPct"],["Realized","right","realizedPL"],["Orig Stop","right","stop1"],["Stop 2","right","stop2"],["Trail Stop","right","tsN"],["Current","right","cpN"],["Setup","left","setup"],["Tags","left",null],["DTS","right","dtsPct"],["RTS","right","rtsD"],["ROTE","right","rotePct"],displayMode==="R"?["R Suggest","right","rSuggestedStop"]:["SBE","right","sbe"],displayMode==="R"?["Locked","right","rLockedProfit"]:["SBE %","right","sbePct"],["P/L","right","plPct"],["R","right","rMult"],["Notes","center",null],["","center",null]]; const compactHide = new Set([2,5,9,10,13,18,19]); return posDrag.order.filter(ci => !compactTable || !compactHide.has(ci)).map((ci, vi) => { const [text, align, sortKey] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none"}}>{text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
+              {(() => { const defs = [["Status","left","riskStatus"],["Symbol","left","sym"],["L/S","center",null],["Shares","right","sharesN"],["Avg. Cost","right","epN"],["Comm","right","commN"],["Pos. Size","right","posValue"],["Exp %","right","expPct"],["Realized","right","realizedPL"],["Orig Stop","right","stop1"],["Stop 2","right","stop2"],["Trail Stop","right","tsN"],["Current","right","cpN"],["Setup","left","setup"],["Tags","left",null],["DTS","right","dtsPct"],["RTS","right","rtsD"],["ROTE","right","rotePct"],displayMode==="R"?["R Suggest","right","rSuggestedStop"]:["SBE","right","sbe"],displayMode==="R"?["Locked","right","rLockedProfit"]:["SBE %","right","sbePct"],["P/L","right","plPct"],["R","right","rMult"],["","center",null],["","center",null]]; const alwaysHide = new Set([5,8,10,13,14]); const compactHide = new Set([2,9,18,19]); const hideSet = new Set([...alwaysHide, ...(compactTable ? compactHide : [])]); return posDrag.order.filter(ci => !hideSet.has(ci)).map((ci, vi) => { const [text, align, sortKey] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none"}}>{text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
             </tr></thead>
             <tbody>
               {(posSorts.length > 0 ? multiSort(enriched, posSorts) : enriched).map((p, idx) => {
@@ -3188,7 +3188,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const isExpanded = expandedPosId === p.id;
                 return (
                   <React.Fragment key={p._lid || p.id}>
-                  <DragTr order={posDrag.order} hiddenSet={compactTable ? new Set([2,5,9,10,13,18,19]) : null} style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
+                  <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,8,10,13,14]); if (compactTable) [2,9,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
                     <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
                     <td style={{padding:"6px 4px"}}><div style={{display:"flex",alignItems:"center",gap:4}}>{p.sym && getTickerLogo(p.sym) && <img src={getTickerLogo(p.sym)} alt="" style={{width:18,height:18,borderRadius:4,flexShrink:0}} onError={e=>{e.target.style.display="none"}} />}<TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></div></td>
                     <td style={{padding:"6px 2px",textAlign:"center"}}><select value={p.tradeType||"Long"} onChange={e=>updateField(p.id,"tradeType",e.target.value)} style={{padding:"3px 4px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,color:(p.tradeType||"Long")==="Short"?C.red:C.green,fontSize:"0.52rem",fontWeight:700,fontFamily:font,cursor:"pointer",outline:"none"}}><option value="Long">L</option><option value="Short">S</option></select></td>
@@ -3213,7 +3213,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rMult>=2?C.green:p.rMult>=1?C.goldBright:p.rMult>=0?C.white:C.red}}>{p.epN&&(p.stop1||p.stop2)?`${p.rMult.toFixed(2)}R`:"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"center",whiteSpace:"nowrap"}}>
                       <div style={{display:"flex",gap:3,alignItems:"center",justifyContent:"center"}}>
-                        <button onClick={()=>togglePosExpand(p.id)} title={isExpanded?"Collapse notes":"Expand notes & chart"} style={{padding:"3px 7px",borderRadius:6,border:`1px solid ${isExpanded?C.borderGold:C.border}`,background:isExpanded?C.goldDim:"transparent",color:isExpanded?C.gold:hasNotes?C.gold:C.muted,fontWeight:700,fontSize:"0.54rem",cursor:"pointer",fontFamily:font}}>{isExpanded?"▲":"▼"}{hasNotes?" ✎":""}</button>
+                        <button onClick={()=>togglePosExpand(p.id)} title={isExpanded?"Collapse":"Additional Data"} style={{padding:"3px 7px",borderRadius:6,border:`1px solid ${isExpanded?C.borderGold:C.border}`,background:isExpanded?C.goldDim:"transparent",color:isExpanded?C.gold:hasNotes?C.gold:C.muted,fontWeight:700,fontSize:"0.54rem",cursor:"pointer",fontFamily:font}}>{isExpanded?"▲ Less":"▼ More"}</button>
                         {p.chartUrl && <a href={p.chartUrl} target="_blank" rel="noopener noreferrer" style={{fontSize:"0.58rem",color:C.blue,fontWeight:600,textDecoration:"none"}} title="TradingView chart">TV</a>}
                         {p.chartImage && <span style={{fontSize:"0.58rem",color:C.green,fontWeight:700}} title="Chart attached">📷</span>}
                       </div>
@@ -3225,10 +3225,33 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                       </div>
                     </td>
                   </DragTr>
-                  {/* Expanded notes/chart area */}
+                  {/* Expanded additional data + notes/chart area */}
                   {isExpanded && (
                     <tr style={{ background:"rgba(201,152,42,0.03)",borderBottom:`1px solid ${C.borderGold}` }}>
                       <td colSpan={26} style={{ padding:"14px 16px" }}>
+                        {/* Additional Data row — fields hidden from main table */}
+                        <div style={{ display:"flex",flexWrap:"wrap",gap:12,marginBottom:14,padding:"10px 14px",borderRadius:10,background:"rgba(255,255,255,0.02)",border:`1px solid ${C.border}` }}>
+                          <div style={{ minWidth:80 }}>
+                            <label style={{ display:"block",fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Commission</label>
+                            <CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={72} />
+                          </div>
+                          <div style={{ minWidth:90 }}>
+                            <label style={{ display:"block",fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Realized P/L</label>
+                            <div style={{ fontWeight:700,fontSize:"0.72rem",color:p.realizedPL!==0?(p.realizedPL>=0?C.green:C.red):C.muted,padding:"5px 0" }}>{p.realizedPL!==0?<>{p.realizedPL>=0?"+":"-"}{fmt$(Math.abs(p.realizedPL))}{p.costFinanced&&<span style={{fontSize:"0.50rem",marginLeft:4,color:C.green,fontWeight:700}}>FINANCED</span>}</>:"—"}</div>
+                          </div>
+                          <div style={{ minWidth:80 }}>
+                            <label style={{ display:"block",fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Stop 2</label>
+                            <LockableCellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={72} />
+                          </div>
+                          <div style={{ minWidth:100 }}>
+                            <label style={{ display:"block",fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Setup</label>
+                            <MiniSelect value={p.setup} onChange={v=>updateField(p.id,"setup",v)} options={setupTypes} width={100} />
+                          </div>
+                          <div style={{ minWidth:140 }}>
+                            <label style={{ display:"block",fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Tags</label>
+                            <TagSelector selected={p.tags||[]} allTags={allTags} onChange={v=>updateField(p.id,"tags",v)} small />
+                          </div>
+                        </div>
                         <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
                           {/* Left: Notes */}
                           <div>
@@ -3348,7 +3371,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               })()}
 
               {/* Totals — 24 cols via DragTr for drag-reorder alignment: Status(0),Symbol(1),L/S(2),Shares(3),AvgCost(4),Comm(5),PosSize(6),Exp%(7),Realized(8),OrigStop(9),Stop2(10),TrailStop(11),Current(12),Setup(13),Tags(14),DTS(15),RTS(16),ROTE(17),SBE/RSuggest(18),SBE%/Locked(19),P/L(20),R(21),Notes(22),Actions(23) */}
-              <DragTr order={posDrag.order} hiddenSet={compactTable ? new Set([2,5,9,10,13,18,19]) : null} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
+              <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,8,10,13,14]); if (compactTable) [2,9,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
                 {/* 0: Status */}
                 <td style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 {/* 1: Symbol */}
