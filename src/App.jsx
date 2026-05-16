@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from "recharts";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import html2canvas from "html2canvas";
@@ -36,8 +37,9 @@ function useScreenWidth() {
 
 // ─── VIV Design Tokens ───
 const C = {
-  bg: "#08080e", bg2: "#0c0c14", white: "#ffffff", text: "rgba(255,255,255,0.82)",
-  muted: "rgba(255,255,255,0.40)", gold: "#c9982a", goldBright: "#f0c050",
+  bg: "#08080e", bg2: "#0c0c14", white: "#ffffff", text: "rgba(255,255,255,0.90)",
+  muted: "rgba(255,255,255,0.58)", gold: "#c9982a", goldBright: "#f0c050",
+  goldMid: "#b8820a", goldDeep: "#7a4f00",
   goldDim: "rgba(201,152,42,0.15)", borderGold: "rgba(201,152,42,0.22)",
   glass: "rgba(255,255,255,0.042)", border: "rgba(255,255,255,0.09)",
   green: "#22c55e", greenDim: "rgba(34,197,94,0.10)", red: "#ef4444", redDim: "rgba(239,68,68,0.08)",
@@ -46,6 +48,17 @@ const C = {
 };
 const font = "'Manrope', -apple-system, sans-serif";
 const fmt$ = (v, dec = 0) => `$${Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
+
+// ─── Brand wordmark — tri-color lockup (Valen / Insiders / Vault) ───
+function Wordmark({ size, style }) {
+  return (
+    <div style={{ fontFamily: font, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2, fontSize: size, ...style }}>
+      <span style={{ color: C.white }}>Valen</span>
+      <span style={{ color: C.gold }}> Insiders </span>
+      <span style={{ color: C.white }}>Vault</span>
+    </div>
+  );
+}
 
 // ─── Multi-sort helper ───
 // sorts = [{key, dir}] where dir is "asc" or "desc"
@@ -94,8 +107,8 @@ function sortArrow(sorts, key) {
 // ─── Slider CSS ───
 const sliderCSS = `
 input[type=range].viv-slider{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;outline:none;cursor:pointer}
-input[type=range].viv-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#f0c050;border:3px solid #08080e;box-shadow:0 0 10px rgba(201,152,42,0.45),0 0 0 1px rgba(201,152,42,0.3);cursor:pointer;margin-top:-8px}
-input[type=range].viv-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#f0c050;border:3px solid #08080e;box-shadow:0 0 10px rgba(201,152,42,0.45);cursor:pointer}
+input[type=range].viv-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:${C.goldBright};border:3px solid #08080e;box-shadow:0 0 10px rgba(201,152,42,0.45),0 0 0 1px rgba(201,152,42,0.3);cursor:pointer;margin-top:-8px}
+input[type=range].viv-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:${C.goldBright};border:3px solid #08080e;box-shadow:0 0 10px rgba(201,152,42,0.45);cursor:pointer}
 input[type=range].viv-slider::-webkit-slider-runnable-track{height:4px;border-radius:2px}
 @keyframes rtsGlow{0%,100%{text-shadow:0 0 6px rgba(239,68,68,0.6),0 0 12px rgba(239,68,68,0.3)}50%{text-shadow:0 0 10px rgba(239,68,68,0.9),0 0 20px rgba(239,68,68,0.5)}}
 @keyframes rtsGlowGreen{0%,100%{text-shadow:0 0 6px rgba(34,197,94,0.5),0 0 12px rgba(34,197,94,0.25)}50%{text-shadow:0 0 10px rgba(34,197,94,0.8),0 0 20px rgba(34,197,94,0.4)}}
@@ -194,12 +207,14 @@ function DragTr({ order, hiddenSet, children, ...props }) {
 }
 
 // ─── Count-Up Animation Hook ───
+const zeroLike = (t) => String(t).replace(/[\d,]+\.?\d*/, m => (0).toFixed((m.split(".")[1] || "").length));
 function useCountUp(target, duration = 900) {
-  const [display, setDisplay] = useState(target);
-  const prevRef = useRef(target);
+  // Starts at a zeroed version of the target so every mount (incl. tab switches) animates up.
+  const [display, setDisplay] = useState(() => zeroLike(target));
+  const prevRef = useRef(null);
   const rafRef = useRef(null);
   useEffect(() => {
-    const from = prevRef.current;
+    const from = prevRef.current === null ? "0" : prevRef.current;
     const to = target;
     prevRef.current = to;
     // Only animate if both are finite numbers
@@ -229,17 +244,61 @@ function useCountUp(target, duration = 900) {
   return display;
 }
 
-function StatTile({ label, value, color, prefix, sub }) {
+function StatTile({ label, value, color, prefix, sub, big, tip }) {
   const display = `${prefix || ""}${value}`;
   const animated = useCountUp(display);
   const len = display.length;
-  const fs = len > 14 ? "0.82rem" : len > 11 ? "0.94rem" : len > 8 ? "1.06rem" : "1.18rem";
+  const fs = big
+    ? (len > 15 ? "1.2rem" : len > 12 ? "1.45rem" : len > 8 ? "1.72rem" : "1.95rem")
+    : (len > 14 ? "0.94rem" : len > 11 ? "1.08rem" : len > 8 ? "1.2rem" : "1.34rem");
   return (
-    <GlassCard small style={{ padding: "18px 20px", height: 88, display: "flex", flexDirection: "column", justifyContent: "center", boxSizing: "border-box" }}>
-      <div style={{ fontWeight: 700, fontSize: "0.54rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted, marginBottom: 8 }}>{label}</div>
-      <div style={{ fontWeight: 800, fontSize: fs, letterSpacing: "-0.04em", color: color || C.white, whiteSpace: "nowrap", transition: "color 0.3s" }}>{animated}</div>
-      {sub && <div style={{ fontWeight: 500, fontSize: "0.62rem", color: C.muted, marginTop: 6 }}>{sub}</div>}
+    <GlassCard small style={{ padding: big ? "22px 24px" : "18px 20px", minHeight: big ? 118 : 98, height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", boxSizing: "border-box" }}>
+      <div style={{ fontWeight: 700, fontSize: big ? "0.62rem" : "0.57rem", letterSpacing: "0.13em", textTransform: "uppercase", color: C.muted, marginBottom: big ? 10 : 8 }}>{tip ? <Abbr tip={tip} underline={false}>{label}</Abbr> : label}</div>
+      <div style={{ fontWeight: 800, fontSize: fs, letterSpacing: "-0.035em", color: color || C.white, whiteSpace: "nowrap", transition: "color 0.3s" }}>{animated}</div>
+      {sub && <div style={{ fontWeight: 500, fontSize: big ? "0.68rem" : "0.64rem", color: C.muted, marginTop: 7 }}>{sub}</div>}
     </GlassCard>
+  );
+}
+// ─── Polished chart tooltip — styled card with colour dots ───
+function ChartTip({ active, payload, label, fmt }) {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div style={{ background: "rgba(12,12,20,0.97)", border: `1px solid ${C.borderGold}`, borderRadius: 10, padding: "9px 12px", boxShadow: "0 10px 34px rgba(0,0,0,0.65)", fontFamily: font, minWidth: 132 }}>
+      <div style={{ fontSize: "0.58rem", fontWeight: 700, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: i ? 5 : 0 }}>
+          <span style={{ width: 9, height: 9, borderRadius: 3, background: p.color || p.stroke || C.gold, flexShrink: 0 }} />
+          <span style={{ fontSize: "0.66rem", color: C.muted, flex: 1, whiteSpace: "nowrap" }}>{p.name}</span>
+          <span style={{ fontSize: "0.74rem", color: C.white, fontWeight: 700 }}>{fmt ? fmt(p.value) : p.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+// ─── Abbreviation tooltip — hover shows a styled card with the full term ───
+function Abbr({ children, tip, underline = true }) {
+  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const ref = useRef(null);
+  const enter = () => {
+    const r = ref.current && ref.current.getBoundingClientRect();
+    if (r) setPos({ x: r.left + r.width / 2, y: r.top });
+    setShow(true);
+  };
+  if (!tip) return <span>{children}</span>;
+  return (
+    <>
+      <span ref={ref} onMouseEnter={enter} onMouseLeave={() => setShow(false)}
+        style={{ borderBottom: underline ? "1px dotted rgba(255,255,255,0.32)" : "none", cursor: "help" }}>
+        {children}
+      </span>
+      {show && createPortal(
+        <div style={{ position: "fixed", left: pos.x, top: pos.y, transform: "translate(-50%,-100%) translateY(-9px)", background: "rgba(12,12,20,0.98)", border: `1px solid ${C.borderGold}`, borderRadius: 8, padding: "8px 12px", fontSize: "0.68rem", fontWeight: 500, color: C.text, fontFamily: font, maxWidth: 252, lineHeight: 1.55, boxShadow: "0 12px 34px rgba(0,0,0,0.7)", zIndex: 99999, pointerEvents: "none", textTransform: "none", letterSpacing: "normal" }}>
+          {tip}
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 function SliderRow({ label, min, max, step, value, onChange, suffix = "", calcText }) {
@@ -392,7 +451,7 @@ function TierStrip({ sizer }) {
 // ─── Gold CTA Button ───
 function GoldBtn({ children, onClick, small }) {
   return (
-    <button onClick={onClick} style={{ background: `linear-gradient(135deg, #a06800, ${C.goldBright}, #a06800)`, color: "#000", fontWeight: 800, fontSize: small ? "0.72rem" : "0.82rem", padding: small ? "8px 16px" : "12px 28px", borderRadius: 980, border: "none", cursor: "pointer", fontFamily: font, boxShadow: `0 0 12px rgba(201,152,42,0.25), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.3)`, transition: "all 0.2s ease", position: "relative", overflow: "hidden" }}
+    <button onClick={onClick} style={{ background: `linear-gradient(135deg, ${C.goldMid}, ${C.goldBright}, ${C.goldDeep})`, color: "#000", fontWeight: 800, fontSize: small ? "0.72rem" : "0.82rem", padding: small ? "8px 16px" : "12px 28px", borderRadius: 980, border: "none", cursor: "pointer", fontFamily: font, boxShadow: `0 0 12px rgba(201,152,42,0.25), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.3)`, transition: "all 0.2s ease", position: "relative", overflow: "hidden" }}
     onMouseEnter={e => { e.target.style.boxShadow = "0 0 20px rgba(201,152,42,0.4), 0 4px 12px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.4)"; e.target.style.transform = "translateY(-1px)"; }}
     onMouseLeave={e => { e.target.style.boxShadow = "0 0 12px rgba(201,152,42,0.25), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.3)"; e.target.style.transform = "translateY(0)"; }}
     >{children}</button>
@@ -1193,7 +1252,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     const wmHeight = 48 * 2;
     ctx.fillStyle = "rgba(8,8,14,0.85)";
     ctx.fillRect(0, canvas.height - wmHeight, canvas.width, wmHeight);
-    ctx.fillStyle = "#c9982a";
+    ctx.fillStyle = C.gold;
     ctx.font = "bold 28px Manrope, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("www.valensontrades.com  |  VIV Swing Trading", canvas.width / 2, canvas.height - wmHeight / 2 + 10);
@@ -1762,7 +1821,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       <div className="viv-screenshot-brand" style={{ display:"none",padding:"20px 24px 12px",marginBottom:8 }}>
         <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
           <div style={{ display:"flex",alignItems:"center",gap:14 }}>
-            <div style={{ width:40,height:40,borderRadius:10,background:`linear-gradient(135deg, ${C.gold}, ${C.goldBright})`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:"1.1rem",color:"#08080e",letterSpacing:"-0.04em",fontFamily:font }}>V</div>
+            <img src="/logo-mark.png" alt="VIV" style={{ width:34,height:"auto" }} />
             <div>
               <div style={{ fontWeight:800,fontSize:"1.1rem",color:C.white,letterSpacing:"-0.03em" }}>VIV Swing Trading</div>
               <div style={{ fontWeight:500,fontSize:"0.58rem",color:C.muted,letterSpacing:"0.04em" }}>www.valensontrades.com</div>
@@ -1775,25 +1834,25 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       {/* Stats — draggable tiles, recalculate based on filter */}
       {(() => {
         const tiles = [
-          { label:"Total P/L", value:`$${Math.abs(stats.totalPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`, color:stats.totalPL>=0?C.green:C.red, prefix:stats.totalPL>=0?"+":"-" },
-          { label:"Win Rate", value:`${stats.ba.toFixed(2)}%`, color:stats.ba>=50?C.green:C.red },
-          { label:"Avg Gain", value:`${stats.avgGain.toFixed(2)}%`, color:C.green, prefix:"+" },
-          { label:"Avg Loss", value:`${stats.avgLoss.toFixed(2)}%`, color:C.red, prefix:"-" },
-          { label:"Win/Loss Ratio", value:stats.glRatio.toFixed(2), color:stats.glRatio>=2?C.green:stats.glRatio>=1?C.gold:C.red },
-          { label:"Adj. W/L Ratio", value:stats.adjustedGL.toFixed(2), color:stats.adjustedGL>=1?C.green:C.red, sub:stats.adjustedGL>=1?"Net profitable":"Net unprofitable" },
-          { label:"Largest Win", value:`${stats.largestWin.toFixed(2)}%`, color:C.green, prefix:"+" },
-          { label:"Largest Loss", value:`${stats.largestLoss.toFixed(2)}%`, color:C.red },
-          { label:"Avg R-Mult", value:`${stats.avgR.toFixed(2)}R`, color:stats.avgR>=0?C.green:C.red },
-          { label:"Avg Hold (Win)", value:`${stats.avgHoldWin.toFixed(1)}d`, color:C.green, sub:"days" },
-          { label:"Avg Hold (Loss)", value:`${stats.avgHoldLoss.toFixed(1)}d`, color:C.red, sub:"days" },
-          { label:"Hold Ratio (W/L)", value:stats.holdRatio.toFixed(2), color:stats.holdRatio>=2?C.green:stats.holdRatio>=1?C.gold:C.red, sub:stats.holdRatio>=2?"Holding winners longer":stats.holdRatio>=1?"Acceptable":"Cutting winners too early" },
+          { label:"Total P/L", value:`$${Math.abs(stats.totalPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`, color:stats.totalPL>=0?C.green:C.red, prefix:stats.totalPL>=0?"+":"-", tip:"Total profit/loss in dollars across all closed trades in the current filter." },
+          { label:"Win Rate", value:`${stats.ba.toFixed(2)}%`, color:stats.ba>=50?C.green:C.red, tip:"Percentage of closed trades that finished profitable." },
+          { label:"Avg Gain", value:`${stats.avgGain.toFixed(2)}%`, color:C.green, prefix:"+", tip:"Average percentage return across winning trades only." },
+          { label:"Avg Loss", value:`${stats.avgLoss.toFixed(2)}%`, color:C.red, prefix:"-", tip:"Average percentage loss across losing trades only." },
+          { label:"Win/Loss Ratio", value:stats.glRatio.toFixed(2), color:stats.glRatio>=2?C.green:stats.glRatio>=1?C.gold:C.red, tip:"Average % win ÷ average % loss — how much bigger a typical winner is than a typical loser. Ignores win rate and each trade's risk." },
+          { label:"Adj. W/L Ratio", value:stats.adjustedGL.toFixed(2), color:stats.adjustedGL>=1?C.green:C.red, sub:stats.adjustedGL>=1?"Net profitable":"Net unprofitable", tip:"Win/Loss ratio weighted by your win rate. Above 1.0 means the system is net profitable." },
+          { label:"Largest Win", value:`${stats.largestWin.toFixed(2)}%`, color:C.green, prefix:"+", tip:"Biggest single winning trade by percentage return." },
+          { label:"Largest Loss", value:`${stats.largestLoss.toFixed(2)}%`, color:C.red, tip:"Biggest single losing trade by percentage return." },
+          { label:"Avg R-Mult", value:`${stats.avgR.toFixed(2)}R`, color:stats.avgR>=0?C.green:C.red, tip:"Average outcome per trade in units of risk taken (R = entry-to-stop distance). Your true per-trade expectancy — blends win rate and size, normalized by each trade's own risk." },
+          { label:"Avg Hold (Win)", value:`${stats.avgHoldWin.toFixed(1)}d`, color:C.green, sub:"days", tip:"Average number of days winning trades were held." },
+          { label:"Avg Hold (Loss)", value:`${stats.avgHoldLoss.toFixed(1)}d`, color:C.red, sub:"days", tip:"Average number of days losing trades were held." },
+          { label:"Hold Ratio (W/L)", value:stats.holdRatio.toFixed(2), color:stats.holdRatio>=2?C.green:stats.holdRatio>=1?C.gold:C.red, sub:stats.holdRatio>=2?"Holding winners longer":stats.holdRatio>=1?"Acceptable":"Cutting winners too early", tip:"Avg win hold ÷ avg loss hold. Above 1.0 means you hold winners longer than losers — below 1.0 means you cut winners too early." },
         ];
         return (
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))",gap:10,marginBottom:20 }}>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(168px, 1fr))",gap:12,marginBottom:20 }}>
             {statDrag.order.map((di, vi) => {
               const t = tiles[di];
               if (!t) return null;
-              return <div key={di} {...statDrag.dragProps(vi)}><StatTile label={t.label} value={t.value} color={t.color} prefix={t.prefix} sub={t.sub} /></div>;
+              return <div key={di} {...statDrag.dragProps(vi)}><StatTile label={t.label} value={t.value} color={t.color} prefix={t.prefix} sub={t.sub} tip={t.tip} /></div>;
             })}
           </div>
         );
@@ -1840,13 +1899,13 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                       <stop offset="100%" stopColor={C.red} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="trade" tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} />
-                  <YAxis tick={{fill:C.muted,fontSize:10}} axisLine={{stroke:C.border}} tickFormatter={eqYAxis==="$" ? (v=>v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1000).toFixed(0)}k`:`$${v}`) : (v=>`${v.toFixed(1)}%`)} domain={eqYAxis==="$"?['auto','auto']:undefined} />
-                  <Tooltip contentStyle={{background:"rgba(12,12,20,0.95)",border:`1px solid ${C.borderGold}`,borderRadius:10,fontSize:13,fontFamily:font,padding:"10px 14px",boxShadow:"0 8px 32px rgba(0,0,0,0.6)"}} labelStyle={{color:C.gold,fontWeight:700,fontSize:12,marginBottom:4}} itemStyle={{color:C.white,fontWeight:600}} formatter={(v)=>eqYAxis==="$"?[`$${Number(v).toLocaleString()}`,"Portfolio"]:[`${Number(v).toFixed(2)}%`,"Cumulative"]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="trade" tick={{fill:C.muted,fontSize:10}} tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis tick={{fill:C.muted,fontSize:10}} tickLine={false} axisLine={false} tickFormatter={eqYAxis==="$" ? (v=>v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1000).toFixed(0)}k`:`$${v}`) : (v=>`${v.toFixed(1)}%`)} domain={eqYAxis==="$"?['auto','auto']:undefined} />
+                  <Tooltip content={<ChartTip fmt={eqYAxis==="$" ? (v=>`$${Number(v).toLocaleString()}`) : (v=>`${Number(v).toFixed(2)}%`)} />} cursor={{stroke:C.borderGold,strokeWidth:1,strokeDasharray:"4 4"}} />
                   {eqYAxis==="%"&&<ReferenceLine y={0} stroke={C.border} />}
                   {eqYAxis==="$"&&<ReferenceLine y={+(portfolioSize||0)} stroke={C.border} strokeDasharray="3 3" />}
-                  <Area type="monotone" dataKey={dataKey} stroke="url(#eqGradientStroke)" strokeWidth={2} fill="url(#eqGradientFill)" dot={(props) => { const val = props.payload[dataKey]; const below = val < baseline; return <circle key={props.index} cx={props.cx} cy={props.cy} r={3.5} fill={below ? C.red : C.green} stroke={below ? C.red : C.green} />; }} />
+                  <Area type="natural" name={eqYAxis==="$"?"Portfolio":"Cumulative"} dataKey={dataKey} stroke="url(#eqGradientStroke)" strokeWidth={2} fill="url(#eqGradientFill)" dot={false} activeDot={(props) => { const val = props.payload[dataKey]; const below = val < baseline; return <circle cx={props.cx} cy={props.cy} r={5} fill={below ? C.red : C.green} stroke={C.bg} strokeWidth={2} />; }} />
                 </AreaChart>
               );
             })()}
@@ -1979,7 +2038,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           <div className="viv-screenshot-brand" style={{ display:"none",padding:"20px 24px 12px",marginBottom:8 }}>
             <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
               <div style={{ display:"flex",alignItems:"center",gap:14 }}>
-                <div style={{ width:40,height:40,borderRadius:10,background:`linear-gradient(135deg, ${C.gold}, ${C.goldBright})`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:"1.1rem",color:"#08080e",letterSpacing:"-0.04em",fontFamily:font }}>V</div>
+                <img src="/logo-mark.png" alt="VIV" style={{ width:34,height:"auto" }} />
                 <div>
                   <div style={{ fontWeight:800,fontSize:"1.1rem",color:C.white,letterSpacing:"-0.03em" }}>VIV Swing Trading</div>
                   <div style={{ fontWeight:500,fontSize:"0.58rem",color:C.muted,letterSpacing:"0.04em" }}>www.valensontrades.com</div>
@@ -2171,7 +2230,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       <div className="viv-screenshot-brand" style={{ display:"none",padding:"20px 24px 12px",marginBottom:8 }}>
         <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
           <div style={{ display:"flex",alignItems:"center",gap:14 }}>
-            <div style={{ width:40,height:40,borderRadius:10,background:`linear-gradient(135deg, ${C.gold}, ${C.goldBright})`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:"1.1rem",color:"#08080e",letterSpacing:"-0.04em",fontFamily:font }}>V</div>
+            <img src="/logo-mark.png" alt="VIV" style={{ width:34,height:"auto" }} />
             <div>
               <div style={{ fontWeight:800,fontSize:"1.1rem",color:C.white,letterSpacing:"-0.03em" }}>VIV Swing Trading</div>
               <div style={{ fontWeight:500,fontSize:"0.58rem",color:C.muted,letterSpacing:"0.04em" }}>www.valensontrades.com</div>
@@ -2312,7 +2371,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     <td style={{ padding: "11px 8px" }}><TagChip label={t.setup} color={C.gold} small /></td>
                     <td style={{ padding: "11px 8px" }}><div style={{display:"flex",gap:3,flexWrap:"wrap"}}>{(t.tags||[]).map(tag => <TagChip key={tag} label={tag} color={C.blue} small />)}</div></td>
                     <td style={{ padding: "11px 8px", fontWeight: 700, color: t.plPct >= 0 ? C.green : C.red }}>{t.plPct >= 0 ? "+" : ""}{t.plPct.toFixed(2)}%</td>
-                    <td style={{ padding: "11px 8px", fontWeight: 700, color: t.plDollar >= 0 ? C.green : C.red }}>{t.plDollar >= 0 ? "+" : ""}${t.plDollar.toLocaleString()}</td>
+                    <td style={{ padding: "11px 8px", fontWeight: 700, color: t.plDollar >= 0 ? C.green : C.red }}>{t.plDollar >= 0 ? "+" : "-"}${Math.abs(t.plDollar).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
                     <td style={{ padding: "11px 8px", fontWeight: 700, color: t.rMult >= 0 ? C.green : C.red }}>{t.rMult.toFixed(2)}R</td>
                     <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.66rem", whiteSpace: "nowrap" }}>{t.reason}</td>
                     <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.64rem", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: t.notes ? "pointer" : "default" }} onClick={() => t.notes && setExpandedTrade(expandedTrade === t.id ? null : t.id)} title={t.notes ? "Click to expand" : ""}>{notesPreview(t.notes) || "—"}</td>
@@ -2374,7 +2433,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                         <td style={{ padding:"6px 8px", fontWeight:700, fontSize:"0.68rem", color:C.text }}>{totalShares.toLocaleString()}</td>
                         <td colSpan={2} />
                         <td style={{ padding:"6px 8px", fontWeight:800, fontSize:"0.68rem", color:weightedPct>=0?C.green:C.red }}>{weightedPct>=0?"+":""}{weightedPct.toFixed(2)}%</td>
-                        <td style={{ padding:"6px 8px", fontWeight:800, fontSize:"0.68rem", color:totalPLD>=0?C.green:C.red }}>{totalPLD>=0?"+":"-"}${Math.abs(totalPLD).toLocaleString()}</td>
+                        <td style={{ padding:"6px 8px", fontWeight:800, fontSize:"0.68rem", color:totalPLD>=0?C.green:C.red }}>{totalPLD>=0?"+":"-"}${Math.abs(totalPLD).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
                         <td style={{ padding:"6px 8px", fontWeight:700, fontSize:"0.68rem", color:avgR>=0?C.green:C.red }}>{avgR.toFixed(2)}R</td>
                         <td colSpan={4} style={{ padding:"6px 8px", fontSize:"0.54rem", color:C.muted }}>{gTrades.length} partial exits</td>
                       </tr>
@@ -2937,11 +2996,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const batches = Math.min(+projBatches || 12, 52);
     const actual = [];
     let aEq = compEquity;
-    // Actual projection uses actual win rate & avg gain/loss from journal (reward/risk based, not R-mult)
-    const actualWr = (actualStats.winRate || 0) / 100;
-    const actualAvgGainPct = (actualStats.avgGain || 0) / 100;
-    const actualAvgLossPct = (actualStats.avgLoss || 0) / 100;
-    const actualReturnPerTrade = actualWr * actualAvgGainPct * tgtRote - (1 - actualWr) * actualAvgLossPct * tgtRote;
+    // Actual projection: average R-multiple from your journal × ROTE risked per trade
+    // (consistent with the Target model, which also works in R-multiples × ROTE)
+    const actualReturnPerTrade = (actualStats.avgR || 0) * tgtRote;
     for (let i = 0; i <= batches; i++) {
       if (i > 0) { aEq *= (1 + actualReturnPerTrade); }
       actual.push(Math.round(aEq));
@@ -2976,11 +3033,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       <Eyebrow>Dashboard</Eyebrow>
       <h1 style={{ fontWeight:800,fontSize:"clamp(1.5rem, 4vw, 2rem)",letterSpacing:"-0.04em",color:C.white,margin:"0 0 24px" }}>Trading Dashboard</h1>
 
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(180px, 1fr))",gap:12,marginBottom:24 }}>
-        <StatTile label="Portfolio" value={fmt$(+portfolioSize)} />
-        <StatTile label="Deployed" value={fmt$(totals.totalValue)} sub={`${totals.count} positions`} />
-        <StatTile label="Open P/L" value={`${Math.abs(totals.totalPL).toLocaleString(undefined,{maximumFractionDigits:0})}`} color={totals.totalPL>=0?C.green:C.red} prefix={totals.totalPL>=0?"+$":"-$"} />
-        <StatTile label="Total RTS" value={totals.totalRTS<=0?"FREE":fmt$(Math.abs(totals.totalRTS))} color={totals.totalRTS<=0?C.green:C.red} sub="Goal: $0 (FREE)" />
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:14,marginBottom:24 }}>
+        <StatTile big label="Portfolio" value={fmt$(+portfolioSize)} sub="Starting capital" />
+        <StatTile big label="Deployed" value={fmt$(totals.totalValue)} sub={`${totals.count} positions`} />
+        <StatTile big label="Open P/L" value={`${Math.abs(totals.totalPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`} color={totals.totalPL>=0?C.green:C.red} prefix={totals.totalPL>=0?"+$":"-$"} />
+        <StatTile big label="Total RTS" value={totals.totalRTS<=0?"FREE":fmt$(Math.abs(totals.totalRTS))} color={totals.totalRTS<=0?C.green:C.red} sub="Goal: $0 (FREE)" />
       </div>
 
       {/* Position Sizer */}
@@ -3021,25 +3078,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 
             {rSizer && (
               <>
-                <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))",gap:12,marginBottom:16 }}>
-                  <StatTile label="Total Risk Budget" value={fmt$(rSizer.totalBudget)} color={C.goldBright} sub={`${rSizer.rotePct}% of ${fmt$(+portfolioSize)}`} />
-                  <StatTile label="R per Trade (Full)" value={fmt$(rSizer.fullR)} color={C.green} sub={`${(rSizer.rotePct / rSizer.n).toFixed(2)}% ROTE each`} />
-                </div>
-                <div style={{ display:"flex",gap:6,marginTop:4 }}>
-                  {[
-                    { label: "Full R", amount: rSizer.fullR, color: C.green, bg: C.greenDim },
-                    { label: "Half R", amount: rSizer.halfR, color: C.gold, bg: C.goldDim },
-                    { label: "Quarter R", amount: rSizer.quarterR, color: C.blue, bg: C.blueDim },
-                    { label: "Pilot R", amount: rSizer.pilotR, color: C.purple, bg: C.purpleDim },
-                  ].map(t => (
-                    <div key={t.label} style={{ flex:1,padding:"10px 12px",borderRadius:10,background:t.bg,borderLeft:`3px solid ${t.color}`,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                      <span style={{ fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.10em",textTransform:"uppercase",color:t.color }}>{t.label}</span>
-                      <span style={{ fontWeight:800,fontSize:"0.82rem",letterSpacing:"-0.03em",color:C.white }}>{fmt$(t.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ marginTop:12,fontSize:"0.64rem",color:C.muted,lineHeight:1.6 }}>
-                  Risk {fmt$(rSizer.fullR)} per full-size trade. If your stop is $2 below entry, buy {rSizer.fullR > 0 ? Math.floor(rSizer.fullR / 2) : 0} shares. Adjust share count so (Entry − Stop) × Shares = R$.
+                <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(240px, 1fr))",gap:14,marginBottom:16 }}>
+                  <StatTile big label="Total Risk Budget" value={fmt$(rSizer.totalBudget)} color={C.goldBright} sub={`${rSizer.rotePct}% of ${fmt$(+portfolioSize)}`} />
+                  <StatTile big label="R per Trade (Full)" value={fmt$(rSizer.fullR)} color={C.green} sub={`${(rSizer.rotePct / rSizer.n).toFixed(2)}% ROTE each`} />
                 </div>
               </>
             )}
@@ -3172,7 +3213,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px" }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {(() => { const defs = [["Status","left","riskStatus"],["Symbol","left","sym"],["L/S","center",null],["Shares","right","sharesN"],["Avg. Cost","right","epN"],["Comm","right","commN"],["Pos. Size","right","posValue"],["Exp %","right","expPct"],["Realized","right","realizedPL"],["Orig Stop","right","stop1"],["Stop 2","right","stop2"],["Trail Stop","right","tsN"],["Current","right","cpN"],["Setup","left","setup"],["Tags","left",null],["DTS","right","dtsPct"],["RTS","right","rtsD"],["ROTE","right","rotePct"],displayMode==="R"?["R Suggest","right","rSuggestedStop"]:["SBE","right","sbe"],displayMode==="R"?["Locked","right","rLockedProfit"]:["SBE %","right","sbePct"],["P/L","right","plPct"],["R","right","rMult"],["","center",null],["","center",null]]; const alwaysHide = new Set([5,8,10,13,14]); const compactHide = new Set([2,9,18,19]); const hideSet = new Set([...alwaysHide, ...(compactTable ? compactHide : [])]); return posDrag.order.filter(ci => !hideSet.has(ci)).map((ci, vi) => { const [text, align, sortKey] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none"}}>{text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
+              {(() => { const defs = [["Status","left","riskStatus","Risk status of this position"],["Symbol","left","sym","Ticker symbol"],["L/S","center",null,"Long or Short position"],["Shares","right","sharesN","Shares held"],["Avg. Cost","right","epN","Average entry price per share"],["Comm","right","commN","Commission"],["Pos. Size","right","posValue","Position Size — shares × avg cost (commission shown beneath)"],["Exp %","right","expPct","Exposure — position size as a percent of current equity"],["Realized","right","realizedPL","Realized P/L from partial sells"],["Orig Stop","right","stop1","Original stop price"],["Stop 2","right","stop2","Secondary stop price"],["Stops","right","tsN","Stop levels — Original, 2nd and Trail stop"],["Current","right","cpN","Current market price"],["Setup / Tags","left","setup","Trade setup type and tags"],["Tags","left",null,"Tags"],["DTS","right","dtsPct","DTS — Distance To Stop"],["RTS","right","rtsD","RTS — Risk To Stop (dollars at risk if stopped out)"],["ROTE","right","rotePct","ROTE — Risk On Total Equity"],displayMode==="R"?["R Suggest","right","rSuggestedStop","Suggested mechanical trail-stop level"]:["SBE","right","sbe","SBE — Sell-to-BreakEven share count"],displayMode==="R"?["Locked","right","rLockedProfit","Profit locked in per share"]:["SBE %","right","sbePct","SBE % — portion of the position to sell for breakeven"],["P/L","right","plPct","Profit / Loss — unrealized (realized shown beneath)"],["R","right","rMult","R-multiple — P/L in units of initial risk"],["","center",null,""],["","center",null,""]]; const alwaysHide = new Set([5,8,9,10,14]); const compactHide = new Set([2,9,18,19]); const hideSet = new Set([...alwaysHide, ...(compactTable ? compactHide : [])]); return posDrag.order.filter(ci => !hideSet.has(ci)).map((ci, vi) => { const [text, align, sortKey, tip] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 7px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.09em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"grab",userSelect:"none"}}>{tip ? <Abbr tip={tip} underline={false}>{text}</Abbr> : text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
             </tr></thead>
             <tbody>
               {(posSorts.length > 0 ? multiSort(enriched, posSorts) : enriched).map((p, idx) => {
@@ -3181,35 +3222,39 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const rb = RISK_BADGE[p.riskStatus] || RISK_BADGE["—"];
                 const isDollar = displayMode === "$";
                 const isR = displayMode === "R";
-                const dtsDisplay = !p.cpN ? "—" : isR ? `${p.dtsR.toFixed(1)}R` : isDollar ? `$${Math.abs(p.dtsD).toFixed(2)}` : `${Math.abs(p.dtsPct).toFixed(2)}%`;
-                const rtsDisplay = !p.cpN ? "—" : isR ? `${p.rtsR.toFixed(1)}R` : isDollar ? `$${Math.abs(p.rtsD).toLocaleString(undefined,{maximumFractionDigits:0})}` : `${(p.sharesN>0?(p.rtsD/(p.cpN*p.sharesN)*100):0).toFixed(2)}%`;
-                const plDisplay = !p.epN ? "—" : isR ? `${p.rMult>=0?"+":""}${p.rMult.toFixed(2)}R` : isDollar ? `${p.plD>=0?"+":"-"}${fmt$(Math.abs(p.plD))}` : `${p.plPct>=0?"+":""}${p.plPct.toFixed(2)}%`;
+                const dtsDisplay = !p.cpN ? "—" : isR ? `${p.dtsR.toFixed(2)}R` : isDollar ? `$${Math.abs(p.dtsD).toFixed(2)}` : `${Math.abs(p.dtsPct).toFixed(2)}%`;
+                const rtsDisplay = !p.cpN ? "—" : isR ? `${p.rtsR.toFixed(2)}R` : isDollar ? `$${Math.abs(p.rtsD).toLocaleString(undefined,{maximumFractionDigits:0})}` : `${(p.sharesN>0?(p.rtsD/(p.cpN*p.sharesN)*100):0).toFixed(2)}%`;
+                const plDisplay = !p.epN ? "—" : isR ? `${p.rMult>=0?"+":""}${p.rMult.toFixed(2)}R` : isDollar ? `${p.plD>=0?"+":"-"}${fmt$(Math.abs(p.plD),2)}` : `${p.plPct>=0?"+":""}${p.plPct.toFixed(2)}%`;
                 const hasNotes = p.notes || p.chartUrl || p.chartImage;
                 const isExpanded = expandedPosId === p.id;
                 return (
                   <React.Fragment key={p._lid || p.id}>
-                  <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,8,10,13,14]); if (compactTable) [2,9,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
+                  <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,8,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
                     <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
                     <td style={{padding:"6px 4px"}}><div style={{display:"flex",alignItems:"center",gap:4}}>{p.sym && getTickerLogo(p.sym) && <img src={getTickerLogo(p.sym)} alt="" style={{width:18,height:18,borderRadius:4,flexShrink:0}} onError={e=>{e.target.style.display="none"}} />}<TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></div></td>
                     <td style={{padding:"6px 2px",textAlign:"center"}}><select value={p.tradeType||"Long"} onChange={e=>updateField(p.id,"tradeType",e.target.value)} style={{padding:"3px 4px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,color:(p.tradeType||"Long")==="Short"?C.red:C.green,fontSize:"0.52rem",fontWeight:700,fontFamily:font,cursor:"pointer",outline:"none"}}><option value="Long">L</option><option value="Short">S</option></select></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.shares} onChange={v=>updateField(p.id,"shares",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.ep} onChange={v=>updateField(p.id,"ep",v)} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={62} /></td>
-                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0?<div style={{fontWeight:700,fontSize:"0.70rem",color:C.white}}>{fmt$(p.posValue)}</div>:"—"}</td>
-                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0&&compEquity>0?<div style={{fontWeight:600,fontSize:"0.70rem",color:p.expPct>100?C.red:C.white}}>{p.expPct.toFixed(1)}%</div>:"—"}</td>
+                    <td style={{padding:"6px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0?<div style={{fontWeight:700,fontSize:"0.72rem",color:C.white}}>{fmt$(p.posValue)}</div>:<div style={{color:C.muted}}>—</div>}<div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:4,marginTop:3}}><span style={{fontSize:"0.46rem",color:C.muted,letterSpacing:"0.06em",textTransform:"uppercase"}}>Comm</span><CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={52} /></div></td>
+                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0&&compEquity>0?<div style={{fontWeight:600,fontSize:"0.70rem",color:p.expPct>100?C.red:C.white}}>{p.expPct.toFixed(2)}%</div>:"—"}</td>
                     <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.realizedPL!==0?<><div style={{fontWeight:700,fontSize:"0.70rem",color:p.realizedPL>=0?C.green:C.red}}>{p.realizedPL>=0?"+":"-"}{fmt$(Math.abs(p.realizedPL))}</div>{p.costFinanced&&<div style={{fontSize:"0.50rem",fontWeight:700,color:C.green,letterSpacing:"0.04em"}}>FINANCED</div>}</>:"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={72} /></td>
-                    <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.trailStop||""} onChange={v=>updateField(p.id,"trailStop",v)} width={78} gold /></td>
+                    <td style={{padding:"6px 4px"}}><div style={{display:"flex",flexDirection:"column",gap:3,alignItems:"flex-end"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:"0.46rem",color:C.muted,letterSpacing:"0.05em",textTransform:"uppercase",width:30,textAlign:"right"}}>Orig</span><LockableCellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} width={66} /></div>
+                      <div style={{display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:"0.46rem",color:C.muted,letterSpacing:"0.05em",textTransform:"uppercase",width:30,textAlign:"right"}}>2nd</span><LockableCellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={66} /></div>
+                      <div style={{display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:"0.46rem",color:C.gold,letterSpacing:"0.05em",textTransform:"uppercase",width:30,textAlign:"right"}}>Trail</span><CellInput value={p.trailStop||""} onChange={v=>updateField(p.id,"trailStop",v)} width={66} gold /></div>
+                    </div></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.cp} onChange={v=>updateField(p.id,"cp",v)} gold width={82} /></td>
-                    <td style={{padding:"6px 4px"}}><MiniSelect value={p.setup} onChange={v=>updateField(p.id,"setup",v)} options={setupTypes} width={85} /></td>
+                    <td style={{padding:"6px 4px"}}><div style={{display:"flex",flexDirection:"column",gap:5}}><MiniSelect value={p.setup} onChange={v=>updateField(p.id,"setup",v)} options={setupTypes} width={118} /><TagSelector selected={p.tags||[]} allTags={allTags} onChange={v=>updateField(p.id,"tags",v)} small /></div></td>
                     <td style={{padding:"6px 4px"}}><TagSelector selected={p.tags||[]} allTags={allTags} onChange={v=>updateField(p.id,"tags",v)} small /></td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:p.dtsD<=0?C.green:C.text,fontSize:"0.70rem"}}>{dtsDisplay}</td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.rtsD<=0?C.green:C.red,fontSize:"0.72rem",animation:p.cpN&&(p.stop1||p.stop2)?(p.rtsD>0?"rtsGlow 2.5s ease-in-out infinite":"rtsGlowGreen 3s ease-in-out infinite"):"none"}}>{rtsDisplay}</td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",whiteSpace:"nowrap"}}>{p.epN&&(p.stop1||p.stop2)?<><div style={{color:p.currentRotePct>0?C.red:C.green}}>{p.currentRotePct.toFixed(2)}%</div>{p.currentRotePct!==p.rotePct&&<div style={{fontSize:"0.50rem",color:C.muted,fontWeight:500}}>Init: {p.rotePct.toFixed(2)}%</div>}</>:"—"}</td>
                     {isR ? <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rSuggestedStop>p.epN?C.green:p.rSuggestedStop===p.epN?C.goldBright:C.muted}}>{p.rPerShare>0?(p.rSuggestedStop>=p.epN&&p.currentRLevel>=1?`$${p.rSuggestedStop.toFixed(2)} (${p.currentRLevel-1===0?"BE":(p.currentRLevel-1)+"R"})`:`$${p.rSuggestedStop.toFixed(2)}`):"—"}</td> : <td style={{padding:"8px 6px",textAlign:"right",color:p.sbe>0?C.text:C.muted,fontSize:"0.70rem"}}>{p.sbe>0?p.sbe.toLocaleString():"—"}</td>}
-                    {isR ? <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rLockedProfit>0?C.green:C.muted}}>{p.rLockedProfit>0?`$${p.rLockedProfit.toFixed(2)}/sh`:"$0"}</td> : <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:!p.sbe?C.muted:p.sbePct>100?C.red:p.sbePct>80?C.gold:C.green,fontSize:"0.70rem"}}>{p.sbe>0?`${p.sbePct.toFixed(1)}%`:"—"}</td>}
-                    <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,color:p.plPct>=0?C.green:C.red,fontSize:"0.70rem"}}>{plDisplay}</td>
+                    {isR ? <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rLockedProfit>0?C.green:C.muted}}>{p.rLockedProfit>0?`$${p.rLockedProfit.toFixed(2)}/sh`:"$0"}</td> : <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:!p.sbe?C.muted:p.sbePct>100?C.red:p.sbePct>80?C.gold:C.green,fontSize:"0.70rem"}}>{p.sbe>0?`${p.sbePct.toFixed(2)}%`:"—"}</td>}
+                    <td style={{padding:"8px 6px",textAlign:"right",whiteSpace:"nowrap"}}><div style={{fontWeight:700,color:p.plPct>=0?C.green:C.red,fontSize:"0.72rem"}}>{plDisplay}</div>{p.realizedPL!==0&&<div style={{fontSize:"0.52rem",fontWeight:700,color:p.realizedPL>=0?C.green:C.red,marginTop:2}}>Rlzd {p.realizedPL>=0?"+":"-"}{fmt$(Math.abs(p.realizedPL),2)}{p.costFinanced&&<span style={{marginLeft:3,color:C.green}}>FIN</span>}</div>}</td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rMult>=2?C.green:p.rMult>=1?C.goldBright:p.rMult>=0?C.white:C.red}}>{p.epN&&(p.stop1||p.stop2)?`${p.rMult.toFixed(2)}R`:"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"center",whiteSpace:"nowrap"}}>
                       <div style={{display:"flex",gap:3,alignItems:"center",justifyContent:"center"}}>
@@ -3229,29 +3274,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                   {isExpanded && (
                     <tr style={{ background:"rgba(201,152,42,0.03)",borderBottom:`1px solid ${C.borderGold}` }}>
                       <td colSpan={26} style={{ padding:"14px 16px" }}>
-                        {/* Additional Data row — fields hidden from main table */}
-                        <div style={{ display:"flex",flexWrap:"wrap",gap:12,marginBottom:14,padding:"10px 14px",borderRadius:10,background:"rgba(255,255,255,0.02)",border:`1px solid ${C.border}` }}>
-                          <div style={{ minWidth:80 }}>
-                            <label style={{ display:"block",fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Commission</label>
-                            <CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={72} />
-                          </div>
-                          <div style={{ minWidth:90 }}>
-                            <label style={{ display:"block",fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Realized P/L</label>
-                            <div style={{ fontWeight:700,fontSize:"0.72rem",color:p.realizedPL!==0?(p.realizedPL>=0?C.green:C.red):C.muted,padding:"5px 0" }}>{p.realizedPL!==0?<>{p.realizedPL>=0?"+":"-"}{fmt$(Math.abs(p.realizedPL))}{p.costFinanced&&<span style={{fontSize:"0.50rem",marginLeft:4,color:C.green,fontWeight:700}}>FINANCED</span>}</>:"—"}</div>
-                          </div>
-                          <div style={{ minWidth:80 }}>
-                            <label style={{ display:"block",fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Stop 2</label>
-                            <LockableCellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={72} />
-                          </div>
-                          <div style={{ minWidth:100 }}>
-                            <label style={{ display:"block",fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Setup</label>
-                            <MiniSelect value={p.setup} onChange={v=>updateField(p.id,"setup",v)} options={setupTypes} width={100} />
-                          </div>
-                          <div style={{ minWidth:140 }}>
-                            <label style={{ display:"block",fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:4 }}>Tags</label>
-                            <TagSelector selected={p.tags||[]} allTags={allTags} onChange={v=>updateField(p.id,"tags",v)} small />
-                          </div>
-                        </div>
+                        {/* Secondary data (commission, stops, setup, tags, realized) now lives on the main row */}
                         <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
                           {/* Left: Notes */}
                           <div>
@@ -3371,7 +3394,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               })()}
 
               {/* Totals — 24 cols via DragTr for drag-reorder alignment: Status(0),Symbol(1),L/S(2),Shares(3),AvgCost(4),Comm(5),PosSize(6),Exp%(7),Realized(8),OrigStop(9),Stop2(10),TrailStop(11),Current(12),Setup(13),Tags(14),DTS(15),RTS(16),ROTE(17),SBE/RSuggest(18),SBE%/Locked(19),P/L(20),R(21),Notes(22),Actions(23) */}
-              <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,8,10,13,14]); if (compactTable) [2,9,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
+              <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,8,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
                 {/* 0: Status */}
                 <td style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 {/* 1: Symbol */}
@@ -3387,7 +3410,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 {/* 6: Pos Size */}
                 <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}><div style={{fontWeight:800,fontSize:"0.72rem",color:C.goldBright}}>{fmt$(enriched.reduce((s,p)=>s+p.posValue,0))}</div></td>
                 {/* 7: Exp % */}
-                <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{(()=>{const tv=enriched.reduce((s,p)=>s+p.posValue,0);const expPct=compEquity>0?(tv/compEquity)*100:0;return<div style={{fontWeight:800,fontSize:"0.72rem",color:expPct>100?C.red:expPct>80?C.gold:C.green}}>{expPct.toFixed(1)}%{expPct>100&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>{(expPct/100).toFixed(1)}x</span>}</div>})()}</td>
+                <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{(()=>{const tv=enriched.reduce((s,p)=>s+p.posValue,0);const expPct=compEquity>0?(tv/compEquity)*100:0;return<div style={{fontWeight:800,fontSize:"0.72rem",color:expPct>100?C.red:expPct>80?C.gold:C.green}}>{expPct.toFixed(2)}%{expPct>100&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>{(expPct/100).toFixed(1)}x</span>}</div>})()}</td>
                 {/* 8: Realized */}
                 <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{(()=>{const tr=enriched.reduce((s,p)=>s+p.realizedPL,0);return tr!==0?<div style={{fontWeight:800,fontSize:"0.72rem",color:tr>=0?C.green:C.red}}>{tr>=0?"+":"-"}{fmt$(Math.abs(tr))}</div>:<span style={{color:C.muted}}>—</span>})()}</td>
                 {/* 9: Orig Stop */}
@@ -3421,7 +3444,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 {/* 19: SBE% / Locked */}
                 <td />
                 {/* 20: P/L */}
-                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{`${totals.totalPL>=0?"+":"-"}${fmt$(Math.abs(totals.totalPL))}`}</td>
+                <td style={{padding:"12px 6px",textAlign:"right",whiteSpace:"nowrap"}}><div style={{fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{`${totals.totalPL>=0?"+":"-"}${fmt$(Math.abs(totals.totalPL),2)}`}</div>{(()=>{const tr=enriched.reduce((s,p)=>s+p.realizedPL,0);return tr!==0?<div style={{fontSize:"0.54rem",fontWeight:700,color:tr>=0?C.green:C.red,marginTop:2}}>Rlzd {tr>=0?"+":"-"}{fmt$(Math.abs(tr),2)}</div>:null;})()}</td>
                 {/* 21: R */}
                 <td />
                 {/* 22: Notes */}
@@ -3459,12 +3482,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               <span style={{ fontSize:"1rem" }}>⚠</span>
               <div>
                 {totals.currentRotePct > totals.tgtRotePct && (
-                  <div style={{ fontWeight:700,fontSize:"0.68rem",color:C.red }}>Current ROTE: {totals.currentRotePct.toFixed(2)}% exceeds your {totals.tgtRotePct.toFixed(1)}% target</div>
+                  <div style={{ fontWeight:700,fontSize:"0.68rem",color:C.red }}>Current ROTE: {totals.currentRotePct.toFixed(2)}% exceeds your {totals.tgtRotePct.toFixed(2)}% target</div>
                 )}
                 {totals.currentRotePct <= totals.tgtRotePct && totals.totalRotePct > totals.tgtRotePct * 1.5 && (
                   <div style={{ fontWeight:700,fontSize:"0.68rem",color:C.gold }}>Initial ROTE: {totals.totalRotePct.toFixed(2)}% — trail stops have reduced current to {totals.currentRotePct.toFixed(2)}%</div>
                 )}
-                <div style={{ fontSize:"0.62rem",color:C.muted,marginTop:2 }}>Target: {totals.tgtRotePct.toFixed(1)}% (set in Compounder). Current uses active stops. Initial uses original stops.</div>
+                <div style={{ fontSize:"0.62rem",color:C.muted,marginTop:2 }}>Target: {totals.tgtRotePct.toFixed(2)}% (set in Compounder). Current uses active stops. Initial uses original stops.</div>
               </div>
             </div>
           )}
@@ -3502,11 +3525,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <p style={{ fontSize:"0.74rem",color:C.muted,margin:"0 0 24px",lineHeight:1.6 }}>Your real-time compounding command center. When positions become risk-free (stop at breakeven or above), that ROTE frees up for new trades. Closed trade profits compound into your equity — new trades risk more dollars at the same %.</p>
 
         {/* Equity Overview */}
-        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(170px, 1fr))",gap:12,marginBottom:20 }}>
-          <StatTile label="Portfolio Size" value={fmt$(compPs)} />
-          <StatTile label="Realized P/L" value={`${compRealizedPL>=0?"+":"-"}${fmt$(Math.abs(compRealizedPL))}`} color={compRealizedPL>=0?C.green:C.red} sub="From closed trades" />
-          <StatTile label="Current Equity" value={fmt$(compEquity)} color={C.goldBright} sub="Portfolio + Realized" />
-          <StatTile label="Unrealized P/L" value={`${budget.totalUnrealized>=0?"+":"-"}${fmt$(Math.abs(budget.totalUnrealized))}`} color={budget.totalUnrealized>=0?C.green:C.red} sub="Open positions" />
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:14,marginBottom:20 }}>
+          <StatTile big label="Portfolio Size" value={fmt$(compPs)} sub="Starting capital" />
+          <StatTile big label="Realized P/L" value={`${compRealizedPL>=0?"+":"-"}${fmt$(Math.abs(compRealizedPL),2)}`} color={compRealizedPL>=0?C.green:C.red} sub="From closed trades" />
+          <StatTile big label="Current Equity" value={fmt$(compEquity)} color={C.goldBright} sub="Portfolio + Realized" />
+          <StatTile big label="Unrealized P/L" value={`${budget.totalUnrealized>=0?"+":"-"}${fmt$(Math.abs(budget.totalUnrealized),2)}`} color={budget.totalUnrealized>=0?C.green:C.red} sub="Open positions" />
         </div>
 
         {/* Risk Budget Panel */}
@@ -3521,7 +3544,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           </div>
 
           {/* ROTE breakdown — prominent stat tiles */}
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))",gap:10,marginBottom:16 }}>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(200px, 1fr))",gap:12,marginBottom:16 }}>
             <div style={{ padding:"12px 16px",borderRadius:12,background:budget.deployedPct>(+targetRote||0)?"rgba(239,68,68,0.08)":"rgba(255,255,255,0.03)",border:`1px solid ${budget.deployedPct>(+targetRote||0)?"rgba(239,68,68,0.30)":C.border}` }}>
               <div style={{ fontSize:"0.60rem",fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4 }}>Current ROTE</div>
               <div style={{ fontSize:"1.15rem",fontWeight:800,color:budget.deployedPct>(+targetRote||0)?C.red:C.green }}>{budget.deployedPct.toFixed(2)}%</div>
@@ -3621,7 +3644,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                         <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:C.red}}>{p.isRiskFree?"$0 (FREE)":fmt$(p.currentRiskD)}</td>
                         <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.isRiskFree?C.green:p.currentRotePct>1.5?C.red:C.text}}>{p.isRiskFree?"0.00%":`${p.currentRotePct.toFixed(2)}%`}</td>
                         <td style={{padding:"10px 8px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:p.isRiskFree?C.greenDim:C.redDim,color:p.isRiskFree?C.green:C.red,border:`1px solid ${p.isRiskFree?"rgba(34,197,94,0.25)":"rgba(239,68,68,0.25)"}`}}>{p.isRiskFree?"FREE":"AT RISK"}</span></td>
-                        <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.unrealizedPL>=0?C.green:C.red}}>{p.unrealizedPL>=0?"+":"-"}{fmt$(Math.abs(p.unrealizedPL))}</td>
+                        <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:p.unrealizedPL>=0?C.green:C.red}}>{p.unrealizedPL>=0?"+":"-"}{fmt$(Math.abs(p.unrealizedPL),2)}</td>
                       </tr>
                     ))}
                     {/* Total row */}
@@ -3633,7 +3656,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                       <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.deployedRisk>0?C.red:C.green}}>{budget.deployedRisk>0?fmt$(budget.deployedRisk):"$0 (ALL FREE)"}</td>
                       <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:C.muted}}>{budget.deployedPct.toFixed(2)}%</td>
                       <td />
-                      <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.totalUnrealized>=0?C.green:C.red}}>{budget.totalUnrealized>=0?"+":"-"}{fmt$(Math.abs(budget.totalUnrealized))}</td>
+                      <td style={{padding:"12px 8px",textAlign:"right",fontWeight:800,color:budget.totalUnrealized>=0?C.green:C.red}}>{budget.totalUnrealized>=0?"+":"-"}{fmt$(Math.abs(budget.totalUnrealized),2)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -3647,46 +3670,41 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           <Eyebrow>Compound Projection</Eyebrow>
           <div style={{ fontWeight:800,fontSize:"1.05rem",color:C.white,marginBottom:6 }}>Target vs Actual</div>
           <p style={{ fontSize:"0.68rem",color:C.muted,margin:"0 0 16px" }}>Project forward from your current equity. Each trade = deploying your target ROTE, taking the trade, then redeploying on the new equity. Your actual stats are pulled from your Trade Journal.</p>
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:16 }}>
-            <div>
-              <div style={{ fontWeight:700,fontSize:"0.58rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.gold,marginBottom:10 }}>Target</div>
-              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
-                <CalcInput label="R-Multiple" value={projR} onChange={setProjR} suffix="R" placeholder="2" />
-                <CalcInput label="Win Rate" value={projWin} onChange={setProjWin} suffix="%" placeholder="55" />
-              </div>
-            </div>
-            <div>
-              <div style={{ fontWeight:700,fontSize:"0.58rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.blue,marginBottom:10 }}>Actual <span style={{color:C.muted,fontWeight:400,textTransform:"none"}}>({actualStats.count} trades)</span></div>
-              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(100px, 1fr))",gap:8 }}>
-                <div style={{ padding:"8px 12px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Win Rate</div>
-                  <div style={{ fontSize:"0.92rem",fontWeight:800,color:actualStats.winRate >= (+projWin||50) ? C.green : C.red }}>{actualStats.winRate.toFixed(0)}%</div>
-                </div>
-                <div style={{ padding:"8px 12px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Avg Gain</div>
-                  <div style={{ fontSize:"0.92rem",fontWeight:800,color:C.green }}>+{actualStats.avgGain.toFixed(1)}%</div>
-                </div>
-                <div style={{ padding:"8px 12px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Avg Loss</div>
-                  <div style={{ fontSize:"0.92rem",fontWeight:800,color:C.red }}>-{actualStats.avgLoss.toFixed(1)}%</div>
-                </div>
-                <div style={{ padding:"8px 12px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Reward/Risk</div>
-                  <div style={{ fontSize:"0.92rem",fontWeight:800,color:actualStats.rewardRisk >= 2 ? C.green : actualStats.rewardRisk >= 1 ? C.gold : C.red }}>{actualStats.rewardRisk.toFixed(2)}</div>
-                </div>
-                <div style={{ padding:"8px 12px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:"0.48rem",fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:3 }}>Exp. Return/Trade</div>
-                  {(()=>{const tgtRote=(+targetRote||0)/100;const wr=actualStats.winRate/100;const retPerTrade=wr*actualStats.avgGain/100*tgtRote-(1-wr)*actualStats.avgLoss/100*tgtRote;return<div style={{ fontSize:"0.92rem",fontWeight:800,color:retPerTrade>=0?C.green:C.red }}>{(retPerTrade*100).toFixed(2)}%</div>})()}
-                </div>
-              </div>
+          {/* TARGET — your goal assumptions */}
+          <div style={{ marginBottom:18 }}>
+            <div style={{ fontWeight:700,fontSize:"0.6rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.gold,marginBottom:10 }}>Target <span style={{ color:C.muted,fontWeight:400,textTransform:"none",letterSpacing:"normal" }}>— your goal assumptions</span></div>
+            <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(200px, 1fr))",gap:12 }}>
+              <CalcInput label="R-Multiple" value={projR} onChange={setProjR} suffix="R" placeholder="2" />
+              <CalcInput label="Win Rate" value={projWin} onChange={setProjWin} suffix="%" placeholder="55" />
+              <CalcInput label="Target Annual Return" value={targetAnnualReturn} onChange={setTargetAnnualReturn} suffix="%" placeholder="50" />
+              <CalcInput label="No. of Trades" value={projBatches} onChange={setProjBatches} suffix="#" placeholder="12" />
             </div>
           </div>
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))",gap:10,marginBottom:16 }}>
-            <CalcInput label="Target Annual Return" value={targetAnnualReturn} onChange={setTargetAnnualReturn} suffix="%" placeholder="50" />
-            <CalcInput label="No. of Trades" value={projBatches} onChange={setProjBatches} suffix="#" placeholder="12" />
+          {/* ACTUAL — from your trade journal */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontWeight:700,fontSize:"0.6rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.blue,marginBottom:10 }}>Actual <span style={{ color:C.muted,fontWeight:400,textTransform:"none",letterSpacing:"normal" }}>— from your journal ({actualStats.count} trades)</span></div>
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(150px, 1fr))",gap:10 }}>
+                {(() => {
+                  const tgtRote = (+targetRote||0)/100;
+                  const retPerTrade = (actualStats.avgR||0)*tgtRote;
+                  const cards = [
+                    { label:"Win Rate", val:`${actualStats.winRate.toFixed(0)}%`, color:actualStats.winRate >= (+projWin||50) ? C.green : C.red, tip:"Your actual win rate from journaled trades." },
+                    { label:"Avg Gain", val:`+${actualStats.avgGain.toFixed(2)}%`, color:C.green, tip:"Average percentage return on your winning trades." },
+                    { label:"Avg Loss", val:`-${actualStats.avgLoss.toFixed(2)}%`, color:C.red, tip:"Average percentage loss on your losing trades." },
+                    { label:"Reward / Risk", val:actualStats.rewardRisk.toFixed(2), color:actualStats.rewardRisk >= 2 ? C.green : actualStats.rewardRisk >= 1 ? C.gold : C.red, tip:"Average gain ÷ average loss — the size of a typical winner versus a typical loser." },
+                    { label:"Equity Growth / Trade", val:`${(retPerTrade*100).toFixed(2)}%`, color:retPerTrade>=0?C.green:C.red, tip:"Per-trade growth of your total equity — average R-multiple × the ROTE you risk per trade. Different from the Journal's avg return per trade, which measures return on the trade itself." },
+                  ];
+                  return cards.map((c,i) => (
+                    <div key={i} style={{ padding:"11px 13px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}`,minHeight:68,display:"flex",flexDirection:"column",justifyContent:"center" }}>
+                      <div style={{ fontSize:"0.54rem",fontWeight:700,color:C.muted,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:5 }}><Abbr tip={c.tip} underline={false}>{c.label}</Abbr></div>
+                      <div style={{ fontSize:"1.02rem",fontWeight:800,color:c.color,letterSpacing:"-0.02em" }}>{c.val}</div>
+                    </div>
+                  ));
+                })()}
+              </div>
           </div>
           {annualGoal && (
-            <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))",gap:12,marginBottom:16 }}>
+            <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(185px, 1fr))",gap:12,marginBottom:16 }}>
               <StatTile label="Annual Target" value={fmt$(annualGoal.targetEquity)} color={C.gold} sub={`+${targetAnnualReturn}% from ${fmt$(compEquity)}`} />
               <StatTile label="Trades Required" value={annualGoal.requiredTrades === Infinity ? "∞" : String(annualGoal.requiredTrades)} color={C.gold} sub={`${(annualGoal.returnPerTrade * 100).toFixed(2)}% per trade`} />
               <StatTile label="Trades Completed" value={String(completedTrades)} color={completedTrades >= (annualGoal.requiredTrades || 0) ? C.green : C.blue} sub={annualGoal.requiredTrades !== Infinity ? `${Math.min(100, (completedTrades / annualGoal.requiredTrades * 100)).toFixed(0)}% of target` : "—"} />
@@ -3695,12 +3713,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           )}
 
           {finalProj && (
-            <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))",gap:12,marginBottom:16 }}>
+            <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(185px, 1fr))",gap:12,marginBottom:16 }}>
               <StatTile label="Current Equity" value={fmt$(compEquity)} />
               <StatTile label={`Target (${projBatches} Trades)`} value={fmt$(finalProj.equity)} color={C.green} />
-              <StatTile label="Target Growth" value={`+${finalProj.growthPct.toFixed(1)}%`} color={C.green} sub={`+${fmt$(finalProj.equity - compEquity)}`} />
+              <StatTile label="Target Growth" value={`+${finalProj.growthPct.toFixed(2)}%`} color={C.green} sub={`+${fmt$(finalProj.equity - compEquity)}`} />
               {actualStats.count > 0 && chartData.length > 1 && (
-                <StatTile label={`Actual (${projBatches} Trades)`} value={fmt$(chartData[chartData.length-1].actual)} color={chartData[chartData.length-1].actual >= finalProj.equity ? C.green : C.red} sub={compEquity > 0 ? `${chartData[chartData.length-1].actual >= compEquity ? "+" : ""}${(((chartData[chartData.length-1].actual - compEquity)/compEquity)*100).toFixed(1)}%` : ""} />
+                <StatTile label={`Actual (${projBatches} Trades)`} value={fmt$(chartData[chartData.length-1].actual)} color={chartData[chartData.length-1].actual >= finalProj.equity ? C.green : C.red} sub={compEquity > 0 ? `${chartData[chartData.length-1].actual >= compEquity ? "+" : ""}${(((chartData[chartData.length-1].actual - compEquity)/compEquity)*100).toFixed(2)}%` : ""} />
               )}
             </div>
           )}
@@ -3719,12 +3737,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                       <stop offset="100%" stopColor={C.blue} stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="rgba(255,255,255,0.04)" />
-                  <XAxis dataKey="cycle" stroke={C.muted} tick={{ fontSize:10 }} />
-                  <YAxis stroke={C.muted} tick={{ fontSize:10 }} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} />
-                  <Tooltip contentStyle={{ background:"#0c0c14",border:`1px solid ${C.border}`,borderRadius:10,fontSize:"0.72rem" }} formatter={(v) => [`$${Number(v).toLocaleString()}`, ""]} />
-                  <Area type="monotone" dataKey="expected" stroke={C.green} strokeWidth={2.5} fill="url(#gradTarget)" dot={false} name="Target" />
-                  {actualStats.count > 0 && <Area type="monotone" dataKey="actual" stroke={C.blue} strokeWidth={2.5} fill="url(#gradActual)" dot={false} name="Actual" />}
+                  <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="cycle" stroke={C.muted} tick={{ fontSize:10 }} tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis stroke={C.muted} tick={{ fontSize:10 }} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} />
+                  <Tooltip content={<ChartTip fmt={v => `$${Number(v).toLocaleString()}`} />} cursor={{ stroke:C.borderGold,strokeWidth:1,strokeDasharray:"4 4" }} />
+                  <Area type="natural" dataKey="expected" stroke={C.green} strokeWidth={2.5} fill="url(#gradTarget)" dot={false} name="Target" />
+                  {actualStats.count > 0 && <Area type="natural" dataKey="actual" stroke={C.blue} strokeWidth={2.5} fill="url(#gradActual)" dot={false} name="Actual" />}
                   <ReferenceLine y={compEquity} stroke={C.muted} strokeDasharray="3 3" label={{ value:"Now",fill:C.muted,fontSize:10 }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -4275,14 +4293,14 @@ function AuthPage() {
 
   return (
     <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased", color: C.text, position: "relative", overflow: "hidden" }}>
-      <SmokeBackground />
+      <AppBackground intensity="serene" />
       {/* Radial vignette overlay */}
       <div style={{ position:"absolute",inset:0,zIndex:1,background:"radial-gradient(ellipse at center, transparent 30%, rgba(8,8,14,0.85) 100%)",pointerEvents:"none" }} />
       <div style={{ width: "100%", maxWidth: 420, padding: "0 24px", position: "relative", zIndex: 2 }}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           {/* VIV Logo mark */}
-          <div style={{ width:56,height:56,borderRadius:16,background:`linear-gradient(135deg, ${C.gold}, ${C.goldBright})`,display:"inline-flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:"1.5rem",color:"#08080e",letterSpacing:"-0.04em",fontFamily:font,marginBottom:16,boxShadow:"0 0 30px rgba(201,152,42,0.3), 0 0 60px rgba(201,152,42,0.15)" }}>V</div>
-          <div style={{ fontWeight: 800, fontSize: "1.6rem", letterSpacing: "-0.03em", color: C.gold, marginBottom: 8, textShadow: `0 0 12px rgba(201,152,42,0.4), 0 0 28px rgba(201,152,42,0.2)`, lineHeight: 1.2 }}>Valen Insiders Vault</div>
+          <img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width:88,height:"auto",display:"block",margin:"0 auto 16px",filter:"drop-shadow(0 0 22px rgba(201,152,42,0.4))" }} />
+          <Wordmark size="1.6rem" style={{ marginBottom: 8 }} />
           <div style={{ fontWeight: 400, fontSize: "0.82rem", color: C.muted, lineHeight: 1.6 }}>
             {mode === "login" ? "Members-only trading dashboard." : mode === "register" ? "Create your account to get started." : "Reset your password."}
           </div>
@@ -4315,7 +4333,7 @@ function AuthPage() {
             {success && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", color: C.green, fontSize: "0.74rem", fontWeight: 500, marginBottom: 16 }}>{success}</div>}
             <button type="submit" disabled={loading} style={{
               width: "100%", padding: "14px", borderRadius: 980, border: "none", cursor: loading ? "wait" : "pointer",
-              background: `linear-gradient(135deg, #a06800, ${C.goldBright}, #a06800)`, color: "#000",
+              background: `linear-gradient(135deg, ${C.goldMid}, ${C.goldBright}, ${C.goldDeep})`, color: "#000",
               fontWeight: 800, fontSize: "0.88rem", fontFamily: font, letterSpacing: "-0.01em",
               opacity: loading ? 0.7 : 1, transition: "opacity 0.2s",
             }}>{loading ? "Please wait..." : mode === "login" ? "Sign In" : mode === "register" ? "Create Account" : "Send Reset Email"}</button>
@@ -4343,11 +4361,67 @@ function AuthPage() {
 // ═══════════════════════════════════════
 // ─── MAIN APP ───
 // ═══════════════════════════════════════
+// ─── Navigation line-icons (thin gold strokes — no emoji) ───
+function NavIcon({ name, size = 17, color = "currentColor" }) {
+  const p = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" };
+  if (name === "dashboard") return <svg {...p}><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-6" /></svg>;
+  if (name === "journal") return <svg {...p}><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>;
+  if (name === "tools") return <svg {...p}><path d="M4 6h9M17 6h3M4 12h4M12 12h8M4 18h11M19 18h1" /><circle cx="14" cy="6" r="2.1" /><circle cx="10" cy="12" r="2.1" /><circle cx="16" cy="18" r="2.1" /></svg>;
+  if (name === "settings") return <svg {...p}><circle cx="12" cy="12" r="3.4" /><path d="M12 2v3.2M12 18.8V22M2 12h3.2M18.8 12H22M4.9 4.9l2.3 2.3M16.8 16.8l2.3 2.3M19.1 4.9l-2.3 2.3M7.2 16.8l-2.3 2.3" /></svg>;
+  return null;
+}
+
+// ─── Animated app background — calm grid + drifting particles + cursor glow ───
+const appBgCSS = `
+.viv-bg-particle{position:absolute;border-radius:50%;background:rgba(240,192,80,0.6);animation-name:vivFloat;animation-timing-function:ease-in-out;animation-iteration-count:infinite;will-change:transform,opacity;}
+@keyframes vivFloat{0%,100%{transform:translateY(0) translateX(0);opacity:0.12;}25%{transform:translateY(-16px) translateX(7px);opacity:0.45;}50%{transform:translateY(-8px) translateX(-5px);opacity:0.26;}75%{transform:translateY(-22px) translateX(9px);opacity:0.6;}}
+.viv-bg-pulse{position:absolute;border-radius:50%;animation:vivPulse 8s ease-in-out infinite;will-change:opacity,transform;}
+@keyframes vivPulse{0%,100%{opacity:0.05;transform:translate(-50%,-50%) scale(0.85);}50%{opacity:0.15;transform:translate(-50%,-50%) scale(1.12);}}
+`;
+function AppBackground({ intensity = "calm" }) {
+  const serene = intensity === "serene";
+  const glowRef = useRef(null);
+  useEffect(() => {
+    // Direct GPU-transform tracking via ref — no React re-render, no CSS transition lag.
+    let raf = null, px = -800, py = -800;
+    const onMove = (e) => {
+      px = e.clientX; py = e.clientY;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        if (glowRef.current) glowRef.current.style.transform = `translate(${px}px,${py}px) translate(-50%,-50%)`;
+        raf = null;
+      });
+    };
+    window.addEventListener("mousemove", onMove);
+    return () => { window.removeEventListener("mousemove", onMove); if (raf) cancelAnimationFrame(raf); };
+  }, []);
+  const count = serene ? 40 : 20;
+  const particles = useMemo(() => Array.from({ length: count }, (_, i) => ({
+    left: `${(i * 39 + 7) % 100}%`, top: `${(i * 27 + 13) % 100}%`,
+    delay: `${((i * 0.71) % 7).toFixed(2)}s`, dur: `${(serene ? 6 : 9) + (i % 6) * 2}s`,
+    size: serene && i % 3 === 0 ? 3.5 : 2.5,
+  })), [count, serene]);
+  const pulses = serene ? [
+    { left: "16%", top: "24%", size: 420, delay: "0s" },
+    { left: "84%", top: "70%", size: 480, delay: "2.6s" },
+    { left: "62%", top: "12%", size: 360, delay: "4.8s" },
+  ] : [];
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden" }}>
+      <style>{appBgCSS}</style>
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(to right, rgba(255,255,255,0.022) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.022) 1px, transparent 1px)", backgroundSize: "44px 44px", maskImage: "radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 82%)", WebkitMaskImage: "radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 82%)" }} />
+      {pulses.map((pl, i) => <div key={`pl${i}`} className="viv-bg-pulse" style={{ left: pl.left, top: pl.top, width: pl.size, height: pl.size, animationDelay: pl.delay, background: "radial-gradient(circle, rgba(201,152,42,0.5), transparent 70%)" }} />)}
+      {particles.map((p, i) => <div key={i} className="viv-bg-particle" style={{ left: p.left, top: p.top, width: p.size, height: p.size, animationDelay: p.delay, animationDuration: p.dur }} />)}
+      <div ref={glowRef} style={{ position: "absolute", left: 0, top: 0, width: serene ? 620 : 520, height: serene ? 620 : 520, borderRadius: "50%", background: `radial-gradient(circle, rgba(201,152,42,${serene ? 0.11 : 0.085}), rgba(201,152,42,0.035) 38%, transparent 70%)`, transform: "translate(-800px,-800px) translate(-50%,-50%)", willChange: "transform" }} />
+    </div>
+  );
+}
+
 const NAV = [
-  { id: "dashboard", label: "Dashboard", icon: "\u{1F4C8}" },
-  { id: "journal", label: "Journal", icon: "\u{1F4CA}" },
-  { id: "tools", label: "Tools", icon: "\u{26A1}" },
-  { id: "settings", label: "Settings", icon: "\u{2699}" },
+  { id: "dashboard", label: "Dashboard" },
+  { id: "journal", label: "Journal" },
+  { id: "tools", label: "Tools" },
+  { id: "settings", label: "Settings" },
 ];
 
 
@@ -4919,7 +4993,7 @@ function AppInner() {
     return (
       <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontWeight: 800, fontSize: "1.3rem", color: C.gold, marginBottom: 12, textShadow: `0 0 12px rgba(201,152,42,0.4)` }}>Valen Insiders Vault</div>
+          <Wordmark size="1.3rem" style={{ marginBottom: 12 }} />
           <div style={{ fontSize: "0.78rem", color: C.muted }}>Loading...</div>
         </div>
       </div>
@@ -4956,22 +5030,27 @@ function AppInner() {
     return (
       <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column", zoom: appZoom }}>
         <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
-          <div style={{ fontWeight: 800, fontSize: "0.88rem", letterSpacing: "-0.02em", color: C.gold, lineHeight: 1, textShadow: `0 0 6px rgba(201,152,42,0.35), 0 0 14px rgba(201,152,42,0.15)` }}>Valen Insiders Vault</div>
+          <Wordmark size="0.88rem" style={{ lineHeight: 1 }} />
           <button onClick={handleLogout} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
         </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80 }}>{pageContent}</div>
+        <AppBackground />
+        <div style={{ flex: 1, overflowY: "auto", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80, position: "relative", zIndex: 1 }}>{pageContent}</div>
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(8,8,14,0.97)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
-          {NAV.map(item => (
-            <button key={item.id} onClick={() => setPage(item.id)} style={{
-              flex: 1, padding: "10px 0 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-              border: "none", cursor: "pointer", fontFamily: font, background: "transparent",
-              color: page === item.id ? C.gold : C.muted, transition: "color 0.15s",
-            }}>
-              <span style={{ fontSize: "1.1rem" }}>{item.icon}</span>
-              <span style={{ fontSize: "0.54rem", fontWeight: page === item.id ? 700 : 500, letterSpacing: "0.04em" }}>{item.label}</span>
-              {page === item.id && <div style={{ position: "absolute", top: 0, width: 24, height: 2, borderRadius: 1, background: C.gold }} />}
-            </button>
-          ))}
+          {NAV.map(item => {
+            const active = page === item.id;
+            return (
+              <button key={item.id} onClick={() => setPage(item.id)} style={{
+                flex: 1, padding: "9px 0 11px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                border: "none", cursor: "pointer", fontFamily: font, position: "relative",
+                background: active ? "linear-gradient(180deg, rgba(201,152,42,0.16), transparent)" : "transparent",
+                color: active ? C.goldBright : C.muted, transition: "color 0.15s",
+              }}>
+                <NavIcon name={item.id} size={19} />
+                <span style={{ fontSize: "0.56rem", fontWeight: active ? 700 : 500, letterSpacing: "0.04em" }}>{item.label}</span>
+                {active && <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 26, height: 2, borderRadius: 1, background: C.goldBright }} />}
+              </button>
+            );
+          })}
         </div>
       </div>
     );
@@ -4981,19 +5060,30 @@ function AppInner() {
   return (
     <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text, zoom: appZoom }}>
       <div onMouseEnter={() => setSidebarOpen(true)} onMouseLeave={() => setSidebarOpen(false)} style={{ width: sidebarW, minHeight: "100vh", padding: sidebarOpen ? "24px 14px" : "24px 8px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, alignSelf: "flex-start", transition: "width 0.2s ease, padding 0.2s ease", overflow: "hidden", position: "relative", zIndex: 50 }}>
-        <div style={{ fontWeight: 800, fontSize: sidebarOpen ? "0.95rem" : "1.1rem", letterSpacing: "-0.02em", color: C.gold, marginBottom: 24, padding: "0 4px", lineHeight: 1.2, textShadow: `0 0 8px rgba(201,152,42,0.35), 0 0 16px rgba(201,152,42,0.15)`, textAlign: sidebarOpen ? "left" : "center", whiteSpace: "nowrap", overflow: "hidden" }}>{sidebarOpen ? "Valen Insiders Vault" : "V"}</div>
+        {sidebarOpen
+          ? <Wordmark size="0.95rem" style={{ marginBottom: 24, padding: "0 4px", whiteSpace: "nowrap", overflow: "hidden" }} />
+          : <div style={{ marginBottom: 24, textAlign: "center" }}><img src="/logo-mark.png" alt="VIV" style={{ width: 30, height: "auto", filter: "drop-shadow(0 0 8px rgba(201,152,42,0.45))" }} /></div>}
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {NAV.map(item => (
-            <button key={item.id} onClick={() => setPage(item.id)} style={{
-              display: "flex", alignItems: "center", gap: 10, padding: sidebarOpen ? "10px 12px" : "10px 0", borderRadius: 10,
-              border: "none", cursor: "pointer", fontFamily: font, width: "100%", textAlign: "left",
-              justifyContent: sidebarOpen ? "flex-start" : "center",
-              background: page === item.id ? C.goldDim : "transparent",
-              color: page === item.id ? C.gold : C.muted,
-              fontWeight: page === item.id ? 700 : 500, fontSize: "0.78rem", transition: "all 0.15s",
-              whiteSpace: "nowrap", overflow: "hidden",
-            }}><span style={{ fontSize: sidebarOpen ? "0.82rem" : "1.1rem", width: sidebarOpen ? 18 : "auto", textAlign: "center", flexShrink: 0 }}>{item.icon}</span>{sidebarOpen && <span>{item.label}</span>}</button>
-          ))}
+          {NAV.map(item => {
+            const active = page === item.id;
+            return (
+              <button key={item.id} onClick={() => setPage(item.id)} style={{
+                display: "flex", alignItems: "center", gap: 11, padding: sidebarOpen ? "11px 13px" : "11px 0", borderRadius: 12,
+                border: active ? `1px solid ${C.borderGold}` : "1px solid transparent",
+                cursor: "pointer", fontFamily: font, width: "100%", textAlign: "left",
+                justifyContent: sidebarOpen ? "flex-start" : "center",
+                background: active ? "linear-gradient(135deg, rgba(201,152,42,0.22), rgba(201,152,42,0.06))" : "transparent",
+                boxShadow: active ? "inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 14px rgba(201,152,42,0.13)" : "none",
+                backdropFilter: active ? "blur(8px)" : "none", WebkitBackdropFilter: active ? "blur(8px)" : "none",
+                color: active ? C.goldBright : C.muted,
+                fontWeight: active ? 700 : 500, fontSize: "0.82rem", letterSpacing: "0.01em", transition: "all 0.18s ease",
+                whiteSpace: "nowrap", overflow: "hidden",
+              }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.color = C.text; }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.color = C.muted; }}
+              ><span style={{ display: "flex", flexShrink: 0 }}><NavIcon name={item.id} size={17} /></span>{sidebarOpen && <span>{item.label}</span>}</button>
+            );
+          })}
         </div>
         <div style={{ flex: 1 }} />
         {sidebarOpen ? (
@@ -5007,8 +5097,8 @@ function AppInner() {
         )}
       </div>
       <div style={{ flex: 1, padding: `${contentPadV}px ${contentPadH}px`, overflowY: "auto", minWidth: 0, position: "relative" }}>
-        {/* Subtle grid background */}
-        <div style={{ position:"fixed",top:0,left:sidebarW,right:0,bottom:0,zIndex:0,pointerEvents:"none",backgroundImage:`linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px)`,backgroundSize:"40px 40px",maskImage:"radial-gradient(ellipse at center, rgba(0,0,0,0.4), transparent 80%)",WebkitMaskImage:"radial-gradient(ellipse at center, rgba(0,0,0,0.4), transparent 80%)" }} />
+        {/* Animated background */}
+        <AppBackground />
         <div style={{ position:"relative",zIndex:1 }}>{pageContent}</div>
       </div>
     </div>
