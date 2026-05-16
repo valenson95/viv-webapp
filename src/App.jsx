@@ -3299,27 +3299,65 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 );
               })()}
 
-              {/* Totals — 24 cols: Status,Symbol,L/S,Shares,AvgCost,Comm,PosSize,Exp%,Realized,OrigStop,Stop2,TrailStop,Current,Setup,Tags,DTS,RTS,ROTE,[RSuggest+Locked|SBE+SBE%],P/L,R,Notes,Actions */}
-              <tr style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
-                <td colSpan={2} style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
-                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.text,fontSize:"0.70rem"}}>{enriched.reduce((s,p)=>s+p.sharesN,0).toLocaleString()}</td>
+              {/* Totals — 24 cols via DragTr for drag-reorder alignment: Status(0),Symbol(1),L/S(2),Shares(3),AvgCost(4),Comm(5),PosSize(6),Exp%(7),Realized(8),OrigStop(9),Stop2(10),TrailStop(11),Current(12),Setup(13),Tags(14),DTS(15),RTS(16),ROTE(17),SBE/RSuggest(18),SBE%/Locked(19),P/L(20),R(21),Notes(22),Actions(23) */}
+              <DragTr order={posDrag.order} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
+                {/* 0: Status */}
+                <td style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
+                {/* 1: Symbol */}
                 <td />
+                {/* 2: L/S */}
+                <td />
+                {/* 3: Shares */}
+                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.text,fontSize:"0.70rem"}}>{enriched.reduce((s,p)=>s+p.sharesN,0).toLocaleString()}</td>
+                {/* 4: Avg Cost */}
+                <td />
+                {/* 5: Comm */}
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,color:C.muted,fontSize:"0.70rem"}}>{fmt$(enriched.reduce((s,p)=>s+p.commN,0))}</td>
+                {/* 6: Pos Size */}
                 <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}><div style={{fontWeight:800,fontSize:"0.72rem",color:C.goldBright}}>{fmt$(enriched.reduce((s,p)=>s+p.posValue,0))}</div></td>
+                {/* 7: Exp % */}
                 <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{(()=>{const tv=enriched.reduce((s,p)=>s+p.posValue,0);const expPct=compEquity>0?(tv/compEquity)*100:0;return<div style={{fontWeight:800,fontSize:"0.72rem",color:expPct>100?C.red:expPct>80?C.gold:C.green}}>{expPct.toFixed(1)}%{expPct>100&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>{(expPct/100).toFixed(1)}x</span>}</div>})()}</td>
+                {/* 8: Realized */}
                 <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{(()=>{const tr=enriched.reduce((s,p)=>s+p.realizedPL,0);return tr!==0?<div style={{fontWeight:800,fontSize:"0.72rem",color:tr>=0?C.green:C.red}}>{tr>=0?"+":"-"}{fmt$(Math.abs(tr))}</div>:<span style={{color:C.muted}}>—</span>})()}</td>
-                <td colSpan={6} />
+                {/* 9: Orig Stop */}
+                <td />
+                {/* 10: Stop 2 */}
+                <td />
+                {/* 11: Trail Stop */}
+                <td />
+                {/* 12: Current */}
+                <td />
+                {/* 13: Setup */}
+                <td />
+                {/* 14: Tags */}
+                <td />
+                {/* 15: DTS */}
                 <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalDtsD<=0?C.green:C.text}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalDtsD).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${Math.abs(totals.avgDtsPct).toFixed(2)}%`}</td>
-                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.74rem",color:totals.totalRTS<=0?C.green:C.red,animation:totals.totalRTS>0?"rtsGlow 2.5s ease-in-out infinite":"rtsGlowGreen 3s ease-in-out infinite"}}>{displayMode==="R"?"—":displayMode==="$"?`$${Math.abs(totals.totalRTS).toLocaleString(undefined,{maximumFractionDigits:0})}`:`${totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%`}</td>
+                {/* 16: RTS — always show both % and $ */}
+                <td style={{padding:"8px 6px",textAlign:"right",whiteSpace:"nowrap",animation:totals.totalRTS>0?"rtsGlow 2.5s ease-in-out infinite":"rtsGlowGreen 3s ease-in-out infinite"}}>
+                  {displayMode==="R"?"—":<>
+                    <div style={{fontWeight:800,fontSize:"0.74rem",color:totals.totalRTS<=0?C.green:C.red}}>{totals.totalValue>0?((totals.totalRTS/totals.totalValue)*100).toFixed(2):"0.00"}%</div>
+                    <div style={{fontSize:"0.58rem",color:totals.totalRTS<=0?C.green:C.red,marginTop:1,fontWeight:700}}>{totals.totalRTS<=0?"FREE":fmt$(totals.totalRTS)}</div>
+                  </>}
+                </td>
+                {/* 17: ROTE */}
                 <td style={{padding:"8px 6px",textAlign:"right",whiteSpace:"nowrap"}}>
                   <div style={{fontWeight:800,fontSize:"0.72rem",color:totals.currentRotePct>totals.tgtRotePct?C.red:totals.currentRotePct>(totals.tgtRotePct*0.8)?C.gold:C.green}}>{totals.currentRotePct.toFixed(2)}%{totals.currentRotePct>totals.tgtRotePct&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>⚠</span>}</div>
                   <div style={{fontSize:"0.58rem",color:C.muted,marginTop:1}}>Init: {totals.totalRotePct.toFixed(2)}%</div>
                 </td>
-                {displayMode==="R" ? <><td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,fontSize:"0.68rem",color:C.muted}}>—</td><td /></> : <td colSpan={2} />}
-                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{displayMode==="R"?`${totals.totalPL>=0?"+":""}${fmt$(Math.abs(totals.totalPL))}`:`${totals.totalPL>=0?"+":"-"}${fmt$(Math.abs(totals.totalPL))}`}</td>
+                {/* 18: SBE / R Suggest */}
+                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:700,fontSize:"0.68rem",color:C.muted}}>{displayMode==="R"?"—":""}</td>
+                {/* 19: SBE% / Locked */}
                 <td />
+                {/* 20: P/L */}
+                <td style={{padding:"12px 6px",textAlign:"right",fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{`${totals.totalPL>=0?"+":"-"}${fmt$(Math.abs(totals.totalPL))}`}</td>
+                {/* 21: R */}
                 <td />
-              </tr>
+                {/* 22: Notes */}
+                <td />
+                {/* 23: Actions */}
+                <td />
+              </DragTr>
             </tbody>
           </table>
         </div>
