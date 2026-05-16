@@ -2426,6 +2426,8 @@ const GLOSSARY = [
 ];
 
 function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg }) {
+  const [compactTable, setCompactTable] = useState(false);
+  const [riskBreakdownOpen, setRiskBreakdownOpen] = useState(false);
   const [sizerMode, setSizerMode] = useState("R"); // "R" = risk-based (default), "%" = position size
   const [rNumStocks, setRNumStocks] = useState(4);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
@@ -4337,8 +4339,6 @@ function AppInner() {
   const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [compactTable, setCompactTable] = useState(false);
-  const [riskBreakdownOpen, setRiskBreakdownOpen] = useState(false);
 
   // ─── Data State (starts with defaults, loaded from Supabase after auth) ───
   const [setupTypes, setSetupTypes] = useState(DEFAULT_SETUP_TYPES);
