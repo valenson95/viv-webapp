@@ -1419,7 +1419,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const distAnalysis = useMemo(() => {
     const trades = filtered;
     const total = trades.length;
-    if (total === 0) return { barData: [], tableData: [], drmaData: [], gainMag: [], lossMag: [] };
+    if (total === 0) return { barData: [], tableData: [], butterflyData: [], butterflyDrma: [], gainMag: [], lossMag: [], returnPerTrade: 0 };
 
     // Find max absolute P&L% to determine bucket range
     const maxAbsPct = Math.max(...trades.map(t => Math.abs(t.plPct)));
