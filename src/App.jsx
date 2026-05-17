@@ -232,7 +232,8 @@ function useCountUp(target, duration = 900) {
       const eased = 1 - Math.pow(1 - progress, 3);
       const current = fromN + (toN - fromN) * eased;
       // Reconstruct string format: preserve prefix/suffix from target
-      const numStr = current.toFixed(decimals);
+      // Use magnitude only — any sign is already part of the target template (prefix or value)
+      const numStr = Math.abs(current).toFixed(decimals);
       // Replace the numeric part in target string
       const formatted = String(to).replace(/[\d,]+\.?\d*/, numStr.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
       setDisplay(formatted);
@@ -4412,7 +4413,7 @@ function AppBackground({ intensity = "calm" }) {
       <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(to right, rgba(255,255,255,0.022) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.022) 1px, transparent 1px)", backgroundSize: "44px 44px", maskImage: "radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 82%)", WebkitMaskImage: "radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 82%)" }} />
       {pulses.map((pl, i) => <div key={`pl${i}`} className="viv-bg-pulse" style={{ left: pl.left, top: pl.top, width: pl.size, height: pl.size, animationDelay: pl.delay, background: "radial-gradient(circle, rgba(201,152,42,0.5), transparent 70%)" }} />)}
       {particles.map((p, i) => <div key={i} className="viv-bg-particle" style={{ left: p.left, top: p.top, width: p.size, height: p.size, animationDelay: p.delay, animationDuration: p.dur }} />)}
-      <div ref={glowRef} style={{ position: "absolute", left: 0, top: 0, width: serene ? 620 : 520, height: serene ? 620 : 520, borderRadius: "50%", background: `radial-gradient(circle, rgba(201,152,42,${serene ? 0.11 : 0.085}), rgba(201,152,42,0.035) 38%, transparent 70%)`, transform: "translate(-800px,-800px) translate(-50%,-50%)", willChange: "transform" }} />
+      <div ref={glowRef} style={{ position: "absolute", left: 0, top: 0, width: serene ? 620 : 520, height: serene ? 620 : 520, borderRadius: "50%", background: `radial-gradient(circle, rgba(201,152,42,${serene ? 0.055 : 0.04}), rgba(201,152,42,0.016) 38%, transparent 70%)`, transform: "translate(-800px,-800px) translate(-50%,-50%)", willChange: "transform" }} />
     </div>
   );
 }
