@@ -463,9 +463,15 @@ function GoldBtn({ children, onClick, small }) {
 function SourceDot({ source }) {
   const ibkr = source === "ibkr";
   const rec = source === "reconciled";
+  const tip = ibkr
+    ? <><strong style={{ color: C.gold }}>Auto-synced from IBKR.</strong><br />Pulled straight from your broker — exact prices, shares, commission and times.</>
+    : rec
+    ? <><strong style={{ color: C.gold }}>Reconciled.</strong><br />IBKR's exact figures merged into your manual entry, keeping your own notes, tags and stop.</>
+    : <><strong style={{ color: C.white }}>Manual entry.</strong><br />You keyed this in yourself — not from IBKR.</>;
   return (
-    <span title={ibkr ? "Auto-synced from Interactive Brokers" : rec ? "Reconciled — IBKR figures + your notes/tags" : "Manually entered"}
-      style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", flexShrink: 0, marginRight: 6, verticalAlign: "middle", background: rec ? "transparent" : (ibkr ? C.gold : "rgba(255,255,255,0.25)"), border: rec ? `1.5px solid ${C.gold}` : "none", boxShadow: ibkr ? `0 0 5px ${C.gold}` : "none" }} />
+    <Abbr tip={tip} underline={false}>
+      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", flexShrink: 0, marginRight: 6, verticalAlign: "middle", cursor: "help", background: rec ? "transparent" : (ibkr ? C.gold : "rgba(255,255,255,0.28)"), border: rec ? `2px solid ${C.gold}` : "none", boxShadow: ibkr ? `0 0 5px ${C.gold}` : "none" }} />
+    </Abbr>
   );
 }
 
@@ -543,29 +549,58 @@ function buildIbkrPreview(data, positions, journaledTrades) {
     if (cands.length > 1) return { ...p, action: "review", matchId: null };
     return { ...p, action: "new", matchId: null };
   });
-  return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows };
+  // ── Auto-close candidates ── positions IBKR no longer holds, whose closing round-trip is in THIS sync.
+  // SAFETY GATE (all must hold): (1) IBKR-owned only — a manual position is NEVER eligible; (2) IBKR's statement
+  // actually returned trade data (an empty/partial statement disqualifies everything — can't confirm a close
+  // without executions); (3) IBKR no longer reports the conid as open (checked against RAW positions, ignoring the
+  // floor, so an out-of-scope-but-still-open lot is never mistaken for closed) — this also makes a PARTIAL sell
+  // ineligible, since the conid is still listed with its reduced size; (4) a reconstructed closed round-trip for
+  // that symbol exists in this sync. The journal-first rule (only remove once the close is actually written to the
+  // Journal) is enforced at write time in confirmIbkrSync, not here.
+  const haveTradeData = Array.isArray(data.trades) && data.trades.length > 0;
+  const ibkrOpenConids = new Set((data.positions || []).filter(p => Number(p.shares) !== 0).map(p => String(p.conid)));
+  const closedBySym = {};
+  closed.forEach(c => { const k = (c.ticker || "").toUpperCase(); (closedBySym[k] = closedBySym[k] || []).push(c); });
+  // Net signed quantity per symbol across ALL executions — independent proof of "fully flat" that doesn't rely on
+  // the Open Positions section being present. A reopened or partially-sold symbol nets to non-zero and is excluded.
+  const netBySym = {};
+  (data.trades || []).forEach(t => { const k = (t.symbol || "").toUpperCase(); netBySym[k] = (netBySym[k] || 0) + (Number(t.signedQty) || 0); });
+  const closeRows = !haveTradeData ? [] : (positions || [])
+    .filter(p => isIbkr(p.source) && p.ibConid                       // (1) IBKR-owned only
+      && !ibkrOpenConids.has(String(p.ibConid))                      // (3a) IBKR no longer lists it open
+      && Math.round(netBySym[(p.sym || "").toUpperCase()] || 0) === 0 // (3b) executions net to flat (catches reopen/partial)
+      && closedBySym[(p.sym || "").toUpperCase()])                   // (4) a closing round-trip exists this sync
+    .map(p => {
+      const rt = closedBySym[(p.sym || "").toUpperCase()];
+      const link = rt[rt.length - 1];                                // most recent round-trip for this symbol
+      return { posId: p.id, sym: p.sym, shares: p.shares, ep: p.ep, entry: p.entry, conid: p.ibConid,
+        linkExecId: link ? link.execId : null, exit: link ? link.exit : "", action: "close" };
+    });
+
+  return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows, closeRows };
 }
 
 // Interactive sync modal — preview + per-row decisions + confirm. Writes happen via onConfirm (App), surgically.
-const ibkrDefaultChoice = (action) => action === "review" ? "skip" : action === "reconcile" ? "reconcile" : action === "synced" ? "update" : "new";
+const ibkrDefaultChoice = (action) => action === "review" ? "skip" : action === "reconcile" ? "reconcile" : action === "synced" ? "update" : action === "close" ? "close" : "new";
 function ibkrChoiceOpts(r) {
   if (r.action === "synced") return [["update", "Update"], ["skip", "Skip"]];
   if (r.action === "reconcile") return [["reconcile", "Reconcile"], ["new", "Keep both"], ["skip", "Skip"]];
   if (r.action === "review") return r.matchId ? [["reconcile", "Reconcile"], ["new", "Import as new"], ["skip", "Skip"]] : [["new", "Import as new"], ["skip", "Skip"]];
+  if (r.action === "close") return [["close", "Close out"], ["skip", "Keep open"]];
   return [["new", "Import"], ["skip", "Skip"]];
 }
 function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, onConfirm }) {
-  const [choices, setChoices] = useState({ pos: {}, trade: {} });
+  const [choices, setChoices] = useState({ pos: {}, trade: {}, close: {} });
   useEffect(() => {
     if (data) {
-      const def = rows => rows.reduce((m, r, i) => { m[i] = ibkrDefaultChoice(r.action); return m; }, {});
-      setChoices({ pos: def(data.posRows), trade: def(data.tradeRows) });
+      const def = rows => (rows || []).reduce((m, r, i) => { m[i] = ibkrDefaultChoice(r.action); return m; }, {});
+      setChoices({ pos: def(data.posRows), trade: def(data.tradeRows), close: def(data.closeRows) });
     }
   }, [data]);
   if (!open) return null;
 
   const chip = (action) => {
-    const map = { new: { c: C.green, t: "New" }, synced: { c: C.muted, t: "Already synced" }, reconcile: { c: C.gold, t: "Matches manual" }, review: { c: C.red, t: "Needs review" } };
+    const map = { new: { c: C.green, t: "New" }, synced: { c: C.muted, t: "Already synced" }, reconcile: { c: C.gold, t: "Matches manual" }, review: { c: C.red, t: "Needs review" }, close: { c: C.goldBright, t: "Closed at IBKR" } };
     const m = map[action] || map.new;
     return <span style={{ fontSize: "0.5rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: m.c, border: `1px solid ${m.c}55`, borderRadius: 980, padding: "2px 7px", whiteSpace: "nowrap" }}>{m.t}</span>;
   };
@@ -577,10 +612,10 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
     </select>
   );
   const confirm = () => {
-    const resolve = (rows, ch) => rows.map((r, i) => ({ ...r, choice: ch[i] || "skip" }));
-    onConfirm(resolve(data.posRows, choices.pos), resolve(data.tradeRows, choices.trade));
+    const resolve = (rows, ch) => (rows || []).map((r, i) => ({ ...r, choice: ch[i] || "skip" }));
+    onConfirm(resolve(data.posRows, choices.pos), resolve(data.tradeRows, choices.trade), resolve(data.closeRows, choices.close));
   };
-  const willWrite = data ? [...Object.values(choices.pos), ...Object.values(choices.trade)].filter(c => c && c !== "skip").length : 0;
+  const willWrite = data ? [...Object.values(choices.pos), ...Object.values(choices.trade), ...Object.values(choices.close)].filter(c => c && c !== "skip").length : 0;
 
   return createPortal(
     <div onClick={status === "writing" ? undefined : onClose} style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(0,0,0,0.66)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
@@ -606,7 +641,7 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
               <div style={{ fontWeight: 800, fontSize: "1rem", color: C.green, marginBottom: 10 }}>Sync complete</div>
               <div style={{ fontSize: "0.76rem", color: C.text, lineHeight: 1.8 }}>
                 Trades: <strong style={{ color: C.white }}>{result.tInserted}</strong> new · <strong style={{ color: C.white }}>{result.tReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.tUpdated}</strong> refreshed<br />
-                Positions: <strong style={{ color: C.white }}>{result.pInserted}</strong> new · <strong style={{ color: C.white }}>{result.pReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.pUpdated}</strong> refreshed
+                Positions: <strong style={{ color: C.white }}>{result.pInserted}</strong> new · <strong style={{ color: C.white }}>{result.pReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.pUpdated}</strong> refreshed · <strong style={{ color: C.white }}>{result.pClosed || 0}</strong> closed out
               </div>
               {result.errors && result.errors.length > 0 && <div style={{ marginTop: 12, fontSize: "0.66rem", color: C.red }}>{result.errors.length} row(s) failed and were skipped: {result.errors.slice(0, 3).join("; ")}{result.errors.length > 3 ? "…" : ""}</div>}
               <button onClick={onClose} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font }}>Done</button>
@@ -623,9 +658,11 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                 <StatTile label="Closed Trades" value={String(data.tradeRows.length)} />
               </div>
               {[{ kind: "pos", title: "Open Positions", rows: data.posRows, cols: ["sym", "shares", "ep", "entry"], head: ["Symbol", "Shares", "Avg Cost", "Opened"] },
-                { kind: "trade", title: "Closed Trades (round-trips)", rows: data.tradeRows, cols: ["ticker", "shares", "entryP", "exitP", "plDollar", "entry"], head: ["Symbol", "Shares", "Entry", "Exit", "P/L $", "In"] }].map(sec => (
+                { kind: "trade", title: "Closed Trades (round-trips)", rows: data.tradeRows, cols: ["ticker", "shares", "entryP", "exitP", "plDollar", "entry"], head: ["Symbol", "Shares", "Entry", "Exit", "P/L $", "In"] },
+                ...(data.closeRows && data.closeRows.length ? [{ kind: "close", title: "Closed at IBKR — remove from Open Positions", rows: data.closeRows, cols: ["sym", "shares", "entry", "exit"], head: ["Symbol", "Shares", "Opened", "Closed"] }] : [])].map(sec => (
                 <div key={sec.title} style={{ marginBottom: 18 }}>
-                  <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>{sec.title} ({sec.rows.length})</div>
+                  <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: sec.kind === "close" ? C.goldBright : C.gold, marginBottom: 8 }}>{sec.title} ({sec.rows.length})</div>
+                  {sec.kind === "close" && <div style={{ fontSize: "0.64rem", color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>These came in from IBKR and are now fully closed there. <strong style={{ color: C.text }}>Close out</strong> files the closed trade into your Journal and removes it from Open Positions (the record is archived, never destroyed, and recoverable). Choose <strong style={{ color: C.text }}>Keep open</strong> to leave it on the Dashboard.</div>}
                   {sec.rows.length === 0 ? <div style={{ fontSize: "0.72rem", color: C.muted, padding: "8px 0" }}>None from {IBKR_SYNC_FLOOR} onward.</div> : (
                     <div style={{ overflowX: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
@@ -1869,7 +1906,8 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     // Adjusted G/L Ratio: factors in win rate — above 1.0 = net profitable
     const adjustedGL = avgLoss > 0 ? ((ba / 100) * avgGain) / (((100 - ba) / 100) * avgLoss) : 0;
     const ev = (ba / 100) * avgGain - ((100 - ba) / 100) * avgLoss;
-    const avgR = trades.reduce((s, t) => s + t.rMult, 0) / trades.length;
+    const rTrades = trades.filter(t => t.rMult != null); // imported trades have no stop → no R; don't dilute the average
+    const avgR = rTrades.length ? rTrades.reduce((s, t) => s + t.rMult, 0) / rTrades.length : 0;
     // Holding duration (days) — uses time fields for fractional-day accuracy when available
     const holdDays = (t) => {
       if (!t.entry || !t.exit) return null;
@@ -2865,14 +2903,14 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     <td style={{ padding: "11px 6px", color: C.muted, fontSize: "0.62rem" }}>{t.entryTime||"—"}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>{t.exit||"—"}</td>
                     <td style={{ padding: "11px 6px", color: C.muted, fontSize: "0.62rem" }}>{t.exitTime||"—"}</td>
-                    <td style={{ padding: "11px 8px", color: C.text }}>${t.entryP.toFixed(2)}</td>
-                    <td style={{ padding: "11px 8px", color: C.text }}>${t.exitP.toFixed(2)}</td>
-                    <td style={{ padding: "11px 8px", color: C.text }}>{t.shares.toLocaleString()}</td>
+                    <td style={{ padding: "11px 8px", color: C.text }}>${(Number(t.entryP) || 0).toFixed(2)}</td>
+                    <td style={{ padding: "11px 8px", color: C.text }}>${(Number(t.exitP) || 0).toFixed(2)}</td>
+                    <td style={{ padding: "11px 8px", color: C.text }}>{(Number(t.shares) || 0).toLocaleString()}</td>
                     <td style={{ padding: "11px 8px" }}><TagChip label={t.setup} color={C.gold} small /></td>
                     <td style={{ padding: "11px 8px" }}><div style={{display:"flex",gap:3,flexWrap:"wrap"}}>{(t.tags||[]).map(tag => <TagChip key={tag} label={tag} color={C.blue} small />)}</div></td>
-                    <td style={{ padding: "11px 8px", fontWeight: 700, color: t.plPct >= 0 ? C.green : C.red }}>{t.plPct >= 0 ? "+" : ""}{t.plPct.toFixed(2)}%</td>
-                    <td style={{ padding: "11px 8px", fontWeight: 700, color: t.plDollar >= 0 ? C.green : C.red }}>{t.plDollar >= 0 ? "+" : "-"}${Math.abs(t.plDollar).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-                    <td style={{ padding: "11px 8px", fontWeight: 700, color: t.rMult >= 0 ? C.green : C.red }}>{t.rMult.toFixed(2)}R</td>
+                    <td style={{ padding: "11px 8px", fontWeight: 700, color: (Number(t.plPct) || 0) >= 0 ? C.green : C.red }}>{(Number(t.plPct) || 0) >= 0 ? "+" : ""}{(Number(t.plPct) || 0).toFixed(2)}%</td>
+                    <td style={{ padding: "11px 8px", fontWeight: 700, color: (Number(t.plDollar) || 0) >= 0 ? C.green : C.red }}>{(Number(t.plDollar) || 0) >= 0 ? "+" : "-"}${Math.abs(Number(t.plDollar) || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                    <td style={{ padding: "11px 8px", fontWeight: 700, color: (t.rMult == null) ? C.muted : (t.rMult >= 0 ? C.green : C.red) }}>{t.rMult == null ? "—" : `${Number(t.rMult).toFixed(2)}R`}</td>
                     <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.66rem", whiteSpace: "nowrap" }}>{t.reason}</td>
                     <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.64rem", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: t.notes ? "pointer" : "default" }} onClick={() => t.notes && setExpandedTrade(expandedTrade === t.id ? null : t.id)} title={t.notes ? "Click to expand" : ""}>{notesPreview(t.notes) || "—"}</td>
                     <td style={{ padding: "11px 8px", whiteSpace: "nowrap" }}>
@@ -4959,16 +4997,19 @@ function AppInner() {
 
   // Phase 2 — surgical writes from the confirmed preview. INSERT new IBKR rows, UPDATE matched rows by id only.
   // Never deletes; reconcile updates only the factual columns so notes/tags/setup/stops are preserved.
-  const confirmIbkrSync = useCallback(async (posRows, tradeRows) => {
+  const confirmIbkrSync = useCallback(async (posRows, tradeRows, closeRows = []) => {
     const uid = session?.user?.id;
     if (!uid) { setIbkrStatus("error"); setIbkrError("Not signed in."); return; }
     setIbkrStatus("writing");
     const nowIso = new Date().toISOString();
-    const res = { tInserted: 0, tReconciled: 0, tUpdated: 0, pInserted: 0, pReconciled: 0, pUpdated: 0, errors: [] };
+    const res = { tInserted: 0, tReconciled: 0, tUpdated: 0, pInserted: 0, pReconciled: 0, pUpdated: 0, pClosed: 0, errors: [] };
+    // execIds of closing round-trips that actually land in the Journal this sync — the gate for auto-close.
+    const journaledExecIds = new Set();
 
     // ── TRADES ── updates first (by id), then bulk insert new
     const tradeInserts = [];
     for (const r of tradeRows) {
+      if (r.action === "synced" && r.execId) journaledExecIds.add(r.execId); // already journaled by a prior sync
       if (r.choice === "skip") continue;
       if (r.choice === "new") {
         tradeInserts.push({ user_id: uid, ticker: r.ticker, entry_date: r.entry, entry_time: r.entryTime || "", exit_date: r.exit, exit_time: r.exitTime || "", entry_price: r.entryP, exit_price: r.exitP, shares: r.shares, commission: r.commission, pl_pct: r.plPct, pl_dollar: r.plDollar, r_mult: null, setup: "", tags: [], exit_reason: "", notes: "", trade_type: r.tradeType, source: "ibkr", ib_exec_id: r.execId, ib_trade_id: r.tradeId, ib_synced_at: nowIso });
@@ -4985,6 +5026,7 @@ function AppInner() {
         if (error) { res.errors.push(`trade ${r.ticker}: ${error.message}`); }
         else {
           if (r.choice === "reconcile") res.tReconciled++; else res.tUpdated++;
+          if (r.execId) journaledExecIds.add(r.execId);
           setJournaledTrades(prev => prev.map(t => t.id === r.matchId ? { ...t, entry: r.entry, entryTime: r.entryTime || "", exit: r.exit, exitTime: r.exitTime || "", entryP: r.entryP, exitP: r.exitP, shares: r.shares, commission: r.commission, plPct: r.plPct, plDollar: r.plDollar, ...(rMult !== undefined ? { rMult } : {}), tradeType: r.tradeType, source: r.choice === "reconcile" ? "reconciled" : t.source, ibExecId: r.execId, ibTradeId: r.tradeId } : t));
         }
       }
@@ -4994,6 +5036,7 @@ function AppInner() {
       if (error) { res.errors.push(`new trades: ${error.message}`); }
       else if (ins) {
         res.tInserted = ins.length;
+        ins.forEach(t => { if (t.ib_exec_id) journaledExecIds.add(t.ib_exec_id); });
         const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
@@ -5025,6 +5068,23 @@ function AppInner() {
         setPositions(prev => [...prev, ...mapped]);
         lastLoadedCount.current = (lastLoadedCount.current || 0) + mapped.length;
       }
+    }
+
+    // ── CLOSE-OUTS ── soft-archive (is_closed=true, NOT a delete) positions IBKR has closed.
+    // JOURNAL-FIRST SAFETY: only archive once the closing round-trip is confirmed present in the Journal
+    // (its execId is in journaledExecIds). If the user skipped that trade, the position is left open — never
+    // orphaned. The update is surgical (by row id + user_id) and only ever targets IBKR-owned rows.
+    const archivedPosIds = new Set();
+    for (const r of (closeRows || [])) {
+      if (r.choice !== "close") continue;                                    // user chose "Keep open"
+      if (!r.linkExecId || !journaledExecIds.has(r.linkExecId)) continue;    // not in the Journal → leave it open
+      const { error } = await supabase.from("positions").update({ is_closed: true, ib_synced_at: nowIso }).eq("id", r.posId).eq("user_id", uid);
+      if (error) { res.errors.push(`close ${r.sym}: ${error.message}`); }
+      else { res.pClosed++; archivedPosIds.add(r.posId); }
+    }
+    if (archivedPosIds.size) {
+      setPositions(prev => { const next = prev.filter(p => !archivedPosIds.has(p.id)); positionsRef.current = next; return next; });
+      lastLoadedCount.current = Math.max(0, (lastLoadedCount.current || 0) - archivedPosIds.size);
     }
 
     setIbkrResult(res);
@@ -5118,6 +5178,7 @@ function AppInner() {
         commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
         trade_type: p.tradeType || "Long",
         source: p.source || "manual", ib_conid: p.ibConid || null, ib_synced_at: p.ibSyncedAt || null, // preserve IBKR identity through bulk Save
+        is_closed: false, // bulk Save only ever holds OPEN positions; archived (closed) rows live untouched in the DB
       }));
 
       if (rows.length === 0) {
@@ -5128,8 +5189,8 @@ function AppInner() {
           setPositionSaveStatus(null);
           return;
         }
-        // User intentionally cleared all — safe to delete
-        await supabase.from("positions").delete().eq("user_id", uid);
+        // User intentionally cleared all — safe to delete OPEN rows only (archived/closed history is preserved)
+        await supabase.from("positions").delete().eq("user_id", uid).eq("is_closed", false);
         isSaving.current = false;
         setPositionSaveStatus("saved");
         if (positionSaveTimer.current) clearTimeout(positionSaveTimer.current);
@@ -5154,10 +5215,11 @@ function AppInner() {
         return; // CRITICAL: if insert fails, don't touch existing data
       }
 
-      // Step 2: Delete old rows — everything for this user EXCEPT what we just inserted
+      // Step 2: Delete old OPEN rows — everything for this user EXCEPT what we just inserted.
+      // SCOPED to is_closed=false so archived (auto-closed) positions are NEVER swept up by the bulk Save.
       const newIds = inserted.map(r => r.id);
       if (newIds.length > 0) {
-        await supabase.from("positions").delete().eq("user_id", uid).not("id", "in", `(${newIds.join(",")})`);
+        await supabase.from("positions").delete().eq("user_id", uid).eq("is_closed", false).not("id", "in", `(${newIds.join(",")})`);
       }
 
       // Step 3: Sync local state with real DB IDs so next save doesn't create duplicates
@@ -5250,7 +5312,7 @@ function AppInner() {
       }
 
       // Positions — CRITICAL: check for query errors. A failed query MUST NOT trigger position deletion.
-      const { data: pos, error: posErr } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
+      const { data: pos, error: posErr } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).order("created_at");
       if (posErr) {
         // ABORT position loading — do NOT touch state, do NOT set lastLoadedCount to 0.
         // This prevents autosave from wiping the DB when a network blip returns null data.
@@ -5296,7 +5358,7 @@ function AppInner() {
           })));
           if (!seedErr) {
             // Re-load from DB so positions have real DB ids
-            const { data: seeded } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
+            const { data: seeded } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).order("created_at");
             if (seeded && seeded.length > 0) {
               lastLoadedCount.current = seeded.length;
               setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long" })));
@@ -5341,7 +5403,7 @@ function AppInner() {
               await supabase.from("positions").insert(rows);
               console.log(`RECOVERY: Inserted ${toInsert.length} positions from offline save.`);
               // Re-load positions to get consistent state
-              const { data: refreshed } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
+              const { data: refreshed } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).order("created_at");
               if (refreshed && refreshed.length > 0) {
                 lastLoadedCount.current = refreshed.length;
                 const snap2 = new Map();
@@ -5383,7 +5445,7 @@ function AppInner() {
       lastSyncTime.current = Date.now();
       try {
         const uid = session.user.id;
-        const { data: pos, error: posErr } = await supabase.from("positions").select("*").eq("user_id", uid).order("created_at");
+        const { data: pos, error: posErr } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).order("created_at");
         if (posErr || !pos) return; // silently skip — don't disrupt user
         // Deduplicate
         const seen = new Map();
@@ -5610,10 +5672,10 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={isAdmin ? runIbkrSync : null} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} />}
       {page === "tools" && <PremiumToolsPage demo={false} portfolioSize={portfolioSize} journaledTrades={journaledTrades} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} />}
-      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={isAdmin ? runIbkrSync : null} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} />
     </>
   );
