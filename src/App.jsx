@@ -1691,6 +1691,8 @@ function TradeChart({ trade }) {
   const candleSeriesRef = useRef(null);      // candlestick series — for coordinate↔price projection
   const candlesRef = useRef([]);             // current candles (for time↔logical-index mapping)
   const toolRef = useRef("cursor");          // live mirror of `tool` for chart-level subscriptions
+  const placeRef = useRef(null);             // freshest placement handler (called from chart.subscribeClick)
+  const draftRef = useRef(null);             // freshest in-progress trendline endpoint (for the rubber-band preview)
   const cacheRef = useRef({ id: null, data: {} });            // fetched candles per timeframe — avoids refetch on toggle
   const [status, setStatus] = useState("loading"); // loading | ok | empty | error | nolib
   const [msg, setMsg] = useState("");
@@ -1820,14 +1822,25 @@ function TradeChart({ trade }) {
           } catch { tsc.fitContent(); }
         } else { tsc.fitContent(); }
 
-        // ── Drawing overlay: re-project the SVG layer on every pan / zoom (rAF-throttled), deselect on empty click ──
+        // ── Drawing overlay: re-project on every pan / zoom (rAF-throttled). Placement + selection use the
+        //    chart's OWN click coordinates (param.point / param.logical) so there's never any offset. ──
         let rafPending = false;
         const bumpOverlay = () => { if (rafPending) return; rafPending = true; requestAnimationFrame(() => { rafPending = false; setOverlayTick(t => (t + 1) % 1e9); }); };
         chart.timeScale().subscribeVisibleLogicalRangeChange(bumpOverlay);
-        chart.subscribeClick(() => { if (toolRef.current === "cursor") setSelectedId(null); });
+        chart.subscribeClick((param) => {
+          if (!param.point) return;
+          if (toolRef.current === "cursor") { setSelectedId(null); return; } // empty-space click deselects
+          const price = s.coordinateToPrice(param.point.y);
+          if (price == null) return;
+          const cd = candlesRef.current;
+          let time = null;
+          if (param.logical != null && cd.length) { const i = Math.max(0, Math.min(cd.length - 1, Math.round(param.logical))); time = cd[i] ? cd[i].time : null; }
+          else if (param.time != null) time = param.time;
+          if (placeRef.current) placeRef.current({ price, time, x: param.point.x, y: param.point.y });
+        });
         bumpOverlay(); // initial projection once the scale is settled
 
-        // ── Crosshair OHLC + MA legend ──
+        // ── Crosshair OHLC + MA legend (+ trendline rubber-band) ──
         const lastBar = candles[candles.length - 1];
         const legendFor = (bar, param) => ({
           o: bar.open, h: bar.high, l: bar.low, c: bar.close,
@@ -1842,6 +1855,7 @@ function TradeChart({ trade }) {
         chart.subscribeCrosshairMove((param) => {
           const bar = (param && param.time && param.seriesData) ? param.seriesData.get(s) : null;
           setLegend(legendFor(bar || lastBar, param));
+          if ((toolRef.current === "trend" || toolRef.current === "rect") && draftRef.current && param.point) setHoverPt({ x: param.point.x, y: param.point.y });
         });
 
         onResize = () => { if (elRef.current && chart) { const cw = elRef.current.clientWidth; chart.applyOptions({ width: cw }); setChartW(cw); setOverlayTick(t => (t + 1) % 1e9); } };
@@ -1910,6 +1924,11 @@ function TradeChart({ trade }) {
   // Toolbar / drawing button style (gold when active)
   const tb = (active) => ({ padding: "4px 10px", borderRadius: 7, border: `1px solid ${active ? C.borderGold : C.border}`, background: active ? C.goldDim : "transparent", color: active ? C.gold : C.muted, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font, whiteSpace: "nowrap" });
   const fmtMA = (v) => v == null ? "—" : v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Vertical drawing-rail icon button (TradingView-style left rail)
+  const railBtn = (id, icon, label) => (
+    <button key={id} onClick={() => { setTool(id); setDraft(null); }} title={label}
+      style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: `1px solid ${tool === id ? C.borderGold : "transparent"}`, background: tool === id ? C.goldDim : "transparent", color: tool === id ? C.gold : C.muted, fontWeight: 700, fontSize: "0.95rem", lineHeight: 1, cursor: "pointer", fontFamily: font }}>{icon}</button>
+  );
 
   // ── Drawing projection (logical-index based so lines stay pinned and extend off-screen) ──
   const CHART_H = 480;
@@ -1929,26 +1948,22 @@ function TradeChart({ trade }) {
   const yToPrice = (y) => { const s = candleSeriesRef.current; if (!s) return null; const p = s.coordinateToPrice(y); return p == null ? null : p; };
 
   const addDrawing = (d) => setDrawings(ds => [...ds, { id: `d${Date.now()}${Math.random().toString(36).slice(2, 6)}`, ...d }]);
-  // Click on the capture layer — place the active tool's drawing
-  const placeAt = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
-    const price = yToPrice(y); if (price == null) return;
-    const time = xToTime(x);
+  // Place the active tool's drawing. Coordinates come from Lightweight Charts itself (param.point /
+  // param.logical via the chart's subscribeClick) — exact pane coordinates, so there's no offset/misalignment.
+  const doPlace = ({ price, time, x, y }) => {
+    if (price == null) return;
     if (tool === "hline") { addDrawing({ type: "hline", a: { time: time || 0, price } }); setTool("cursor"); }
-    else if (tool === "trend") {
+    else if (tool === "trend" || tool === "rect") {
       if (time == null) return;
       if (!draft) setDraft({ time, price });
-      else { addDrawing({ type: "trend", a: draft, b: { time, price } }); setDraft(null); setTool("cursor"); }
+      else { addDrawing({ type: tool, a: draft, b: { time, price } }); setDraft(null); setTool("cursor"); }
     } else if (tool === "text") {
       setEditingText({ id: `d${Date.now()}${Math.random().toString(36).slice(2, 6)}`, x, y, value: "", a: { time: time || 0, price } });
     }
   };
-  const onOverlayMove = (e) => {
-    if (tool !== "trend" || !draft) { if (hoverPt) setHoverPt(null); return; }
-    const rect = e.currentTarget.getBoundingClientRect();
-    setHoverPt({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-  };
+  // Keep chart-level subscriptions (created once in the build effect) pointed at the freshest closures
+  useEffect(() => { placeRef.current = doPlace; });
+  useEffect(() => { draftRef.current = draft; }, [draft]);
   const commitText = () => {
     if (!editingText) return;
     const v = (editingText.value || "").trim();
@@ -1977,6 +1992,14 @@ function TradeChart({ trade }) {
         <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={10} />
         <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={sel ? 2.5 : 2} />
         {sel && <><circle cx={x1} cy={y1} r={4} fill={C.goldBright} stroke="#08080e" strokeWidth={1} /><circle cx={x2} cy={y2} r={4} fill={C.goldBright} stroke="#08080e" strokeWidth={1} /></>}
+      </g>);
+    }
+    if (d.type === "rect") {
+      const x1 = timeToX(d.a.time), y1 = priceToY(d.a.price), x2 = timeToX(d.b.time), y2 = priceToY(d.b.price);
+      if ([x1, y1, x2, y2].some(v => v == null)) return null;
+      const rx = Math.min(x1, x2), ry = Math.min(y1, y2), rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1);
+      return (<g key={d.id} style={{ pointerEvents: tool === "cursor" ? "auto" : "none", cursor: "pointer" }} onClick={(e) => selectDrawing(e, d.id)}>
+        <rect x={rx} y={ry} width={rw} height={rh} fill="rgba(240,192,80,0.10)" stroke={stroke} strokeWidth={sel ? 2 : 1.5} />
       </g>);
     }
     if (d.type === "text") {
@@ -2010,24 +2033,29 @@ function TradeChart({ trade }) {
           <button onClick={() => chartRef.current && chartRef.current.timeScale().fitContent()} title="Fit chart to data" style={tb(false)}>Fit</button>
         </div>
       </div>
-      {/* Drawing tools — trendline · horizontal line · text · select+Delete to remove */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-        <span style={{ fontSize: "0.5rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginRight: 2 }}>Draw</span>
-        <button onClick={() => { setTool("cursor"); setDraft(null); }} title="Cursor — pan, zoom, select a drawing" style={tb(tool === "cursor")}>↖ Cursor</button>
-        <button onClick={() => setTool("trend")} title="Trendline — click two points" style={tb(tool === "trend")}>╱ Trendline</button>
-        <button onClick={() => setTool("hline")} title="Horizontal line — click to place a level" style={tb(tool === "hline")}>— H-Line</button>
-        <button onClick={() => setTool("text")} title="Text — click to place a label, then type" style={tb(tool === "text")}>T Text</button>
-        {selectedId != null
-          ? <button onClick={() => { setDrawings(ds => ds.filter(d => d.id !== selectedId)); setSelectedId(null); }} title="Delete selected drawing (or press Delete)" style={{ ...tb(false), color: C.red, borderColor: "rgba(239,68,68,0.4)" }}>🗑 Delete</button>
-          : <button onClick={() => { setDrawings([]); setSelectedId(null); }} title="Remove all drawings" style={tb(false)}>✕ Clear All</button>}
-        {tool === "trend" && <span style={{ fontSize: "0.55rem", color: C.gold }}>{draft ? "click the second point…" : "click the first point…"}</span>}
-        {tool === "hline" && <span style={{ fontSize: "0.55rem", color: C.gold }}>click to drop a level</span>}
-        {tool === "text" && <span style={{ fontSize: "0.55rem", color: C.gold }}>click where you want the text</span>}
-        {tool === "cursor" && selectedId != null && <span style={{ fontSize: "0.55rem", color: C.muted }}>press Delete to remove · click empty space to deselect</span>}
+      {/* Contextual drawing hint */}
+      <div style={{ minHeight: 16, marginBottom: 6, fontSize: "0.55rem", color: C.gold, fontWeight: 600 }}>
+        {tool === "trend" && (draft ? "Trendline — click the second point" : "Trendline — click the first point")}
+        {tool === "rect" && (draft ? "Rectangle — click the opposite corner" : "Rectangle — click the first corner")}
+        {tool === "hline" && "Horizontal line — click to drop a level"}
+        {tool === "text" && "Text — click where you want the label, then type"}
+        {tool === "cursor" && selectedId != null && <span style={{ color: C.muted }}>Selected — press Delete to remove, or click empty space to deselect</span>}
       </div>
-      {/* Chart + stats panel */}
+      {/* Drawing rail (left) + chart + stats panel */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 460px", minWidth: 0 }}>
+        {/* TradingView-style vertical drawing rail */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "6px 4px", border: `1px solid ${C.border}`, borderRadius: 9, background: "rgba(255,255,255,0.02)", alignSelf: "flex-start" }}>
+          {railBtn("cursor", "↖", "Cursor — pan, zoom, select a drawing")}
+          {railBtn("trend", "╱", "Trendline — click two points")}
+          {railBtn("hline", "─", "Horizontal line — click to place a level")}
+          {railBtn("rect", "▭", "Rectangle / zone — click two corners")}
+          {railBtn("text", "T", "Text — click to place a label, then type")}
+          <div style={{ height: 1, background: C.border, margin: "3px 2px" }} />
+          {selectedId != null
+            ? <button onClick={() => { setDrawings(ds => ds.filter(d => d.id !== selectedId)); setSelectedId(null); }} title="Delete selected drawing (or press Delete)" style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: `1px solid rgba(239,68,68,0.4)`, background: "transparent", color: C.red, fontSize: "0.95rem", cursor: "pointer", fontFamily: font }}>🗑</button>
+            : <button onClick={() => { setDrawings([]); setSelectedId(null); }} title="Clear all drawings" style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: `1px solid transparent`, background: "transparent", color: C.muted, fontSize: "0.95rem", cursor: "pointer", fontFamily: font }}>✕</button>}
+        </div>
+        <div style={{ flex: "1 1 420px", minWidth: 0 }}>
           <div style={{ position: "relative" }}>
             <div ref={elRef} style={{ width: "100%", minHeight: 480, cursor: tool === "cursor" ? "default" : "crosshair" }}>
               {status !== "ok" && (
@@ -2055,12 +2083,17 @@ function TradeChart({ trade }) {
                 )}
               </div>
             )}
-            {/* Drawing overlay — SVG pinned to the chart; re-projected on pan/zoom via overlayTick */}
+            {/* Drawing overlay — render-only SVG pinned to the chart (re-projected on pan/zoom via overlayTick).
+                The chart underneath stays fully interactive; clicks/placement come from the chart's own
+                subscribeClick, and only drawing shapes (in cursor mode) capture clicks for selection. */}
             {status === "ok" && (
-              <svg data-tick={overlayTick} width={chartW} height={CHART_H} style={{ position: "absolute", top: 0, left: 0, pointerEvents: tool === "cursor" ? "none" : "auto" }}>
-                {tool !== "cursor" && <rect x={0} y={0} width={chartW} height={CHART_H} fill="transparent" style={{ pointerEvents: "auto", cursor: "crosshair" }} onClick={placeAt} onMouseMove={onOverlayMove} onMouseLeave={() => setHoverPt(null)} />}
+              <svg data-tick={overlayTick} width={chartW} height={CHART_H} style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}>
                 {drawings.map(renderDrawing)}
-                {tool === "trend" && draft && hoverPt && (() => { const x1 = timeToX(draft.time), y1 = priceToY(draft.price); if (x1 == null || y1 == null) return null; return <line x1={x1} y1={y1} x2={hoverPt.x} y2={hoverPt.y} stroke={C.goldBright} strokeWidth={1} strokeDasharray="4 4" />; })()}
+                {draft && hoverPt && (tool === "trend" || tool === "rect") && (() => {
+                  const x1 = timeToX(draft.time), y1 = priceToY(draft.price); if (x1 == null || y1 == null) return null;
+                  if (tool === "rect") { const rx = Math.min(x1, hoverPt.x), ry = Math.min(y1, hoverPt.y), rw = Math.abs(hoverPt.x - x1), rh = Math.abs(hoverPt.y - y1); return <rect x={rx} y={ry} width={rw} height={rh} fill="rgba(240,192,80,0.08)" stroke={C.goldBright} strokeWidth={1} strokeDasharray="4 4" />; }
+                  return <line x1={x1} y1={y1} x2={hoverPt.x} y2={hoverPt.y} stroke={C.goldBright} strokeWidth={1} strokeDasharray="4 4" />;
+                })()}
               </svg>
             )}
             {/* Inline text editor */}
