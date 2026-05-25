@@ -479,11 +479,15 @@ function SourceDot({ source }) {
 const IBKR_SYNC_FLOOR = "2026-05-01"; // only system trades ENTERED on/after this date are pulled
 // Normalize a trade date to ISO YYYY-MM-DD (handles "M/D/YY" manual/dashboard entries and "YYYY-MM-DD" IBKR rows).
 // Used both by the IBKR reconcile-matcher and the trade-review chart.
+// Normalize any date string to a YYYY-MM-DD day key. Handles M/D/YY · M/D/YYYY · ISO (with - or /) and
+// strips any trailing time component (e.g. "2026-05-01 14:30" or "2026-05-01T09:17" → "2026-05-01"),
+// so same-day comparisons line up regardless of whether a time was stored.
 const tradeDateISO = (d) => {
   if (!d) return "";
-  const s = String(d).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  const s = String(d).trim().split(/[ T]/)[0];
+  const iso = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
   if (m) { const y = m[3].length === 2 ? "20" + m[3] : m[3]; return `${y}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`; }
   return s;
 };
@@ -1832,11 +1836,7 @@ function TradeChart({ trade }) {
           if (toolRef.current === "cursor") { setSelectedId(null); return; } // empty-space click deselects
           const price = s.coordinateToPrice(param.point.y);
           if (price == null) return;
-          const cd = candlesRef.current;
-          let time = null;
-          if (param.logical != null && cd.length) { const i = Math.max(0, Math.min(cd.length - 1, Math.round(param.logical))); time = cd[i] ? cd[i].time : null; }
-          else if (param.time != null) time = param.time;
-          if (placeRef.current) placeRef.current({ price, time, x: param.point.x, y: param.point.y });
+          if (placeRef.current) placeRef.current({ price, x: param.point.x, y: param.point.y });
         });
         bumpOverlay(); // initial projection once the scale is settled
 
@@ -1934,31 +1934,41 @@ function TradeChart({ trade }) {
   const CHART_H = 480;
   const tsApi = () => chartRef.current && chartRef.current.timeScale();
   const paneW = () => { const ts = tsApi(); try { return ts ? ts.width() : chartW; } catch { return chartW; } };
-  const timeToIndex = (time) => {
-    const cd = candlesRef.current; if (!cd.length) return 0;
-    if (time <= cd[0].time) return 0;
-    if (time >= cd[cd.length - 1].time) return cd.length - 1;
-    let lo = 0, hi = cd.length - 1;
-    while (lo < hi) { const mid = (lo + hi) >> 1; if (cd[mid].time < time) lo = mid + 1; else hi = mid; }
-    return (lo > 0 && Math.abs(cd[lo - 1].time - time) <= Math.abs(cd[lo].time - time)) ? lo - 1 : lo;
+  // Sub-candle-exact anchoring: drawings store an INTERPOLATED timestamp (timeframe-stable) and project via a
+  // FRACTIONAL logical index, so a point lands exactly under the cursor — no snapping-to-candle that tilted lines.
+  const logicalToTime = (logical) => {
+    const cd = candlesRef.current; const n = cd.length; if (!n) return 0;
+    if (logical <= 0) { const step = n > 1 ? cd[1].time - cd[0].time : 86400; return cd[0].time + logical * step; }
+    if (logical >= n - 1) { const step = n > 1 ? cd[n - 1].time - cd[n - 2].time : 86400; return cd[n - 1].time + (logical - (n - 1)) * step; }
+    const i = Math.floor(logical), frac = logical - i;
+    return cd[i].time + frac * (cd[i + 1].time - cd[i].time);
   };
-  const timeToX = (time) => { const ts = tsApi(); if (!ts) return null; const x = ts.logicalToCoordinate(timeToIndex(time)); return x == null ? null : x; };
+  const timeToLogical = (time) => {
+    const cd = candlesRef.current; const n = cd.length; if (!n) return 0;
+    if (time <= cd[0].time) { const step = n > 1 ? cd[1].time - cd[0].time : 86400; return step ? (time - cd[0].time) / step : 0; }
+    if (time >= cd[n - 1].time) { const step = n > 1 ? cd[n - 1].time - cd[n - 2].time : 86400; return step ? (n - 1) + (time - cd[n - 1].time) / step : n - 1; }
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (cd[mid].time <= time) lo = mid; else hi = mid; }
+    const span = cd[hi].time - cd[lo].time;
+    return lo + (span ? (time - cd[lo].time) / span : 0);
+  };
+  const timeToX = (time) => { const ts = tsApi(); if (!ts) return null; const x = ts.logicalToCoordinate(timeToLogical(time)); return x == null ? null : x; };
   const priceToY = (price) => { const s = candleSeriesRef.current; if (!s) return null; const y = s.priceToCoordinate(price); return y == null ? null : y; };
-  const xToTime = (x) => { const ts = tsApi(); if (!ts) return null; const lg = ts.coordinateToLogical(x); if (lg == null) return null; const cd = candlesRef.current; const i = Math.max(0, Math.min(cd.length - 1, Math.round(lg))); return cd[i] ? cd[i].time : null; };
-  const yToPrice = (y) => { const s = candleSeriesRef.current; if (!s) return null; const p = s.coordinateToPrice(y); return p == null ? null : p; };
 
   const addDrawing = (d) => setDrawings(ds => [...ds, { id: `d${Date.now()}${Math.random().toString(36).slice(2, 6)}`, ...d }]);
   // Place the active tool's drawing. Coordinates come from Lightweight Charts itself (param.point /
   // param.logical via the chart's subscribeClick) — exact pane coordinates, so there's no offset/misalignment.
-  const doPlace = ({ price, time, x, y }) => {
+  const doPlace = ({ price, x, y }) => {
     if (price == null) return;
-    if (tool === "hline") { addDrawing({ type: "hline", a: { time: time || 0, price } }); setTool("cursor"); }
+    const ts = chartRef.current && chartRef.current.timeScale();
+    const fl = ts ? ts.coordinateToLogical(x) : null;        // fractional logical → exact sub-candle position
+    const time = (fl != null) ? logicalToTime(fl) : 0;
+    if (tool === "hline") { addDrawing({ type: "hline", a: { time, price } }); setTool("cursor"); }
     else if (tool === "trend" || tool === "rect") {
-      if (time == null) return;
       if (!draft) setDraft({ time, price });
       else { addDrawing({ type: tool, a: draft, b: { time, price } }); setDraft(null); setTool("cursor"); }
     } else if (tool === "text") {
-      setEditingText({ id: `d${Date.now()}${Math.random().toString(36).slice(2, 6)}`, x, y, value: "", a: { time: time || 0, price } });
+      setEditingText({ id: `d${Date.now()}${Math.random().toString(36).slice(2, 6)}`, x, y, value: "", a: { time, price } });
     }
   };
   // Keep chart-level subscriptions (created once in the build effect) pointed at the freshest closures
@@ -3715,38 +3725,27 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const compPs = +portfolioSize || 0;
   const compEquity = compPs + compRealizedPL;
 
-  // Parse date string (M/D/YY, M/D/YYYY, YYYY-MM-DD) to ms timestamp for comparison
-  const parseDateMs = useCallback((d) => {
-    if (!d) return 0;
-    const s = d.trim();
-    // M/D/YY or M/D/YYYY
-    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-    if (m) { const y = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]); return new Date(y, parseInt(m[1])-1, parseInt(m[2])).getTime(); }
-    // YYYY-MM-DD
-    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (iso) return new Date(parseInt(iso[1]), parseInt(iso[2])-1, parseInt(iso[3])).getTime();
-    return 0;
-  }, []);
-
   // Realized P/L per position — ONLY counts journal trades that are partial sells of the SAME lot.
-  // Match: same ticker AND the SAME entry date (a partial sell keeps the position's entry date).
-  // A separate round-trip in the same ticker (different entry date) is a distinct trade and is NOT
-  // attributed here — that previously inflated/confused the open position's "Realized" figure.
+  // Match: same ticker AND the SAME entry day (a partial sell, taken via the Sell button, inherits the
+  // position's entry date — see confirmSell). Comparison uses `tradeDateISO` so it's robust to format/time
+  // differences (e.g. manual "5/1/26" vs IBKR "2026-05-01" vs a stored timestamp all resolve to one day).
+  // A separate round-trip in the same ticker (different entry day) is a distinct trade and is NOT attributed
+  // here — that previously inflated/confused the open position's "Realized" figure (e.g. KLAC).
   const realizedByPosition = useMemo(() => {
     const map = {};
     if (!journaledTrades || !positions) return map;
     positions.forEach(p => {
       if (!p.sym) return;
-      const posEntryMs = parseDateMs(p.entry);
-      if (!posEntryMs) { map[p.id] = 0; return; } // no valid entry date → can't attribute
+      const posKey = tradeDateISO(p.entry);
+      if (!posKey) { map[p.id] = 0; return; } // no entry date → can't attribute
       const realized = journaledTrades
-        .filter(t => t.ticker === p.sym && parseDateMs(t.entry) === posEntryMs)
+        .filter(t => t.ticker === p.sym && tradeDateISO(t.entry) === posKey)
         .reduce((sum, t) => sum + (t.plDollar || 0), 0);
       // Use position id as key (not ticker) to handle multiple positions of same ticker
       map[p.id] = realized;
     });
     return map;
-  }, [journaledTrades, positions, parseDateMs]);
+  }, [journaledTrades, positions]);
 
   // Enriched — dual stop loss: if stop2 is set, 50/50 split. Otherwise stop1 covers 100%.
   const enriched = useMemo(() => positions.map(p => { try {
