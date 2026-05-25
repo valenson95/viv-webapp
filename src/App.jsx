@@ -1688,12 +1688,9 @@ function volAvgData(candles, period) {
 function TradeChart({ trade }) {
   const elRef = useRef(null);
   const chartRef = useRef(null);
-  const candleSeriesRef = useRef(null);      // candlestick series — for coordinate→price in the click handler
-  const toolRef = useRef("cursor");          // live mirror of `tool` for the (closure-captured) click handler
-  const pendingRef = useRef(null);           // first endpoint of an in-progress trendline
-  const clearRef = useRef(null);             // build-scoped "clear all drawings" fn (called by the toolbar)
-  const runtimeDrawRef = useRef({ plines: [], lseries: [] }); // live drawing objects on the current chart
-  const drawDataRef = useRef({ id: null, hlines: [], trends: [] }); // logical drawings, persisted across rebuilds
+  const candleSeriesRef = useRef(null);      // candlestick series — for coordinate↔price projection
+  const candlesRef = useRef([]);             // current candles (for time↔logical-index mapping)
+  const toolRef = useRef("cursor");          // live mirror of `tool` for chart-level subscriptions
   const cacheRef = useRef({ id: null, data: {} });            // fetched candles per timeframe — avoids refetch on toggle
   const [status, setStatus] = useState("loading"); // loading | ok | empty | error | nolib
   const [msg, setMsg] = useState("");
@@ -1702,15 +1699,38 @@ function TradeChart({ trade }) {
   const [maOn, setMaOn] = useState(true);    // show MA10/20/50
   const [maType, setMaType] = useState("SMA"); // "SMA" | "EMA"
   const [volOn, setVolOn] = useState(true);  // show volume pane + 50-period volume average
-  const [tool, setTool] = useState("cursor"); // "cursor" | "hline" | "trend"
   const [legend, setLegend] = useState(null); // crosshair OHLC + MA readout
   const [best, setBest] = useState(null);    // peak favorable price between entry & exit (from candles)
-
-  // Reset per-trade caches/drawings when the trade changes
-  if (cacheRef.current.id !== trade.id) cacheRef.current = { id: trade.id, data: {} };
-  if (drawDataRef.current.id !== trade.id) drawDataRef.current = { id: trade.id, hlines: [], trends: [] };
-  // Keep the click-handler's tool mirror in sync; cancel any half-drawn trendline when leaving the trend tool
-  useEffect(() => { toolRef.current = tool; if (tool !== "trend") pendingRef.current = null; }, [tool]);
+  const [chartW, setChartW] = useState(600); // live chart pixel width (for full-width horizontal-line drawings)
+  // ── Drawing layer (SVG overlay) ──
+  const [tool, setTool] = useState("cursor"); // "cursor" | "trend" | "hline" | "text"
+  const [drawings, setDrawings] = useState([]); // [{id,type:'trend'|'hline'|'text', a:{time,price}, b?:{time,price}, text?}]
+  const [selectedId, setSelectedId] = useState(null);
+  const [draft, setDraft] = useState(null);  // first endpoint of an in-progress trendline {time,price}
+  const [hoverPt, setHoverPt] = useState(null); // live cursor {x,y} for the trendline rubber-band preview
+  const [editingText, setEditingText] = useState(null); // {id,x,y,value} text being typed
+  const [overlayTick, setOverlayTick] = useState(0); // bumped on pan/zoom/resize to re-project the overlay
+  const drawKey = `viv-draw-${trade.id}`;
+  // Load this trade's saved drawings (localStorage — survives reload, never touches the DB)
+  useEffect(() => {
+    try { const raw = localStorage.getItem(drawKey); setDrawings(raw ? JSON.parse(raw) : []); }
+    catch { setDrawings([]); }
+    setSelectedId(null); setDraft(null); setEditingText(null); setTool("cursor");
+  }, [trade.id]);
+  // Persist on change
+  useEffect(() => { try { localStorage.setItem(drawKey, JSON.stringify(drawings)); } catch { } }, [drawings, drawKey]);
+  useEffect(() => { toolRef.current = tool; if (tool !== "trend") setDraft(null); }, [tool]);
+  // Delete / Backspace removes the selected drawing (ignored while typing in a field)
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const ae = document.activeElement, tag = ae && ae.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (ae && ae.isContentEditable)) return;
+      if (selectedId != null) { e.preventDefault(); setDrawings(ds => ds.filter(d => d.id !== selectedId)); setSelectedId(null); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedId]);
 
   const entryISO = tradeDateISO(trade.entry), exitISO = tradeDateISO(trade.exit || trade.entry);
   const spanDays = Math.max(0, (Date.parse(exitISO) - Date.parse(entryISO)) / 86400000);
@@ -1741,9 +1761,11 @@ function TradeChart({ trade }) {
           rightPriceScale: { borderColor: "rgba(255,255,255,0.1)", scaleMargins: volOn ? { top: 0.08, bottom: 0.26 } : { top: 0.12, bottom: 0.12 }, mode: logScale ? 1 : 0 }, crosshair: { mode: 0 },
         });
         chartRef.current = chart;
+        setChartW(w);
         const s = chart.addCandlestickSeries({ upColor: C.green, downColor: C.red, borderUpColor: C.green, borderDownColor: C.red, wickUpColor: C.green, wickDownColor: C.red });
         s.setData(candles);
         candleSeriesRef.current = s;
+        candlesRef.current = candles;
 
         // ── Volume pane (own scale, bottom ~18%) + 50-period volume average ──
         if (volOn) {
@@ -1785,9 +1807,8 @@ function TradeChart({ trade }) {
         if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: C.red, shape: "arrowDown", size: 2, text: `EXIT $${exitP}` });
         markers.sort((a, b) => a.time - b.time);
         s.setMarkers(markers);
-        // Thin DOTTED price lines so they read clearly without masking the candles
-        if (entryP > 0) s.createPriceLine({ price: entryP, color: C.green, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "Entry" });
-        if (exitP > 0) s.createPriceLine({ price: exitP, color: C.red, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "Exit" });
+        // Entry/exit are shown by the on-candle arrows only (no full-width lines — they were distracting).
+        // Stop stays as a subtle dashed reference line when set.
         if (+trade.stop > 0) s.createPriceLine({ price: +trade.stop, color: C.gold, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "Stop" });
 
         // ── Default view: focus on the trade; the deep history stays scrollable ──
@@ -1799,44 +1820,12 @@ function TradeChart({ trade }) {
           } catch { tsc.fitContent(); }
         } else { tsc.fitContent(); }
 
-        // ── Re-apply persisted drawings (survive timeframe / toggle rebuilds) ──
-        runtimeDrawRef.current = { plines: [], lseries: [] };
-        drawDataRef.current.hlines.forEach(price => {
-          runtimeDrawRef.current.plines.push(s.createPriceLine({ price, color: C.goldBright, lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "" }));
-        });
-        drawDataRef.current.trends.forEach(([a, b]) => {
-          const ls = chart.addLineSeries({ color: C.goldBright, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-          ls.setData([{ time: a.time, value: a.price }, { time: b.time, value: b.price }].sort((x, y) => x.time - y.time));
-          runtimeDrawRef.current.lseries.push(ls);
-        });
-
-        // ── Drawing interactions (horizontal line · 2-click trendline) ──
-        const addHLine = (price) => { runtimeDrawRef.current.plines.push(s.createPriceLine({ price, color: C.goldBright, lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "" })); drawDataRef.current.hlines.push(price); };
-        const addTrend = (a, b) => {
-          if (a.time === b.time) return;
-          const ls = chart.addLineSeries({ color: C.goldBright, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-          ls.setData([{ time: a.time, value: a.price }, { time: b.time, value: b.price }].sort((x, y) => x.time - y.time));
-          runtimeDrawRef.current.lseries.push(ls); drawDataRef.current.trends.push([a, b]);
-        };
-        clearRef.current = () => {
-          runtimeDrawRef.current.plines.forEach(pl => { try { s.removePriceLine(pl); } catch { } });
-          runtimeDrawRef.current.lseries.forEach(ls => { try { chart.removeSeries(ls); } catch { } });
-          runtimeDrawRef.current = { plines: [], lseries: [] };
-          drawDataRef.current = { id: trade.id, hlines: [], trends: [] };
-        };
-        chart.subscribeClick((param) => {
-          const t = toolRef.current;
-          if (t === "cursor" || !param.point) return;
-          const price = s.coordinateToPrice(param.point.y);
-          if (price == null) return;
-          if (t === "hline") { addHLine(price); }
-          else if (t === "trend") {
-            const time = chart.timeScale().coordinateToTime(param.point.x);
-            if (time == null) return;
-            if (!pendingRef.current) pendingRef.current = { time, price };
-            else { addTrend(pendingRef.current, { time, price }); pendingRef.current = null; }
-          }
-        });
+        // ── Drawing overlay: re-project the SVG layer on every pan / zoom (rAF-throttled), deselect on empty click ──
+        let rafPending = false;
+        const bumpOverlay = () => { if (rafPending) return; rafPending = true; requestAnimationFrame(() => { rafPending = false; setOverlayTick(t => (t + 1) % 1e9); }); };
+        chart.timeScale().subscribeVisibleLogicalRangeChange(bumpOverlay);
+        chart.subscribeClick(() => { if (toolRef.current === "cursor") setSelectedId(null); });
+        bumpOverlay(); // initial projection once the scale is settled
 
         // ── Crosshair OHLC + MA legend ──
         const lastBar = candles[candles.length - 1];
@@ -1855,7 +1844,7 @@ function TradeChart({ trade }) {
           setLegend(legendFor(bar || lastBar, param));
         });
 
-        onResize = () => { if (elRef.current && chart) chart.applyOptions({ width: elRef.current.clientWidth }); };
+        onResize = () => { if (elRef.current && chart) { const cw = elRef.current.clientWidth; chart.applyOptions({ width: cw }); setChartW(cw); setOverlayTick(t => (t + 1) % 1e9); } };
         window.addEventListener("resize", onResize);
       }, 30);
     };
@@ -1922,6 +1911,84 @@ function TradeChart({ trade }) {
   const tb = (active) => ({ padding: "4px 10px", borderRadius: 7, border: `1px solid ${active ? C.borderGold : C.border}`, background: active ? C.goldDim : "transparent", color: active ? C.gold : C.muted, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font, whiteSpace: "nowrap" });
   const fmtMA = (v) => v == null ? "—" : v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  // ── Drawing projection (logical-index based so lines stay pinned and extend off-screen) ──
+  const CHART_H = 480;
+  const tsApi = () => chartRef.current && chartRef.current.timeScale();
+  const paneW = () => { const ts = tsApi(); try { return ts ? ts.width() : chartW; } catch { return chartW; } };
+  const timeToIndex = (time) => {
+    const cd = candlesRef.current; if (!cd.length) return 0;
+    if (time <= cd[0].time) return 0;
+    if (time >= cd[cd.length - 1].time) return cd.length - 1;
+    let lo = 0, hi = cd.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (cd[mid].time < time) lo = mid + 1; else hi = mid; }
+    return (lo > 0 && Math.abs(cd[lo - 1].time - time) <= Math.abs(cd[lo].time - time)) ? lo - 1 : lo;
+  };
+  const timeToX = (time) => { const ts = tsApi(); if (!ts) return null; const x = ts.logicalToCoordinate(timeToIndex(time)); return x == null ? null : x; };
+  const priceToY = (price) => { const s = candleSeriesRef.current; if (!s) return null; const y = s.priceToCoordinate(price); return y == null ? null : y; };
+  const xToTime = (x) => { const ts = tsApi(); if (!ts) return null; const lg = ts.coordinateToLogical(x); if (lg == null) return null; const cd = candlesRef.current; const i = Math.max(0, Math.min(cd.length - 1, Math.round(lg))); return cd[i] ? cd[i].time : null; };
+  const yToPrice = (y) => { const s = candleSeriesRef.current; if (!s) return null; const p = s.coordinateToPrice(y); return p == null ? null : p; };
+
+  const addDrawing = (d) => setDrawings(ds => [...ds, { id: `d${Date.now()}${Math.random().toString(36).slice(2, 6)}`, ...d }]);
+  // Click on the capture layer — place the active tool's drawing
+  const placeAt = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const price = yToPrice(y); if (price == null) return;
+    const time = xToTime(x);
+    if (tool === "hline") { addDrawing({ type: "hline", a: { time: time || 0, price } }); setTool("cursor"); }
+    else if (tool === "trend") {
+      if (time == null) return;
+      if (!draft) setDraft({ time, price });
+      else { addDrawing({ type: "trend", a: draft, b: { time, price } }); setDraft(null); setTool("cursor"); }
+    } else if (tool === "text") {
+      setEditingText({ id: `d${Date.now()}${Math.random().toString(36).slice(2, 6)}`, x, y, value: "", a: { time: time || 0, price } });
+    }
+  };
+  const onOverlayMove = (e) => {
+    if (tool !== "trend" || !draft) { if (hoverPt) setHoverPt(null); return; }
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoverPt({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+  };
+  const commitText = () => {
+    if (!editingText) return;
+    const v = (editingText.value || "").trim();
+    if (v) setDrawings(ds => [...ds, { id: editingText.id, type: "text", a: editingText.a, text: v }]);
+    setEditingText(null); setTool("cursor");
+  };
+  const selectDrawing = (e, id) => { e.stopPropagation(); if (tool === "cursor") setSelectedId(id); };
+  // Render one persisted drawing as SVG
+  const renderDrawing = (d) => {
+    const sel = d.id === selectedId;
+    const stroke = sel ? C.goldBright : "rgba(240,192,80,0.85)";
+    const pw = paneW();
+    if (d.type === "hline") {
+      const y = priceToY(d.a.price); if (y == null) return null;
+      return (<g key={d.id} style={{ pointerEvents: tool === "cursor" ? "auto" : "none", cursor: "pointer" }} onClick={(e) => selectDrawing(e, d.id)}>
+        <line x1={0} y1={y} x2={pw} y2={y} stroke="transparent" strokeWidth={10} />
+        <line x1={0} y1={y} x2={pw} y2={y} stroke={stroke} strokeWidth={sel ? 2 : 1.5} />
+        <rect x={pw - 56} y={y - 8} width={52} height={15} rx={3} fill={stroke} />
+        <text x={pw - 30} y={y + 3} fill="#08080e" fontSize={9} fontWeight={700} textAnchor="middle" fontFamily={font}>{d.a.price.toFixed(2)}</text>
+      </g>);
+    }
+    if (d.type === "trend") {
+      const x1 = timeToX(d.a.time), y1 = priceToY(d.a.price), x2 = timeToX(d.b.time), y2 = priceToY(d.b.price);
+      if ([x1, y1, x2, y2].some(v => v == null)) return null;
+      return (<g key={d.id} style={{ pointerEvents: tool === "cursor" ? "auto" : "none", cursor: "pointer" }} onClick={(e) => selectDrawing(e, d.id)}>
+        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={10} />
+        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={sel ? 2.5 : 2} />
+        {sel && <><circle cx={x1} cy={y1} r={4} fill={C.goldBright} stroke="#08080e" strokeWidth={1} /><circle cx={x2} cy={y2} r={4} fill={C.goldBright} stroke="#08080e" strokeWidth={1} /></>}
+      </g>);
+    }
+    if (d.type === "text") {
+      const x = timeToX(d.a.time), y = priceToY(d.a.price); if (x == null || y == null) return null;
+      return (<g key={d.id} style={{ pointerEvents: tool === "cursor" ? "auto" : "none", cursor: "pointer" }} onClick={(e) => selectDrawing(e, d.id)}
+        onDoubleClick={(e) => { e.stopPropagation(); setEditingText({ id: d.id, x, y, value: d.text, a: d.a }); setDrawings(ds => ds.filter(z => z.id !== d.id)); setTool("text"); }}>
+        <text x={x} y={y} fill={sel ? C.goldBright : C.white} stroke="#08080e" strokeWidth={3} style={{ paintOrder: "stroke" }} fontSize={12} fontWeight={700} fontFamily={font}>{d.text}</text>
+      </g>);
+    }
+    return null;
+  };
+
   return (
     <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
       {/* Toolbar — symbol · timeframe switcher · chart controls */}
@@ -1943,15 +2010,20 @@ function TradeChart({ trade }) {
           <button onClick={() => chartRef.current && chartRef.current.timeScale().fitContent()} title="Fit chart to data" style={tb(false)}>Fit</button>
         </div>
       </div>
-      {/* Drawing tools — horizontal line · 2-click trendline · clear */}
+      {/* Drawing tools — trendline · horizontal line · text · select+Delete to remove */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: "0.5rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginRight: 2 }}>Draw</span>
-        <button onClick={() => setTool("cursor")} title="Cursor — pan / zoom" style={tb(tool === "cursor")}>↖ Cursor</button>
-        <button onClick={() => setTool("hline")} title="Horizontal line — click the chart to place a level" style={tb(tool === "hline")}>— H-Line</button>
-        <button onClick={() => setTool("trend")} title="Trendline — click two points to draw a line" style={tb(tool === "trend")}>╱ Trendline</button>
-        <button onClick={() => clearRef.current && clearRef.current()} title="Remove all drawings" style={tb(false)}>✕ Clear</button>
-        {tool === "trend" && <span style={{ fontSize: "0.55rem", color: C.gold }}>{pendingRef.current ? "click the second point…" : "click the first point…"}</span>}
+        <button onClick={() => { setTool("cursor"); setDraft(null); }} title="Cursor — pan, zoom, select a drawing" style={tb(tool === "cursor")}>↖ Cursor</button>
+        <button onClick={() => setTool("trend")} title="Trendline — click two points" style={tb(tool === "trend")}>╱ Trendline</button>
+        <button onClick={() => setTool("hline")} title="Horizontal line — click to place a level" style={tb(tool === "hline")}>— H-Line</button>
+        <button onClick={() => setTool("text")} title="Text — click to place a label, then type" style={tb(tool === "text")}>T Text</button>
+        {selectedId != null
+          ? <button onClick={() => { setDrawings(ds => ds.filter(d => d.id !== selectedId)); setSelectedId(null); }} title="Delete selected drawing (or press Delete)" style={{ ...tb(false), color: C.red, borderColor: "rgba(239,68,68,0.4)" }}>🗑 Delete</button>
+          : <button onClick={() => { setDrawings([]); setSelectedId(null); }} title="Remove all drawings" style={tb(false)}>✕ Clear All</button>}
+        {tool === "trend" && <span style={{ fontSize: "0.55rem", color: C.gold }}>{draft ? "click the second point…" : "click the first point…"}</span>}
         {tool === "hline" && <span style={{ fontSize: "0.55rem", color: C.gold }}>click to drop a level</span>}
+        {tool === "text" && <span style={{ fontSize: "0.55rem", color: C.gold }}>click where you want the text</span>}
+        {tool === "cursor" && selectedId != null && <span style={{ fontSize: "0.55rem", color: C.muted }}>press Delete to remove · click empty space to deselect</span>}
       </div>
       {/* Chart + stats panel */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -1982,6 +2054,20 @@ function TradeChart({ trade }) {
                   </div>
                 )}
               </div>
+            )}
+            {/* Drawing overlay — SVG pinned to the chart; re-projected on pan/zoom via overlayTick */}
+            {status === "ok" && (
+              <svg data-tick={overlayTick} width={chartW} height={CHART_H} style={{ position: "absolute", top: 0, left: 0, pointerEvents: tool === "cursor" ? "none" : "auto" }}>
+                {tool !== "cursor" && <rect x={0} y={0} width={chartW} height={CHART_H} fill="transparent" style={{ pointerEvents: "auto", cursor: "crosshair" }} onClick={placeAt} onMouseMove={onOverlayMove} onMouseLeave={() => setHoverPt(null)} />}
+                {drawings.map(renderDrawing)}
+                {tool === "trend" && draft && hoverPt && (() => { const x1 = timeToX(draft.time), y1 = priceToY(draft.price); if (x1 == null || y1 == null) return null; return <line x1={x1} y1={y1} x2={hoverPt.x} y2={hoverPt.y} stroke={C.goldBright} strokeWidth={1} strokeDasharray="4 4" />; })()}
+              </svg>
+            )}
+            {/* Inline text editor */}
+            {status === "ok" && editingText && (
+              <input autoFocus value={editingText.value} onChange={(e) => setEditingText(t => ({ ...t, value: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Enter") commitText(); else if (e.key === "Escape") { setEditingText(null); setTool("cursor"); } }} onBlur={commitText}
+                placeholder="type…" style={{ position: "absolute", left: editingText.x, top: editingText.y - 12, background: "rgba(8,8,14,0.92)", border: `1px solid ${C.borderGold}`, color: C.white, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "2px 6px", borderRadius: 4, outline: "none", zIndex: 5, minWidth: 90 }} />
             )}
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center", fontSize: "0.56rem", color: C.muted, marginTop: 6, flexWrap: "wrap" }}>
@@ -2475,6 +2561,24 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   }, [filtered]);
 
   const startEdit = (t) => { setEditingId(t.id); setEditRow({ ...t }); setEditNotes(parseNotes(t.notes)); };
+  // Unified Chart+Review panel: clicking the chart icon OR Edit opens the same expandable panel
+  // (live chart on top, editable trade review below). Legacy plain notes seed the Lessons field so nothing is lost.
+  const [reviewDraft, setReviewDraft] = useState({ right: "", wrong: "", lessons: "" });
+  const [reviewSavedId, setReviewSavedId] = useState(null);
+  const openReview = (t) => {
+    if (expandedTrade === t.id) { setExpandedTrade(null); return; }
+    const n = parseNotes(t.notes);
+    setReviewDraft({ right: n.right || "", wrong: n.wrong || "", lessons: n.lessons || n._plain || "" });
+    setReviewSavedId(null);
+    setExpandedTrade(t.id);
+  };
+  const saveReview = (id) => {
+    const serialized = serializeNotes({ right: reviewDraft.right, wrong: reviewDraft.wrong, lessons: reviewDraft.lessons });
+    setJournaledTrades(prev => prev.map(t => t.id === id ? { ...t, notes: serialized } : t));
+    setReviewSavedId(id);
+    setTimeout(() => onManualSaveRef.current(), 50);
+    setTimeout(() => setReviewSavedId(cur => cur === id ? null : cur), 2200);
+  };
   const saveEdit = () => {
     if (!editingId) return;
     const serializedNotes = serializeNotes(editNotes);
@@ -3202,48 +3306,53 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     <td style={{ padding: "11px 8px", fontWeight: 700, color: (Number(t.plDollar) || 0) >= 0 ? C.green : C.red }}>{(Number(t.plDollar) || 0) >= 0 ? "+" : "-"}${Math.abs(Number(t.plDollar) || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
                     <td style={{ padding: "11px 8px", fontWeight: 700, color: (t.rMult == null) ? C.muted : (t.rMult >= 0 ? C.green : C.red) }}>{t.rMult == null ? "—" : `${Number(t.rMult).toFixed(2)}R`}</td>
                     <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.66rem", whiteSpace: "nowrap" }}>{t.reason}</td>
-                    <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.64rem", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: t.notes ? "pointer" : "default" }} onClick={() => t.notes && setExpandedTrade(expandedTrade === t.id ? null : t.id)} title={t.notes ? "Click to expand" : ""}>{notesPreview(t.notes) || "—"}</td>
+                    <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.64rem", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }} onClick={() => openReview(t)} title="Click to open chart + trade review">{notesPreview(t.notes) || "—"}</td>
                     <td style={{ padding: "11px 8px", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <span style={{ fontSize: "0.72rem", cursor: "pointer" }} onClick={() => setExpandedTrade(expandedTrade === t.id ? null : t.id)} title="Review chart (entry/exit on the candle)">📈</span>
+                        <span style={{ fontSize: "0.72rem", cursor: "pointer" }} onClick={() => openReview(t)} title="Open chart + trade review">📈</span>
                         {t.chartUrl && <a href={t.chartUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "0.62rem", color: C.blue, textDecoration: "none", fontWeight: 600 }} title="Open TradingView chart">TV</a>}
-                        {t.chartImage && <span style={{ fontSize: "0.62rem", color: C.green, fontWeight: 700, cursor: "pointer" }} onClick={() => setExpandedTrade(expandedTrade === t.id ? null : t.id)} title="View chart image">📷</span>}
+                        {t.chartImage && <span style={{ fontSize: "0.62rem", color: C.green, fontWeight: 700, cursor: "pointer" }} onClick={() => openReview(t)} title="View chart image">📷</span>}
                       </div>
                     </td>
                     <td style={{ padding: "11px 8px", whiteSpace: "nowrap" }}>
                       <div style={{ display: "flex", gap: 4 }}>
-                        <button onClick={() => startEdit(t)} style={{padding:"3px 8px",borderRadius:6,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontSize:"0.54rem",cursor:"pointer",fontFamily:font}}>Edit</button>
+                        <button onClick={() => openReview(t)} title="Open chart + trade review" style={{padding:"3px 8px",borderRadius:6,border:`1px solid ${expandedTrade===t.id?C.borderGold:C.border}`,background:expandedTrade===t.id?C.goldDim:"transparent",color:expandedTrade===t.id?C.gold:C.muted,fontSize:"0.54rem",cursor:"pointer",fontFamily:font}}>Edit</button>
                         <button onClick={() => deleteTrade(t.id)} title="Delete trade" style={{padding:"3px 6px",borderRadius:6,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontWeight:700,fontSize:"0.58rem",cursor:"pointer",fontFamily:font}}>×</button>
                       </div>
                     </td>
                   </DragTr>
-                  {/* Expanded view: notes + chart */}
+                  {/* Unified Chart + Review panel — live chart on top, editable trade review below */}
                   {expandedTrade === t.id && (
                     <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: `1px solid ${C.border}` }}>
                       <td colSpan={17} style={{ padding: "14px 20px" }}>
-                        {/* Live candlestick chart — TradingView-style: timeframes, markers, stats panel */}
+                        {/* Live candlestick chart — timeframes · MAs · volume · drawing tools · stats panel */}
                         <TradeChart trade={t} />
-                        <div style={{ display: "grid", gridTemplateColumns: t.chartImage ? "1fr 1fr" : "1fr", gap: 16 }}>
-                          <div>
-                            {(() => { const n = parseNotes(t.notes);
-                              return n._plain ? (
-                                <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.6 }}>{n._plain}</div>
-                              ) : (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                  {n.right && <div><span style={{ fontWeight: 700, fontSize: "0.58rem", color: C.green, textTransform: "uppercase", letterSpacing: "0.08em" }}>What Went Right</span><div style={{ fontSize: "0.72rem", color: C.text, marginTop: 3, lineHeight: 1.5 }}>{n.right}</div></div>}
-                                  {n.wrong && <div><span style={{ fontWeight: 700, fontSize: "0.58rem", color: C.red, textTransform: "uppercase", letterSpacing: "0.08em" }}>What Went Wrong</span><div style={{ fontSize: "0.72rem", color: C.text, marginTop: 3, lineHeight: 1.5 }}>{n.wrong}</div></div>}
-                                  {n.lessons && <div><span style={{ fontWeight: 700, fontSize: "0.58rem", color: C.gold, textTransform: "uppercase", letterSpacing: "0.08em" }}>Lessons Learned</span><div style={{ fontSize: "0.72rem", color: C.text, marginTop: 3, lineHeight: 1.5 }}>{n.lessons}</div></div>}
-                                  {!n.right && !n.wrong && !n.lessons && <div style={{ fontSize: "0.70rem", color: C.muted }}>No notes yet. Click Edit to add a trade review.</div>}
-                                </div>
-                              );
-                            })()}
-                            {t.chartUrl && <div style={{ marginTop: 10 }}><a href={t.chartUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "0.70rem", color: C.blue, textDecoration: "underline" }}>Open TradingView Chart →</a></div>}
+                        {/* Editable Trade Review */}
+                        <div style={{ marginTop: 4 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                            <div style={{ fontWeight: 700, fontSize: "0.62rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold }}>Trade Review</div>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <button onClick={() => startEdit(t)} title="Edit the trade's factual details (dates, prices, shares, setup, tags)" style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font }}>Edit details</button>
+                              <button onClick={() => saveReview(t.id)} style={{ padding: "5px 16px", borderRadius: 7, border: `1px solid ${C.green}44`, background: C.greenDim, color: C.green, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font }}>{reviewSavedId === t.id ? "Saved ✓" : "Save Review"}</button>
+                              <button onClick={() => setExpandedTrade(null)} title="Close" style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font }}>Close</button>
+                            </div>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                            {[{ key: "right", label: "What Went Right", color: C.green }, { key: "wrong", label: "What Went Wrong", color: C.red }, { key: "lessons", label: "Lessons Learned", color: C.gold }].map(({ key, label, color }) => (
+                              <div key={key}>
+                                <label style={{ display: "block", fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.08em", textTransform: "uppercase", color, marginBottom: 4 }}>{label}</label>
+                                <textarea value={reviewDraft[key]} onChange={e => setReviewDraft(r => ({ ...r, [key]: e.target.value }))} placeholder={`${label}...`} rows={3}
+                                  style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 10px", color: C.white, fontSize: "0.72rem", fontFamily: font, outline: "none", resize: "vertical", lineHeight: 1.5 }}
+                                  onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                              </div>
+                            ))}
                           </div>
                           {t.chartImage && (
-                            <div style={{ borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}` }}>
+                            <div style={{ marginTop: 12, borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}`, maxWidth: 520 }}>
                               <img src={t.chartImage} alt={`${t.ticker} chart`} style={{ width: "100%", maxHeight: 280, objectFit: "contain", background: "#111" }} />
                             </div>
                           )}
+                          {t.chartUrl && <div style={{ marginTop: 10 }}><a href={t.chartUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "0.70rem", color: C.blue, textDecoration: "underline" }}>Open TradingView Chart →</a></div>}
                         </div>
                       </td>
                     </tr>
@@ -3586,16 +3695,19 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     return 0;
   }, []);
 
-  // Realized P/L per position — only counts journal trades that are partial sells of the CURRENT position
-  // Match: same ticker AND trade entry date >= position entry date (old trades of same ticker are excluded)
+  // Realized P/L per position — ONLY counts journal trades that are partial sells of the SAME lot.
+  // Match: same ticker AND the SAME entry date (a partial sell keeps the position's entry date).
+  // A separate round-trip in the same ticker (different entry date) is a distinct trade and is NOT
+  // attributed here — that previously inflated/confused the open position's "Realized" figure.
   const realizedByPosition = useMemo(() => {
     const map = {};
     if (!journaledTrades || !positions) return map;
     positions.forEach(p => {
       if (!p.sym) return;
       const posEntryMs = parseDateMs(p.entry);
+      if (!posEntryMs) { map[p.id] = 0; return; } // no valid entry date → can't attribute
       const realized = journaledTrades
-        .filter(t => t.ticker === p.sym && parseDateMs(t.entry) >= posEntryMs)
+        .filter(t => t.ticker === p.sym && parseDateMs(t.entry) === posEntryMs)
         .reduce((sum, t) => sum + (t.plDollar || 0), 0);
       // Use position id as key (not ticker) to handle multiple positions of same ticker
       map[p.id] = realized;
