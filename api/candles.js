@@ -6,8 +6,8 @@ const KEY = process.env.POLYGON_API_KEY;
 
 // res → Polygon {multiplier, timespan}
 const RES = {
-  "1min": [1, "minute"], "5min": [5, "minute"], "15min": [15, "minute"],
-  "30min": [30, "minute"], "60min": [1, "hour"], "1day": [1, "day"],
+  "1min": [1, "minute"], "3min": [3, "minute"], "5min": [5, "minute"], "15min": [15, "minute"],
+  "30min": [30, "minute"], "60min": [1, "hour"], "4h": [4, "hour"], "1day": [1, "day"],
 };
 
 const cache = {}; // { key: { data, ts } }
