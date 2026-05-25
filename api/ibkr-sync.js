@@ -1,19 +1,20 @@
-// Vercel Serverless Function — Interactive Brokers Flex Web Service sync (READ-ONLY)
-// Fetches the configured Activity Flex Query, parses Open Positions + Trades, returns normalized JSON.
-// IMPORTANT: this function NEVER writes to any database. All reconciliation + writes happen
-// client-side behind a preview + explicit confirm, so existing data can never be touched here.
+// Vercel Serverless Function — Interactive Brokers Flex Web Service sync (READ-ONLY, PER-USER)
+// Each member connects THEIR OWN IBKR account: their Flex token + query id live in their own
+// (RLS-protected) user_settings row. This function authenticates the caller via their Supabase
+// session JWT, reads only that user's credentials, and pulls only that user's statement.
+// It NEVER writes to any database. All reconciliation + writes happen client-side behind a confirm.
 
-const TOKEN = process.env.IBKR_FLEX_TOKEN;
-const QUERY_ID = process.env.IBKR_FLEX_QUERY_ID;
+import { createClient } from "@supabase/supabase-js";
+
+const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SB_ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const SEND_URL = "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/SendRequest";
 
-// Read a simple <Tag>value</Tag>
 const tag = (xml, name) => {
   const m = xml.match(new RegExp(`<${name}>(.*?)</${name}>`, "s"));
   return m ? m[1].trim() : null;
 };
 
-// Parse every <ElementName .../> occurrence into an array of {attr: value} objects
 function parseElements(xml, elementName) {
   const out = [];
   const re = new RegExp(`<${elementName}\\b([^>]*?)/?>`, "g");
@@ -28,7 +29,6 @@ function parseElements(xml, elementName) {
   return out;
 }
 
-// "20260502;093000" or "20260502" -> { date: "2026-05-02", time: "09:30" }
 function parseDateTime(v) {
   if (!v) return { date: "", time: "" };
   const [d, t] = String(v).split(";");
@@ -47,12 +47,29 @@ async function fetchText(url) {
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
+  res.setHeader("Access-Control-Allow-Headers", "authorization, content-type");
 
-  if (!TOKEN || !QUERY_ID) {
-    return res.status(500).json({ ok: false, error: "IBKR_FLEX_TOKEN / IBKR_FLEX_QUERY_ID not configured in Vercel environment." });
+  if (!SB_URL || !SB_ANON) {
+    return res.status(500).json({ ok: false, error: "Server not configured: missing SUPABASE_URL / SUPABASE_ANON_KEY env vars in Vercel." });
   }
 
   try {
+    // ── Authenticate the caller and read ONLY their IBKR credentials ──
+    const auth = req.headers.authorization || "";
+    if (!auth) return res.status(401).json({ ok: false, error: "Not signed in." });
+    const sb = createClient(SB_URL, SB_ANON, { global: { headers: { Authorization: auth } }, auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: { user } = {}, error: uErr } = await sb.auth.getUser();
+    if (uErr || !user) return res.status(401).json({ ok: false, error: "Your session expired — refresh the page and sign in again." });
+
+    const { data: settings } = await sb.from("user_settings").select("setting_key,setting_value").eq("user_id", user.id).in("setting_key", ["ibkr_token", "ibkr_query_id"]);
+    const m = {};
+    (settings || []).forEach(s => { m[s.setting_key] = (s.setting_value == null) ? "" : String(s.setting_value).trim(); });
+    const TOKEN = m.ibkr_token;
+    const QUERY_ID = m.ibkr_query_id;
+    if (!TOKEN || !QUERY_ID) {
+      return res.status(400).json({ ok: false, error: "Connect your IBKR account in Settings first — enter your own Flex Query ID and Token." });
+    }
+
     // ── Step 1: request statement generation ──
     const sendXml = await fetchText(`${SEND_URL}?t=${encodeURIComponent(TOKEN)}&q=${encodeURIComponent(QUERY_ID)}&v=3`);
     const status = tag(sendXml, "Status");
@@ -63,12 +80,12 @@ export default async function handler(req, res) {
     const baseUrl = tag(sendXml, "Url") || "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/GetStatement";
     if (!ref) return res.status(502).json({ ok: false, error: "No reference code returned by IBKR." });
 
-    // ── Step 2: poll for the statement (generation can take a few seconds) ──
+    // ── Step 2: poll for the statement ──
     let stmtXml = "";
     for (let attempt = 0; attempt < 4; attempt++) {
       await new Promise((r) => setTimeout(r, attempt === 0 ? 800 : 1800));
       stmtXml = await fetchText(`${baseUrl}?t=${encodeURIComponent(TOKEN)}&q=${encodeURIComponent(ref)}&v=3`);
-      if (stmtXml.includes("<FlexQueryResponse")) break; // real statement arrived
+      if (stmtXml.includes("<FlexQueryResponse")) break;
       const s = tag(stmtXml, "Status");
       if (s && s !== "Warn" && s !== "Success") {
         return res.status(502).json({ ok: false, error: `IBKR statement error: ${tag(stmtXml, "ErrorMessage") || s} (code ${tag(stmtXml, "ErrorCode") || "?"})` });
@@ -80,43 +97,17 @@ export default async function handler(req, res) {
 
     const accountId = (stmtXml.match(/accountId="([^"]+)"/) || [])[1] || null;
 
-    // ── Open Positions ──
     const positions = parseElements(stmtXml, "OpenPosition")
       .map((a) => {
         const dt = parseDateTime(a.openDateTime || a.holdingPeriodDateTime || "");
-        return {
-          conid: a.conid || "",
-          symbol: a.symbol || "",
-          shares: a.position || "0",
-          avgCost: a.costBasisPrice || a.openPrice || "0",
-          markPrice: a.markPrice || "",
-          openDate: dt.date,
-          openTime: dt.time,
-          assetCategory: a.assetCategory || "",
-        };
+        return { conid: a.conid || "", symbol: a.symbol || "", shares: a.position || "0", avgCost: a.costBasisPrice || a.openPrice || "0", markPrice: a.markPrice || "", openDate: dt.date, openTime: dt.time, assetCategory: a.assetCategory || "" };
       })
       .filter((p) => p.symbol && Number(p.shares) !== 0);
 
-    // ── Trades (execution level) ──
     const trades = parseElements(stmtXml, "Trade")
       .map((a) => {
         const dt = parseDateTime(a.dateTime || (a.tradeDate ? a.tradeDate + (a.tradeTime ? ";" + a.tradeTime : "") : ""));
-        return {
-          tradeID: a.tradeID || "",
-          execID: a.ibExecID || a.tradeID || "",
-          conid: a.conid || "",
-          symbol: a.symbol || "",
-          date: dt.date,
-          time: dt.time,
-          buySell: a.buySell || "",
-          quantity: Math.abs(Number(a.quantity) || 0),
-          signedQty: Number(a.quantity) || 0,
-          price: Number(a.tradePrice) || 0,
-          commission: Math.abs(Number(a.ibCommission) || 0),
-          realizedPnl: Number(a.fifoPnlRealized) || 0,
-          openClose: a.openCloseIndicator || "",
-          assetCategory: a.assetCategory || "",
-        };
+        return { tradeID: a.tradeID || "", execID: a.ibExecID || a.tradeID || "", conid: a.conid || "", symbol: a.symbol || "", date: dt.date, time: dt.time, buySell: a.buySell || "", quantity: Math.abs(Number(a.quantity) || 0), signedQty: Number(a.quantity) || 0, price: Number(a.tradePrice) || 0, commission: Math.abs(Number(a.ibCommission) || 0), realizedPnl: Number(a.fifoPnlRealized) || 0, openClose: a.openCloseIndicator || "", assetCategory: a.assetCategory || "" };
       })
       .filter((t) => t.symbol && t.execID);
 
