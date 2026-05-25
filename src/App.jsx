@@ -459,6 +459,147 @@ function GoldBtn({ children, onClick, small }) {
   );
 }
 
+// Source indicator — tiny dot showing whether a row was keyed in manually or auto-synced from IBKR
+function SourceDot({ source }) {
+  const ibkr = source === "ibkr";
+  return (
+    <span title={ibkr ? "Auto-synced from Interactive Brokers" : "Manually entered"}
+      style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", flexShrink: 0, marginRight: 6, verticalAlign: "middle", background: ibkr ? C.gold : "rgba(255,255,255,0.25)", boxShadow: ibkr ? `0 0 5px ${C.gold}` : "none" }} />
+  );
+}
+
+// ─── IBKR Sync: entry-date floor + preview reconstruction (pure, no DB writes) ───
+const IBKR_SYNC_FLOOR = "2026-05-01"; // only system trades ENTERED on/after this date are pulled
+
+// Reconstruct closed round-trips (flat-to-flat per symbol) + open positions, then diff against current data.
+function buildIbkrPreview(data, positions, journaledTrades) {
+  // Closed trades — group executions per symbol, close out a round-trip each time net position returns to flat
+  const bySym = {};
+  (data.trades || []).forEach(t => { (bySym[t.symbol] = bySym[t.symbol] || []).push(t); });
+  const closed = [];
+  Object.entries(bySym).forEach(([sym, execs]) => {
+    execs.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    let pos = 0, cycle = [];
+    execs.forEach(e => {
+      pos += e.signedQty;
+      cycle.push(e);
+      if (pos === 0 && cycle.length) {
+        const buys = cycle.filter(c => c.signedQty > 0);
+        const sells = cycle.filter(c => c.signedQty < 0);
+        const isLong = (buys[0] ? buys[0].date + buys[0].time : "z") <= (sells[0] ? sells[0].date + sells[0].time : "z");
+        const entryLegs = isLong ? buys : sells, exitLegs = isLong ? sells : buys;
+        const qty = entryLegs.reduce((s, c) => s + c.quantity, 0);
+        const entryP = qty ? entryLegs.reduce((s, c) => s + c.price * c.quantity, 0) / qty : 0;
+        const exitQty = exitLegs.reduce((s, c) => s + c.quantity, 0);
+        const exitP = exitQty ? exitLegs.reduce((s, c) => s + c.price * c.quantity, 0) / exitQty : 0;
+        const first = cycle[0], last = cycle[cycle.length - 1];
+        const commission = cycle.reduce((s, c) => s + c.commission, 0);
+        const realized = cycle.reduce((s, c) => s + c.realizedPnl, 0);
+        const plDollar = realized || ((exitP - entryP) * qty - commission);
+        const plPct = entryP > 0 ? (plDollar / (entryP * qty)) * 100 : 0;
+        if (first.date >= IBKR_SYNC_FLOOR && qty > 0) {
+          closed.push({ ticker: sym, entry: first.date, entryTime: first.time, exit: last.date, exitTime: last.time,
+            entryP: +entryP.toFixed(4), exitP: +exitP.toFixed(4), shares: qty, plPct: +plPct.toFixed(2),
+            plDollar: +plDollar.toFixed(2), commission: +commission.toFixed(2), execId: last.execID, tradeId: last.tradeID,
+            tradeType: isLong ? "Long" : "Short" });
+        }
+        cycle = [];
+      }
+    });
+  });
+
+  // Open positions — apply the same entry-date floor (only holds opened on/after May 1)
+  const openPos = (data.positions || [])
+    .filter(p => (p.openDate || "") >= IBKR_SYNC_FLOOR)
+    .map(p => ({ sym: p.symbol, conid: p.conid, shares: String(Math.abs(Number(p.shares))), ep: String(p.avgCost),
+      cp: p.markPrice ? String(p.markPrice) : "", entry: p.openDate, entryTime: p.openTime,
+      tradeType: Number(p.shares) < 0 ? "Short" : "Long" }));
+
+  // Diff against current data
+  const existingExecIds = new Set((journaledTrades || []).filter(t => t.ibExecId).map(t => t.ibExecId));
+  const existingConids = new Set((positions || []).filter(p => p.ibConid).map(p => p.ibConid));
+  const tradeRows = closed.map(c => {
+    const dup = existingExecIds.has(c.execId);
+    const manualMatch = !dup && (journaledTrades || []).some(t => t.source !== "ibkr" && t.ticker === c.ticker && t.entry === c.entry);
+    return { ...c, status: dup ? "synced" : manualMatch ? "conflict" : "new" };
+  });
+  const posRows = openPos.map(p => {
+    const dup = existingConids.has(p.conid);
+    const manualMatch = !dup && (positions || []).some(x => x.source !== "ibkr" && x.sym === p.sym);
+    return { ...p, status: dup ? "synced" : manualMatch ? "conflict" : "new" };
+  });
+  return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows };
+}
+
+// Read-only preview modal (Phase 1 — shows what WOULD import; no DB writes happen here)
+function IbkrSyncModal({ open, onClose, status, data, error, onRetry }) {
+  if (!open) return null;
+  const chip = (s) => {
+    const map = { new: { c: C.green, t: "New" }, synced: { c: C.muted, t: "Already synced" }, conflict: { c: C.gold, t: "Matches manual" } };
+    const m = map[s] || map.new;
+    return <span style={{ fontSize: "0.5rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: m.c, border: `1px solid ${m.c}55`, borderRadius: 980, padding: "2px 7px" }}>{m.t}</span>;
+  };
+  const counts = data ? {
+    pNew: data.posRows.filter(r => r.status === "new").length, pConf: data.posRows.filter(r => r.status === "conflict").length,
+    tNew: data.tradeRows.filter(r => r.status === "new").length, tConf: data.tradeRows.filter(r => r.status === "conflict").length,
+  } : null;
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(0,0,0,0.66)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "min(860px, 96vw)", maxHeight: "88vh", overflowY: "auto", background: C.bg2, border: `1px solid ${C.borderGold}`, borderRadius: 18, boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
+        <div style={{ position: "sticky", top: 0, background: C.bg2, borderBottom: `1px solid ${C.border}`, padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 }}>
+          <div>
+            <Eyebrow>Interactive Brokers</Eyebrow>
+            <div style={{ fontWeight: 800, fontSize: "1.05rem", color: C.white }}>Sync Preview</div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.1rem", cursor: "pointer", fontFamily: font }}>✕</button>
+        </div>
+        <div style={{ padding: "20px 24px" }}>
+          {status === "loading" && <div style={{ textAlign: "center", padding: "40px 0", color: C.muted, fontSize: "0.84rem" }}>Pulling your latest statement from IBKR… <span style={{ display: "block", marginTop: 6, fontSize: "0.66rem" }}>(generation can take a few seconds)</span></div>}
+          {status === "error" && (
+            <div style={{ padding: "16px 18px", background: "rgba(239,68,68,0.08)", border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 12, color: C.text, fontSize: "0.76rem", lineHeight: 1.6 }}>
+              <strong style={{ color: C.red }}>Couldn't sync.</strong><div style={{ marginTop: 6 }}>{error}</div>
+              <button onClick={onRetry} style={{ marginTop: 14, padding: "8px 16px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.7rem", cursor: "pointer", fontFamily: font }}>Try again</button>
+            </div>
+          )}
+          {status === "preview" && data && (
+            <>
+              <div style={{ padding: "10px 14px", background: "rgba(201,152,42,0.08)", border: `1px solid ${C.borderGold}`, borderRadius: 10, fontSize: "0.7rem", color: C.text, lineHeight: 1.6, marginBottom: 18 }}>
+                <strong style={{ color: C.goldBright }}>Preview only — nothing has been saved.</strong> This is exactly what a sync would pull (entry date on/after {IBKR_SYNC_FLOOR}). Check it against IBKR. Writing to your journal is enabled in the next update, once you confirm the pull is accurate.
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px,1fr))", gap: 10, marginBottom: 18 }}>
+                <StatTile label="Account" value={data.account || "—"} />
+                <StatTile label="Open Positions" value={String(data.posRows.length)} sub={`${counts.pNew} new · ${counts.pConf} to review`} />
+                <StatTile label="Closed Trades" value={String(data.tradeRows.length)} sub={`${counts.tNew} new · ${counts.tConf} to review`} />
+              </div>
+              {[{ title: "Open Positions", rows: data.posRows, cols: ["sym", "shares", "ep", "entry"], head: ["Symbol", "Shares", "Avg Cost", "Opened"] },
+                { title: "Closed Trades (round-trips)", rows: data.tradeRows, cols: ["ticker", "shares", "entryP", "exitP", "plDollar", "entry", "exit"], head: ["Symbol", "Shares", "Entry", "Exit", "P/L $", "In", "Out"] }].map(sec => (
+                <div key={sec.title} style={{ marginBottom: 18 }}>
+                  <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>{sec.title} ({sec.rows.length})</div>
+                  {sec.rows.length === 0 ? <div style={{ fontSize: "0.72rem", color: C.muted, padding: "8px 0" }}>None from May 1 onward.</div> : (
+                    <div style={{ overflowX: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
+                        <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{sec.head.map(h => <th key={h} style={{ padding: "8px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>{h}</th>)}<th style={{ padding: "8px 8px", textAlign: "right" }} /></tr></thead>
+                        <tbody>{sec.rows.map((r, i) => (
+                          <tr key={i} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                            {sec.cols.map(col => <td key={col} style={{ padding: "7px 8px", color: col === "plDollar" ? (r[col] >= 0 ? C.green : C.red) : C.text, fontWeight: col === sec.cols[0] ? 700 : 400, whiteSpace: "nowrap" }}>{col === "plDollar" ? `${r[col] >= 0 ? "+" : ""}${Number(r[col]).toLocaleString()}` : (r[col] ?? "—")}</td>)}
+                            <td style={{ padding: "7px 8px", textAlign: "right" }}>{chip(r.status)}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button onClick={onClose} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontWeight: 700, fontSize: "0.74rem", cursor: "pointer", fontFamily: font }}>Close</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>, document.body);
+}
+
 // ═══════════════════════════════════════
 // ─── CALCULATOR TABS (unchanged logic) ───
 // ═══════════════════════════════════════
@@ -911,16 +1052,214 @@ function LossRecoveryTable() {
     </div>))}
   </div></GlassCard>);
 }
-function PremiumToolsPage({ demo }) {
-  const[tab,setTab]=useState(0);const tabs=["Risk","Expectancy","Risk Finance","Expected Move"];
+// ─── Return Simulator (Sitting Simulator) — winner-size distribution → compounded return ───
+// Model (verified against reference simulations): each trade compounds equity ×= (1 + positionSize × tradeReturn)
+function ReturnSimulatorTab({ portfolioSize, currentCapital }) {
+  const baseStart = +portfolioSize || 0;
+  const baseCurrent = (currentCapital != null && currentCapital > 0) ? currentCapital : baseStart;
+  const [simStart, setSimStart] = useState("");
+  const [simCurrent, setSimCurrent] = useState("");
+  const [simPosSize, setSimPosSize] = useState("12");
+  const [simLossMode, setSimLossMode] = useState("count"); // "count" | "rate"
+  const [simLosers, setSimLosers] = useState("150");
+  const [simWinRate, setSimWinRate] = useState("40");
+  const [simAvgLoss, setSimAvgLoss] = useState("5");
+  const [simTiers, setSimTiers] = useState([{ count: "80", gain: "5" }, { count: "10", gain: "50" }, { count: "10", gain: "100" }]);
+  const [simScenarios, setSimScenarios] = useState([]);
+
+  const sim = useMemo(() => {
+    const startCap = (+simStart > 0) ? +simStart : baseStart;
+    const base = (+simCurrent > 0) ? +simCurrent : (baseCurrent > 0 ? baseCurrent : startCap); // projection compounds from current capital
+    const ps = (+simPosSize || 0) / 100;
+    const avgLoss = (+simAvgLoss || 0) / 100;
+    const tiers = simTiers
+      .map(t => ({ count: Math.max(0, Math.floor(+t.count || 0)), gain: (+t.gain || 0) / 100 }))
+      .filter(t => t.count > 0);
+    const winners = tiers.reduce((s, t) => s + t.count, 0);
+    let losers;
+    if (simLossMode === "rate") {
+      const r = (+simWinRate || 0) / 100; // win rate → derive losing-trade count from winner count
+      losers = (r > 0 && r < 1 && winners > 0) ? Math.round(winners * (1 - r) / r) : 0;
+    } else {
+      losers = Math.max(0, Math.floor(+simLosers || 0));
+    }
+    const total = winners + losers;
+    if (base <= 0 || ps <= 0 || total === 0) return null;
+    const lossMult = 1 - ps * avgLoss;
+    const tierStats = tiers.map(t => {
+      const perTrade = 1 + ps * t.gain;
+      const tierMult = Math.pow(perTrade, t.count);
+      const logContrib = t.count * Math.log(perTrade > 0 ? perTrade : 1e-9);
+      return { ...t, perTrade, tierMult, logContrib };
+    });
+    const lossDrag = Math.pow(Math.max(lossMult, 0), losers);
+    const winMult = tierStats.reduce((m, t) => m * t.tierMult, 1);
+    const endEq = base * lossDrag * winMult;
+    const totalReturn = (endEq / base - 1) * 100;
+    const winRate = (winners / total) * 100;
+    const fromStartReturn = startCap > 0 ? (endEq / startCap - 1) * 100 : totalReturn;
+    // Equity curve — interleave winners & losers proportionally for a representative compounding path
+    const winArr = [];
+    tierStats.forEach(t => { for (let i = 0; i < t.count; i++) winArr.push(t.gain); });
+    const seq = [];
+    let wi = 0, li = 0;
+    for (let k = 0; k < total; k++) {
+      const pullWin = li >= losers ? true : wi >= winArr.length ? false : ((wi + 1) / Math.max(1, winArr.length)) <= ((li + 1) / Math.max(1, losers));
+      if (pullWin) seq.push(winArr[wi++]); else { seq.push(-avgLoss); li++; }
+    }
+    let eq = base;
+    const curve = [{ trade: 0, equity: Math.round(base) }];
+    const step = total > 600 ? Math.ceil(total / 600) : 1; // sample for very large counts
+    seq.forEach((rr, idx) => {
+      eq *= (1 + ps * rr);
+      if ((idx + 1) % step === 0 || idx === seq.length - 1) curve.push({ trade: idx + 1, equity: Math.round(eq) });
+    });
+    return { startCap, base, ps, losers, avgLoss, winners, total, winRate, lossDrag, winMult, endEq, totalReturn, fromStartReturn, tierStats, curve };
+  }, [simStart, simCurrent, simPosSize, simLossMode, simLosers, simWinRate, simAvgLoss, simTiers, baseStart, baseCurrent]);
+
+  const winnersCount = simTiers.reduce((s, t) => s + Math.max(0, Math.floor(+t.count || 0)), 0);
+
+  return (
+    <div style={{ padding: "24px 28px 32px" }}>
+      <p style={{ fontSize: "0.8rem", color: C.muted, margin: "0 0 20px", lineHeight: 1.6 }}>Model how the <strong style={{ color: C.text }}>size of your biggest winners</strong> and your average loss drive total compounded return. Same win rate can give wildly different outcomes — letting winners run is what moves the needle. Each trade compounds at <span style={{ color: C.text }}>equity × (1 + position size × trade return)</span>.</p>
+
+      {/* Capital + sizing inputs */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 10 }}>
+        <CalcInput label="Start Capital" value={simStart} onChange={setSimStart} placeholder={baseStart ? Math.round(baseStart).toString() : "100000"} />
+        <CalcInput label="Current Capital" value={simCurrent} onChange={setSimCurrent} placeholder={baseCurrent ? Math.round(baseCurrent).toString() : "100000"} />
+        <CalcInput label="Position Size" value={simPosSize} onChange={setSimPosSize} suffix="%" placeholder="12" />
+        <CalcInput label="Avg Loss" value={simAvgLoss} onChange={setSimAvgLoss} suffix="%" placeholder="5" />
+      </div>
+      <div style={{ fontSize: "0.6rem", color: C.muted, margin: "0 0 20px" }}>Current Capital = initial + realized profits (auto-filled from your journal). The simulation compounds from this — edit either field to override.</div>
+
+      {/* Win/Loss input — by count OR by win rate */}
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
+          <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold }}>Losing Trades</div>
+          <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}` }}>
+            {[{ k: "count", label: "By count #" }, { k: "rate", label: "By win rate %" }].map(({ k, label }) => (
+              <button key={k} onClick={() => setSimLossMode(k)} style={{ padding: "6px 14px", background: simLossMode === k ? C.goldDim : "rgba(255,255,255,0.03)", border: "none", color: simLossMode === k ? C.gold : C.muted, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font }}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
+          {simLossMode === "count"
+            ? <CalcInput label="Losing Trades" value={simLosers} onChange={setSimLosers} suffix="#" placeholder="150" />
+            : <CalcInput label="Win Rate" value={simWinRate} onChange={setSimWinRate} suffix="%" placeholder="40" />}
+        </div>
+      </div>
+
+      {/* Winner tiers */}
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.gold }}>Winning Trades <span style={{ color: C.muted, fontWeight: 400, textTransform: "none", letterSpacing: "normal" }}>— group your winners by size ({winnersCount} total)</span></div>
+          <button onClick={() => setSimTiers(t => [...t, { count: "5", gain: "30" }])} style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontSize: "0.58rem", fontWeight: 700, cursor: "pointer", fontFamily: font }}>+ Add tier</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {simTiers.map((row, i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "center" }}>
+              <div style={{ position: "relative" }}>
+                <input type="number" min="0" step="1" value={row.count} onChange={e => setSimTiers(t => t.map((r, idx) => idx === i ? { ...r, count: e.target.value } : r))} placeholder="count" style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 56px 10px 14px", color: C.white, fontSize: "0.82rem", fontFamily: font, outline: "none" }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: C.muted, fontSize: "0.62rem" }}>trades</span>
+              </div>
+              <div style={{ position: "relative" }}>
+                <input type="number" step="any" value={row.gain} onChange={e => setSimTiers(t => t.map((r, idx) => idx === i ? { ...r, gain: e.target.value } : r))} placeholder="gain" style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 30px 10px 14px", color: C.white, fontSize: "0.82rem", fontFamily: font, outline: "none" }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: C.muted, fontSize: "0.74rem", fontWeight: 600 }}>%</span>
+              </div>
+              <button onClick={() => setSimTiers(t => t.filter((_, idx) => idx !== i))} disabled={simTiers.length <= 1} style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: simTiers.length <= 1 ? "rgba(255,255,255,0.2)" : C.muted, fontSize: "0.7rem", cursor: simTiers.length <= 1 ? "not-allowed" : "pointer", fontFamily: font }}>✕</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {sim ? (<>
+        {/* Result tiles */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(165px, 1fr))", gap: 12, marginBottom: 16 }}>
+          <StatTile big label="Total Return" value={`${sim.totalReturn >= 0 ? "+" : ""}${sim.totalReturn.toFixed(2)}%`} color={sim.totalReturn >= 0 ? C.green : C.red} sub={`${sim.total} trades · from ${fmt$(sim.base)}`} />
+          <StatTile big label="Ending Balance" value={fmt$(sim.endEq)} color={C.gold} sub={sim.startCap && Math.round(sim.startCap) !== Math.round(sim.base) ? `${sim.fromStartReturn >= 0 ? "+" : ""}${sim.fromStartReturn.toFixed(0)}% from start` : "compounded"} />
+          <StatTile label="Win Rate" value={`${sim.winRate.toFixed(1)}%`} sub={`${sim.winners}W / ${sim.losers}L`} />
+          <StatTile label="Loss Drag" value={`×${sim.lossDrag.toFixed(2)}`} color={C.red} sub={`${sim.losers} losers @ ${(sim.avgLoss * 100).toFixed(1)}%`} />
+        </div>
+
+        {/* Per-tier contribution */}
+        <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 13, padding: "6px 14px", marginBottom: 16, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
+            <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>
+              {["Winner Size", "Count", "Per-Trade", "Tier Multiple", "Share of Upside"].map((h, hi) => <th key={hi} style={{ padding: "9px 6px", textAlign: hi === 0 ? "left" : "right", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {(() => {
+                const winLogSum = sim.tierStats.reduce((s, t) => s + t.logContrib, 0);
+                return sim.tierStats.map((t, i) => (
+                  <tr key={i} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                    <td style={{ padding: "8px 6px", color: C.green, fontWeight: 700 }}>+{(t.gain * 100).toFixed((t.gain * 100) % 1 === 0 ? 0 : 1)}%</td>
+                    <td style={{ padding: "8px 6px", textAlign: "right", color: C.text }}>{t.count}</td>
+                    <td style={{ padding: "8px 6px", textAlign: "right", color: C.muted }}>×{t.perTrade.toFixed(3)}</td>
+                    <td style={{ padding: "8px 6px", textAlign: "right", color: C.white, fontWeight: 700 }}>×{t.tierMult.toFixed(2)}</td>
+                    <td style={{ padding: "8px 6px", textAlign: "right", color: C.goldBright, fontWeight: 700 }}>{winLogSum > 0 ? ((t.logContrib / winLogSum) * 100).toFixed(1) : "0.0"}%</td>
+                  </tr>
+                ));
+              })()}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Equity curve */}
+        <ResponsiveContainer width="100%" height={240}>
+          <AreaChart data={sim.curve} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
+            <defs><linearGradient id="gradSimTool" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.gold} stopOpacity={0.28} /><stop offset="100%" stopColor={C.gold} stopOpacity={0.02} /></linearGradient></defs>
+            <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+            <XAxis dataKey="trade" stroke={C.muted} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickMargin={8} />
+            <YAxis stroke={C.muted} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`} />
+            <Tooltip content={<ChartTip fmt={v => `$${Number(v).toLocaleString()}`} />} cursor={{ stroke: C.borderGold, strokeWidth: 1, strokeDasharray: "4 4" }} />
+            <Area type="monotone" dataKey="equity" stroke={C.gold} strokeWidth={2.5} fill="url(#gradSimTool)" dot={false} name="Equity" />
+            <ReferenceLine y={sim.base} stroke={C.muted} strokeDasharray="3 3" label={{ value: "Start", fill: C.muted, fontSize: 10 }} />
+          </AreaChart>
+        </ResponsiveContainer>
+
+        {/* Scenario compare */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+          <button onClick={() => setSimScenarios(s => [...s, { id: Date.now(), posSize: +simPosSize || 0, losers: sim.losers, avgLoss: +simAvgLoss || 0, winRate: sim.winRate, totalReturn: sim.totalReturn, endEq: sim.endEq, total: sim.total, tiers: sim.tierStats.map(t => ({ count: t.count, gain: t.gain * 100 })) }].slice(-6))} style={{ padding: "9px 16px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontSize: "0.64rem", fontWeight: 800, cursor: "pointer", fontFamily: font }}>＋ Save as scenario</button>
+          {simScenarios.length > 0 && <button onClick={() => setSimScenarios([])} style={{ padding: "9px 16px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.64rem", fontWeight: 700, cursor: "pointer", fontFamily: font }}>Clear all</button>}
+          <span style={{ fontSize: "0.58rem", color: C.muted }}>Snapshot the current setup, change a tier, and compare side by side.</span>
+        </div>
+
+        {simScenarios.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 14 }}>
+            {simScenarios.map((sc, si) => (
+              <div key={sc.id} style={{ position: "relative", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 13, padding: "14px 16px" }}>
+                <button onClick={() => setSimScenarios(s => s.filter(x => x.id !== sc.id))} style={{ position: "absolute", top: 8, right: 10, background: "transparent", border: "none", color: C.muted, fontSize: "0.7rem", cursor: "pointer", fontFamily: font }}>✕</button>
+                <div style={{ fontSize: "0.56rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 8 }}>Scenario {si + 1}</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: sc.totalReturn >= 0 ? C.green : C.red, letterSpacing: "-0.03em", marginBottom: 2 }}>{sc.totalReturn >= 0 ? "+" : ""}{sc.totalReturn.toFixed(0)}%</div>
+                <div style={{ fontSize: "0.62rem", color: C.gold, fontWeight: 700, marginBottom: 10 }}>{fmt$(sc.endEq)}</div>
+                <div style={{ fontSize: "0.56rem", color: C.muted, lineHeight: 1.7 }}>
+                  <div>Pos size {sc.posSize}% · Avg loss {sc.avgLoss}%</div>
+                  <div>Win rate {sc.winRate.toFixed(0)}% · {sc.total} trades</div>
+                  <div style={{ marginTop: 6, color: C.text }}>{sc.tiers.map(t => `${t.count}×${t.gain}%`).join(" · ")}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </>) : (
+        <div style={{ padding: "24px", textAlign: "center", color: C.muted, fontSize: "0.82rem" }}>Enter a position size and at least one winner tier to simulate.</div>
+      )}
+    </div>
+  );
+}
+
+function PremiumToolsPage({ demo, portfolioSize, journaledTrades }) {
+  const[tab,setTab]=useState(0);const tabs=["Return Simulator","Risk","Expectancy","Risk Finance","Expected Move"];
+  const realizedPL = useMemo(() => (journaledTrades || []).reduce((s, t) => s + (t.plDollar || 0), 0), [journaledTrades]);
+  const currentCapital = (+portfolioSize || 0) + realizedPL;
   return (<div>
     <Eyebrow>Premium Tools</Eyebrow>
-    <h1 style={{fontWeight:800,fontSize:"clamp(1.5rem, 4vw, 2rem)",letterSpacing:"-0.04em",color:C.white,margin:"0 0 4px"}}>Risk Management</h1>
-    <p style={{fontWeight:300,fontSize:"0.84rem",color:C.muted,margin:"0 0 24px",lineHeight:1.6}}>Define your risk before you enter. Calculate your edge. Protect your capital.</p>
-    <GlassCard><div style={{display:"flex",borderBottom:`1px solid ${C.border}`}}>
-      {tabs.map((t,i)=>(<button key={t} onClick={()=>setTab(i)} style={{flex:1,padding:"14px 0",textAlign:"center",fontWeight:tab===i?700:500,fontSize:"0.80rem",color:tab===i?C.white:C.muted,cursor:"pointer",background:"transparent",border:"none",fontFamily:font,borderBottom:tab===i?`2px solid ${C.gold}`:"2px solid transparent"}}>{t}</button>))}
+    <h1 style={{fontWeight:800,fontSize:"clamp(1.5rem, 4vw, 2rem)",letterSpacing:"-0.04em",color:C.white,margin:"0 0 4px"}}>Optimise & Manage Risk</h1>
+    <p style={{fontWeight:300,fontSize:"0.84rem",color:C.muted,margin:"0 0 24px",lineHeight:1.6}}>Simulate and optimise your returns, then define your risk before you enter. Calculate your edge. Protect your capital.</p>
+    <GlassCard><div style={{display:"flex",borderBottom:`1px solid ${C.border}`,flexWrap:"wrap"}}>
+      {tabs.map((t,i)=>(<button key={t} onClick={()=>setTab(i)} style={{flex:"1 1 120px",padding:"14px 0",textAlign:"center",fontWeight:tab===i?700:500,fontSize:"0.80rem",color:tab===i?C.white:C.muted,cursor:"pointer",background:"transparent",border:"none",fontFamily:font,borderBottom:tab===i?`2px solid ${C.gold}`:"2px solid transparent"}}>{t}</button>))}
     </div>
-      {tab===0&&<RiskTab demo={demo}/>}{tab===1&&<ExpectancyTab demo={demo}/>}{tab===2&&<RiskFinanceTab demo={demo}/>}{tab===3&&<ExpectedMoveTab demo={demo}/>}
+      {tab===0&&<ReturnSimulatorTab portfolioSize={portfolioSize} currentCapital={currentCapital}/>}{tab===1&&<RiskTab demo={demo}/>}{tab===2&&<ExpectancyTab demo={demo}/>}{tab===3&&<RiskFinanceTab demo={demo}/>}{tab===4&&<ExpectedMoveTab demo={demo}/>}
     </GlassCard>
     <LossRecoveryTable />
   </div>);
@@ -1222,6 +1561,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const [distMode, setDistMode] = useState("actual"); // "actual" | "cap" | "cleared"
   const [distCapVal, setDistCapVal] = useState(""); // Cap Losses at X%
   const [distTableEdits, setDistTableEdits] = useState({}); // {bucketIdx: {gains, losses}} manual overrides
+  const [distGainMax, setDistGainMax] = useState(""); // extend fine 2% gain buckets up to this % (blank = auto from data, clamped to 100)
+  const [distCustomTiers, setDistCustomTiers] = useState([]); // extra high-value point buckets for simulating monster winners, e.g. [150, 500]
+  const [distTierInput, setDistTierInput] = useState(""); // input box for adding a custom tier
   const [drmaExplainerOpen, setDrmaExplainerOpen] = useState(false);
   // Drag reorder hooks — stat tiles, trade journal columns, open positions columns
   const statDrag = useDragReorder(12); // 12 stat tiles
@@ -1490,12 +1832,20 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     if (total === 0) return { barData: [], tableData: [], butterflyData: [], butterflyDrma: [], gainMag: [], lossMag: [], returnPerTrade: 0, stats: null };
 
     const maxAbsPct = Math.max(...trades.map(t => Math.abs(t.plPct)));
-    const bucketHi = Math.max(Math.ceil(maxAbsPct / 2) * 2, 20);
+    // Fine 2%-wide buckets — extend up to distGainMax (clamped to 100%) so big winners can be simulated, not just your personal max
+    const gainMaxInput = parseFloat(distGainMax);
+    const fineTarget = Number.isFinite(gainMaxInput) && gainMaxInput > 0 ? Math.ceil(gainMaxInput / 2) * 2 : 0;
+    const bucketHi = Math.min(Math.max(Math.ceil(maxAbsPct / 2) * 2, fineTarget, 20), 100);
     const buckets = [];
     for (let i = 0; i < bucketHi; i += 2) buckets.push({ lo: i, hi: i + 2, range: `${i} - ${i+2}%`, gains: 0, losses: 0, gainPcts: [], lossPcts: [] });
+    const fineCount = buckets.length;
+    // Custom high-value tiers (point buckets) above the fine range — for simulating monster winners (e.g. 150%, 500%)
+    [...distCustomTiers].filter(v => v > bucketHi).sort((a, b) => a - b).forEach(v => {
+      buckets.push({ lo: v, hi: v, range: `${v}%`, custom: true, gains: 0, losses: 0, gainPcts: [], lossPcts: [] });
+    });
     trades.forEach(t => {
       const absPct = Math.abs(t.plPct);
-      const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor(absPct / 2)));
+      const idx = Math.max(0, Math.min(fineCount - 1, Math.floor(absPct / 2))); // real trades land only in fine buckets
       if (t.plPct > 0) { buckets[idx].gains++; buckets[idx].gainPcts.push(t.plPct); }
       else { buckets[idx].losses++; buckets[idx].lossPcts.push(t.plPct); }
     });
@@ -1562,7 +1912,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       barData, tableData, butterflyData, butterflyDrma, gainMag, lossMag, returnPerTrade: cumDRMA, cappedCount,
       stats: { ba, avgGain, avgLoss, glRatio, adjustedGL: isFinite(adjustedGL) ? adjustedGL : 999.99, total: editedTotal, wins: allGainPcts.length, losses: allLossPcts.length }
     };
-  }, [filtered, distMode, distCapVal, distTableEdits]);
+  }, [filtered, distMode, distCapVal, distTableEdits, distGainMax, distCustomTiers]);
 
   // Equity curve data — supports $ vs % and trades vs months
   const equityData = useMemo(() => {
@@ -2071,6 +2421,17 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     {distCapVal !== "" && activeDistData.cappedCount > 0 && <span style={{ fontSize:"0.52rem",color:C.gold,fontWeight:700 }}>{activeDistData.cappedCount} capped</span>}
                   </div>
                 )}
+                {/* Extend gain range — fine buckets up to N%, plus custom high tiers for simulating monster winners */}
+                <div style={{ display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",borderLeft:`1px solid ${C.border}`,paddingLeft:12,marginLeft:2 }}>
+                  <span style={{ fontSize:"0.52rem",color:C.muted,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase" }}>Simulate gains to</span>
+                  <input type="number" step="2" min="20" max="100" placeholder="auto" value={distGainMax} onChange={e => setDistGainMax(e.target.value)} style={{ width:62,padding:"7px 8px",background:"rgba(255,255,255,0.05)",border:`1px solid ${distGainMax!==""?C.gold:C.border}`,borderRadius:8,color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none",textAlign:"center" }} />
+                  <span style={{ fontSize:"0.52rem",color:C.muted }}>% fine</span>
+                  <input type="number" step="any" min="1" placeholder="+ tier %" value={distTierInput} onChange={e => setDistTierInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { const v = parseFloat(distTierInput); if (v > 0 && !distCustomTiers.includes(v)) { setDistCustomTiers(t => [...t, v]); setDistTierInput(""); } } }} style={{ width:72,padding:"7px 8px",background:"rgba(255,255,255,0.05)",border:`1px solid ${C.border}`,borderRadius:8,color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none",textAlign:"center" }} />
+                  <button onClick={() => { const v = parseFloat(distTierInput); if (v > 0 && !distCustomTiers.includes(v)) { setDistCustomTiers(t => [...t, v]); setDistTierInput(""); } }} style={{ padding:"7px 12px",borderRadius:8,border:`1px solid ${C.borderGold}`,background:C.goldDim,color:C.gold,fontSize:"0.58rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>Add tier</button>
+                  {[...distCustomTiers].sort((a,b)=>a-b).map(v => (
+                    <span key={v} onClick={() => setDistCustomTiers(t => t.filter(x => x !== v))} title="Remove tier" style={{ display:"inline-flex",alignItems:"center",gap:5,padding:"5px 9px",borderRadius:980,border:`1px solid ${C.borderGold}`,background:"rgba(201,152,42,0.10)",color:C.goldBright,fontSize:"0.56rem",fontWeight:700,cursor:"pointer",fontFamily:font }}>{v}% ✕</span>
+                  ))}
+                </div>
               </div>
 
               {/* ── Summary Card ── */}
@@ -2361,7 +2722,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                 }
                 return (<React.Fragment key={t.id}>
                   <DragTr order={tradeDrag.order} style={{ borderBottom: isGroup && !isLastInGroup ? "1px dashed rgba(201,152,42,0.20)" : "1px solid rgba(255,255,255,0.03)", cursor: "pointer", borderLeft: groupBorder }} onDoubleClick={() => startEdit(t)}>
-                    <td style={{ padding: "11px 8px", fontWeight: 700, color: C.gold }}>{isGroup && !isFirstInGroup ? <span style={{color:C.muted,fontSize:"0.56rem"}}>↳</span> : null} {t.ticker}{isGroup && isFirstInGroup ? <span style={{marginLeft:4,fontSize:"0.48rem",fontWeight:600,color:C.muted,verticalAlign:"middle"}}>({groupSize})</span> : null}</td>
+                    <td style={{ padding: "11px 8px", fontWeight: 700, color: C.gold }}>{isGroup && !isFirstInGroup ? <span style={{color:C.muted,fontSize:"0.56rem"}}>↳</span> : null} <SourceDot source={t.source} />{t.ticker}{isGroup && isFirstInGroup ? <span style={{marginLeft:4,fontSize:"0.48rem",fontWeight:600,color:C.muted,verticalAlign:"middle"}}>({groupSize})</span> : null}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>{t.entry}</td>
                     <td style={{ padding: "11px 6px", color: C.muted, fontSize: "0.62rem" }}>{t.entryTime||"—"}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>{t.exit||"—"}</td>
@@ -2485,7 +2846,7 @@ const GLOSSARY = [
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
-function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg }) {
+function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync }) {
   const [compactTable, setCompactTable] = useState(false);
   // Open Positions zoom — scales the whole table (5 steps each way, 70%–130%, 6% per step). Persisted as a UI-only pref.
   const [posZoom, setPosZoom] = useState(() => { const s = parseFloat(localStorage.getItem("viv-pos-zoom")); return Number.isFinite(s) ? Math.min(1.3, Math.max(0.7, s)) : 1; });
@@ -2504,13 +2865,16 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const onManualSaveRef = useRef(onManualSave);
   useEffect(() => { onManualSaveRef.current = onManualSave; }, [onManualSave]);
 
+  // fullSizePct is now the TARGET POSITION SIZE PER TRADE (%). perStock = $ at full size; fullSizeAmt = implied total if fully loaded.
   const sizer = useMemo(() => {
     const ps = +portfolioSize;
     if (!ps || ps <= 0) return null;
-    const fullSizeAmt = ps * (fullSizePct / 100);
-    const perStock = fullSizeAmt / numStocks;
-    return { fullSizeAmt, full: perStock, half: perStock / 2, quarter: perStock / 4, pilot: perStock / 8 };
+    const perTradePct = +fullSizePct || 0;
+    const perStock = ps * (perTradePct / 100);
+    const fullSizeAmt = perStock * numStocks;
+    return { perTradePct, fullSizeAmt, impliedTotalPct: perTradePct * numStocks, full: perStock, half: perStock / 2, quarter: perStock / 4, pilot: perStock / 8 };
   }, [portfolioSize, fullSizePct, numStocks]);
+  const targetPosPct = +fullSizePct || 0; // benchmark for Open Positions Exp % colour coding
 
   // R-based sizer: Account × ROTE% = total risk budget, ÷ max positions = R$ per trade
   const rSizer = useMemo(() => {
@@ -2914,25 +3278,6 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     };
   }, [enriched, journaledTrades, targetRote]);
 
-  // ─── Compounder: state & calculations (embedded from former CompounderPage) ───
-  const [projR, setProjR] = useState("2");
-  const [projWin, setProjWin] = useState("55");
-  const [projBatches, setProjBatches] = useState("12");
-  const [targetAnnualReturn, setTargetAnnualReturn] = useState("");
-
-  // Actual stats from journal trades
-  const actualStats = useMemo(() => {
-    if (!journaledTrades || journaledTrades.length === 0) return { winRate: 0, avgR: 0, avgGain: 0, avgLoss: 0, rewardRisk: 0, count: 0 };
-    const wins = journaledTrades.filter(t => (t.plPct || 0) > 0);
-    const losses = journaledTrades.filter(t => (t.plPct || 0) <= 0);
-    const winRate = (wins.length / journaledTrades.length) * 100;
-    const avgR = journaledTrades.reduce((s, t) => s + (t.rMult || 0), 0) / journaledTrades.length;
-    // Equal-weighted avg gain/loss: simple average of trade percentages
-    const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + (t.plPct || 0), 0) / wins.length : 0;
-    const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + (t.plPct || 0), 0) / losses.length) : 0;
-    const rewardRisk = avgLoss > 0 ? avgGain / avgLoss : 0;
-    return { winRate, avgR, avgGain, avgLoss, rewardRisk, count: journaledTrades.length };
-  }, [journaledTrades]);
 
   const posAnalysis = useMemo(() => {
     if (!positions || positions.length === 0) return [];
@@ -2977,57 +3322,6 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     return { totalBudget, deployedRisk, initialRisk, freedRisk, available, atRiskCount, freeCount, totalCount, totalUnrealized, deployedPct, availablePct, initialRotePct, tgtRote };
   }, [posAnalysis, compEquity, targetRote]);
 
-  const projection = useMemo(() => {
-    if (compEquity <= 0) return [];
-    const tgtRote = (+targetRote || 0) / 100;
-    const tgtR = +projR || 1;
-    const wr = (+projWin || 50) / 100;
-    const batches = Math.min(+projBatches || 12, 52);
-    const expectedReturnPerTrade = wr * tgtR * tgtRote - (1 - wr) * tgtRote;
-    const rows = [];
-    let eq = compEquity;
-    for (let i = 0; i <= batches; i++) {
-      const prevEq = i === 0 ? compEquity : rows[i - 1].equity;
-      const newEq = i === 0 ? eq : prevEq * (1 + expectedReturnPerTrade);
-      rows.push({ cycle: i, equity: newEq, riskBudget: newEq * tgtRote, gain: i === 0 ? 0 : newEq - prevEq, growthPct: i === 0 ? 0 : ((newEq - compEquity) / compEquity) * 100 });
-    }
-    return rows;
-  }, [compEquity, targetRote, projR, projWin, projBatches]);
-
-  const chartData = useMemo(() => {
-    if (projection.length === 0) return [];
-    const tgtRote = (+targetRote || 0) / 100;
-    const tgtR = +projR || 1;
-    const batches = Math.min(+projBatches || 12, 52);
-    const actual = [];
-    let aEq = compEquity;
-    // Actual projection: average R-multiple from your journal × ROTE risked per trade
-    // (consistent with the Target model, which also works in R-multiples × ROTE)
-    const actualReturnPerTrade = (actualStats.avgR || 0) * tgtRote;
-    for (let i = 0; i <= batches; i++) {
-      if (i > 0) { aEq *= (1 + actualReturnPerTrade); }
-      actual.push(Math.round(aEq));
-    }
-    return projection.map((d, i) => ({ cycle: i === 0 ? "Now" : `T${d.cycle}`, expected: Math.round(d.equity), actual: actual[i] }));
-  }, [projection, compEquity, targetRote, projR, projBatches, actualStats]);
-
-  const finalProj = projection.length > 1 ? projection[projection.length - 1] : null;
-
-  // Target annual return → back-calculate required trades
-  const annualGoal = useMemo(() => {
-    const annRet = +(targetAnnualReturn || 0) / 100;
-    if (annRet <= 0 || compEquity <= 0) return null;
-    const tgtRote = (+targetRote || 0) / 100;
-    const wr = (+projWin || 50) / 100;
-    const tgtR = +projR || 1;
-    const expectedReturnPerTrade = wr * tgtR * tgtRote - (1 - wr) * tgtRote;
-    if (expectedReturnPerTrade <= 0) return { requiredTrades: Infinity, targetEquity: compEquity * (1 + annRet), returnPerTrade: expectedReturnPerTrade };
-    const requiredTrades = Math.ceil(Math.log(1 + annRet) / Math.log(1 + expectedReturnPerTrade));
-    return { requiredTrades, targetEquity: compEquity * (1 + annRet), returnPerTrade: expectedReturnPerTrade };
-  }, [targetAnnualReturn, compEquity, targetRote, projWin, projR]);
-
-  // Completed trades = total journal trades
-  const completedTrades = actualStats.count;
 
   const compTh = (text, align = "right") => <th style={{padding:"10px 8px",textAlign:align,fontWeight:700,fontSize:"0.50rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap"}}>{text}</th>;
 
@@ -3050,7 +3344,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10 }}>
           <div>
             <Eyebrow>Position Sizer</Eyebrow>
-            <div style={{ fontWeight:800,fontSize:"1.05rem",letterSpacing:"-0.03em",color:C.white }}>{sizerMode === "R" ? "Risk-Based Sizing (R)" : "Portfolio Allocation Framework"}</div>
+            <div style={{ fontWeight:800,fontSize:"1.05rem",letterSpacing:"-0.03em",color:C.white }}>{sizerMode === "R" ? "Risk-Based Sizing (R)" : "Percent-Based Sizing (%)"}</div>
           </div>
           <div style={{ display:"flex",borderRadius:10,overflow:"hidden",border:`1px solid ${C.border}` }}>
             {[{k:"R",label:"R Mode"},{k:"%",label:"% Mode"}].map(({k,label})=>(
@@ -3063,8 +3357,30 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 
         {sizerMode === "%" ? (
           <>
-            <SliderRow label="Full Allocation" min={10} max={60} step={5} value={fullSizePct} onChange={setFullSizePct} suffix="%" calcText={sizer?fmt$(sizer.fullSizeAmt):""} />
-            <SliderRow label="Max Positions" min={1} max={12} step={1} value={numStocks} onChange={setNumStocks} calcText={sizer?`${fmt$(sizer.full)} / stock`:""} />
+            <div style={{ display:"flex",gap:20,alignItems:"flex-end",flexWrap:"wrap",marginBottom:20 }}>
+              <div style={{ flex:"0 0 auto" }}>
+                <div style={{ fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:6 }}>Target Size / Trade</div>
+                <div style={{ position:"relative",width:160 }}>
+                  <input type="number" step="1" min="0" value={fullSizePct} onChange={e=>setFullSizePct(+e.target.value||0)} style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:10,padding:"11px 32px 11px 14px",color:C.white,fontSize:"0.95rem",fontWeight:600,fontFamily:font,outline:"none" }} onFocus={e=>e.target.style.borderColor=C.gold} onBlur={e=>e.target.style.borderColor=C.border} />
+                  <span style={{ position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",color:C.muted,fontSize:"0.78rem",fontWeight:600 }}>%</span>
+                </div>
+              </div>
+              <div style={{ flex:"0 0 auto" }}>
+                <div style={{ fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,marginBottom:6 }}>Max Positions</div>
+                <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+                  <button onClick={()=>setNumStocks(Math.max(1,numStocks-1))} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.white,fontWeight:800,fontSize:"1rem",cursor:"pointer",fontFamily:font,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                  <span style={{ fontWeight:800,fontSize:"1.1rem",color:C.white,minWidth:28,textAlign:"center" }}>{numStocks}</span>
+                  <button onClick={()=>setNumStocks(Math.min(20,numStocks+1))} style={{width:32,height:32,borderRadius:8,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.white,fontWeight:800,fontSize:"1rem",cursor:"pointer",fontFamily:font,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                </div>
+              </div>
+            </div>
+            {sizer && (
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:14,marginBottom:16 }}>
+                <StatTile big label="Position Size / Trade" value={`${sizer.perTradePct.toFixed(2)}%`} color={C.goldBright} sub={`${fmt$(sizer.full)} per trade`} />
+                <StatTile big label="Implied Full Exposure" value={`${sizer.impliedTotalPct.toFixed(0)}%`} color={sizer.impliedTotalPct>100?C.red:C.green} sub={`${fmt$(sizer.fullSizeAmt)} across ${numStocks} positions`} />
+              </div>
+            )}
+            <div style={{ fontSize:"0.6rem",color:C.muted,marginBottom:10 }}>Scale in from Pilot → Full. Your target of {sizer?sizer.perTradePct.toFixed(0):0}% per trade colour-codes the <strong style={{color:C.text}}>Exp %</strong> column below (green = on size, red = oversized, blue = undersized).</div>
             <TierStrip sizer={sizer} />
           </>
         ) : (
@@ -3123,6 +3439,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
             <button onClick={() => { if (saveStatus === "error" && saveErrorMsg) { alert("Save error: " + saveErrorMsg); } else { onManualSave(); } }} disabled={saveStatus === "saving"} title={saveStatus === "error" && saveErrorMsg ? "Error: " + saveErrorMsg : "Save all positions to database"} style={{ padding:"8px 16px",borderRadius:980,border:`1px solid ${saveStatus === "saved" ? "rgba(34,197,94,0.4)" : saveStatus === "error" ? "rgba(239,68,68,0.4)" : C.borderGold}`,background:saveStatus === "saved" ? "rgba(34,197,94,0.12)" : saveStatus === "error" ? "rgba(239,68,68,0.12)" : C.goldDim,color:saveStatus === "saved" ? C.green : saveStatus === "error" ? C.red : C.gold,fontWeight:700,fontSize:"0.72rem",cursor:saveStatus === "saving" ? "wait" : "pointer",fontFamily:font,transition:"all 0.2s",display:"flex",alignItems:"center",gap:6 }}>
               {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Save Failed ⓘ" : "Save"}
             </button>
+            {onIbkrSync && <button onClick={onIbkrSync} title="Pull positions & trades from Interactive Brokers" style={{ padding:"8px 14px",borderRadius:980,border:`1px solid ${C.borderGold}`,background:"rgba(255,255,255,0.04)",color:C.gold,fontWeight:700,fontSize:"0.72rem",cursor:"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:6 }}>⟳ Sync IBKR</button>}
             <button onClick={() => exportMasterCSV(positions.filter(p => p.sym), journaledTrades)} style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.muted,fontWeight:700,fontSize:"0.62rem",cursor:"pointer",fontFamily:font }}>Export CSV</button>
             <label style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.muted,fontWeight:700,fontSize:"0.62rem",cursor:"pointer",fontFamily:font }}>
               Import
@@ -3241,13 +3558,13 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                   <React.Fragment key={p._lid || p.id}>
                   <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,8,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
                     <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
-                    <td style={{padding:"6px 4px"}}><div style={{display:"flex",alignItems:"center",gap:4}}>{p.sym && getTickerLogo(p.sym) && <img src={getTickerLogo(p.sym)} alt="" style={{width:18,height:18,borderRadius:4,flexShrink:0}} onError={e=>{e.target.style.display="none"}} />}<TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></div></td>
+                    <td style={{padding:"6px 4px"}}><div style={{display:"flex",alignItems:"center",gap:4}}><SourceDot source={p.source} />{p.sym && getTickerLogo(p.sym) && <img src={getTickerLogo(p.sym)} alt="" style={{width:18,height:18,borderRadius:4,flexShrink:0}} onError={e=>{e.target.style.display="none"}} />}<TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></div></td>
                     <td style={{padding:"6px 2px",textAlign:"center"}}><select value={p.tradeType||"Long"} onChange={e=>updateField(p.id,"tradeType",e.target.value)} style={{padding:"3px 4px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,color:(p.tradeType||"Long")==="Short"?C.red:C.green,fontSize:"0.52rem",fontWeight:700,fontFamily:font,cursor:"pointer",outline:"none"}}><option value="Long">L</option><option value="Short">S</option></select></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.shares} onChange={v=>updateField(p.id,"shares",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.ep} onChange={v=>updateField(p.id,"ep",v)} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0?<div style={{fontWeight:700,fontSize:"0.72rem",color:C.white}}>{fmt$(p.posValue)}</div>:<div style={{color:C.muted}}>—</div>}<div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:4,marginTop:3}}><span style={{fontSize:"0.46rem",color:C.muted,letterSpacing:"0.06em",textTransform:"uppercase"}}>Comm</span><CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={52} /></div></td>
-                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0&&compEquity>0?<div style={{fontWeight:600,fontSize:"0.70rem",color:p.expPct>100?C.red:C.white}}>{p.expPct.toFixed(2)}%</div>:"—"}</td>
+                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0&&compEquity>0?(()=>{let col=C.white,note=null;if(targetPosPct>0){const lo=targetPosPct*0.8,hi=targetPosPct*1.2;if(p.expPct>hi){col=C.red;note="Oversized";}else if(p.expPct<lo){col=C.blue;note="Undersized";}else{col=C.green;note="On Size";}}else if(p.expPct>100){col=C.red;}return<div><div style={{fontWeight:600,fontSize:"0.70rem",color:col}}>{p.expPct.toFixed(2)}%</div>{note&&<div style={{fontSize:"0.5rem",fontWeight:700,color:col,letterSpacing:"0.05em",textTransform:"uppercase",marginTop:1}}>{note}</div>}</div>;})():"—"}</td>
                     <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.realizedPL!==0?<><div style={{fontWeight:700,fontSize:"0.70rem",color:p.realizedPL>=0?C.green:C.red}}>{p.realizedPL>=0?"+":"-"}{fmt$(Math.abs(p.realizedPL))}</div>{p.costFinanced&&<div style={{fontSize:"0.50rem",fontWeight:700,color:C.green,letterSpacing:"0.04em"}}>FINANCED</div>}</>:"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={72} /></td>
@@ -3676,95 +3993,6 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           </GlassCard>
         )}
 
-        {/* Forward Projection */}
-        <GlassCard style={{ padding:"24px 28px",marginBottom:20 }}>
-          <Eyebrow>Compound Projection</Eyebrow>
-          <div style={{ fontWeight:800,fontSize:"1.05rem",color:C.white,marginBottom:6 }}>Target vs Actual</div>
-          <p style={{ fontSize:"0.68rem",color:C.muted,margin:"0 0 16px" }}>Project forward from your current equity. Each trade = deploying your target ROTE, taking the trade, then redeploying on the new equity. Your actual stats are pulled from your Trade Journal.</p>
-          {/* TARGET — your goal assumptions */}
-          <div style={{ marginBottom:18 }}>
-            <div style={{ fontWeight:700,fontSize:"0.6rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.gold,marginBottom:10 }}>Target <span style={{ color:C.muted,fontWeight:400,textTransform:"none",letterSpacing:"normal" }}>— your goal assumptions</span></div>
-            <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(200px, 1fr))",gap:12 }}>
-              <CalcInput label="R-Multiple" value={projR} onChange={setProjR} suffix="R" placeholder="2" />
-              <CalcInput label="Win Rate" value={projWin} onChange={setProjWin} suffix="%" placeholder="55" />
-              <CalcInput label="Target Annual Return" value={targetAnnualReturn} onChange={setTargetAnnualReturn} suffix="%" placeholder="50" />
-              <CalcInput label="No. of Trades" value={projBatches} onChange={setProjBatches} suffix="#" placeholder="12" />
-            </div>
-          </div>
-          {/* ACTUAL — from your trade journal */}
-          <div style={{ marginBottom:16 }}>
-            <div style={{ fontWeight:700,fontSize:"0.6rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.blue,marginBottom:10 }}>Actual <span style={{ color:C.muted,fontWeight:400,textTransform:"none",letterSpacing:"normal" }}>— from your journal ({actualStats.count} trades)</span></div>
-              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(150px, 1fr))",gap:10 }}>
-                {(() => {
-                  const tgtRote = (+targetRote||0)/100;
-                  const retPerTrade = (actualStats.avgR||0)*tgtRote;
-                  const cards = [
-                    { label:"Win Rate", val:`${actualStats.winRate.toFixed(0)}%`, color:actualStats.winRate >= (+projWin||50) ? C.green : C.red, tip:"Your actual win rate from journaled trades." },
-                    { label:"Avg Gain", val:`+${actualStats.avgGain.toFixed(2)}%`, color:C.green, tip:"Average percentage return on your winning trades." },
-                    { label:"Avg Loss", val:`-${actualStats.avgLoss.toFixed(2)}%`, color:C.red, tip:"Average percentage loss on your losing trades." },
-                    { label:"Reward / Risk", val:actualStats.rewardRisk.toFixed(2), color:actualStats.rewardRisk >= 2 ? C.green : actualStats.rewardRisk >= 1 ? C.gold : C.red, tip:"Average gain ÷ average loss — the size of a typical winner versus a typical loser." },
-                    { label:"Equity Growth / Trade", val:`${(retPerTrade*100).toFixed(2)}%`, color:retPerTrade>=0?C.green:C.red, tip:"Per-trade growth of your total equity — average R-multiple × the ROTE you risk per trade. Different from the Journal's avg return per trade, which measures return on the trade itself." },
-                  ];
-                  return cards.map((c,i) => (
-                    <div key={i} style={{ padding:"11px 13px",borderRadius:10,background:C.glass,border:`1px solid ${C.border}`,minHeight:68,display:"flex",flexDirection:"column",justifyContent:"center" }}>
-                      <div style={{ fontSize:"0.54rem",fontWeight:700,color:C.muted,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:5 }}><Abbr tip={c.tip} underline={false}>{c.label}</Abbr></div>
-                      <div style={{ fontSize:"1.02rem",fontWeight:800,color:c.color,letterSpacing:"-0.02em" }}>{c.val}</div>
-                    </div>
-                  ));
-                })()}
-              </div>
-          </div>
-          {annualGoal && (
-            <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(185px, 1fr))",gap:12,marginBottom:16 }}>
-              <StatTile label="Annual Target" value={fmt$(annualGoal.targetEquity)} color={C.gold} sub={`+${targetAnnualReturn}% from ${fmt$(compEquity)}`} />
-              <StatTile label="Trades Required" value={annualGoal.requiredTrades === Infinity ? "∞" : String(annualGoal.requiredTrades)} color={C.gold} sub={`${(annualGoal.returnPerTrade * 100).toFixed(2)}% per trade`} />
-              <StatTile label="Trades Completed" value={String(completedTrades)} color={completedTrades >= (annualGoal.requiredTrades || 0) ? C.green : C.blue} sub={annualGoal.requiredTrades !== Infinity ? `${Math.min(100, (completedTrades / annualGoal.requiredTrades * 100)).toFixed(0)}% of target` : "—"} />
-              <StatTile label="Trades Remaining" value={annualGoal.requiredTrades === Infinity ? "∞" : String(Math.max(0, annualGoal.requiredTrades - completedTrades))} color={completedTrades >= (annualGoal.requiredTrades || 0) ? C.green : C.red} sub={completedTrades >= (annualGoal.requiredTrades || 0) ? "Goal reached" : "to hit annual target"} />
-            </div>
-          )}
-
-          {finalProj && (
-            <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(185px, 1fr))",gap:12,marginBottom:16 }}>
-              <StatTile label="Current Equity" value={fmt$(compEquity)} />
-              <StatTile label={`Target (${projBatches} Trades)`} value={fmt$(finalProj.equity)} color={C.green} />
-              <StatTile label="Target Growth" value={`+${finalProj.growthPct.toFixed(2)}%`} color={C.green} sub={`+${fmt$(finalProj.equity - compEquity)}`} />
-              {actualStats.count > 0 && chartData.length > 1 && (
-                <StatTile label={`Actual (${projBatches} Trades)`} value={fmt$(chartData[chartData.length-1].actual)} color={chartData[chartData.length-1].actual >= finalProj.equity ? C.green : C.red} sub={compEquity > 0 ? `${chartData[chartData.length-1].actual >= compEquity ? "+" : ""}${(((chartData[chartData.length-1].actual - compEquity)/compEquity)*100).toFixed(2)}%` : ""} />
-              )}
-            </div>
-          )}
-
-          {chartData.length > 1 && (
-            <>
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={chartData} margin={{ top:10,right:30,left:10,bottom:5 }}>
-                  <defs>
-                    <linearGradient id="gradTarget" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={C.green} stopOpacity={0.25} />
-                      <stop offset="100%" stopColor={C.green} stopOpacity={0.02} />
-                    </linearGradient>
-                    <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={C.blue} stopOpacity={0.25} />
-                      <stop offset="100%" stopColor={C.blue} stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="cycle" stroke={C.muted} tick={{ fontSize:10 }} tickLine={false} axisLine={false} tickMargin={8} />
-                  <YAxis stroke={C.muted} tick={{ fontSize:10 }} tickLine={false} axisLine={false} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} />
-                  <Tooltip content={<ChartTip fmt={v => `$${Number(v).toLocaleString()}`} />} cursor={{ stroke:C.borderGold,strokeWidth:1,strokeDasharray:"4 4" }} />
-                  <Area type="natural" dataKey="expected" stroke={C.green} strokeWidth={2.5} fill="url(#gradTarget)" dot={false} name="Target" />
-                  {actualStats.count > 0 && <Area type="natural" dataKey="actual" stroke={C.blue} strokeWidth={2.5} fill="url(#gradActual)" dot={false} name="Actual" />}
-                  <ReferenceLine y={compEquity} stroke={C.muted} strokeDasharray="3 3" label={{ value:"Now",fill:C.muted,fontSize:10 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-              <div style={{ display:"flex",gap:16,justifyContent:"center",marginTop:8,flexWrap:"wrap" }}>
-                <span style={{ fontSize:"0.60rem",color:C.green }}>■ Target</span>
-                {actualStats.count > 0 && <span style={{ fontSize:"0.60rem",color:C.blue }}>■ Actual</span>}
-              </div>
-            </>
-          )}
-        </GlassCard>
-
         {/* How It Works */}
         <GlassCard style={{ padding:"22px 26px" }}>
           <Eyebrow>How It Works</Eyebrow>
@@ -3784,8 +4012,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 // ═══════════════════════════════════════
 // ─── SETTINGS PAGE ───
 // ═══════════════════════════════════════
-function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session }) {
+function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session, onIbkrSync }) {
   const isAdmin = userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const [ibkrTutOpen, setIbkrTutOpen] = useState(false);
   const [newSetup, setNewSetup] = useState("");
   const [newTag, setNewTag] = useState("");
   const [newReason, setNewReason] = useState("");
@@ -3860,6 +4089,53 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
     <div>
       <Eyebrow>Settings</Eyebrow>
       <h1 style={{ fontWeight: 800, fontSize: "2rem", letterSpacing: "-0.04em", color: C.white, marginBottom: 24 }}>Account Settings</h1>
+
+      {/* Interactive Brokers Sync */}
+      <GlassCard style={{ padding: "24px 28px", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+          <div style={{ flex: "1 1 280px" }}>
+            <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Interactive Brokers Sync</div>
+            <div style={{ fontSize: "0.70rem", color: C.muted, lineHeight: 1.6 }}>Pull your open positions and closed trades straight from IBKR (entered on/after {IBKR_SYNC_FLOOR}). You'll always see a preview before anything saves — manual entries are never overwritten.</div>
+          </div>
+          {onIbkrSync && <button onClick={onIbkrSync} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 7, alignSelf: "center" }}>⟳ Sync from IBKR</button>}
+        </div>
+
+        {/* Expandable setup tutorial */}
+        <div style={{ marginTop: 18, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
+          <div onClick={() => setIbkrTutOpen(o => !o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
+            <span style={{ fontSize: "0.66rem", fontWeight: 700, color: C.gold, letterSpacing: "0.04em" }}>📘 First time? How to connect Interactive Brokers (step by step)</span>
+            <span style={{ fontSize: "0.6rem", color: C.muted, transform: ibkrTutOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</span>
+          </div>
+          {ibkrTutOpen && (
+            <div style={{ marginTop: 14, fontSize: "0.72rem", color: C.text, lineHeight: 1.7 }}>
+              <p style={{ margin: "0 0 14px", color: C.muted }}>This is a one-time setup. It lets the app read (never change) your IBKR account statements. Takes about 5 minutes. Follow each step exactly.</p>
+
+              {[
+                { h: "Step 1 · Log in to IBKR on a computer", b: <>Go to <strong style={{ color: C.white }}>interactivebrokers.com</strong> and log in to <strong style={{ color: C.white }}>Client Portal</strong> (the web version, not the mobile app). At the top menu, click <strong style={{ color: C.white }}>Performance &amp; Reports → Flex Queries</strong>.</> },
+                { h: "Step 2 · Create an Activity Flex Query", b: <>Next to <strong style={{ color: C.white }}>“Activity Flex Query”</strong>, click the blue <strong style={{ color: C.white }}>+</strong> button. In <strong style={{ color: C.white }}>Query Name</strong>, type anything, e.g. <strong style={{ color: C.white }}>VIV</strong>.</> },
+                { h: "Step 3 · Tick TWO sections", b: <>Under <strong style={{ color: C.white }}>Sections</strong>, click <strong style={{ color: C.white }}>Open Positions</strong> — when its field list appears, click <strong style={{ color: C.white }}>Select All</strong>, then leave its option as <strong style={{ color: C.white }}>Summary</strong>. Then scroll down, click <strong style={{ color: C.white }}>Trades</strong> — again click <strong style={{ color: C.white }}>Select All</strong>, and leave its option as <strong style={{ color: C.white }}>Execution</strong>. Don't tick anything else.</> },
+                { h: "Step 4 · Delivery settings", b: <>Scroll to <strong style={{ color: C.white }}>Delivery Configuration</strong>. Set <strong style={{ color: C.white }}>Format = XML</strong> and <strong style={{ color: C.white }}>Period = Last 365 Calendar Days</strong>. (The app itself only keeps trades from {IBKR_SYNC_FLOOR} onward — this just makes sure nothing recent is missed.)</> },
+                { h: "Step 5 · General settings — leave the defaults", b: <>Date Format <strong style={{ color: C.white }}>yyyyMMdd</strong>, Time Format <strong style={{ color: C.white }}>HHmmss</strong>, separator <strong style={{ color: C.white }}>; (semi-colon)</strong>, and all the Yes/No toggles set to <strong style={{ color: C.white }}>No</strong>. Click <strong style={{ color: C.white }}>Continue</strong>, review, then <strong style={{ color: C.white }}>Create</strong>.</> },
+                { h: "Step 6 · Copy your Query ID", b: <>Back on the Flex Queries list, your new query shows a <strong style={{ color: C.white }}>Query ID</strong> (a number). Write it down.</> },
+                { h: "Step 7 · Turn on the Flex Web Service & get a token", b: <>On the same page, find <strong style={{ color: C.white }}>Flex Web Service Configuration</strong>. Switch its <strong style={{ color: C.white }}>Status</strong> to <strong style={{ color: C.white }}>on</strong>, click <strong style={{ color: C.white }}>Generate New Token</strong>, set the longest expiry, and copy the long number it gives you. <span style={{ color: C.gold }}>Treat this token like a password — it's read-only, but don't share it publicly.</span></> },
+                { h: "Step 8 · Give Valen the Query ID + token (one time)", b: <>Send your <strong style={{ color: C.white }}>Query ID</strong> and <strong style={{ color: C.white }}>token</strong> to your admin so they can connect it on the server. Once that's done, the <strong style={{ color: C.gold }}>“Sync from IBKR”</strong> button above will pull your data.</> },
+              ].map((s, i) => (
+                <div key={i} style={{ marginBottom: 12, paddingLeft: 14, borderLeft: `2px solid ${C.borderGold}` }}>
+                  <div style={{ fontWeight: 700, color: C.white, fontSize: "0.72rem", marginBottom: 3 }}>{s.h}</div>
+                  <div style={{ color: C.text }}>{s.b}</div>
+                </div>
+              ))}
+
+              <div style={{ marginTop: 14, padding: "12px 14px", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: "0.68rem", color: C.muted, lineHeight: 1.7 }}>
+                <strong style={{ color: C.white }}>Good to know:</strong>
+                <div style={{ marginTop: 6 }}>• <strong style={{ color: C.text }}>There's a 1-day lag.</strong> Trades you make today appear in the sync the next business day (after IBKR settles overnight). For day-of tracking, key the trade in manually — when the sync catches up you'll be able to reconcile it.</div>
+                <div style={{ marginTop: 4 }}>• <strong style={{ color: C.text }}>The dot next to each ticker</strong> shows where it came from: <SourceDot source="manual" /> manual · <SourceDot source="ibkr" /> auto-synced from IBKR.</div>
+                <div style={{ marginTop: 4 }}>• <strong style={{ color: C.text }}>Your data is safe.</strong> Every sync shows a preview first, and it only ever adds or updates IBKR rows — it never edits or deletes anything you typed by hand.</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </GlassCard>
 
       {/* Font Size */}
       <GlassCard style={{ padding: "24px 28px", marginBottom: 16 }}>
@@ -4455,6 +4731,25 @@ function AppInner() {
   const [journaledTrades, setJournaledTrades] = useState([]);
   const [positions, setPositions] = useState([]);
   const [portfolioSize, setPortfolioSize] = useState("500000");
+
+  // ─── IBKR sync (read-only preview — Phase 1) ───
+  const [ibkrOpen, setIbkrOpen] = useState(false);
+  const [ibkrStatus, setIbkrStatus] = useState("idle");
+  const [ibkrData, setIbkrData] = useState(null);
+  const [ibkrError, setIbkrError] = useState(null);
+  const runIbkrSync = useCallback(async () => {
+    setIbkrOpen(true); setIbkrStatus("loading"); setIbkrError(null); setIbkrData(null);
+    try {
+      const res = await fetch("/api/ibkr-sync");
+      const json = await res.json();
+      if (!json.ok) { setIbkrStatus("error"); setIbkrError(json.error || "Sync failed."); return; }
+      setIbkrData(buildIbkrPreview(json, positions, journaledTrades));
+      setIbkrStatus("preview");
+    } catch (e) {
+      setIbkrStatus("error");
+      setIbkrError("Couldn't reach the sync service. Note: the /api function only runs on the deployed site (valensontrades.com), not in local dev.");
+    }
+  }, [positions, journaledTrades]);
   const [fullSizePct, setFullSizePct] = useState(25);
   const [numStocks, setNumStocks] = useState(5);
   const [fontSize, setFontSize] = useState("standard");
@@ -4706,7 +5001,7 @@ function AppInner() {
         const snap = new Map();
         clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
         loadedSnapshot.current = snap;
-        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long" })));
+        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null })));
       } else if (!posErr) {
         // Query succeeded but returned empty — check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
@@ -4738,7 +5033,7 @@ function AppInner() {
       const { data: trades, error: tradesErr } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false });
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       if (trades && trades.length > 0) {
-        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long" })));
+        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null })));
         lastLoadedTradeCount.current = trades.length;
       }
 
@@ -5032,10 +5327,11 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} />}
-      {page === "tools" && <PremiumToolsPage demo={false} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} />}
+      {page === "tools" && <PremiumToolsPage demo={false} portfolioSize={portfolioSize} journaledTrades={journaledTrades} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} />}
-      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} />}
+      <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} onRetry={runIbkrSync} />
     </>
   );
 
