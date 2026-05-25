@@ -477,6 +477,16 @@ function SourceDot({ source }) {
 
 // ─── IBKR Sync: entry-date floor + preview reconstruction (pure, no DB writes) ───
 const IBKR_SYNC_FLOOR = "2026-05-01"; // only system trades ENTERED on/after this date are pulled
+// Normalize a trade date to ISO YYYY-MM-DD (handles "M/D/YY" manual/dashboard entries and "YYYY-MM-DD" IBKR rows).
+// Used both by the IBKR reconcile-matcher and the trade-review chart.
+const tradeDateISO = (d) => {
+  if (!d) return "";
+  const s = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) { const y = m[3].length === 2 ? "20" + m[3] : m[3]; return `${y}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`; }
+  return s;
+};
 
 // Reconstruct closed round-trips (flat-to-flat per symbol) + open positions, then diff against current data.
 function buildIbkrPreview(data, positions, journaledTrades) {
@@ -528,7 +538,7 @@ function buildIbkrPreview(data, positions, journaledTrades) {
   const tradeRows = closed.map(c => {
     const synced = (journaledTrades || []).find(t => t.ibExecId && t.ibExecId === c.execId);
     if (synced) return { ...c, action: "synced", matchId: synced.id };
-    const cands = (journaledTrades || []).filter(t => !isIbkr(t.source) && (t.ticker || "").toUpperCase() === c.ticker.toUpperCase() && t.entry === c.entry);
+    const cands = (journaledTrades || []).filter(t => !isIbkr(t.source) && (t.ticker || "").toUpperCase() === c.ticker.toUpperCase() && tradeDateISO(t.entry) === tradeDateISO(c.entry));
     if (cands.length === 1) {
       const m = cands[0];
       const sharesOk = Math.abs((Number(m.shares) || 0) - c.shares) <= Math.max(1, c.shares * 0.02);
@@ -1635,25 +1645,43 @@ function notesPreview(raw) {
   return parts.join(" | ") || "";
 }
 
-// Trade-review candlestick chart (TradingView Lightweight Charts via CDN). Marks entry/exit on the exact
-// candle by matching your known fill PRICE within the bar — timezone-proof. Read-only; data via /api/candles.
+// Trade-review candlestick chart (TradingView Lightweight Charts via CDN). TradingView-style chrome:
+// switchable timeframes, log/fit controls, bold full-width entry/exit price lines + labelled arrows, a
+// peak-favorable-excursion ("best exit") marker, and a stats panel. Marker placement matches the known fill
+// PRICE within the bar — timezone-proof. Read-only; data via /api/candles.
+const CHART_TFS = [["1m", "1min"], ["3m", "3min"], ["5m", "5min"], ["15m", "15min"], ["30m", "30min"], ["1h", "60min"], ["4h", "4h"], ["D", "1day"]];
 function TradeChart({ trade }) {
   const elRef = useRef(null);
+  const chartRef = useRef(null);
   const [status, setStatus] = useState("loading"); // loading | ok | empty | error | nolib
   const [msg, setMsg] = useState("");
+  const [tf, setTf] = useState(null);        // null = auto-pick by trade span
+  const [logScale, setLogScale] = useState(false);
+  const [best, setBest] = useState(null);    // peak favorable price between entry & exit (from candles)
+
+  const entryISO = tradeDateISO(trade.entry), exitISO = tradeDateISO(trade.exit || trade.entry);
+  const spanDays = Math.max(0, (Date.parse(exitISO) - Date.parse(entryISO)) / 86400000);
+  const autoRes = spanDays <= 1 ? "5min" : spanDays <= 5 ? "15min" : spanDays <= 25 ? "60min" : "1day";
+  const activeRes = tf || autoRes;
+  const isShort = (trade.tradeType || "Long") === "Short";
+
+  // Toggle log/linear price scale on the live chart without re-fetching candles
+  useEffect(() => { if (chartRef.current) chartRef.current.priceScale("right").applyOptions({ mode: logScale ? 1 : 0 }); }, [logScale]);
+
   useEffect(() => {
     const LWC = window.LightweightCharts;
     if (!LWC) { setStatus("nolib"); return; }
     let chart = null, disposed = false, onResize = null;
+    setStatus("loading"); setBest(null);
     (async () => {
       try {
-        const entryD = trade.entry, exitD = trade.exit || trade.entry;
-        if (!trade.ticker || !entryD) { setStatus("empty"); return; }
+        if (!trade.ticker || !entryISO) { setStatus("empty"); return; }
+        // Context window widens with the timeframe so daily charts show weeks, 1-min charts show a day or two
+        const padFor = (r) => r === "1day" ? 90 : r === "4h" ? 25 : (r === "60min" || r === "30min") ? 8 : r === "15min" ? 4 : 2;
         const pad = (d, days) => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + days); return t.toISOString().slice(0, 10); };
-        const from = pad(entryD, -3), to = pad(exitD, 3);
-        const spanDays = Math.max(0, (Date.parse(exitD) - Date.parse(entryD)) / 86400000);
-        const res = spanDays <= 1 ? "5min" : spanDays <= 5 ? "15min" : spanDays <= 25 ? "60min" : "1day";
-        const r = await fetch(`/api/candles?symbol=${encodeURIComponent(trade.ticker)}&from=${from}&to=${to}&res=${res}`);
+        const pd = padFor(activeRes);
+        const from = pad(entryISO, -pd), to = pad(exitISO, pd);
+        const r = await fetch(`/api/candles?symbol=${encodeURIComponent(trade.ticker)}&from=${from}&to=${to}&res=${activeRes}`);
         const j = await r.json();
         if (disposed) return;
         if (!j.ok) { setStatus("error"); setMsg(j.error || "Could not load candles."); return; }
@@ -1665,11 +1693,12 @@ function TradeChart({ trade }) {
           if (disposed || !elRef.current) return;
           const w = elRef.current.clientWidth || 600;
           chart = LWC.createChart(elRef.current, {
-            width: w, height: 380, layout: { background: { color: "transparent" }, textColor: "rgba(255,255,255,0.55)", fontFamily: font },
+            width: w, height: 430, layout: { background: { color: "transparent" }, textColor: "rgba(255,255,255,0.6)", fontFamily: font },
             grid: { vertLines: { color: "rgba(255,255,255,0.05)" }, horzLines: { color: "rgba(255,255,255,0.05)" } },
-            timeScale: { timeVisible: res !== "1day", borderColor: "rgba(255,255,255,0.1)" },
-            rightPriceScale: { borderColor: "rgba(255,255,255,0.1)" }, crosshair: { mode: 0 },
+            timeScale: { timeVisible: activeRes !== "1day", borderColor: "rgba(255,255,255,0.1)", rightOffset: 6 },
+            rightPriceScale: { borderColor: "rgba(255,255,255,0.1)", scaleMargins: { top: 0.18, bottom: 0.18 }, mode: logScale ? 1 : 0 }, crosshair: { mode: 0 },
           });
+          chartRef.current = chart;
           const s = chart.addCandlestickSeries({ upColor: C.green, downColor: C.red, borderUpColor: C.green, borderDownColor: C.red, wickUpColor: C.green, wickDownColor: C.red });
           s.setData(candles);
           const entryP = +trade.entryP, exitP = +trade.exitP;
@@ -1678,13 +1707,22 @@ function TradeChart({ trade }) {
           const entryBar = candles.find(c => inBar(c, entryP)) || nearest(entryP);
           let exitBar = null; for (let i = candles.length - 1; i >= 0; i--) { if (inBar(candles[i], exitP)) { exitBar = candles[i]; break; } }
           if (!exitBar) exitBar = nearest(exitP);
+          // Peak favorable excursion ("best exit") between the entry and exit bars
+          let peak = null;
+          if (entryBar && exitBar) {
+            const lo = Math.min(entryBar.time, exitBar.time), hi = Math.max(entryBar.time, exitBar.time);
+            candles.forEach(c => { if (c.time >= lo && c.time <= hi && (!peak || (isShort ? c.low < peak.low : c.high > peak.high))) peak = c; });
+            if (peak) setBest({ price: isShort ? peak.low : peak.high, time: peak.time });
+          }
           const markers = [];
-          if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: C.green, shape: "arrowUp", text: `Entry ${entryP}` });
-          if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: C.red, shape: "arrowDown", text: `Exit ${exitP}` });
+          if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: C.green, shape: "arrowUp", size: 2, text: `ENTRY $${entryP}` });
+          if (peak && entryBar && exitBar && peak.time !== exitBar.time && peak.time !== entryBar.time) markers.push({ time: peak.time, position: isShort ? "belowBar" : "aboveBar", color: C.goldBright, shape: "circle", size: 1, text: "Peak" });
+          if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: C.red, shape: "arrowDown", size: 2, text: `EXIT $${exitP}` });
           markers.sort((a, b) => a.time - b.time);
           s.setMarkers(markers);
-          if (entryP > 0) s.createPriceLine({ price: entryP, color: C.green, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "Entry" });
-          if (exitP > 0) s.createPriceLine({ price: exitP, color: C.red, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "Exit" });
+          // Bold, solid, full-width price lines — clear and detached from the candles
+          if (entryP > 0) s.createPriceLine({ price: entryP, color: C.green, lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "Entry" });
+          if (exitP > 0) s.createPriceLine({ price: exitP, color: C.red, lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "Exit" });
           if (+trade.stop > 0) s.createPriceLine({ price: +trade.stop, color: C.gold, lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: "Stop" });
           chart.timeScale().fitContent();
           onResize = () => { if (elRef.current && chart) chart.applyOptions({ width: elRef.current.clientWidth }); };
@@ -1692,26 +1730,87 @@ function TradeChart({ trade }) {
         }, 30);
       } catch (e) { if (!disposed) { setStatus("error"); setMsg("Chart only loads on the deployed site (the data API isn't available in local dev)."); } }
     })();
-    return () => { disposed = true; if (onResize) window.removeEventListener("resize", onResize); if (chart) chart.remove(); };
-  }, [trade.id]);
+    return () => { disposed = true; if (onResize) window.removeEventListener("resize", onResize); if (chart) chart.remove(); chartRef.current = null; };
+  }, [trade.id, activeRes]);
+
+  // ─── Trade stats (panel) ───
+  const entryP = +trade.entryP || 0, exitP = +trade.exitP || 0, shares = +trade.shares || 0, stop = +trade.stop || 0;
+  const plD = Number(trade.plDollar) || 0, plP = Number(trade.plPct) || 0, comm = Number(trade.commission) || 0;
+  const tradeRisk = stop > 0 && entryP > 0 ? Math.abs(entryP - stop) * shares : null;
+  const money = (v) => `$${Math.abs(Number(v)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmtT = (sec) => { const d = new Date(sec * 1000); return activeRes === "1day" ? d.toLocaleDateString() : d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
+  const duration = (() => {
+    if (!entryISO || !exitISO) return "—";
+    const d1 = new Date(entryISO + "T00:00:00"), d2 = new Date(exitISO + "T00:00:00");
+    if (trade.entryTime) { const [h, m] = trade.entryTime.split(":").map(Number); if (!isNaN(h)) d1.setHours(h, m || 0); }
+    if (trade.exitTime) { const [h, m] = trade.exitTime.split(":").map(Number); if (!isNaN(h)) d2.setHours(h, m || 0); }
+    const ms = Math.max(0, d2 - d1), dd = Math.floor(ms / 86400000), hh = Math.floor((ms % 86400000) / 3600000), mm = Math.floor((ms % 3600000) / 60000);
+    return dd > 0 ? `${dd}d ${hh}h` : hh > 0 ? `${hh}h ${mm}m` : `${mm}m`;
+  })();
+  const statRows = [
+    ["Direction", isShort ? "Short" : "Long", isShort ? C.red : C.green],
+    ["Average Entry", entryP ? `$${entryP.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : "—", C.white],
+    ["Average Exit", exitP ? `$${exitP.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : "—", C.white],
+    ["Shares", shares ? shares.toLocaleString() : "—", C.white],
+    ["Duration", duration, C.white],
+    ["P/L", `${plD >= 0 ? "+" : "-"}${money(plD)}`, plD >= 0 ? C.green : C.red],
+    ["Return", `${plP >= 0 ? "+" : ""}${plP.toFixed(2)}%`, plP >= 0 ? C.green : C.red],
+    ["Realized R", trade.rMult == null ? "—" : `${Number(trade.rMult).toFixed(2)}R`, trade.rMult == null ? C.muted : (trade.rMult >= 0 ? C.green : C.red)],
+    ["Trade Risk", tradeRisk != null ? money(tradeRisk) : "—", C.text],
+    ["Stop", stop > 0 ? `$${stop.toFixed(2)}` : "—", C.text],
+    ["Commission & Fees", money(comm), C.text],
+    ["Best Exit Price", best ? `$${best.price.toFixed(2)}` : "—", C.goldBright],
+    ["Best Exit Time", best ? fmtT(best.time) : "—", C.text],
+  ];
 
   return (
     <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <div style={{ fontWeight: 700, fontSize: "0.66rem", color: C.white }}>{trade.ticker} <span style={{ color: C.muted, fontWeight: 400 }}>· entry {trade.entry}{trade.entryTime ? ` ${trade.entryTime}` : ""} → exit {trade.exit}{trade.exitTime ? ` ${trade.exitTime}` : ""}</span></div>
-        <div style={{ display: "flex", gap: 12, fontSize: "0.56rem", color: C.muted }}>
-          <span>▲ <span style={{ color: C.green }}>Entry</span></span><span>▼ <span style={{ color: C.red }}>Exit</span></span>{+trade.stop > 0 && <span>— <span style={{ color: C.gold }}>Stop</span></span>}
+      {/* Toolbar — symbol · timeframe switcher · chart controls */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontWeight: 700, fontSize: "0.7rem", color: C.white }}>{trade.ticker}</span>
+          <span style={{ fontSize: "0.5rem", fontWeight: 700, padding: "2px 7px", borderRadius: 980, background: isShort ? C.redDim : C.greenDim, color: isShort ? C.red : C.green, border: `1px solid ${isShort ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)"}` }}>{isShort ? "SHORT" : "LONG"}</span>
+          <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}` }}>
+            {CHART_TFS.map(([label, res]) => (
+              <button key={res} onClick={() => setTf(res)} title={`Switch to ${label} candles`} style={{ padding: "4px 9px", background: activeRes === res ? C.goldDim : "transparent", border: "none", borderRight: `1px solid ${C.border}`, color: activeRes === res ? C.gold : C.muted, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font }}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setLogScale(l => !l)} title="Toggle logarithmic price scale" style={{ padding: "4px 11px", borderRadius: 7, border: `1px solid ${logScale ? C.borderGold : C.border}`, background: logScale ? C.goldDim : "transparent", color: logScale ? C.gold : C.muted, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font }}>Log</button>
+          <button onClick={() => chartRef.current && chartRef.current.timeScale().fitContent()} title="Fit chart to data" style={{ padding: "4px 11px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font }}>Fit</button>
         </div>
       </div>
-      <div ref={elRef} style={{ width: "100%", minHeight: 380 }}>
-        {status !== "ok" && (
-          <div style={{ height: 380, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: "0.74rem", textAlign: "center", padding: "0 20px" }}>
-            {status === "loading" && "Loading chart…"}
-            {status === "empty" && "No candle data for this period."}
-            {status === "nolib" && "Chart library didn't load — refresh the page."}
-            {status === "error" && (msg || "Couldn't load the chart.")}
+      {/* Chart + stats panel */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 460px", minWidth: 0 }}>
+          <div ref={elRef} style={{ width: "100%", minHeight: 430 }}>
+            {status !== "ok" && (
+              <div style={{ height: 430, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: "0.74rem", textAlign: "center", padding: "0 20px" }}>
+                {status === "loading" && "Loading chart…"}
+                {status === "empty" && "No candle data for this period."}
+                {status === "nolib" && "Chart library didn't load — refresh the page."}
+                {status === "error" && (msg || "Couldn't load the chart.")}
+              </div>
+            )}
           </div>
-        )}
+          <div style={{ display: "flex", gap: 12, alignItems: "center", fontSize: "0.56rem", color: C.muted, marginTop: 6, flexWrap: "wrap" }}>
+            <span>▲ <span style={{ color: C.green }}>Entry</span></span>
+            <span>▼ <span style={{ color: C.red }}>Exit</span></span>
+            {best && <span>● <span style={{ color: C.goldBright }}>Peak</span></span>}
+            {+trade.stop > 0 && <span>— <span style={{ color: C.gold }}>Stop</span></span>}
+            <span style={{ marginLeft: "auto" }}>{trade.entry}{trade.entryTime ? ` ${trade.entryTime}` : ""} → {trade.exit}{trade.exitTime ? ` ${trade.exitTime}` : ""}</span>
+          </div>
+        </div>
+        <div style={{ flex: "1 1 210px", background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", alignSelf: "flex-start" }}>
+          <div style={{ fontSize: "0.54rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Trade Stats</div>
+          {statRows.map(([label, val, col], i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "5px 0", borderBottom: i < statRows.length - 1 ? `1px solid rgba(255,255,255,0.04)` : "none" }}>
+              <span style={{ fontSize: "0.6rem", color: C.muted, whiteSpace: "nowrap" }}>{label}</span>
+              <span style={{ fontSize: "0.66rem", fontWeight: 700, color: col || C.white, textAlign: "right" }}>{val}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -2144,12 +2243,12 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     };
     const months = {};
     filtered.forEach(t => {
-      const raw = t.exit || t.entry || "";
-      const match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+      // Normalize first so BOTH manual "M/D/YY" and IBKR ISO "YYYY-MM-DD" dates group correctly
+      // (the old slash-only regex silently dropped every IBKR-synced trade from the monthly tracker).
+      const iso = tradeDateISO(t.exit || t.entry || "");
+      const match = iso.match(/^(\d{4})-(\d{2})/);
       if (!match) return;
-      const y = match[3].length === 2 ? "20" + match[3] : match[3];
-      const mo = match[1].padStart(2, "0");
-      const key = `${y}-${mo}`;
+      const key = `${match[1]}-${match[2]}`;
       if (!months[key]) months[key] = [];
       months[key].push(t);
     });
@@ -2931,20 +3030,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   {expandedTrade === t.id && (
                     <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: `1px solid ${C.border}` }}>
                       <td colSpan={17} style={{ padding: "14px 20px" }}>
-                        {/* Trade-review stat strip */}
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 22px", marginBottom: 12, fontSize: "0.66rem" }}>
-                          {[
-                            ["Entry", `$${Number(t.entryP).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, C.text],
-                            ["Exit", `$${Number(t.exitP).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, C.text],
-                            ["Shares", Number(t.shares).toLocaleString(), C.text],
-                            ["P/L %", `${t.plPct >= 0 ? "+" : ""}${Number(t.plPct).toFixed(2)}%`, t.plPct >= 0 ? C.green : C.red],
-                            ["P/L $", `${t.plDollar >= 0 ? "+" : "-"}$${Math.abs(Number(t.plDollar)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, t.plDollar >= 0 ? C.green : C.red],
-                            ["R", `${Number(t.rMult || 0).toFixed(2)}R`, (t.rMult || 0) >= 0 ? C.green : C.red],
-                          ].map(([label, val, col], i) => (
-                            <span key={i}><span style={{ color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", fontSize: "0.54rem", fontWeight: 700, marginRight: 6 }}>{label}</span><span style={{ color: col, fontWeight: 700 }}>{val}</span></span>
-                          ))}
-                        </div>
-                        {/* Live candlestick chart — entry/exit on the exact candle */}
+                        {/* Live candlestick chart — TradingView-style: timeframes, markers, stats panel */}
                         <TradeChart trade={t} />
                         <div style={{ display: "grid", gridTemplateColumns: t.chartImage ? "1fr 1fr" : "1fr", gap: 16 }}>
                           <div>
