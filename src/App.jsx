@@ -1598,6 +1598,88 @@ function notesPreview(raw) {
   return parts.join(" | ") || "";
 }
 
+// Trade-review candlestick chart (TradingView Lightweight Charts via CDN). Marks entry/exit on the exact
+// candle by matching your known fill PRICE within the bar — timezone-proof. Read-only; data via /api/candles.
+function TradeChart({ trade }) {
+  const elRef = useRef(null);
+  const [status, setStatus] = useState("loading"); // loading | ok | empty | error | nolib
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    const LWC = window.LightweightCharts;
+    if (!LWC) { setStatus("nolib"); return; }
+    let chart = null, disposed = false, onResize = null;
+    (async () => {
+      try {
+        const entryD = trade.entry, exitD = trade.exit || trade.entry;
+        if (!trade.ticker || !entryD) { setStatus("empty"); return; }
+        const pad = (d, days) => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + days); return t.toISOString().slice(0, 10); };
+        const from = pad(entryD, -3), to = pad(exitD, 3);
+        const spanDays = Math.max(0, (Date.parse(exitD) - Date.parse(entryD)) / 86400000);
+        const res = spanDays <= 1 ? "5min" : spanDays <= 5 ? "15min" : spanDays <= 25 ? "60min" : "1day";
+        const r = await fetch(`/api/candles?symbol=${encodeURIComponent(trade.ticker)}&from=${from}&to=${to}&res=${res}`);
+        const j = await r.json();
+        if (disposed) return;
+        if (!j.ok) { setStatus("error"); setMsg(j.error || "Could not load candles."); return; }
+        const candles = j.candles || [];
+        if (!candles.length) { setStatus("empty"); return; }
+        setStatus("ok");
+        // build on next tick so the container is in the DOM
+        setTimeout(() => {
+          if (disposed || !elRef.current) return;
+          const w = elRef.current.clientWidth || 600;
+          chart = LWC.createChart(elRef.current, {
+            width: w, height: 380, layout: { background: { color: "transparent" }, textColor: "rgba(255,255,255,0.55)", fontFamily: font },
+            grid: { vertLines: { color: "rgba(255,255,255,0.05)" }, horzLines: { color: "rgba(255,255,255,0.05)" } },
+            timeScale: { timeVisible: res !== "1day", borderColor: "rgba(255,255,255,0.1)" },
+            rightPriceScale: { borderColor: "rgba(255,255,255,0.1)" }, crosshair: { mode: 0 },
+          });
+          const s = chart.addCandlestickSeries({ upColor: C.green, downColor: C.red, borderUpColor: C.green, borderDownColor: C.red, wickUpColor: C.green, wickDownColor: C.red });
+          s.setData(candles);
+          const entryP = +trade.entryP, exitP = +trade.exitP;
+          const inBar = (c, p) => c.low <= p && p <= c.high;
+          const nearest = (p) => candles.reduce((b, c) => Math.abs(c.close - p) < Math.abs((b ? b.close : 1e18) - p) ? c : b, null);
+          const entryBar = candles.find(c => inBar(c, entryP)) || nearest(entryP);
+          let exitBar = null; for (let i = candles.length - 1; i >= 0; i--) { if (inBar(candles[i], exitP)) { exitBar = candles[i]; break; } }
+          if (!exitBar) exitBar = nearest(exitP);
+          const markers = [];
+          if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: C.green, shape: "arrowUp", text: `Entry ${entryP}` });
+          if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: C.red, shape: "arrowDown", text: `Exit ${exitP}` });
+          markers.sort((a, b) => a.time - b.time);
+          s.setMarkers(markers);
+          if (entryP > 0) s.createPriceLine({ price: entryP, color: C.green, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "Entry" });
+          if (exitP > 0) s.createPriceLine({ price: exitP, color: C.red, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "Exit" });
+          if (+trade.stop > 0) s.createPriceLine({ price: +trade.stop, color: C.gold, lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: "Stop" });
+          chart.timeScale().fitContent();
+          onResize = () => { if (elRef.current && chart) chart.applyOptions({ width: elRef.current.clientWidth }); };
+          window.addEventListener("resize", onResize);
+        }, 30);
+      } catch (e) { if (!disposed) { setStatus("error"); setMsg("Chart only loads on the deployed site (the data API isn't available in local dev)."); } }
+    })();
+    return () => { disposed = true; if (onResize) window.removeEventListener("resize", onResize); if (chart) chart.remove(); };
+  }, [trade.id]);
+
+  return (
+    <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ fontWeight: 700, fontSize: "0.66rem", color: C.white }}>{trade.ticker} <span style={{ color: C.muted, fontWeight: 400 }}>· entry {trade.entry}{trade.entryTime ? ` ${trade.entryTime}` : ""} → exit {trade.exit}{trade.exitTime ? ` ${trade.exitTime}` : ""}</span></div>
+        <div style={{ display: "flex", gap: 12, fontSize: "0.56rem", color: C.muted }}>
+          <span>▲ <span style={{ color: C.green }}>Entry</span></span><span>▼ <span style={{ color: C.red }}>Exit</span></span>{+trade.stop > 0 && <span>— <span style={{ color: C.gold }}>Stop</span></span>}
+        </div>
+      </div>
+      <div ref={elRef} style={{ width: "100%", minHeight: 380 }}>
+        {status !== "ok" && (
+          <div style={{ height: 380, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: "0.74rem", textAlign: "center", padding: "0 20px" }}>
+            {status === "loading" && "Loading chart…"}
+            {status === "empty" && "No candle data for this period."}
+            {status === "nolib" && "Chart library didn't load — refresh the page."}
+            {status === "error" && (msg || "Couldn't load the chart.")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, saveStatus, positions, setPositions, positionsRef, portfolioSize }) {
   const [filterSetup, setFilterSetup] = useState("All");
   const [filterTag, setFilterTag] = useState("All");
@@ -2794,10 +2876,10 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.66rem", whiteSpace: "nowrap" }}>{t.reason}</td>
                     <td style={{ padding: "11px 8px", color: C.muted, fontSize: "0.64rem", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: t.notes ? "pointer" : "default" }} onClick={() => t.notes && setExpandedTrade(expandedTrade === t.id ? null : t.id)} title={t.notes ? "Click to expand" : ""}>{notesPreview(t.notes) || "—"}</td>
                     <td style={{ padding: "11px 8px", whiteSpace: "nowrap" }}>
-                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <span style={{ fontSize: "0.72rem", cursor: "pointer" }} onClick={() => setExpandedTrade(expandedTrade === t.id ? null : t.id)} title="Review chart (entry/exit on the candle)">📈</span>
                         {t.chartUrl && <a href={t.chartUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "0.62rem", color: C.blue, textDecoration: "none", fontWeight: 600 }} title="Open TradingView chart">TV</a>}
                         {t.chartImage && <span style={{ fontSize: "0.62rem", color: C.green, fontWeight: 700, cursor: "pointer" }} onClick={() => setExpandedTrade(expandedTrade === t.id ? null : t.id)} title="View chart image">📷</span>}
-                        {!t.chartUrl && !t.chartImage && <span style={{ color: C.muted, fontSize: "0.58rem" }}>—</span>}
                       </div>
                     </td>
                     <td style={{ padding: "11px 8px", whiteSpace: "nowrap" }}>
@@ -2811,6 +2893,21 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   {expandedTrade === t.id && (
                     <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: `1px solid ${C.border}` }}>
                       <td colSpan={17} style={{ padding: "14px 20px" }}>
+                        {/* Trade-review stat strip */}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 22px", marginBottom: 12, fontSize: "0.66rem" }}>
+                          {[
+                            ["Entry", `$${Number(t.entryP).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, C.text],
+                            ["Exit", `$${Number(t.exitP).toLocaleString(undefined, { maximumFractionDigits: 4 })}`, C.text],
+                            ["Shares", Number(t.shares).toLocaleString(), C.text],
+                            ["P/L %", `${t.plPct >= 0 ? "+" : ""}${Number(t.plPct).toFixed(2)}%`, t.plPct >= 0 ? C.green : C.red],
+                            ["P/L $", `${t.plDollar >= 0 ? "+" : "-"}$${Math.abs(Number(t.plDollar)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, t.plDollar >= 0 ? C.green : C.red],
+                            ["R", `${Number(t.rMult || 0).toFixed(2)}R`, (t.rMult || 0) >= 0 ? C.green : C.red],
+                          ].map(([label, val, col], i) => (
+                            <span key={i}><span style={{ color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", fontSize: "0.54rem", fontWeight: 700, marginRight: 6 }}>{label}</span><span style={{ color: col, fontWeight: 700 }}>{val}</span></span>
+                          ))}
+                        </div>
+                        {/* Live candlestick chart — entry/exit on the exact candle */}
+                        <TradeChart trade={t} />
                         <div style={{ display: "grid", gridTemplateColumns: t.chartImage ? "1fr 1fr" : "1fr", gap: 16 }}>
                           <div>
                             {(() => { const n = parseNotes(t.notes);
@@ -4071,6 +4168,10 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session, onIbkrSync }) {
   const isAdmin = userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [ibkrTutOpen, setIbkrTutOpen] = useState(false);
+  const [ibkrQueryId, setIbkrQueryId] = useState("");
+  const [ibkrToken, setIbkrToken] = useState("");
+  const [ibkrConnStatus, setIbkrConnStatus] = useState("");
+  const [ibkrLoaded, setIbkrLoaded] = useState(false);
   const [newSetup, setNewSetup] = useState("");
   const [newTag, setNewTag] = useState("");
   const [newReason, setNewReason] = useState("");
@@ -4079,6 +4180,32 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
   const [codeLoading, setCodeLoading] = useState(false);
   const [allMembers, setAllMembers] = useState([]);
   const [backupStatus, setBackupStatus] = useState("");
+
+  // Load this member's own IBKR connection (their RLS-protected settings)
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    supabase.from("user_settings").select("setting_key,setting_value").eq("user_id", uid).in("setting_key", ["ibkr_token", "ibkr_query_id"]).then(({ data }) => {
+      (data || []).forEach(s => {
+        if (s.setting_key === "ibkr_token") setIbkrToken(s.setting_value == null ? "" : String(s.setting_value));
+        if (s.setting_key === "ibkr_query_id") setIbkrQueryId(s.setting_value == null ? "" : String(s.setting_value));
+      });
+      setIbkrLoaded(true);
+    });
+  }, [session]);
+
+  const saveIbkrConn = async () => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    setIbkrConnStatus("saving");
+    const { error } = await supabase.from("user_settings").upsert([
+      { user_id: uid, setting_key: "ibkr_query_id", setting_value: ibkrQueryId.trim(), updated_at: new Date().toISOString() },
+      { user_id: uid, setting_key: "ibkr_token", setting_value: ibkrToken.trim(), updated_at: new Date().toISOString() },
+    ], { onConflict: "user_id,setting_key" });
+    setIbkrConnStatus(error ? "error" : "saved");
+    setTimeout(() => setIbkrConnStatus(""), 2500);
+  };
+  const ibkrConnected = ibkrToken.trim() && ibkrQueryId.trim();
 
   // Load access codes and members for admin
   useEffect(() => {
@@ -4153,7 +4280,29 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
             <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Interactive Brokers Sync</div>
             <div style={{ fontSize: "0.70rem", color: C.muted, lineHeight: 1.6 }}>Pull your open positions and closed trades straight from IBKR (entered on/after {IBKR_SYNC_FLOOR}). You'll always see a preview before anything saves — manual entries are never overwritten.</div>
           </div>
-          {onIbkrSync && <button onClick={onIbkrSync} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 7, alignSelf: "center" }}>⟳ Sync from IBKR</button>}
+          {onIbkrSync
+            ? <button onClick={onIbkrSync} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 7, alignSelf: "center" }}>⟳ Sync from IBKR</button>
+            : <span style={{ fontSize: "0.6rem", color: C.muted, alignSelf: "center", textAlign: "right", maxWidth: 160 }}>Syncing rolls out soon — connect your account below so you're ready.</span>}
+        </div>
+
+        {/* Per-member connection — your own IBKR Query ID + Token (stored only on your account) */}
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+            <span style={{ fontWeight: 700, fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted }}>Your IBKR Connection</span>
+            {ibkrLoaded && <span style={{ fontSize: "0.56rem", fontWeight: 700, color: ibkrConnected ? C.green : C.muted, border: `1px solid ${ibkrConnected ? C.green : C.border}55`, borderRadius: 980, padding: "2px 9px" }}>{ibkrConnected ? "Connected ✓" : "Not connected"}</span>}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, alignItems: "end" }}>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" }}>Flex Query ID</label>
+              <input type="text" value={ibkrQueryId} onChange={e => setIbkrQueryId(e.target.value)} placeholder="e.g. 1519726" style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", color: C.white, fontSize: "0.82rem", fontFamily: font, outline: "none" }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+            </div>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" }}>Flex Web Service Token</label>
+              <input type="password" value={ibkrToken} onChange={e => setIbkrToken(e.target.value)} placeholder="paste your token" autoComplete="off" style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", color: C.white, fontSize: "0.82rem", fontFamily: font, outline: "none" }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+            </div>
+            <button onClick={saveIbkrConn} disabled={ibkrConnStatus === "saving"} style={{ padding: "10px 18px", borderRadius: 980, border: `1px solid ${ibkrConnStatus === "saved" ? "rgba(34,197,94,0.4)" : C.borderGold}`, background: ibkrConnStatus === "saved" ? "rgba(34,197,94,0.12)" : C.goldDim, color: ibkrConnStatus === "saved" ? C.green : C.gold, fontWeight: 800, fontSize: "0.72rem", cursor: "pointer", fontFamily: font, height: 40, whiteSpace: "nowrap" }}>{ibkrConnStatus === "saving" ? "Saving…" : ibkrConnStatus === "saved" ? "Saved ✓" : ibkrConnStatus === "error" ? "Failed" : "Save connection"}</button>
+          </div>
+          <div style={{ fontSize: "0.58rem", color: C.muted, marginTop: 8, lineHeight: 1.6 }}>Stored only on your own account (private). The token is read-only — it can pull your statements but can't trade or move money. Don't have these yet? Follow the steps below.</div>
         </div>
 
         {/* Expandable setup tutorial */}
@@ -4174,7 +4323,7 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
                 { h: "Step 5 · General settings — leave the defaults", b: <>Date Format <strong style={{ color: C.white }}>yyyyMMdd</strong>, Time Format <strong style={{ color: C.white }}>HHmmss</strong>, separator <strong style={{ color: C.white }}>; (semi-colon)</strong>, and all the Yes/No toggles set to <strong style={{ color: C.white }}>No</strong>. Click <strong style={{ color: C.white }}>Continue</strong>, review, then <strong style={{ color: C.white }}>Create</strong>.</> },
                 { h: "Step 6 · Copy your Query ID", b: <>Back on the Flex Queries list, your new query shows a <strong style={{ color: C.white }}>Query ID</strong> (a number). Write it down.</> },
                 { h: "Step 7 · Turn on the Flex Web Service & get a token", b: <>On the same page, find <strong style={{ color: C.white }}>Flex Web Service Configuration</strong>. Switch its <strong style={{ color: C.white }}>Status</strong> to <strong style={{ color: C.white }}>on</strong>, click <strong style={{ color: C.white }}>Generate New Token</strong>, set the longest expiry, and copy the long number it gives you. <span style={{ color: C.gold }}>Treat this token like a password — it's read-only, but don't share it publicly.</span></> },
-                { h: "Step 8 · Give Valen the Query ID + token (one time)", b: <>Send your <strong style={{ color: C.white }}>Query ID</strong> and <strong style={{ color: C.white }}>token</strong> to your admin so they can connect it on the server. Once that's done, the <strong style={{ color: C.gold }}>“Sync from IBKR”</strong> button above will pull your data.</> },
+                { h: "Step 8 · Paste them into the fields above", b: <>Copy your <strong style={{ color: C.white }}>Query ID</strong> and <strong style={{ color: C.white }}>Token</strong> into <strong style={{ color: C.white }}>Your IBKR Connection</strong> above and click <strong style={{ color: C.white }}>Save connection</strong>. That's it — your account is linked (privately, only to you). The <strong style={{ color: C.gold }}>“Sync from IBKR”</strong> button pulls <em>your</em> data.</> },
               ].map((s, i) => (
                 <div key={i} style={{ marginBottom: 12, paddingLeft: 14, borderLeft: `2px solid ${C.borderGold}` }}>
                   <div style={{ fontWeight: 700, color: C.white, fontSize: "0.72rem", marginBottom: 3 }}>{s.h}</div>
@@ -4797,7 +4946,7 @@ function AppInner() {
   const runIbkrSync = useCallback(async () => {
     setIbkrOpen(true); setIbkrStatus("loading"); setIbkrError(null); setIbkrData(null); setIbkrResult(null);
     try {
-      const res = await fetch("/api/ibkr-sync");
+      const res = await fetch("/api/ibkr-sync", { headers: { Authorization: `Bearer ${session?.access_token || ""}` } });
       const json = await res.json();
       if (!json.ok) { setIbkrStatus("error"); setIbkrError(json.error || "Sync failed."); return; }
       setIbkrData(buildIbkrPreview(json, positions, journaledTrades));
@@ -4806,7 +4955,7 @@ function AppInner() {
       setIbkrStatus("error");
       setIbkrError("Couldn't reach the sync service. Note: the /api function only runs on the deployed site (valensontrades.com), not in local dev.");
     }
-  }, [positions, journaledTrades]);
+  }, [positions, journaledTrades, session]);
 
   // Phase 2 — surgical writes from the confirmed preview. INSERT new IBKR rows, UPDATE matched rows by id only.
   // Never deletes; reconcile updates only the factual columns so notes/tags/setup/stops are preserved.
@@ -5451,6 +5600,8 @@ function AppInner() {
   const contentPadH = isMobile ? 16 : isTablet ? 24 : 36;
   const contentPadV = isMobile ? 16 : 28;
 
+  // Interim: IBKR sync trigger is admin-only until per-user rollout is confirmed. Members can still enter their own creds in Settings.
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const pageContent = (
     <>
       {isOffline && (
@@ -5459,10 +5610,10 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={isAdmin ? runIbkrSync : null} />}
       {page === "tools" && <PremiumToolsPage demo={false} portfolioSize={portfolioSize} journaledTrades={journaledTrades} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} />}
-      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={isAdmin ? runIbkrSync : null} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} />
     </>
   );
