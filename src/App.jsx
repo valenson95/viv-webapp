@@ -1646,18 +1646,71 @@ function notesPreview(raw) {
 }
 
 // Trade-review candlestick chart (TradingView Lightweight Charts via CDN). TradingView-style chrome:
-// switchable timeframes, log/fit controls, bold full-width entry/exit price lines + labelled arrows, a
-// peak-favorable-excursion ("best exit") marker, and a stats panel. Marker placement matches the known fill
-// PRICE within the bar — timezone-proof. Read-only; data via /api/candles.
+// switchable timeframes; volume pane + 50-period volume average; MA10/20/50 (SMA or EMA, toggleable);
+// log/fit controls; click-to-place drawing tools (horizontal line + 2-click trendline); a crosshair
+// OHLC+MA legend; dotted thin entry/exit price lines + labelled arrows; a peak-favorable-excursion
+// ("best exit") marker; and a stats panel. Daily charts load ~600d of history (default view focused on the
+// trade; scroll back for more). Marker placement matches the known fill PRICE within the bar — timezone-proof.
+// Read-only; data via /api/candles.
 const CHART_TFS = [["1m", "1min"], ["3m", "3min"], ["5m", "5min"], ["15m", "15min"], ["30m", "30min"], ["1h", "60min"], ["4h", "4h"], ["D", "1day"]];
+const MA_COLORS = { 10: "#3b82f6", 20: "#f0c050", 50: "#a78bfa" }; // MA10 blue · MA20 gold · MA50 violet — functional chart overlays
+// Moving-average series data ([{time,value}]). SMA = rolling mean; EMA = exponential (seeded on first close).
+function maData(candles, period, type) {
+  const out = [];
+  if (type === "EMA") {
+    const k = 2 / (period + 1);
+    let prev = null;
+    for (let i = 0; i < candles.length; i++) {
+      const px = candles[i].close;
+      prev = prev == null ? px : px * k + prev * (1 - k);
+      if (i >= period - 1) out.push({ time: candles[i].time, value: +prev.toFixed(4) });
+    }
+  } else {
+    let sum = 0;
+    for (let i = 0; i < candles.length; i++) {
+      sum += candles[i].close;
+      if (i >= period) sum -= candles[i - period].close;
+      if (i >= period - 1) out.push({ time: candles[i].time, value: +(sum / period).toFixed(4) });
+    }
+  }
+  return out;
+}
+// Rolling average of volume ([{time,value}]) — the 50-period volume line drawn over the volume pane.
+function volAvgData(candles, period) {
+  const out = []; let sum = 0;
+  for (let i = 0; i < candles.length; i++) {
+    sum += (candles[i].volume || 0);
+    if (i >= period) sum -= (candles[i - period].volume || 0);
+    if (i >= period - 1) out.push({ time: candles[i].time, value: sum / period });
+  }
+  return out;
+}
 function TradeChart({ trade }) {
   const elRef = useRef(null);
   const chartRef = useRef(null);
+  const candleSeriesRef = useRef(null);      // candlestick series — for coordinate→price in the click handler
+  const toolRef = useRef("cursor");          // live mirror of `tool` for the (closure-captured) click handler
+  const pendingRef = useRef(null);           // first endpoint of an in-progress trendline
+  const clearRef = useRef(null);             // build-scoped "clear all drawings" fn (called by the toolbar)
+  const runtimeDrawRef = useRef({ plines: [], lseries: [] }); // live drawing objects on the current chart
+  const drawDataRef = useRef({ id: null, hlines: [], trends: [] }); // logical drawings, persisted across rebuilds
+  const cacheRef = useRef({ id: null, data: {} });            // fetched candles per timeframe — avoids refetch on toggle
   const [status, setStatus] = useState("loading"); // loading | ok | empty | error | nolib
   const [msg, setMsg] = useState("");
   const [tf, setTf] = useState(null);        // null = auto-pick by trade span
   const [logScale, setLogScale] = useState(false);
+  const [maOn, setMaOn] = useState(true);    // show MA10/20/50
+  const [maType, setMaType] = useState("SMA"); // "SMA" | "EMA"
+  const [volOn, setVolOn] = useState(true);  // show volume pane + 50-period volume average
+  const [tool, setTool] = useState("cursor"); // "cursor" | "hline" | "trend"
+  const [legend, setLegend] = useState(null); // crosshair OHLC + MA readout
   const [best, setBest] = useState(null);    // peak favorable price between entry & exit (from candles)
+
+  // Reset per-trade caches/drawings when the trade changes
+  if (cacheRef.current.id !== trade.id) cacheRef.current = { id: trade.id, data: {} };
+  if (drawDataRef.current.id !== trade.id) drawDataRef.current = { id: trade.id, hlines: [], trends: [] };
+  // Keep the click-handler's tool mirror in sync; cancel any half-drawn trendline when leaving the trend tool
+  useEffect(() => { toolRef.current = tool; if (tool !== "trend") pendingRef.current = null; }, [tool]);
 
   const entryISO = tradeDateISO(trade.entry), exitISO = tradeDateISO(trade.exit || trade.entry);
   const spanDays = Math.max(0, (Date.parse(exitISO) - Date.parse(entryISO)) / 86400000);
@@ -1671,67 +1724,170 @@ function TradeChart({ trade }) {
   useEffect(() => {
     const LWC = window.LightweightCharts;
     if (!LWC) { setStatus("nolib"); return; }
-    let chart = null, disposed = false, onResize = null;
-    setStatus("loading"); setBest(null);
+    let disposed = false, onResize = null;
+    setBest(null);
+
+    // Render the chart from a candle array (runs after fetch or straight from cache)
+    const build = (candles) => {
+      setStatus("ok");
+      // build on next tick so the container is in the DOM
+      setTimeout(() => {
+        if (disposed || !elRef.current) return;
+        const w = elRef.current.clientWidth || 600;
+        const chart = LWC.createChart(elRef.current, {
+          width: w, height: 480, layout: { background: { color: "transparent" }, textColor: "rgba(255,255,255,0.6)", fontFamily: font },
+          grid: { vertLines: { color: "rgba(255,255,255,0.05)" }, horzLines: { color: "rgba(255,255,255,0.05)" } },
+          timeScale: { timeVisible: activeRes !== "1day", borderColor: "rgba(255,255,255,0.1)", rightOffset: 6 },
+          rightPriceScale: { borderColor: "rgba(255,255,255,0.1)", scaleMargins: volOn ? { top: 0.08, bottom: 0.26 } : { top: 0.12, bottom: 0.12 }, mode: logScale ? 1 : 0 }, crosshair: { mode: 0 },
+        });
+        chartRef.current = chart;
+        const s = chart.addCandlestickSeries({ upColor: C.green, downColor: C.red, borderUpColor: C.green, borderDownColor: C.red, wickUpColor: C.green, wickDownColor: C.red });
+        s.setData(candles);
+        candleSeriesRef.current = s;
+
+        // ── Volume pane (own scale, bottom ~18%) + 50-period volume average ──
+        if (volOn) {
+          const vol = chart.addHistogramSeries({ priceScaleId: "vol", priceFormat: { type: "volume" } });
+          chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+          vol.setData(candles.map(c => ({ time: c.time, value: c.volume || 0, color: c.close >= c.open ? "rgba(34,197,94,0.45)" : "rgba(239,68,68,0.45)" })));
+          const va = volAvgData(candles, 50);
+          if (va.length) { const vma = chart.addLineSeries({ priceScaleId: "vol", color: "rgba(240,192,80,0.9)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }); vma.setData(va); }
+        }
+
+        // ── Moving averages (MA10/20/50, SMA or EMA) ──
+        const maObjs = {}, maLast = {};
+        if (maOn) {
+          [10, 20, 50].forEach(p => {
+            const d = maData(candles, p, maType);
+            if (!d.length) return;
+            const ls = chart.addLineSeries({ color: MA_COLORS[p], lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+            ls.setData(d);
+            maObjs[p] = ls; maLast[p] = d[d.length - 1].value;
+          });
+        }
+
+        // ── Entry / exit / peak markers (price-matched within the bar — timezone-proof) ──
+        const entryP = +trade.entryP, exitP = +trade.exitP;
+        const inBar = (c, p) => c.low <= p && p <= c.high;
+        const nearest = (p) => candles.reduce((b, c) => Math.abs(c.close - p) < Math.abs((b ? b.close : 1e18) - p) ? c : b, null);
+        const entryBar = candles.find(c => inBar(c, entryP)) || nearest(entryP);
+        let exitBar = null; for (let i = candles.length - 1; i >= 0; i--) { if (inBar(candles[i], exitP)) { exitBar = candles[i]; break; } }
+        if (!exitBar) exitBar = nearest(exitP);
+        let peak = null;
+        if (entryBar && exitBar) {
+          const lo = Math.min(entryBar.time, exitBar.time), hi = Math.max(entryBar.time, exitBar.time);
+          candles.forEach(c => { if (c.time >= lo && c.time <= hi && (!peak || (isShort ? c.low < peak.low : c.high > peak.high))) peak = c; });
+          if (peak) setBest({ price: isShort ? peak.low : peak.high, time: peak.time });
+        }
+        const markers = [];
+        if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: C.green, shape: "arrowUp", size: 2, text: `ENTRY $${entryP}` });
+        if (peak && entryBar && exitBar && peak.time !== exitBar.time && peak.time !== entryBar.time) markers.push({ time: peak.time, position: isShort ? "belowBar" : "aboveBar", color: C.goldBright, shape: "circle", size: 1, text: "Peak" });
+        if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: C.red, shape: "arrowDown", size: 2, text: `EXIT $${exitP}` });
+        markers.sort((a, b) => a.time - b.time);
+        s.setMarkers(markers);
+        // Thin DOTTED price lines so they read clearly without masking the candles
+        if (entryP > 0) s.createPriceLine({ price: entryP, color: C.green, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "Entry" });
+        if (exitP > 0) s.createPriceLine({ price: exitP, color: C.red, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "Exit" });
+        if (+trade.stop > 0) s.createPriceLine({ price: +trade.stop, color: C.gold, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "Stop" });
+
+        // ── Default view: focus on the trade; the deep history stays scrollable ──
+        const tsc = chart.timeScale();
+        if (activeRes === "1day" && entryISO && exitISO) {
+          try {
+            const viewPad = 75 * 86400; // ~2.5 months of context each side
+            tsc.setVisibleRange({ from: Math.floor(Date.parse(entryISO) / 1000) - viewPad, to: Math.floor(Date.parse(exitISO) / 1000) + viewPad });
+          } catch { tsc.fitContent(); }
+        } else { tsc.fitContent(); }
+
+        // ── Re-apply persisted drawings (survive timeframe / toggle rebuilds) ──
+        runtimeDrawRef.current = { plines: [], lseries: [] };
+        drawDataRef.current.hlines.forEach(price => {
+          runtimeDrawRef.current.plines.push(s.createPriceLine({ price, color: C.goldBright, lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "" }));
+        });
+        drawDataRef.current.trends.forEach(([a, b]) => {
+          const ls = chart.addLineSeries({ color: C.goldBright, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+          ls.setData([{ time: a.time, value: a.price }, { time: b.time, value: b.price }].sort((x, y) => x.time - y.time));
+          runtimeDrawRef.current.lseries.push(ls);
+        });
+
+        // ── Drawing interactions (horizontal line · 2-click trendline) ──
+        const addHLine = (price) => { runtimeDrawRef.current.plines.push(s.createPriceLine({ price, color: C.goldBright, lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "" })); drawDataRef.current.hlines.push(price); };
+        const addTrend = (a, b) => {
+          if (a.time === b.time) return;
+          const ls = chart.addLineSeries({ color: C.goldBright, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+          ls.setData([{ time: a.time, value: a.price }, { time: b.time, value: b.price }].sort((x, y) => x.time - y.time));
+          runtimeDrawRef.current.lseries.push(ls); drawDataRef.current.trends.push([a, b]);
+        };
+        clearRef.current = () => {
+          runtimeDrawRef.current.plines.forEach(pl => { try { s.removePriceLine(pl); } catch { } });
+          runtimeDrawRef.current.lseries.forEach(ls => { try { chart.removeSeries(ls); } catch { } });
+          runtimeDrawRef.current = { plines: [], lseries: [] };
+          drawDataRef.current = { id: trade.id, hlines: [], trends: [] };
+        };
+        chart.subscribeClick((param) => {
+          const t = toolRef.current;
+          if (t === "cursor" || !param.point) return;
+          const price = s.coordinateToPrice(param.point.y);
+          if (price == null) return;
+          if (t === "hline") { addHLine(price); }
+          else if (t === "trend") {
+            const time = chart.timeScale().coordinateToTime(param.point.x);
+            if (time == null) return;
+            if (!pendingRef.current) pendingRef.current = { time, price };
+            else { addTrend(pendingRef.current, { time, price }); pendingRef.current = null; }
+          }
+        });
+
+        // ── Crosshair OHLC + MA legend ──
+        const lastBar = candles[candles.length - 1];
+        const legendFor = (bar, param) => ({
+          o: bar.open, h: bar.high, l: bar.low, c: bar.close,
+          up: bar.close >= bar.open,
+          ma: maOn ? {
+            10: maObjs[10] ? (param?.seriesData?.get(maObjs[10])?.value ?? maLast[10]) : null,
+            20: maObjs[20] ? (param?.seriesData?.get(maObjs[20])?.value ?? maLast[20]) : null,
+            50: maObjs[50] ? (param?.seriesData?.get(maObjs[50])?.value ?? maLast[50]) : null,
+          } : null,
+        });
+        setLegend(legendFor(lastBar, null));
+        chart.subscribeCrosshairMove((param) => {
+          const bar = (param && param.time && param.seriesData) ? param.seriesData.get(s) : null;
+          setLegend(legendFor(bar || lastBar, param));
+        });
+
+        onResize = () => { if (elRef.current && chart) chart.applyOptions({ width: elRef.current.clientWidth }); };
+        window.addEventListener("resize", onResize);
+      }, 30);
+    };
+
     (async () => {
       try {
         if (!trade.ticker || !entryISO) { setStatus("empty"); return; }
-        // Context window widens with the timeframe so daily charts show weeks, 1-min charts show a day or two
-        const padFor = (r) => r === "1day" ? 90 : r === "4h" ? 25 : (r === "60min" || r === "30min") ? 8 : r === "15min" ? 4 : 2;
+        // Cache hit — rebuild from already-fetched candles (toggling MA/Vol never refetches)
+        const cached = cacheRef.current.data[activeRes];
+        if (cached) { if (!cached.length) { setStatus("empty"); return; } build(cached); return; }
+        setStatus("loading");
+        // History window widens with the timeframe — daily pulls ~600d (≈20 months) so you can scroll back a year+
+        const padDays = (r) => r === "1day" ? 45 : r === "4h" ? 60 : (r === "60min" || r === "30min") ? 12 : r === "15min" ? 5 : 2;
+        const beforeDays = activeRes === "1day" ? 600 : padDays(activeRes);
+        const afterDays = padDays(activeRes);
         const pad = (d, days) => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + days); return t.toISOString().slice(0, 10); };
-        const pd = padFor(activeRes);
-        const from = pad(entryISO, -pd), to = pad(exitISO, pd);
+        const from = pad(entryISO, -beforeDays);
+        let to = pad(exitISO, afterDays);
+        const today = new Date().toISOString().slice(0, 10);
+        if (to > today) to = today;
         const r = await fetch(`/api/candles?symbol=${encodeURIComponent(trade.ticker)}&from=${from}&to=${to}&res=${activeRes}`);
         const j = await r.json();
         if (disposed) return;
         if (!j.ok) { setStatus("error"); setMsg(j.error || "Could not load candles."); return; }
         const candles = j.candles || [];
+        cacheRef.current.data[activeRes] = candles;
         if (!candles.length) { setStatus("empty"); return; }
-        setStatus("ok");
-        // build on next tick so the container is in the DOM
-        setTimeout(() => {
-          if (disposed || !elRef.current) return;
-          const w = elRef.current.clientWidth || 600;
-          chart = LWC.createChart(elRef.current, {
-            width: w, height: 430, layout: { background: { color: "transparent" }, textColor: "rgba(255,255,255,0.6)", fontFamily: font },
-            grid: { vertLines: { color: "rgba(255,255,255,0.05)" }, horzLines: { color: "rgba(255,255,255,0.05)" } },
-            timeScale: { timeVisible: activeRes !== "1day", borderColor: "rgba(255,255,255,0.1)", rightOffset: 6 },
-            rightPriceScale: { borderColor: "rgba(255,255,255,0.1)", scaleMargins: { top: 0.18, bottom: 0.18 }, mode: logScale ? 1 : 0 }, crosshair: { mode: 0 },
-          });
-          chartRef.current = chart;
-          const s = chart.addCandlestickSeries({ upColor: C.green, downColor: C.red, borderUpColor: C.green, borderDownColor: C.red, wickUpColor: C.green, wickDownColor: C.red });
-          s.setData(candles);
-          const entryP = +trade.entryP, exitP = +trade.exitP;
-          const inBar = (c, p) => c.low <= p && p <= c.high;
-          const nearest = (p) => candles.reduce((b, c) => Math.abs(c.close - p) < Math.abs((b ? b.close : 1e18) - p) ? c : b, null);
-          const entryBar = candles.find(c => inBar(c, entryP)) || nearest(entryP);
-          let exitBar = null; for (let i = candles.length - 1; i >= 0; i--) { if (inBar(candles[i], exitP)) { exitBar = candles[i]; break; } }
-          if (!exitBar) exitBar = nearest(exitP);
-          // Peak favorable excursion ("best exit") between the entry and exit bars
-          let peak = null;
-          if (entryBar && exitBar) {
-            const lo = Math.min(entryBar.time, exitBar.time), hi = Math.max(entryBar.time, exitBar.time);
-            candles.forEach(c => { if (c.time >= lo && c.time <= hi && (!peak || (isShort ? c.low < peak.low : c.high > peak.high))) peak = c; });
-            if (peak) setBest({ price: isShort ? peak.low : peak.high, time: peak.time });
-          }
-          const markers = [];
-          if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: C.green, shape: "arrowUp", size: 2, text: `ENTRY $${entryP}` });
-          if (peak && entryBar && exitBar && peak.time !== exitBar.time && peak.time !== entryBar.time) markers.push({ time: peak.time, position: isShort ? "belowBar" : "aboveBar", color: C.goldBright, shape: "circle", size: 1, text: "Peak" });
-          if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: C.red, shape: "arrowDown", size: 2, text: `EXIT $${exitP}` });
-          markers.sort((a, b) => a.time - b.time);
-          s.setMarkers(markers);
-          // Bold, solid, full-width price lines — clear and detached from the candles
-          if (entryP > 0) s.createPriceLine({ price: entryP, color: C.green, lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "Entry" });
-          if (exitP > 0) s.createPriceLine({ price: exitP, color: C.red, lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: "Exit" });
-          if (+trade.stop > 0) s.createPriceLine({ price: +trade.stop, color: C.gold, lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: "Stop" });
-          chart.timeScale().fitContent();
-          onResize = () => { if (elRef.current && chart) chart.applyOptions({ width: elRef.current.clientWidth }); };
-          window.addEventListener("resize", onResize);
-        }, 30);
+        build(candles);
       } catch (e) { if (!disposed) { setStatus("error"); setMsg("Chart only loads on the deployed site (the data API isn't available in local dev)."); } }
     })();
-    return () => { disposed = true; if (onResize) window.removeEventListener("resize", onResize); if (chart) chart.remove(); chartRef.current = null; };
-  }, [trade.id, activeRes]);
+    return () => { disposed = true; if (onResize) window.removeEventListener("resize", onResize); if (chartRef.current) { chartRef.current.remove(); chartRef.current = null; } candleSeriesRef.current = null; };
+  }, [trade.id, activeRes, maOn, maType, volOn]);
 
   // ─── Trade stats (panel) ───
   const entryP = +trade.entryP || 0, exitP = +trade.exitP || 0, shares = +trade.shares || 0, stop = +trade.stop || 0;
@@ -1762,6 +1918,9 @@ function TradeChart({ trade }) {
     ["Best Exit Price", best ? `$${best.price.toFixed(2)}` : "—", C.goldBright],
     ["Best Exit Time", best ? fmtT(best.time) : "—", C.text],
   ];
+  // Toolbar / drawing button style (gold when active)
+  const tb = (active) => ({ padding: "4px 10px", borderRadius: 7, border: `1px solid ${active ? C.borderGold : C.border}`, background: active ? C.goldDim : "transparent", color: active ? C.gold : C.muted, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font, whiteSpace: "nowrap" });
+  const fmtMA = (v) => v == null ? "—" : v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
@@ -1776,21 +1935,52 @@ function TradeChart({ trade }) {
             ))}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => setLogScale(l => !l)} title="Toggle logarithmic price scale" style={{ padding: "4px 11px", borderRadius: 7, border: `1px solid ${logScale ? C.borderGold : C.border}`, background: logScale ? C.goldDim : "transparent", color: logScale ? C.gold : C.muted, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font }}>Log</button>
-          <button onClick={() => chartRef.current && chartRef.current.timeScale().fitContent()} title="Fit chart to data" style={{ padding: "4px 11px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.6rem", cursor: "pointer", fontFamily: font }}>Fit</button>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button onClick={() => setMaOn(v => !v)} title="Toggle moving averages (10 / 20 / 50)" style={tb(maOn)}>MA</button>
+          <button onClick={() => setMaType(t => t === "SMA" ? "EMA" : "SMA")} title="Switch between simple and exponential moving averages" style={tb(false)}>{maType}</button>
+          <button onClick={() => setVolOn(v => !v)} title="Toggle volume + 50-period volume average" style={tb(volOn)}>Vol</button>
+          <button onClick={() => setLogScale(l => !l)} title="Toggle logarithmic price scale" style={tb(logScale)}>Log</button>
+          <button onClick={() => chartRef.current && chartRef.current.timeScale().fitContent()} title="Fit chart to data" style={tb(false)}>Fit</button>
         </div>
+      </div>
+      {/* Drawing tools — horizontal line · 2-click trendline · clear */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: "0.5rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginRight: 2 }}>Draw</span>
+        <button onClick={() => setTool("cursor")} title="Cursor — pan / zoom" style={tb(tool === "cursor")}>↖ Cursor</button>
+        <button onClick={() => setTool("hline")} title="Horizontal line — click the chart to place a level" style={tb(tool === "hline")}>— H-Line</button>
+        <button onClick={() => setTool("trend")} title="Trendline — click two points to draw a line" style={tb(tool === "trend")}>╱ Trendline</button>
+        <button onClick={() => clearRef.current && clearRef.current()} title="Remove all drawings" style={tb(false)}>✕ Clear</button>
+        {tool === "trend" && <span style={{ fontSize: "0.55rem", color: C.gold }}>{pendingRef.current ? "click the second point…" : "click the first point…"}</span>}
+        {tool === "hline" && <span style={{ fontSize: "0.55rem", color: C.gold }}>click to drop a level</span>}
       </div>
       {/* Chart + stats panel */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 460px", minWidth: 0 }}>
-          <div ref={elRef} style={{ width: "100%", minHeight: 430 }}>
-            {status !== "ok" && (
-              <div style={{ height: 430, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: "0.74rem", textAlign: "center", padding: "0 20px" }}>
-                {status === "loading" && "Loading chart…"}
-                {status === "empty" && "No candle data for this period."}
-                {status === "nolib" && "Chart library didn't load — refresh the page."}
-                {status === "error" && (msg || "Couldn't load the chart.")}
+          <div style={{ position: "relative" }}>
+            <div ref={elRef} style={{ width: "100%", minHeight: 480, cursor: tool === "cursor" ? "default" : "crosshair" }}>
+              {status !== "ok" && (
+                <div style={{ height: 480, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: "0.74rem", textAlign: "center", padding: "0 20px" }}>
+                  {status === "loading" && "Loading chart…"}
+                  {status === "empty" && "No candle data for this period."}
+                  {status === "nolib" && "Chart library didn't load — refresh the page."}
+                  {status === "error" && (msg || "Couldn't load the chart.")}
+                </div>
+              )}
+            </div>
+            {/* TradingView-style crosshair legend (OHLC + MA values) */}
+            {status === "ok" && legend && (
+              <div style={{ position: "absolute", top: 8, left: 10, pointerEvents: "none", fontFamily: font, fontSize: "0.6rem", fontWeight: 700, lineHeight: 1.5, textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
+                <div style={{ color: C.white }}>{trade.ticker} · {CHART_TFS.find(([, r]) => r === activeRes)?.[0] || activeRes}</div>
+                <div style={{ color: legend.up ? C.green : C.red }}>
+                  O {fmtMA(legend.o)}  H {fmtMA(legend.h)}  L {fmtMA(legend.l)}  C {fmtMA(legend.c)}
+                </div>
+                {maOn && legend.ma && (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ color: MA_COLORS[10] }}>{maType}10 {fmtMA(legend.ma[10])}</span>
+                    <span style={{ color: MA_COLORS[20] }}>{maType}20 {fmtMA(legend.ma[20])}</span>
+                    <span style={{ color: MA_COLORS[50] }}>{maType}50 {fmtMA(legend.ma[50])}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1799,6 +1989,7 @@ function TradeChart({ trade }) {
             <span>▼ <span style={{ color: C.red }}>Exit</span></span>
             {best && <span>● <span style={{ color: C.goldBright }}>Peak</span></span>}
             {+trade.stop > 0 && <span>— <span style={{ color: C.gold }}>Stop</span></span>}
+            {maOn && <span style={{ color: MA_COLORS[10] }}>━ {maType}10/20/50</span>}
             <span style={{ marginLeft: "auto" }}>{trade.entry}{trade.entryTime ? ` ${trade.entryTime}` : ""} → {trade.exit}{trade.exitTime ? ` ${trade.exitTime}` : ""}</span>
           </div>
         </div>
