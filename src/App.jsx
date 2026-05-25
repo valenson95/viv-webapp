@@ -459,12 +459,13 @@ function GoldBtn({ children, onClick, small }) {
   );
 }
 
-// Source indicator — tiny dot showing whether a row was keyed in manually or auto-synced from IBKR
+// Source indicator — tiny dot: faint grey = manual · solid gold = IBKR auto-synced · hollow gold ring = reconciled (IBKR figures + your notes)
 function SourceDot({ source }) {
   const ibkr = source === "ibkr";
+  const rec = source === "reconciled";
   return (
-    <span title={ibkr ? "Auto-synced from Interactive Brokers" : "Manually entered"}
-      style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", flexShrink: 0, marginRight: 6, verticalAlign: "middle", background: ibkr ? C.gold : "rgba(255,255,255,0.25)", boxShadow: ibkr ? `0 0 5px ${C.gold}` : "none" }} />
+    <span title={ibkr ? "Auto-synced from Interactive Brokers" : rec ? "Reconciled — IBKR figures + your notes/tags" : "Manually entered"}
+      style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", flexShrink: 0, marginRight: 6, verticalAlign: "middle", background: rec ? "transparent" : (ibkr ? C.gold : "rgba(255,255,255,0.25)"), border: rec ? `1.5px solid ${C.gold}` : "none", boxShadow: ibkr ? `0 0 5px ${C.gold}` : "none" }} />
   );
 }
 
@@ -508,50 +509,88 @@ function buildIbkrPreview(data, positions, journaledTrades) {
     });
   });
 
-  // Open positions — apply the same entry-date floor (only holds opened on/after May 1)
+  // Open positions — these are current holdings, so show them unless they have a KNOWN open date before the floor.
+  // (IBKR Summary-level positions often omit the open date; a blank date must NOT hide a live holding.)
   const openPos = (data.positions || [])
-    .filter(p => (p.openDate || "") >= IBKR_SYNC_FLOOR)
+    .filter(p => !p.openDate || p.openDate >= IBKR_SYNC_FLOOR)
     .map(p => ({ sym: p.symbol, conid: p.conid, shares: String(Math.abs(Number(p.shares))), ep: String(p.avgCost),
       cp: p.markPrice ? String(p.markPrice) : "", entry: p.openDate, entryTime: p.openTime,
       tradeType: Number(p.shares) < 0 ? "Short" : "Long" }));
 
-  // Diff against current data
-  const existingExecIds = new Set((journaledTrades || []).filter(t => t.ibExecId).map(t => t.ibExecId));
-  const existingConids = new Set((positions || []).filter(p => p.ibConid).map(p => p.ibConid));
+  // Diff against current data → classify each row + attach the matched existing row id (for surgical writes)
+  const isIbkr = s => s === "ibkr" || s === "reconciled";
   const tradeRows = closed.map(c => {
-    const dup = existingExecIds.has(c.execId);
-    const manualMatch = !dup && (journaledTrades || []).some(t => t.source !== "ibkr" && t.ticker === c.ticker && t.entry === c.entry);
-    return { ...c, status: dup ? "synced" : manualMatch ? "conflict" : "new" };
+    const synced = (journaledTrades || []).find(t => t.ibExecId && t.ibExecId === c.execId);
+    if (synced) return { ...c, action: "synced", matchId: synced.id };
+    const cands = (journaledTrades || []).filter(t => !isIbkr(t.source) && (t.ticker || "").toUpperCase() === c.ticker.toUpperCase() && t.entry === c.entry);
+    if (cands.length === 1) {
+      const m = cands[0];
+      const sharesOk = Math.abs((Number(m.shares) || 0) - c.shares) <= Math.max(1, c.shares * 0.02);
+      return { ...c, action: sharesOk ? "reconcile" : "review", matchId: m.id, matchStop: Number(m.stop) || 0 };
+    }
+    if (cands.length > 1) return { ...c, action: "review", matchId: null };
+    return { ...c, action: "new", matchId: null };
   });
   const posRows = openPos.map(p => {
-    const dup = existingConids.has(p.conid);
-    const manualMatch = !dup && (positions || []).some(x => x.source !== "ibkr" && x.sym === p.sym);
-    return { ...p, status: dup ? "synced" : manualMatch ? "conflict" : "new" };
+    const synced = (positions || []).find(x => x.ibConid && x.ibConid === p.conid);
+    if (synced) return { ...p, action: "synced", matchId: synced.id };
+    const cands = (positions || []).filter(x => !isIbkr(x.source) && (x.sym || "").toUpperCase() === p.sym.toUpperCase());
+    if (cands.length === 1) {
+      const m = cands[0];
+      const sharesOk = Math.abs((Number(m.shares) || 0) - Number(p.shares)) <= Math.max(1, Number(p.shares) * 0.05);
+      return { ...p, action: sharesOk ? "reconcile" : "review", matchId: m.id };
+    }
+    if (cands.length > 1) return { ...p, action: "review", matchId: null };
+    return { ...p, action: "new", matchId: null };
   });
   return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows };
 }
 
-// Read-only preview modal (Phase 1 — shows what WOULD import; no DB writes happen here)
-function IbkrSyncModal({ open, onClose, status, data, error, onRetry }) {
+// Interactive sync modal — preview + per-row decisions + confirm. Writes happen via onConfirm (App), surgically.
+const ibkrDefaultChoice = (action) => action === "review" ? "skip" : action === "reconcile" ? "reconcile" : action === "synced" ? "update" : "new";
+function ibkrChoiceOpts(r) {
+  if (r.action === "synced") return [["update", "Update"], ["skip", "Skip"]];
+  if (r.action === "reconcile") return [["reconcile", "Reconcile"], ["new", "Keep both"], ["skip", "Skip"]];
+  if (r.action === "review") return r.matchId ? [["reconcile", "Reconcile"], ["new", "Import as new"], ["skip", "Skip"]] : [["new", "Import as new"], ["skip", "Skip"]];
+  return [["new", "Import"], ["skip", "Skip"]];
+}
+function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, onConfirm }) {
+  const [choices, setChoices] = useState({ pos: {}, trade: {} });
+  useEffect(() => {
+    if (data) {
+      const def = rows => rows.reduce((m, r, i) => { m[i] = ibkrDefaultChoice(r.action); return m; }, {});
+      setChoices({ pos: def(data.posRows), trade: def(data.tradeRows) });
+    }
+  }, [data]);
   if (!open) return null;
-  const chip = (s) => {
-    const map = { new: { c: C.green, t: "New" }, synced: { c: C.muted, t: "Already synced" }, conflict: { c: C.gold, t: "Matches manual" } };
-    const m = map[s] || map.new;
-    return <span style={{ fontSize: "0.5rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: m.c, border: `1px solid ${m.c}55`, borderRadius: 980, padding: "2px 7px" }}>{m.t}</span>;
+
+  const chip = (action) => {
+    const map = { new: { c: C.green, t: "New" }, synced: { c: C.muted, t: "Already synced" }, reconcile: { c: C.gold, t: "Matches manual" }, review: { c: C.red, t: "Needs review" } };
+    const m = map[action] || map.new;
+    return <span style={{ fontSize: "0.5rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: m.c, border: `1px solid ${m.c}55`, borderRadius: 980, padding: "2px 7px", whiteSpace: "nowrap" }}>{m.t}</span>;
   };
-  const counts = data ? {
-    pNew: data.posRows.filter(r => r.status === "new").length, pConf: data.posRows.filter(r => r.status === "conflict").length,
-    tNew: data.tradeRows.filter(r => r.status === "new").length, tConf: data.tradeRows.filter(r => r.status === "conflict").length,
-  } : null;
+  const setChoice = (kind, i, v) => setChoices(prev => ({ ...prev, [kind]: { ...prev[kind], [i]: v } }));
+  const sel = (kind, i, r) => (
+    <select value={choices[kind][i] || "skip"} onChange={e => setChoice(kind, i, e.target.value)} disabled={status === "writing"}
+      style={{ background: "rgba(255,255,255,0.05)", color: C.white, border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 6px", fontSize: "0.62rem", fontFamily: font, outline: "none" }}>
+      {ibkrChoiceOpts(r).map(([v, label]) => <option key={v} value={v} style={{ background: C.bg2 }}>{label}</option>)}
+    </select>
+  );
+  const confirm = () => {
+    const resolve = (rows, ch) => rows.map((r, i) => ({ ...r, choice: ch[i] || "skip" }));
+    onConfirm(resolve(data.posRows, choices.pos), resolve(data.tradeRows, choices.trade));
+  };
+  const willWrite = data ? [...Object.values(choices.pos), ...Object.values(choices.trade)].filter(c => c && c !== "skip").length : 0;
+
   return createPortal(
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(0,0,0,0.66)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: "min(860px, 96vw)", maxHeight: "88vh", overflowY: "auto", background: C.bg2, border: `1px solid ${C.borderGold}`, borderRadius: 18, boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
+    <div onClick={status === "writing" ? undefined : onClose} style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(0,0,0,0.66)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "min(900px, 96vw)", maxHeight: "88vh", overflowY: "auto", background: C.bg2, border: `1px solid ${C.borderGold}`, borderRadius: 18, boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
         <div style={{ position: "sticky", top: 0, background: C.bg2, borderBottom: `1px solid ${C.border}`, padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 }}>
           <div>
             <Eyebrow>Interactive Brokers</Eyebrow>
-            <div style={{ fontWeight: 800, fontSize: "1.05rem", color: C.white }}>Sync Preview</div>
+            <div style={{ fontWeight: 800, fontSize: "1.05rem", color: C.white }}>Sync from IBKR</div>
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.1rem", cursor: "pointer", fontFamily: font }}>✕</button>
+          <button onClick={onClose} disabled={status === "writing"} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.1rem", cursor: status === "writing" ? "default" : "pointer", fontFamily: font }}>✕</button>
         </div>
         <div style={{ padding: "20px 24px" }}>
           {status === "loading" && <div style={{ textAlign: "center", padding: "40px 0", color: C.muted, fontSize: "0.84rem" }}>Pulling your latest statement from IBKR… <span style={{ display: "block", marginTop: 6, fontSize: "0.66rem" }}>(generation can take a few seconds)</span></div>}
@@ -561,28 +600,41 @@ function IbkrSyncModal({ open, onClose, status, data, error, onRetry }) {
               <button onClick={onRetry} style={{ marginTop: 14, padding: "8px 16px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.7rem", cursor: "pointer", fontFamily: font }}>Try again</button>
             </div>
           )}
-          {status === "preview" && data && (
+          {status === "done" && result && (
+            <div style={{ textAlign: "center", padding: "30px 10px" }}>
+              <div style={{ fontSize: "2rem", marginBottom: 8 }}>✓</div>
+              <div style={{ fontWeight: 800, fontSize: "1rem", color: C.green, marginBottom: 10 }}>Sync complete</div>
+              <div style={{ fontSize: "0.76rem", color: C.text, lineHeight: 1.8 }}>
+                Trades: <strong style={{ color: C.white }}>{result.tInserted}</strong> new · <strong style={{ color: C.white }}>{result.tReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.tUpdated}</strong> refreshed<br />
+                Positions: <strong style={{ color: C.white }}>{result.pInserted}</strong> new · <strong style={{ color: C.white }}>{result.pReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.pUpdated}</strong> refreshed
+              </div>
+              {result.errors && result.errors.length > 0 && <div style={{ marginTop: 12, fontSize: "0.66rem", color: C.red }}>{result.errors.length} row(s) failed and were skipped: {result.errors.slice(0, 3).join("; ")}{result.errors.length > 3 ? "…" : ""}</div>}
+              <button onClick={onClose} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font }}>Done</button>
+            </div>
+          )}
+          {(status === "preview" || status === "writing") && data && (
             <>
               <div style={{ padding: "10px 14px", background: "rgba(201,152,42,0.08)", border: `1px solid ${C.borderGold}`, borderRadius: 10, fontSize: "0.7rem", color: C.text, lineHeight: 1.6, marginBottom: 18 }}>
-                <strong style={{ color: C.goldBright }}>Preview only — nothing has been saved.</strong> This is exactly what a sync would pull (entry date on/after {IBKR_SYNC_FLOOR}). Check it against IBKR. Writing to your journal is enabled in the next update, once you confirm the pull is accurate.
+                <strong style={{ color: C.goldBright }}>Review before importing.</strong> Entry date on/after {IBKR_SYNC_FLOOR}. <strong style={{ color: C.white }}>Reconcile</strong> updates a manual entry with IBKR's exact figures and keeps your notes/tags. Nothing is ever deleted; manual rows you don't reconcile are untouched.
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px,1fr))", gap: 10, marginBottom: 18 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 10, marginBottom: 18 }}>
                 <StatTile label="Account" value={data.account || "—"} />
-                <StatTile label="Open Positions" value={String(data.posRows.length)} sub={`${counts.pNew} new · ${counts.pConf} to review`} />
-                <StatTile label="Closed Trades" value={String(data.tradeRows.length)} sub={`${counts.tNew} new · ${counts.tConf} to review`} />
+                <StatTile label="Open Positions" value={String(data.posRows.length)} />
+                <StatTile label="Closed Trades" value={String(data.tradeRows.length)} />
               </div>
-              {[{ title: "Open Positions", rows: data.posRows, cols: ["sym", "shares", "ep", "entry"], head: ["Symbol", "Shares", "Avg Cost", "Opened"] },
-                { title: "Closed Trades (round-trips)", rows: data.tradeRows, cols: ["ticker", "shares", "entryP", "exitP", "plDollar", "entry", "exit"], head: ["Symbol", "Shares", "Entry", "Exit", "P/L $", "In", "Out"] }].map(sec => (
+              {[{ kind: "pos", title: "Open Positions", rows: data.posRows, cols: ["sym", "shares", "ep", "entry"], head: ["Symbol", "Shares", "Avg Cost", "Opened"] },
+                { kind: "trade", title: "Closed Trades (round-trips)", rows: data.tradeRows, cols: ["ticker", "shares", "entryP", "exitP", "plDollar", "entry"], head: ["Symbol", "Shares", "Entry", "Exit", "P/L $", "In"] }].map(sec => (
                 <div key={sec.title} style={{ marginBottom: 18 }}>
                   <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>{sec.title} ({sec.rows.length})</div>
-                  {sec.rows.length === 0 ? <div style={{ fontSize: "0.72rem", color: C.muted, padding: "8px 0" }}>None from May 1 onward.</div> : (
+                  {sec.rows.length === 0 ? <div style={{ fontSize: "0.72rem", color: C.muted, padding: "8px 0" }}>None from {IBKR_SYNC_FLOOR} onward.</div> : (
                     <div style={{ overflowX: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
-                        <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{sec.head.map(h => <th key={h} style={{ padding: "8px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>{h}</th>)}<th style={{ padding: "8px 8px", textAlign: "right" }} /></tr></thead>
+                        <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{sec.head.map(h => <th key={h} style={{ padding: "8px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>{h}</th>)}<th style={{ padding: "8px 8px", textAlign: "center", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Status</th><th style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Action</th></tr></thead>
                         <tbody>{sec.rows.map((r, i) => (
-                          <tr key={i} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
-                            {sec.cols.map(col => <td key={col} style={{ padding: "7px 8px", color: col === "plDollar" ? (r[col] >= 0 ? C.green : C.red) : C.text, fontWeight: col === sec.cols[0] ? 700 : 400, whiteSpace: "nowrap" }}>{col === "plDollar" ? `${r[col] >= 0 ? "+" : ""}${Number(r[col]).toLocaleString()}` : (r[col] ?? "—")}</td>)}
-                            <td style={{ padding: "7px 8px", textAlign: "right" }}>{chip(r.status)}</td>
+                          <tr key={i} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, opacity: (choices[sec.kind][i] === "skip") ? 0.45 : 1 }}>
+                            {sec.cols.map(col => <td key={col} style={{ padding: "7px 8px", color: col === "plDollar" ? (r[col] >= 0 ? C.green : C.red) : C.text, fontWeight: col === sec.cols[0] ? 700 : 400, whiteSpace: "nowrap" }}>{col === "ep" || col === "entryP" || col === "exitP" ? (r[col] !== undefined && r[col] !== "" ? Number(r[col]).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—") : col === "plDollar" ? `${r[col] >= 0 ? "+" : ""}${Number(r[col]).toLocaleString()}` : (r[col] ?? "—")}</td>)}
+                            <td style={{ padding: "7px 8px", textAlign: "center" }}>{chip(r.action)}</td>
+                            <td style={{ padding: "7px 8px", textAlign: "right" }}>{sel(sec.kind, i, r)}</td>
                           </tr>
                         ))}</tbody>
                       </table>
@@ -590,8 +642,12 @@ function IbkrSyncModal({ open, onClose, status, data, error, onRetry }) {
                   )}
                 </div>
               ))}
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-                <button onClick={onClose} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontWeight: 700, fontSize: "0.74rem", cursor: "pointer", fontFamily: font }}>Close</button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: "0.64rem", color: C.muted }}>{willWrite} row{willWrite === 1 ? "" : "s"} will be written · the rest skipped.</span>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={onClose} disabled={status === "writing"} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontWeight: 700, fontSize: "0.74rem", cursor: status === "writing" ? "default" : "pointer", fontFamily: font }}>Cancel</button>
+                  <button onClick={confirm} disabled={status === "writing" || willWrite === 0} style={{ padding: "10px 22px", borderRadius: 980, border: "none", background: willWrite === 0 ? "rgba(255,255,255,0.1)" : `linear-gradient(135deg, ${C.goldMid}, ${C.goldBright})`, color: willWrite === 0 ? C.muted : "#000", fontWeight: 800, fontSize: "0.74rem", cursor: (status === "writing" || willWrite === 0) ? "default" : "pointer", fontFamily: font }}>{status === "writing" ? "Importing…" : `Import ${willWrite}`}</button>
+                </div>
               </div>
             </>
           )}
@@ -4737,8 +4793,9 @@ function AppInner() {
   const [ibkrStatus, setIbkrStatus] = useState("idle");
   const [ibkrData, setIbkrData] = useState(null);
   const [ibkrError, setIbkrError] = useState(null);
+  const [ibkrResult, setIbkrResult] = useState(null);
   const runIbkrSync = useCallback(async () => {
-    setIbkrOpen(true); setIbkrStatus("loading"); setIbkrError(null); setIbkrData(null);
+    setIbkrOpen(true); setIbkrStatus("loading"); setIbkrError(null); setIbkrData(null); setIbkrResult(null);
     try {
       const res = await fetch("/api/ibkr-sync");
       const json = await res.json();
@@ -4750,6 +4807,80 @@ function AppInner() {
       setIbkrError("Couldn't reach the sync service. Note: the /api function only runs on the deployed site (valensontrades.com), not in local dev.");
     }
   }, [positions, journaledTrades]);
+
+  // Phase 2 — surgical writes from the confirmed preview. INSERT new IBKR rows, UPDATE matched rows by id only.
+  // Never deletes; reconcile updates only the factual columns so notes/tags/setup/stops are preserved.
+  const confirmIbkrSync = useCallback(async (posRows, tradeRows) => {
+    const uid = session?.user?.id;
+    if (!uid) { setIbkrStatus("error"); setIbkrError("Not signed in."); return; }
+    setIbkrStatus("writing");
+    const nowIso = new Date().toISOString();
+    const res = { tInserted: 0, tReconciled: 0, tUpdated: 0, pInserted: 0, pReconciled: 0, pUpdated: 0, errors: [] };
+
+    // ── TRADES ── updates first (by id), then bulk insert new
+    const tradeInserts = [];
+    for (const r of tradeRows) {
+      if (r.choice === "skip") continue;
+      if (r.choice === "new") {
+        tradeInserts.push({ user_id: uid, ticker: r.ticker, entry_date: r.entry, entry_time: r.entryTime || "", exit_date: r.exit, exit_time: r.exitTime || "", entry_price: r.entryP, exit_price: r.exitP, shares: r.shares, commission: r.commission, pl_pct: r.plPct, pl_dollar: r.plDollar, r_mult: null, setup: "", tags: [], exit_reason: "", notes: "", trade_type: r.tradeType, source: "ibkr", ib_exec_id: r.execId, ib_trade_id: r.tradeId, ib_synced_at: nowIso });
+      } else if ((r.choice === "reconcile" || r.choice === "update") && r.matchId) {
+        let rMult; // undefined = leave the column as-is
+        if (r.choice === "reconcile" && r.matchStop > 0) {
+          const rps = r.tradeType === "Long" ? (r.entryP - r.matchStop) : (r.matchStop - r.entryP);
+          if (rps > 0) { const pps = r.tradeType === "Long" ? (r.exitP - r.entryP) : (r.entryP - r.exitP); rMult = +(pps / rps).toFixed(2); }
+        }
+        const upd = { entry_date: r.entry, entry_time: r.entryTime || "", exit_date: r.exit, exit_time: r.exitTime || "", entry_price: r.entryP, exit_price: r.exitP, shares: r.shares, commission: r.commission, pl_pct: r.plPct, pl_dollar: r.plDollar, trade_type: r.tradeType, ib_exec_id: r.execId, ib_trade_id: r.tradeId, ib_synced_at: nowIso };
+        if (r.choice === "reconcile") upd.source = "reconciled"; // "update" (re-sync) leaves source as-is
+        if (rMult !== undefined) upd.r_mult = rMult;
+        const { error } = await supabase.from("trades").update(upd).eq("id", r.matchId).eq("user_id", uid);
+        if (error) { res.errors.push(`trade ${r.ticker}: ${error.message}`); }
+        else {
+          if (r.choice === "reconcile") res.tReconciled++; else res.tUpdated++;
+          setJournaledTrades(prev => prev.map(t => t.id === r.matchId ? { ...t, entry: r.entry, entryTime: r.entryTime || "", exit: r.exit, exitTime: r.exitTime || "", entryP: r.entryP, exitP: r.exitP, shares: r.shares, commission: r.commission, plPct: r.plPct, plDollar: r.plDollar, ...(rMult !== undefined ? { rMult } : {}), tradeType: r.tradeType, source: r.choice === "reconcile" ? "reconciled" : t.source, ibExecId: r.execId, ibTradeId: r.tradeId } : t));
+        }
+      }
+    }
+    if (tradeInserts.length) {
+      const { data: ins, error } = await supabase.from("trades").insert(tradeInserts).select("*");
+      if (error) { res.errors.push(`new trades: ${error.message}`); }
+      else if (ins) {
+        res.tInserted = ins.length;
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null }));
+        setJournaledTrades(prev => [...mapped, ...prev]);
+      }
+    }
+
+    // ── POSITIONS ──
+    const posInserts = [];
+    for (const r of posRows) {
+      if (r.choice === "skip") continue;
+      if (r.choice === "new") {
+        posInserts.push({ user_id: uid, symbol: r.sym, entry_date: r.entry, entry_time: r.entryTime || "", shares: String(r.shares), entry_price: String(r.ep), current_price: r.cp || "", stop_price: "", stop_price_2: "", trailing_stop: "", setup: "", tags: [], commission: null, notes: "", chart_url: "", chart_image: "", trade_type: r.tradeType, source: "ibkr", ib_conid: r.conid, ib_synced_at: nowIso });
+      } else if ((r.choice === "reconcile" || r.choice === "update") && r.matchId) {
+        const upd = { symbol: r.sym, entry_date: r.entry, entry_time: r.entryTime || "", shares: String(r.shares), entry_price: String(r.ep), trade_type: r.tradeType, ib_conid: r.conid, ib_synced_at: nowIso };
+        if (r.choice === "reconcile") upd.source = "reconciled"; // "update" (re-sync) leaves source as-is
+        const { error } = await supabase.from("positions").update(upd).eq("id", r.matchId).eq("user_id", uid);
+        if (error) { res.errors.push(`position ${r.sym}: ${error.message}`); }
+        else {
+          if (r.choice === "reconcile") res.pReconciled++; else res.pUpdated++;
+          setPositions(prev => prev.map(p => p.id === r.matchId ? { ...p, sym: r.sym, entry: r.entry, entryTime: r.entryTime || "", shares: String(r.shares), ep: String(r.ep), tradeType: r.tradeType, source: r.choice === "reconcile" ? "reconciled" : p.source, ibConid: r.conid } : p));
+        }
+      }
+    }
+    if (posInserts.length) {
+      const { data: ins, error } = await supabase.from("positions").insert(posInserts).select("*");
+      if (error) { res.errors.push(`new positions: ${error.message}`); }
+      else if (ins) {
+        res.pInserted = ins.length;
+        const mapped = ins.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "ibkr", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null }));
+        setPositions(prev => [...prev, ...mapped]);
+        lastLoadedCount.current = (lastLoadedCount.current || 0) + mapped.length;
+      }
+    }
+
+    setIbkrResult(res);
+    setIbkrStatus("done");
+  }, [session]);
   const [fullSizePct, setFullSizePct] = useState(25);
   const [numStocks, setNumStocks] = useState(5);
   const [fontSize, setFontSize] = useState("standard");
@@ -4837,6 +4968,7 @@ function AppInner() {
         stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
         commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
         trade_type: p.tradeType || "Long",
+        source: p.source || "manual", ib_conid: p.ibConid || null, ib_synced_at: p.ibSyncedAt || null, // preserve IBKR identity through bulk Save
       }));
 
       if (rows.length === 0) {
@@ -4980,7 +5112,7 @@ function AppInner() {
         const seen = new Map();
         const dupIds = [];
         for (const p of pos) {
-          const key = `${p.symbol}|${p.entry_date}|${p.entry_price}|${p.shares}|${p.stop_price}`;
+          const key = `${p.symbol}|${p.entry_date}|${p.entry_price}|${p.shares}|${p.stop_price}|${p.source || "manual"}`;
           if (seen.has(key)) {
             // Duplicate — mark the older one (lower id) for deletion
             const prev = seen.get(key);
@@ -5108,7 +5240,7 @@ function AppInner() {
         const seen = new Map();
         const dupIds = [];
         for (const p of pos) {
-          const key = `${p.symbol}|${p.entry_date}|${p.entry_price}|${p.shares}|${p.stop_price}`;
+          const key = `${p.symbol}|${p.entry_date}|${p.entry_price}|${p.shares}|${p.stop_price}|${p.source || "manual"}`;
           if (seen.has(key)) {
             const prev = seen.get(key);
             if (p.id > prev.id) { dupIds.push(prev.id); seen.set(key, p); }
@@ -5331,7 +5463,7 @@ function AppInner() {
       {page === "tools" && <PremiumToolsPage demo={false} portfolioSize={portfolioSize} journaledTrades={journaledTrades} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} />}
-      <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} onRetry={runIbkrSync} />
+      <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} />
     </>
   );
 
