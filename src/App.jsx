@@ -503,6 +503,11 @@ function buildIbkrPreview(data, positions, journaledTrades) {
   (data.trades || []).forEach(t => { (bySym[t.symbol] = bySym[t.symbol] || []).push(t); });
   const closed = [];
   const partials = [];
+  // Lookup of IBKR position by symbol (case-insensitive) — gives us the lot's TRUE open date even when
+  // the Flex query window cuts off the original BUY execution. We anchor partials to this date so
+  // partial.entry always matches position.entry (= openDate) and the dashboard matcher finds the link.
+  const posBySym = {};
+  (data.positions || []).forEach(p => { if (p.symbol) posBySym[String(p.symbol).toUpperCase()] = p; });
   Object.entries(bySym).forEach(([sym, execs]) => {
     execs.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     let pos = 0, cycle = [];
@@ -538,8 +543,13 @@ function buildIbkrPreview(data, positions, journaledTrades) {
     // = lot's first opening exec date (matches the position's openDate), so realizedByPosition matches.
     if (cycle.length > 0) {
       const firstExec = cycle[0];
+      // Lot's TRUE open date — prefer the IBKR position's openDate (survives query-window truncation),
+      // fall back to the first exec in our cycle when openDate isn't provided.
+      const ibkrPos = posBySym[sym.toUpperCase()];
+      const lotEntry = (ibkrPos && ibkrPos.openDate) || firstExec.date;
+      const lotEntryTime = (ibkrPos && ibkrPos.openTime) || firstExec.time;
       // Skip lots whose ORIGIN is before the sync floor (same rule as closed round-trips)
-      if (firstExec.date >= IBKR_SYNC_FLOOR) {
+      if (lotEntry >= IBKR_SYNC_FLOOR) {
         const isLong = firstExec.signedQty > 0;
         // Running volume-weighted avg cost of opening legs preceding each close
         let openShares = 0, openCost = 0;
@@ -555,7 +565,7 @@ function buildIbkrPreview(data, positions, journaledTrades) {
             const plDollar = c.realizedPnl || ((isLong ? (c.price - avgEntryP) : (avgEntryP - c.price)) * closedQty - c.commission);
             const plPct = avgEntryP > 0 ? (plDollar / (avgEntryP * closedQty)) * 100 : 0;
             partials.push({
-              ticker: sym, entry: firstExec.date, entryTime: firstExec.time, exit: c.date, exitTime: c.time,
+              ticker: sym, entry: lotEntry, entryTime: lotEntryTime, exit: c.date, exitTime: c.time,
               entryP: +avgEntryP.toFixed(4), exitP: +c.price.toFixed(4), shares: closedQty,
               plPct: +plPct.toFixed(2), plDollar: +plDollar.toFixed(2), commission: +c.commission.toFixed(2),
               execId: c.execID, tradeId: c.tradeID, tradeType: isLong ? "Long" : "Short", isPartial: true,
@@ -3813,8 +3823,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     positions.forEach(p => {
       if (!p.sym) { map[p.id] = { pl: 0, shares: 0 }; return; }
       const posSym = String(p.sym).trim().toUpperCase();
-      const posKey = tradeDateISO(p.entry);
-      if (!posKey) { map[p.id] = { pl: 0, shares: 0 }; return; }
+      const posKey = tradeDateISO(p.entry); // may be empty for IBKR Summary-level positions (openDate omitted)
 
       const sameTicker = journaledTrades.filter(t =>
         String(t.ticker || "").trim().toUpperCase() === posSym
@@ -3822,13 +3831,21 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 
       let matches;
       if (openLotsByTicker[posSym] === 1) {
-        // Single open lot — attribute any closed trade of this ticker with entry on/after pos entry
+        // Single open lot of this ticker — by definition every closed trade of this ticker BELONGS to this
+        // lot (you can't have a separate later round-trip on a ticker you're still holding). So attribute
+        // them all. If we DO have a position entry day, still drop trades dated strictly before it (those
+        // are earlier round-trips on the same ticker that have since fully closed).
         matches = sameTicker.filter(t => {
+          if (!posKey) return true;                  // pos has no entry → take everything for this ticker
           const tKey = tradeDateISO(t.entry);
-          return tKey && tKey >= posKey;
+          if (!tKey) return true;                    // trade has no entry → keep (better to show than to hide)
+          return tKey >= posKey;
         });
+      } else if (!posKey) {
+        // Multiple lots + no position entry day → can't disambiguate. Skip.
+        matches = [];
       } else {
-        // Multiple open lots — must use strict same-day match to disambiguate
+        // Multiple open lots of the same ticker → require strict same-day match to keep them separate
         matches = sameTicker.filter(t => tradeDateISO(t.entry) === posKey);
       }
 
@@ -3838,6 +3855,32 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     });
     return map;
   }, [journaledTrades, positions]);
+
+  // Diagnostic counters — surfaced under the Open Positions header so the user can see exactly what's
+  // matched vs unmatched. Helps distinguish "matcher is broken" from "no partials have actually been
+  // imported into the Journal yet". Reads journal trades that LOOK like IBKR partial trims.
+  const partialsDiag = useMemo(() => {
+    if (!journaledTrades) return { totalRealized: 0, attributed: 0, unattributedTrades: 0, positionsWithPartials: 0 };
+    const totalRealized = Object.values(realizedByPosition).reduce((s, v) => s + (v?.pl || 0), 0);
+    const positionsWithPartials = Object.values(realizedByPosition).filter(v => v?.pl && v.pl !== 0).length;
+    // Count IBKR-source partial-style entries (exit_reason "Partial Trim" or has ibExecId) in journal
+    const partialJournalTrades = journaledTrades.filter(t =>
+      (t.source === "ibkr" || t.source === "reconciled") && (t.reason === "Partial Trim" || t.ibExecId)
+    );
+    const attributedPlSum = positions ? positions.reduce((s, p) => {
+      const v = realizedByPosition[p.id];
+      return s + (v?.pl || 0);
+    }, 0) : 0;
+    // Trades that look like partials but didn't end up attributed (sum of their pl that's not in attributedPlSum)
+    const journalPartialsTotal = partialJournalTrades.reduce((s, t) => s + (t.plDollar || 0), 0);
+    const unattributedAmount = Math.round((journalPartialsTotal - attributedPlSum) * 100) / 100;
+    return {
+      totalRealized: Math.round(totalRealized * 100) / 100,
+      attributed: positionsWithPartials,
+      journalPartialTradeCount: partialJournalTrades.length,
+      unattributedAmount,
+    };
+  }, [realizedByPosition, journaledTrades, positions]);
 
   // Enriched — dual stop loss: if stop2 is set, 50/50 split. Otherwise stop1 covers 100%.
   const enriched = useMemo(() => positions.map(p => { try {
@@ -4133,6 +4176,18 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           <div>
             <div style={{ fontWeight:700,fontSize:"0.78rem",color:C.white }}>Open Positions</div>
             <div style={{ fontWeight:400,fontSize:"0.64rem",color:C.muted,marginTop:2 }}>Edit any white cell. Gold = current price. Grey = auto-calculated.</div>
+            {(partialsDiag.journalPartialTradeCount > 0 || partialsDiag.totalRealized !== 0) && (
+              <div style={{ marginTop:8, display:"inline-flex", alignItems:"center", gap:10, padding:"5px 12px", borderRadius:980,
+                background: partialsDiag.journalPartialTradeCount > 0 && partialsDiag.attributed === 0 ? "rgba(239,68,68,0.10)" : "rgba(201,152,42,0.10)",
+                border: `1px solid ${partialsDiag.journalPartialTradeCount > 0 && partialsDiag.attributed === 0 ? "rgba(239,68,68,0.35)" : C.borderGold}`,
+                fontSize:"0.62rem", fontWeight:600, color:C.text }}>
+                <span style={{ fontSize:"0.66rem" }}>📊</span>
+                <span><strong style={{color:C.goldBright}}>Partials:</strong> {partialsDiag.journalPartialTradeCount} in journal · attributed to <strong style={{color:partialsDiag.attributed>0?C.green:C.red}}>{partialsDiag.attributed}</strong> position{partialsDiag.attributed===1?"":"s"} · total realized <strong style={{color:partialsDiag.totalRealized>=0?C.green:C.red}}>{partialsDiag.totalRealized>=0?"+":"-"}${Math.abs(partialsDiag.totalRealized).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></span>
+                {partialsDiag.journalPartialTradeCount > 0 && partialsDiag.attributed === 0 && (
+                  <span style={{ color:C.red, fontWeight:700 }}>← matcher found nothing. Click <strong style={{color:C.goldBright}}>Sync IBKR</strong> → import latest, or check the Trade Journal for entry-date drift.</span>
+                )}
+              </div>
+            )}
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <button onClick={fetchLivePrices} disabled={priceLoading} style={{
