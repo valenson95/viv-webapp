@@ -3485,27 +3485,39 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const onManualSaveRef = useRef(onManualSave);
   useEffect(() => { onManualSaveRef.current = onManualSave; }, [onManualSave]);
 
-  // fullSizePct is now the TARGET POSITION SIZE PER TRADE (%). perStock = $ at full size; fullSizeAmt = implied total if fully loaded.
+  // Compounded equity = starting capital + realized P/L from all closed journal trades.
+  // This is the TRUE account size to size against — it grows as profits are realized,
+  // so the sizer compounds. (Defined here so the sizers below can use it; also used by
+  // enriched / posAnalysis / budget further down.)
+  const compRealizedPL = useMemo(() => {
+    if (!journaledTrades || journaledTrades.length === 0) return 0;
+    return journaledTrades.reduce((sum, t) => sum + (t.plDollar || 0), 0);
+  }, [journaledTrades]);
+  const compPs = +portfolioSize || 0;
+  const compEquity = compPs + compRealizedPL;
+
+  // fullSizePct is the TARGET POSITION SIZE PER TRADE (%). Sizing is on current (compounded)
+  // equity, not starting capital — perStock = $ at full size; fullSizeAmt = implied total if fully loaded.
   const sizer = useMemo(() => {
-    const ps = +portfolioSize;
+    const ps = compEquity;
     if (!ps || ps <= 0) return null;
     const perTradePct = +fullSizePct || 0;
     const perStock = ps * (perTradePct / 100);
     const fullSizeAmt = perStock * numStocks;
     return { perTradePct, fullSizeAmt, impliedTotalPct: perTradePct * numStocks, full: perStock, half: perStock / 2, quarter: perStock / 4, pilot: perStock / 8 };
-  }, [portfolioSize, fullSizePct, numStocks]);
+  }, [compEquity, fullSizePct, numStocks]);
   const targetPosPct = +fullSizePct || 0; // benchmark for Open Positions Exp % colour coding
 
-  // R-based sizer: Account × ROTE% = total risk budget, ÷ max positions = R$ per trade
+  // R-based sizer: current equity × ROTE% = total risk budget, ÷ max positions = R$ per trade
   const rSizer = useMemo(() => {
-    const ps = +portfolioSize;
+    const ps = compEquity;
     if (!ps || ps <= 0) return null;
     const rotePct = +(targetRote || 0);
     const totalBudget = ps * (rotePct / 100);
     const n = rNumStocks || 1;
     const fullR = totalBudget / n;
     return { totalBudget, fullR, halfR: fullR / 2, quarterR: fullR / 4, pilotR: fullR / 8, rotePct, n };
-  }, [portfolioSize, targetRote, rNumStocks]);
+  }, [compEquity, targetRote, rNumStocks]);
   const [sellId, setSellId] = useState(null);
   const [sellQty, setSellQty] = useState("");
   const [sellPrice, setSellPrice] = useState("");
@@ -3717,14 +3729,6 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     setTimeout(() => onManualSaveRef.current(), 50); // ref avoids stale closure
   };
 
-  // Compute compEquity BEFORE enriched so expPct can be sorted
-  const compRealizedPL = useMemo(() => {
-    if (!journaledTrades || journaledTrades.length === 0) return 0;
-    return journaledTrades.reduce((sum, t) => sum + (t.plDollar || 0), 0);
-  }, [journaledTrades]);
-  const compPs = +portfolioSize || 0;
-  const compEquity = compPs + compRealizedPL;
-
   // Realized P/L per position — ONLY counts journal trades that are partial sells of the SAME lot.
   // Match: same ticker AND the SAME entry day (a partial sell, taken via the Sell button, inherits the
   // position's entry date — see confirmSell). Comparison uses `tradeDateISO` so it's robust to format/time
@@ -3738,8 +3742,10 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       if (!p.sym) return;
       const posKey = tradeDateISO(p.entry);
       if (!posKey) { map[p.id] = 0; return; } // no entry date → can't attribute
+      // Normalize tickers: trim + uppercase on both sides so manual/IBKR/edited rows match cleanly
+      const posSym = String(p.sym).trim().toUpperCase();
       const realized = journaledTrades
-        .filter(t => t.ticker === p.sym && tradeDateISO(t.entry) === posKey)
+        .filter(t => String(t.ticker || "").trim().toUpperCase() === posSym && tradeDateISO(t.entry) === posKey)
         .reduce((sum, t) => sum + (t.plDollar || 0), 0);
       // Use position id as key (not ticker) to handle multiple positions of same ticker
       map[p.id] = realized;
@@ -3965,7 +3971,16 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           </div>
         </div>
 
-        <CalcInput label="Account Size" value={portfolioSize} onChange={setPortfolioSize} style={{ maxWidth:300,marginBottom:24 }} />
+        <div style={{ marginBottom:24 }}>
+          <CalcInput label="Starting Capital" value={portfolioSize} onChange={setPortfolioSize} style={{ maxWidth:300 }} />
+          <div style={{ fontSize:"0.62rem",color:C.muted,marginTop:8 }}>
+            Sizing on current equity{" "}
+            <strong style={{ color:C.goldBright }}>{fmt$(compEquity)}</strong>
+            {compRealizedPL !== 0 && (
+              <> · starting {fmt$(compPs)} {compRealizedPL >= 0 ? "+" : "−"} {fmt$(Math.abs(compRealizedPL),2)} realized P/L</>
+            )}
+          </div>
+        </div>
 
         {sizerMode === "%" ? (
           <>
@@ -4012,7 +4027,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
             {rSizer && (
               <>
                 <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(240px, 1fr))",gap:14,marginBottom:16 }}>
-                  <StatTile big label="Total Risk Budget" value={fmt$(rSizer.totalBudget)} color={C.goldBright} sub={`${rSizer.rotePct}% of ${fmt$(+portfolioSize)}`} />
+                  <StatTile big label="Total Risk Budget" value={fmt$(rSizer.totalBudget)} color={C.goldBright} sub={`${rSizer.rotePct}% of ${fmt$(compEquity)}`} />
                   <StatTile big label="R per Trade (Full)" value={fmt$(rSizer.fullR)} color={C.green} sub={`${(rSizer.rotePct / rSizer.n).toFixed(2)}% ROTE each`} />
                 </div>
               </>
@@ -4210,6 +4225,65 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                       </div>
                     </td>
                   </DragTr>
+                  {/* Inline sell row — rendered directly below the position being sold so user doesn't scroll */}
+                  {isSelling && (() => {
+                    const totalShares = parseFloat(p.shares) || 0;
+                    const qty = parseFloat(sellQty) || 0;
+                    const isPartial = qty < totalShares && qty > 0;
+                    return (
+                      <tr style={{ background:"rgba(239,68,68,0.06)",borderBottom:`2px solid ${C.red}33` }}>
+                        <td colSpan={26} style={{ padding:"14px 16px" }}>
+                          <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:10 }}>
+                            <span style={{ fontWeight:700,fontSize:"0.68rem",color:C.red,letterSpacing:"0.08em",textTransform:"uppercase" }}>Sell {p.sym}</span>
+                            <div style={{display:"flex",alignItems:"center",gap:5}}>
+                              <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Qty</span>
+                              <CellInput value={sellQty} onChange={setSellQty} width={60} />
+                              <span style={{fontSize:"0.58rem",color:C.muted}}>of {totalShares}</span>
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:5}}>
+                              <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Exit $</span>
+                              <CellInput value={sellPrice} onChange={setSellPrice} gold width={82} />
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:5}}>
+                              <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Comm</span>
+                              <CellInput value={sellComm} onChange={setSellComm} width={62} />
+                            </div>
+                            <MiniSelect value={sellReason} onChange={setSellReason} options={exitReasons} width={130} />
+                            <div style={{display:"flex",alignItems:"center",gap:5}}>
+                              <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Tags</span>
+                              <TagSelector selected={sellTags} allTags={allTags} onChange={setSellTags} small />
+                            </div>
+                            <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontSize:"0.62rem",color:C.muted}}>
+                              <input type="checkbox" checked={sellAddJournal} onChange={e=>setSellAddJournal(e.target.checked)} style={{accentColor:C.gold}} />
+                              Add to Journal
+                            </label>
+                            <button onClick={confirmSell} style={{padding:"6px 14px",borderRadius:8,border:`1px solid rgba(239,68,68,0.3)`,background:C.redDim,color:C.red,fontWeight:700,fontSize:"0.66rem",cursor:"pointer",fontFamily:font}}>
+                              {isPartial ? `Sell ${qty} shares` : "Close Position"}
+                            </button>
+                            <button onClick={cancelSell} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontSize:"0.62rem",cursor:"pointer",fontFamily:font}}>Cancel</button>
+                          </div>
+                          {sellAddJournal && (
+                            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:10,alignItems:"start" }}>
+                              {[{key:"right",label:"What Went Right",color:C.green},{key:"wrong",label:"What Went Wrong",color:C.red},{key:"lessons",label:"What I Learned",color:C.gold}].map(({key,label,color}) => (
+                                <div key={key}>
+                                  <label style={{ display:"block",fontWeight:700,fontSize:"0.52rem",letterSpacing:"0.08em",textTransform:"uppercase",color,marginBottom:3 }}>{label}</label>
+                                  <textarea value={sellNotesStruct[key]} onChange={e => { const v = e.target.value; setSellNotesStruct(n => ({...n, [key]: v})); }} placeholder={`${label}...`} rows={2}
+                                    style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:6,padding:"6px 8px",color:C.white,fontSize:"0.68rem",fontFamily:font,outline:"none",resize:"vertical" }}
+                                    onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                                </div>
+                              ))}
+                              <div>
+                                <label style={{ display:"block",fontWeight:700,fontSize:"0.52rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.blue,marginBottom:3 }}>TV Link</label>
+                                <input type="url" value={sellChartUrl} onChange={e=>setSellChartUrl(e.target.value)} placeholder="tradingview.com/..."
+                                  style={{ width:140,boxSizing:"border-box",background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:6,padding:"6px 8px",color:C.blue,fontSize:"0.68rem",fontFamily:font,outline:"none" }}
+                                  onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })()}
                   {/* Expanded additional data + notes/chart area */}
                   {isExpanded && (
                     <tr style={{ background:"rgba(201,152,42,0.03)",borderBottom:`1px solid ${C.borderGold}` }}>
@@ -4268,70 +4342,6 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                   </React.Fragment>
                 );
               })}
-
-              {/* Sell inline form */}
-              {sellId && (() => {
-                const pos = findSellPos();
-                if (!pos) return null;
-                const totalShares = parseFloat(pos.shares) || 0;
-                const qty = parseFloat(sellQty) || 0;
-                const isPartial = qty < totalShares && qty > 0;
-                return (
-                  <tr style={{ background:"rgba(239,68,68,0.06)",borderBottom:`2px solid ${C.red}33` }}>
-                    <td colSpan={26} style={{ padding:"14px 16px" }}>
-                      {/* Row 1: Core sell fields */}
-                      <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:10 }}>
-                        <span style={{ fontWeight:700,fontSize:"0.68rem",color:C.red,letterSpacing:"0.08em",textTransform:"uppercase" }}>Sell {pos.sym}</span>
-                        <div style={{display:"flex",alignItems:"center",gap:5}}>
-                          <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Qty</span>
-                          <CellInput value={sellQty} onChange={setSellQty} width={60} />
-                          <span style={{fontSize:"0.58rem",color:C.muted}}>of {totalShares}</span>
-                        </div>
-                        <div style={{display:"flex",alignItems:"center",gap:5}}>
-                          <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Exit $</span>
-                          <CellInput value={sellPrice} onChange={setSellPrice} gold width={82} />
-                        </div>
-                        <div style={{display:"flex",alignItems:"center",gap:5}}>
-                          <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Comm</span>
-                          <CellInput value={sellComm} onChange={setSellComm} width={62} />
-                        </div>
-                        <MiniSelect value={sellReason} onChange={setSellReason} options={exitReasons} width={130} />
-                        <div style={{display:"flex",alignItems:"center",gap:5}}>
-                          <span style={{fontSize:"0.62rem",color:C.muted,fontWeight:600}}>Tags</span>
-                          <TagSelector selected={sellTags} allTags={allTags} onChange={setSellTags} small />
-                        </div>
-                        <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontSize:"0.62rem",color:C.muted}}>
-                          <input type="checkbox" checked={sellAddJournal} onChange={e=>setSellAddJournal(e.target.checked)} style={{accentColor:C.gold}} />
-                          Add to Journal
-                        </label>
-                        <button onClick={confirmSell} style={{padding:"6px 14px",borderRadius:8,border:`1px solid rgba(239,68,68,0.3)`,background:C.redDim,color:C.red,fontWeight:700,fontSize:"0.66rem",cursor:"pointer",fontFamily:font}}>
-                          {isPartial ? `Sell ${qty} shares` : "Close Position"}
-                        </button>
-                        <button onClick={cancelSell} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,fontSize:"0.62rem",cursor:"pointer",fontFamily:font}}>Cancel</button>
-                      </div>
-                      {/* Row 2: Notes + TV link (collapsible via Journal checkbox) */}
-                      {sellAddJournal && (
-                        <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:10,alignItems:"start" }}>
-                          {[{key:"right",label:"What Went Right",color:C.green},{key:"wrong",label:"What Went Wrong",color:C.red},{key:"lessons",label:"What I Learned",color:C.gold}].map(({key,label,color}) => (
-                            <div key={key}>
-                              <label style={{ display:"block",fontWeight:700,fontSize:"0.52rem",letterSpacing:"0.08em",textTransform:"uppercase",color,marginBottom:3 }}>{label}</label>
-                              <textarea value={sellNotesStruct[key]} onChange={e => { const v = e.target.value; setSellNotesStruct(n => ({...n, [key]: v})); }} placeholder={`${label}...`} rows={2}
-                                style={{ width:"100%",boxSizing:"border-box",background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:6,padding:"6px 8px",color:C.white,fontSize:"0.68rem",fontFamily:font,outline:"none",resize:"vertical" }}
-                                onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
-                            </div>
-                          ))}
-                          <div>
-                            <label style={{ display:"block",fontWeight:700,fontSize:"0.52rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.blue,marginBottom:3 }}>TV Link</label>
-                            <input type="url" value={sellChartUrl} onChange={e=>setSellChartUrl(e.target.value)} placeholder="tradingview.com/..."
-                              style={{ width:140,boxSizing:"border-box",background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:6,padding:"6px 8px",color:C.blue,fontSize:"0.68rem",fontFamily:font,outline:"none" }}
-                              onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
-                          </div>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })()}
 
               {/* Totals — 24 cols via DragTr for drag-reorder alignment: Status(0),Symbol(1),L/S(2),Shares(3),AvgCost(4),Comm(5),PosSize(6),Exp%(7),Realized(8),OrigStop(9),Stop2(10),TrailStop(11),Current(12),Setup(13),Tags(14),DTS(15),RTS(16),ROTE(17),SBE/RSuggest(18),SBE%/Locked(19),P/L(20),R(21),Notes(22),Actions(23) */}
               <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,8,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
@@ -6178,13 +6188,3 @@ function AppInner() {
         <div style={{ position:"relative",zIndex:1 }}>{pageContent}</div>
       </div>
     </div>
-  );
-}
-
-export default function App() {
-  return (
-    <ErrorBoundary>
-      <AppInner />
-    </ErrorBoundary>
-  );
-}
