@@ -3735,20 +3735,54 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   // differences (e.g. manual "5/1/26" vs IBKR "2026-05-01" vs a stored timestamp all resolve to one day).
   // A separate round-trip in the same ticker (different entry day) is a distinct trade and is NOT attributed
   // here — that previously inflated/confused the open position's "Realized" figure (e.g. KLAC).
+  // For each open position, attribute partial-sell journal trades:
+  //   • Primary rule: same ticker AND trade entry day === position entry day (the Sell button
+  //     stamps the position's entry day onto the partial trade, so a clean flow always matches here).
+  //   • Fallback for IBKR-synced positions (the date drifts when IBKR reconciles or timezone shifts):
+  //     when this is the ONLY open lot of that ticker, ANY closed trade of the same ticker whose
+  //     entry day is on/after the position entry is treated as a partial of this lot. That's safe
+  //     because a separate earlier round-trip would have an entry BEFORE this lot's entry (filtered
+  //     out), and there can't be a separate later round-trip on the same ticker while we're still
+  //     holding shares of it. When MULTIPLE open lots of the same ticker exist, we can't disambiguate,
+  //     so we fall back to strict day-match only.
+  // Returns { pl: $, shares: total sold, hasMatch: bool } per position id.
   const realizedByPosition = useMemo(() => {
     const map = {};
     if (!journaledTrades || !positions) return map;
+
+    // Count open lots per ticker so we know when there's ambiguity
+    const openLotsByTicker = {};
     positions.forEach(p => {
       if (!p.sym) return;
-      const posKey = tradeDateISO(p.entry);
-      if (!posKey) { map[p.id] = 0; return; } // no entry date → can't attribute
-      // Normalize tickers: trim + uppercase on both sides so manual/IBKR/edited rows match cleanly
+      const sym = String(p.sym).trim().toUpperCase();
+      openLotsByTicker[sym] = (openLotsByTicker[sym] || 0) + 1;
+    });
+
+    positions.forEach(p => {
+      if (!p.sym) { map[p.id] = { pl: 0, shares: 0 }; return; }
       const posSym = String(p.sym).trim().toUpperCase();
-      const realized = journaledTrades
-        .filter(t => String(t.ticker || "").trim().toUpperCase() === posSym && tradeDateISO(t.entry) === posKey)
-        .reduce((sum, t) => sum + (t.plDollar || 0), 0);
-      // Use position id as key (not ticker) to handle multiple positions of same ticker
-      map[p.id] = realized;
+      const posKey = tradeDateISO(p.entry);
+      if (!posKey) { map[p.id] = { pl: 0, shares: 0 }; return; }
+
+      const sameTicker = journaledTrades.filter(t =>
+        String(t.ticker || "").trim().toUpperCase() === posSym
+      );
+
+      let matches;
+      if (openLotsByTicker[posSym] === 1) {
+        // Single open lot — attribute any closed trade of this ticker with entry on/after pos entry
+        matches = sameTicker.filter(t => {
+          const tKey = tradeDateISO(t.entry);
+          return tKey && tKey >= posKey;
+        });
+      } else {
+        // Multiple open lots — must use strict same-day match to disambiguate
+        matches = sameTicker.filter(t => tradeDateISO(t.entry) === posKey);
+      }
+
+      const pl = matches.reduce((sum, t) => sum + (t.plDollar || 0), 0);
+      const shares = matches.reduce((sum, t) => sum + (parseFloat(t.shares) || 0), 0);
+      map[p.id] = { pl, shares };
     });
     return map;
   }, [journaledTrades, positions]);
@@ -3851,12 +3885,17 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const rtsR = rPerShare > 0 && sharesN > 0 ? (rtsD / sharesN) / rPerShare : 0;
 
     const expPct = compEquity > 0 ? (posValue / compEquity) * 100 : 0;
-    // Realized P/L from partial sells of THIS position (not all trades of same ticker)
-    const realizedPL = realizedByPosition[p.id] || 0;
+    // Realized P/L + shares trimmed from partial sells of THIS position
+    const rb = realizedByPosition[p.id] || { pl: 0, shares: 0 };
+    const realizedPL = rb.pl || 0;
+    const realizedShares = rb.shares || 0;
+    // Original total shares = currently-held + already-sold (for "% trimmed" display)
+    const origShares = sharesN + realizedShares;
+    const trimPct = origShares > 0 ? (realizedShares / origShares) * 100 : 0;
     // Cost financed = realized profits >= initial risk (playing with house money)
     const costFinanced = realizedPL > 0 && initRiskD > 0 && realizedPL >= initRiskD;
-    return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
-  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0 }; }
+    return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
+  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, realizedShares:0, origShares:0, trimPct:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0 }; }
   }), [positions, sizer, portfolioSize, compEquity, realizedByPosition]);
 
   const totals = useMemo(() => {
@@ -4209,7 +4248,22 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",whiteSpace:"nowrap"}}>{p.epN&&(p.stop1||p.stop2)?<><div style={{color:p.currentRotePct>0?C.red:C.green}}>{p.currentRotePct.toFixed(2)}%</div>{p.currentRotePct!==p.rotePct&&<div style={{fontSize:"0.50rem",color:C.muted,fontWeight:500}}>Init: {p.rotePct.toFixed(2)}%</div>}</>:"—"}</td>
                     {isR ? <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rSuggestedStop>p.epN?C.green:p.rSuggestedStop===p.epN?C.goldBright:C.muted}}>{p.rPerShare>0?(p.rSuggestedStop>=p.epN&&p.currentRLevel>=1?`$${p.rSuggestedStop.toFixed(2)} (${p.currentRLevel-1===0?"BE":(p.currentRLevel-1)+"R"})`:`$${p.rSuggestedStop.toFixed(2)}`):"—"}</td> : <td style={{padding:"8px 6px",textAlign:"right",color:p.sbe>0?C.text:C.muted,fontSize:"0.70rem"}}>{p.sbe>0?p.sbe.toLocaleString():"—"}</td>}
                     {isR ? <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rLockedProfit>0?C.green:C.muted}}>{p.rLockedProfit>0?`$${p.rLockedProfit.toFixed(2)}/sh`:"$0"}</td> : <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:!p.sbe?C.muted:p.sbePct>100?C.red:p.sbePct>80?C.gold:C.green,fontSize:"0.70rem"}}>{p.sbe>0?`${p.sbePct.toFixed(2)}%`:"—"}</td>}
-                    <td style={{padding:"8px 6px",textAlign:"right",whiteSpace:"nowrap"}}><div style={{fontWeight:700,color:p.plPct>=0?C.green:C.red,fontSize:"0.72rem"}}>{plDisplay}</div>{p.realizedPL!==0&&<div style={{fontSize:"0.52rem",fontWeight:700,color:p.realizedPL>=0?C.green:C.red,marginTop:2}}>Rlzd {p.realizedPL>=0?"+":"-"}{fmt$(Math.abs(p.realizedPL),2)}{p.costFinanced&&<span style={{marginLeft:3,color:C.green}}>FIN</span>}</div>}</td>
+                    <td style={{padding:"8px 6px",textAlign:"right",whiteSpace:"nowrap"}}>
+                      <div style={{fontWeight:700,color:p.plPct>=0?C.green:C.red,fontSize:"0.72rem"}}>{plDisplay}</div>
+                      {p.realizedPL!==0 && (
+                        <div style={{marginTop:3,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:1}}>
+                          <div style={{fontSize:"0.54rem",fontWeight:700,color:p.realizedPL>=0?C.green:C.red,letterSpacing:"0.02em"}}>
+                            Rlzd {p.realizedPL>=0?"+":"-"}{fmt$(Math.abs(p.realizedPL),2)}
+                            {p.costFinanced && <span style={{marginLeft:4,padding:"1px 4px",borderRadius:3,background:"rgba(34,197,94,0.15)",color:C.green,fontSize:"0.46rem",fontWeight:800,letterSpacing:"0.06em"}}>FIN</span>}
+                          </div>
+                          {p.trimPct>0 && (
+                            <div style={{fontSize:"0.50rem",fontWeight:700,color:C.gold,letterSpacing:"0.04em",textTransform:"uppercase"}}>
+                              {p.trimPct.toFixed(0)}% Trimmed
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rMult>=2?C.green:p.rMult>=1?C.goldBright:p.rMult>=0?C.white:C.red}}>{p.epN&&(p.stop1||p.stop2)?`${p.rMult.toFixed(2)}R`:"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"center",whiteSpace:"nowrap"}}>
                       <div style={{display:"flex",gap:3,alignItems:"center",justifyContent:"center"}}>
@@ -6144,57 +6198,3 @@ function AppInner() {
 
   // ─── DESKTOP / TABLET LAYOUT ───
   return (
-    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text, zoom: appZoom }}>
-      <div onMouseEnter={() => setSidebarOpen(true)} onMouseLeave={() => setSidebarOpen(false)} style={{ width: sidebarW, minHeight: "100vh", padding: sidebarOpen ? "24px 14px" : "24px 8px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, alignSelf: "flex-start", transition: "width 0.2s ease, padding 0.2s ease", overflow: "hidden", position: "relative", zIndex: 50 }}>
-        {sidebarOpen
-          ? <Wordmark size="0.95rem" style={{ marginBottom: 24, padding: "0 4px", whiteSpace: "nowrap", overflow: "hidden" }} />
-          : <div style={{ marginBottom: 24, textAlign: "center" }}><img src="/logo-mark.png" alt="VIV" style={{ width: 30, height: "auto", filter: "drop-shadow(0 0 8px rgba(201,152,42,0.45))" }} /></div>}
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {NAV.map(item => {
-            const active = page === item.id;
-            return (
-              <button key={item.id} onClick={() => setPage(item.id)} style={{
-                display: "flex", alignItems: "center", gap: 11, padding: sidebarOpen ? "11px 13px" : "11px 0", borderRadius: 12,
-                border: active ? `1px solid ${C.borderGold}` : "1px solid transparent",
-                cursor: "pointer", fontFamily: font, width: "100%", textAlign: "left",
-                justifyContent: sidebarOpen ? "flex-start" : "center",
-                background: active ? "linear-gradient(135deg, rgba(201,152,42,0.22), rgba(201,152,42,0.06))" : "transparent",
-                boxShadow: active ? "inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 14px rgba(201,152,42,0.13)" : "none",
-                backdropFilter: active ? "blur(8px)" : "none", WebkitBackdropFilter: active ? "blur(8px)" : "none",
-                color: active ? C.goldBright : C.muted,
-                fontWeight: active ? 700 : 500, fontSize: "0.82rem", letterSpacing: "0.01em", transition: "all 0.18s ease",
-                whiteSpace: "nowrap", overflow: "hidden",
-              }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.color = C.text; }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.color = C.muted; }}
-              ><span style={{ display: "flex", flexShrink: 0 }}><NavIcon name={item.id} size={17} /></span>{sidebarOpen && <span>{item.label}</span>}</button>
-            );
-          })}
-        </div>
-        <div style={{ flex: 1 }} />
-        {sidebarOpen ? (
-          <div style={{ padding: "10px 12px", borderRadius: 10, background: C.glass, border: `1px solid ${C.border}` }}>
-            <div style={{ fontWeight: 700, fontSize: "0.72rem", color: C.white, marginBottom: 2 }}>{displayName}</div>
-            <div style={{ fontSize: "0.56rem", color: C.muted, marginBottom: 6, wordBreak: "break-all" }}>{userEmail}</div>
-            <button onClick={handleLogout} style={{ width: "100%", padding: "5px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
-          </div>
-        ) : (
-          <button onClick={handleLogout} title="Sign Out" style={{ padding: "8px 0", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.70rem", cursor: "pointer", fontFamily: font, width: "100%", textAlign: "center" }}>↩</button>
-        )}
-      </div>
-      <div style={{ flex: 1, padding: `${contentPadV}px ${contentPadH}px`, overflowY: "auto", minWidth: 0, position: "relative" }}>
-        {/* Animated background */}
-        <AppBackground />
-        <div style={{ position:"relative",zIndex:1 }}>{pageContent}</div>
-      </div>
-    </div>
-  );
-}
-
-export default function App() {
-  return (
-    <ErrorBoundary>
-      <AppInner />
-    </ErrorBoundary>
-  );
-}
