@@ -6198,3 +6198,57 @@ function AppInner() {
 
   // ─── DESKTOP / TABLET LAYOUT ───
   return (
+    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text, zoom: appZoom }}>
+      <div onMouseEnter={() => setSidebarOpen(true)} onMouseLeave={() => setSidebarOpen(false)} style={{ width: sidebarW, minHeight: "100vh", padding: sidebarOpen ? "24px 14px" : "24px 8px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, alignSelf: "flex-start", transition: "width 0.2s ease, padding 0.2s ease", overflow: "hidden", position: "relative", zIndex: 50 }}>
+        {sidebarOpen
+          ? <Wordmark size="0.95rem" style={{ marginBottom: 24, padding: "0 4px", whiteSpace: "nowrap", overflow: "hidden" }} />
+          : <div style={{ marginBottom: 24, textAlign: "center" }}><img src="/logo-mark.png" alt="VIV" style={{ width: 30, height: "auto", filter: "drop-shadow(0 0 8px rgba(201,152,42,0.45))" }} /></div>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {NAV.map(item => {
+            const active = page === item.id;
+            return (
+              <button key={item.id} onClick={() => setPage(item.id)} style={{
+                display: "flex", alignItems: "center", gap: 11, padding: sidebarOpen ? "11px 13px" : "11px 0", borderRadius: 12,
+                border: active ? `1px solid ${C.borderGold}` : "1px solid transparent",
+                cursor: "pointer", fontFamily: font, width: "100%", textAlign: "left",
+                justifyContent: sidebarOpen ? "flex-start" : "center",
+                background: active ? "linear-gradient(135deg, rgba(201,152,42,0.22), rgba(201,152,42,0.06))" : "transparent",
+                boxShadow: active ? "inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 14px rgba(201,152,42,0.13)" : "none",
+                backdropFilter: active ? "blur(8px)" : "none", WebkitBackdropFilter: active ? "blur(8px)" : "none",
+                color: active ? C.goldBright : C.muted,
+                fontWeight: active ? 700 : 500, fontSize: "0.82rem", letterSpacing: "0.01em", transition: "all 0.18s ease",
+                whiteSpace: "nowrap", overflow: "hidden",
+              }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.color = C.text; }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.color = C.muted; }}
+              ><span style={{ display: "flex", flexShrink: 0 }}><NavIcon name={item.id} size={17} /></span>{sidebarOpen && <span>{item.label}</span>}</button>
+            );
+          })}
+        </div>
+        <div style={{ flex: 1 }} />
+        {sidebarOpen ? (
+          <div style={{ padding: "10px 12px", borderRadius: 10, background: C.glass, border: `1px solid ${C.border}` }}>
+            <div style={{ fontWeight: 700, fontSize: "0.72rem", color: C.white, marginBottom: 2 }}>{displayName}</div>
+            <div style={{ fontSize: "0.56rem", color: C.muted, marginBottom: 6, wordBreak: "break-all" }}>{userEmail}</div>
+            <button onClick={handleLogout} style={{ width: "100%", padding: "5px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
+          </div>
+        ) : (
+          <button onClick={handleLogout} title="Sign Out" style={{ padding: "8px 0", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.70rem", cursor: "pointer", fontFamily: font, width: "100%", textAlign: "center" }}>↩</button>
+        )}
+      </div>
+      <div style={{ flex: 1, padding: `${contentPadV}px ${contentPadH}px`, overflowY: "auto", minWidth: 0, position: "relative" }}>
+        {/* Animated background */}
+        <AppBackground />
+        <div style={{ position:"relative",zIndex:1 }}>{pageContent}</div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
+  );
+}
