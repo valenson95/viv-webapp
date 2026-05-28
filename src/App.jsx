@@ -6188,3 +6188,13 @@ function AppInner() {
         <div style={{ position:"relative",zIndex:1 }}>{pageContent}</div>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
+  );
+}
