@@ -4258,7 +4258,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px",zoom:posZoom }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {(() => { const defs = [["Status","left","riskStatus","Risk status of this position"],["Symbol","left","sym","Ticker symbol"],["L/S","center",null,"Long or Short position"],["Shares","right","sharesN","Shares held"],["Avg. Cost","right","epN","Average entry price per share"],["Comm","right","commN","Commission"],["Pos. Size","right","posValue","Position Size — shares × avg cost (commission shown beneath)"],["Exp %","right","expPct","Exposure — position size as a percent of current equity"],["Realized","right","realizedPL","Realized P/L from partial sells"],["Orig Stop","right","stop1","Original stop price"],["Stop 2","right","stop2","Secondary stop price"],["Stops","right","tsN","Stop levels — Original, 2nd and Trail stop"],["Current","right","cpN","Current market price"],["Setup / Tags","left","setup","Trade setup type and tags"],["Tags","left",null,"Tags"],["DTS","right","dtsPct","DTS — Distance To Stop"],["RTS","right","rtsD","RTS — Risk To Stop (dollars at risk if stopped out)"],["ROTE","right","rotePct","ROTE — Risk On Total Equity"],displayMode==="R"?["R Suggest","right","rSuggestedStop","Suggested mechanical trail-stop level"]:["SBE","right","sbe","SBE — Sell-to-BreakEven share count"],displayMode==="R"?["Locked","right","rLockedProfit","Profit locked in per share"]:["SBE %","right","sbePct","SBE % — portion of the position to sell for breakeven"],["P/L","right","plPct","Profit / Loss — unrealized (realized shown beneath)"],["R","right","rMult","R-multiple — P/L in units of initial risk"],["","center",null,""],["","center",null,""]]; const alwaysHide = new Set([5,8,9,10,14]); const compactHide = new Set([2,9,18,19]); const hideSet = new Set([...alwaysHide, ...(compactTable ? compactHide : [])]); return posDrag.order.filter(ci => !hideSet.has(ci)).map((ci, vi) => { const [text, align, sortKey, tip] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 7px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.09em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"grab",userSelect:"none"}}>{tip ? <Abbr tip={tip} underline={false}>{text}</Abbr> : text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
+              {(() => { const defs = [["Status","left","riskStatus","Risk status of this position"],["Symbol","left","sym","Ticker symbol"],["L/S","center",null,"Long or Short position"],["Shares","right","sharesN","Shares held"],["Avg. Cost","right","epN","Average entry price per share"],["Comm","right","commN","Commission"],["Pos. Size","right","posValue","Position Size — shares × avg cost (commission shown beneath)"],["Exp %","right","expPct","Exposure — position size as a percent of current equity"],["Realized","right","realizedPL","Realized P/L locked in from partial sells on this open lot · gold bar = % of the original position trimmed off"],["Orig Stop","right","stop1","Original stop price"],["Stop 2","right","stop2","Secondary stop price"],["Stops","right","tsN","Stop levels — Original, 2nd and Trail stop"],["Current","right","cpN","Current market price"],["Setup / Tags","left","setup","Trade setup type and tags"],["Tags","left",null,"Tags"],["DTS","right","dtsPct","DTS — Distance To Stop"],["RTS","right","rtsD","RTS — Risk To Stop (dollars at risk if stopped out)"],["ROTE","right","rotePct","ROTE — Risk On Total Equity"],displayMode==="R"?["R Suggest","right","rSuggestedStop","Suggested mechanical trail-stop level"]:["SBE","right","sbe","SBE — Sell-to-BreakEven share count"],displayMode==="R"?["Locked","right","rLockedProfit","Profit locked in per share"]:["SBE %","right","sbePct","SBE % — portion of the position to sell for breakeven"],["P/L","right","plPct","Unrealized Profit / Loss on the remaining shares (realized partials live in the Realized column)"],["R","right","rMult","R-multiple — P/L in units of initial risk"],["","center",null,""],["","center",null,""]]; const alwaysHide = new Set([5,9,10,14]); const compactHide = new Set([2,9,18,19]); const hideSet = new Set([...alwaysHide, ...(compactTable ? compactHide : [])]); return posDrag.order.filter(ci => !hideSet.has(ci)).map((ci, vi) => { const [text, align, sortKey, tip] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 7px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.09em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"grab",userSelect:"none"}}>{tip ? <Abbr tip={tip} underline={false}>{text}</Abbr> : text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
             </tr></thead>
             <tbody>
               {(posSorts.length > 0 ? multiSort(enriched, posSorts) : enriched).map((p, idx) => {
@@ -4274,7 +4274,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const isExpanded = expandedPosId === p.id;
                 return (
                   <React.Fragment key={p._lid || p.id}>
-                  <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,8,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
+                  <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
                     <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
                     <td style={{padding:"6px 4px"}}><div style={{display:"flex",alignItems:"center",gap:4}}><SourceDot source={p.source} />{p.sym && getTickerLogo(p.sym) && <img src={getTickerLogo(p.sym)} alt="" style={{width:18,height:18,borderRadius:4,flexShrink:0}} onError={e=>{e.target.style.display="none"}} />}<TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></div></td>
                     <td style={{padding:"6px 2px",textAlign:"center"}}><select value={p.tradeType||"Long"} onChange={e=>updateField(p.id,"tradeType",e.target.value)} style={{padding:"3px 4px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,color:(p.tradeType||"Long")==="Short"?C.red:C.green,fontSize:"0.52rem",fontWeight:700,fontFamily:font,cursor:"pointer",outline:"none"}}><option value="Long">L</option><option value="Short">S</option></select></td>
@@ -4283,7 +4283,31 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     <td style={{padding:"6px 4px",textAlign:"right"}}><CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={62} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0?<div style={{fontWeight:700,fontSize:"0.72rem",color:C.white}}>{fmt$(p.posValue)}</div>:<div style={{color:C.muted}}>—</div>}<div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:4,marginTop:3}}><span style={{fontSize:"0.46rem",color:C.muted,letterSpacing:"0.06em",textTransform:"uppercase"}}>Comm</span><CellInput value={p.comm||""} onChange={v=>updateField(p.id,"comm",v)} width={52} /></div></td>
                     <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.posValue>0&&compEquity>0?(()=>{let col=C.white,note=null;if(targetPosPct>0){const lo=targetPosPct*0.8,hi=targetPosPct*1.2;if(p.expPct>hi){col=C.red;note="Oversized";}else if(p.expPct<lo){col=C.blue;note="Undersized";}else{col=C.green;note="On Size";}}else if(p.expPct>100){col=C.red;}return<div><div style={{fontWeight:600,fontSize:"0.70rem",color:col}}>{p.expPct.toFixed(2)}%</div>{note&&<div style={{fontSize:"0.5rem",fontWeight:700,color:col,letterSpacing:"0.05em",textTransform:"uppercase",marginTop:1}}>{note}</div>}</div>;})():"—"}</td>
-                    <td style={{padding:"8px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{p.realizedPL!==0?<><div style={{fontWeight:700,fontSize:"0.70rem",color:p.realizedPL>=0?C.green:C.red}}>{p.realizedPL>=0?"+":"-"}{fmt$(Math.abs(p.realizedPL))}</div>{p.costFinanced&&<div style={{fontSize:"0.50rem",fontWeight:700,color:C.green,letterSpacing:"0.04em"}}>FINANCED</div>}</>:"—"}</td>
+                    <td style={{padding:"8px 6px",textAlign:"right",whiteSpace:"nowrap"}}>{p.realizedPL!==0 ? (() => {
+                      const isPos = p.realizedPL >= 0;
+                      const col = isPos ? C.green : C.red;
+                      const tint = isPos ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)";
+                      const ring = isPos ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.28)";
+                      const trimClamped = Math.min(100, Math.max(0, p.trimPct || 0));
+                      return (
+                        <div style={{ display:"inline-flex", flexDirection:"column", alignItems:"stretch", gap:3, padding:"4px 8px 5px", borderRadius:8, background:tint, border:`1px solid ${ring}`, minWidth:78 }}>
+                          <div style={{ fontWeight:800, fontSize:"0.74rem", color:col, lineHeight:1.1, textAlign:"right" }}>
+                            {isPos?"+":"-"}{fmt$(Math.abs(p.realizedPL),2)}
+                          </div>
+                          {p.trimPct > 0 && (
+                            <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                              <div style={{ flex:1, height:3, borderRadius:2, background:"rgba(255,255,255,0.08)", overflow:"hidden" }}>
+                                <div style={{ width:`${trimClamped}%`, height:"100%", background:C.gold, borderRadius:2 }} />
+                              </div>
+                              <span style={{ fontSize:"0.52rem", fontWeight:800, color:C.goldBright, letterSpacing:"0.02em", whiteSpace:"nowrap" }}>{p.trimPct.toFixed(0)}%</span>
+                            </div>
+                          )}
+                          {p.costFinanced && (
+                            <div style={{ fontSize:"0.46rem", fontWeight:800, color:C.green, letterSpacing:"0.08em", textTransform:"uppercase", background:"rgba(34,197,94,0.15)", padding:"1px 5px", borderRadius:3, alignSelf:"flex-end" }}>Financed</div>
+                          )}
+                        </div>
+                      );
+                    })() : <span style={{ color:C.muted }}>—</span>}</td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop} onChange={v=>updateField(p.id,"stop",v)} width={72} /></td>
                     <td style={{padding:"6px 4px",textAlign:"right"}}><LockableCellInput value={p.stop2||""} onChange={v=>updateField(p.id,"stop2",v)} width={72} /></td>
                     <td style={{padding:"6px 4px"}}><div style={{display:"flex",flexDirection:"column",gap:3,alignItems:"flex-end"}}>
@@ -4302,19 +4326,6 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     {isR ? <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rLockedProfit>0?C.green:C.muted}}>{p.rLockedProfit>0?`$${p.rLockedProfit.toFixed(2)}/sh`:"$0"}</td> : <td style={{padding:"8px 6px",textAlign:"right",fontWeight:600,color:!p.sbe?C.muted:p.sbePct>100?C.red:p.sbePct>80?C.gold:C.green,fontSize:"0.70rem"}}>{p.sbe>0?`${p.sbePct.toFixed(2)}%`:"—"}</td>}
                     <td style={{padding:"8px 6px",textAlign:"right",whiteSpace:"nowrap"}}>
                       <div style={{fontWeight:700,color:p.plPct>=0?C.green:C.red,fontSize:"0.72rem"}}>{plDisplay}</div>
-                      {p.realizedPL!==0 && (
-                        <div style={{marginTop:3,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:1}}>
-                          <div style={{fontSize:"0.54rem",fontWeight:700,color:p.realizedPL>=0?C.green:C.red,letterSpacing:"0.02em"}}>
-                            Rlzd {p.realizedPL>=0?"+":"-"}{fmt$(Math.abs(p.realizedPL),2)}
-                            {p.costFinanced && <span style={{marginLeft:4,padding:"1px 4px",borderRadius:3,background:"rgba(34,197,94,0.15)",color:C.green,fontSize:"0.46rem",fontWeight:800,letterSpacing:"0.06em"}}>FIN</span>}
-                          </div>
-                          {p.trimPct>0 && (
-                            <div style={{fontSize:"0.50rem",fontWeight:700,color:C.gold,letterSpacing:"0.04em",textTransform:"uppercase"}}>
-                              {p.trimPct.toFixed(0)}% Trimmed
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rMult>=2?C.green:p.rMult>=1?C.goldBright:p.rMult>=0?C.white:C.red}}>{p.epN&&(p.stop1||p.stop2)?`${p.rMult.toFixed(2)}R`:"—"}</td>
                     <td style={{padding:"6px 4px",textAlign:"center",whiteSpace:"nowrap"}}>
@@ -4450,7 +4461,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               })}
 
               {/* Totals — 24 cols via DragTr for drag-reorder alignment: Status(0),Symbol(1),L/S(2),Shares(3),AvgCost(4),Comm(5),PosSize(6),Exp%(7),Realized(8),OrigStop(9),Stop2(10),TrailStop(11),Current(12),Setup(13),Tags(14),DTS(15),RTS(16),ROTE(17),SBE/RSuggest(18),SBE%/Locked(19),P/L(20),R(21),Notes(22),Actions(23) */}
-              <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,8,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
+              <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
                 {/* 0: Status */}
                 <td style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 {/* 1: Symbol */}
@@ -4468,7 +4479,19 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 {/* 7: Exp % */}
                 <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{(()=>{const tv=enriched.reduce((s,p)=>s+p.posValue,0);const expPct=compEquity>0?(tv/compEquity)*100:0;return<div style={{fontWeight:800,fontSize:"0.72rem",color:expPct>100?C.red:expPct>80?C.gold:C.green}}>{expPct.toFixed(2)}%{expPct>100&&<span style={{marginLeft:3,fontSize:"0.64rem"}}>{(expPct/100).toFixed(1)}x</span>}</div>})()}</td>
                 {/* 8: Realized */}
-                <td style={{padding:"12px 4px",textAlign:"right",whiteSpace:"nowrap"}}>{(()=>{const tr=enriched.reduce((s,p)=>s+p.realizedPL,0);return tr!==0?<div style={{fontWeight:800,fontSize:"0.72rem",color:tr>=0?C.green:C.red}}>{tr>=0?"+":"-"}{fmt$(Math.abs(tr))}</div>:<span style={{color:C.muted}}>—</span>})()}</td>
+                <td style={{padding:"12px 6px",textAlign:"right",whiteSpace:"nowrap"}}>{(() => {
+                  const tr = enriched.reduce((s,p) => s + p.realizedPL, 0);
+                  if (tr === 0) return <span style={{color:C.muted}}>—</span>;
+                  const isPos = tr >= 0;
+                  const col = isPos ? C.green : C.red;
+                  const tint = isPos ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)";
+                  const ring = isPos ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.28)";
+                  return (
+                    <div style={{ display:"inline-block", padding:"5px 10px", borderRadius:8, background:tint, border:`1px solid ${ring}` }}>
+                      <div style={{ fontWeight:800, fontSize:"0.78rem", color:col, lineHeight:1.1 }}>{isPos?"+":"-"}{fmt$(Math.abs(tr),2)}</div>
+                    </div>
+                  );
+                })()}</td>
                 {/* 9: Orig Stop */}
                 <td />
                 {/* 10: Stop 2 */}
@@ -4500,7 +4523,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 {/* 19: SBE% / Locked */}
                 <td />
                 {/* 20: P/L */}
-                <td style={{padding:"12px 6px",textAlign:"right",whiteSpace:"nowrap"}}><div style={{fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{`${totals.totalPL>=0?"+":"-"}${fmt$(Math.abs(totals.totalPL),2)}`}</div>{(()=>{const tr=enriched.reduce((s,p)=>s+p.realizedPL,0);return tr!==0?<div style={{fontSize:"0.54rem",fontWeight:700,color:tr>=0?C.green:C.red,marginTop:2}}>Rlzd {tr>=0?"+":"-"}{fmt$(Math.abs(tr),2)}</div>:null;})()}</td>
+                <td style={{padding:"12px 6px",textAlign:"right",whiteSpace:"nowrap"}}><div style={{fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{`${totals.totalPL>=0?"+":"-"}${fmt$(Math.abs(totals.totalPL),2)}`}</div></td>
                 {/* 21: R */}
                 <td />
                 {/* 22: Notes */}
