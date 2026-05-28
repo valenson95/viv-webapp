@@ -494,10 +494,15 @@ const tradeDateISO = (d) => {
 
 // Reconstruct closed round-trips (flat-to-flat per symbol) + open positions, then diff against current data.
 function buildIbkrPreview(data, positions, journaledTrades) {
-  // Closed trades — group executions per symbol, close out a round-trip each time net position returns to flat
+  // Closed trades — group executions per symbol, close out a round-trip each time net position returns to flat.
+  // Also emit "partial" entries for sells that REDUCED an open lot's shares without flattening it (so they
+  // show up as realized P/L on the still-open position in the dashboard). When a lot eventually flattens,
+  // the closed round-trip captures the whole story and partials for that completed cycle are NOT emitted —
+  // so no double-counting.
   const bySym = {};
   (data.trades || []).forEach(t => { (bySym[t.symbol] = bySym[t.symbol] || []).push(t); });
   const closed = [];
+  const partials = [];
   Object.entries(bySym).forEach(([sym, execs]) => {
     execs.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     let pos = 0, cycle = [];
@@ -527,6 +532,42 @@ function buildIbkrPreview(data, positions, journaledTrades) {
         cycle = [];
       }
     });
+    // After processing all execs for this symbol: if cycle is non-empty, the lot is STILL OPEN.
+    // Walk the cycle and emit a partial entry for each "close direction" exec — these are partial
+    // take-profits / stop-trims that reduced shares but didn't flatten the lot. The trade's entry
+    // = lot's first opening exec date (matches the position's openDate), so realizedByPosition matches.
+    if (cycle.length > 0) {
+      const firstExec = cycle[0];
+      // Skip lots whose ORIGIN is before the sync floor (same rule as closed round-trips)
+      if (firstExec.date >= IBKR_SYNC_FLOOR) {
+        const isLong = firstExec.signedQty > 0;
+        // Running volume-weighted avg cost of opening legs preceding each close
+        let openShares = 0, openCost = 0;
+        cycle.forEach(c => {
+          const isOpening = (isLong && c.signedQty > 0) || (!isLong && c.signedQty < 0);
+          const isClosing = (isLong && c.signedQty < 0) || (!isLong && c.signedQty > 0);
+          if (isOpening) {
+            openShares += c.quantity;
+            openCost += c.price * c.quantity;
+          } else if (isClosing && openShares > 0) {
+            const avgEntryP = openCost / openShares;
+            const closedQty = c.quantity;
+            const plDollar = c.realizedPnl || ((isLong ? (c.price - avgEntryP) : (avgEntryP - c.price)) * closedQty - c.commission);
+            const plPct = avgEntryP > 0 ? (plDollar / (avgEntryP * closedQty)) * 100 : 0;
+            partials.push({
+              ticker: sym, entry: firstExec.date, entryTime: firstExec.time, exit: c.date, exitTime: c.time,
+              entryP: +avgEntryP.toFixed(4), exitP: +c.price.toFixed(4), shares: closedQty,
+              plPct: +plPct.toFixed(2), plDollar: +plDollar.toFixed(2), commission: +c.commission.toFixed(2),
+              execId: c.execID, tradeId: c.tradeID, tradeType: isLong ? "Long" : "Short", isPartial: true,
+            });
+            // Reduce the lot's running open shares by what we just closed (proportionally)
+            const ratio = (openShares - closedQty) / openShares;
+            openCost *= Math.max(0, ratio);
+            openShares -= closedQty;
+          }
+        });
+      }
+    }
   });
 
   // Open positions — these are current holdings, so show them unless they have a KNOWN open date before the floor.
@@ -549,6 +590,13 @@ function buildIbkrPreview(data, positions, journaledTrades) {
       return { ...c, action: sharesOk ? "reconcile" : "review", matchId: m.id, matchStop: Number(m.stop) || 0 };
     }
     if (cands.length > 1) return { ...c, action: "review", matchId: null };
+    return { ...c, action: "new", matchId: null };
+  });
+  // Partial sells from still-open lots — dedup by execId only (each partial has a unique IBKR exec).
+  // A re-sync of the same partial = "synced" (no-op). A brand new partial = "new" (import to Journal).
+  const partialRows = partials.map(c => {
+    const synced = (journaledTrades || []).find(t => t.ibExecId && t.ibExecId === c.execId);
+    if (synced) return { ...c, action: "synced", matchId: synced.id };
     return { ...c, action: "new", matchId: null };
   });
   const posRows = openPos.map(p => {
@@ -591,7 +639,7 @@ function buildIbkrPreview(data, positions, journaledTrades) {
         linkExecId: link ? link.execId : null, exit: link ? link.exit : "", action: "close" };
     });
 
-  return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows, closeRows };
+  return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows, closeRows, partialRows };
 }
 
 // Interactive sync modal — preview + per-row decisions + confirm. Writes happen via onConfirm (App), surgically.
@@ -604,11 +652,11 @@ function ibkrChoiceOpts(r) {
   return [["new", "Import"], ["skip", "Skip"]];
 }
 function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, onConfirm }) {
-  const [choices, setChoices] = useState({ pos: {}, trade: {}, close: {} });
+  const [choices, setChoices] = useState({ pos: {}, trade: {}, close: {}, partial: {} });
   useEffect(() => {
     if (data) {
       const def = rows => (rows || []).reduce((m, r, i) => { m[i] = ibkrDefaultChoice(r.action); return m; }, {});
-      setChoices({ pos: def(data.posRows), trade: def(data.tradeRows), close: def(data.closeRows) });
+      setChoices({ pos: def(data.posRows), trade: def(data.tradeRows), close: def(data.closeRows), partial: def(data.partialRows) });
     }
   }, [data]);
   if (!open) return null;
@@ -627,9 +675,9 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
   );
   const confirm = () => {
     const resolve = (rows, ch) => (rows || []).map((r, i) => ({ ...r, choice: ch[i] || "skip" }));
-    onConfirm(resolve(data.posRows, choices.pos), resolve(data.tradeRows, choices.trade), resolve(data.closeRows, choices.close));
+    onConfirm(resolve(data.posRows, choices.pos), resolve(data.tradeRows, choices.trade), resolve(data.closeRows, choices.close), resolve(data.partialRows, choices.partial));
   };
-  const willWrite = data ? [...Object.values(choices.pos), ...Object.values(choices.trade), ...Object.values(choices.close)].filter(c => c && c !== "skip").length : 0;
+  const willWrite = data ? [...Object.values(choices.pos), ...Object.values(choices.trade), ...Object.values(choices.close), ...Object.values(choices.partial)].filter(c => c && c !== "skip").length : 0;
 
   return createPortal(
     <div onClick={status === "writing" ? undefined : onClose} style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(0,0,0,0.66)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
@@ -656,6 +704,7 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
               <div style={{ fontSize: "0.76rem", color: C.text, lineHeight: 1.8 }}>
                 Trades: <strong style={{ color: C.white }}>{result.tInserted}</strong> new · <strong style={{ color: C.white }}>{result.tReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.tUpdated}</strong> refreshed<br />
                 Positions: <strong style={{ color: C.white }}>{result.pInserted}</strong> new · <strong style={{ color: C.white }}>{result.pReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.pUpdated}</strong> refreshed · <strong style={{ color: C.white }}>{result.pClosed || 0}</strong> closed out
+                {(result.partialsInserted || 0) > 0 && <><br />Partial sells: <strong style={{ color: C.white }}>{result.partialsInserted}</strong> imported</>}
               </div>
               {result.errors && result.errors.length > 0 && <div style={{ marginTop: 12, fontSize: "0.66rem", color: C.red }}>{result.errors.length} row(s) failed and were skipped: {result.errors.slice(0, 3).join("; ")}{result.errors.length > 3 ? "…" : ""}</div>}
               <button onClick={onClose} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font }}>Done</button>
@@ -670,13 +719,16 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                 <StatTile label="Account" value={data.account || "—"} />
                 <StatTile label="Open Positions" value={String(data.posRows.length)} />
                 <StatTile label="Closed Trades" value={String(data.tradeRows.length)} />
+                <StatTile label="Partial Sells" value={String((data.partialRows || []).length)} />
               </div>
               {[{ kind: "pos", title: "Open Positions", rows: data.posRows, cols: ["sym", "shares", "ep", "entry"], head: ["Symbol", "Shares", "Avg Cost", "Opened"] },
                 { kind: "trade", title: "Closed Trades (round-trips)", rows: data.tradeRows, cols: ["ticker", "shares", "entryP", "exitP", "plDollar", "entry"], head: ["Symbol", "Shares", "Entry", "Exit", "P/L $", "In"] },
+                ...(data.partialRows && data.partialRows.length ? [{ kind: "partial", title: "Partial Sells (from still-open positions)", rows: data.partialRows, cols: ["ticker", "shares", "entryP", "exitP", "plDollar", "exit"], head: ["Symbol", "Shares", "Avg Cost", "Exit", "P/L $", "Sold"] }] : []),
                 ...(data.closeRows && data.closeRows.length ? [{ kind: "close", title: "Closed at IBKR — remove from Open Positions", rows: data.closeRows, cols: ["sym", "shares", "entry", "exit"], head: ["Symbol", "Shares", "Opened", "Closed"] }] : [])].map(sec => (
                 <div key={sec.title} style={{ marginBottom: 18 }}>
                   <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: sec.kind === "close" ? C.goldBright : C.gold, marginBottom: 8 }}>{sec.title} ({sec.rows.length})</div>
                   {sec.kind === "close" && <div style={{ fontSize: "0.64rem", color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>These came in from IBKR and are now fully closed there. <strong style={{ color: C.text }}>Close out</strong> files the closed trade into your Journal and removes it from Open Positions (the record is archived, never destroyed, and recoverable). Choose <strong style={{ color: C.text }}>Keep open</strong> to leave it on the Dashboard.</div>}
+                  {sec.kind === "partial" && <div style={{ fontSize: "0.64rem", color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>Trims you took in IBKR that did <strong style={{ color: C.text }}>not</strong> fully close the position. Importing each one logs it to your Journal and surfaces it on the still-open position as realized P/L + "% Trimmed" in the Dashboard. Dedup is by IBKR execution id, so re-syncs are safe.</div>}
                   {sec.rows.length === 0 ? <div style={{ fontSize: "0.72rem", color: C.muted, padding: "8px 0" }}>None from {IBKR_SYNC_FLOOR} onward.</div> : (
                     <div style={{ overflowX: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
@@ -5482,12 +5534,12 @@ function AppInner() {
 
   // Phase 2 — surgical writes from the confirmed preview. INSERT new IBKR rows, UPDATE matched rows by id only.
   // Never deletes; reconcile updates only the factual columns so notes/tags/setup/stops are preserved.
-  const confirmIbkrSync = useCallback(async (posRows, tradeRows, closeRows = []) => {
+  const confirmIbkrSync = useCallback(async (posRows, tradeRows, closeRows = [], partialRows = []) => {
     const uid = session?.user?.id;
     if (!uid) { setIbkrStatus("error"); setIbkrError("Not signed in."); return; }
     setIbkrStatus("writing");
     const nowIso = new Date().toISOString();
-    const res = { tInserted: 0, tReconciled: 0, tUpdated: 0, pInserted: 0, pReconciled: 0, pUpdated: 0, pClosed: 0, errors: [] };
+    const res = { tInserted: 0, tReconciled: 0, tUpdated: 0, pInserted: 0, pReconciled: 0, pUpdated: 0, pClosed: 0, partialsInserted: 0, errors: [] };
     // execIds of closing round-trips that actually land in the Journal this sync — the gate for auto-close.
     const journaledExecIds = new Set();
 
@@ -5552,6 +5604,24 @@ function AppInner() {
         const mapped = ins.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "ibkr", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null }));
         setPositions(prev => [...prev, ...mapped]);
         lastLoadedCount.current = (lastLoadedCount.current || 0) + mapped.length;
+      }
+    }
+
+    // ── PARTIAL SELLS ── append-only inserts into the trades table. Each partial is a stand-alone
+    // closed trade entry with the lot's open date as `entry_date` (so the dashboard's realizedByPosition
+    // matcher attributes it to the still-open position). Dedup is by ib_exec_id (a unique IBKR execution id).
+    const partialInserts = [];
+    for (const r of (partialRows || [])) {
+      if (r.choice === "skip" || r.action === "synced") continue;
+      partialInserts.push({ user_id: uid, ticker: r.ticker, entry_date: r.entry, entry_time: r.entryTime || "", exit_date: r.exit, exit_time: r.exitTime || "", entry_price: r.entryP, exit_price: r.exitP, shares: r.shares, commission: r.commission, pl_pct: r.plPct, pl_dollar: r.plDollar, r_mult: null, setup: "", tags: [], exit_reason: "Partial Trim", notes: "", trade_type: r.tradeType, source: "ibkr", ib_exec_id: r.execId, ib_trade_id: r.tradeId, ib_synced_at: nowIso });
+    }
+    if (partialInserts.length) {
+      const { data: ins, error } = await supabase.from("trades").insert(partialInserts).select("*");
+      if (error) { res.errors.push(`partial sells: ${error.message}`); }
+      else if (ins) {
+        res.partialsInserted = ins.length;
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null }));
+        setJournaledTrades(prev => [...mapped, ...prev]);
       }
     }
 
@@ -6182,74 +6252,3 @@ function AppInner() {
               <button key={item.id} onClick={() => setPage(item.id)} style={{
                 flex: 1, padding: "9px 0 11px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
                 border: "none", cursor: "pointer", fontFamily: font, position: "relative",
-                background: active ? "linear-gradient(180deg, rgba(201,152,42,0.16), transparent)" : "transparent",
-                color: active ? C.goldBright : C.muted, transition: "color 0.15s",
-              }}>
-                <NavIcon name={item.id} size={19} />
-                <span style={{ fontSize: "0.56rem", fontWeight: active ? 700 : 500, letterSpacing: "0.04em" }}>{item.label}</span>
-                {active && <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 26, height: 2, borderRadius: 1, background: C.goldBright }} />}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // ─── DESKTOP / TABLET LAYOUT ───
-  return (
-    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", WebkitFontSmoothing: "antialiased", color: C.text, zoom: appZoom }}>
-      <div onMouseEnter={() => setSidebarOpen(true)} onMouseLeave={() => setSidebarOpen(false)} style={{ width: sidebarW, minHeight: "100vh", padding: sidebarOpen ? "24px 14px" : "24px 8px", background: "rgba(8,8,14,0.95)", borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, alignSelf: "flex-start", transition: "width 0.2s ease, padding 0.2s ease", overflow: "hidden", position: "relative", zIndex: 50 }}>
-        {sidebarOpen
-          ? <Wordmark size="0.95rem" style={{ marginBottom: 24, padding: "0 4px", whiteSpace: "nowrap", overflow: "hidden" }} />
-          : <div style={{ marginBottom: 24, textAlign: "center" }}><img src="/logo-mark.png" alt="VIV" style={{ width: 30, height: "auto", filter: "drop-shadow(0 0 8px rgba(201,152,42,0.45))" }} /></div>}
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {NAV.map(item => {
-            const active = page === item.id;
-            return (
-              <button key={item.id} onClick={() => setPage(item.id)} style={{
-                display: "flex", alignItems: "center", gap: 11, padding: sidebarOpen ? "11px 13px" : "11px 0", borderRadius: 12,
-                border: active ? `1px solid ${C.borderGold}` : "1px solid transparent",
-                cursor: "pointer", fontFamily: font, width: "100%", textAlign: "left",
-                justifyContent: sidebarOpen ? "flex-start" : "center",
-                background: active ? "linear-gradient(135deg, rgba(201,152,42,0.22), rgba(201,152,42,0.06))" : "transparent",
-                boxShadow: active ? "inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 14px rgba(201,152,42,0.13)" : "none",
-                backdropFilter: active ? "blur(8px)" : "none", WebkitBackdropFilter: active ? "blur(8px)" : "none",
-                color: active ? C.goldBright : C.muted,
-                fontWeight: active ? 700 : 500, fontSize: "0.82rem", letterSpacing: "0.01em", transition: "all 0.18s ease",
-                whiteSpace: "nowrap", overflow: "hidden",
-              }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.color = C.text; }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.color = C.muted; }}
-              ><span style={{ display: "flex", flexShrink: 0 }}><NavIcon name={item.id} size={17} /></span>{sidebarOpen && <span>{item.label}</span>}</button>
-            );
-          })}
-        </div>
-        <div style={{ flex: 1 }} />
-        {sidebarOpen ? (
-          <div style={{ padding: "10px 12px", borderRadius: 10, background: C.glass, border: `1px solid ${C.border}` }}>
-            <div style={{ fontWeight: 700, fontSize: "0.72rem", color: C.white, marginBottom: 2 }}>{displayName}</div>
-            <div style={{ fontSize: "0.56rem", color: C.muted, marginBottom: 6, wordBreak: "break-all" }}>{userEmail}</div>
-            <button onClick={handleLogout} style={{ width: "100%", padding: "5px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.58rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>Sign Out</button>
-          </div>
-        ) : (
-          <button onClick={handleLogout} title="Sign Out" style={{ padding: "8px 0", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.70rem", cursor: "pointer", fontFamily: font, width: "100%", textAlign: "center" }}>↩</button>
-        )}
-      </div>
-      <div style={{ flex: 1, padding: `${contentPadV}px ${contentPadH}px`, overflowY: "auto", minWidth: 0, position: "relative" }}>
-        {/* Animated background */}
-        <AppBackground />
-        <div style={{ position:"relative",zIndex:1 }}>{pageContent}</div>
-      </div>
-    </div>
-  );
-}
-
-export default function App() {
-  return (
-    <ErrorBoundary>
-      <AppInner />
-    </ErrorBoundary>
-  );
-}
-
