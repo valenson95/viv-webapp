@@ -638,6 +638,68 @@ function buildIbkrPreview(data, positions, journaledTrades) {
     if (cands.length > 1) return { ...c, action: "review", matchId: null };
     return { ...c, action: "new", matchId: null };
   });
+  // ── AGGREGATE N-TO-1 MATCHING ── catch the case where ONE manual journal trade (the user's
+  // hand-keyed aggregate) represents the SUM of multiple IBKR rows for the same ticker/lot.
+  // Without this, IBKR's per-fill rows all classify as "new" individually (none match the manual's
+  // total share count 1:1) and get imported as duplicates of the manual aggregate.
+  // Subset-sum approach: for each unclaimed manual, find any subset of unmatched IBKR rows
+  // (same ticker, entry within ±5 days) whose shares sum to the manual's total within 5%.
+  // Marks the matched rows with action="duplicate", default choice "skip" in the modal.
+  const claimedManualIds = new Set();
+  [...tradeRows, ...partialRows].forEach(r => { if (r.matchId && r.action !== "new") claimedManualIds.add(r.matchId); });
+  const subsetSum = (rows, target, tolPct = 0.05) => {
+    const n = rows.length;
+    if (n === 0 || n > 14) return null; // 2^14 = 16384 — fast; bail above
+    const tol = Math.max(1, target * tolPct);
+    for (let mask = 1; mask < (1 << n); mask++) {
+      let sum = 0;
+      const idx = [];
+      for (let i = 0; i < n; i++) {
+        if (mask & (1 << i)) { sum += Number(rows[i].shares) || 0; idx.push(i); }
+      }
+      if (Math.abs(sum - target) <= tol) return idx;
+    }
+    return null;
+  };
+  (journaledTrades || []).forEach(manual => {
+    if (isIbkr(manual.source) || claimedManualIds.has(manual.id)) return;
+    const sym = (manual.ticker || "").toUpperCase();
+    if (!sym) return;
+    const manualShares = Number(manual.shares) || 0;
+    if (manualShares <= 0) return;
+    // Eligible IBKR rows: action="new", same ticker, entry within ±5d of manual entry.
+    const elig = [];
+    tradeRows.forEach((r, i) => {
+      if (r.action !== "new") return;
+      if ((r.ticker || "").toUpperCase() !== sym) return;
+      if (dayDiff(r.entry, manual.entry) > 5) return;
+      elig.push({ r, i, kind: "trade" });
+    });
+    partialRows.forEach((r, i) => {
+      if (r.action !== "new") return;
+      if ((r.ticker || "").toUpperCase() !== sym) return;
+      if (dayDiff(r.entry, manual.entry) > 5) return;
+      elig.push({ r, i, kind: "partial" });
+    });
+    if (elig.length === 0) return;
+    // First try the full set (most common: all eligible rows sum to the manual). Only fall back to
+    // subset-sum if the total overshoots — avoids picking a wrong subset when the totals already line up.
+    const total = elig.reduce((s, e) => s + (Number(e.r.shares) || 0), 0);
+    let pickedIdx;
+    if (Math.abs(total - manualShares) <= Math.max(1, manualShares * 0.05)) {
+      pickedIdx = elig.map((_, i) => i);
+    } else {
+      pickedIdx = subsetSum(elig.map(e => e.r), manualShares, 0.05);
+    }
+    if (!pickedIdx) return;
+    claimedManualIds.add(manual.id);
+    pickedIdx.forEach(k => {
+      const e = elig[k];
+      const patch = { action: "duplicate", matchId: manual.id, dupAggregate: true, dupManualShares: manualShares };
+      if (e.kind === "trade") tradeRows[e.i] = { ...e.r, ...patch };
+      else partialRows[e.i] = { ...e.r, ...patch };
+    });
+  });
   const posRows = openPos.map(p => {
     const synced = (positions || []).find(x => x.ibConid && x.ibConid === p.conid);
     if (synced) return { ...p, action: "synced", matchId: synced.id };
@@ -678,30 +740,73 @@ function buildIbkrPreview(data, positions, journaledTrades) {
         linkExecId: link ? link.execId : null, exit: link ? link.exit : "", action: "close" };
     });
 
-  return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows, closeRows, partialRows };
+  // ── EXISTING DUPLICATES IN JOURNAL ── catches the case where the user already imported IBKR partials
+  // in a PRIOR sync, then later (or earlier) keyed a manual aggregate trade representing the same fills.
+  // These don't appear in this sync's tradeRows/partialRows (they're stuck in the journal), so we scan
+  // directly. Each group = one manual aggregate + the IBKR-sourced journal rows that sum to it.
+  const dupeJournalGroups = [];
+  const ibkrJournalRows = (journaledTrades || []).filter(t => isIbkr(t.source));
+  const claimedIbkrJournalIds = new Set();
+  (journaledTrades || []).forEach(manual => {
+    if (isIbkr(manual.source) || claimedManualIds.has(manual.id)) return;
+    const sym = (manual.ticker || "").toUpperCase();
+    if (!sym) return;
+    const manualShares = Number(manual.shares) || 0;
+    if (manualShares <= 0) return;
+    const elig = ibkrJournalRows.filter(t =>
+      !claimedIbkrJournalIds.has(t.id) &&
+      (t.ticker || "").toUpperCase() === sym &&
+      dayDiff(t.entry, manual.entry) <= 5
+    );
+    if (elig.length === 0) return;
+    const total = elig.reduce((s, t) => s + (Number(t.shares) || 0), 0);
+    let pickedIdx;
+    if (Math.abs(total - manualShares) <= Math.max(1, manualShares * 0.05)) {
+      pickedIdx = elig.map((_, i) => i);
+    } else {
+      pickedIdx = subsetSum(elig, manualShares, 0.05);
+    }
+    if (!pickedIdx) return;
+    claimedManualIds.add(manual.id);
+    const ibkrPicks = pickedIdx.map(i => elig[i]);
+    ibkrPicks.forEach(t => claimedIbkrJournalIds.add(t.id));
+    dupeJournalGroups.push({
+      manualId: manual.id, ticker: manual.ticker, manualEntry: manual.entry, manualExit: manual.exit,
+      manualShares, manualPL: Number(manual.plDollar) || 0, manualRMult: manual.rMult,
+      ibkrRows: ibkrPicks.map(t => ({ id: t.id, entry: t.entry, exit: t.exit, shares: Number(t.shares) || 0, plDollar: Number(t.plDollar) || 0, reason: t.reason, source: t.source })),
+      ibkrTotalShares: ibkrPicks.reduce((s, t) => s + (Number(t.shares) || 0), 0),
+      ibkrTotalPL: ibkrPicks.reduce((s, t) => s + (Number(t.plDollar) || 0), 0),
+    });
+  });
+
+  return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows, closeRows, partialRows, dupeJournalGroups };
 }
 
 // Interactive sync modal — preview + per-row decisions + confirm. Writes happen via onConfirm (App), surgically.
-const ibkrDefaultChoice = (action) => action === "review" ? "skip" : action === "reconcile" ? "reconcile" : action === "synced" ? "update" : action === "close" ? "close" : "new";
+const ibkrDefaultChoice = (action) => action === "review" ? "skip" : action === "reconcile" ? "reconcile" : action === "synced" ? "update" : action === "close" ? "close" : action === "duplicate" ? "skip" : "new";
 function ibkrChoiceOpts(r) {
   if (r.action === "synced") return [["update", "Update"], ["skip", "Skip"]];
   if (r.action === "reconcile") return [["reconcile", "Reconcile"], ["new", "Keep both"], ["skip", "Skip"]];
   if (r.action === "review") return r.matchId ? [["reconcile", "Reconcile"], ["new", "Import as new"], ["skip", "Skip"]] : [["new", "Import as new"], ["skip", "Skip"]];
   if (r.action === "close") return [["close", "Close out"], ["skip", "Keep open"]];
+  if (r.action === "duplicate") return [["skip", "Skip (already in journal)"], ["new", "Import anyway"]];
   return [["new", "Import"], ["skip", "Skip"]];
 }
 function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, onConfirm }) {
-  const [choices, setChoices] = useState({ pos: {}, trade: {}, close: {}, partial: {} });
+  const [choices, setChoices] = useState({ pos: {}, trade: {}, close: {}, partial: {}, dupes: {} });
   useEffect(() => {
     if (data) {
       const def = rows => (rows || []).reduce((m, r, i) => { m[i] = ibkrDefaultChoice(r.action); return m; }, {});
-      setChoices({ pos: def(data.posRows), trade: def(data.tradeRows), close: def(data.closeRows), partial: def(data.partialRows) });
+      // Existing-duplicate groups default to "delete-ibkr": keep your manual aggregate (with R-mult, notes,
+      // setup, tags), soft-delete the IBKR partial rows that double-counted it. Recoverable via is_deleted=false.
+      const dupeDef = (data.dupeJournalGroups || []).reduce((m, _g, i) => { m[i] = "delete-ibkr"; return m; }, {});
+      setChoices({ pos: def(data.posRows), trade: def(data.tradeRows), close: def(data.closeRows), partial: def(data.partialRows), dupes: dupeDef });
     }
   }, [data]);
   if (!open) return null;
 
   const chip = (action) => {
-    const map = { new: { c: C.green, t: "New" }, synced: { c: C.muted, t: "Already synced" }, reconcile: { c: C.gold, t: "Matches manual" }, review: { c: C.red, t: "Needs review" }, close: { c: C.goldBright, t: "Closed at IBKR" } };
+    const map = { new: { c: C.green, t: "New" }, synced: { c: C.muted, t: "Already synced" }, reconcile: { c: C.gold, t: "Matches manual" }, review: { c: C.red, t: "Needs review" }, close: { c: C.goldBright, t: "Closed at IBKR" }, duplicate: { c: C.goldBright, t: "Already in journal" } };
     const m = map[action] || map.new;
     return <span style={{ fontSize: "0.5rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: m.c, border: `1px solid ${m.c}55`, borderRadius: 980, padding: "2px 7px", whiteSpace: "nowrap" }}>{m.t}</span>;
   };
@@ -714,9 +819,10 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
   );
   const confirm = () => {
     const resolve = (rows, ch) => (rows || []).map((r, i) => ({ ...r, choice: ch[i] || "skip" }));
-    onConfirm(resolve(data.posRows, choices.pos), resolve(data.tradeRows, choices.trade), resolve(data.closeRows, choices.close), resolve(data.partialRows, choices.partial));
+    const dupes = (data.dupeJournalGroups || []).map((g, i) => ({ ...g, choice: choices.dupes[i] || "skip" }));
+    onConfirm(resolve(data.posRows, choices.pos), resolve(data.tradeRows, choices.trade), resolve(data.closeRows, choices.close), resolve(data.partialRows, choices.partial), dupes);
   };
-  const willWrite = data ? [...Object.values(choices.pos), ...Object.values(choices.trade), ...Object.values(choices.close), ...Object.values(choices.partial)].filter(c => c && c !== "skip").length : 0;
+  const willWrite = data ? [...Object.values(choices.pos), ...Object.values(choices.trade), ...Object.values(choices.close), ...Object.values(choices.partial), ...Object.values(choices.dupes)].filter(c => c && c !== "skip").length : 0;
 
   return createPortal(
     <div onClick={status === "writing" ? undefined : onClose} style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(0,0,0,0.66)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
@@ -744,6 +850,7 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                 Trades: <strong style={{ color: C.white }}>{result.tInserted}</strong> new · <strong style={{ color: C.white }}>{result.tReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.tUpdated}</strong> refreshed<br />
                 Positions: <strong style={{ color: C.white }}>{result.pInserted}</strong> new · <strong style={{ color: C.white }}>{result.pReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.pUpdated}</strong> refreshed · <strong style={{ color: C.white }}>{result.pClosed || 0}</strong> closed out
                 {(result.partialsInserted || 0) > 0 && <><br />Partial sells: <strong style={{ color: C.white }}>{result.partialsInserted}</strong> imported</>}
+                {(result.dupesResolved || 0) > 0 && <><br />Cleanup: <strong style={{ color: C.white }}>{result.dupesResolved}</strong> duplicate group{result.dupesResolved === 1 ? "" : "s"} resolved · <strong style={{ color: C.white }}>{result.dupesDeleted}</strong> row{result.dupesDeleted === 1 ? "" : "s"} soft-deleted</>}
               </div>
               {result.errors && result.errors.length > 0 && <div style={{ marginTop: 12, fontSize: "0.66rem", color: C.red }}>{result.errors.length} row(s) failed and were skipped: {result.errors.slice(0, 3).join("; ")}{result.errors.length > 3 ? "…" : ""}</div>}
               <button onClick={onClose} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font }}>Done</button>
@@ -759,6 +866,7 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                 <StatTile label="Open Positions" value={String(data.posRows.length)} />
                 <StatTile label="Closed Trades" value={String(data.tradeRows.length)} />
                 <StatTile label="Partial Sells" value={String((data.partialRows || []).length)} />
+                {(data.dupeJournalGroups || []).length > 0 && <StatTile label="Dupes Found" value={String(data.dupeJournalGroups.length)} />}
               </div>
               {[{ kind: "pos", title: "Open Positions", rows: data.posRows, cols: ["sym", "shares", "ep", "entry"], head: ["Symbol", "Shares", "Avg Cost", "Opened"] },
                 { kind: "trade", title: "Closed Trades (round-trips)", rows: data.tradeRows, cols: ["ticker", "shares", "entryP", "exitP", "plDollar", "entry"], head: ["Symbol", "Shares", "Entry", "Exit", "P/L $", "In"] },
@@ -784,6 +892,47 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                   )}
                 </div>
               ))}
+              {data.dupeJournalGroups && data.dupeJournalGroups.length > 0 && (
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.red, marginBottom: 8 }}>⚠ Existing duplicates in your journal ({data.dupeJournalGroups.length})</div>
+                  <div style={{ fontSize: "0.64rem", color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
+                    Each group below is one manual aggregate trade + a set of IBKR-imported rows whose shares <strong style={{ color: C.text }}>sum to the same total</strong> — so they're double-counting the same fills. Default is to <strong style={{ color: C.text }}>keep your manual entry (with R-multiple, notes, tags)</strong> and soft-delete the IBKR rows. Nothing is hard-deleted — every removal sets <code style={{ color: C.gold }}>is_deleted=true</code> and is recoverable from the DB.
+                  </div>
+                  {data.dupeJournalGroups.map((g, i) => {
+                    const ch = choices.dupes[i] || "skip";
+                    const sharesMatch = Math.abs(g.ibkrTotalShares - g.manualShares) <= Math.max(1, g.manualShares * 0.05);
+                    return (
+                      <div key={i} style={{ marginBottom: 12, padding: 12, borderRadius: 10, border: `1px solid ${ch === "skip" ? C.border : C.borderGold}`, background: ch === "skip" ? "rgba(255,255,255,0.02)" : "rgba(201,152,42,0.05)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
+                          <div style={{ fontWeight: 800, fontSize: "0.78rem", color: C.goldBright }}>{g.ticker} <span style={{ color: C.muted, fontWeight: 500, fontSize: "0.66rem" }}>· {sharesMatch ? "shares match exactly" : "shares within 5%"}</span></div>
+                          <select value={ch} onChange={e => setChoice("dupes", i, e.target.value)} disabled={status === "writing"} style={{ background: "rgba(255,255,255,0.05)", color: C.white, border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 8px", fontSize: "0.66rem", fontFamily: font, outline: "none", minWidth: 220 }}>
+                            <option value="delete-ibkr" style={{ background: C.bg2 }}>Keep manual · delete {g.ibkrRows.length} IBKR row{g.ibkrRows.length === 1 ? "" : "s"}</option>
+                            <option value="delete-manual" style={{ background: C.bg2 }}>Keep IBKR · delete manual aggregate</option>
+                            <option value="skip" style={{ background: C.bg2 }}>Skip (keep both)</option>
+                          </select>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: "0.66rem" }}>
+                          <div style={{ padding: 10, borderRadius: 8, background: ch === "delete-manual" ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.03)", border: `1px solid ${ch === "delete-manual" ? "rgba(239,68,68,0.30)" : C.border}`, opacity: ch === "delete-manual" ? 0.7 : 1 }}>
+                            <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Your manual {ch === "delete-manual" && "· will be deleted"}</div>
+                            <div style={{ color: C.text, lineHeight: 1.5 }}>
+                              {g.manualEntry} → {g.manualExit} · {Number(g.manualShares).toLocaleString()} sh · <strong style={{ color: g.manualPL >= 0 ? C.green : C.red }}>{g.manualPL >= 0 ? "+" : ""}{fmt$(Math.abs(g.manualPL), 2)}</strong>{g.manualRMult != null && <> · {Number(g.manualRMult).toFixed(2)}R</>}
+                            </div>
+                          </div>
+                          <div style={{ padding: 10, borderRadius: 8, background: ch === "delete-ibkr" ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.03)", border: `1px solid ${ch === "delete-ibkr" ? "rgba(239,68,68,0.30)" : C.border}`, opacity: ch === "delete-ibkr" ? 0.7 : 1 }}>
+                            <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>IBKR rows ({g.ibkrRows.length}) {ch === "delete-ibkr" && "· will be deleted"}</div>
+                            {g.ibkrRows.map(r => (
+                              <div key={r.id} style={{ color: C.text, lineHeight: 1.5 }}>
+                                {r.entry} → {r.exit} · {Number(r.shares).toLocaleString()} sh · <strong style={{ color: r.plDollar >= 0 ? C.green : C.red }}>{r.plDollar >= 0 ? "+" : ""}{fmt$(Math.abs(r.plDollar), 2)}</strong>
+                              </div>
+                            ))}
+                            <div style={{ marginTop: 4, paddingTop: 4, borderTop: `1px dashed ${C.border}`, color: C.muted, fontSize: "0.62rem" }}>Total: {Number(g.ibkrTotalShares).toLocaleString()} sh · {g.ibkrTotalPL >= 0 ? "+" : ""}{fmt$(Math.abs(g.ibkrTotalPL), 2)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <span style={{ fontSize: "0.64rem", color: C.muted }}>{willWrite} row{willWrite === 1 ? "" : "s"} will be written · the rest skipped.</span>
                 <div style={{ display: "flex", gap: 10 }}>
@@ -5641,12 +5790,12 @@ function AppInner() {
 
   // Phase 2 — surgical writes from the confirmed preview. INSERT new IBKR rows, UPDATE matched rows by id only.
   // Never deletes; reconcile updates only the factual columns so notes/tags/setup/stops are preserved.
-  const confirmIbkrSync = useCallback(async (posRows, tradeRows, closeRows = [], partialRows = []) => {
+  const confirmIbkrSync = useCallback(async (posRows, tradeRows, closeRows = [], partialRows = [], dupeGroups = []) => {
     const uid = session?.user?.id;
     if (!uid) { setIbkrStatus("error"); setIbkrError("Not signed in."); return; }
     setIbkrStatus("writing");
     const nowIso = new Date().toISOString();
-    const res = { tInserted: 0, tReconciled: 0, tUpdated: 0, pInserted: 0, pReconciled: 0, pUpdated: 0, pClosed: 0, partialsInserted: 0, errors: [] };
+    const res = { tInserted: 0, tReconciled: 0, tUpdated: 0, pInserted: 0, pReconciled: 0, pUpdated: 0, pClosed: 0, partialsInserted: 0, dupesResolved: 0, dupesDeleted: 0, errors: [] };
     // execIds of closing round-trips that actually land in the Journal this sync — the gate for auto-close.
     const journaledExecIds = new Set();
 
@@ -5765,6 +5914,22 @@ function AppInner() {
     if (archivedPosIds.size) {
       setPositions(prev => { const next = prev.filter(p => !archivedPosIds.has(p.id)); positionsRef.current = next; return next; });
       lastLoadedCount.current = Math.max(0, (lastLoadedCount.current || 0) - archivedPosIds.size);
+    }
+
+    // ── EXISTING-DUPLICATE CLEANUP ── soft-delete (is_deleted=true, recoverable) the rows the user marked
+    // as duplicates. delete-ibkr → wipe the IBKR-side rows · delete-manual → wipe the manual aggregate · skip → no-op.
+    // Surgical update by id + user_id; never touches anything the user didn't pick.
+    const deletedTradeIds = new Set();
+    for (const g of (dupeGroups || [])) {
+      if (g.choice === "skip") continue;
+      const ids = g.choice === "delete-ibkr" ? g.ibkrRows.map(r => r.id) : g.choice === "delete-manual" ? [g.manualId] : [];
+      if (!ids.length) continue;
+      const { error } = await supabase.from("trades").update({ is_deleted: true }).in("id", ids).eq("user_id", uid);
+      if (error) { res.errors.push(`cleanup ${g.ticker}: ${error.message}`); }
+      else { res.dupesResolved++; res.dupesDeleted += ids.length; ids.forEach(id => deletedTradeIds.add(id)); }
+    }
+    if (deletedTradeIds.size) {
+      setJournaledTrades(prev => prev.filter(t => !deletedTradeIds.has(t.id)));
     }
 
     setIbkrResult(res);
