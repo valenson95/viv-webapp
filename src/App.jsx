@@ -495,8 +495,9 @@ const normalizeIntradayLog = (raw) => {
     lastClearedAt: raw.lastClearedAt || null,
   };
 };
-// Feature flag — Step 1 plumbing ships dark. Flip to true (or via localStorage 'viv-intraday-enabled') in Step 5.
-const INTRADAY_FEATURE_ENABLED = (typeof window !== "undefined" && window.localStorage && localStorage.getItem("viv-intraday-enabled") === "1");
+// Per-browser feature flag — read once at module load for the initial value, but the App component
+// keeps a reactive state copy (intradayFeatureEnabled) so the Settings toggle can flip it live.
+const INTRADAY_FEATURE_DEFAULT = (typeof window !== "undefined" && window.localStorage && localStorage.getItem("viv-intraday-enabled") === "1");
 // Normalize a trade date to ISO YYYY-MM-DD (handles "M/D/YY" manual/dashboard entries and "YYYY-MM-DD" IBKR rows).
 // Used both by the IBKR reconcile-matcher and the trade-review chart.
 // Normalize any date string to a YYYY-MM-DD day key. Handles M/D/YY · M/D/YYYY · ISO (with - or /) and
@@ -664,6 +665,49 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
     if (cands.length > 1) return { ...c, action: "review", matchId: null };
     return { ...c, action: "new", matchId: null };
   });
+  // ── INTRADAY LOG RECONCILIATION ── for each open position's intraday log, find IBKR partials whose
+  // ticker + same exit day + shares within 5% match a logged trim event. On confirm these events get a
+  // reconciledExecId + reconciledAt stamp so the dashboard's Today panel shows "IBKR ✓" beside them.
+  // MVP only matches trim events (sells from a still-open lot — what the partials array carries). Add
+  // events stay unreconciled and the user dismisses them once the next sync brings in the new round-trip.
+  const intradayMatches = [];
+  const intradayClaimedExecIds = new Set();
+  (positions || []).forEach(pos => {
+    const log = pos && pos.intradayLog;
+    if (!log || !Array.isArray(log.events)) return;
+    const sym = (pos.sym || "").toUpperCase();
+    if (!sym) return;
+    log.events.forEach(ev => {
+      if (!ev || ev.reconciledExecId) return; // already reconciled
+      if (ev.type !== "trim") return;          // MVP: only trims auto-reconcile
+      const eventDay = tradeDateISO(ev.ts);
+      const eventShares = Number(ev.shares) || 0;
+      if (eventShares <= 0) return;
+      const candidate = partialRows.find(par =>
+        par.execId && par.action !== "review" &&
+        !intradayClaimedExecIds.has(par.execId) &&
+        (par.ticker || "").toUpperCase() === sym &&
+        tradeDateISO(par.exit) === eventDay &&
+        Math.abs((Number(par.shares) || 0) - eventShares) <= Math.max(1, eventShares * 0.05)
+      );
+      if (candidate) {
+        intradayClaimedExecIds.add(candidate.execId);
+        intradayMatches.push({
+          positionId: pos.id,
+          eventId: ev.id,
+          execId: candidate.execId,
+          ticker: sym,
+          eventShares,
+          eventPrice: Number(ev.price) || 0,
+          eventTime: ev.ts,
+          ibkrShares: Number(candidate.shares) || 0,
+          ibkrPrice: Number(candidate.exitP) || 0,
+          ibkrTime: `${candidate.exit}${candidate.exitTime ? " " + candidate.exitTime : ""}`,
+        });
+      }
+    });
+  });
+
   // ── AGGREGATE N-TO-1 MATCHING ── catch the case where ONE manual journal trade (the user's
   // hand-keyed aggregate) represents the SUM of multiple IBKR rows for the same ticker/lot.
   // Without this, IBKR's per-fill rows all classify as "new" individually (none match the manual's
@@ -805,7 +849,7 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
     });
   });
 
-  return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows, closeRows, partialRows, dupeJournalGroups };
+  return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows, closeRows, partialRows, dupeJournalGroups, intradayMatches };
 }
 
 // ─── INTEGRITY CHECKER ─── pure function. Walks already-loaded journal + positions + softDeletedExecIds
@@ -1220,7 +1264,8 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
   const confirm = () => {
     const resolve = (rows, ch) => (rows || []).map((r, i) => ({ ...r, choice: ch[i] || "skip" }));
     const dupes = (data.dupeJournalGroups || []).map((g, i) => ({ ...g, choice: choices.dupes[i] || "skip" }));
-    onConfirm(resolve(data.posRows, choices.pos), resolve(data.tradeRows, choices.trade), resolve(data.closeRows, choices.close), resolve(data.partialRows, choices.partial), dupes);
+    const intradayMatches = data.intradayMatches || [];
+    onConfirm(resolve(data.posRows, choices.pos), resolve(data.tradeRows, choices.trade), resolve(data.closeRows, choices.close), resolve(data.partialRows, choices.partial), dupes, intradayMatches);
   };
   const willWrite = data ? [...Object.values(choices.pos), ...Object.values(choices.trade), ...Object.values(choices.close), ...Object.values(choices.partial), ...Object.values(choices.dupes)].filter(c => c && c !== "skip").length : 0;
 
@@ -1251,6 +1296,7 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                 Positions: <strong style={{ color: C.white }}>{result.pInserted}</strong> new · <strong style={{ color: C.white }}>{result.pReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.pUpdated}</strong> refreshed · <strong style={{ color: C.white }}>{result.pClosed || 0}</strong> closed out
                 {(result.partialsInserted || 0) > 0 && <><br />Partial sells: <strong style={{ color: C.white }}>{result.partialsInserted}</strong> imported</>}
                 {(result.dupesResolved || 0) > 0 && <><br />Cleanup: <strong style={{ color: C.white }}>{result.dupesResolved}</strong> duplicate group{result.dupesResolved === 1 ? "" : "s"} resolved · <strong style={{ color: C.white }}>{result.dupesDeleted}</strong> row{result.dupesDeleted === 1 ? "" : "s"} soft-deleted</>}
+                {(result.intradayReconciled || 0) > 0 && <><br />Intraday: <strong style={{ color: C.white }}>{result.intradayReconciled}</strong> event{result.intradayReconciled === 1 ? "" : "s"} confirmed by IBKR</>}
               </div>
               {result.errors && result.errors.length > 0 && <div style={{ marginTop: 12, fontSize: "0.66rem", color: C.red }}>{result.errors.length} row(s) failed and were skipped: {result.errors.slice(0, 3).join("; ")}{result.errors.length > 3 ? "…" : ""}</div>}
               <div style={{ marginTop: 18, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
@@ -1308,6 +1354,34 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                   )}
                 </div>
               ))}
+              {/* ─── Intraday events confirmed by IBKR ─── auto-matched from each position's Today log against
+                   incoming IBKR partials. On confirm, the matched events are marked reconciledExecId so they
+                   show "IBKR ✓" in the dashboard's Today panel. No new journal rows; the IBKR partial itself
+                   is the journal record (which gets imported by the Partial Sells section above). */}
+              {data.intradayMatches && data.intradayMatches.length > 0 && (
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 8 }}>✓ Intraday events confirmed by IBKR ({data.intradayMatches.length})</div>
+                  <div style={{ fontSize: "0.64rem", color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
+                    These are events you logged in the dashboard's <strong style={{ color: C.text }}>Today</strong> panel that match an incoming IBKR partial. On confirm they'll be marked <strong style={{ color: C.green }}>IBKR ✓</strong> in your timeline. No new trade rows are created here — IBKR's actual fill is imported by the <strong style={{ color: C.text }}>Partial Sells</strong> section above (that's the canonical journal record).
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {data.intradayMatches.map((m, i) => (
+                      <div key={`${m.positionId}-${m.eventId}-${i}`} style={{ display: "grid", gridTemplateColumns: "min-content 1fr 1fr min-content", gap: 12, alignItems: "center", padding: "8px 12px", borderRadius: 8, background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}` }}>
+                        <span style={{ fontSize: "0.78rem", color: C.goldBright, fontWeight: 800 }}>{m.ticker}</span>
+                        <div style={{ fontSize: "0.64rem", color: C.text, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                          <div style={{ color: C.muted, fontSize: "0.52rem", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>You logged</div>
+                          {m.eventShares} sh{m.eventPrice > 0 ? ` @ $${m.eventPrice.toFixed(2)}` : ""}
+                        </div>
+                        <div style={{ fontSize: "0.64rem", color: C.text, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                          <div style={{ color: C.muted, fontSize: "0.52rem", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>IBKR confirmed</div>
+                          {m.ibkrShares} sh @ ${m.ibkrPrice.toFixed(2)}
+                        </div>
+                        <span style={{ fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.green, padding: "3px 9px", borderRadius: 980, background: "rgba(34,197,94,0.10)", border: "1px solid rgba(34,197,94,0.32)" }}>Match</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {data.dupeJournalGroups && data.dupeJournalGroups.length > 0 && (
                 <div style={{ marginBottom: 18 }}>
                   <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.red, marginBottom: 8 }}>⚠ Existing duplicates in your journal ({data.dupeJournalGroups.length})</div>
@@ -4122,7 +4196,10 @@ const GLOSSARY = [
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
-function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable }) {
+function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled }) {
+  // Alias so existing `INTRADAY_FEATURE_ENABLED` references inside this component keep reading as a single
+  // flag without rewriting every callsite. Reactive — flipping the Settings toggle re-renders the table.
+  const INTRADAY_FEATURE_ENABLED = intradayFeatureEnabled;
   const [compactTable, setCompactTable] = useState(false);
   // Open Positions zoom — scales the whole table (5 steps each way, 70%–130%, 6% per step). Persisted as a UI-only pref.
   const [posZoom, setPosZoom] = useState(() => { const s = parseFloat(localStorage.getItem("viv-pos-zoom")); return Number.isFinite(s) ? Math.min(1.3, Math.max(0.7, s)) : 1; });
@@ -4311,7 +4388,22 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const removeRow = useCallback((id, skipConfirm) => {
     if (!skipConfirm) {
       const pos = positions.find(p => p.id === id);
-      if (!window.confirm(`Remove ${pos?.sym || "this"} position? This will delete it from your open positions.`)) return;
+      // Build extra warning copy when there are still-live intraday events that would vanish with the row.
+      let intradayWarning = "";
+      const liveEvents = (pos && pos.intradayLog && Array.isArray(pos.intradayLog.events))
+        ? pos.intradayLog.events.filter(e => !e.reconciledExecId)
+        : [];
+      if (liveEvents.length > 0) {
+        const lines = liveEvents.slice(0, 5).map(e => {
+          if (e.type === "trim") return `  • Trim ${e.shares || "?"} sh${e.price ? ` @ $${Number(e.price).toFixed(2)}` : ""}`;
+          if (e.type === "add") return `  • Add ${e.shares || "?"} sh${e.price ? ` @ $${Number(e.price).toFixed(2)}` : ""}`;
+          if (e.type === "stop") return `  • Stop → $${Number(e.stop || 0).toFixed(2)}`;
+          return `  • Note: ${(e.note || "").slice(0, 40)}`;
+        });
+        const extra = liveEvents.length > 5 ? `\n  …and ${liveEvents.length - 5} more` : "";
+        intradayWarning = `\n\n⚠ This position has ${liveEvents.length} unreconciled intraday event${liveEvents.length === 1 ? "" : "s"} that will be lost:\n${lines.join("\n")}${extra}`;
+      }
+      if (!window.confirm(`Remove ${pos?.sym || "this"} position? This will delete it from your open positions.${intradayWarning}`)) return;
     }
     setPositions(prev => {
       const next = prev.filter(p => p.id !== id);
@@ -4319,7 +4411,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       positionsRef.current = next; // Eagerly sync ref for emergencySave
       return next;
     });
-  }, [lastLoadedCountRef]);
+  }, [lastLoadedCountRef, positions]);
 
   // Remap sellId when autosave replaces position IDs
   useEffect(() => {
@@ -4331,7 +4423,26 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   }, [positions]); // fires after setPositions syncs IDs from savePositionsNow
 
   // Sell flow
-  const startSell = (p) => { setSellId(p.id); setSellQty(p.shares); setSellPrice(p.cp); setSellReason(exitReasons[0] || "Sold Into Strength"); setSellTags([]); setSellAddJournal(true); setSellNotes(""); setSellComm(""); setSellChartUrl(p.chartUrl || ""); const posNotes = parseNotes(p.notes); setSellNotesStruct({ right: posNotes.right || "", wrong: posNotes.wrong || "", lessons: posNotes.lessons || "" }); };
+  const startSell = (p) => {
+    // ─── Collision guard ─── if the user already logged a same-day trim event in the Today panel and
+    // the IBKR sync hasn't reconciled it yet, prompt before opening the manual Sell flow. Catches the
+    // common mistake "I logged this and forgot — am I about to double-log it via Sell?"
+    if (INTRADAY_FEATURE_ENABLED && intradayColumnAvailable && p.intradayLog && Array.isArray(p.intradayLog.events)) {
+      const todayKey = tradeDateISO(new Date().toISOString());
+      const liveTrims = p.intradayLog.events.filter(e => e.type === "trim" && !e.reconciledExecId && tradeDateISO(e.ts) === todayKey);
+      if (liveTrims.length > 0) {
+        const totalLogged = liveTrims.reduce((s, e) => s + (Number(e.shares) || 0), 0);
+        const summary = liveTrims.length === 1
+          ? `${liveTrims[0].shares || "?"} sh${liveTrims[0].price ? ` @ $${Number(liveTrims[0].price).toFixed(2)}` : ""}`
+          : `${liveTrims.length} trims totalling ${totalLogged} sh`;
+        const ok = window.confirm(`You already logged a trim for ${p.sym} today (${summary}) in the Today panel. The Sell button creates a closed-trade journal row that will likely DUPLICATE tomorrow's IBKR partial.\n\nContinue with the Sell flow anyway?\n\n(Recommended: hit Cancel, let IBKR sync overnight fill the journal automatically.)`);
+        if (!ok) return;
+      }
+    }
+    setSellId(p.id); setSellQty(p.shares); setSellPrice(p.cp); setSellReason(exitReasons[0] || "Sold Into Strength"); setSellTags([]); setSellAddJournal(true); setSellNotes(""); setSellComm(""); setSellChartUrl(p.chartUrl || "");
+    const posNotes = parseNotes(p.notes);
+    setSellNotesStruct({ right: posNotes.right || "", wrong: posNotes.wrong || "", lessons: posNotes.lessons || "" });
+  };
   const cancelSell = () => setSellId(null);
   // Helper: find position by sellId, with ID-map fallback to survive autosave ID sync
   const findSellPos = useCallback(() => {
@@ -4637,12 +4748,17 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       return s + dirSign * (px - epN) * qty;
     }, 0);
     const trimProjPct = origShares > 0 ? ((realizedShares + sumTrimsLogged) / origShares) * 100 : 0;
+    // Today's-only trim % — just the intraday log's contribution, separate from any historical realized trims.
+    // Helps the user see "this session I trimmed 1.9%" vs "total trimmed is now 41.9%".
+    const todayTrimPct = origShares > 0 ? (sumTrimsLogged / origShares) * 100 : 0;
+    // Projected remaining % — what's left of the original after today's logged trim is booked.
+    const remainingProjPct = origShares > 0 ? (sharesNProj / origShares) * 100 : 0;
     const intradayEventCount = _log.length;
     const intradayLiveCount = _liveEvents.length;
     const intradayAllReconciled = _log.length > 0 && _liveEvents.length === 0;
 
-    return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR, sumTrimsLogged, sumAddsLogged, sharesNProj, realizedProjAdd, trimProjPct, intradayEventCount, intradayLiveCount, intradayAllReconciled };
-  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, realizedShares:0, origShares:0, trimPct:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0, sumTrimsLogged:0, sumAddsLogged:0, sharesNProj:0, realizedProjAdd:0, trimProjPct:0, intradayEventCount:0, intradayLiveCount:0, intradayAllReconciled:false }; }
+    return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR, sumTrimsLogged, sumAddsLogged, sharesNProj, realizedProjAdd, trimProjPct, todayTrimPct, remainingProjPct, intradayEventCount, intradayLiveCount, intradayAllReconciled };
+  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, realizedShares:0, origShares:0, trimPct:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0, sumTrimsLogged:0, sumAddsLogged:0, sharesNProj:0, realizedProjAdd:0, trimProjPct:0, todayTrimPct:0, remainingProjPct:0, intradayEventCount:0, intradayLiveCount:0, intradayAllReconciled:false }; }
   }), [positions, sizer, portfolioSize, compEquity, realizedByPosition]);
 
   const totals = useMemo(() => {
@@ -5268,20 +5384,34 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                                     <div style={{ fontSize: "1.05rem", fontWeight: 800, color: C.green, lineHeight: 1.1 }}>+{p.sumAddsLogged.toLocaleString()} <span style={{ fontSize: "0.62rem", fontWeight: 600, color: C.muted }}>sh</span></div>
                                   </div>
                                 )}
-                                <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(0,0,0,0.25)", border: `1px solid ${C.border}` }}>
-                                  <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Remaining Shares</div>
-                                  <div style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white, lineHeight: 1.1 }}>{p.sharesNProj.toLocaleString()} <span style={{ fontSize: "0.62rem", fontWeight: 600, color: C.muted }}>of {p.origShares.toLocaleString()}</span></div>
-                                </div>
-                                {p.trimProjPct > p.trimPct && (
+                                {/* ─── Today's Trim ─── just the intraday log's contribution as % of original.
+                                     Answers: "what did I trim TODAY, as a fraction of the position?" */}
+                                {p.sumTrimsLogged > 0 && (
                                   <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(0,0,0,0.25)", border: `1px solid ${C.border}` }}>
-                                    <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Projected Trim %</div>
-                                    <div style={{ fontSize: "1.05rem", fontWeight: 800, color: C.goldBright, lineHeight: 1.1 }}>{p.trimProjPct.toFixed(1)}<span style={{ fontSize: "0.72rem" }}>%</span> <span style={{ fontSize: "0.58rem", fontWeight: 600, color: C.muted }}>(was {p.trimPct.toFixed(1)}%)</span></div>
+                                    <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>This Trim</div>
+                                    <div style={{ fontSize: "1.05rem", fontWeight: 800, color: C.goldBright, lineHeight: 1.1 }}>{p.todayTrimPct.toFixed(1)}<span style={{ fontSize: "0.72rem" }}>%</span></div>
+                                    <div style={{ fontSize: "0.54rem", fontWeight: 600, color: C.muted, marginTop: 2 }}>of original position</div>
                                   </div>
                                 )}
+                                {/* ─── Total Trimmed ─── cumulative trim % across all history (journal + today). */}
+                                {(p.realizedShares > 0 || p.sumTrimsLogged > 0) && (
+                                  <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(0,0,0,0.25)", border: `1px solid ${C.border}` }}>
+                                    <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Total Trimmed</div>
+                                    <div style={{ fontSize: "1.05rem", fontWeight: 800, color: C.goldBright, lineHeight: 1.1 }}>{p.trimProjPct.toFixed(1)}<span style={{ fontSize: "0.72rem" }}>%</span></div>
+                                    <div style={{ fontSize: "0.54rem", fontWeight: 600, color: C.muted, marginTop: 2 }}>cumulative {p.trimProjPct > p.trimPct ? <>· was <span style={{ color: C.text }}>{p.trimPct.toFixed(1)}%</span></> : ""}</div>
+                                  </div>
+                                )}
+                                {/* ─── Remaining ─── what's left of the original position after today's log books. */}
+                                <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(0,0,0,0.25)", border: `1px solid ${C.border}` }}>
+                                  <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Remaining</div>
+                                  <div style={{ fontSize: "1.05rem", fontWeight: 800, color: C.green, lineHeight: 1.1 }}>{p.remainingProjPct.toFixed(1)}<span style={{ fontSize: "0.72rem" }}>%</span></div>
+                                  <div style={{ fontSize: "0.54rem", fontWeight: 600, color: C.muted, marginTop: 2 }}>{p.sharesNProj.toLocaleString()} sh of {p.origShares.toLocaleString()}</div>
+                                </div>
                                 {p.realizedProjAdd !== 0 && (
                                   <div style={{ padding: "10px 12px", borderRadius: 8, background: p.realizedProjAdd >= 0 ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)", border: `1px solid ${p.realizedProjAdd >= 0 ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.28)"}` }}>
                                     <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>+ Realized Profit</div>
                                     <div style={{ fontSize: "1.05rem", fontWeight: 800, color: p.realizedProjAdd >= 0 ? C.green : C.red, lineHeight: 1.1 }}>{p.realizedProjAdd >= 0 ? "+" : "-"}{fmt$(Math.abs(p.realizedProjAdd), 2)}</div>
+                                    <div style={{ fontSize: "0.54rem", fontWeight: 600, color: C.muted, marginTop: 2 }}>from logged trims</div>
                                   </div>
                                 )}
                               </div>
@@ -5655,7 +5785,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 // ═══════════════════════════════════════
 // ─── SETTINGS PAGE ───
 // ═══════════════════════════════════════
-function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session, onIbkrSync, onRunIntegrity, integrityReport, integrityRunning }) {
+function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session, onIbkrSync, onRunIntegrity, integrityReport, integrityRunning, intradayFeatureEnabled, onToggleIntradayFeature, intradayColumnAvailable }) {
   const isAdmin = userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [ibkrTutOpen, setIbkrTutOpen] = useState(false);
   const [ibkrQueryId, setIbkrQueryId] = useState("");
@@ -5783,6 +5913,39 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
               )}
             </div>
             <button onClick={onRunIntegrity} disabled={integrityRunning} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: integrityRunning ? "default" : "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 7, alignSelf: "center", opacity: integrityRunning ? 0.6 : 1 }}>{integrityRunning ? <><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 999, border: `2px solid ${C.gold}`, borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />Scanning…</> : (integrityReport ? "↻ Re-run check" : "✓ Run check")}</button>
+          </div>
+        </GlassCard>
+      )}
+
+      {/* ─── Beta Features ─── per-browser opt-in for features still in test. The toggle writes to
+           localStorage so it persists per device. No DevTools required. */}
+      {onToggleIntradayFeature && (
+        <GlassCard style={{ padding: "24px 28px", marginBottom: 16 }}>
+          <div style={{ marginBottom: 14 }}>
+            <Eyebrow>Beta Features</Eyebrow>
+            <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Features in Test</div>
+            <div style={{ fontSize: "0.70rem", color: C.muted, lineHeight: 1.6 }}>Opt in to features that are still being validated. Toggles are per-browser — flipping them here doesn't affect other members or other devices.</div>
+          </div>
+          {/* Intraday Activity row */}
+          <div style={{ padding: "14px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 280px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontWeight: 700, fontSize: "0.78rem", color: C.white }}>Intraday Activity</span>
+                <span style={{ fontSize: "0.50rem", fontWeight: 800, padding: "2px 7px", borderRadius: 980, background: C.goldDim, color: C.gold, border: `1px solid ${C.borderGold}`, letterSpacing: "0.08em", textTransform: "uppercase" }}>Beta</span>
+              </div>
+              <div style={{ fontSize: "0.64rem", color: C.muted, lineHeight: 1.55 }}>
+                Adds a <strong style={{ color: C.text }}>"Today"</strong> column to Open Positions where you log intraday trims, adds, stop nudges, or notes. <strong style={{ color: C.text }}>Calculation only — does NOT change shares / stop / P/L.</strong> IBKR sync overnight auto-matches logged trims to real fills.
+              </div>
+              {!intradayColumnAvailable && (
+                <div style={{ marginTop: 8, padding: "7px 10px", borderRadius: 7, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.28)", fontSize: "0.60rem", color: C.red, lineHeight: 1.5 }}>
+                  ⚠ Schema migration not detected. Run the <code style={{ color: C.goldBright }}>positions.intraday_log</code> migration in Supabase before enabling — otherwise the toggle has no effect.
+                </div>
+              )}
+            </div>
+            {/* Toggle switch */}
+            <button onClick={() => onToggleIntradayFeature(!intradayFeatureEnabled)} role="switch" aria-checked={intradayFeatureEnabled} disabled={!intradayColumnAvailable} title={intradayColumnAvailable ? (intradayFeatureEnabled ? "Click to disable" : "Click to enable") : "Run the SQL migration first"} style={{ width: 56, height: 30, borderRadius: 980, border: `1px solid ${intradayFeatureEnabled ? C.borderGold : C.border}`, background: intradayFeatureEnabled ? C.goldDim : "rgba(255,255,255,0.04)", position: "relative", cursor: intradayColumnAvailable ? "pointer" : "not-allowed", opacity: intradayColumnAvailable ? 1 : 0.5, transition: "all 0.2s", fontFamily: font, padding: 0 }}>
+              <span style={{ position: "absolute", top: 3, left: intradayFeatureEnabled ? 28 : 3, width: 22, height: 22, borderRadius: 999, background: intradayFeatureEnabled ? C.goldBright : C.muted, transition: "left 0.18s ease-out, background 0.18s", boxShadow: intradayFeatureEnabled ? "0 0 8px rgba(240,192,80,0.5)" : "none" }} />
+            </button>
           </div>
         </GlassCard>
       )}
@@ -6469,6 +6632,16 @@ function AppInner() {
   // deploy BEFORE the SQL migration is run. State (not ref) so children re-render once detection flips.
   const [intradayColumnAvailable, setIntradayColumnAvailable] = useState(false);
   const intradayColumnAvailableRef = useRef(false); // mirror ref for the save mapper (synchronous reads)
+  // Reactive feature flag (per browser, persisted in localStorage). Settings → Beta Features toggle
+  // updates it. Replaces the DevTools `localStorage.setItem` flow — members can opt in via UI.
+  const [intradayFeatureEnabled, setIntradayFeatureEnabled] = useState(INTRADAY_FEATURE_DEFAULT);
+  const toggleIntradayFeature = useCallback((on) => {
+    try {
+      if (on) localStorage.setItem("viv-intraday-enabled", "1");
+      else localStorage.removeItem("viv-intraday-enabled");
+    } catch { /* private mode or quota — ignore */ }
+    setIntradayFeatureEnabled(!!on);
+  }, []);
   // ─── Integrity Checker (read-only scan) ───
   // Pure scan of already-loaded state — no DB writes, no network. Triggered on demand from Settings.
   // Even though the scan is sub-millisecond, we briefly flip `running` so the button shows a "Scanning…"
@@ -6527,12 +6700,12 @@ function AppInner() {
 
   // Phase 2 — surgical writes from the confirmed preview. INSERT new IBKR rows, UPDATE matched rows by id only.
   // Never deletes; reconcile updates only the factual columns so notes/tags/setup/stops are preserved.
-  const confirmIbkrSync = useCallback(async (posRows, tradeRows, closeRows = [], partialRows = [], dupeGroups = []) => {
+  const confirmIbkrSync = useCallback(async (posRows, tradeRows, closeRows = [], partialRows = [], dupeGroups = [], intradayMatches = []) => {
     const uid = session?.user?.id;
     if (!uid) { setIbkrStatus("error"); setIbkrError("Not signed in."); return; }
     setIbkrStatus("writing");
     const nowIso = new Date().toISOString();
-    const res = { tInserted: 0, tReconciled: 0, tUpdated: 0, pInserted: 0, pReconciled: 0, pUpdated: 0, pClosed: 0, partialsInserted: 0, dupesResolved: 0, dupesDeleted: 0, errors: [] };
+    const res = { tInserted: 0, tReconciled: 0, tUpdated: 0, pInserted: 0, pReconciled: 0, pUpdated: 0, pClosed: 0, partialsInserted: 0, dupesResolved: 0, dupesDeleted: 0, intradayReconciled: 0, errors: [] };
     // execIds of closing round-trips that actually land in the Journal this sync — the gate for auto-close.
     const journaledExecIds = new Set();
 
@@ -6572,6 +6745,7 @@ function AppInner() {
       positionsUpdated: [],
       positionsClosed: [], // [{ id, before }] — before.is_closed lets us restore exactly
       tradesSoftDeleted: [],
+      intradayReconciled: [], // [{ positionId, eventId }] — Undo clears reconciledExecId on these
     };
 
     // ── TRADES ── updates first (by id), then bulk insert new
@@ -6719,9 +6893,39 @@ function AppInner() {
       if (newlyDeletedExecIds.size) setSoftDeletedExecIds(prev => { const next = new Set(prev); newlyDeletedExecIds.forEach(x => next.add(x)); return next; });
     }
 
+    // ─── INTRADAY LOG RECONCILIATION ─── for each match, mark the event with reconciledExecId + reconciledAt.
+    // We fetch each affected position's CURRENT intraday_log from the DB first (avoids racing the user's
+    // in-memory edits and avoids losing concurrent additions on other devices). Then a single surgical
+    // UPDATE per position writes the merged log. Failures push to res.errors but never abort the rest of
+    // the sync — the journal partials have already been written above.
+    if (Array.isArray(intradayMatches) && intradayMatches.length > 0 && intradayColumnAvailableRef.current) {
+      const byPos = {};
+      intradayMatches.forEach(m => { (byPos[m.positionId] = byPos[m.positionId] || []).push(m); });
+      for (const [posIdStr, matches] of Object.entries(byPos)) {
+        const posId = Number(posIdStr);
+        const { data: row, error: fetchErr } = await supabase.from("positions").select("intraday_log").eq("id", posId).eq("user_id", uid).single();
+        if (fetchErr || !row) { res.errors.push(`intraday fetch ${posId}: ${fetchErr ? fetchErr.message : "row not found"}`); continue; }
+        const currentLog = normalizeIntradayLog(row.intraday_log);
+        const recIso = new Date().toISOString();
+        let touchedCount = 0;
+        const updatedEvents = (currentLog.events || []).map(ev => {
+          const m = matches.find(x => x.eventId === ev.id);
+          if (m && !ev.reconciledExecId) { touchedCount++; return { ...ev, reconciledExecId: m.execId, reconciledAt: recIso }; }
+          return ev;
+        });
+        if (touchedCount === 0) continue;
+        const nextLog = { ...currentLog, events: updatedEvents, lastReconciledAt: recIso };
+        const { error: updErr } = await supabase.from("positions").update({ intraday_log: nextLog }).eq("id", posId).eq("user_id", uid);
+        if (updErr) { res.errors.push(`intraday update ${posId}: ${updErr.message}`); continue; }
+        res.intradayReconciled += touchedCount;
+        matches.forEach(m => audit.intradayReconciled.push({ positionId: posId, eventId: m.eventId }));
+        setPositions(prev => prev.map(p => p.id === posId ? { ...p, intradayLog: nextLog } : p));
+      }
+    }
+
     // Persist audit log + result. Only persist if SOMETHING was actually written (avoids "Undo" appearing
     // after an all-skip preview).
-    const wroteSomething = audit.tradesInserted.length || audit.tradesUpdated.length || audit.positionsInserted.length || audit.positionsUpdated.length || audit.positionsClosed.length || audit.tradesSoftDeleted.length;
+    const wroteSomething = audit.tradesInserted.length || audit.tradesUpdated.length || audit.positionsInserted.length || audit.positionsUpdated.length || audit.positionsClosed.length || audit.tradesSoftDeleted.length || audit.intradayReconciled.length;
     if (wroteSomething) {
       audit.label = `Sync ${audit.syncedAt.slice(0, 16).replace("T", " ")} · ${res.tInserted + res.partialsInserted} new · ${res.tReconciled} reconciled · ${res.pClosed} closed · ${res.dupesDeleted} cleaned`;
       persistUndoLog(audit);
@@ -6782,6 +6986,26 @@ function AppInner() {
     if (lastSync.tradesSoftDeleted.length) {
       const { error } = await supabase.from("trades").update({ is_deleted: false }).in("id", lastSync.tradesSoftDeleted).eq("user_id", uid);
       if (error) r.errors.push(`restore dupes: ${error.message}`); else r.tradesUndeleted = lastSync.tradesSoftDeleted.length;
+    }
+    // 6b) Un-reconcile intraday events: clear reconciledExecId / reconciledAt that the sync stamped.
+    // Per-position fetch+merge so we don't trample other events the user added since the sync.
+    if (Array.isArray(lastSync.intradayReconciled) && lastSync.intradayReconciled.length) {
+      const byPos = {};
+      lastSync.intradayReconciled.forEach(x => { (byPos[x.positionId] = byPos[x.positionId] || []).push(x.eventId); });
+      let unreconciled = 0;
+      for (const [posIdStr, eventIds] of Object.entries(byPos)) {
+        const posId = Number(posIdStr);
+        const { data: row, error: fetchErr } = await supabase.from("positions").select("intraday_log").eq("id", posId).eq("user_id", uid).single();
+        if (fetchErr || !row) { r.errors.push(`undo intraday fetch ${posId}: ${fetchErr ? fetchErr.message : "missing"}`); continue; }
+        const log = normalizeIntradayLog(row.intraday_log);
+        const ids = new Set(eventIds);
+        const nextEvents = (log.events || []).map(ev => ids.has(ev.id) ? { ...ev, reconciledExecId: null, reconciledAt: null } : ev);
+        const nextLog = { ...log, events: nextEvents };
+        const { error: updErr } = await supabase.from("positions").update({ intraday_log: nextLog }).eq("id", posId).eq("user_id", uid);
+        if (updErr) { r.errors.push(`undo intraday update ${posId}: ${updErr.message}`); continue; }
+        unreconciled += eventIds.length;
+      }
+      r.intradayUnreconciled = unreconciled;
     }
     // 7) Re-hydrate state from the DB (one source of truth — avoids drift from per-row in-memory patches).
     try {
@@ -7406,10 +7630,10 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} />}
       {page === "tools" && <PremiumToolsPage demo={false} portfolioSize={portfolioSize} journaledTrades={journaledTrades} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} />}
-      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
       <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />
     </>
