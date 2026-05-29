@@ -493,7 +493,11 @@ const tradeDateISO = (d) => {
 };
 
 // Reconstruct closed round-trips (flat-to-flat per symbol) + open positions, then diff against current data.
-function buildIbkrPreview(data, positions, journaledTrades) {
+function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) {
+  // execIds the user previously soft-deleted as duplicates — these physical rows still exist in the trades
+  // table (just with is_deleted=true), so re-inserting would hit the unique constraint trades_user_ib_exec.
+  // Treat them as "synced" (no-op) so the user doesn't see ugly DB errors on every subsequent sync.
+  const _deletedExecIds = softDeletedExecIds instanceof Set ? softDeletedExecIds : new Set(softDeletedExecIds || []);
   // Closed trades — group executions per symbol, close out a round-trip each time net position returns to flat.
   // Also emit "partial" entries for sells that REDUCED an open lot's shares without flattening it (so they
   // show up as realized P/L on the still-open position in the dashboard). When a lot eventually flattens,
@@ -609,6 +613,7 @@ function buildIbkrPreview(data, positions, journaledTrades) {
   const tradeRows = closed.map(c => {
     const synced = (journaledTrades || []).find(t => t.ibExecId && t.ibExecId === c.execId);
     if (synced) return { ...c, action: "synced", matchId: synced.id };
+    if (c.execId && _deletedExecIds.has(c.execId)) return { ...c, action: "synced", matchId: null, prevDeleted: true };
     const tickerHits = (journaledTrades || []).filter(t => !isIbkr(t.source) && (t.ticker || "").toUpperCase() === c.ticker.toUpperCase());
     let cands = tickerHits.filter(t => tradeDateISO(t.entry) === tradeDateISO(c.entry) || tradeDateISO(t.exit) === tradeDateISO(c.exit));
     if (cands.length === 0) cands = tickerHits.filter(t => dayDiff(t.entry, c.entry) <= 3 && sharesClose(t.shares, c.shares, 0.05));
@@ -627,6 +632,7 @@ function buildIbkrPreview(data, positions, journaledTrades) {
   const partialRows = partials.map(c => {
     const synced = (journaledTrades || []).find(t => t.ibExecId && t.ibExecId === c.execId);
     if (synced) return { ...c, action: "synced", matchId: synced.id };
+    if (c.execId && _deletedExecIds.has(c.execId)) return { ...c, action: "synced", matchId: null, prevDeleted: true };
     const cands = (journaledTrades || []).filter(t =>
       !isIbkr(t.source) &&
       (t.ticker || "").toUpperCase() === c.ticker.toUpperCase() &&
@@ -5790,6 +5796,11 @@ function AppInner() {
   const [ibkrData, setIbkrData] = useState(null);
   const [ibkrError, setIbkrError] = useState(null);
   const [ibkrResult, setIbkrResult] = useState(null);
+  // Set of ib_exec_ids that exist in the trades table with is_deleted=true. The matcher uses this to skip
+  // re-importing rows the user previously cleaned up — the unique constraint trades_user_ib_exec applies
+  // to soft-deleted rows too (the physical row stays), so without this we'd hit the constraint and the
+  // sync UI shows ugly "duplicate key" errors. Tracked here so the matcher can classify them as "synced".
+  const [softDeletedExecIds, setSoftDeletedExecIds] = useState(() => new Set());
   // ─── Undo last sync ───
   // Single-deep stack. Persisted to localStorage keyed by userId; expires 24h after the sync.
   // Captures only the rows the sync touched (inserts by id, soft-deletes by id, closes with prior is_closed value).
@@ -5822,13 +5833,13 @@ function AppInner() {
       const res = await fetch("/api/ibkr-sync", { headers: { Authorization: `Bearer ${session?.access_token || ""}` } });
       const json = await res.json();
       if (!json.ok) { setIbkrStatus("error"); setIbkrError(json.error || "Sync failed."); return; }
-      setIbkrData(buildIbkrPreview(json, positions, journaledTrades));
+      setIbkrData(buildIbkrPreview(json, positions, journaledTrades, softDeletedExecIds));
       setIbkrStatus("preview");
     } catch (e) {
       setIbkrStatus("error");
       setIbkrError("Couldn't reach the sync service. Note: the /api function only runs on the deployed site (valensontrades.com), not in local dev.");
     }
-  }, [positions, journaledTrades, session]);
+  }, [positions, journaledTrades, session, softDeletedExecIds]);
 
   // Phase 2 — surgical writes from the confirmed preview. INSERT new IBKR rows, UPDATE matched rows by id only.
   // Never deletes; reconcile updates only the factual columns so notes/tags/setup/stops are preserved.
@@ -6014,7 +6025,14 @@ function AppInner() {
       else { res.dupesResolved++; res.dupesDeleted += ids.length; ids.forEach(id => { deletedTradeIds.add(id); audit.tradesSoftDeleted.push(id); }); }
     }
     if (deletedTradeIds.size) {
-      setJournaledTrades(prev => prev.filter(t => !deletedTradeIds.has(t.id)));
+      // Capture the ib_exec_ids of the rows we just soft-deleted, so the matcher won't try to re-import
+      // them on the very next sync (which would hit the unique constraint and surface a DB error to the user).
+      const newlyDeletedExecIds = new Set();
+      setJournaledTrades(prev => {
+        prev.forEach(t => { if (deletedTradeIds.has(t.id) && t.ibExecId) newlyDeletedExecIds.add(t.ibExecId); });
+        return prev.filter(t => !deletedTradeIds.has(t.id));
+      });
+      if (newlyDeletedExecIds.size) setSoftDeletedExecIds(prev => { const next = new Set(prev); newlyDeletedExecIds.forEach(x => next.add(x)); return next; });
     }
 
     // Persist audit log + result. Only persist if SOMETHING was actually written (avoids "Undo" appearing
@@ -6083,10 +6101,12 @@ function AppInner() {
     }
     // 7) Re-hydrate state from the DB (one source of truth — avoids drift from per-row in-memory patches).
     try {
-      const [tradesRes, posRes] = await Promise.all([
+      const [tradesRes, posRes, softDelsRes] = await Promise.all([
         supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false }),
         supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false),
+        supabase.from("trades").select("ib_exec_id").eq("user_id", uid).eq("is_deleted", true).not("ib_exec_id", "is", null),
       ]);
+      if (softDelsRes.data) setSoftDeletedExecIds(new Set(softDelsRes.data.map(r => r.ib_exec_id).filter(Boolean)));
       if (tradesRes.data) {
         setJournaledTrades(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null })));
       }
@@ -6392,6 +6412,10 @@ function AppInner() {
         setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null })));
         lastLoadedTradeCount.current = trades.length;
       }
+      // Soft-deleted IBKR exec ids — small parallel query, just the column we need. Used by the matcher
+      // to skip re-importing rows the unique constraint trades_user_ib_exec would block anyway.
+      const { data: softDels } = await supabase.from("trades").select("ib_exec_id").eq("user_id", uid).eq("is_deleted", true).not("ib_exec_id", "is", null);
+      if (softDels) setSoftDeletedExecIds(new Set(softDels.map(r => r.ib_exec_id).filter(Boolean)));
 
       // ─── Recover any emergency offline saves from localStorage ───
       try {
