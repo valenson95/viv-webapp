@@ -792,7 +792,7 @@ function ibkrChoiceOpts(r) {
   if (r.action === "duplicate") return [["skip", "Skip (already in journal)"], ["new", "Import anyway"]];
   return [["new", "Import"], ["skip", "Skip"]];
 }
-function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, onConfirm }) {
+function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, onConfirm, lastSync, onUndo, undoStatus }) {
   const [choices, setChoices] = useState({ pos: {}, trade: {}, close: {}, partial: {}, dupes: {} });
   useEffect(() => {
     if (data) {
@@ -853,11 +853,27 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                 {(result.dupesResolved || 0) > 0 && <><br />Cleanup: <strong style={{ color: C.white }}>{result.dupesResolved}</strong> duplicate group{result.dupesResolved === 1 ? "" : "s"} resolved · <strong style={{ color: C.white }}>{result.dupesDeleted}</strong> row{result.dupesDeleted === 1 ? "" : "s"} soft-deleted</>}
               </div>
               {result.errors && result.errors.length > 0 && <div style={{ marginTop: 12, fontSize: "0.66rem", color: C.red }}>{result.errors.length} row(s) failed and were skipped: {result.errors.slice(0, 3).join("; ")}{result.errors.length > 3 ? "…" : ""}</div>}
-              <button onClick={onClose} style={{ marginTop: 18, padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font }}>Done</button>
+              <div style={{ marginTop: 18, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                {lastSync && result.syncId && lastSync.syncId === result.syncId && (
+                  <button
+                    onClick={() => { if (window.confirm("Undo this sync? All new rows will be soft-deleted, all reconciled rows will be restored to their pre-sync values, all auto-closed positions will be re-opened, and all cleanup-deleted duplicates will be restored. Notes/tags/setup/stops you've added since the sync are preserved.")) onUndo(); }}
+                    disabled={undoStatus === "running"}
+                    style={{ padding: "9px 18px", borderRadius: 980, border: `1px solid rgba(239,68,68,0.30)`, background: "rgba(239,68,68,0.08)", color: C.red, fontWeight: 700, fontSize: "0.72rem", cursor: undoStatus === "running" ? "default" : "pointer", fontFamily: font }}>
+                    {undoStatus === "running" ? "Undoing…" : "↶ Undo this sync"}
+                  </button>
+                )}
+                <button onClick={onClose} style={{ padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font }}>Done</button>
+              </div>
             </div>
           )}
           {(status === "preview" || status === "writing") && data && (
             <>
+              {lastSync && lastSync.expiresAt && Date.parse(lastSync.expiresAt) > Date.now() && (
+                <div style={{ padding: "8px 12px", background: "rgba(239,68,68,0.06)", border: `1px solid rgba(239,68,68,0.25)`, borderRadius: 10, fontSize: "0.66rem", color: C.text, lineHeight: 1.5, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span><strong style={{ color: C.red }}>↶ Previous sync recoverable</strong> · {lastSync.label || lastSync.syncedAt} · expires {new Date(lastSync.expiresAt).toLocaleString()}</span>
+                  <button onClick={() => { if (window.confirm("Undo the PREVIOUS sync (not this preview)? All rows that sync inserted will be soft-deleted, reconciled rows restored to prior values, auto-closed positions re-opened, and cleanup-deleted duplicates restored.")) onUndo(); }} disabled={undoStatus === "running" || status === "writing"} style={{ padding: "6px 12px", borderRadius: 980, border: `1px solid rgba(239,68,68,0.30)`, background: "rgba(239,68,68,0.10)", color: C.red, fontWeight: 700, fontSize: "0.64rem", cursor: undoStatus === "running" ? "default" : "pointer", fontFamily: font, whiteSpace: "nowrap" }}>{undoStatus === "running" ? "Undoing…" : "Undo previous sync"}</button>
+                </div>
+              )}
               <div style={{ padding: "10px 14px", background: "rgba(201,152,42,0.08)", border: `1px solid ${C.borderGold}`, borderRadius: 10, fontSize: "0.7rem", color: C.text, lineHeight: 1.6, marginBottom: 18 }}>
                 <strong style={{ color: C.goldBright }}>Review before importing.</strong> Entry date on/after {IBKR_SYNC_FLOOR}. <strong style={{ color: C.white }}>Reconcile</strong> updates a manual entry with IBKR's exact figures and keeps your notes/tags. Nothing is ever deleted; manual rows you don't reconcile are untouched.
               </div>
@@ -5774,6 +5790,32 @@ function AppInner() {
   const [ibkrData, setIbkrData] = useState(null);
   const [ibkrError, setIbkrError] = useState(null);
   const [ibkrResult, setIbkrResult] = useState(null);
+  // ─── Undo last sync ───
+  // Single-deep stack. Persisted to localStorage keyed by userId; expires 24h after the sync.
+  // Captures only the rows the sync touched (inserts by id, soft-deletes by id, closes with prior is_closed value).
+  // Reverse: soft-delete inserts (recoverable), set is_deleted=false on softs, set is_closed=false on closes.
+  const [lastSync, setLastSync] = useState(null);
+  const undoStorageKey = useMemo(() => session?.user?.id ? `viv-ibkr-undo-${session.user.id}` : null, [session]);
+  useEffect(() => {
+    if (!undoStorageKey) { setLastSync(null); return; }
+    try {
+      const raw = localStorage.getItem(undoStorageKey);
+      if (!raw) { setLastSync(null); return; }
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.userId !== session.user.id) { setLastSync(null); return; }
+      if (parsed.expiresAt && Date.parse(parsed.expiresAt) < Date.now()) {
+        localStorage.removeItem(undoStorageKey);
+        setLastSync(null);
+        return;
+      }
+      setLastSync(parsed);
+    } catch { setLastSync(null); }
+  }, [undoStorageKey, session]);
+  const persistUndoLog = useCallback((audit) => {
+    if (!undoStorageKey) return;
+    try { localStorage.setItem(undoStorageKey, JSON.stringify(audit)); }
+    catch { /* quota — drop silently rather than break the sync */ }
+  }, [undoStorageKey]);
   const runIbkrSync = useCallback(async () => {
     setIbkrOpen(true); setIbkrStatus("loading"); setIbkrError(null); setIbkrData(null); setIbkrResult(null);
     try {
@@ -5799,6 +5841,44 @@ function AppInner() {
     // execIds of closing round-trips that actually land in the Journal this sync — the gate for auto-close.
     const journaledExecIds = new Set();
 
+    // ─── UNDO AUDIT CAPTURE ─── snapshot every row this sync will UPDATE *before* we touch it, so Undo can
+    // restore the exact prior values. Insert/close/soft-delete reverts only need the ids (Undo soft-deletes
+    // inserts, re-opens closed positions, un-soft-deletes the duplicates). If the snapshot SELECT fails we
+    // abort the sync rather than write something we can't reverse — Tier 4 safety.
+    const updTradeIds = [
+      ...tradeRows.filter(r => (r.choice === "reconcile" || r.choice === "update") && r.matchId).map(r => r.matchId),
+      ...(partialRows || []).filter(r => r.choice === "reconcile" && r.matchId).map(r => r.matchId),
+    ];
+    const updPosIds = posRows.filter(r => (r.choice === "reconcile" || r.choice === "update") && r.matchId).map(r => r.matchId);
+    const closePosIds = (closeRows || []).filter(r => r.choice === "close").map(r => r.posId);
+    const dupeTradeIds = (dupeGroups || []).flatMap(g => g.choice === "delete-ibkr" ? g.ibkrRows.map(r => r.id) : g.choice === "delete-manual" ? [g.manualId] : []);
+    const beforeTrades = {};
+    const beforePositions = {};
+    const allTradeIdsToSnapshot = [...new Set([...updTradeIds, ...dupeTradeIds])];
+    const allPosIdsToSnapshot = [...new Set([...updPosIds, ...closePosIds])];
+    if (allTradeIdsToSnapshot.length) {
+      const { data: snap, error } = await supabase.from("trades").select("*").in("id", allTradeIdsToSnapshot).eq("user_id", uid);
+      if (error) { setIbkrStatus("error"); setIbkrError("Couldn't snapshot before-state for Undo. Sync cancelled (no data changed)."); return; }
+      (snap || []).forEach(t => { beforeTrades[t.id] = t; });
+    }
+    if (allPosIdsToSnapshot.length) {
+      const { data: snap, error } = await supabase.from("positions").select("*").in("id", allPosIdsToSnapshot).eq("user_id", uid);
+      if (error) { setIbkrStatus("error"); setIbkrError("Couldn't snapshot before-state for Undo. Sync cancelled (no data changed)."); return; }
+      (snap || []).forEach(p => { beforePositions[p.id] = p; });
+    }
+    const audit = {
+      syncId: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
+      userId: uid,
+      syncedAt: nowIso,
+      expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      tradesInserted: [],
+      tradesUpdated: [],   // [{ id, before }]
+      positionsInserted: [],
+      positionsUpdated: [],
+      positionsClosed: [], // [{ id, before }] — before.is_closed lets us restore exactly
+      tradesSoftDeleted: [],
+    };
+
     // ── TRADES ── updates first (by id), then bulk insert new
     const tradeInserts = [];
     for (const r of tradeRows) {
@@ -5820,6 +5900,7 @@ function AppInner() {
         else {
           if (r.choice === "reconcile") res.tReconciled++; else res.tUpdated++;
           if (r.execId) journaledExecIds.add(r.execId);
+          if (beforeTrades[r.matchId]) audit.tradesUpdated.push({ id: r.matchId, before: beforeTrades[r.matchId] });
           setJournaledTrades(prev => prev.map(t => t.id === r.matchId ? { ...t, entry: r.entry, entryTime: r.entryTime || "", exit: r.exit, exitTime: r.exitTime || "", entryP: r.entryP, exitP: r.exitP, shares: r.shares, commission: r.commission, plPct: r.plPct, plDollar: r.plDollar, ...(rMult !== undefined ? { rMult } : {}), tradeType: r.tradeType, source: r.choice === "reconcile" ? "reconciled" : t.source, ibExecId: r.execId, ibTradeId: r.tradeId } : t));
         }
       }
@@ -5829,7 +5910,7 @@ function AppInner() {
       if (error) { res.errors.push(`new trades: ${error.message}`); }
       else if (ins) {
         res.tInserted = ins.length;
-        ins.forEach(t => { if (t.ib_exec_id) journaledExecIds.add(t.ib_exec_id); });
+        ins.forEach(t => { if (t.ib_exec_id) journaledExecIds.add(t.ib_exec_id); audit.tradesInserted.push(t.id); });
         const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
@@ -5848,6 +5929,7 @@ function AppInner() {
         if (error) { res.errors.push(`position ${r.sym}: ${error.message}`); }
         else {
           if (r.choice === "reconcile") res.pReconciled++; else res.pUpdated++;
+          if (beforePositions[r.matchId]) audit.positionsUpdated.push({ id: r.matchId, before: beforePositions[r.matchId] });
           setPositions(prev => prev.map(p => p.id === r.matchId ? { ...p, sym: r.sym, entry: r.entry, entryTime: r.entryTime || "", shares: String(r.shares), ep: String(r.ep), tradeType: r.tradeType, source: r.choice === "reconcile" ? "reconciled" : p.source, ibConid: r.conid } : p));
         }
       }
@@ -5857,6 +5939,7 @@ function AppInner() {
       if (error) { res.errors.push(`new positions: ${error.message}`); }
       else if (ins) {
         res.pInserted = ins.length;
+        ins.forEach(p => audit.positionsInserted.push(p.id));
         const mapped = ins.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "ibkr", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null }));
         setPositions(prev => [...prev, ...mapped]);
         lastLoadedCount.current = (lastLoadedCount.current || 0) + mapped.length;
@@ -5882,6 +5965,7 @@ function AppInner() {
         if (error) { res.errors.push(`partial ${r.ticker}: ${error.message}`); }
         else {
           res.tReconciled++;
+          if (beforeTrades[r.matchId]) audit.tradesUpdated.push({ id: r.matchId, before: beforeTrades[r.matchId] });
           setJournaledTrades(prev => prev.map(t => t.id === r.matchId ? { ...t, entry: r.entry, entryTime: r.entryTime || "", exit: r.exit, exitTime: r.exitTime || "", entryP: r.entryP, exitP: r.exitP, shares: r.shares, commission: r.commission, plPct: r.plPct, plDollar: r.plDollar, ...(rMult !== undefined ? { rMult } : {}), tradeType: r.tradeType, source: "reconciled", ibExecId: r.execId, ibTradeId: r.tradeId } : t));
         }
         continue;
@@ -5894,6 +5978,7 @@ function AppInner() {
       if (error) { res.errors.push(`partial sells: ${error.message}`); }
       else if (ins) {
         res.partialsInserted = ins.length;
+        ins.forEach(t => audit.tradesInserted.push(t.id));
         const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
@@ -5909,7 +5994,7 @@ function AppInner() {
       if (!r.linkExecId || !journaledExecIds.has(r.linkExecId)) continue;    // not in the Journal → leave it open
       const { error } = await supabase.from("positions").update({ is_closed: true, ib_synced_at: nowIso }).eq("id", r.posId).eq("user_id", uid);
       if (error) { res.errors.push(`close ${r.sym}: ${error.message}`); }
-      else { res.pClosed++; archivedPosIds.add(r.posId); }
+      else { res.pClosed++; archivedPosIds.add(r.posId); if (beforePositions[r.posId]) audit.positionsClosed.push({ id: r.posId, before: beforePositions[r.posId] }); }
     }
     if (archivedPosIds.size) {
       setPositions(prev => { const next = prev.filter(p => !archivedPosIds.has(p.id)); positionsRef.current = next; return next; });
@@ -5926,15 +6011,98 @@ function AppInner() {
       if (!ids.length) continue;
       const { error } = await supabase.from("trades").update({ is_deleted: true }).in("id", ids).eq("user_id", uid);
       if (error) { res.errors.push(`cleanup ${g.ticker}: ${error.message}`); }
-      else { res.dupesResolved++; res.dupesDeleted += ids.length; ids.forEach(id => deletedTradeIds.add(id)); }
+      else { res.dupesResolved++; res.dupesDeleted += ids.length; ids.forEach(id => { deletedTradeIds.add(id); audit.tradesSoftDeleted.push(id); }); }
     }
     if (deletedTradeIds.size) {
       setJournaledTrades(prev => prev.filter(t => !deletedTradeIds.has(t.id)));
     }
 
+    // Persist audit log + result. Only persist if SOMETHING was actually written (avoids "Undo" appearing
+    // after an all-skip preview).
+    const wroteSomething = audit.tradesInserted.length || audit.tradesUpdated.length || audit.positionsInserted.length || audit.positionsUpdated.length || audit.positionsClosed.length || audit.tradesSoftDeleted.length;
+    if (wroteSomething) {
+      audit.label = `Sync ${audit.syncedAt.slice(0, 16).replace("T", " ")} · ${res.tInserted + res.partialsInserted} new · ${res.tReconciled} reconciled · ${res.pClosed} closed · ${res.dupesDeleted} cleaned`;
+      persistUndoLog(audit);
+      setLastSync(audit);
+      res.syncId = audit.syncId;
+    }
     setIbkrResult(res);
     setIbkrStatus("done");
-  }, [session]);
+  }, [session, persistUndoLog]);
+
+  // ─── Undo Last Sync ─── reverses the most recent confirmed sync. Soft-delete inserts (recoverable),
+  // restore updated rows to their captured before-state, set is_deleted=false on auto-cleaned dupes,
+  // set is_closed=false on auto-archived positions. All updates are scoped by user_id. Per-row try/catch
+  // so one failure doesn't abort the whole undo. After success we clear the audit log; no double-undo.
+  const [undoStatus, setUndoStatus] = useState("idle"); // idle | running | done
+  const [undoResult, setUndoResult] = useState(null);
+  const undoLastSync = useCallback(async () => {
+    const uid = session?.user?.id;
+    if (!uid || !lastSync || lastSync.userId !== uid) return;
+    if (undoStatus === "running") return;
+    setUndoStatus("running"); setUndoResult(null);
+    const r = { tradesReinserted: 0, tradesRestored: 0, positionsReinserted: 0, positionsRestored: 0, positionsReopened: 0, tradesUndeleted: 0, errors: [] };
+    // 1) Soft-delete the trades this sync INSERTed.
+    if (lastSync.tradesInserted.length) {
+      const { error } = await supabase.from("trades").update({ is_deleted: true }).in("id", lastSync.tradesInserted).eq("user_id", uid);
+      if (error) r.errors.push(`undelete inserts: ${error.message}`); else r.tradesReinserted = lastSync.tradesInserted.length;
+    }
+    // 2) Restore the trades this sync UPDATEd to their captured before-state. Only restore the columns
+    // the sync wrote — judgment columns (notes, tags, setup, stop, exit_reason) the user may have edited
+    // SINCE the sync are left alone.
+    for (const { id, before } of lastSync.tradesUpdated) {
+      const upd = {
+        entry_date: before.entry_date, entry_time: before.entry_time, exit_date: before.exit_date, exit_time: before.exit_time,
+        entry_price: before.entry_price, exit_price: before.exit_price, shares: before.shares, commission: before.commission,
+        pl_pct: before.pl_pct, pl_dollar: before.pl_dollar, r_mult: before.r_mult, trade_type: before.trade_type,
+        source: before.source, ib_exec_id: before.ib_exec_id, ib_trade_id: before.ib_trade_id, ib_synced_at: before.ib_synced_at,
+      };
+      const { error } = await supabase.from("trades").update(upd).eq("id", id).eq("user_id", uid);
+      if (error) r.errors.push(`restore trade ${id}: ${error.message}`); else r.tradesRestored++;
+    }
+    // 3) Soft-archive the positions this sync INSERTed (is_closed=true keeps the record, hides from dashboard).
+    if (lastSync.positionsInserted.length) {
+      const { error } = await supabase.from("positions").update({ is_closed: true }).in("id", lastSync.positionsInserted).eq("user_id", uid);
+      if (error) r.errors.push(`archive inserts: ${error.message}`); else r.positionsReinserted = lastSync.positionsInserted.length;
+    }
+    // 4) Restore the positions this sync UPDATEd.
+    for (const { id, before } of lastSync.positionsUpdated) {
+      const upd = { symbol: before.symbol, entry_date: before.entry_date, entry_time: before.entry_time, shares: before.shares, entry_price: before.entry_price, trade_type: before.trade_type, source: before.source, ib_conid: before.ib_conid, ib_synced_at: before.ib_synced_at };
+      const { error } = await supabase.from("positions").update(upd).eq("id", id).eq("user_id", uid);
+      if (error) r.errors.push(`restore position ${id}: ${error.message}`); else r.positionsRestored++;
+    }
+    // 5) Re-open auto-closed positions (restore exact prior is_closed + ib_synced_at).
+    for (const { id, before } of lastSync.positionsClosed) {
+      const { error } = await supabase.from("positions").update({ is_closed: before.is_closed === undefined ? false : before.is_closed, ib_synced_at: before.ib_synced_at }).eq("id", id).eq("user_id", uid);
+      if (error) r.errors.push(`reopen position ${id}: ${error.message}`); else r.positionsReopened++;
+    }
+    // 6) Restore soft-deleted duplicates.
+    if (lastSync.tradesSoftDeleted.length) {
+      const { error } = await supabase.from("trades").update({ is_deleted: false }).in("id", lastSync.tradesSoftDeleted).eq("user_id", uid);
+      if (error) r.errors.push(`restore dupes: ${error.message}`); else r.tradesUndeleted = lastSync.tradesSoftDeleted.length;
+    }
+    // 7) Re-hydrate state from the DB (one source of truth — avoids drift from per-row in-memory patches).
+    try {
+      const [tradesRes, posRes] = await Promise.all([
+        supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false }),
+        supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false),
+      ]);
+      if (tradesRes.data) {
+        setJournaledTrades(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null })));
+      }
+      if (posRes.data) {
+        const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null }));
+        setPositions(mapped);
+        positionsRef.current = mapped;
+        lastLoadedCount.current = mapped.length;
+      }
+    } catch (e) { r.errors.push(`reload: ${e.message}`); }
+    // 8) Clear the audit log — undo is one-shot.
+    if (undoStorageKey) localStorage.removeItem(undoStorageKey);
+    setLastSync(null);
+    setUndoResult(r);
+    setUndoStatus("done");
+  }, [session, lastSync, undoStatus, undoStorageKey]);
   const [fullSizePct, setFullSizePct] = useState(25);
   const [numStocks, setNumStocks] = useState(5);
   const [fontSize, setFontSize] = useState("standard");
@@ -6521,7 +6689,7 @@ function AppInner() {
       {page === "tools" && <PremiumToolsPage demo={false} portfolioSize={portfolioSize} journaledTrades={journaledTrades} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} />}
-      <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} />
+      <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
     </>
   );
 
