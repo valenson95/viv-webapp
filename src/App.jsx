@@ -477,6 +477,24 @@ function SourceDot({ source }) {
 
 // ─── IBKR Sync: entry-date floor + preview reconstruction (pure, no DB writes) ───
 const IBKR_SYNC_FLOOR = "2026-05-01"; // only system trades ENTERED on/after this date are pulled
+
+// ─── Intraday Activity Log ─── per-position JSON column. Default shape always returned by the load mapper
+// so downstream code never has to null-check. Events are immutable once added; only `reconciledExecId` and
+// `reconciledAt` mutate (set by IBKR sync when it confirms an event). `lastClearedAt` records the last time
+// the user dismissed reconciled events.
+const INTRADAY_LOG_VERSION = 1;
+const DEFAULT_INTRADAY_LOG = Object.freeze({ version: INTRADAY_LOG_VERSION, events: [], lastReconciledAt: null, lastClearedAt: null });
+const normalizeIntradayLog = (raw) => {
+  if (!raw || typeof raw !== "object") return { ...DEFAULT_INTRADAY_LOG };
+  return {
+    version: typeof raw.version === "number" ? raw.version : INTRADAY_LOG_VERSION,
+    events: Array.isArray(raw.events) ? raw.events : [],
+    lastReconciledAt: raw.lastReconciledAt || null,
+    lastClearedAt: raw.lastClearedAt || null,
+  };
+};
+// Feature flag — Step 1 plumbing ships dark. Flip to true (or via localStorage 'viv-intraday-enabled') in Step 5.
+const INTRADAY_FEATURE_ENABLED = (typeof window !== "undefined" && window.localStorage && localStorage.getItem("viv-intraday-enabled") === "1");
 // Normalize a trade date to ISO YYYY-MM-DD (handles "M/D/YY" manual/dashboard entries and "YYYY-MM-DD" IBKR rows).
 // Used both by the IBKR reconcile-matcher and the trade-review chart.
 // Normalize any date string to a YYYY-MM-DD day key. Handles M/D/YY · M/D/YYYY · ISO (with - or /) and
@@ -786,6 +804,380 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
   });
 
   return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows, closeRows, partialRows, dupeJournalGroups };
+}
+
+// ─── INTEGRITY CHECKER ─── pure function. Walks already-loaded journal + positions + softDeletedExecIds
+// and emits a categorized list of findings. ZERO writes — read-only scan. Re-uses the same matching
+// helpers as buildIbkrPreview so findings stay consistent between the live sync preview and the standalone
+// integrity scan. Severity: "critical" → must review · "warn" → should review · "info" → background context.
+function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedExecIds = new Set() } = {}) {
+  const t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : 0;
+  const dayMs = 86400000;
+  const dayDiffLocal = (a, b) => {
+    if (!a || !b) return Infinity;
+    const am = Date.parse(tradeDateISO(a));
+    const bm = Date.parse(tradeDateISO(b));
+    if (isNaN(am) || isNaN(bm)) return Infinity;
+    return Math.abs(am - bm) / dayMs;
+  };
+  const sharesCloseLocal = (a, b, pct = 0.05) => {
+    const aN = Number(a) || 0, bN = Number(b) || 0;
+    return Math.abs(aN - bN) <= Math.max(1, Math.max(aN, bN) * pct);
+  };
+  const isIbkrLocal = s => s === "ibkr" || s === "reconciled";
+  const subsetSumLocal = (rows, target, tolPct = 0.05) => {
+    const n = rows.length;
+    if (n === 0 || n > 14) return null;
+    const tol = Math.max(1, target * tolPct);
+    for (let mask = 1; mask < (1 << n); mask++) {
+      let sum = 0; const idx = [];
+      for (let i = 0; i < n; i++) if (mask & (1 << i)) { sum += Number(rows[i].shares) || 0; idx.push(i); }
+      if (Math.abs(sum - target) <= tol) return idx;
+    }
+    return null;
+  };
+  const findings = [];
+  let nextId = 0;
+  const add = (severity, category, name, description, details, suggestedAction) =>
+    findings.push({ id: `f-${++nextId}`, severity, category, name, description, details: details || [], suggestedAction: suggestedAction || null });
+
+  // ── DUPLICATES ──
+  // 1) Exact-key duplicate trades
+  const exactKey = t => `${(t.ticker || "").toUpperCase()}|${tradeDateISO(t.entry)}|${tradeDateISO(t.exit)}|${Number(t.shares) || 0}|${(Number(t.plDollar) || 0).toFixed(2)}`;
+  const byKey = {};
+  journaledTrades.forEach(t => { if (!t.ticker) return; const k = exactKey(t); (byKey[k] = byKey[k] || []).push(t); });
+  Object.entries(byKey).forEach(([k, group]) => {
+    if (group.length < 2) return;
+    add("critical", "duplicates", "Exact-key duplicate trades",
+      `${group.length} trades share the same ticker + entry day + exit day + shares + P/L. Almost certainly the same fill imported twice.`,
+      group.map(t => `${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${t.shares} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)} · source: ${t.source || "?"}${t.ibExecId ? ` · execId: ${t.ibExecId.slice(-12)}` : ""}`),
+      "Open Trade Journal → review each row → soft-delete the manual/duplicate one. The Sync modal's duplicate-cleanup section has a one-click resolver."
+    );
+  });
+
+  // 2) Soft-deleted exec_id leak — a live trade whose execId is also in the soft-deleted set
+  const deletedSet = softDeletedExecIds instanceof Set ? softDeletedExecIds : new Set(softDeletedExecIds || []);
+  journaledTrades.forEach(t => {
+    if (t.ibExecId && deletedSet.has(t.ibExecId)) {
+      add("critical", "duplicates", "Soft-deleted exec ID leak",
+        `Trade ${t.ticker} has an IBKR exec ID that's also in the soft-deleted tombstone list — likely a partial cleanup state.`,
+        [`${t.ticker} · ${tradeDateISO(t.entry)} · ${t.shares} sh · exec ${t.ibExecId.slice(-12)} · source: ${t.source || "?"}`],
+        "Decide which copy is canonical: soft-delete this one again, or accept it (will fail to import on next sync if there's still a tombstone)."
+      );
+    }
+  });
+
+  // 3) Duplicate ib_conid on open positions
+  const byConid = {};
+  positions.forEach(p => { if (p.ibConid) (byConid[p.ibConid] = byConid[p.ibConid] || []).push(p); });
+  Object.values(byConid).forEach(group => {
+    if (group.length < 2) return;
+    add("critical", "duplicates", "Duplicate IBKR conid on open positions",
+      `${group.length} open positions share the same IBKR contract id. The next sync will reconcile against all of them and may double-update.`,
+      group.map(p => `${p.sym} · entry ${tradeDateISO(p.entry)} · ${p.shares} sh · conid ${p.ibConid} · source: ${p.source || "?"}`),
+      "Pick the canonical row. Archive the duplicates (is_closed=true) via the IBKR sync auto-close flow, or contact support for manual cleanup."
+    );
+  });
+
+  // 4) Aggregate dupe: 1 manual = N IBKR (matches the Sync modal's existing detection — re-surfaced)
+  const ibkrJournalRows = journaledTrades.filter(t => isIbkrLocal(t.source));
+  const claimedIds = new Set();
+  journaledTrades.filter(m => !isIbkrLocal(m.source)).forEach(manual => {
+    if (claimedIds.has(manual.id)) return;
+    const sym = (manual.ticker || "").toUpperCase();
+    if (!sym) return;
+    const manualShares = Number(manual.shares) || 0;
+    if (manualShares <= 0) return;
+    const elig = ibkrJournalRows.filter(t => !claimedIds.has(t.id) && (t.ticker || "").toUpperCase() === sym && dayDiffLocal(t.entry, manual.entry) <= 5);
+    if (!elig.length) return;
+    const total = elig.reduce((s, t) => s + (Number(t.shares) || 0), 0);
+    const picked = Math.abs(total - manualShares) <= Math.max(1, manualShares * 0.05)
+      ? elig.map((_, i) => i)
+      : subsetSumLocal(elig, manualShares, 0.05);
+    if (!picked) return;
+    claimedIds.add(manual.id);
+    picked.forEach(i => claimedIds.add(elig[i].id));
+    add("warn", "duplicates", "Aggregate duplicate (manual ↔ N×IBKR)",
+      `Manual ${manual.ticker} (${manualShares} sh) matches the sum of ${picked.length} IBKR row${picked.length === 1 ? "" : "s"} within ±5%. Same physical trade represented twice.`,
+      [`Manual: ${manual.ticker} · ${tradeDateISO(manual.entry)} → ${tradeDateISO(manual.exit)} · ${manualShares} sh · ${(Number(manual.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(manual.plDollar) || 0).toFixed(2)}${manual.rMult != null ? ` · ${Number(manual.rMult).toFixed(2)}R` : ""}`,
+       ...picked.map(i => { const t = elig[i]; return `IBKR: ${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${Number(t.shares) || 0} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)}`; })],
+      "Open the IBKR Sync modal — the duplicate-cleanup section has a one-click 'Keep manual · delete N IBKR rows' resolver."
+    );
+  });
+
+  // 5) Inverse aggregate: 1 IBKR round-trip = N manual partial trims
+  const claimedIbkrIds = new Set();
+  journaledTrades.filter(t => isIbkrLocal(t.source) && t.reason !== "Partial Trim").forEach(ibkr => {
+    if (claimedIbkrIds.has(ibkr.id)) return;
+    const sym = (ibkr.ticker || "").toUpperCase();
+    if (!sym) return;
+    const ibkrShares = Number(ibkr.shares) || 0;
+    if (ibkrShares <= 0) return;
+    const elig = journaledTrades.filter(t => !isIbkrLocal(t.source) && !claimedIds.has(t.id) && (t.ticker || "").toUpperCase() === sym && dayDiffLocal(t.entry, ibkr.entry) <= 5);
+    if (elig.length < 2) return;
+    const picked = subsetSumLocal(elig, ibkrShares, 0.05);
+    if (!picked || picked.length < 2) return;
+    claimedIbkrIds.add(ibkr.id);
+    picked.forEach(i => claimedIds.add(elig[i].id));
+    add("warn", "duplicates", "Inverse aggregate (IBKR ↔ N×manual)",
+      `IBKR ${ibkr.ticker} (${ibkrShares} sh round-trip) sums to ${picked.length} manual rows within ±5%. The manuals are likely staged Sell-button trims that overlap with this single IBKR cycle.`,
+      [`IBKR: ${ibkr.ticker} · ${tradeDateISO(ibkr.entry)} → ${tradeDateISO(ibkr.exit)} · ${ibkrShares} sh · ${(Number(ibkr.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(ibkr.plDollar) || 0).toFixed(2)}`,
+       ...picked.map(i => { const t = elig[i]; return `Manual: ${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${Number(t.shares) || 0} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)}`; })],
+      "Review side-by-side. Keep whichever set has your judgment fields (notes, R-mult, setup); soft-delete the other via the Journal."
+    );
+  });
+
+  // ── ORPHANS ──
+  // 6) Open position missing critical fields
+  positions.forEach(p => {
+    const shares = Number(p.shares);
+    const ep = Number(p.ep);
+    const missing = [];
+    if (!p.sym) missing.push("ticker");
+    if (!Number.isFinite(shares) || shares <= 0) missing.push(`shares (${p.shares == null ? "null" : p.shares})`);
+    if (!Number.isFinite(ep) || ep <= 0) missing.push(`entry price (${p.ep == null ? "null" : p.ep})`);
+    if (missing.length) add("critical", "orphans", "Open position missing critical field(s)",
+      `Position is missing: ${missing.join(", ")}. Breaks sizer / exposure / risk math.`,
+      [`${p.sym || "(no ticker)"} · entry ${tradeDateISO(p.entry) || "?"} · source: ${p.source || "?"}`],
+      "Open the Dashboard → click the row → fill in the missing field → Save."
+    );
+  });
+
+  // ── FORMULAS ──
+  // 7) P/L sign disagreement (dollars vs percent vs derived)
+  journaledTrades.forEach(t => {
+    const d = Number(t.plDollar) || 0;
+    const pct = Number(t.plPct) || 0;
+    if (d && pct && Math.sign(d) !== Math.sign(pct)) {
+      add("warn", "formulas", "P/L sign disagreement ($ vs %)",
+        `${t.ticker}: dollar P/L is ${d >= 0 ? "positive" : "negative"} but percent P/L is ${pct >= 0 ? "positive" : "negative"}. Usually a hand-keyed sign error.`,
+        [`${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · $${d.toFixed(2)} · ${pct.toFixed(2)}%`],
+        "Re-key one field, or open the trade and let Save recompute from entry/exit/shares."
+      );
+    }
+    if (t.tradeType && Number(t.entryP) && Number(t.exitP) && d) {
+      const derived = t.tradeType === "Short" ? (Number(t.entryP) - Number(t.exitP)) : (Number(t.exitP) - Number(t.entryP));
+      if (derived && Math.sign(d) !== Math.sign(derived)) {
+        add("warn", "formulas", "P/L sign disagrees with prices",
+          `${t.ticker} ${t.tradeType}: dollar P/L sign doesn't match (exit - entry). Likely a long/short mislabel.`,
+          [`${t.ticker} ${t.tradeType} · entry $${Number(t.entryP).toFixed(2)} → exit $${Number(t.exitP).toFixed(2)} · $${d.toFixed(2)}`],
+          "Verify the trade direction. If short, exit < entry is profit. If long, exit > entry is profit."
+        );
+      }
+    }
+  });
+
+  // 8) r_mult set without stop
+  journaledTrades.forEach(t => {
+    if (t.rMult != null && Number(t.rMult) !== 0 && (!t.stop || Number(t.stop) <= 0)) {
+      add("info", "formulas", "R-multiple set without stop",
+        `${t.ticker}: ${Number(t.rMult).toFixed(2)}R recorded but no stop on the trade. R can't be re-derived if needed.`,
+        [`${t.ticker} · ${tradeDateISO(t.entry)} · rMult ${Number(t.rMult).toFixed(2)} · stop ${t.stop || "—"}`],
+        "Either set the stop the trade was sized against, or clear rMult."
+      );
+    }
+  });
+
+  // 9) Trim % > 100% on open positions
+  positions.forEach(p => {
+    const sym = (p.sym || "").toUpperCase();
+    if (!sym) return;
+    const matches = journaledTrades.filter(t => (t.ticker || "").toUpperCase() === sym && tradeDateISO(t.entry) === tradeDateISO(p.entry));
+    if (!matches.length) return;
+    const trimmed = matches.reduce((s, t) => s + (Number(t.shares) || 0), 0);
+    const remaining = Number(p.shares) || 0;
+    const original = trimmed + remaining;
+    if (original > 0 && trimmed > original * 1.001) {
+      add("critical", "formulas", "Trim % exceeds 100%",
+        `${p.sym}: realized partials sum to ${trimmed} sh but remaining is ${remaining} sh — you "trimmed" more than you held. Almost always a duplicate partial.`,
+        [`${p.sym} · entry ${tradeDateISO(p.entry)} · ${matches.length} matching closed trade${matches.length === 1 ? "" : "s"} · trimmed ${trimmed} · remaining ${remaining}`],
+        "Cross-check Trade Journal for duplicate partials with same ticker + entry day. Soft-delete the extras."
+      );
+    }
+  });
+
+  // ── IBKR identity ──
+  // 10) IBKR trade missing ib_exec_id
+  journaledTrades.forEach(t => {
+    if ((t.source === "ibkr" || t.source === "reconciled") && !t.ibExecId) {
+      add("critical", "ibkr", "IBKR trade missing exec ID",
+        `${t.ticker}: source is ${t.source} but exec ID is empty. Re-sync can't identify it → would be re-imported as "new" → duplicate.`,
+        [`${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${t.shares} sh · source ${t.source}`],
+        "Last-resort fix: demote source to 'manual' (loses sync ownership but prevents auto-dupes)."
+      );
+    }
+  });
+
+  // 11) IBKR position missing ib_conid
+  positions.forEach(p => {
+    if ((p.source === "ibkr" || p.source === "reconciled") && !p.ibConid) {
+      add("critical", "ibkr", "IBKR position missing conid",
+        `${p.sym}: source is ${p.source} but conid is empty. Next sync's matcher will miss it → likely duplicate row.`,
+        [`${p.sym} · entry ${tradeDateISO(p.entry)} · ${p.shares} sh · source ${p.source}`],
+        "Re-link via a fresh sync, or demote source to 'manual'."
+      );
+    }
+  });
+
+  // 12) Stale IBKR sync (>30 days old)
+  const cutoff = Date.now() - 30 * dayMs;
+  let staleCount = 0;
+  journaledTrades.concat(positions).forEach(r => {
+    const src = r.source;
+    const ts = r.ibSyncedAt || r.ib_synced_at;
+    if ((src === "ibkr" || src === "reconciled") && (!ts || Date.parse(ts) < cutoff)) staleCount++;
+  });
+  if (staleCount) {
+    add("info", "ibkr", "Stale IBKR rows",
+      `${staleCount} IBKR-sourced row${staleCount === 1 ? " is" : "s are"} older than 30 days since last sync. Run a sync to refresh.`,
+      [], "Click Sync IBKR to refresh."
+    );
+  }
+
+  const elapsedMs = (typeof performance !== "undefined" && performance.now) ? Math.round(performance.now() - t0) : 0;
+  return {
+    findings,
+    counts: {
+      critical: findings.filter(f => f.severity === "critical").length,
+      warn: findings.filter(f => f.severity === "warn").length,
+      info: findings.filter(f => f.severity === "info").length,
+    },
+    stats: { trades: journaledTrades.length, positions: positions.length, elapsedMs },
+  };
+}
+
+// Integrity report modal — purely presentational; receives the report object and renders categorised findings.
+const INTEGRITY_CATS = [
+  { key: "duplicates", label: "Duplicates" },
+  { key: "orphans", label: "Orphans" },
+  { key: "formulas", label: "Formulas" },
+  { key: "ibkr", label: "IBKR" },
+];
+function IntegrityReportModal({ open, onClose, report, onReRun }) {
+  const [activeCat, setActiveCat] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  useEffect(() => {
+    if (!report) return;
+    const firstWithCritical = INTEGRITY_CATS.find(c => report.findings.some(f => f.category === c.key && f.severity === "critical"));
+    const firstWithAny = INTEGRITY_CATS.find(c => report.findings.some(f => f.category === c.key));
+    setActiveCat((firstWithCritical || firstWithAny || INTEGRITY_CATS[0]).key);
+    setExpandedId(null);
+  }, [report]);
+  if (!open || !report) return null;
+  const sevColor = s => s === "critical" ? C.red : s === "warn" ? C.gold : C.muted;
+  const sevLabel = s => s === "critical" ? "Critical" : s === "warn" ? "Warn" : "Info";
+  const catMaxSev = key => {
+    const inCat = report.findings.filter(f => f.category === key);
+    if (inCat.some(f => f.severity === "critical")) return "critical";
+    if (inCat.some(f => f.severity === "warn")) return "warn";
+    if (inCat.length) return "info";
+    return null;
+  };
+  const visible = report.findings.filter(f => f.category === activeCat);
+  const totalFindings = report.findings.length;
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(0,0,0,0.66)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "min(940px, 96vw)", maxHeight: "88vh", overflowY: "auto", background: C.bg2, border: `1px solid ${C.borderGold}`, borderRadius: 18, boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
+        <div style={{ position: "sticky", top: 0, background: C.bg2, borderBottom: `1px solid ${C.border}`, padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1, gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <Eyebrow>Data Integrity</Eyebrow>
+            <div style={{ fontWeight: 800, fontSize: "1.05rem", color: C.white }}>Integrity Report</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button onClick={onReRun} style={{ padding: "7px 14px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.66rem", cursor: "pointer", fontFamily: font }}>↻ Re-run</button>
+            <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.1rem", cursor: "pointer", fontFamily: font }}>✕</button>
+          </div>
+        </div>
+        <div style={{ padding: "20px 24px" }}>
+          {/* Summary tiles */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 10, marginBottom: 18 }}>
+            <div style={{ padding: "12px 14px", borderRadius: 12, background: report.counts.critical > 0 ? "rgba(239,68,68,0.10)" : "rgba(34,197,94,0.08)", border: `1px solid ${report.counts.critical > 0 ? "rgba(239,68,68,0.30)" : "rgba(34,197,94,0.22)"}` }}>
+              <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Critical</div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: report.counts.critical > 0 ? C.red : C.green }}>{report.counts.critical}</div>
+            </div>
+            <div style={{ padding: "12px 14px", borderRadius: 12, background: report.counts.warn > 0 ? "rgba(201,152,42,0.10)" : "rgba(255,255,255,0.03)", border: `1px solid ${report.counts.warn > 0 ? C.borderGold : C.border}` }}>
+              <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Warn</div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: report.counts.warn > 0 ? C.goldBright : C.muted }}>{report.counts.warn}</div>
+            </div>
+            <div style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Info</div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: C.text }}>{report.counts.info}</div>
+            </div>
+            <div style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Scanned</div>
+              <div style={{ fontSize: "0.84rem", fontWeight: 800, color: C.text, lineHeight: 1.2 }}>{report.stats.trades} trades<br />{report.stats.positions} positions</div>
+            </div>
+          </div>
+          {/* All-clean state */}
+          {totalFindings === 0 ? (
+            <div style={{ padding: "40px 16px", textAlign: "center", borderRadius: 12, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.22)" }}>
+              <div style={{ fontSize: "2.4rem", marginBottom: 8 }}>✓</div>
+              <div style={{ fontWeight: 800, fontSize: "1rem", color: C.green, marginBottom: 6 }}>All clean</div>
+              <div style={{ fontSize: "0.72rem", color: C.muted, lineHeight: 1.6 }}>Zero duplicates, zero orphans, zero formula glitches. Scan took {report.stats.elapsedMs}ms.</div>
+            </div>
+          ) : (
+            <>
+              {/* Category tabs */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+                {INTEGRITY_CATS.map(c => {
+                  const inCat = report.findings.filter(f => f.category === c.key);
+                  if (!inCat.length) return null;
+                  const sev = catMaxSev(c.key);
+                  const isActive = activeCat === c.key;
+                  return (
+                    <button key={c.key} onClick={() => { setActiveCat(c.key); setExpandedId(null); }} style={{ padding: "7px 14px", borderRadius: 980, border: `1px solid ${isActive ? sevColor(sev) : C.border}`, background: isActive ? `${sevColor(sev)}1a` : "transparent", color: isActive ? sevColor(sev) : C.muted, fontWeight: 700, fontSize: "0.66rem", cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: 999, background: sevColor(sev), display: "inline-block" }} />
+                      {c.label}
+                      <span style={{ fontSize: "0.6rem", padding: "1px 7px", borderRadius: 980, background: isActive ? `${sevColor(sev)}33` : "rgba(255,255,255,0.06)", color: isActive ? sevColor(sev) : C.muted }}>{inCat.length}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Findings list */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {visible.map(f => {
+                  const isOpen = expandedId === f.id;
+                  return (
+                    <div key={f.id} style={{ border: `1px solid ${isOpen ? sevColor(f.severity) + "55" : C.border}`, borderRadius: 12, background: isOpen ? `${sevColor(f.severity)}0d` : "rgba(255,255,255,0.02)", overflow: "hidden", transition: "border 120ms" }}>
+                      <button onClick={() => setExpandedId(isOpen ? null : f.id)} style={{ width: "100%", padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, background: "transparent", border: "none", cursor: "pointer", fontFamily: font, textAlign: "left", color: C.text }}>
+                        <span style={{ width: 9, height: 9, borderRadius: 999, background: sevColor(f.severity), flexShrink: 0 }} />
+                        <span style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: sevColor(f.severity), minWidth: 56 }}>{sevLabel(f.severity)}</span>
+                        <span style={{ fontWeight: 700, fontSize: "0.74rem", color: C.white, flex: 1 }}>{f.name}</span>
+                        <span style={{ color: C.muted, fontSize: "0.66rem" }}>{isOpen ? "▴" : "▾"}</span>
+                      </button>
+                      {isOpen && (
+                        <div style={{ padding: "0 14px 14px 14px" }}>
+                          <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.6, marginBottom: 10 }}>{f.description}</div>
+                          {f.details.length > 0 && (
+                            <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(0,0,0,0.30)", border: `1px solid ${C.border}`, marginBottom: 10 }}>
+                              {f.details.map((d, i) => (
+                                <div key={i} style={{ fontSize: "0.66rem", color: C.text, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{d}</div>
+                              ))}
+                            </div>
+                          )}
+                          {f.suggestedAction && (
+                            <div style={{ fontSize: "0.66rem", color: C.muted, lineHeight: 1.5, fontStyle: "italic" }}>
+                              <strong style={{ color: C.goldBright, fontStyle: "normal" }}>Suggested next step: </strong>{f.suggestedAction}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          {/* Footer */}
+          <div style={{ marginTop: 18, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <div style={{ fontSize: "0.62rem", color: C.muted }}>Scan ran in {report.stats.elapsedMs}ms over {report.stats.trades} trades and {report.stats.positions} positions · read-only (no data changed)</div>
+            <button onClick={onClose} style={{ padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font }}>Close</button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
 }
 
 // Interactive sync modal — preview + per-row decisions + confirm. Writes happen via onConfirm (App), surgically.
@@ -5018,7 +5410,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 // ═══════════════════════════════════════
 // ─── SETTINGS PAGE ───
 // ═══════════════════════════════════════
-function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session, onIbkrSync }) {
+function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session, onIbkrSync, onRunIntegrity, integrityReport }) {
   const isAdmin = userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [ibkrTutOpen, setIbkrTutOpen] = useState(false);
   const [ibkrQueryId, setIbkrQueryId] = useState("");
@@ -5125,6 +5517,30 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
     <div>
       <Eyebrow>Settings</Eyebrow>
       <h1 style={{ fontWeight: 800, fontSize: "2rem", letterSpacing: "-0.04em", color: C.white, marginBottom: 24 }}>Account Settings</h1>
+
+      {/* ─── Data Integrity Check ─── read-only safety net. Surfaces duplicates, orphans, formula glitches. */}
+      {onRunIntegrity && (
+        <GlassCard style={{ padding: "24px 28px", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+            <div style={{ flex: "1 1 320px" }}>
+              <Eyebrow>Safety</Eyebrow>
+              <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Data Integrity Check</div>
+              <div style={{ fontSize: "0.70rem", color: C.muted, lineHeight: 1.6 }}>Scan your trades and positions for duplicates, orphans, P/L sign errors, and broken IBKR identity columns. Read-only — nothing is changed, ever.</div>
+              {integrityReport && (
+                <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ fontSize: "0.58rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Last result</span>
+                  <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 9px", borderRadius: 980, background: integrityReport.counts.critical > 0 ? "rgba(239,68,68,0.10)" : "rgba(34,197,94,0.10)", color: integrityReport.counts.critical > 0 ? C.red : C.green, border: `1px solid ${integrityReport.counts.critical > 0 ? "rgba(239,68,68,0.30)" : "rgba(34,197,94,0.30)"}` }}>
+                    {integrityReport.counts.critical > 0 ? `${integrityReport.counts.critical} critical` : "All clean ✓"}
+                  </span>
+                  {integrityReport.counts.warn > 0 && <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 9px", borderRadius: 980, background: "rgba(201,152,42,0.10)", color: C.goldBright, border: `1px solid ${C.borderGold}` }}>{integrityReport.counts.warn} warn</span>}
+                  {integrityReport.counts.info > 0 && <span style={{ fontSize: "0.62rem", fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "rgba(255,255,255,0.03)", color: C.muted, border: `1px solid ${C.border}` }}>{integrityReport.counts.info} info</span>}
+                </div>
+              )}
+            </div>
+            <button onClick={onRunIntegrity} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 7, alignSelf: "center" }}>{integrityReport ? "↻ Re-run check" : "✓ Run check"}</button>
+          </div>
+        </GlassCard>
+      )}
 
       {/* Interactive Brokers Sync */}
       <GlassCard style={{ padding: "24px 28px", marginBottom: 16 }}>
@@ -5801,6 +6217,21 @@ function AppInner() {
   // to soft-deleted rows too (the physical row stays), so without this we'd hit the constraint and the
   // sync UI shows ugly "duplicate key" errors. Tracked here so the matcher can classify them as "synced".
   const [softDeletedExecIds, setSoftDeletedExecIds] = useState(() => new Set());
+  // Whether the positions.intraday_log column has been added to the DB schema. Detected on first load
+  // (by checking whether the field appears in a SELECT * result). If FALSE, the bulk Save and IBKR sync
+  // writers MUST NOT include intraday_log in the row payload — Supabase would reject the whole insert
+  // with "column does not exist" and the user would lose every position. This makes the code safe to
+  // deploy BEFORE the SQL migration is run.
+  const intradayColumnAvailable = useRef(false);
+  // ─── Integrity Checker (read-only scan) ───
+  // Pure scan of already-loaded state — no DB writes, no network. Triggered on demand from Settings.
+  const [integrityReport, setIntegrityReport] = useState(null);
+  const [integrityOpen, setIntegrityOpen] = useState(false);
+  const runIntegrityCheck = useCallback(() => {
+    const report = runIntegrityChecks({ journaledTrades, positions, softDeletedExecIds });
+    setIntegrityReport(report);
+    setIntegrityOpen(true);
+  }, [journaledTrades, positions, softDeletedExecIds]);
   // ─── Undo last sync ───
   // Single-deep stack. Persisted to localStorage keyed by userId; expires 24h after the sync.
   // Captures only the rows the sync touched (inserts by id, soft-deletes by id, closes with prior is_closed value).
@@ -5951,7 +6382,7 @@ function AppInner() {
       else if (ins) {
         res.pInserted = ins.length;
         ins.forEach(p => audit.positionsInserted.push(p.id));
-        const mapped = ins.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "ibkr", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null }));
+        const mapped = ins.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "ibkr", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
         setPositions(prev => [...prev, ...mapped]);
         lastLoadedCount.current = (lastLoadedCount.current || 0) + mapped.length;
       }
@@ -6111,7 +6542,7 @@ function AppInner() {
         setJournaledTrades(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null })));
       }
       if (posRes.data) {
-        const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null }));
+        const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
         setPositions(mapped);
         positionsRef.current = mapped;
         lastLoadedCount.current = mapped.length;
@@ -6204,15 +6635,22 @@ function AppInner() {
     saveStartTime.current = Date.now();
     setPositionSaveStatus("saving");
     try {
-      const rows = posArr.map(p => ({
-        user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", entry_time: p.entryTime || "", shares: p.shares || "",
-        entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
-        stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
-        commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
-        trade_type: p.tradeType || "Long",
-        source: p.source || "manual", ib_conid: p.ibConid || null, ib_synced_at: p.ibSyncedAt || null, // preserve IBKR identity through bulk Save
-        is_closed: false, // bulk Save only ever holds OPEN positions; archived (closed) rows live untouched in the DB
-      }));
+      const rows = posArr.map(p => {
+        const row = {
+          user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", entry_time: p.entryTime || "", shares: p.shares || "",
+          entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
+          stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
+          commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, notes: p.notes || "", chart_url: p.chartUrl || "", chart_image: p.chartImage || "",
+          trade_type: p.tradeType || "Long",
+          source: p.source || "manual", ib_conid: p.ibConid || null, ib_synced_at: p.ibSyncedAt || null, // preserve IBKR identity through bulk Save
+          is_closed: false, // bulk Save only ever holds OPEN positions; archived (closed) rows live untouched in the DB
+        };
+        // CRITICAL: carries the intraday activity log through bulk Save unchanged. Only included when the
+        // DB column actually exists (detected on load) — protects against deploying the code before the
+        // migration is run, which would otherwise reject every Save and wipe positions.
+        if (intradayColumnAvailable.current) row.intraday_log = p.intradayLog || null;
+        return row;
+      });
 
       if (rows.length === 0) {
         // Only delete if user genuinely has no positions — guard against accidental empty state
@@ -6373,11 +6811,16 @@ function AppInner() {
         }
         const clean = pos.filter(p => !dupIds.includes(p.id));
         lastLoadedCount.current = clean.length;
+        // Detect the intraday_log column. If present (even as null), the schema migration has been run
+        // and the save mapper can safely include it. If absent, save must skip the field.
+        if (clean.length > 0 && Object.prototype.hasOwnProperty.call(clean[0], "intraday_log")) {
+          intradayColumnAvailable.current = true;
+        }
         // Build snapshot of loaded data for corruption detection before future saves
         const snap = new Map();
         clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
         loadedSnapshot.current = snap;
-        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null })));
+        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) })));
       } else if (!posErr) {
         // Query succeeded but returned empty — check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
@@ -6394,7 +6837,7 @@ function AppInner() {
             const { data: seeded } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).order("created_at");
             if (seeded && seeded.length > 0) {
               lastLoadedCount.current = seeded.length;
-              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long" })));
+              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", intradayLog: normalizeIntradayLog(p.intraday_log) })));
             }
           }
           await saveSettingNow(uid, "initialized", true);
@@ -6446,7 +6889,7 @@ function AppInner() {
                 const snap2 = new Map();
                 refreshed.forEach(p => { if (p.symbol) snap2.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
                 loadedSnapshot.current = snap2;
-                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long" }));
+                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", intradayLog: normalizeIntradayLog(p.intraday_log) }));
                 positionsRef.current = next;
                 setPositions(next);
               }
@@ -6712,8 +7155,9 @@ function AppInner() {
       {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} />}
       {page === "tools" && <PremiumToolsPage demo={false} portfolioSize={portfolioSize} journaledTrades={journaledTrades} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} />}
-      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
+      <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} />
     </>
   );
 
