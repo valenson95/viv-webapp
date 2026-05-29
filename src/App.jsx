@@ -112,6 +112,8 @@ input[type=range].viv-slider::-moz-range-thumb{width:16px;height:16px;border-rad
 input[type=range].viv-slider::-webkit-slider-runnable-track{height:4px;border-radius:2px}
 @keyframes rtsGlow{0%,100%{text-shadow:0 0 6px rgba(239,68,68,0.6),0 0 12px rgba(239,68,68,0.3)}50%{text-shadow:0 0 10px rgba(239,68,68,0.9),0 0 20px rgba(239,68,68,0.5)}}
 @keyframes rtsGlowGreen{0%,100%{text-shadow:0 0 6px rgba(34,197,94,0.5),0 0 12px rgba(34,197,94,0.25)}50%{text-shadow:0 0 10px rgba(34,197,94,0.8),0 0 20px rgba(34,197,94,0.4)}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes intradayPulse{0%,100%{box-shadow:0 0 0 0 rgba(201,152,42,0.4)}50%{box-shadow:0 0 0 4px rgba(201,152,42,0)}}
 `;
 
 // ─── Default Data ───
@@ -1053,7 +1055,7 @@ const INTEGRITY_CATS = [
   { key: "formulas", label: "Formulas" },
   { key: "ibkr", label: "IBKR" },
 ];
-function IntegrityReportModal({ open, onClose, report, onReRun }) {
+function IntegrityReportModal({ open, onClose, report, onReRun, running }) {
   const [activeCat, setActiveCat] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   useEffect(() => {
@@ -1084,7 +1086,7 @@ function IntegrityReportModal({ open, onClose, report, onReRun }) {
             <div style={{ fontWeight: 800, fontSize: "1.05rem", color: C.white }}>Integrity Report</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button onClick={onReRun} style={{ padding: "7px 14px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.66rem", cursor: "pointer", fontFamily: font }}>↻ Re-run</button>
+            <button onClick={onReRun} disabled={running} style={{ padding: "7px 14px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.66rem", cursor: running ? "default" : "pointer", fontFamily: font, opacity: running ? 0.6 : 1, display: "flex", alignItems: "center", gap: 6 }}>{running ? <><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 999, border: `2px solid ${C.gold}`, borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />Scanning…</> : "↻ Re-run"}</button>
             <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.1rem", cursor: "pointer", fontFamily: font }}>✕</button>
           </div>
         </div>
@@ -4120,7 +4122,7 @@ const GLOSSARY = [
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
-function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync }) {
+function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable }) {
   const [compactTable, setCompactTable] = useState(false);
   // Open Positions zoom — scales the whole table (5 steps each way, 70%–130%, 6% per step). Persisted as a UI-only pref.
   const [posZoom, setPosZoom] = useState(() => { const s = parseFloat(localStorage.getItem("viv-pos-zoom")); return Number.isFinite(s) ? Math.min(1.3, Math.max(0.7, s)) : 1; });
@@ -4132,7 +4134,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [posSorts, setPosSorts] = useState([]); // [{key, dir}] multi-sort for positions
   const [posColWidths, setPosColWidths] = useState({}); // {colKey: width} for resizable columns
-  const posDrag = useDragReorder(24); // ~24 open positions columns
+  const posDrag = useDragReorder(25); // 25 open positions columns (24 + "Today" intraday activity)
 
   // Ref to always hold the latest onManualSave — fixes stale closure when
   // setTimeout fires after setPositions (state update hasn't rendered yet)
@@ -4186,6 +4188,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
   const [priceLoading, setPriceLoading] = useState(false);
   const [lastPriceRefresh, setLastPriceRefresh] = useState(null);
   const [expandedPosId, setExpandedPosId] = useState(null);
+  // ─── Intraday Activity panel state ─── inline timeline + Add Event form per open position.
+  // Independent of expandedPosId (the More expander) so a user can have one open at a time per row
+  // and the two don't fight for vertical space.
+  const [expandedIntradayId, setExpandedIntradayId] = useState(null);
+  const [intradayDraft, setIntradayDraft] = useState({ type: "trim", shares: "", price: "", stop: "", note: "" });
+  const resetIntradayDraft = useCallback(() => setIntradayDraft({ type: "trim", shares: "", price: "", stop: "", note: "" }), []);
   const [posUploadingImage, setPosUploadingImage] = useState(false);
   const [posEditNotes, setPosEditNotes] = useState({ right: "", wrong: "", lessons: "", _plain: "" });
 
@@ -4261,6 +4269,36 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       return next;
     });
   }, []);
+
+  // ─── Intraday Activity surgical update ─── runs a partial UPDATE on the single position row's
+  // intraday_log JSON column. Bypasses the bulk Save's insert-all-delete-old pattern entirely — so even
+  // if the user clicks Save mid-edit, the log update can't lose a race with the bulk write. Refuses to
+  // run unless `intradayColumnAvailable` is true (migration confirmed). Mirrors React state so the UI
+  // reflects the new log immediately. Errors are logged but never thrown — the local state has already
+  // accepted the change, so the user sees their event; on next reload the DB is the truth.
+  const updateIntradayLog = useCallback(async (posId, mutator) => {
+    if (!intradayColumnAvailable) {
+      console.warn("[intraday] schema migration not detected — refusing to update. Run the SQL ALTER TABLE first.");
+      return null;
+    }
+    let nextLog = null;
+    setPositions(prev => {
+      const next = prev.map(p => {
+        if (p.id !== posId) return p;
+        const current = normalizeIntradayLog(p.intradayLog);
+        nextLog = normalizeIntradayLog(mutator(current));
+        return { ...p, intradayLog: nextLog };
+      });
+      positionsRef.current = next;
+      return next;
+    });
+    if (!nextLog || !session?.user?.id) return nextLog;
+    try {
+      const { error } = await supabase.from("positions").update({ intraday_log: nextLog }).eq("id", posId).eq("user_id", session.user.id);
+      if (error) console.error("[intraday] update failed:", error.message);
+    } catch (e) { console.error("[intraday] update threw:", e); }
+    return nextLog;
+  }, [intradayColumnAvailable, session, setPositions, positionsRef]);
   const addPosition = useCallback(() => {
     setPositions(prev => {
       const maxId = prev.reduce((m, p) => Math.max(m, p.id || 0), 0);
@@ -4581,8 +4619,30 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const trimPct = origShares > 0 ? (realizedShares / origShares) * 100 : 0;
     // Cost financed = realized profits >= initial risk (playing with house money)
     const costFinanced = realizedPL > 0 && initRiskD > 0 && realizedPL >= initRiskD;
-    return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR };
-  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, realizedShares:0, origShares:0, trimPct:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0 }; }
+    // ─── Intraday projected fields ─── pure read of the intraday_log on this position. Adds projected
+    // shares / trim % / realized $ for display alongside the confirmed (sharesN / trimPct / realizedPL)
+    // values — NEVER replaces them. If the user hasn't logged anything today, every field is 0 and the
+    // existing UI is unchanged. Reconciled events (matched to IBKR fills) are EXCLUDED from "projected"
+    // because the journal will carry them once sync runs.
+    const _log = (p.intradayLog && Array.isArray(p.intradayLog.events)) ? p.intradayLog.events : [];
+    const _liveEvents = _log.filter(e => e && !e.reconciledExecId);
+    const sumTrimsLogged = _liveEvents.filter(e => e.type === "trim").reduce((s, e) => s + (Number(e.shares) || 0), 0);
+    const sumAddsLogged = _liveEvents.filter(e => e.type === "add").reduce((s, e) => s + (Number(e.shares) || 0), 0);
+    const sharesNProj = sharesN - sumTrimsLogged + sumAddsLogged;
+    const realizedProjAdd = _liveEvents.filter(e => e.type === "trim").reduce((s, e) => {
+      const px = Number(e.price) || 0;
+      if (px <= 0 || epN <= 0) return s;
+      const qty = Number(e.shares) || 0;
+      const dirSign = (p.tradeType === "Short") ? -1 : 1;
+      return s + dirSign * (px - epN) * qty;
+    }, 0);
+    const trimProjPct = origShares > 0 ? ((realizedShares + sumTrimsLogged) / origShares) * 100 : 0;
+    const intradayEventCount = _log.length;
+    const intradayLiveCount = _liveEvents.length;
+    const intradayAllReconciled = _log.length > 0 && _liveEvents.length === 0;
+
+    return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR, sumTrimsLogged, sumAddsLogged, sharesNProj, realizedProjAdd, trimProjPct, intradayEventCount, intradayLiveCount, intradayAllReconciled };
+  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, realizedShares:0, origShares:0, trimPct:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0, sumTrimsLogged:0, sumAddsLogged:0, sharesNProj:0, realizedProjAdd:0, trimProjPct:0, intradayEventCount:0, intradayLiveCount:0, intradayAllReconciled:false }; }
   }), [positions, sizer, portfolioSize, compEquity, realizedByPosition]);
 
   const totals = useMemo(() => {
@@ -4905,7 +4965,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px",zoom:posZoom }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {(() => { const defs = [["Status","left","riskStatus","Risk status of this position"],["Symbol","left","sym","Ticker symbol"],["L/S","center",null,"Long or Short position"],["Shares","right","sharesN","Shares held"],["Avg. Cost","right","epN","Average entry price per share"],["Comm","right","commN","Commission"],["Pos. Size","right","posValue","Position Size — shares × avg cost (commission shown beneath)"],["Exp %","right","expPct","Exposure — position size as a percent of current equity"],["Realized","right","realizedPL","Realized P/L locked in from partial sells on this open lot · gold bar = % of the original position trimmed off"],["Orig Stop","right","stop1","Original stop price"],["Stop 2","right","stop2","Secondary stop price"],["Stops","right","tsN","Stop levels — Original, 2nd and Trail stop"],["Current","right","cpN","Current market price"],["Setup / Tags","left","setup","Trade setup type and tags"],["Tags","left",null,"Tags"],["DTS","right","dtsPct","DTS — Distance To Stop"],["RTS","right","rtsD","RTS — Risk To Stop (dollars at risk if stopped out)"],["ROTE","right","rotePct","ROTE — Risk On Total Equity"],displayMode==="R"?["R Suggest","right","rSuggestedStop","Suggested mechanical trail-stop level"]:["SBE","right","sbe","SBE — Sell-to-BreakEven share count"],displayMode==="R"?["Locked","right","rLockedProfit","Profit locked in per share"]:["SBE %","right","sbePct","SBE % — portion of the position to sell for breakeven"],["P/L","right","plPct","Unrealized Profit / Loss on the remaining shares (realized partials live in the Realized column)"],["R","right","rMult","R-multiple — P/L in units of initial risk"],["","center",null,""],["","center",null,""]]; const alwaysHide = new Set([5,9,10,14]); const compactHide = new Set([2,9,18,19]); const hideSet = new Set([...alwaysHide, ...(compactTable ? compactHide : [])]); return posDrag.order.filter(ci => !hideSet.has(ci)).map((ci, vi) => { const [text, align, sortKey, tip] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 7px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.09em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"grab",userSelect:"none"}}>{tip ? <Abbr tip={tip} underline={false}>{text}</Abbr> : text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
+              {(() => { const defs = [["Status","left","riskStatus","Risk status of this position"],["Symbol","left","sym","Ticker symbol"],["L/S","center",null,"Long or Short position"],["Shares","right","sharesN","Shares held"],["Avg. Cost","right","epN","Average entry price per share"],["Comm","right","commN","Commission"],["Pos. Size","right","posValue","Position Size — shares × avg cost (commission shown beneath)"],["Exp %","right","expPct","Exposure — position size as a percent of current equity"],["Realized","right","realizedPL","Realized P/L locked in from partial sells on this open lot · gold bar = % of the original position trimmed off"],["Orig Stop","right","stop1","Original stop price"],["Stop 2","right","stop2","Secondary stop price"],["Stops","right","tsN","Stop levels — Original, 2nd and Trail stop"],["Current","right","cpN","Current market price"],["Setup / Tags","left","setup","Trade setup type and tags"],["Tags","left",null,"Tags"],["DTS","right","dtsPct","DTS — Distance To Stop"],["RTS","right","rtsD","RTS — Risk To Stop (dollars at risk if stopped out)"],["ROTE","right","rotePct","ROTE — Risk On Total Equity"],displayMode==="R"?["R Suggest","right","rSuggestedStop","Suggested mechanical trail-stop level"]:["SBE","right","sbe","SBE — Sell-to-BreakEven share count"],displayMode==="R"?["Locked","right","rLockedProfit","Profit locked in per share"]:["SBE %","right","sbePct","SBE % — portion of the position to sell for breakeven"],["P/L","right","plPct","Unrealized Profit / Loss on the remaining shares (realized partials live in the Realized column)"],["R","right","rMult","R-multiple — P/L in units of initial risk"],["Today","center","intradayLiveCount","Intraday activity — log partial trims, adds, stop nudges. Auto-reconciles overnight when IBKR sync confirms the fills. Position numbers above never change from logging."],["","center",null,""],["","center",null,""]]; const intradayOn = INTRADAY_FEATURE_ENABLED && intradayColumnAvailable; const alwaysHide = new Set([5,9,10,14, ...(intradayOn ? [] : [22])]); const compactHide = new Set([2,9,18,19]); const hideSet = new Set([...alwaysHide, ...(compactTable ? compactHide : [])]); return posDrag.order.filter(ci => !hideSet.has(ci)).map((ci, vi) => { const [text, align, sortKey, tip] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 7px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.09em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"grab",userSelect:"none"}}>{tip ? <Abbr tip={tip} underline={false}>{text}</Abbr> : text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
             </tr></thead>
             <tbody>
               {(posSorts.length > 0 ? multiSort(enriched, posSorts) : enriched).map((p, idx) => {
@@ -4921,7 +4981,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 const isExpanded = expandedPosId === p.id;
                 return (
                   <React.Fragment key={p._lid || p.id}>
-                  <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
+                  <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); if (!(INTRADAY_FEATURE_ENABLED && intradayColumnAvailable)) s.add(22); return s; })()} style={{ borderBottom: (isExpanded || expandedIntradayId === p.id) ? "none" : "1px solid rgba(255,255,255,0.04)",background:isSelling?"rgba(239,68,68,0.04)":idx%2?"rgba(255,255,255,0.01)":"transparent" }}>
                     <td style={{padding:"8px 6px"}}><span style={{padding:"3px 8px",borderRadius:980,fontSize:"0.50rem",fontWeight:700,background:rb.bg,color:rb.color,border:`1px solid ${rb.border}`,whiteSpace:"nowrap"}}>{p.riskStatus}</span></td>
                     <td style={{padding:"6px 4px"}}><div style={{display:"flex",alignItems:"center",gap:4}}><SourceDot source={p.source} />{p.sym && getTickerLogo(p.sym) && <img src={getTickerLogo(p.sym)} alt="" style={{width:18,height:18,borderRadius:4,flexShrink:0}} onError={e=>{e.target.style.display="none"}} />}<TickerInput value={p.sym} onChange={v=>updateField(p.id,"sym",v)} /></div></td>
                     <td style={{padding:"6px 2px",textAlign:"center"}}><select value={p.tradeType||"Long"} onChange={e=>updateField(p.id,"tradeType",e.target.value)} style={{padding:"3px 4px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,color:(p.tradeType||"Long")==="Short"?C.red:C.green,fontSize:"0.52rem",fontWeight:700,fontFamily:font,cursor:"pointer",outline:"none"}}><option value="Long">L</option><option value="Short">S</option></select></td>
@@ -4975,6 +5035,26 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                       <div style={{fontWeight:700,color:p.plPct>=0?C.green:C.red,fontSize:"0.72rem"}}>{plDisplay}</div>
                     </td>
                     <td style={{padding:"8px 6px",textAlign:"right",fontWeight:700,fontSize:"0.70rem",color:p.rMult>=2?C.green:p.rMult>=1?C.goldBright:p.rMult>=0?C.white:C.red}}>{p.epN&&(p.stop1||p.stop2)?`${p.rMult.toFixed(2)}R`:"—"}</td>
+                    {/* Today / Intraday Activity cell — three visual states: empty (+ Log) · unreconciled (gold pill) · all-reconciled (green pill) */}
+                    <td style={{padding:"6px 4px",textAlign:"center",whiteSpace:"nowrap"}}>
+                      {(() => {
+                        const isIntradayOpen = expandedIntradayId === p.id;
+                        const liveCount = p.intradayLiveCount || 0;
+                        const totalCount = p.intradayEventCount || 0;
+                        const allRec = p.intradayAllReconciled;
+                        const trimSum = p.sumTrimsLogged || 0;
+                        const addSum = p.sumAddsLogged || 0;
+                        const onClick = () => { if (isIntradayOpen) { setExpandedIntradayId(null); } else { setExpandedIntradayId(p.id); setExpandedPosId(null); resetIntradayDraft(); } };
+                        if (totalCount === 0) {
+                          return <button onClick={onClick} title="Log a trim, add, stop nudge or note for today (no journal row written, no shares changed)" style={{padding:"3px 9px",borderRadius:7,border:`1px dashed ${isIntradayOpen?C.borderGold:C.border}`,background:isIntradayOpen?C.goldDim:"transparent",color:isIntradayOpen?C.gold:C.muted,fontWeight:700,fontSize:"0.54rem",cursor:"pointer",fontFamily:font,letterSpacing:"0.04em"}}>{isIntradayOpen?"▲ Close":"+ Log"}</button>;
+                        }
+                        const bg = allRec ? "rgba(34,197,94,0.10)" : "rgba(201,152,42,0.12)";
+                        const border = allRec ? "rgba(34,197,94,0.32)" : C.borderGold;
+                        const col = allRec ? C.green : C.goldBright;
+                        const summary = trimSum > 0 ? `▼ ${trimSum}` : addSum > 0 ? `▲ ${addSum}` : `${liveCount || totalCount}`;
+                        return <button onClick={onClick} title={`${totalCount} event${totalCount === 1 ? "" : "s"} today${allRec ? " · all confirmed by IBKR" : liveCount > 0 ? ` · ${liveCount} pending sync` : ""}`} style={{padding:"3px 10px",borderRadius:980,border:`1px solid ${border}`,background:bg,color:col,fontWeight:800,fontSize:"0.58rem",cursor:"pointer",fontFamily:font,display:"inline-flex",alignItems:"center",gap:5,animation:(liveCount > 0 && !isIntradayOpen)?"intradayPulse 2.4s ease-in-out infinite":"none"}}>{summary}{allRec && " ✓"}</button>;
+                      })()}
+                    </td>
                     <td style={{padding:"6px 4px",textAlign:"center",whiteSpace:"nowrap"}}>
                       <div style={{display:"flex",gap:3,alignItems:"center",justifyContent:"center"}}>
                         <button onClick={()=>togglePosExpand(p.id)} title={isExpanded?"Collapse":"Additional Data"} style={{padding:"3px 7px",borderRadius:6,border:`1px solid ${isExpanded?C.borderGold:C.border}`,background:isExpanded?C.goldDim:"transparent",color:isExpanded?C.gold:hasNotes?C.gold:C.muted,fontWeight:700,fontSize:"0.54rem",cursor:"pointer",fontFamily:font}}>{isExpanded?"▲ Less":"▼ More"}</button>
@@ -4996,7 +5076,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                     const isPartial = qty < totalShares && qty > 0;
                     return (
                       <tr style={{ background:"rgba(239,68,68,0.06)",borderBottom:`2px solid ${C.red}33` }}>
-                        <td colSpan={26} style={{ padding:"14px 16px" }}>
+                        <td colSpan={27} style={{ padding:"14px 16px" }}>
                           <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:10 }}>
                             <span style={{ fontWeight:700,fontSize:"0.68rem",color:C.red,letterSpacing:"0.08em",textTransform:"uppercase" }}>Sell {p.sym}</span>
                             <div style={{display:"flex",alignItems:"center",gap:5}}>
@@ -5048,10 +5128,140 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                       </tr>
                     );
                   })()}
+                  {/* ─── Intraday Activity inline panel ─── opens when the user clicks the "Today" cell.
+                       Renders a timeline of events newest-first + an Add Event form. All mutations go through
+                       updateIntradayLog (surgical UPDATE), not bulk Save — so this can't lose a race with
+                       the Save button. */}
+                  {INTRADAY_FEATURE_ENABLED && intradayColumnAvailable && expandedIntradayId === p.id && (() => {
+                    const log = p.intradayLog || DEFAULT_INTRADAY_LOG;
+                    const events = (log.events || []).slice().sort((a, b) => String(b.ts || "").localeCompare(String(a.ts || "")));
+                    const eventIcon = (e) => e.type === "trim" ? <span style={{color:C.red}}>▼</span> : e.type === "add" ? <span style={{color:C.green}}>▲</span> : e.type === "stop" ? <span style={{color:C.goldBright}}>⌐</span> : <span style={{color:C.muted}}>✎</span>;
+                    const eventSummary = (e) => {
+                      if (e.type === "trim") return `Trimmed ${e.shares || "?"} sh${e.price ? ` @ $${Number(e.price).toFixed(2)}` : ""}`;
+                      if (e.type === "add") return `Added ${e.shares || "?"} sh${e.price ? ` @ $${Number(e.price).toFixed(2)}` : ""}`;
+                      if (e.type === "stop") return `Stop → $${Number(e.stop || 0).toFixed(2)}`;
+                      return e.note || "(no text)";
+                    };
+                    const fmtTs = (ts) => { try { const d = new Date(ts); return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); } catch { return "—"; } };
+                    const draftValid = intradayDraft.type === "trim" || intradayDraft.type === "add"
+                      ? Number(intradayDraft.shares) > 0
+                      : intradayDraft.type === "stop"
+                      ? Number(intradayDraft.stop) > 0
+                      : (intradayDraft.note || "").trim().length > 0;
+                    const addEvent = async () => {
+                      if (!draftValid) return;
+                      const ev = { id: `e-${Date.now()}-${Math.floor(Math.random() * 10000)}`, ts: new Date().toISOString(), type: intradayDraft.type };
+                      if (intradayDraft.type === "trim" || intradayDraft.type === "add") {
+                        ev.shares = Number(intradayDraft.shares) || 0;
+                        if (intradayDraft.price) ev.price = Number(intradayDraft.price);
+                      } else if (intradayDraft.type === "stop") {
+                        ev.stop = Number(intradayDraft.stop) || 0;
+                      } else {
+                        ev.note = String(intradayDraft.note || "").trim();
+                      }
+                      await updateIntradayLog(p.id, (current) => ({ ...current, events: [...(current.events || []), ev] }));
+                      resetIntradayDraft();
+                    };
+                    const removeEvent = async (id) => {
+                      if (!window.confirm("Remove this event from today's log? Position numbers are not affected.")) return;
+                      await updateIntradayLog(p.id, (current) => ({ ...current, events: (current.events || []).filter(e => e.id !== id) }));
+                    };
+                    const clearReconciled = async () => {
+                      await updateIntradayLog(p.id, (current) => ({ ...current, events: (current.events || []).filter(e => !e.reconciledExecId), lastClearedAt: new Date().toISOString() }));
+                    };
+                    return (
+                      <tr style={{ background: "rgba(201,152,42,0.04)", borderBottom: `1px solid ${C.borderGold}` }}>
+                        <td colSpan={27} style={{ padding: "16px 18px" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+                            <div>
+                              <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold }}>Intraday · {p.sym}</div>
+                              <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 3 }}>Log trims, adds, stop nudges, and notes for today. <strong style={{ color: C.text }}>Nothing here changes your position's official numbers</strong> — IBKR sync overnight will fill the journal automatically.</div>
+                            </div>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              {events.some(e => e.reconciledExecId) && <button onClick={clearReconciled} title="Remove events IBKR has already confirmed — keeps unreconciled events" style={{ padding: "5px 11px", borderRadius: 980, border: `1px solid rgba(34,197,94,0.30)`, background: "rgba(34,197,94,0.08)", color: C.green, fontWeight: 700, fontSize: "0.60rem", cursor: "pointer", fontFamily: font }}>✓ Clear reconciled</button>}
+                              <button onClick={() => setExpandedIntradayId(null)} style={{ padding: "5px 11px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.60rem", cursor: "pointer", fontFamily: font }}>Close</button>
+                            </div>
+                          </div>
+
+                          {/* Add Event form */}
+                          <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(0,0,0,0.30)", border: `1px solid ${C.border}`, marginBottom: 14 }}>
+                            <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+                              {[["trim", "Trim", C.red], ["add", "Add", C.green], ["stop", "Stop", C.goldBright], ["note", "Note", C.muted]].map(([key, label, col]) => (
+                                <button key={key} onClick={() => setIntradayDraft(d => ({ ...d, type: key }))} style={{ padding: "5px 13px", borderRadius: 980, border: `1px solid ${intradayDraft.type === key ? col : C.border}`, background: intradayDraft.type === key ? `${col}1f` : "transparent", color: intradayDraft.type === key ? col : C.muted, fontWeight: 700, fontSize: "0.62rem", cursor: "pointer", fontFamily: font, letterSpacing: "0.04em" }}>{label}</button>
+                              ))}
+                            </div>
+                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+                              {(intradayDraft.type === "trim" || intradayDraft.type === "add") && (
+                                <>
+                                  <div>
+                                    <label style={{ display: "block", fontSize: "0.50rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Shares</label>
+                                    <input type="text" inputMode="numeric" value={intradayDraft.shares} onChange={e => setIntradayDraft(d => ({ ...d, shares: e.target.value.replace(/[^0-9]/g, "") }))} placeholder="0" style={{ width: 88, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.white, fontSize: "0.72rem", fontFamily: font, outline: "none" }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                                  </div>
+                                  <div>
+                                    <label style={{ display: "block", fontSize: "0.50rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Fill Price <span style={{ color: C.muted, fontWeight: 400, fontSize: "0.46rem", textTransform: "none", letterSpacing: 0 }}>(optional)</span></label>
+                                    <input type="text" inputMode="decimal" value={intradayDraft.price} onChange={e => setIntradayDraft(d => ({ ...d, price: e.target.value.replace(/[^0-9.]/g, "") }))} placeholder="0.00" style={{ width: 100, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.white, fontSize: "0.72rem", fontFamily: font, outline: "none" }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                                  </div>
+                                </>
+                              )}
+                              {intradayDraft.type === "stop" && (
+                                <div>
+                                  <label style={{ display: "block", fontSize: "0.50rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>New Stop Price</label>
+                                  <input type="text" inputMode="decimal" value={intradayDraft.stop} onChange={e => setIntradayDraft(d => ({ ...d, stop: e.target.value.replace(/[^0-9.]/g, "") }))} placeholder="0.00" style={{ width: 120, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.borderGold}`, borderRadius: 7, padding: "7px 10px", color: C.goldBright, fontSize: "0.72rem", fontFamily: font, outline: "none" }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.borderGold} />
+                                </div>
+                              )}
+                              {intradayDraft.type === "note" && (
+                                <div style={{ flex: 1, minWidth: 220 }}>
+                                  <label style={{ display: "block", fontSize: "0.50rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Observation</label>
+                                  <input type="text" value={intradayDraft.note} onChange={e => setIntradayDraft(d => ({ ...d, note: e.target.value }))} placeholder="Quick thought — saved to today's timeline" onKeyDown={e => { if (e.key === "Enter" && draftValid) addEvent(); }} style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.white, fontSize: "0.72rem", fontFamily: font, outline: "none" }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                                </div>
+                              )}
+                              <button onClick={addEvent} disabled={!draftValid} style={{ padding: "8px 16px", borderRadius: 980, border: "none", background: draftValid ? `linear-gradient(135deg, ${C.goldMid}, ${C.goldBright})` : "rgba(255,255,255,0.06)", color: draftValid ? "#000" : C.muted, fontWeight: 800, fontSize: "0.66rem", cursor: draftValid ? "pointer" : "default", fontFamily: font }}>Add to log</button>
+                            </div>
+                          </div>
+
+                          {/* Timeline */}
+                          {events.length === 0 ? (
+                            <div style={{ padding: "18px", textAlign: "center", borderRadius: 10, border: `1px dashed ${C.border}`, color: C.muted, fontSize: "0.66rem", fontStyle: "italic" }}>
+                              No events logged yet. Use the form above to log a trim, add, stop nudge, or observation. Tomorrow's IBKR sync will reconcile trims and adds to actual fills.
+                            </div>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              {events.map(e => {
+                                const isRec = !!e.reconciledExecId;
+                                return (
+                                  <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, background: isRec ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.03)", border: `1px solid ${isRec ? "rgba(34,197,94,0.25)" : C.border}`, opacity: isRec ? 0.85 : 1 }}>
+                                    <span style={{ width: 14, textAlign: "center", fontSize: "0.78rem" }}>{eventIcon(e)}</span>
+                                    <span style={{ fontSize: "0.58rem", color: C.muted, minWidth: 44 }}>{fmtTs(e.ts)}</span>
+                                    <span style={{ fontSize: "0.70rem", color: C.text, flex: 1, fontWeight: 600, textDecoration: isRec ? "line-through" : "none" }}>{eventSummary(e)}</span>
+                                    {isRec && <span style={{ fontSize: "0.50rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.green, padding: "2px 7px", borderRadius: 980, background: "rgba(34,197,94,0.10)", border: "1px solid rgba(34,197,94,0.32)" }}>IBKR ✓</span>}
+                                    <button onClick={() => removeEvent(e.id)} title="Remove this event" style={{ background: "transparent", border: "none", color: C.muted, fontSize: "0.78rem", cursor: "pointer", padding: "2px 6px", fontFamily: font }}>×</button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Projected summary strip */}
+                          {(p.sumTrimsLogged > 0 || p.sumAddsLogged > 0) && (
+                            <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "rgba(201,152,42,0.06)", border: `1px solid ${C.borderGold}`, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                              <div style={{ fontSize: "0.58rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.goldBright, fontWeight: 700 }}>Projected after IBKR books</div>
+                              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "0.68rem", color: C.text }}>
+                                {p.sumTrimsLogged > 0 && <span>Trim sum: <strong style={{ color: C.goldBright }}>{p.sumTrimsLogged}</strong> sh</span>}
+                                {p.sumAddsLogged > 0 && <span>Add sum: <strong style={{ color: C.green }}>+{p.sumAddsLogged}</strong> sh</span>}
+                                <span>Projected shares: <strong style={{ color: C.white }}>{p.sharesNProj.toLocaleString()}</strong></span>
+                                {p.trimProjPct > p.trimPct && <span>Projected trim: <strong style={{ color: C.goldBright }}>{p.trimProjPct.toFixed(0)}%</strong></span>}
+                                {p.realizedProjAdd !== 0 && <span>+ Realized: <strong style={{ color: p.realizedProjAdd >= 0 ? C.green : C.red }}>{p.realizedProjAdd >= 0 ? "+" : "-"}{fmt$(Math.abs(p.realizedProjAdd), 2)}</strong></span>}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })()}
                   {/* Expanded additional data + notes/chart area */}
                   {isExpanded && (
                     <tr style={{ background:"rgba(201,152,42,0.03)",borderBottom:`1px solid ${C.borderGold}` }}>
-                      <td colSpan={26} style={{ padding:"14px 16px" }}>
+                      <td colSpan={27} style={{ padding:"14px 16px" }}>
                         {/* Secondary data (commission, stops, setup, tags, realized) now lives on the main row */}
                         <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
                           {/* Left: Notes */}
@@ -5108,7 +5318,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               })}
 
               {/* Totals — 24 cols via DragTr for drag-reorder alignment: Status(0),Symbol(1),L/S(2),Shares(3),AvgCost(4),Comm(5),PosSize(6),Exp%(7),Realized(8),OrigStop(9),Stop2(10),TrailStop(11),Current(12),Setup(13),Tags(14),DTS(15),RTS(16),ROTE(17),SBE/RSuggest(18),SBE%/Locked(19),P/L(20),R(21),Notes(22),Actions(23) */}
-              <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); return s; })()} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
+              <DragTr order={posDrag.order} hiddenSet={(() => { const s = new Set([5,9,10,14]); if (compactTable) [2,18,19].forEach(c => s.add(c)); if (!(INTRADAY_FEATURE_ENABLED && intradayColumnAvailable)) s.add(22); return s; })()} style={{ borderTop:`2px solid ${C.border}`,background:"rgba(255,255,255,0.02)" }}>
                 {/* 0: Status */}
                 <td style={{padding:"12px 6px",fontWeight:800,fontSize:"0.64rem",color:C.white,letterSpacing:"0.06em",textTransform:"uppercase"}}>Totals</td>
                 {/* 1: Symbol */}
@@ -5173,9 +5383,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                 <td style={{padding:"12px 6px",textAlign:"right",whiteSpace:"nowrap"}}><div style={{fontWeight:800,fontSize:"0.72rem",color:totals.totalPL>=0?C.green:C.red}}>{`${totals.totalPL>=0?"+":"-"}${fmt$(Math.abs(totals.totalPL),2)}`}</div></td>
                 {/* 21: R */}
                 <td />
-                {/* 22: Notes */}
+                {/* 22: Today — totals row shows aggregated live event count across positions, or — */}
+                <td style={{padding:"12px 6px",textAlign:"center",fontWeight:700,fontSize:"0.62rem",color:C.muted}}>{(() => { const liveTotal = enriched.reduce((s,p)=>s+(p.intradayLiveCount||0),0); return liveTotal > 0 ? <span style={{color:C.goldBright}}>{liveTotal} live</span> : "—"; })()}</td>
+                {/* 23: Notes / More */}
                 <td />
-                {/* 23: Actions */}
+                {/* 24: Actions */}
                 <td />
               </DragTr>
             </tbody>
@@ -5410,7 +5622,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
 // ═══════════════════════════════════════
 // ─── SETTINGS PAGE ───
 // ═══════════════════════════════════════
-function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session, onIbkrSync, onRunIntegrity, integrityReport }) {
+function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session, onIbkrSync, onRunIntegrity, integrityReport, integrityRunning }) {
   const isAdmin = userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [ibkrTutOpen, setIbkrTutOpen] = useState(false);
   const [ibkrQueryId, setIbkrQueryId] = useState("");
@@ -5537,7 +5749,7 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
                 </div>
               )}
             </div>
-            <button onClick={onRunIntegrity} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 7, alignSelf: "center" }}>{integrityReport ? "↻ Re-run check" : "✓ Run check"}</button>
+            <button onClick={onRunIntegrity} disabled={integrityRunning} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: integrityRunning ? "default" : "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 7, alignSelf: "center", opacity: integrityRunning ? 0.6 : 1 }}>{integrityRunning ? <><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 999, border: `2px solid ${C.gold}`, borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />Scanning…</> : (integrityReport ? "↻ Re-run check" : "✓ Run check")}</button>
           </div>
         </GlassCard>
       )}
@@ -6221,16 +6433,24 @@ function AppInner() {
   // (by checking whether the field appears in a SELECT * result). If FALSE, the bulk Save and IBKR sync
   // writers MUST NOT include intraday_log in the row payload — Supabase would reject the whole insert
   // with "column does not exist" and the user would lose every position. This makes the code safe to
-  // deploy BEFORE the SQL migration is run.
-  const intradayColumnAvailable = useRef(false);
+  // deploy BEFORE the SQL migration is run. State (not ref) so children re-render once detection flips.
+  const [intradayColumnAvailable, setIntradayColumnAvailable] = useState(false);
+  const intradayColumnAvailableRef = useRef(false); // mirror ref for the save mapper (synchronous reads)
   // ─── Integrity Checker (read-only scan) ───
   // Pure scan of already-loaded state — no DB writes, no network. Triggered on demand from Settings.
+  // Even though the scan is sub-millisecond, we briefly flip `running` so the button shows a "Scanning…"
+  // state — confirms the click registered and gives the user visual feedback.
   const [integrityReport, setIntegrityReport] = useState(null);
   const [integrityOpen, setIntegrityOpen] = useState(false);
+  const [integrityRunning, setIntegrityRunning] = useState(false);
   const runIntegrityCheck = useCallback(() => {
-    const report = runIntegrityChecks({ journaledTrades, positions, softDeletedExecIds });
-    setIntegrityReport(report);
-    setIntegrityOpen(true);
+    setIntegrityRunning(true);
+    setTimeout(() => {
+      const report = runIntegrityChecks({ journaledTrades, positions, softDeletedExecIds });
+      setIntegrityReport(report);
+      setIntegrityOpen(true);
+      setIntegrityRunning(false);
+    }, 200);
   }, [journaledTrades, positions, softDeletedExecIds]);
   // ─── Undo last sync ───
   // Single-deep stack. Persisted to localStorage keyed by userId; expires 24h after the sync.
@@ -6648,7 +6868,7 @@ function AppInner() {
         // CRITICAL: carries the intraday activity log through bulk Save unchanged. Only included when the
         // DB column actually exists (detected on load) — protects against deploying the code before the
         // migration is run, which would otherwise reject every Save and wipe positions.
-        if (intradayColumnAvailable.current) row.intraday_log = p.intradayLog || null;
+        if (intradayColumnAvailableRef.current) row.intraday_log = p.intradayLog || null;
         return row;
       });
 
@@ -6814,7 +7034,8 @@ function AppInner() {
         // Detect the intraday_log column. If present (even as null), the schema migration has been run
         // and the save mapper can safely include it. If absent, save must skip the field.
         if (clean.length > 0 && Object.prototype.hasOwnProperty.call(clean[0], "intraday_log")) {
-          intradayColumnAvailable.current = true;
+          intradayColumnAvailableRef.current = true;
+          setIntradayColumnAvailable(true);
         }
         // Build snapshot of loaded data for corruption detection before future saves
         const snap = new Map();
@@ -7152,12 +7373,12 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} />}
       {page === "tools" && <PremiumToolsPage demo={false} portfolioSize={portfolioSize} journaledTrades={journaledTrades} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} />}
-      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} />}
+      {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
-      <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} />
+      <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />
     </>
   );
 
