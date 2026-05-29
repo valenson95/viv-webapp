@@ -588,25 +588,54 @@ function buildIbkrPreview(data, positions, journaledTrades) {
       cp: p.markPrice ? String(p.markPrice) : "", entry: p.openDate, entryTime: p.openTime,
       tradeType: Number(p.shares) < 0 ? "Short" : "Long" }));
 
-  // Diff against current data → classify each row + attach the matched existing row id (for surgical writes)
+  // Diff against current data → classify each row + attach the matched existing row id (for surgical writes).
+  // Matching helpers — used by both closed-trade and partial-sell classifiers.
   const isIbkr = s => s === "ibkr" || s === "reconciled";
+  const dayDiff = (a, b) => {
+    if (!a || !b) return Infinity;
+    const am = Date.parse(tradeDateISO(a));
+    const bm = Date.parse(tradeDateISO(b));
+    if (isNaN(am) || isNaN(bm)) return Infinity;
+    return Math.abs(am - bm) / 86400000;
+  };
+  const sharesClose = (a, b, pct = 0.05) => {
+    const aN = Number(a) || 0, bN = Number(b) || 0;
+    return Math.abs(aN - bN) <= Math.max(1, Math.max(aN, bN) * pct);
+  };
+  // CLOSED ROUND-TRIPS — match by ticker + (entry day exact OR exit day exact). Fallback: entry within ±3 days
+  // AND shares within 5% — handles the common case where the manual entry date drifts by a day from IBKR's
+  // first BUY exec (timezone, manual-typing error, split-day fill). This is what stops the "Sync re-imports
+  // everything I already closed manually" duplicate cycle.
   const tradeRows = closed.map(c => {
     const synced = (journaledTrades || []).find(t => t.ibExecId && t.ibExecId === c.execId);
     if (synced) return { ...c, action: "synced", matchId: synced.id };
-    const cands = (journaledTrades || []).filter(t => !isIbkr(t.source) && (t.ticker || "").toUpperCase() === c.ticker.toUpperCase() && tradeDateISO(t.entry) === tradeDateISO(c.entry));
+    const tickerHits = (journaledTrades || []).filter(t => !isIbkr(t.source) && (t.ticker || "").toUpperCase() === c.ticker.toUpperCase());
+    let cands = tickerHits.filter(t => tradeDateISO(t.entry) === tradeDateISO(c.entry) || tradeDateISO(t.exit) === tradeDateISO(c.exit));
+    if (cands.length === 0) cands = tickerHits.filter(t => dayDiff(t.entry, c.entry) <= 3 && sharesClose(t.shares, c.shares, 0.05));
     if (cands.length === 1) {
       const m = cands[0];
-      const sharesOk = Math.abs((Number(m.shares) || 0) - c.shares) <= Math.max(1, c.shares * 0.02);
+      const sharesOk = sharesClose(m.shares, c.shares, 0.05);
       return { ...c, action: sharesOk ? "reconcile" : "review", matchId: m.id, matchStop: Number(m.stop) || 0 };
     }
     if (cands.length > 1) return { ...c, action: "review", matchId: null };
     return { ...c, action: "new", matchId: null };
   });
-  // Partial sells from still-open lots — dedup by execId only (each partial has a unique IBKR exec).
-  // A re-sync of the same partial = "synced" (no-op). A brand new partial = "new" (import to Journal).
+  // PARTIAL SELLS from still-open lots — execId match first (re-sync of an already-imported partial = no-op).
+  // Otherwise try to reconcile against a manual Sell-button partial for the same lot: ticker + lot entry day
+  // within ±3d + exit day within ±1d + shares within 5%. Prevents duplicate trims from inflating trim % on
+  // the open position.
   const partialRows = partials.map(c => {
     const synced = (journaledTrades || []).find(t => t.ibExecId && t.ibExecId === c.execId);
     if (synced) return { ...c, action: "synced", matchId: synced.id };
+    const cands = (journaledTrades || []).filter(t =>
+      !isIbkr(t.source) &&
+      (t.ticker || "").toUpperCase() === c.ticker.toUpperCase() &&
+      dayDiff(t.entry, c.entry) <= 3 &&
+      dayDiff(t.exit, c.exit) <= 1 &&
+      sharesClose(t.shares, c.shares, 0.05)
+    );
+    if (cands.length === 1) return { ...c, action: "reconcile", matchId: cands[0].id, matchStop: Number(cands[0].stop) || 0 };
+    if (cands.length > 1) return { ...c, action: "review", matchId: null };
     return { ...c, action: "new", matchId: null };
   });
   const posRows = openPos.map(p => {
@@ -5685,12 +5714,30 @@ function AppInner() {
       }
     }
 
-    // ── PARTIAL SELLS ── append-only inserts into the trades table. Each partial is a stand-alone
-    // closed trade entry with the lot's open date as `entry_date` (so the dashboard's realizedByPosition
-    // matcher attributes it to the still-open position). Dedup is by ib_exec_id (a unique IBKR execution id).
+    // ── PARTIAL SELLS ── if matched to a manual Sell-button trim → UPDATE (reconcile, keep notes/tags,
+    // stamp ib_exec_id so future syncs are no-ops). Otherwise → INSERT new. Dedup is by ib_exec_id once
+    // imported. Each partial's entry_date = the lot's open date, so realizedByPosition on the dashboard
+    // attributes it to the still-open position.
     const partialInserts = [];
     for (const r of (partialRows || [])) {
       if (r.choice === "skip" || r.action === "synced") continue;
+      if (r.choice === "reconcile" && r.matchId) {
+        let rMult;
+        if (r.matchStop > 0) {
+          const rps = r.tradeType === "Long" ? (r.entryP - r.matchStop) : (r.matchStop - r.entryP);
+          if (rps > 0) { const pps = r.tradeType === "Long" ? (r.exitP - r.entryP) : (r.entryP - r.exitP); rMult = +(pps / rps).toFixed(2); }
+        }
+        const upd = { entry_date: r.entry, entry_time: r.entryTime || "", exit_date: r.exit, exit_time: r.exitTime || "", entry_price: r.entryP, exit_price: r.exitP, shares: r.shares, commission: r.commission, pl_pct: r.plPct, pl_dollar: r.plDollar, trade_type: r.tradeType, ib_exec_id: r.execId, ib_trade_id: r.tradeId, ib_synced_at: nowIso, source: "reconciled" };
+        if (rMult !== undefined) upd.r_mult = rMult;
+        const { error } = await supabase.from("trades").update(upd).eq("id", r.matchId).eq("user_id", uid);
+        if (error) { res.errors.push(`partial ${r.ticker}: ${error.message}`); }
+        else {
+          res.tReconciled++;
+          setJournaledTrades(prev => prev.map(t => t.id === r.matchId ? { ...t, entry: r.entry, entryTime: r.entryTime || "", exit: r.exit, exitTime: r.exitTime || "", entryP: r.entryP, exitP: r.exitP, shares: r.shares, commission: r.commission, plPct: r.plPct, plDollar: r.plDollar, ...(rMult !== undefined ? { rMult } : {}), tradeType: r.tradeType, source: "reconciled", ibExecId: r.execId, ibTradeId: r.tradeId } : t));
+        }
+        continue;
+      }
+      if (r.choice !== "new") continue;
       partialInserts.push({ user_id: uid, ticker: r.ticker, entry_date: r.entry, entry_time: r.entryTime || "", exit_date: r.exit, exit_time: r.exitTime || "", entry_price: r.entryP, exit_price: r.exitP, shares: r.shares, commission: r.commission, pl_pct: r.plPct, pl_dollar: r.plDollar, r_mult: null, setup: "", tags: [], exit_reason: "Partial Trim", notes: "", trade_type: r.tradeType, source: "ibkr", ib_exec_id: r.execId, ib_trade_id: r.tradeId, ib_synced_at: nowIso });
     }
     if (partialInserts.length) {
