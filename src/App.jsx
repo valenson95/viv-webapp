@@ -62,11 +62,19 @@ function Wordmark({ size, style }) {
 
 // ─── Multi-sort helper ───
 // sorts = [{key, dir}] where dir is "asc" or "desc"
+// Date-typed sort keys — values are normalized to ISO YYYY-MM-DD before string compare so manual entries
+// (e.g. "5/28/26") and IBKR imports (e.g. "2026-05-28") sort chronologically together. Without this,
+// localeCompare treats "5/28/26" > "2026-05-18" because "5" > "2" in lexicographic order.
+const SORT_DATE_KEYS = new Set(["entry", "exit"]);
 function multiSort(arr, sorts) {
   if (!sorts || sorts.length === 0) return arr;
   return [...arr].sort((a, b) => {
     for (const { key, dir } of sorts) {
       let av = a[key], bv = b[key];
+      if (SORT_DATE_KEYS.has(key)) {
+        av = tradeDateISO(av) || ""; // empty string sorts before any real date
+        bv = tradeDateISO(bv) || "";
+      }
       // Normalize: treat null/undefined/"" as -Infinity for numbers
       if (typeof av === "string" && typeof bv === "string") {
         const cmp = av.localeCompare(bv, undefined, { sensitivity: "base" });
@@ -1369,7 +1377,7 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                         <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{sec.head.map(h => <th key={h} style={{ padding: "8px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>{h}</th>)}<th style={{ padding: "8px 8px", textAlign: "center", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Status</th><th style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Action</th></tr></thead>
                         <tbody>{sec.rows.map((r, i) => (
                           <tr key={i} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, opacity: (choices[sec.kind][i] === "skip") ? 0.45 : 1 }}>
-                            {sec.cols.map(col => <td key={col} style={{ padding: "7px 8px", color: col === "plDollar" ? (r[col] >= 0 ? C.green : C.red) : C.text, fontWeight: col === sec.cols[0] ? 700 : 400, whiteSpace: "nowrap" }}>{col === "ep" || col === "entryP" || col === "exitP" ? (r[col] !== undefined && r[col] !== "" ? Number(r[col]).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—") : col === "plDollar" ? `${r[col] >= 0 ? "+" : ""}${Number(r[col]).toLocaleString()}` : (r[col] ?? "—")}</td>)}
+                            {sec.cols.map(col => <td key={col} style={{ padding: "7px 8px", color: col === "plDollar" ? (r[col] >= 0 ? C.green : C.red) : C.text, fontWeight: col === sec.cols[0] ? 700 : 400, whiteSpace: "nowrap" }}>{col === "ep" || col === "entryP" || col === "exitP" ? (r[col] !== undefined && r[col] !== "" ? Number(r[col]).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—") : col === "plDollar" ? `${r[col] >= 0 ? "+" : ""}${Number(r[col]).toLocaleString()}` : (col === "entry" || col === "exit") ? (tradeDateISO(r[col]) || r[col] || "—") : (r[col] ?? "—")}</td>)}
                             <td style={{ padding: "7px 8px", textAlign: "center" }}>{chip(r.action)}</td>
                             <td style={{ padding: "7px 8px", textAlign: "right" }}>{sel(sec.kind, i, r)}</td>
                           </tr>
@@ -1430,14 +1438,14 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                           <div style={{ padding: 10, borderRadius: 8, background: ch === "delete-manual" ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.03)", border: `1px solid ${ch === "delete-manual" ? "rgba(239,68,68,0.30)" : C.border}`, opacity: ch === "delete-manual" ? 0.7 : 1 }}>
                             <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Your manual {ch === "delete-manual" && "· will be deleted"}</div>
                             <div style={{ color: C.text, lineHeight: 1.5 }}>
-                              {g.manualEntry} → {g.manualExit} · {Number(g.manualShares).toLocaleString()} sh · <strong style={{ color: g.manualPL >= 0 ? C.green : C.red }}>{g.manualPL >= 0 ? "+" : ""}{fmt$(Math.abs(g.manualPL), 2)}</strong>{g.manualRMult != null && <> · {Number(g.manualRMult).toFixed(2)}R</>}
+                              {tradeDateISO(g.manualEntry) || g.manualEntry} → {tradeDateISO(g.manualExit) || g.manualExit} · {Number(g.manualShares).toLocaleString()} sh · <strong style={{ color: g.manualPL >= 0 ? C.green : C.red }}>{g.manualPL >= 0 ? "+" : ""}{fmt$(Math.abs(g.manualPL), 2)}</strong>{g.manualRMult != null && <> · {Number(g.manualRMult).toFixed(2)}R</>}
                             </div>
                           </div>
                           <div style={{ padding: 10, borderRadius: 8, background: ch === "delete-ibkr" ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.03)", border: `1px solid ${ch === "delete-ibkr" ? "rgba(239,68,68,0.30)" : C.border}`, opacity: ch === "delete-ibkr" ? 0.7 : 1 }}>
                             <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>IBKR rows ({g.ibkrRows.length}) {ch === "delete-ibkr" && "· will be deleted"}</div>
                             {g.ibkrRows.map(r => (
                               <div key={r.id} style={{ color: C.text, lineHeight: 1.5 }}>
-                                {r.entry} → {r.exit} · {Number(r.shares).toLocaleString()} sh · <strong style={{ color: r.plDollar >= 0 ? C.green : C.red }}>{r.plDollar >= 0 ? "+" : ""}{fmt$(Math.abs(r.plDollar), 2)}</strong>
+                                {tradeDateISO(r.entry) || r.entry} → {tradeDateISO(r.exit) || r.exit} · {Number(r.shares).toLocaleString()} sh · <strong style={{ color: r.plDollar >= 0 ? C.green : C.red }}>{r.plDollar >= 0 ? "+" : ""}{fmt$(Math.abs(r.plDollar), 2)}</strong>
                               </div>
                             ))}
                             <div style={{ marginTop: 4, paddingTop: 4, borderTop: `1px dashed ${C.border}`, color: C.muted, fontSize: "0.62rem" }}>Total: {Number(g.ibkrTotalShares).toLocaleString()} sh · {g.ibkrTotalPL >= 0 ? "+" : ""}{fmt$(Math.abs(g.ibkrTotalPL), 2)}</div>
@@ -2874,7 +2882,7 @@ function TradeChart({ trade }) {
             {best && <span>● <span style={{ color: C.goldBright }}>Peak</span></span>}
             {+trade.stop > 0 && <span>— <span style={{ color: C.gold }}>Stop</span></span>}
             {maOn && <span style={{ color: MA_COLORS[10] }}>━ {maType}10/20/50</span>}
-            <span style={{ marginLeft: "auto" }}>{trade.entry}{trade.entryTime ? ` ${trade.entryTime}` : ""} → {trade.exit}{trade.exitTime ? ` ${trade.exitTime}` : ""}</span>
+            <span style={{ marginLeft: "auto" }}>{tradeDateISO(trade.entry) || trade.entry}{trade.entryTime ? ` ${trade.entryTime}` : ""} → {tradeDateISO(trade.exit) || trade.exit}{trade.exitTime ? ` ${trade.exitTime}` : ""}</span>
           </div>
         </div>
         <div style={{ flex: "1 1 210px", background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", alignSelf: "flex-start" }}>
@@ -4091,9 +4099,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                 return (<React.Fragment key={t.id}>
                   <DragTr order={tradeDrag.order} style={{ borderBottom: isGroup && !isLastInGroup ? "1px dashed rgba(201,152,42,0.20)" : "1px solid rgba(255,255,255,0.03)", cursor: "pointer", borderLeft: groupBorder }} onDoubleClick={() => startEdit(t)}>
                     <td style={{ padding: "11px 8px", fontWeight: 700, color: C.gold }}>{isGroup && !isFirstInGroup ? <span style={{color:C.muted,fontSize:"0.56rem"}}>↳</span> : null} <SourceDot source={t.source} />{t.ticker}{isGroup && isFirstInGroup ? <span style={{marginLeft:4,fontSize:"0.48rem",fontWeight:600,color:C.muted,verticalAlign:"middle"}}>({groupSize})</span> : null}</td>
-                    <td style={{ padding: "11px 8px", color: C.text }}>{t.entry}</td>
+                    <td style={{ padding: "11px 8px", color: C.text }}>{tradeDateISO(t.entry) || t.entry || "—"}</td>
                     <td style={{ padding: "11px 6px", color: C.muted, fontSize: "0.62rem" }}>{t.entryTime||"—"}</td>
-                    <td style={{ padding: "11px 8px", color: C.text }}>{t.exit||"—"}</td>
+                    <td style={{ padding: "11px 8px", color: C.text }}>{tradeDateISO(t.exit) || t.exit || "—"}</td>
                     <td style={{ padding: "11px 6px", color: C.muted, fontSize: "0.62rem" }}>{t.exitTime||"—"}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>${(Number(t.entryP) || 0).toFixed(2)}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>${(Number(t.exitP) || 0).toFixed(2)}</td>
@@ -4221,7 +4229,7 @@ const GLOSSARY = [
   ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
 ];
 
-function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled }) {
+function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning }) {
   // Alias so existing `INTRADAY_FEATURE_ENABLED` references inside this component keep reading as a single
   // flag without rewriting every callsite. Reactive — flipping the Settings toggle re-renders the table.
   const INTRADAY_FEATURE_ENABLED = intradayFeatureEnabled;
@@ -5006,6 +5014,24 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Save Failed ⓘ" : "Save"}
             </button>
             {onIbkrSync && <button onClick={onIbkrSync} title="Pull positions & trades from Interactive Brokers" style={{ padding:"8px 14px",borderRadius:980,border:`1px solid ${C.borderGold}`,background:"rgba(255,255,255,0.04)",color:C.gold,fontWeight:700,fontSize:"0.72rem",cursor:"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:6 }}>⟳ Sync IBKR</button>}
+            {/* ─── Integrity Check ─── one-click read-only scan from the Dashboard, complementing the
+                 Settings entry point. The status pill shows "All clean ✓", "N critical", "N warn" so
+                 members can tell at a glance whether their data is healthy, without opening the modal. */}
+            {onRunIntegrity && (() => {
+              const hasReport = !!integrityReport;
+              const crit = integrityReport?.counts?.critical || 0;
+              const warn = integrityReport?.counts?.warn || 0;
+              const ringColor = crit > 0 ? "rgba(239,68,68,0.4)" : warn > 0 ? C.borderGold : hasReport ? "rgba(34,197,94,0.4)" : C.border;
+              const bg = crit > 0 ? "rgba(239,68,68,0.08)" : warn > 0 ? C.goldDim : hasReport ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.04)";
+              const fg = crit > 0 ? C.red : warn > 0 ? C.gold : hasReport ? C.green : C.muted;
+              const statusText = integrityRunning ? "Scanning…" : crit > 0 ? `${crit} critical` : warn > 0 ? `${warn} warn` : hasReport ? "All clean" : "Run Check";
+              return (
+                <button onClick={onRunIntegrity} disabled={integrityRunning} title="Scan your journal and positions for duplicates, formula errors, and orphans. Read-only — never changes data." style={{ padding:"8px 14px",borderRadius:980,border:`1px solid ${ringColor}`,background:bg,color:fg,fontWeight:700,fontSize:"0.72rem",cursor:integrityRunning?"default":"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:6,opacity:integrityRunning?0.6:1 }}>
+                  {integrityRunning ? <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 999, border: `2px solid ${fg}`, borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} /> : (crit > 0 ? "⚠" : warn > 0 ? "!" : hasReport ? "✓" : "✓")}
+                  {statusText}
+                </button>
+              );
+            })()}
             <button onClick={() => exportMasterCSV(positions.filter(p => p.sym), journaledTrades)} style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.muted,fontWeight:700,fontSize:"0.62rem",cursor:"pointer",fontFamily:font }}>Export CSV</button>
             <label style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.border}`,background:"rgba(255,255,255,0.04)",color:C.muted,fontWeight:700,fontSize:"0.62rem",cursor:"pointer",fontFamily:font }}>
               Import
@@ -5106,7 +5132,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         <div style={{ overflowX:"auto",padding:"0 0 4px",zoom:posZoom }}>
           <table style={{ width:"100%",borderCollapse:"collapse",fontSize:"0.71rem" }}>
             <thead><tr style={{ borderBottom:`1px solid ${C.border}` }}>
-              {(() => { const defs = [["Status","left","riskStatus","Risk status of this position"],["Symbol","left","sym","Ticker symbol"],["L/S","center",null,"Long or Short position"],["Shares","right","sharesN","Shares held"],["Avg. Cost","right","epN","Average entry price per share"],["Comm","right","commN","Commission"],["Pos. Size","right","posValue","Position Size — shares × avg cost (commission shown beneath)"],["Exp %","right","expPct","Exposure — position size as a percent of current equity"],["Realized","right","realizedPL","Realized P/L locked in from partial sells on this open lot · gold bar = % of the original position trimmed off"],["Orig Stop","right","stop1","Original stop price"],["Stop 2","right","stop2","Secondary stop price"],["Stops","right","tsN","Stop levels — Original, 2nd and Trail stop"],["Today","center","intradayLiveCount","Intraday activity — log partial trims, adds, stop nudges, or notes for today. Calculation only — does NOT change shares / stop / P/L. IBKR sync overnight fills the journal automatically."],["Current","right","cpN","Current market price"],["Setup / Tags","left","setup","Trade setup type and tags"],["Tags","left",null,"Tags"],["DTS","right","dtsPct","DTS — Distance To Stop"],["RTS","right","rtsD","RTS — Risk To Stop (dollars at risk if stopped out)"],["ROTE","right","rotePct","ROTE — Risk On Total Equity"],displayMode==="R"?["R Suggest","right","rSuggestedStop","Suggested mechanical trail-stop level"]:["SBE","right","sbe","SBE — Sell-to-BreakEven share count"],displayMode==="R"?["Locked","right","rLockedProfit","Profit locked in per share"]:["SBE %","right","sbePct","SBE % — portion of the position to sell for breakeven"],["P/L","right","plPct","Unrealized Profit / Loss on the remaining shares (realized partials live in the Realized column)"],["R","right","rMult","R-multiple — P/L in units of initial risk"],["","center",null,""],["","center",null,""]]; const intradayOn = INTRADAY_FEATURE_ENABLED && intradayColumnAvailable; const alwaysHide = new Set([5,9,10,15, ...(intradayOn ? [] : [12])]); const compactHide = new Set([2,9,19,20]); const hideSet = new Set([...alwaysHide, ...(compactTable ? compactHide : [])]); return posDrag.order.filter(ci => !hideSet.has(ci)).map((ci, vi) => { const [text, align, sortKey, tip] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 7px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.09em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"grab",userSelect:"none"}}>{tip ? <Abbr tip={tip} underline={false}>{text}</Abbr> : text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
+              {(() => { const defs = [["Status","left","riskStatus","Risk status of this position"],["Symbol","left","sym","Ticker symbol"],["L/S","center",null,"Long or Short position"],["Shares","right","sharesN","Shares held"],["Avg. Cost","right","epN","Average entry price per share"],["Comm","right","commN","Commission"],["Pos. Size","right","posValue","Position Size — shares × avg cost (commission shown beneath)"],["Exp %","right","expPct","Exposure — position size as a percent of current equity"],["Realized","right","realizedPL","Realized P/L locked in from partial sells on this open lot · gold bar = % of the original position trimmed off"],["Orig Stop","right","stop1","Original stop price"],["Stop 2","right","stop2","Secondary stop price"],["Stops","right","tsN","Stop levels — Original, 2nd and Trail stop"],["Activity","center","intradayLiveCount","Activity log — record partial trims, adds, stop nudges, or notes for today. Calculation only — does NOT change shares / stop / P/L. IBKR sync overnight fills the journal automatically."],["Current","right","cpN","Current market price"],["Setup / Tags","left","setup","Trade setup type and tags"],["Tags","left",null,"Tags"],["DTS","right","dtsPct","DTS — Distance To Stop"],["RTS","right","rtsD","RTS — Risk To Stop (dollars at risk if stopped out)"],["ROTE","right","rotePct","ROTE — Risk On Total Equity"],displayMode==="R"?["R Suggest","right","rSuggestedStop","Suggested mechanical trail-stop level"]:["SBE","right","sbe","SBE — Sell-to-BreakEven share count"],displayMode==="R"?["Locked","right","rLockedProfit","Profit locked in per share"]:["SBE %","right","sbePct","SBE % — portion of the position to sell for breakeven"],["P/L","right","plPct","Unrealized Profit / Loss on the remaining shares (realized partials live in the Realized column)"],["R","right","rMult","R-multiple — P/L in units of initial risk"],["","center",null,""],["","center",null,""]]; const intradayOn = INTRADAY_FEATURE_ENABLED && intradayColumnAvailable; const alwaysHide = new Set([5,9,10,15, ...(intradayOn ? [] : [12])]); const compactHide = new Set([2,9,19,20]); const hideSet = new Set([...alwaysHide, ...(compactTable ? compactHide : [])]); return posDrag.order.filter(ci => !hideSet.has(ci)).map((ci, vi) => { const [text, align, sortKey, tip] = defs[ci]; return <th key={`ph-${ci}`} {...posDrag.dragProps(vi)} onClick={sortKey ? (e) => { e.stopPropagation(); setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)); } : undefined} style={{padding:"10px 7px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.09em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"grab",userSelect:"none"}}>{tip ? <Abbr tip={tip} underline={false}>{text}</Abbr> : text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>; }); })()}
             </tr></thead>
             <tbody>
               {(posSorts.length > 0 ? multiSort(enriched, posSorts) : enriched).map((p, idx) => {
@@ -5318,7 +5344,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
                         <td colSpan={27} style={{ padding: "16px 18px" }}>
                           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
                             <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                              <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold }}>Intraday · {p.sym}</div>
+                              <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.gold }}>Activity Log · {p.sym}</div>
                               <div style={{ marginTop: 6, padding: "8px 12px", borderRadius: 8, background: "rgba(201,152,42,0.10)", border: `1px solid ${C.borderGold}`, fontSize: "0.68rem", color: C.text, lineHeight: 1.5 }}>
                                 <strong style={{ color: C.goldBright }}>⚠ Calculation only.</strong> Logging here <strong style={{ color: C.text }}>does NOT change</strong> your shares, stop, P/L, or any official position number. It's a private notepad for the day — IBKR sync overnight will confirm the real fills and fill the journal automatically.
                               </div>
@@ -7655,7 +7681,7 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} />}
+      {page === "dashboard" && <DashboardPage onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} />}
       {page === "tools" && <PremiumToolsPage demo={false} portfolioSize={portfolioSize} journaledTrades={journaledTrades} />}
       {page === "journal" && <TradeJournalPage journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} />}
       {page === "settings" && <SettingsPage setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} />}
