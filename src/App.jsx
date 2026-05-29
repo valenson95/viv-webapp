@@ -894,10 +894,10 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   journaledTrades.forEach(t => { if (!t.ticker) return; const k = exactKey(t); (byKey[k] = byKey[k] || []).push(t); });
   Object.entries(byKey).forEach(([k, group]) => {
     if (group.length < 2) return;
-    add("critical", "duplicates", "Exact-key duplicate trades",
-      `${group.length} trades share the same ticker + entry day + exit day + shares + P/L. Almost certainly the same fill imported twice.`,
-      group.map(t => `${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${t.shares} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)} · source: ${t.source || "?"}${t.ibExecId ? ` · execId: ${t.ibExecId.slice(-12)}` : ""}`),
-      "Open Trade Journal → review each row → soft-delete the manual/duplicate one. The Sync modal's duplicate-cleanup section has a one-click resolver."
+    add("critical", "duplicates", "The same trade appears twice",
+      `You have ${group.length} trades with the same ticker, entry, exit, share count, and P/L. This usually means you saved or imported the same trade twice, which inflates your stats and skews your win rate.`,
+      group.map(t => `${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${t.shares} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)} · source: ${t.source || "manual"}`),
+      "Go to Trade Journal, find the duplicate rows, and delete the extra one — or open Settings → IBKR Sync and use the one-click duplicate-cleanup at the top of the modal."
     );
   });
 
@@ -905,10 +905,10 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   const deletedSet = softDeletedExecIds instanceof Set ? softDeletedExecIds : new Set(softDeletedExecIds || []);
   journaledTrades.forEach(t => {
     if (t.ibExecId && deletedSet.has(t.ibExecId)) {
-      add("critical", "duplicates", "Soft-deleted exec ID leak",
-        `Trade ${t.ticker} has an IBKR exec ID that's also in the soft-deleted tombstone list — likely a partial cleanup state.`,
-        [`${t.ticker} · ${tradeDateISO(t.entry)} · ${t.shares} sh · exec ${t.ibExecId.slice(-12)} · source: ${t.source || "?"}`],
-        "Decide which copy is canonical: soft-delete this one again, or accept it (will fail to import on next sync if there's still a tombstone)."
+      add("critical", "duplicates", "A deleted IBKR trade came back",
+        `A ${t.ticker} trade you previously deleted has reappeared in your live Journal. This usually happens when an edit accidentally un-deleted it, and leaving it as-is will mess up your performance metrics.`,
+        [`${t.ticker} · ${tradeDateISO(t.entry)} · ${t.shares} sh · source: ${t.source || "manual"}`],
+        "Open Trade Journal, search the ticker, and delete the trade again — or, if you actually want to keep it, note that the next IBKR sync will skip importing it."
       );
     }
   });
@@ -918,10 +918,10 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   positions.forEach(p => { if (p.ibConid) (byConid[p.ibConid] = byConid[p.ibConid] || []).push(p); });
   Object.values(byConid).forEach(group => {
     if (group.length < 2) return;
-    add("critical", "duplicates", "Duplicate IBKR conid on open positions",
-      `${group.length} open positions share the same IBKR contract id. The next sync will reconcile against all of them and may double-update.`,
-      group.map(p => `${p.sym} · entry ${tradeDateISO(p.entry)} · ${p.shares} sh · conid ${p.ibConid} · source: ${p.source || "?"}`),
-      "Pick the canonical row. Archive the duplicates (is_closed=true) via the IBKR sync auto-close flow, or contact support for manual cleanup."
+    add("critical", "duplicates", "Same IBKR position listed twice",
+      `${group.length} open positions in your Dashboard point to the same underlying IBKR position. The next sync will try to update both rows, which can double-count your exposure and risk.`,
+      group.map(p => `${p.sym} · entry ${tradeDateISO(p.entry)} · ${p.shares} sh · source: ${p.source || "manual"}`),
+      "Go to the Open Positions table, decide which row is the real one, and archive the duplicate via Settings → IBKR Sync (auto-close flow) — or contact support if you're unsure which to keep."
     );
   });
 
@@ -943,11 +943,11 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (!picked) return;
     claimedIds.add(manual.id);
     picked.forEach(i => claimedIds.add(elig[i].id));
-    add("warn", "duplicates", "Aggregate duplicate (manual ↔ N×IBKR)",
-      `Manual ${manual.ticker} (${manualShares} sh) matches the sum of ${picked.length} IBKR row${picked.length === 1 ? "" : "s"} within ±5%. Same physical trade represented twice.`,
+    add("warn", "duplicates", "One manual trade matches several IBKR fills",
+      `A ${manual.ticker} trade you logged by hand (${manualShares} sh) adds up to the same shares as ${picked.length} IBKR-synced fill${picked.length === 1 ? "" : "s"} for the same ticker within a few days. The same trade is being counted twice — once manually, once from IBKR.`,
       [`Manual: ${manual.ticker} · ${tradeDateISO(manual.entry)} → ${tradeDateISO(manual.exit)} · ${manualShares} sh · ${(Number(manual.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(manual.plDollar) || 0).toFixed(2)}${manual.rMult != null ? ` · ${Number(manual.rMult).toFixed(2)}R` : ""}`,
        ...picked.map(i => { const t = elig[i]; return `IBKR: ${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${Number(t.shares) || 0} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)}`; })],
-      "Open the IBKR Sync modal — the duplicate-cleanup section has a one-click 'Keep manual · delete N IBKR rows' resolver."
+      "Open Settings → IBKR Sync — the duplicate-cleanup section has a one-click \"Keep manual, delete IBKR copies\" button for this exact case."
     );
   });
 
@@ -965,11 +965,11 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (!picked || picked.length < 2) return;
     claimedIbkrIds.add(ibkr.id);
     picked.forEach(i => claimedIds.add(elig[i].id));
-    add("warn", "duplicates", "Inverse aggregate (IBKR ↔ N×manual)",
-      `IBKR ${ibkr.ticker} (${ibkrShares} sh round-trip) sums to ${picked.length} manual rows within ±5%. The manuals are likely staged Sell-button trims that overlap with this single IBKR cycle.`,
+    add("warn", "duplicates", "One IBKR trade matches several manual trims",
+      `A single IBKR round-trip on ${ibkr.ticker} (${ibkrShares} sh) lines up with ${picked.length} smaller trades you logged manually (likely from using the Sell button). The same trade is being counted on both sides, distorting your trim history and totals.`,
       [`IBKR: ${ibkr.ticker} · ${tradeDateISO(ibkr.entry)} → ${tradeDateISO(ibkr.exit)} · ${ibkrShares} sh · ${(Number(ibkr.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(ibkr.plDollar) || 0).toFixed(2)}`,
        ...picked.map(i => { const t = elig[i]; return `Manual: ${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${Number(t.shares) || 0} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)}`; })],
-      "Review side-by-side. Keep whichever set has your judgment fields (notes, R-mult, setup); soft-delete the other via the Journal."
+      "Open Trade Journal, compare the two sets side-by-side, and delete whichever set is missing your notes, R-multiple, and setup — keep the one with your judgment."
     );
   });
 
@@ -982,10 +982,10 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (!p.sym) missing.push("ticker");
     if (!Number.isFinite(shares) || shares <= 0) missing.push(`shares (${p.shares == null ? "null" : p.shares})`);
     if (!Number.isFinite(ep) || ep <= 0) missing.push(`entry price (${p.ep == null ? "null" : p.ep})`);
-    if (missing.length) add("critical", "orphans", "Open position missing critical field(s)",
-      `Position is missing: ${missing.join(", ")}. Breaks sizer / exposure / risk math.`,
-      [`${p.sym || "(no ticker)"} · entry ${tradeDateISO(p.entry) || "?"} · source: ${p.source || "?"}`],
-      "Open the Dashboard → click the row → fill in the missing field → Save."
+    if (missing.length) add("critical", "orphans", "This open position is missing key info",
+      `An open position is missing its ${missing.join(", ")}. Without these, the Position Sizer, exposure %, and risk numbers on your Dashboard can't be calculated correctly.`,
+      [`${p.sym || "(no ticker)"} · entry ${tradeDateISO(p.entry) || "?"} · source: ${p.source || "manual"}`],
+      "Go to the Dashboard, click the row in the Open Positions table, fill in the blank field, and press Save."
     );
   });
 
@@ -995,19 +995,19 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     const d = Number(t.plDollar) || 0;
     const pct = Number(t.plPct) || 0;
     if (d && pct && Math.sign(d) !== Math.sign(pct)) {
-      add("warn", "formulas", "P/L sign disagreement ($ vs %)",
-        `${t.ticker}: dollar P/L is ${d >= 0 ? "positive" : "negative"} but percent P/L is ${pct >= 0 ? "positive" : "negative"}. Usually a hand-keyed sign error.`,
+      add("warn", "formulas", "Your dollar and percent P/L disagree",
+        `Your ${t.ticker} trade shows a ${d >= 0 ? "profit" : "loss"} in dollars but a ${pct >= 0 ? "profit" : "loss"} in percent. It's almost always a typo on one of the two fields and will throw off your win rate and equity curve.`,
         [`${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · $${d.toFixed(2)} · ${pct.toFixed(2)}%`],
-        "Re-key one field, or open the trade and let Save recompute from entry/exit/shares."
+        "Open the trade in Trade Journal, re-enter the correct number, and press Save — Save will recalculate everything from entry, exit, and shares."
       );
     }
     if (t.tradeType && Number(t.entryP) && Number(t.exitP) && d) {
       const derived = t.tradeType === "Short" ? (Number(t.entryP) - Number(t.exitP)) : (Number(t.exitP) - Number(t.entryP));
       if (derived && Math.sign(d) !== Math.sign(derived)) {
-        add("warn", "formulas", "P/L sign disagrees with prices",
-          `${t.ticker} ${t.tradeType}: dollar P/L sign doesn't match (exit - entry). Likely a long/short mislabel.`,
+        add("warn", "formulas", "Your P/L doesn't match the entry and exit",
+          `The profit or loss on your ${t.ticker} ${t.tradeType} trade doesn't match what the entry and exit prices say it should be. The most common cause is a long trade mislabeled as a short (or vice versa).`,
           [`${t.ticker} ${t.tradeType} · entry $${Number(t.entryP).toFixed(2)} → exit $${Number(t.exitP).toFixed(2)} · $${d.toFixed(2)}`],
-          "Verify the trade direction. If short, exit < entry is profit. If long, exit > entry is profit."
+          "Open the trade in Trade Journal, check the direction (long or short), correct it, and press Save."
         );
       }
     }
@@ -1016,10 +1016,10 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   // 8) r_mult set without stop
   journaledTrades.forEach(t => {
     if (t.rMult != null && Number(t.rMult) !== 0 && (!t.stop || Number(t.stop) <= 0)) {
-      add("info", "formulas", "R-multiple set without stop",
-        `${t.ticker}: ${Number(t.rMult).toFixed(2)}R recorded but no stop on the trade. R can't be re-derived if needed.`,
-        [`${t.ticker} · ${tradeDateISO(t.entry)} · rMult ${Number(t.rMult).toFixed(2)} · stop ${t.stop || "—"}`],
-        "Either set the stop the trade was sized against, or clear rMult."
+      add("info", "formulas", "This trade has an R-multiple but no stop loss",
+        `Your ${t.ticker} trade shows ${Number(t.rMult).toFixed(2)}R but no stop loss is recorded, so the R-multiple can't be verified. It's usually old data from before stops were tracked.`,
+        [`${t.ticker} · ${tradeDateISO(t.entry)} · ${Number(t.rMult).toFixed(2)}R · stop: ${t.stop || "not set"}`],
+        "Open the trade in Trade Journal and either enter the stop loss you used at entry, or clear the R-multiple field — then Save."
       );
     }
   });
@@ -1034,10 +1034,10 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     const remaining = Number(p.shares) || 0;
     const original = trimmed + remaining;
     if (original > 0 && trimmed > original * 1.001) {
-      add("critical", "formulas", "Trim % exceeds 100%",
-        `${p.sym}: realized partials sum to ${trimmed} sh but remaining is ${remaining} sh — you "trimmed" more than you held. Almost always a duplicate partial.`,
-        [`${p.sym} · entry ${tradeDateISO(p.entry)} · ${matches.length} matching closed trade${matches.length === 1 ? "" : "s"} · trimmed ${trimmed} · remaining ${remaining}`],
-        "Cross-check Trade Journal for duplicate partials with same ticker + entry day. Soft-delete the extras."
+      add("critical", "formulas", "You sold more shares than you owned",
+        `Your partial sells on ${p.sym} add up to ${trimmed} sh but you only have ${remaining} sh remaining. This almost always means one of your trims was logged twice.`,
+        [`${p.sym} · entry ${tradeDateISO(p.entry)} · ${matches.length} matching trim${matches.length === 1 ? "" : "s"} · sold ${trimmed} sh · remaining ${remaining} sh`],
+        "Go to Trade Journal, search for the ticker, find two partial sells with the same entry day, and delete the duplicate."
       );
     }
   });
@@ -1046,10 +1046,10 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   // 10) IBKR trade missing ib_exec_id
   journaledTrades.forEach(t => {
     if ((t.source === "ibkr" || t.source === "reconciled") && !t.ibExecId) {
-      add("critical", "ibkr", "IBKR trade missing exec ID",
-        `${t.ticker}: source is ${t.source} but exec ID is empty. Re-sync can't identify it → would be re-imported as "new" → duplicate.`,
-        [`${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${t.shares} sh · source ${t.source}`],
-        "Last-resort fix: demote source to 'manual' (loses sync ownership but prevents auto-dupes)."
+      add("critical", "ibkr", "IBKR trade is missing its fill ID",
+        `Your ${t.ticker} trade is marked as coming from IBKR but has no IBKR fill ID attached. The next sync won't recognize it and will import it again as a brand-new trade — creating a duplicate.`,
+        [`${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${t.shares} sh · source: ${t.source}`],
+        "Open the trade in Trade Journal and change its source to Manual — this gives up IBKR linking but prevents the duplicate on your next sync."
       );
     }
   });
@@ -1057,10 +1057,10 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   // 11) IBKR position missing ib_conid
   positions.forEach(p => {
     if ((p.source === "ibkr" || p.source === "reconciled") && !p.ibConid) {
-      add("critical", "ibkr", "IBKR position missing conid",
-        `${p.sym}: source is ${p.source} but conid is empty. Next sync's matcher will miss it → likely duplicate row.`,
-        [`${p.sym} · entry ${tradeDateISO(p.entry)} · ${p.shares} sh · source ${p.source}`],
-        "Re-link via a fresh sync, or demote source to 'manual'."
+      add("critical", "ibkr", "IBKR position is missing its position ID",
+        `Your ${p.sym} open position is marked as coming from IBKR but has no IBKR position ID attached. The next sync won't be able to match it and will likely add a second copy.`,
+        [`${p.sym} · entry ${tradeDateISO(p.entry)} · ${p.shares} sh · source: ${p.source}`],
+        "Go to Settings → IBKR Sync and run a fresh sync to re-link the position — or open the row in the Open Positions table and change its source to Manual."
       );
     }
   });
@@ -1074,11 +1074,36 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if ((src === "ibkr" || src === "reconciled") && (!ts || Date.parse(ts) < cutoff)) staleCount++;
   });
   if (staleCount) {
-    add("info", "ibkr", "Stale IBKR rows",
-      `${staleCount} IBKR-sourced row${staleCount === 1 ? " is" : "s are"} older than 30 days since last sync. Run a sync to refresh.`,
-      [], "Click Sync IBKR to refresh."
+    add("info", "ibkr", "IBKR data hasn't refreshed recently",
+      `${staleCount} IBKR-linked row${staleCount === 1 ? " hasn't" : "s haven't"} been refreshed in over 30 days. Your prices, fills, and commissions may be out of date.`,
+      [], "Click the Sync button on the Dashboard or in Settings → IBKR Sync to pull the latest data from IBKR."
     );
   }
+
+  // 14) Manual open position likely closed by IBKR same-day — catches the scenario where a member opens
+  // a position in IBKR, keys it manually on the dashboard, then has it stopped out (or fully closed) the
+  // same day by IBKR. The closed round-trip is in the journal but the manual open position is still on
+  // the dashboard, looking like an open trade that no longer exists in reality.
+  positions.forEach(p => {
+    if (p.source !== "manual") return; // only manual positions can be orphaned this way (IBKR positions auto-close)
+    const sym = (p.sym || "").toUpperCase();
+    if (!sym || !p.entry) return;
+    const posEntryDay = tradeDateISO(p.entry);
+    if (!posEntryDay) return;
+    const matchingClosed = journaledTrades.find(t =>
+      (t.ticker || "").toUpperCase() === sym &&
+      t.reason !== "Partial Trim" && // ignore partial trims — those don't fully close
+      tradeDateISO(t.entry) === posEntryDay
+    );
+    if (matchingClosed) {
+      add("warn", "orphans", `Your ${p.sym} position may already be closed`,
+        `You have ${p.sym} open on the Dashboard, but your Trade Journal shows a completed ${p.sym} round-trip starting the same day. IBKR probably closed this position (stop hit, target hit, or full sell) but the manual row is still showing on your Dashboard.`,
+        [`Open on Dashboard: ${p.sym} · entry ${posEntryDay} · ${p.shares} sh${p.notes ? ` · has notes` : ""}`,
+         `Closed in Journal: ${matchingClosed.ticker} · ${tradeDateISO(matchingClosed.entry)} → ${tradeDateISO(matchingClosed.exit)} · ${matchingClosed.shares} sh · ${(Number(matchingClosed.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(matchingClosed.plDollar) || 0).toFixed(2)}`],
+        "Go to Open Positions, click ✕ on the manual row to remove it — your Trade Journal already has the real closed trade with the correct numbers from IBKR. Copy any notes you want to keep into the journal trade before removing."
+      );
+    }
+  });
 
   const elapsedMs = (typeof performance !== "undefined" && performance.now) ? Math.round(performance.now() - t0) : 0;
   return {
