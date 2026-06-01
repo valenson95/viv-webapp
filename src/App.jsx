@@ -561,7 +561,10 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
         const realized = cycle.reduce((s, c) => s + c.realizedPnl, 0);
         const plDollar = realized || ((exitP - entryP) * qty - commission);
         const plPct = entryP > 0 ? (plDollar / (entryP * qty)) * 100 : 0;
-        if (first.date >= IBKR_SYNC_FLOOR && qty > 0) {
+        // Gate on EXIT date, not entry date — a pre-floor open that closes post-floor is a post-floor
+        // realized event (P/L hits this month's books) and belongs in the journal. Earlier this filter
+        // used first.date and silently dropped legit close-outs (e.g. April open → May close).
+        if (last.date >= IBKR_SYNC_FLOOR && qty > 0) {
           closed.push({ ticker: sym, entry: first.date, entryTime: first.time, exit: last.date, exitTime: last.time,
             entryP: +entryP.toFixed(4), exitP: +exitP.toFixed(4), shares: qty, plPct: +plPct.toFixed(2),
             plDollar: +plDollar.toFixed(2), commission: +commission.toFixed(2), execId: last.execID, tradeId: last.tradeID,
@@ -581,8 +584,11 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
       const ibkrPos = posBySym[sym.toUpperCase()];
       const lotEntry = (ibkrPos && ibkrPos.openDate) || firstExec.date;
       const lotEntryTime = (ibkrPos && ibkrPos.openTime) || firstExec.time;
-      // Skip lots whose ORIGIN is before the sync floor (same rule as closed round-trips)
-      if (lotEntry >= IBKR_SYNC_FLOOR) {
+      // Gate is per-close-event (c.date), NOT lotEntry — a pre-floor lot can still emit post-floor
+      // partial trims, because each trim is a post-floor realized event. We still walk the full cycle
+      // (including pre-floor opens) so the running avg cost is correct; we only SKIP THE EMIT for
+      // closes that fall before the floor.
+      {
         const isLong = firstExec.signedQty > 0;
         // Running volume-weighted avg cost of opening legs preceding each close
         let openShares = 0, openCost = 0;
@@ -595,15 +601,18 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
           } else if (isClosing && openShares > 0) {
             const avgEntryP = openCost / openShares;
             const closedQty = c.quantity;
-            const plDollar = c.realizedPnl || ((isLong ? (c.price - avgEntryP) : (avgEntryP - c.price)) * closedQty - c.commission);
-            const plPct = avgEntryP > 0 ? (plDollar / (avgEntryP * closedQty)) * 100 : 0;
-            partials.push({
-              ticker: sym, entry: lotEntry, entryTime: lotEntryTime, exit: c.date, exitTime: c.time,
-              entryP: +avgEntryP.toFixed(4), exitP: +c.price.toFixed(4), shares: closedQty,
-              plPct: +plPct.toFixed(2), plDollar: +plDollar.toFixed(2), commission: +c.commission.toFixed(2),
-              execId: c.execID, tradeId: c.tradeID, tradeType: isLong ? "Long" : "Short", isPartial: true,
-            });
-            // Reduce the lot's running open shares by what we just closed (proportionally)
+            if (c.date >= IBKR_SYNC_FLOOR) {
+              const plDollar = c.realizedPnl || ((isLong ? (c.price - avgEntryP) : (avgEntryP - c.price)) * closedQty - c.commission);
+              const plPct = avgEntryP > 0 ? (plDollar / (avgEntryP * closedQty)) * 100 : 0;
+              partials.push({
+                ticker: sym, entry: lotEntry, entryTime: lotEntryTime, exit: c.date, exitTime: c.time,
+                entryP: +avgEntryP.toFixed(4), exitP: +c.price.toFixed(4), shares: closedQty,
+                plPct: +plPct.toFixed(2), plDollar: +plDollar.toFixed(2), commission: +c.commission.toFixed(2),
+                execId: c.execID, tradeId: c.tradeID, tradeType: isLong ? "Long" : "Short", isPartial: true,
+              });
+            }
+            // Reduce the lot's running open shares by what we just closed (proportionally), whether or
+            // not we emitted — avg cost must stay correct for any later post-floor closes in the cycle.
             const ratio = (openShares - closedQty) / openShares;
             openCost *= Math.max(0, ratio);
             openShares -= closedQty;
@@ -857,7 +866,62 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
     });
   });
 
-  return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows, closeRows, partialRows, dupeJournalGroups, intradayMatches };
+  // ── SYMBOL REPORT ── per-symbol diagnostic showing what IBKR returned for each ticker and exactly
+  // which output bucket(s) it ended up in (or why nothing was emitted). Surfaced in the sync modal so
+  // silent failures ("I closed it but nothing showed up") can be self-diagnosed without code dives.
+  const allSymbols = new Set();
+  Object.keys(bySym).forEach(s => allSymbols.add((s || "").toUpperCase()));
+  (data.positions || []).forEach(p => p.symbol && allSymbols.add(String(p.symbol).toUpperCase()));
+  // Also include any of the user's open positions / journal entries that AREN'T in IBKR's data — those
+  // are the loudest silent failures ("I have it open / closed manually but IBKR returned nothing for it").
+  (positions || []).forEach(p => p.sym && allSymbols.add(String(p.sym).toUpperCase()));
+  const symbolReport = Array.from(allSymbols).sort().map(SYM => {
+    const execs = bySym[SYM] || bySym[Object.keys(bySym).find(k => k.toUpperCase() === SYM)] || [];
+    const ibkrPos = (data.positions || []).find(p => String(p.symbol || "").toUpperCase() === SYM);
+    const userPos = (positions || []).find(p => String(p.sym || "").toUpperCase() === SYM);
+    const tradeRow = tradeRows.find(r => String(r.ticker || "").toUpperCase() === SYM);
+    const partialRow = partialRows.find(r => String(r.ticker || "").toUpperCase() === SYM);
+    const closeRow = closeRows.find(r => String(r.sym || "").toUpperCase() === SYM);
+    const posRow = posRows.find(r => String(r.sym || "").toUpperCase() === SYM);
+    const netQty = Math.round(netBySym[SYM] || 0);
+    const closedThisSym = closed.filter(c => String(c.ticker || "").toUpperCase() === SYM);
+    const partialsThisSym = partials.filter(p => String(p.ticker || "").toUpperCase() === SYM);
+    const reasons = [];
+    if (execs.length === 0) reasons.push("no executions in this statement");
+    if (execs.length > 0 && closedThisSym.length === 0 && partialsThisSym.length === 0) {
+      // Walk execs to see if any cycle closed pre-floor — that's the most common "vanished" cause now
+      const lastExec = execs[execs.length - 1];
+      if (lastExec && lastExec.date < IBKR_SYNC_FLOOR) reasons.push(`all closes before floor (${IBKR_SYNC_FLOOR})`);
+    }
+    if (execs.length > 0 && netQty !== 0 && closedThisSym.length === 0) reasons.push(`still open at IBKR (net ${netQty} sh)`);
+    if (userPos && !ibkrPos && !closeRow && execs.length === 0) reasons.push("on your dashboard, NOT in IBKR statement — check Flex query period");
+    if (userPos && userPos.source === "manual" && closedThisSym.length > 0 && !tradeRow) reasons.push("manual position — auto-close blocked (reconcile first)");
+    return {
+      sym: SYM,
+      execs: execs.length,
+      netQty,
+      ibkrHasOpen: !!ibkrPos,
+      userHasOpen: !!userPos,
+      userSource: userPos ? userPos.source : null,
+      closedBuilt: closedThisSym.length,
+      partialsBuilt: partialsThisSym.length,
+      tradeAction: tradeRow ? tradeRow.action : null,
+      partialAction: partialRow ? partialRow.action : null,
+      closeAction: closeRow ? closeRow.action : null,
+      posAction: posRow ? posRow.action : null,
+      notes: reasons,
+    };
+  });
+  const diagnostics = {
+    tradesReturned: (data.trades || []).length,
+    positionsReturned: (data.positions || []).length,
+    closedBuilt: closed.length,
+    partialsBuilt: partials.length,
+    haveTradeData,
+    sinceFloor: IBKR_SYNC_FLOOR,
+    symbolReport,
+  };
+  return { account: data.account, fetchedAt: data.fetchedAt, posRows, tradeRows, closeRows, partialRows, dupeJournalGroups, intradayMatches, diagnostics };
 }
 
 // ─── INTEGRITY CHECKER ─── pure function. Walks already-loaded journal + positions + softDeletedExecIds
@@ -1354,7 +1418,7 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                 </div>
               )}
               <div style={{ padding: "10px 14px", background: "rgba(201,152,42,0.08)", border: `1px solid ${C.borderGold}`, borderRadius: 10, fontSize: "0.7rem", color: C.text, lineHeight: 1.6, marginBottom: 18 }}>
-                <strong style={{ color: C.goldBright }}>Review before importing.</strong> Entry date on/after {IBKR_SYNC_FLOOR}. <strong style={{ color: C.white }}>Reconcile</strong> updates a manual entry with IBKR's exact figures and keeps your notes/tags. Nothing is ever deleted; manual rows you don't reconcile are untouched.
+                <strong style={{ color: C.goldBright }}>Review before importing.</strong> Closed on/after {IBKR_SYNC_FLOOR} (trades that closed before this date stay out of the journal even if their entry was earlier). <strong style={{ color: C.white }}>Reconcile</strong> updates a manual entry with IBKR's exact figures and keeps your notes/tags. Nothing is ever deleted; manual rows you don't reconcile are untouched.
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 10, marginBottom: 18 }}>
                 <StatTile label="Account" value={data.account || "—"} />
@@ -1363,6 +1427,63 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                 <StatTile label="Partial Sells" value={String((data.partialRows || []).length)} />
                 {(data.dupeJournalGroups || []).length > 0 && <StatTile label="Dupes Found" value={String(data.dupeJournalGroups.length)} />}
               </div>
+              {/* ─── LOUD BANNERS ─── catch silent statement failures that previously slipped past unnoticed. */}
+              {data.diagnostics && !data.diagnostics.haveTradeData && data.diagnostics.positionsReturned === 0 && (
+                <div style={{ padding: "12px 14px", background: "rgba(239,68,68,0.10)", border: `1px solid rgba(239,68,68,0.45)`, borderRadius: 10, fontSize: "0.74rem", color: C.text, lineHeight: 1.55, marginBottom: 14 }}>
+                  <strong style={{ color: C.red }}>⚠ IBKR returned no data.</strong> Statement is empty — your Flex Query may still be regenerating, or the period setting excludes recent days. Check Settings → IBKR Connection (Period = "Last 365 Calendar Days") and retry in a few minutes.
+                </div>
+              )}
+              {data.diagnostics && !data.diagnostics.haveTradeData && data.diagnostics.positionsReturned > 0 && (
+                <div style={{ padding: "12px 14px", background: "rgba(255,200,40,0.10)", border: `1px solid rgba(255,200,40,0.40)`, borderRadius: 10, fontSize: "0.74rem", color: C.text, lineHeight: 1.55, marginBottom: 14 }}>
+                  <strong style={{ color: C.goldBright }}>⚠ No trade executions in this statement.</strong> IBKR returned your open positions but zero executions, so close-detection, partial-sell import, and reconcile are OFF for this sync. If you traded recently, the statement likely hasn't refreshed yet — retry later.
+                </div>
+              )}
+              {/* ─── DIAGNOSTICS PANEL ─── per-symbol gate trace. Collapsed by default; expand to see exactly
+                   what IBKR returned for each ticker and which output bucket it landed in (or why it didn't). */}
+              {data.diagnostics && (data.diagnostics.symbolReport || []).length > 0 && (
+                <details style={{ marginBottom: 18, border: `1px solid ${C.border}`, borderRadius: 10, background: "rgba(255,255,255,0.02)" }}>
+                  <summary style={{ padding: "10px 14px", cursor: "pointer", fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>🔍 Diagnostics · per-symbol gate trace</span>
+                    <span style={{ fontSize: "0.58rem", color: C.muted, fontWeight: 600, letterSpacing: 0, textTransform: "none" }}>
+                      {data.diagnostics.tradesReturned} execs · {data.diagnostics.closedBuilt} round-trips · {data.diagnostics.partialsBuilt} partials · floor {data.diagnostics.sinceFloor}
+                    </span>
+                  </summary>
+                  <div style={{ padding: "0 14px 12px 14px" }}>
+                    <div style={{ fontSize: "0.62rem", color: C.muted, marginBottom: 10, lineHeight: 1.55 }}>
+                      For every ticker either on your dashboard or in this IBKR statement, here's what was emitted (or why nothing was). If you expected an action that's missing, the <strong style={{ color: C.text }}>Notes</strong> column tells you the gate that blocked it.
+                    </div>
+                    <div style={{ overflowX: "auto", border: `1px solid ${C.border}`, borderRadius: 8 }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.66rem" }}>
+                        <thead><tr style={{ borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.02)" }}>
+                          {["Symbol", "IBKR Execs", "Net Qty", "IBKR Open?", "On Dashboard?", "Round-Trips Built", "Partials Built", "Action", "Notes"].map(h => (
+                            <th key={h} style={{ padding: "7px 8px", textAlign: "left", fontSize: "0.48rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, fontWeight: 700, whiteSpace: "nowrap" }}>{h}</th>
+                          ))}
+                        </tr></thead>
+                        <tbody>
+                          {data.diagnostics.symbolReport.map((r, i) => {
+                            const action = r.tradeAction || r.partialAction || r.closeAction || r.posAction || null;
+                            const actionColor = action === "new" ? C.green : action === "reconcile" ? C.gold : action === "close" ? C.goldBright : action === "review" ? C.red : action === "synced" ? C.muted : C.muted;
+                            const hasIssue = r.notes.length > 0;
+                            return (
+                              <tr key={r.sym} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, background: hasIssue ? "rgba(239,68,68,0.04)" : "transparent" }}>
+                                <td style={{ padding: "6px 8px", color: C.white, fontWeight: 700 }}>{r.sym}</td>
+                                <td style={{ padding: "6px 8px", color: r.execs > 0 ? C.text : C.muted }}>{r.execs}</td>
+                                <td style={{ padding: "6px 8px", color: r.netQty === 0 ? C.muted : (r.netQty > 0 ? C.green : C.red) }}>{r.netQty}</td>
+                                <td style={{ padding: "6px 8px", color: C.text }}>{r.ibkrHasOpen ? "✓" : "—"}</td>
+                                <td style={{ padding: "6px 8px", color: C.text }}>{r.userHasOpen ? (r.userSource === "manual" ? "✓ manual" : `✓ ${r.userSource}`) : "—"}</td>
+                                <td style={{ padding: "6px 8px", color: r.closedBuilt > 0 ? C.gold : C.muted, fontWeight: r.closedBuilt > 0 ? 700 : 400 }}>{r.closedBuilt}</td>
+                                <td style={{ padding: "6px 8px", color: r.partialsBuilt > 0 ? C.gold : C.muted, fontWeight: r.partialsBuilt > 0 ? 700 : 400 }}>{r.partialsBuilt}</td>
+                                <td style={{ padding: "6px 8px", color: actionColor, fontWeight: action ? 700 : 400, textTransform: "uppercase", fontSize: "0.56rem", letterSpacing: "0.06em" }}>{action || "—"}</td>
+                                <td style={{ padding: "6px 8px", color: hasIssue ? C.red : C.muted, fontSize: "0.60rem", lineHeight: 1.45 }}>{r.notes.length ? r.notes.join(" · ") : "ok"}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </details>
+              )}
               {[{ kind: "pos", title: "Open Positions", rows: data.posRows, cols: ["sym", "shares", "ep", "entry"], head: ["Symbol", "Shares", "Avg Cost", "Opened"] },
                 { kind: "trade", title: "Closed Trades (round-trips)", rows: data.tradeRows, cols: ["ticker", "shares", "entryP", "exitP", "plDollar", "entry"], head: ["Symbol", "Shares", "Entry", "Exit", "P/L $", "In"] },
                 ...(data.partialRows && data.partialRows.length ? [{ kind: "partial", title: "Partial Sells (from still-open positions)", rows: data.partialRows, cols: ["ticker", "shares", "entryP", "exitP", "plDollar", "exit"], head: ["Symbol", "Shares", "Avg Cost", "Exit", "P/L $", "Sold"] }] : []),
@@ -1371,7 +1492,7 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                   <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: sec.kind === "close" ? C.goldBright : C.gold, marginBottom: 8 }}>{sec.title} ({sec.rows.length})</div>
                   {sec.kind === "close" && <div style={{ fontSize: "0.64rem", color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>These came in from IBKR and are now fully closed there. <strong style={{ color: C.text }}>Close out</strong> files the closed trade into your Journal and removes it from Open Positions (the record is archived, never destroyed, and recoverable). Choose <strong style={{ color: C.text }}>Keep open</strong> to leave it on the Dashboard.</div>}
                   {sec.kind === "partial" && <div style={{ fontSize: "0.64rem", color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>Trims you took in IBKR that did <strong style={{ color: C.text }}>not</strong> fully close the position. Importing each one logs it to your Journal and surfaces it on the still-open position as realized P/L + "% Trimmed" in the Dashboard. Dedup is by IBKR execution id, so re-syncs are safe.</div>}
-                  {sec.rows.length === 0 ? <div style={{ fontSize: "0.72rem", color: C.muted, padding: "8px 0" }}>None from {IBKR_SYNC_FLOOR} onward.</div> : (
+                  {sec.rows.length === 0 ? <div style={{ fontSize: "0.72rem", color: C.muted, padding: "8px 0" }}>None closed on/after {IBKR_SYNC_FLOOR}. (Expand <strong style={{ color: C.text }}>Diagnostics</strong> above to see why a specific symbol isn't here.)</div> : (
                     <div style={{ overflowX: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
                         <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{sec.head.map(h => <th key={h} style={{ padding: "8px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>{h}</th>)}<th style={{ padding: "8px 8px", textAlign: "center", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Status</th><th style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Action</th></tr></thead>
@@ -6081,7 +6202,7 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
           <div style={{ flex: "1 1 280px" }}>
             <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>Interactive Brokers Sync</div>
-            <div style={{ fontSize: "0.70rem", color: C.muted, lineHeight: 1.6 }}>Pull your open positions and closed trades straight from IBKR (entered on/after {IBKR_SYNC_FLOOR}). You'll always see a preview before anything saves — manual entries are never overwritten.</div>
+            <div style={{ fontSize: "0.70rem", color: C.muted, lineHeight: 1.6 }}>Pull your open positions and closed trades straight from IBKR (closed on/after {IBKR_SYNC_FLOOR}). You'll always see a preview before anything saves — manual entries are never overwritten.</div>
           </div>
           {onIbkrSync
             ? <button onClick={onIbkrSync} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 7, alignSelf: "center" }}>⟳ Sync from IBKR</button>
