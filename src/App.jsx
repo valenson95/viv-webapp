@@ -5222,14 +5222,12 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       // because a fully-closed round-trip with reasons like "Sold Into Strength" / "Hit Initial Stop"
       // carries NEITHER marker, so it falls through to rule 2 (strict day) and gets excluded.
       const heuristicMatches = sameTicker.filter(t => {
-        // Drop the broad ibExecId catch — that was over-attributing closed round-trips. Only the
-        // explicit "Partial Trim" reason qualifies as a partial-trim heuristic. (Linked trades are
-        // already handled in Stage 1; this is unlinked-only.)
-        const isPartialTrim = t.reason === "Partial Trim";
-        if (isPartialTrim) return true;
-        if (!posKey) return true;
-        const tKey = tradeDateISO(t.entry);
-        return !!tKey && tKey === posKey;
+        // Stage 2 — ONLY trades with the explicit "Partial Trim" marker count. No same-day fallback,
+        // no ticker-only catch. A closed round-trip on the same day as the current open lot's entry
+        // (which the previous same-day rule wrongly attributed) won't slip in here — it has no marker.
+        // Users with legacy data who want a trade attributed must either set reason="Partial Trim"
+        // on the row, or run the 🔗 Link Trades wizard to give it an explicit positionId.
+        return t.reason === "Partial Trim";
       });
 
       const matches = [...linkedMatches, ...heuristicMatches];
