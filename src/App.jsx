@@ -3077,6 +3077,13 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   // Drag reorder hooks — stat tiles, trade journal columns, open positions columns
   const statDrag = useDragReorder(12); // 12 stat tiles
   const tradeDrag = useDragReorder(17); // 17 trade journal columns
+  // Privacy mode — hides absolute dollar amounts and converts surface metrics to relative (% / R / ratios).
+  // Affects Total P/L tile, Equity Curve Y-axis, Tracker monthly Comm column, and Closed Trades P/L $ column.
+  // Persists in localStorage so the user can leave it on while screenshotting/sharing without re-toggling.
+  const [privacyMode, setPrivacyMode] = useState(() => {
+    try { return localStorage.getItem("viv-privacy-mode") === "1"; } catch { return false; }
+  });
+  useEffect(() => { try { localStorage.setItem("viv-privacy-mode", privacyMode ? "1" : "0"); } catch {} }, [privacyMode]);
   // Bulk-edit state — selection survives sort/filter changes (lives on trade id, not row index).
   const [selectedTradeIds, setSelectedTradeIds] = useState(() => new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -3663,6 +3670,22 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           <h1 style={{ fontWeight: 800, fontSize: "clamp(1.5rem, 4vw, 2rem)", letterSpacing: "-0.04em", color: C.white, margin: 0 }}>Performance Tracker{activeFilterLabel && <span style={{ fontSize: "0.6em", color: C.muted, fontWeight: 400 }}>{activeFilterLabel}</span>}</h1>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            onClick={() => setPrivacyMode(p => !p)}
+            title={privacyMode ? "Privacy ON — dollar amounts hidden. Click to show." : "Privacy OFF — click to hide dollar amounts for sharing."}
+            style={{
+              padding: "8px 14px", borderRadius: 980,
+              border: `1px solid ${privacyMode ? C.borderGold : C.border}`,
+              background: privacyMode ? C.goldDim : "transparent",
+              color: privacyMode ? C.goldBright : C.muted,
+              fontWeight: 700, fontSize: "0.66rem", cursor: "pointer", fontFamily: font,
+              display: "flex", alignItems: "center", gap: 6, transition: "all 0.18s",
+              boxShadow: privacyMode ? "0 0 12px rgba(201,152,42,0.18)" : "none",
+            }}
+          >
+            <span style={{ fontSize: "0.78rem", lineHeight: 1 }}>{privacyMode ? "🔒" : "🔓"}</span>
+            {privacyMode ? "Privacy ON" : "Privacy"}
+          </button>
           <ShareDropdown menuOpen={shareMenuOpen} setMenuOpen={setShareMenuOpen} status={shareStatus} captureFn={captureStats} label="Stats" />
           <button onClick={onManualSave} disabled={saveStatus === "saving"} style={{ padding:"8px 16px",borderRadius:980,border:`1px solid ${saveStatus === "saved" ? "rgba(34,197,94,0.4)" : saveStatus === "error" ? "rgba(239,68,68,0.4)" : C.borderGold}`,background:saveStatus === "saved" ? "rgba(34,197,94,0.12)" : saveStatus === "error" ? "rgba(239,68,68,0.12)" : C.goldDim,color:saveStatus === "saved" ? C.green : saveStatus === "error" ? C.red : C.gold,fontWeight:700,fontSize:"0.72rem",cursor:saveStatus === "saving" ? "wait" : "pointer",fontFamily:font,transition:"all 0.2s",display:"flex",alignItems:"center",gap:6 }}>
             {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Save Failed" : "Save"}
@@ -3783,7 +3806,14 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       {/* Stats — draggable tiles, recalculate based on filter */}
       {(() => {
         const tiles = [
-          { label:"Total P/L", value:`$${Math.abs(stats.totalPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`, color:stats.totalPL>=0?C.green:C.red, prefix:stats.totalPL>=0?"+":"-", tip:"Total profit/loss in dollars across all closed trades in the current filter." },
+          privacyMode
+            ? (() => {
+                const startCap = Number(portfolioSize) || 0;
+                const startEquity = startCap - stats.totalPL;     // equity BEFORE this filter's trades
+                const ret = startEquity > 0 ? (stats.totalPL / startEquity) * 100 : 0;
+                return { label:"Total Return", value:`${Math.abs(ret).toFixed(2)}%`, color:stats.totalPL>=0?C.green:C.red, prefix:stats.totalPL>=0?"+":"-", tip:"Cumulative percentage return across all closed trades in the current filter (P/L ÷ starting equity). Dollar amount hidden — toggle Privacy off to view." };
+              })()
+            : { label:"Total P/L", value:`$${Math.abs(stats.totalPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`, color:stats.totalPL>=0?C.green:C.red, prefix:stats.totalPL>=0?"+":"-", tip:"Total profit/loss in dollars across all closed trades in the current filter." },
           { label:"Win Rate", value:`${stats.ba.toFixed(2)}%`, color:stats.ba>=50?C.green:C.red, tip:"Percentage of closed trades that finished profitable." },
           { label:"Avg Gain", value:`${stats.avgGain.toFixed(2)}%`, color:C.green, prefix:"+", tip:"Average percentage return across winning trades only." },
           { label:"Avg Loss", value:`${stats.avgLoss.toFixed(2)}%`, color:C.red, prefix:"-", tip:"Average percentage loss across losing trades only." },
@@ -3812,10 +3842,14 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
         <GlassCard style={{ padding: "18px 22px" }}>
           <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14 }}>
             <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Equity Curve</div>
-            <div style={{ display:"flex",gap:6 }}>
-              <div style={{display:"flex",borderRadius:6,overflow:"hidden",border:`1px solid ${C.border}`}}>
-                {["$","%"].map(v=>(<button key={v} onClick={()=>setEqYAxis(v)} style={{padding:"3px 10px",background:eqYAxis===v?C.goldDim:"transparent",border:"none",color:eqYAxis===v?C.gold:C.muted,fontWeight:700,fontSize:"0.56rem",cursor:"pointer",fontFamily:font}}>{v}</button>))}
-              </div>
+            <div style={{ display:"flex",gap:6,alignItems:"center" }}>
+              {privacyMode ? (
+                <span title="Privacy is ON — equity axis locked to %. Toggle Privacy off to switch back to $." style={{ display:"flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:6,border:`1px solid ${C.borderGold}`,background:C.goldDim,color:C.gold,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.04em" }}>🔒 %</span>
+              ) : (
+                <div style={{display:"flex",borderRadius:6,overflow:"hidden",border:`1px solid ${C.border}`}}>
+                  {["$","%"].map(v=>(<button key={v} onClick={()=>setEqYAxis(v)} style={{padding:"3px 10px",background:eqYAxis===v?C.goldDim:"transparent",border:"none",color:eqYAxis===v?C.gold:C.muted,fontWeight:700,fontSize:"0.56rem",cursor:"pointer",fontFamily:font}}>{v}</button>))}
+                </div>
+              )}
               <div style={{display:"flex",borderRadius:6,overflow:"hidden",border:`1px solid ${C.border}`}}>
                 {[["trades","By Date"],["months","By Month"]].map(([k,l])=>(<button key={k} onClick={()=>setEqXAxis(k)} style={{padding:"3px 10px",background:eqXAxis===k?C.goldDim:"transparent",border:"none",color:eqXAxis===k?C.gold:C.muted,fontWeight:700,fontSize:"0.56rem",cursor:"pointer",fontFamily:font}}>{l}</button>))}
               </div>
@@ -3823,8 +3857,10 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           </div>
           <ResponsiveContainer width="100%" height={170}>
             {(() => {
-              const dataKey = eqYAxis === "$" ? "equity" : "equityPct";
-              const baseline = eqYAxis === "$" ? +(portfolioSize || 0) : 0;
+              // Privacy mode forces % regardless of eqYAxis state — keeps absolute $ off any screenshot.
+              const effYAxis = privacyMode ? "%" : eqYAxis;
+              const dataKey = effYAxis === "$" ? "equity" : "equityPct";
+              const baseline = effYAxis === "$" ? +(portfolioSize || 0) : 0;
               const vals = equityData.map(d => d[dataKey]).filter(v => v != null);
               const maxVal = Math.max(...vals), minVal = Math.min(...vals);
               const range = maxVal - minVal;
@@ -3850,11 +3886,11 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                   <XAxis dataKey="trade" tick={{fill:C.muted,fontSize:10}} tickLine={false} axisLine={false} tickMargin={8} />
-                  <YAxis tick={{fill:C.muted,fontSize:10}} tickLine={false} axisLine={false} tickFormatter={eqYAxis==="$" ? (v=>v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1000).toFixed(0)}k`:`$${v}`) : (v=>`${v.toFixed(1)}%`)} domain={eqYAxis==="$"?['auto','auto']:undefined} />
-                  <Tooltip content={<ChartTip fmt={eqYAxis==="$" ? (v=>`$${Number(v).toLocaleString()}`) : (v=>`${Number(v).toFixed(2)}%`)} />} cursor={{stroke:C.borderGold,strokeWidth:1,strokeDasharray:"4 4"}} />
-                  {eqYAxis==="%"&&<ReferenceLine y={0} stroke={C.border} />}
-                  {eqYAxis==="$"&&<ReferenceLine y={+(portfolioSize||0)} stroke={C.border} strokeDasharray="3 3" />}
-                  <Area type="natural" name={eqYAxis==="$"?"Portfolio":"Cumulative"} dataKey={dataKey} stroke="url(#eqGradientStroke)" strokeWidth={2} fill="url(#eqGradientFill)" dot={false} activeDot={(props) => { const val = props.payload[dataKey]; const below = val < baseline; return <circle cx={props.cx} cy={props.cy} r={5} fill={below ? C.red : C.green} stroke={C.bg} strokeWidth={2} />; }} />
+                  <YAxis tick={{fill:C.muted,fontSize:10}} tickLine={false} axisLine={false} tickFormatter={effYAxis==="$" ? (v=>v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1000).toFixed(0)}k`:`$${v}`) : (v=>`${v.toFixed(1)}%`)} domain={effYAxis==="$"?['auto','auto']:undefined} />
+                  <Tooltip content={<ChartTip fmt={effYAxis==="$" ? (v=>`$${Number(v).toLocaleString()}`) : (v=>`${Number(v).toFixed(2)}%`)} />} cursor={{stroke:C.borderGold,strokeWidth:1,strokeDasharray:"4 4"}} />
+                  {effYAxis==="%"&&<ReferenceLine y={0} stroke={C.border} />}
+                  {effYAxis==="$"&&<ReferenceLine y={+(portfolioSize||0)} stroke={C.border} strokeDasharray="3 3" />}
+                  <Area type="natural" name={effYAxis==="$"?"Portfolio":"Cumulative"} dataKey={dataKey} stroke="url(#eqGradientStroke)" strokeWidth={2} fill="url(#eqGradientFill)" dot={false} activeDot={(props) => { const val = props.payload[dataKey]; const below = val < baseline; return <circle cx={props.cx} cy={props.cy} r={5} fill={below ? C.red : C.green} stroke={C.bg} strokeWidth={2} />; }} />
                 </AreaChart>
               );
             })()}
@@ -3920,14 +3956,14 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.68rem" }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                  {(() => { const defs = ["Date","Avg Gain","Avg Loss","Net","Ratio","Win %","Loss %","Wins","Losses","BE","# Trades","LG Gain","LG Loss","LG Net","Ratio","Avg Days Win","Avg Days Loss","Comm"]; return monthDrag.order.map((ci, vi) => <th key={`mh-${ci}`} {...monthDrag.dragProps(vi)} style={{padding:"9px 6px",textAlign:ci===0?"left":"right",fontWeight:700,fontSize:"0.48rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none"}}>{defs[ci]}</th>); })()}
+                  {(() => { const defs = ["Date","Avg Gain","Avg Loss","Net","Ratio","Win %","Loss %","Wins","Losses","BE","# Trades","LG Gain","LG Loss","LG Net","Ratio","Avg Days Win","Avg Days Loss","Comm"]; const monthHide = privacyMode ? new Set([17]) : new Set(); return monthDrag.order.filter(ci => !monthHide.has(ci)).map((ci, vi) => <th key={`mh-${ci}`} {...monthDrag.dragProps(vi)} style={{padding:"9px 6px",textAlign:ci===0?"left":"right",fontWeight:700,fontSize:"0.48rem",letterSpacing:"0.08em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none"}}>{defs[ci]}</th>); })()}
                 </tr>
               </thead>
               <tbody>
                 {monthlyPerf.map(m => {
                   const bgColor = m.net >= 0 ? "rgba(34,197,94,0.04)" : "rgba(239,68,68,0.04)";
                   return (
-                    <DragTr key={m.month} order={monthDrag.order} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, background: bgColor }}>
+                    <DragTr key={m.month} order={monthDrag.order} hiddenSet={privacyMode ? new Set([17]) : undefined} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, background: bgColor }}>
                       <td style={{ padding:"7px 6px",fontWeight:600,color:C.white,whiteSpace:"nowrap",fontSize:"0.68rem" }}>{m.label}</td>
                       {mTd(pf(m.avgGain), { color: C.green })}
                       {mTd(`-${pf(m.avgLoss)}`, { color: C.red })}
@@ -3950,7 +3986,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   );
                 })}
                 {/* Totals row */}
-                <DragTr order={monthDrag.order} style={{ borderTop: `2px solid ${C.border}`, background: "rgba(255,255,255,0.02)" }}>
+                <DragTr order={monthDrag.order} hiddenSet={privacyMode ? new Set([17]) : undefined} style={{ borderTop: `2px solid ${C.border}`, background: "rgba(255,255,255,0.02)" }}>
                   <td style={{ padding:"8px 6px",fontWeight:800,color:C.white,textTransform:"uppercase",fontSize:"0.60rem",letterSpacing:"0.06em" }}>Total</td>
                   {mTd(pf(totAvgGain), { color: C.green, fw: 800 })}
                   {mTd(`-${pf(totAvgLoss)}`, { color: C.red, fw: 800 })}
@@ -4275,6 +4311,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
             <thead>
               {(() => {
                 const tradeHeaderDefs = [["Symbol","ticker"],["Entry","entry"],["Time","entryTime"],["Exit","exit"],["Time","exitTime"],["Entry $","entryP"],["Exit $","exitP"],["Shares","shares"],["Setup","setup"],["Tags",null],["P/L %","plPct"],["P/L $","plDollar"],["R-Mult","rMult"],["Reason","reason"],["Notes",null],["Chart",null],["",null]];
+                const tradeHide = privacyMode ? new Set([11]) : new Set();   // hide P/L $ column when privacy ON
                 return (
                   <tr style={{ borderBottom: `1px solid ${C.border}` }}>
                     <th style={{ padding:"9px 6px 9px 12px", width:28, cursor:"pointer", textAlign:"center" }} title={visibleAllSelected ? "Clear visible selection" : "Select all visible"}>
@@ -4285,7 +4322,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                         style={{ accentColor: C.gold, cursor:"pointer", width:14, height:14 }}
                       />
                     </th>
-                    {tradeDrag.order.map((ci, vi) => {
+                    {tradeDrag.order.filter(ci => !tradeHide.has(ci)).map((ci, vi) => {
                       const [h, k] = tradeHeaderDefs[ci] || ["",""];
                       return <th key={`${h}-${ci}`} {...tradeDrag.dragProps(vi)} onClick={k ? (e) => { e.stopPropagation(); setTradeSorts(s => toggleSort(s, k, e.shiftKey)); } : undefined} style={{ padding:"9px 8px",textAlign:"left",fontWeight:700,fontSize:"0.52rem",letterSpacing:"0.10em",textTransform:"uppercase",color:tradeSorts.find(s=>s.key===k)?C.gold:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none" }}>{h}{k ? sortArrow(tradeSorts, k) : ""}</th>;
                     })}
@@ -4329,7 +4366,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                       <td style={{ padding: "6px 6px" }}><CellInput value={editRow.shares} onChange={v => setEditRow(r => ({...r, shares: +v}))} width={60} /></td>
                       <td style={{ padding: "6px 6px" }}><MiniSelect value={editRow.setup} onChange={v => setEditRow(r => ({...r, setup: v}))} options={setupTypes} width={90} /></td>
                       <td style={{ padding: "6px 6px" }}><TagSelector selected={editRow.tags || []} allTags={allTags} onChange={v => setEditRow(r => ({...r, tags: v}))} small /></td>
-                      <td colSpan={3} style={{ fontSize:"0.54rem",color:C.muted,textAlign:"center" }} />
+                      <td colSpan={privacyMode ? 2 : 3} style={{ fontSize:"0.54rem",color:C.muted,textAlign:"center" }} />
                       <td style={{ padding: "6px 6px" }}><MiniSelect value={editRow.reason} onChange={v => setEditRow(r => ({...r, reason: v}))} options={exitReasons} width={110} /></td>
                       <td style={{ padding: "6px 6px", fontSize: "0.58rem", color: C.muted }}>see below</td>
                       <td style={{ padding: "6px 6px", fontSize: "0.58rem", color: C.muted }}>see below</td>
@@ -4340,7 +4377,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     </tr>
                     {/* Expanded edit area: structured notes + chart URL + image upload */}
                     <tr style={{ background: "rgba(201,152,42,0.03)", borderBottom: `2px solid ${C.borderGold}` }}>
-                      <td colSpan={18} style={{ padding: "14px 16px" }}>
+                      <td colSpan={privacyMode ? 17 : 18} style={{ padding: "14px 16px" }}>
                         {/* ── TRADE MATH strip ── Trade Type + Original Stop + live Initial Risk & R-Multiple. The
                              journal table doesn't expose a Stop column, so before this strip an imported/keyed
                              trade had no way to record its original stop and therefore no R-multiple could be
@@ -4442,7 +4479,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   </React.Fragment>);
                 }
                 return (<React.Fragment key={t.id}>
-                  <DragTr order={tradeDrag.order} prefix={
+                  <DragTr order={tradeDrag.order} hiddenSet={privacyMode ? new Set([11]) : undefined} prefix={
                     <td style={{ padding: "11px 6px 11px 12px", textAlign: "center", width: 28 }} onClick={(e) => { e.stopPropagation(); toggleSelectTrade(t.id); }}>
                       <input type="checkbox" checked={selectedTradeIds.has(t.id)} onChange={() => toggleSelectTrade(t.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: C.gold, cursor: "pointer", width: 14, height: 14 }} />
                     </td>
@@ -4479,7 +4516,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   {/* Unified Chart + Review panel — live chart on top, editable trade review below */}
                   {expandedTrade === t.id && (
                     <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: `1px solid ${C.border}` }}>
-                      <td colSpan={18} style={{ padding: "14px 20px" }}>
+                      <td colSpan={privacyMode ? 17 : 18} style={{ padding: "14px 20px" }}>
                         {/* Live candlestick chart — timeframes · MAs · volume · drawing tools · stats panel */}
                         <TradeChart trade={t} />
                         {/* Editable Trade Review */}
@@ -4530,7 +4567,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                         <td style={{ padding:"6px 8px", fontWeight:700, fontSize:"0.68rem", color:C.text }}>{totalShares.toLocaleString()}</td>
                         <td colSpan={2} />
                         <td style={{ padding:"6px 8px", fontWeight:800, fontSize:"0.68rem", color:weightedPct>=0?C.green:C.red }}>{weightedPct>=0?"+":""}{weightedPct.toFixed(2)}%</td>
-                        <td style={{ padding:"6px 8px", fontWeight:800, fontSize:"0.68rem", color:totalPLD>=0?C.green:C.red }}>{totalPLD>=0?"+":"-"}${Math.abs(totalPLD).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                        {!privacyMode && (
+                          <td style={{ padding:"6px 8px", fontWeight:800, fontSize:"0.68rem", color:totalPLD>=0?C.green:C.red }}>{totalPLD>=0?"+":"-"}${Math.abs(totalPLD).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+                        )}
                         <td style={{ padding:"6px 8px", fontWeight:700, fontSize:"0.68rem", color:avgR>=0?C.green:C.red }}>{avgR.toFixed(2)}R</td>
                         <td colSpan={4} style={{ padding:"6px 8px", fontSize:"0.54rem", color:C.muted }}>{gTrades.length} partial exits</td>
                       </tr>
