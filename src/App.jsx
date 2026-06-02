@@ -3073,7 +3073,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const [distTierInput, setDistTierInput] = useState(""); // input box for adding a custom tier
   const [drmaExplainerOpen, setDrmaExplainerOpen] = useState(false);
   // Drag reorder hooks — stat tiles, trade journal columns, open positions columns
-  const statDrag = useDragReorder(12); // 12 stat tiles
+  const statDrag = useDragReorder(13); // 13 stat tiles (incl. Breakeven Rate)
   const tradeDrag = useDragReorder(17); // 17 trade journal columns
   const monthDrag = useDragReorder(18); // 18 monthly performance columns
   const distDrag = useDragReorder(7); // 7 distribution table columns
@@ -3228,9 +3228,25 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 
   const stats = useMemo(() => {
     const trades = filtered;
-    if (trades.length === 0) return { ba:0,avgGain:0,avgLoss:0,glRatio:0,adjustedGL:0,ev:0,avgR:0,largestLoss:0,largestWin:0,totalPL:0,total:0,avgHoldWin:0,avgHoldLoss:0,holdRatio:0 };
-    const wins = trades.filter(t => t.plPct > 0), losses = trades.filter(t => t.plPct <= 0);
+    if (trades.length === 0) return { ba:0,beRate:0,lossRate:0,avgGain:0,avgLoss:0,glRatio:0,adjustedGL:0,ev:0,avgR:0,largestLoss:0,largestWin:0,totalPL:0,total:0,wins:0,losses:0,be:0,avgHoldWin:0,avgHoldLoss:0,holdRatio:0 };
+    // Classify by R-multiple when available (within ±0.1R = breakeven); otherwise fall back to plPct
+    // (any sub-tenth-of-a-percent trade also counts as breakeven). Breakevens are excluded from BOTH
+    // win and loss buckets so they don't inflate avg gain/loss or skew the win-rate denominator math.
+    const classify = (t) => {
+      if (t.rMult != null && !isNaN(t.rMult)) {
+        if (Math.abs(t.rMult) <= 0.1) return "be";
+        return t.rMult > 0 ? "win" : "loss";
+      }
+      const p = Number(t.plPct) || 0;
+      if (Math.abs(p) < 0.1) return "be";
+      return p > 0 ? "win" : "loss";
+    };
+    const wins = trades.filter(t => classify(t) === "win");
+    const losses = trades.filter(t => classify(t) === "loss");
+    const bes = trades.filter(t => classify(t) === "be");
     const ba = (wins.length / trades.length) * 100;
+    const beRate = (bes.length / trades.length) * 100;
+    const lossRate = (losses.length / trades.length) * 100;
     // Equal-weighted avg gain/loss: simple average of trade percentages
     const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
     const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.plPct, 0) / losses.length) : 0;
@@ -3261,7 +3277,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     const avgHoldLoss = lossDays.length > 0 ? lossDays.reduce((s,d) => s + d, 0) / lossDays.length : 0;
     const holdRatio = avgHoldLoss > 0 ? avgHoldWin / avgHoldLoss : 0;
     const totalComm = trades.reduce((s, t) => s + (parseFloat(t.commission) || 0), 0);
-    return { ba, avgGain, avgLoss, glRatio, adjustedGL, ev, avgR, largestLoss: Math.min(...trades.map(t => t.plPct)), largestWin: Math.max(...trades.map(t => t.plPct)), totalPL: trades.reduce((s, t) => s + t.plDollar, 0), total: trades.length, avgHoldWin, avgHoldLoss, holdRatio, totalComm };
+    return { ba, beRate, lossRate, avgGain, avgLoss, glRatio, adjustedGL, ev, avgR, largestLoss: Math.min(...trades.map(t => t.plPct)), largestWin: Math.max(...trades.map(t => t.plPct)), totalPL: trades.reduce((s, t) => s + t.plDollar, 0), total: trades.length, wins: wins.length, losses: losses.length, be: bes.length, avgHoldWin, avgHoldLoss, holdRatio, totalComm };
   }, [filtered]);
 
   // ─── Distribution Analysis Data ───
@@ -3485,11 +3501,21 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       if (!months[key]) months[key] = [];
       months[key].push(t);
     });
+    // Same classifier as the main stats memo — keep monthly breakdown consistent with the headline tiles.
+    const classify = (t) => {
+      if (t.rMult != null && !isNaN(t.rMult)) {
+        if (Math.abs(t.rMult) <= 0.1) return "be";
+        return t.rMult > 0 ? "win" : "loss";
+      }
+      const p = Number(t.plPct) || 0;
+      if (Math.abs(p) < 0.1) return "be";
+      return p > 0 ? "win" : "loss";
+    };
     return Object.keys(months).sort().map(k => {
       const trades = months[k];
-      const wins = trades.filter(t => t.plPct > 0);
-      const losses = trades.filter(t => t.plPct <= 0);
-      const be = trades.filter(t => t.plPct === 0);
+      const wins = trades.filter(t => classify(t) === "win");
+      const losses = trades.filter(t => classify(t) === "loss");
+      const be = trades.filter(t => classify(t) === "be");
       const count = trades.length;
       const dollar = trades.reduce((s, t) => s + t.plDollar, 0);
       const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
@@ -3712,9 +3738,10 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       {(() => {
         const tiles = [
           { label:"Total P/L", value:`$${Math.abs(stats.totalPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`, color:stats.totalPL>=0?C.green:C.red, prefix:stats.totalPL>=0?"+":"-", tip:"Total profit/loss in dollars across all closed trades in the current filter." },
-          { label:"Win Rate", value:`${stats.ba.toFixed(2)}%`, color:stats.ba>=50?C.green:C.red, tip:"Percentage of closed trades that finished profitable." },
-          { label:"Avg Gain", value:`${stats.avgGain.toFixed(2)}%`, color:C.green, prefix:"+", tip:"Average percentage return across winning trades only." },
-          { label:"Avg Loss", value:`${stats.avgLoss.toFixed(2)}%`, color:C.red, prefix:"-", tip:"Average percentage loss across losing trades only." },
+          { label:"Win Rate", value:`${stats.ba.toFixed(2)}%`, color:stats.ba>=50?C.green:C.red, sub:`${stats.wins}W · ${stats.losses}L · ${stats.be}BE`, tip:"Percentage of trades that finished outside ±0.1R (or ±0.1% when R is unavailable). Trades inside that band count as breakeven and are excluded — they neither help nor hurt win rate." },
+          { label:"Breakeven Rate", value:`${stats.beRate.toFixed(2)}%`, color:C.gold, sub:`${stats.be} of ${stats.total} trades`, tip:"Trades closed within ±0.1R (or ±0.1% if no R-multiple). These are scratch trades — moved your stop to entry, took a quick exit, or got a flat fill. Reported separately so wins and losses stay honest." },
+          { label:"Avg Gain", value:`${stats.avgGain.toFixed(2)}%`, color:C.green, prefix:"+", tip:"Average percentage return across winning trades only (breakevens excluded)." },
+          { label:"Avg Loss", value:`${stats.avgLoss.toFixed(2)}%`, color:C.red, prefix:"-", tip:"Average percentage loss across losing trades only (breakevens excluded)." },
           { label:"Win/Loss Ratio", value:stats.glRatio.toFixed(2), color:stats.glRatio>=2?C.green:stats.glRatio>=1?C.gold:C.red, tip:"Average % win ÷ average % loss — how much bigger a typical winner is than a typical loser. Ignores win rate and each trade's risk." },
           { label:"Adj. W/L Ratio", value:stats.adjustedGL.toFixed(2), color:stats.adjustedGL>=1?C.green:C.red, sub:stats.adjustedGL>=1?"Net profitable":"Net unprofitable", tip:"Win/Loss ratio weighted by your win rate. Above 1.0 means the system is net profitable." },
           { label:"Largest Win", value:`${stats.largestWin.toFixed(2)}%`, color:C.green, prefix:"+", tip:"Biggest single winning trade by percentage return." },
@@ -4194,6 +4221,54 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     {/* Expanded edit area: structured notes + chart URL + image upload */}
                     <tr style={{ background: "rgba(201,152,42,0.03)", borderBottom: `2px solid ${C.borderGold}` }}>
                       <td colSpan={17} style={{ padding: "14px 16px" }}>
+                        {/* ── TRADE MATH strip ── Trade Type + Original Stop + live Initial Risk & R-Multiple. The
+                             journal table doesn't expose a Stop column, so before this strip an imported/keyed
+                             trade had no way to record its original stop and therefore no R-multiple could be
+                             computed. saveEdit (App.jsx ~3543) already reads editRow.stop + editRow.tradeType
+                             to recompute rMult — this just surfaces the inputs. */}
+                        {(() => {
+                          const ep = parseFloat(editRow.entryP) || 0;
+                          const xp = parseFloat(editRow.exitP) || 0;
+                          const st = parseFloat(editRow.stop) || 0;
+                          const isShort = (editRow.tradeType || "Long") === "Short";
+                          const initRiskPct = ep > 0 && st > 0 ? (isShort ? (st - ep) / ep : (ep - st) / ep) : 0;
+                          const realizedPct = ep > 0 ? (isShort ? (ep - xp) / ep : (xp - ep) / ep) : 0;
+                          const rMult = initRiskPct > 0 ? realizedPct / initRiskPct : 0;
+                          const validStop = initRiskPct > 0;
+                          // For a long, stop must be below entry; for a short, above entry. Surface the warning
+                          // inline so a typo (e.g. stop above entry on a long) doesn't quietly invert R-mult.
+                          const stopFlipped = st > 0 && ep > 0 && ((isShort && st <= ep) || (!isShort && st >= ep));
+                          return (
+                            <div style={{ marginBottom: 14, padding: "12px 16px", borderRadius: 10, background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}`, display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+                              <div style={{ fontWeight: 800, fontSize: "0.56rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Trade Math</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <label style={{ fontSize: "0.54rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Type</label>
+                                <MiniSelect value={editRow.tradeType || "Long"} onChange={v => setEditRow(r => ({...r, tradeType: v}))} options={["Long", "Short"]} width={80} />
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <label style={{ fontSize: "0.54rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>Original Stop</label>
+                                <CellInput value={editRow.stop || ""} onChange={v => setEditRow(r => ({...r, stop: v}))} width={90} gold placeholder="0.00" />
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <label style={{ fontSize: "0.54rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>Init Risk</label>
+                                <span style={{ fontSize: "0.86rem", fontWeight: 700, color: validStop ? C.text : C.muted, minWidth: 56, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{validStop ? `${(initRiskPct * 100).toFixed(2)}%` : "—"}</span>
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <label style={{ fontSize: "0.54rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>R-Multiple</label>
+                                <span style={{ fontSize: "1rem", fontWeight: 800, color: !validStop ? C.muted : (rMult >= 0 ? C.green : C.red), minWidth: 64, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", letterSpacing: "-0.02em" }}>{validStop ? `${rMult >= 0 ? "+" : ""}${rMult.toFixed(2)}R` : "—"}</span>
+                              </div>
+                              {stopFlipped ? (
+                                <div style={{ flex: 1, fontSize: "0.6rem", color: C.red, lineHeight: 1.5, fontWeight: 600 }}>
+                                  ⚠ Stop is on the wrong side of entry for a {isShort ? "Short" : "Long"} — should be {isShort ? "above" : "below"} ${ep.toFixed(2)}. Check before saving.
+                                </div>
+                              ) : (
+                                <div style={{ flex: 1, fontSize: "0.58rem", color: C.muted, lineHeight: 1.5 }}>
+                                  Key your <strong style={{ color: C.text }}>original stop</strong> (where you'd have exited on a hard fail) to measure R-multiple. Updates live; saves with the row.
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                           {/* Left: Structured Notes */}
                           <div>
@@ -4768,42 +4843,38 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const map = {};
     if (!journaledTrades || !positions) return map;
 
-    // Count open lots per ticker so we know when there's ambiguity
-    const openLotsByTicker = {};
-    positions.forEach(p => {
-      if (!p.sym) return;
-      const sym = String(p.sym).trim().toUpperCase();
-      openLotsByTicker[sym] = (openLotsByTicker[sym] || 0) + 1;
-    });
-
     positions.forEach(p => {
       if (!p.sym) { map[p.id] = { pl: 0, shares: 0 }; return; }
       const posSym = String(p.sym).trim().toUpperCase();
       const posKey = tradeDateISO(p.entry); // may be empty for IBKR Summary-level positions (openDate omitted)
+      const posEp = parseFloat(p.ep) || 0;  // weighted-avg entry price of THIS lot
 
       const sameTicker = journaledTrades.filter(t =>
         String(t.ticker || "").trim().toUpperCase() === posSym
       );
 
-      let matches;
-      if (openLotsByTicker[posSym] === 1) {
-        // Single open lot of this ticker — by definition every closed trade of this ticker BELONGS to this
-        // lot (you can't have a separate later round-trip on a ticker you're still holding). So attribute
-        // them all. If we DO have a position entry day, still drop trades dated strictly before it (those
-        // are earlier round-trips on the same ticker that have since fully closed).
-        matches = sameTicker.filter(t => {
-          if (!posKey) return true;                  // pos has no entry → take everything for this ticker
-          const tKey = tradeDateISO(t.entry);
-          if (!tKey) return true;                    // trade has no entry → keep (better to show than to hide)
-          return tKey >= posKey;
-        });
-      } else if (!posKey) {
-        // Multiple lots + no position entry day → can't disambiguate. Skip.
-        matches = [];
-      } else {
-        // Multiple open lots of the same ticker → require strict same-day match to keep them separate
-        matches = sameTicker.filter(t => tradeDateISO(t.entry) === posKey);
-      }
+      // STRICT MATCH — same ticker + same entry DAY + same entry PRICE (within 0.5% tolerance).
+      //
+      // The earlier "single-lot = take everything after posKey" heuristic over-attributed: any past
+      // round-trip on the same ticker that happened to fall AFTER the current lot's entry day was
+      // counted as a partial of this lot (e.g., open MDB 5/22 → separate scalp 5/25 → trim 5/29
+      // would lump the 5/25 scalp into MDB's realized). The fix: require BOTH the entry day AND the
+      // weighted-avg entry price to match. Partials of the CURRENT lot inherit the lot's entry day
+      // (Sell button: `entry: pos.entry`; IBKR sync: `entry = lotEntry = position.openDate`) AND
+      // share the lot's avg cost (selling doesn't change the avg of remaining shares, and IBKR's
+      // running VWAP at trim time equals the lot avg). A separate cycle on the same day would have
+      // a different avg entry price → correctly excluded. A trade with no date or no price can't be
+      // safely attributed — better to under-attribute than to over-attribute.
+      const PRICE_TOL = 0.005; // 0.5% — generous enough to absorb rounding between text-stored ep and computed entryP
+      const matches = sameTicker.filter(t => {
+        if (!posKey) return false;
+        const tKey = tradeDateISO(t.entry);
+        if (!tKey || tKey !== posKey) return false;
+        if (!(posEp > 0)) return true;                         // pos has no entry price → fall back to date-only
+        const tEp = parseFloat(t.entryP) || 0;
+        if (!(tEp > 0)) return true;                           // trade has no entry price → keep (date already matched)
+        return Math.abs(tEp - posEp) / posEp <= PRICE_TOL;
+      });
 
       const pl = matches.reduce((sum, t) => sum + (t.plDollar || 0), 0);
       const shares = matches.reduce((sum, t) => sum + (parseFloat(t.shares) || 0), 0);
