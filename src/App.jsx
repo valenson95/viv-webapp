@@ -3084,6 +3084,11 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     try { return localStorage.getItem("viv-privacy-mode") === "1"; } catch { return false; }
   });
   useEffect(() => { try { localStorage.setItem("viv-privacy-mode", privacyMode ? "1" : "0"); } catch {} }, [privacyMode]);
+  // Link Historical Trades wizard — backfill `positionId` on legacy/unlinked journal trades.
+  // Opens a preview modal with auto-suggested links; user confirms or overrides before any write.
+  const [linkWizardOpen, setLinkWizardOpen] = useState(false);
+  const [linkChoices, setLinkChoices] = useState({}); // { tradeId: positionId | "past" | "skip" }
+  const [linkStatus, setLinkStatus] = useState("");
   // Bulk-edit state — selection survives sort/filter changes (lives on trade id, not row index).
   const [selectedTradeIds, setSelectedTradeIds] = useState(() => new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -3660,6 +3665,86 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 
   const visibleAllSelected = filtered.length > 0 && filtered.every(t => selectedTradeIds.has(t.id));
 
+  // ── LINK HISTORICAL TRADES — auto-suggest engine ──
+  // For each unlinked trade, suggest a `positionId` (link to that open lot) or "past" (mark as
+  // past-cycle / unlinked-on-purpose). Rules:
+  //   1. Trade reason === "Partial Trim" AND a single open lot of that ticker exists → link to that lot.
+  //   2. Trade entry day === open lot's entry day for that ticker → link.
+  //   3. No matching open lot of that ticker → default "past" (this catches INOD/TEAM-style losing
+  //      round-trips for tickers where the user no longer holds an open position).
+  //   4. Open lot exists but neither (1) nor (2) applies → default "past" (the safe choice — better
+  //      to under-attribute, the user can override per-row in the wizard).
+  const linkWizardData = useMemo(() => {
+    if (!linkWizardOpen || !journaledTrades) return null;
+    const unlinked = journaledTrades.filter(t => !t.positionId);
+    const openByTicker = {};
+    (positions || []).forEach(p => {
+      const sym = String(p.sym || "").toUpperCase();
+      if (!sym) return;
+      (openByTicker[sym] = openByTicker[sym] || []).push(p);
+    });
+    const rows = unlinked.map(t => {
+      const sym = String(t.ticker || "").toUpperCase();
+      const lots = openByTicker[sym] || [];
+      let suggestion = "past";
+      if (lots.length === 1) {
+        const p = lots[0];
+        const sameDay = tradeDateISO(t.entry) === tradeDateISO(p.entry);
+        const isPartialTrim = t.reason === "Partial Trim";
+        if (isPartialTrim || sameDay) suggestion = p.id;
+      } else if (lots.length > 1) {
+        // Multi-lot: try same-day match. If exactly one matches, suggest it. Else past.
+        const matches = lots.filter(p => tradeDateISO(t.entry) === tradeDateISO(p.entry));
+        if (matches.length === 1) suggestion = matches[0].id;
+      }
+      return { t, lots, suggestion };
+    });
+    // Sort: rows where a current open lot exists first (so the user sees actionable ones up top);
+    // within each group, by ticker.
+    rows.sort((a, b) => {
+      const aHas = a.lots.length > 0 ? 0 : 1;
+      const bHas = b.lots.length > 0 ? 0 : 1;
+      if (aHas !== bHas) return aHas - bHas;
+      return String(a.t.ticker || "").localeCompare(String(b.t.ticker || ""));
+    });
+    return rows;
+  }, [linkWizardOpen, journaledTrades, positions]);
+
+  // Initialize choices when wizard opens
+  useEffect(() => {
+    if (!linkWizardOpen || !linkWizardData) return;
+    const init = {};
+    linkWizardData.forEach(r => { init[r.t.id] = r.suggestion; });
+    setLinkChoices(init);
+  }, [linkWizardOpen, linkWizardData]);
+
+  const linkApply = useCallback(async () => {
+    if (!linkWizardData) return;
+    setLinkStatus("applying");
+    // Update journal state first (instant feedback). DB write happens immediately after via per-row
+    // updates (cheaper than a bulk save which would touch unrelated rows).
+    const updates = linkWizardData.map(r => {
+      const choice = linkChoices[r.t.id] ?? r.suggestion;
+      const positionId = (choice === "past" || choice === "skip") ? null : choice;
+      return { tradeId: r.t.id, positionId, skip: choice === "skip" };
+    });
+    setJournaledTrades(prev => prev.map(t => {
+      const u = updates.find(x => x.tradeId === t.id);
+      if (!u || u.skip) return t;
+      return { ...t, positionId: u.positionId };
+    }));
+    // Persist to DB (one update per touched row; per-row try/catch so one failure doesn't abort)
+    if (session) {
+      const writes = updates.filter(u => !u.skip);
+      await Promise.all(writes.map(async u => {
+        const { error } = await supabase.from("trades").update({ position_id: u.positionId }).eq("id", u.tradeId);
+        if (error) console.error("Link wizard write error:", u.tradeId, error.message);
+      }));
+    }
+    setLinkStatus("done");
+    setTimeout(() => { setLinkWizardOpen(false); setLinkStatus(""); }, 800);
+  }, [linkWizardData, linkChoices, session, setJournaledTrades]);
+
   const activeFilterLabel = filterSetup !== "All" || filterTag !== "All" ? ` (filtered: ${filtered.length}/${allTrades.length})` : "";
 
   return (
@@ -3697,6 +3782,13 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           </label>
           <button onClick={() => setShowImportGuide(!showImportGuide)} style={{ padding: "8px 12px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 600, fontSize: "0.66rem", cursor: "pointer", fontFamily: font }}>
             {showImportGuide ? "Hide Guide" : "Import Guide"}
+          </button>
+          <button
+            onClick={() => setLinkWizardOpen(true)}
+            title="Link historical trades to their open positions (one-time backfill so Realized P/L is accurate)"
+            style={{ padding: "8px 14px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: "rgba(201,152,42,0.08)", color: C.goldBright, fontWeight: 700, fontSize: "0.66rem", cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 6 }}
+          >
+            🔗 Link Trades
           </button>
         </div>
       </div>
@@ -4219,6 +4311,76 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           </GlassCard>
           </div>{/* end distScreenRef */}
         </div>
+      )}
+
+      {/* ─── LINK HISTORICAL TRADES WIZARD ─── one-time backfill of position_id on legacy trades. */}
+      {linkWizardOpen && linkWizardData && createPortal(
+        <div onClick={() => linkStatus !== "applying" && setLinkWizardOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(0,0,0,0.66)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "min(960px, 96vw)", maxHeight: "88vh", display: "flex", flexDirection: "column", background: C.bg2, border: `1px solid ${C.borderGold}`, borderRadius: 18, boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
+            <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+              <Eyebrow>Trade Journal</Eyebrow>
+              <div style={{ fontWeight: 800, fontSize: "1.05rem", color: C.white }}>🔗 Link historical trades to open positions</div>
+              <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 6, lineHeight: 1.55 }}>One-time setup. Each row's <strong style={{ color: C.text }}>Link</strong> column shows the suggested attribution: <strong style={{ color: C.gold }}>→ open position</strong> means "this trade counts toward that position's Realized P/L", <strong style={{ color: C.text }}>Past cycle</strong> means "this trade is from a closed lot — don't attribute to any current open position." Override any row via the dropdown. Nothing writes until you click <strong style={{ color: C.gold }}>Apply</strong>.</div>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+              {linkWizardData.length === 0 ? (
+                <div style={{ padding: "30px 0", textAlign: "center", color: C.muted, fontSize: "0.8rem" }}>
+                  All journal trades are already linked. 🎉 No backfill needed.
+                </div>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(201,152,42,0.06)", border: `1px solid ${C.borderGold}`, fontSize: "0.66rem", color: C.text, lineHeight: 1.5 }}>
+                    <strong style={{ color: C.goldBright }}>{linkWizardData.length}</strong> unlinked trade{linkWizardData.length === 1 ? "" : "s"} · <strong style={{ color: C.green }}>{Object.values(linkChoices).filter(v => v && v !== "past" && v !== "skip").length}</strong> will link to an open position · <strong style={{ color: C.muted }}>{Object.values(linkChoices).filter(v => v === "past").length}</strong> will be marked past cycle
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                    <button onClick={() => { const all = {}; linkWizardData.forEach(r => { all[r.t.id] = r.suggestion; }); setLinkChoices(all); }} style={{ padding: "6px 14px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.62rem", cursor: "pointer", fontFamily: font }}>Accept all suggestions</button>
+                    <button onClick={() => { const all = {}; linkWizardData.forEach(r => { all[r.t.id] = "past"; }); setLinkChoices(all); }} style={{ padding: "6px 14px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.62rem", cursor: "pointer", fontFamily: font }}>Mark all past cycle</button>
+                    <button onClick={() => { const all = {}; linkWizardData.forEach(r => { all[r.t.id] = "skip"; }); setLinkChoices(all); }} style={{ padding: "6px 14px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.62rem", cursor: "pointer", fontFamily: font }}>Skip all (no change)</button>
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.66rem" }}>
+                    <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                      {["Ticker","Entry","Exit","Shares","P/L %","Reason","Suggested Link"].map(h => (
+                        <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontSize: "0.48rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, fontWeight: 700, whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {linkWizardData.map(({ t, lots, suggestion }) => {
+                        const choice = linkChoices[t.id] ?? suggestion;
+                        const isLink = choice !== "past" && choice !== "skip";
+                        return (
+                          <tr key={t.id} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, background: choice === "skip" ? "rgba(255,255,255,0.02)" : "transparent" }}>
+                            <td style={{ padding: "7px 6px", color: C.gold, fontWeight: 700 }}>{t.ticker}</td>
+                            <td style={{ padding: "7px 6px", color: C.text }}>{tradeDateISO(t.entry) || "—"}</td>
+                            <td style={{ padding: "7px 6px", color: C.text }}>{tradeDateISO(t.exit) || "—"}</td>
+                            <td style={{ padding: "7px 6px", color: C.text }}>{Number(t.shares).toLocaleString()}</td>
+                            <td style={{ padding: "7px 6px", color: (Number(t.plPct) || 0) >= 0 ? C.green : C.red, fontWeight: 600 }}>{(Number(t.plPct) || 0).toFixed(2)}%</td>
+                            <td style={{ padding: "7px 6px", color: C.muted }}>{t.reason || "—"}</td>
+                            <td style={{ padding: "7px 6px" }}>
+                              <select value={choice} onChange={e => setLinkChoices(prev => ({ ...prev, [t.id]: e.target.value === "past" || e.target.value === "skip" ? e.target.value : Number(e.target.value) || e.target.value }))} disabled={linkStatus === "applying"} style={{ background: isLink ? "rgba(34,197,94,0.10)" : "rgba(255,255,255,0.04)", color: C.text, border: `1px solid ${isLink ? "rgba(34,197,94,0.32)" : C.border}`, borderRadius: 7, padding: "4px 8px", fontSize: "0.64rem", fontFamily: font, outline: "none" }}>
+                                {lots.map(p => <option key={p.id} value={p.id} style={{ background: C.bg2 }}>→ {p.sym} (open · {tradeDateISO(p.entry) || "?"})</option>)}
+                                <option value="past" style={{ background: C.bg2 }}>Past cycle / unlinked</option>
+                                <option value="skip" style={{ background: C.bg2 }}>Skip (don't change)</option>
+                              </select>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+            <div style={{ padding: "14px 24px", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
+              <button onClick={() => setLinkWizardOpen(false)} disabled={linkStatus === "applying"} style={{ padding: "9px 18px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.7rem", cursor: "pointer", fontFamily: font }}>Cancel</button>
+              {linkWizardData.length > 0 && (
+                <button onClick={linkApply} disabled={linkStatus === "applying"} style={{ padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: linkStatus === "done" ? "rgba(34,197,94,0.16)" : C.goldDim, color: linkStatus === "done" ? C.green : C.gold, fontWeight: 800, fontSize: "0.72rem", cursor: linkStatus === "applying" ? "wait" : "pointer", fontFamily: font }}>
+                  {linkStatus === "applying" ? "Applying…" : linkStatus === "done" ? "Done ✓" : `Apply links`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* Closed Trades Table — editable */}
@@ -4948,7 +5110,9 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         entryP: epN, exitP, shares: soldShares, stop: stopN, setup: pos.setup,
         tags: [...(pos.tags || []), ...sellTags], plPct, plDollar, rMult,
         commission: commPortion, tradeType: pos.tradeType || "Long",
-        reason: sellReason, notes: finalNotes, chartUrl: sellChartUrl || pos.chartUrl || "", chartImage: pos.chartImage || "", _fromDashboard: true,
+        reason: sellReason, notes: finalNotes, chartUrl: sellChartUrl || pos.chartUrl || "", chartImage: pos.chartImage || "",
+        positionId: pos.id,    // ← Option C: auto-link this trade to the open lot it came from
+        _fromDashboard: true,
       };
 
       // ATOMIC: Write trade directly to Supabase so it survives refresh
@@ -4962,6 +5126,7 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           pl_pct: tradeObj.plPct, pl_dollar: tradeObj.plDollar, r_mult: tradeObj.rMult,
           exit_reason: tradeObj.reason, notes: tradeObj.notes,
           chart_url: tradeObj.chartUrl, chart_image: tradeObj.chartImage, trade_type: tradeObj.tradeType,
+          position_id: pos.id, // ← Option C: auto-link this trade to the open lot it came from
         };
         const { data: inserted, error } = await supabase.from("trades").insert([dbRow]).select("id");
         if (!error && inserted && inserted.length > 0) {
@@ -5009,16 +5174,36 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
     const map = {};
     if (!journaledTrades || !positions) return map;
 
+    // ── OPTION C — EXPLICIT POSITION LINKAGE ──
+    // First pass: any trade with `positionId` set is attributed STRICTLY to that position. No date,
+    // no ticker, no reason — pure id match. This is the deterministic, bulletproof path.
+    // Second pass (below, inside the per-position loop): for trades with NO positionId, fall back to
+    // the heuristic match (ticker + reason + same-day). This keeps the app working during the
+    // backfill window — once a user has linked all historical trades via the wizard, the heuristic
+    // path becomes a no-op and every Realized number is provably correct.
+    const linkedByPosId = {};
+    journaledTrades.forEach(t => {
+      if (!t.positionId) return;
+      if (!linkedByPosId[t.positionId]) linkedByPosId[t.positionId] = [];
+      linkedByPosId[t.positionId].push(t);
+    });
+
     positions.forEach(p => {
       if (!p.sym) { map[p.id] = { pl: 0, shares: 0 }; return; }
       const posSym = String(p.sym).trim().toUpperCase();
       const posKey = tradeDateISO(p.entry); // may be empty for IBKR Summary-level positions (openDate omitted)
 
+      // STAGE 1 — explicitly linked trades for this position.
+      const linkedMatches = linkedByPosId[p.id] || [];
+
+      // STAGE 2 — heuristic fallback ONLY for trades with no positionId set. Trades that are
+      // explicitly linked to a DIFFERENT position are excluded from this pool entirely.
       const sameTicker = journaledTrades.filter(t =>
+        !t.positionId &&
         String(t.ticker || "").trim().toUpperCase() === posSym
       );
 
-      // MATCH RULE — three branches, ordered:
+      // MATCH RULE for unlinked trades — three branches, ordered:
       //
       //   1. Trade is CLEARLY a partial trim of this ticker (`ib_exec_id` set OR `reason === "Partial Trim"`):
       //      attribute it. No date check. This is the rule that catches IBKR partials whose entry-date
@@ -5036,14 +5221,18 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       // MDB-style bug (separate same-ticker round-trip on a later day getting attributed) stays fixed
       // because a fully-closed round-trip with reasons like "Sold Into Strength" / "Hit Initial Stop"
       // carries NEITHER marker, so it falls through to rule 2 (strict day) and gets excluded.
-      const matches = sameTicker.filter(t => {
-        const isPartialTrim = !!t.ibExecId || t.reason === "Partial Trim";
+      const heuristicMatches = sameTicker.filter(t => {
+        // Drop the broad ibExecId catch — that was over-attributing closed round-trips. Only the
+        // explicit "Partial Trim" reason qualifies as a partial-trim heuristic. (Linked trades are
+        // already handled in Stage 1; this is unlinked-only.)
+        const isPartialTrim = t.reason === "Partial Trim";
         if (isPartialTrim) return true;
         if (!posKey) return true;
         const tKey = tradeDateISO(t.entry);
         return !!tKey && tKey === posKey;
       });
 
+      const matches = [...linkedMatches, ...heuristicMatches];
       const pl = matches.reduce((sum, t) => sum + (t.plDollar || 0), 0);
       const shares = matches.reduce((sum, t) => sum + (parseFloat(t.shares) || 0), 0);
       map[p.id] = { pl, shares };
@@ -7425,7 +7614,7 @@ function AppInner() {
       else if (ins) {
         res.tInserted = ins.length;
         ins.forEach(t => { if (t.ib_exec_id) journaledExecIds.add(t.ib_exec_id); audit.tradesInserted.push(t.id); });
-        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null }));
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
     }
@@ -7485,7 +7674,11 @@ function AppInner() {
         continue;
       }
       if (r.choice !== "new") continue;
-      partialInserts.push({ user_id: uid, ticker: r.ticker, entry_date: r.entry, entry_time: r.entryTime || "", exit_date: r.exit, exit_time: r.exitTime || "", entry_price: r.entryP, exit_price: r.exitP, shares: r.shares, commission: r.commission, pl_pct: r.plPct, pl_dollar: r.plDollar, r_mult: null, setup: "", tags: [], exit_reason: "Partial Trim", notes: "", trade_type: r.tradeType, source: "ibkr", ib_exec_id: r.execId, ib_trade_id: r.tradeId, ib_synced_at: nowIso });
+      // Option C — auto-link this partial to the currently-open position of the same ticker, if any.
+      // Partials by definition come from a still-open lot, so a matching open position MUST exist.
+      // Falls back to null (legacy heuristic match) if the user closed the lot manually before the sync ran.
+      const linkedPos = (positions || []).find(p => (p.sym || "").toUpperCase() === (r.ticker || "").toUpperCase());
+      partialInserts.push({ user_id: uid, ticker: r.ticker, entry_date: r.entry, entry_time: r.entryTime || "", exit_date: r.exit, exit_time: r.exitTime || "", entry_price: r.entryP, exit_price: r.exitP, shares: r.shares, commission: r.commission, pl_pct: r.plPct, pl_dollar: r.plDollar, r_mult: null, setup: "", tags: [], exit_reason: "Partial Trim", notes: "", trade_type: r.tradeType, source: "ibkr", ib_exec_id: r.execId, ib_trade_id: r.tradeId, ib_synced_at: nowIso, position_id: linkedPos ? linkedPos.id : null });
     }
     if (partialInserts.length) {
       const { data: ins, error } = await supabase.from("trades").insert(partialInserts).select("*");
@@ -7493,7 +7686,7 @@ function AppInner() {
       else if (ins) {
         res.partialsInserted = ins.length;
         ins.forEach(t => audit.tradesInserted.push(t.id));
-        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null }));
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
     }
@@ -7661,7 +7854,7 @@ function AppInner() {
       ]);
       if (softDelsRes.data) setSoftDeletedExecIds(new Set(softDelsRes.data.map(r => r.ib_exec_id).filter(Boolean)));
       if (tradesRes.data) {
-        setJournaledTrades(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null })));
+        setJournaledTrades(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null })));
       }
       if (posRes.data) {
         const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
@@ -7975,7 +8168,7 @@ function AppInner() {
       const { data: trades, error: tradesErr } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false });
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       if (trades && trades.length > 0) {
-        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null })));
+        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null })));
         lastLoadedTradeCount.current = trades.length;
       }
       // Soft-deleted IBKR exec ids — small parallel query, just the column we need. Used by the matcher
@@ -8164,6 +8357,7 @@ function AppInner() {
         pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,
         exit_reason: t.reason || "", commission: t.commission != null ? Number(t.commission) : null, notes: t.notes || "",
         chart_url: t.chartUrl || "", chart_image: t.chartImage || "", trade_type: t.tradeType || "Long",
+        position_id: t.positionId || null,   // ← Option C: persist the link (null = past cycle / unlinked)
       });
       const newTrades = journaledTrades.filter(t => !existingIds.has(t.id));
       if (newTrades.length > 0) {
