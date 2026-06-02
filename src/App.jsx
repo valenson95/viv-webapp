@@ -5013,34 +5013,26 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       if (!p.sym) { map[p.id] = { pl: 0, shares: 0 }; return; }
       const posSym = String(p.sym).trim().toUpperCase();
       const posKey = tradeDateISO(p.entry); // may be empty for IBKR Summary-level positions (openDate omitted)
-      const posEp = parseFloat(p.ep) || 0;  // weighted-avg entry price of THIS lot
 
       const sameTicker = journaledTrades.filter(t =>
         String(t.ticker || "").trim().toUpperCase() === posSym
       );
 
-      // STRICT MATCH — same ticker + same entry DAY + same entry PRICE (within 0.5% tolerance).
+      // STRICT SAME-DAY MATCH — ticker + entry day exact. Matches the CLAUDE.md spec.
       //
-      // The earlier "single-lot = take everything after posKey" heuristic over-attributed: any past
-      // round-trip on the same ticker that happened to fall AFTER the current lot's entry day was
-      // counted as a partial of this lot (e.g., open MDB 5/22 → separate scalp 5/25 → trim 5/29
-      // would lump the 5/25 scalp into MDB's realized). The fix: require BOTH the entry day AND the
-      // weighted-avg entry price to match. Partials of the CURRENT lot inherit the lot's entry day
-      // (Sell button: `entry: pos.entry`; IBKR sync: `entry = lotEntry = position.openDate`) AND
-      // share the lot's avg cost (selling doesn't change the avg of remaining shares, and IBKR's
-      // running VWAP at trim time equals the lot avg). A separate cycle on the same day would have
-      // a different avg entry price → correctly excluded. A trade with no date or no price can't be
-      // safely attributed — better to under-attribute than to over-attribute.
-      const PRICE_TOL = 0.005; // 0.5% — generous enough to absorb rounding between text-stored ep and computed entryP
-      const matches = sameTicker.filter(t => {
-        if (!posKey) return false;
-        const tKey = tradeDateISO(t.entry);
-        if (!tKey || tKey !== posKey) return false;
-        if (!(posEp > 0)) return true;                         // pos has no entry price → fall back to date-only
-        const tEp = parseFloat(t.entryP) || 0;
-        if (!(tEp > 0)) return true;                           // trade has no entry price → keep (date already matched)
-        return Math.abs(tEp - posEp) / posEp <= PRICE_TOL;
-      });
+      // Partials of THIS lot always inherit the lot's entry day:
+      //   • Sell button writes `entry: pos.entry`
+      //   • IBKR sync writes `entry = lotEntry = position.openDate`
+      // So any partial of the current open position matches on day-key.
+      //
+      // A separate round-trip on a DIFFERENT date (e.g. open MDB 5/22 → separate scalp 5/25 → trim
+      // 5/29) won't share the lot's entry day and is correctly excluded. The earlier `tKey >= posKey`
+      // heuristic let those bleed in; this exact-equality check is what shuts the leak.
+      //
+      // Earlier I'd also added a price-tolerance check, but that rejected legit partials whenever the
+      // user added to a position AFTER trimming (post-trim ADD shifts position.ep but the partial's
+      // recorded entryP is the lot's avg AT trim time). Date alone is the right rule.
+      const matches = !posKey ? [] : sameTicker.filter(t => tradeDateISO(t.entry) === posKey);
 
       const pl = matches.reduce((sum, t) => sum + (t.plDollar || 0), 0);
       const shares = matches.reduce((sum, t) => sum + (parseFloat(t.shares) || 0), 0);
