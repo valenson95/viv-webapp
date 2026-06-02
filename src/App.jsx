@@ -5018,21 +5018,31 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         String(t.ticker || "").trim().toUpperCase() === posSym
       );
 
-      // STRICT SAME-DAY MATCH — ticker + entry day exact. Matches the CLAUDE.md spec.
+      // MATCH RULE — three branches, ordered:
       //
-      // Partials of THIS lot always inherit the lot's entry day:
-      //   • Sell button writes `entry: pos.entry`
-      //   • IBKR sync writes `entry = lotEntry = position.openDate`
-      // So any partial of the current open position matches on day-key.
+      //   1. Trade is CLEARLY a partial trim of this ticker (`ib_exec_id` set OR `reason === "Partial Trim"`):
+      //      attribute it. No date check. This is the rule that catches IBKR partials whose entry-date
+      //      has drifted from the position's current entry-date (IBKR FIFO shifts openDate after each
+      //      trim, leaving older imported partials stranded under a strict same-day rule). It also
+      //      catches user-typed partial trims even if their entry-date field doesn't perfectly match
+      //      the position. A "Partial Trim" labeled trade on a ticker you still hold open is, by
+      //      definition, a partial of that open lot — there's no other reasonable interpretation.
       //
-      // A separate round-trip on a DIFFERENT date (e.g. open MDB 5/22 → separate scalp 5/25 → trim
-      // 5/29) won't share the lot's entry day and is correctly excluded. The earlier `tKey >= posKey`
-      // heuristic let those bleed in; this exact-equality check is what shuts the leak.
+      //   2. Same-day match (`tKey === posKey`): the normal Sell-button / same-day partial case.
       //
-      // Earlier I'd also added a price-tolerance check, but that rejected legit partials whenever the
-      // user added to a position AFTER trimming (post-trim ADD shifts position.ep but the partial's
-      // recorded entryP is the lot's avg AT trim time). Date alone is the right rule.
-      const matches = !posKey ? [] : sameTicker.filter(t => tradeDateISO(t.entry) === posKey);
+      //   3. Position has NO entry date: take all same-ticker trades. Permissive fallback for legacy
+      //      rows; without an anchor date there's no way to filter.
+      //
+      // MDB-style bug (separate same-ticker round-trip on a later day getting attributed) stays fixed
+      // because a fully-closed round-trip with reasons like "Sold Into Strength" / "Hit Initial Stop"
+      // carries NEITHER marker, so it falls through to rule 2 (strict day) and gets excluded.
+      const matches = sameTicker.filter(t => {
+        const isPartialTrim = !!t.ibExecId || t.reason === "Partial Trim";
+        if (isPartialTrim) return true;
+        if (!posKey) return true;
+        const tKey = tradeDateISO(t.entry);
+        return !!tKey && tKey === posKey;
+      });
 
       const pl = matches.reduce((sum, t) => sum + (t.plDollar || 0), 0);
       const shares = matches.reduce((sum, t) => sum + (parseFloat(t.shares) || 0), 0);
@@ -7091,6 +7101,71 @@ function NavIcon({ name, size = 17, color = "currentColor" }) {
   return null;
 }
 
+// ─── Mobile responsiveness — single global stylesheet that scales down the most awkward inline-style
+// patterns (oversized card padding, wide grid gaps, big headline fonts) on phone widths. Works via
+// attribute selectors against the inline `style` strings the app emits — non-invasive (no className
+// plumbing needed) and only kicks in below 640px. Anything still feeling chunky on phone is a candidate
+// for a more targeted media-query rule here, NOT a state-tracked layout split (which would cost a re-render).
+const mobileCSS = `
+@media (max-width: 640px) {
+  /* Global font baseline — slightly smaller body text on phones */
+  body, .viv-mobile-root { font-size: 14px; }
+  h1 { font-size: 1.35rem !important; line-height: 1.2 !important; letter-spacing: -0.03em !important; }
+  h2 { font-size: 1rem !important; line-height: 1.25 !important; }
+
+  /* Large card paddings → compact */
+  [style*='padding: "32px 28px"'],
+  [style*='padding: "30px 32px"'],
+  [style*='padding: "28px 32px"'],
+  [style*='padding: "24px 32px"'],
+  [style*='padding: "24px 28px"'] { padding: 14px 14px !important; }
+  [style*='padding: "22px 28px"'],
+  [style*='padding: "20px 24px"'],
+  [style*='padding: "18px 24px"'],
+  [style*='padding: "18px 22px"'] { padding: 12px 14px !important; }
+  [style*='padding: "16px 18px"'],
+  [style*='padding: "14px 16px"'] { padding: 10px 12px !important; }
+
+  /* Generous grid / flex gaps → tighter */
+  [style*='gap: 24'] { gap: 10px !important; }
+  [style*='gap: 22'],
+  [style*='gap: 20'] { gap: 10px !important; }
+  [style*='gap: 18'],
+  [style*='gap: 16'] { gap: 8px !important; }
+  [style*='gap: 14'] { gap: 8px !important; }
+
+  /* Bottom margins between sections → tighter */
+  [style*='marginBottom: 28'],
+  [style*='marginBottom: 24'],
+  [style*='marginBottom: 22'],
+  [style*='marginBottom: 20'] { margin-bottom: 14px !important; }
+
+  /* Tables: compact rows + smaller font (most tables already scroll horizontally) */
+  table th, table td { padding: 5px 4px !important; font-size: 0.62rem !important; }
+
+  /* StatTile cluster — minmax 168px is too tight for phone; let them stack 2-up */
+  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(168px'],
+  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(150px'],
+  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(160px'] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* Big hero numbers (1.5rem+, 2rem) → scale down */
+  [style*='fontSize: "2rem"'] { font-size: 1.4rem !important; }
+  [style*='fontSize: "1.8rem"'] { font-size: 1.3rem !important; }
+  [style*='fontSize: "1.5rem"'] { font-size: 1.15rem !important; }
+}
+@media (max-width: 420px) {
+  /* Tiniest phones — make stat tiles single-column so labels and big numbers stay readable */
+  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(168px'],
+  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(150px'],
+  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(160px'] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+`;
+
 // ─── Animated app background — calm grid + drifting particles + cursor glow ───
 const appBgCSS = `
 .viv-bg-particle{position:absolute;border-radius:50%;background:rgba(240,192,80,0.6);animation-name:vivFloat;animation-timing-function:ease-in-out;animation-iteration-count:infinite;will-change:transform,opacity;}
@@ -7146,6 +7221,16 @@ const NAV = [
 
 
 function AppInner() {
+  // Inject the global mobile-responsive stylesheet once on mount. Lives in <head> for the lifetime of
+  // the app (no cleanup — removing it would just bounce the UI for nothing).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (document.getElementById("viv-mobile-css")) return;
+    const tag = document.createElement("style");
+    tag.id = "viv-mobile-css";
+    tag.textContent = mobileCSS;
+    document.head.appendChild(tag);
+  }, []);
   const screenW = useScreenWidth();
   const isMobile = screenW < 768;
   const isTablet = screenW >= 768 && screenW < 1024;
