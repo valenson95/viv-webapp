@@ -522,7 +522,12 @@ const tradeDateISO = (d) => {
 };
 
 // Reconstruct closed round-trips (flat-to-flat per symbol) + open positions, then diff against current data.
-function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) {
+function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds, ignoreTickers) {
+  // Per-user ignore list — tickers the user has marked default-skip in Settings. Rows still get
+  // built and classified normally (so the user can override on a one-off basis); we just set
+  // `ignored: true` and the modal defaults their action to "skip".
+  const _ignoreSet = ignoreTickers instanceof Set ? ignoreTickers : new Set(ignoreTickers || []);
+  const isIgnored = sym => _ignoreSet.has(String(sym || "").toUpperCase());
   // execIds the user previously soft-deleted as duplicates — these physical rows still exist in the trades
   // table (just with is_deleted=true), so re-inserting would hit the unique constraint trades_user_ib_exec.
   // Treat them as "synced" (no-op) so the user doesn't see ugly DB errors on every subsequent sync.
@@ -602,7 +607,14 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
             const avgEntryP = openCost / openShares;
             const closedQty = c.quantity;
             if (c.date >= IBKR_SYNC_FLOOR) {
-              const plDollar = c.realizedPnl || ((isLong ? (c.price - avgEntryP) : (avgEntryP - c.price)) * closedQty - c.commission);
+              // P/L from WEIGHTED-AVG cost basis (NOT IBKR's fifoPnlRealized). FIFO assigns each
+              // partial share to its earliest-bought lot, which can differ wildly from weighted avg
+              // when a position was built in multiple tranches at different prices — e.g. MDB built
+              // at $400 then $300, sold partial at $382.29: FIFO marks it −$5.6k (vs the $400 lot),
+              // weighted-avg marks it +$4.9k (vs the $366.67 blended cost). The dashboard's avg cost
+              // IS weighted avg (matches IBKR's costBasisPrice on OpenPosition), so partial P/L must
+              // use the same convention to stay self-consistent and match user expectations.
+              const plDollar = (isLong ? (c.price - avgEntryP) : (avgEntryP - c.price)) * closedQty - c.commission;
               const plPct = avgEntryP > 0 ? (plDollar / (avgEntryP * closedQty)) * 100 : 0;
               partials.push({
                 ticker: sym, entry: lotEntry, entryTime: lotEntryTime, exit: c.date, exitTime: c.time,
@@ -649,28 +661,30 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
   // first BUY exec (timezone, manual-typing error, split-day fill). This is what stops the "Sync re-imports
   // everything I already closed manually" duplicate cycle.
   const tradeRows = closed.map(c => {
+    const ignored = isIgnored(c.ticker);
     const synced = (journaledTrades || []).find(t => t.ibExecId && t.ibExecId === c.execId);
-    if (synced) return { ...c, action: "synced", matchId: synced.id };
-    if (c.execId && _deletedExecIds.has(c.execId)) return { ...c, action: "synced", matchId: null, prevDeleted: true };
+    if (synced) return { ...c, action: "synced", matchId: synced.id, ignored };
+    if (c.execId && _deletedExecIds.has(c.execId)) return { ...c, action: "synced", matchId: null, prevDeleted: true, ignored };
     const tickerHits = (journaledTrades || []).filter(t => !isIbkr(t.source) && (t.ticker || "").toUpperCase() === c.ticker.toUpperCase());
     let cands = tickerHits.filter(t => tradeDateISO(t.entry) === tradeDateISO(c.entry) || tradeDateISO(t.exit) === tradeDateISO(c.exit));
     if (cands.length === 0) cands = tickerHits.filter(t => dayDiff(t.entry, c.entry) <= 3 && sharesClose(t.shares, c.shares, 0.05));
     if (cands.length === 1) {
       const m = cands[0];
       const sharesOk = sharesClose(m.shares, c.shares, 0.05);
-      return { ...c, action: sharesOk ? "reconcile" : "review", matchId: m.id, matchStop: Number(m.stop) || 0 };
+      return { ...c, action: sharesOk ? "reconcile" : "review", matchId: m.id, matchStop: Number(m.stop) || 0, ignored };
     }
-    if (cands.length > 1) return { ...c, action: "review", matchId: null };
-    return { ...c, action: "new", matchId: null };
+    if (cands.length > 1) return { ...c, action: "review", matchId: null, ignored };
+    return { ...c, action: "new", matchId: null, ignored };
   });
   // PARTIAL SELLS from still-open lots — execId match first (re-sync of an already-imported partial = no-op).
   // Otherwise try to reconcile against a manual Sell-button partial for the same lot: ticker + lot entry day
   // within ±3d + exit day within ±1d + shares within 5%. Prevents duplicate trims from inflating trim % on
   // the open position.
   const partialRows = partials.map(c => {
+    const ignored = isIgnored(c.ticker);
     const synced = (journaledTrades || []).find(t => t.ibExecId && t.ibExecId === c.execId);
-    if (synced) return { ...c, action: "synced", matchId: synced.id };
-    if (c.execId && _deletedExecIds.has(c.execId)) return { ...c, action: "synced", matchId: null, prevDeleted: true };
+    if (synced) return { ...c, action: "synced", matchId: synced.id, ignored };
+    if (c.execId && _deletedExecIds.has(c.execId)) return { ...c, action: "synced", matchId: null, prevDeleted: true, ignored };
     const cands = (journaledTrades || []).filter(t =>
       !isIbkr(t.source) &&
       (t.ticker || "").toUpperCase() === c.ticker.toUpperCase() &&
@@ -678,9 +692,9 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
       dayDiff(t.exit, c.exit) <= 1 &&
       sharesClose(t.shares, c.shares, 0.05)
     );
-    if (cands.length === 1) return { ...c, action: "reconcile", matchId: cands[0].id, matchStop: Number(cands[0].stop) || 0 };
-    if (cands.length > 1) return { ...c, action: "review", matchId: null };
-    return { ...c, action: "new", matchId: null };
+    if (cands.length === 1) return { ...c, action: "reconcile", matchId: cands[0].id, matchStop: Number(cands[0].stop) || 0, ignored };
+    if (cands.length > 1) return { ...c, action: "review", matchId: null, ignored };
+    return { ...c, action: "new", matchId: null, ignored };
   });
   // ── INTRADAY LOG RECONCILIATION ── for each open position's intraday log, find IBKR partials whose
   // ticker + same exit day + shares within 5% match a logged trim event. On confirm these events get a
@@ -788,16 +802,17 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
     });
   });
   const posRows = openPos.map(p => {
+    const ignored = isIgnored(p.sym);
     const synced = (positions || []).find(x => x.ibConid && x.ibConid === p.conid);
-    if (synced) return { ...p, action: "synced", matchId: synced.id };
+    if (synced) return { ...p, action: "synced", matchId: synced.id, ignored };
     const cands = (positions || []).filter(x => !isIbkr(x.source) && (x.sym || "").toUpperCase() === p.sym.toUpperCase());
     if (cands.length === 1) {
       const m = cands[0];
       const sharesOk = Math.abs((Number(m.shares) || 0) - Number(p.shares)) <= Math.max(1, Number(p.shares) * 0.05);
-      return { ...p, action: sharesOk ? "reconcile" : "review", matchId: m.id };
+      return { ...p, action: sharesOk ? "reconcile" : "review", matchId: m.id, ignored };
     }
-    if (cands.length > 1) return { ...p, action: "review", matchId: null };
-    return { ...p, action: "new", matchId: null };
+    if (cands.length > 1) return { ...p, action: "review", matchId: null, ignored };
+    return { ...p, action: "new", matchId: null, ignored };
   });
   // ── Auto-close candidates ── positions IBKR no longer holds, whose closing round-trip is in THIS sync.
   // SAFETY GATE (all must hold): (1) IBKR-owned only — a manual position is NEVER eligible; (2) IBKR's statement
@@ -824,7 +839,7 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds) 
       const rt = closedBySym[(p.sym || "").toUpperCase()];
       const link = rt[rt.length - 1];                                // most recent round-trip for this symbol
       return { posId: p.id, sym: p.sym, shares: p.shares, ep: p.ep, entry: p.entry, conid: p.ibConid,
-        linkExecId: link ? link.execId : null, exit: link ? link.exit : "", action: "close" };
+        linkExecId: link ? link.execId : null, exit: link ? link.exit : "", action: "close", ignored: isIgnored(p.sym) };
     });
 
   // ── EXISTING DUPLICATES IN JOURNAL ── catches the case where the user already imported IBKR partials
@@ -1324,7 +1339,14 @@ function IntegrityReportModal({ open, onClose, report, onReRun, running }) {
 }
 
 // Interactive sync modal — preview + per-row decisions + confirm. Writes happen via onConfirm (App), surgically.
-const ibkrDefaultChoice = (action) => action === "review" ? "skip" : action === "reconcile" ? "reconcile" : action === "synced" ? "update" : action === "close" ? "close" : action === "duplicate" ? "skip" : "new";
+// Rows flagged `ignored` (ticker on the user's Settings → Ignore list) always default to "skip" regardless
+// of action — overrides every other rule. User can still toggle to import/reconcile in the modal.
+const ibkrDefaultChoice = (r) => {
+  const action = typeof r === "string" ? r : r && r.action;
+  const ignored = typeof r === "object" && r && r.ignored;
+  if (ignored) return "skip";
+  return action === "review" ? "skip" : action === "reconcile" ? "reconcile" : action === "synced" ? "update" : action === "close" ? "close" : action === "duplicate" ? "skip" : "new";
+};
 function ibkrChoiceOpts(r) {
   if (r.action === "synced") return [["update", "Update"], ["skip", "Skip"]];
   if (r.action === "reconcile") return [["reconcile", "Reconcile"], ["new", "Keep both"], ["skip", "Skip"]];
@@ -1337,7 +1359,7 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
   const [choices, setChoices] = useState({ pos: {}, trade: {}, close: {}, partial: {}, dupes: {} });
   useEffect(() => {
     if (data) {
-      const def = rows => (rows || []).reduce((m, r, i) => { m[i] = ibkrDefaultChoice(r.action); return m; }, {});
+      const def = rows => (rows || []).reduce((m, r, i) => { m[i] = ibkrDefaultChoice(r); return m; }, {});
       // Existing-duplicate groups default to "delete-ibkr": keep your manual aggregate (with R-mult, notes,
       // setup, tags), soft-delete the IBKR partial rows that double-counted it. Recoverable via is_deleted=false.
       const dupeDef = (data.dupeJournalGroups || []).reduce((m, _g, i) => { m[i] = "delete-ibkr"; return m; }, {});
@@ -1499,7 +1521,14 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                         <tbody>{sec.rows.map((r, i) => (
                           <tr key={i} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, opacity: (choices[sec.kind][i] === "skip") ? 0.45 : 1 }}>
                             {sec.cols.map(col => <td key={col} style={{ padding: "7px 8px", color: col === "plDollar" ? (r[col] >= 0 ? C.green : C.red) : C.text, fontWeight: col === sec.cols[0] ? 700 : 400, whiteSpace: "nowrap" }}>{col === "ep" || col === "entryP" || col === "exitP" ? (r[col] !== undefined && r[col] !== "" ? Number(r[col]).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—") : col === "plDollar" ? `${r[col] >= 0 ? "+" : ""}${Number(r[col]).toLocaleString()}` : (col === "entry" || col === "exit") ? (tradeDateISO(r[col]) || r[col] || "—") : (r[col] ?? "—")}</td>)}
-                            <td style={{ padding: "7px 8px", textAlign: "center" }}>{chip(r.action)}</td>
+                            <td style={{ padding: "7px 8px", textAlign: "center" }}>
+                              <div style={{ display: "inline-flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+                                {chip(r.action)}
+                                {r.ignored && (
+                                  <span title="On your Ignore list — defaulted to Skip. Toggle the Action dropdown to import this one." style={{ fontSize: "0.46rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 980, padding: "2px 6px", background: "rgba(255,255,255,0.03)", whiteSpace: "nowrap" }}>⊘ Ignored</span>
+                                )}
+                              </div>
+                            </td>
                             <td style={{ padding: "7px 8px", textAlign: "right" }}>{sel(sec.kind, i, r)}</td>
                           </tr>
                         ))}</tbody>
@@ -6039,6 +6068,8 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
   const [ibkrToken, setIbkrToken] = useState("");
   const [ibkrConnStatus, setIbkrConnStatus] = useState("");
   const [ibkrLoaded, setIbkrLoaded] = useState(false);
+  const [ibkrIgnoreText, setIbkrIgnoreText] = useState("");
+  const [ibkrIgnoreStatus, setIbkrIgnoreStatus] = useState("");
   const [newSetup, setNewSetup] = useState("");
   const [newTag, setNewTag] = useState("");
   const [newReason, setNewReason] = useState("");
@@ -6052,10 +6083,11 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
   useEffect(() => {
     const uid = session?.user?.id;
     if (!uid) return;
-    supabase.from("user_settings").select("setting_key,setting_value").eq("user_id", uid).in("setting_key", ["ibkr_token", "ibkr_query_id"]).then(({ data }) => {
+    supabase.from("user_settings").select("setting_key,setting_value").eq("user_id", uid).in("setting_key", ["ibkr_token", "ibkr_query_id", "ibkr_ignore_tickers"]).then(({ data }) => {
       (data || []).forEach(s => {
         if (s.setting_key === "ibkr_token") setIbkrToken(s.setting_value == null ? "" : String(s.setting_value));
         if (s.setting_key === "ibkr_query_id") setIbkrQueryId(s.setting_value == null ? "" : String(s.setting_value));
+        if (s.setting_key === "ibkr_ignore_tickers") setIbkrIgnoreText(s.setting_value == null ? "" : String(s.setting_value));
       });
       setIbkrLoaded(true);
     });
@@ -6073,6 +6105,23 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
     setTimeout(() => setIbkrConnStatus(""), 2500);
   };
   const ibkrConnected = ibkrToken.trim() && ibkrQueryId.trim();
+
+  const saveIbkrIgnore = async () => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    // Normalize: uppercase, trim, dedupe, keep canonical form for display + storage.
+    const clean = Array.from(new Set(
+      ibkrIgnoreText.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean)
+    )).join(", ");
+    setIbkrIgnoreText(clean);
+    setIbkrIgnoreStatus("saving");
+    const { error } = await supabase.from("user_settings").upsert([
+      { user_id: uid, setting_key: "ibkr_ignore_tickers", setting_value: clean, updated_at: new Date().toISOString() },
+    ], { onConflict: "user_id,setting_key" });
+    setIbkrIgnoreStatus(error ? "error" : "saved");
+    setTimeout(() => setIbkrIgnoreStatus(""), 2500);
+  };
+  const ibkrIgnoreList = ibkrIgnoreText.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
 
   // Load access codes and members for admin
   useEffect(() => {
@@ -6227,6 +6276,32 @@ function SettingsPage({ setupTypes, setSetupTypes, tags, setTags, exitReasons, s
             <button onClick={saveIbkrConn} disabled={ibkrConnStatus === "saving"} style={{ padding: "10px 18px", borderRadius: 980, border: `1px solid ${ibkrConnStatus === "saved" ? "rgba(34,197,94,0.4)" : C.borderGold}`, background: ibkrConnStatus === "saved" ? "rgba(34,197,94,0.12)" : C.goldDim, color: ibkrConnStatus === "saved" ? C.green : C.gold, fontWeight: 800, fontSize: "0.72rem", cursor: "pointer", fontFamily: font, height: 40, whiteSpace: "nowrap" }}>{ibkrConnStatus === "saving" ? "Saving…" : ibkrConnStatus === "saved" ? "Saved ✓" : ibkrConnStatus === "error" ? "Failed" : "Save connection"}</button>
           </div>
           <div style={{ fontSize: "0.58rem", color: C.muted, marginTop: 8, lineHeight: 1.6 }}>Stored only on your own account (private). The token is read-only — it can pull your statements but can't trade or move money. Don't have these yet? Follow the steps below.</div>
+        </div>
+
+        {/* Ignore list — tickers that default to Skip on every sync (still visible in the preview; you can toggle to import on a one-off basis). */}
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted }}>Ignore Tickers on Sync</div>
+              <div style={{ fontSize: "0.62rem", color: C.muted, marginTop: 4, lineHeight: 1.55 }}>Tickers here default to <strong style={{ color: C.text }}>Skip</strong> on every sync — they still appear in the preview (so you can override on a one-off basis), just not auto-selected. Good for index hedges, options, or any account-only ticker you don't track in VIV.</div>
+            </div>
+            {ibkrIgnoreList.length > 0 && (
+              <span style={{ fontSize: "0.56rem", fontWeight: 700, color: C.gold, border: `1px solid ${C.borderGold}`, borderRadius: 980, padding: "2px 9px" }}>{ibkrIgnoreList.length} ignored</span>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "stretch", flexWrap: "wrap" }}>
+            <input type="text" value={ibkrIgnoreText} onChange={e => setIbkrIgnoreText(e.target.value)} placeholder="e.g. SPY, QQQ, VXX, SOXL" style={{ flex: "1 1 240px", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", color: C.white, fontSize: "0.82rem", fontFamily: font, outline: "none", letterSpacing: "0.04em" }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+            <button onClick={saveIbkrIgnore} disabled={ibkrIgnoreStatus === "saving"} style={{ padding: "10px 18px", borderRadius: 980, border: `1px solid ${ibkrIgnoreStatus === "saved" ? "rgba(34,197,94,0.4)" : C.borderGold}`, background: ibkrIgnoreStatus === "saved" ? "rgba(34,197,94,0.12)" : C.goldDim, color: ibkrIgnoreStatus === "saved" ? C.green : C.gold, fontWeight: 800, fontSize: "0.72rem", cursor: "pointer", fontFamily: font, height: 40, whiteSpace: "nowrap" }}>{ibkrIgnoreStatus === "saving" ? "Saving…" : ibkrIgnoreStatus === "saved" ? "Saved ✓" : ibkrIgnoreStatus === "error" ? "Failed" : "Save list"}</button>
+          </div>
+          {ibkrIgnoreList.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
+              {ibkrIgnoreList.map(t => (
+                <span key={t} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 980, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, color: C.text, fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.04em" }}>
+                  <span style={{ opacity: 0.5 }}>⊘</span>{t}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Expandable setup tutorial */}
@@ -6934,10 +7009,19 @@ function AppInner() {
   const runIbkrSync = useCallback(async () => {
     setIbkrOpen(true); setIbkrStatus("loading"); setIbkrError(null); setIbkrData(null); setIbkrResult(null);
     try {
+      const uid = session?.user?.id;
+      // Pull the user's ignore list fresh each sync — no in-memory cache to go stale if Settings was just edited.
+      let ignoreTickers = new Set();
+      if (uid) {
+        const { data: ig } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "ibkr_ignore_tickers").maybeSingle();
+        if (ig && ig.setting_value) {
+          String(ig.setting_value).split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean).forEach(t => ignoreTickers.add(t));
+        }
+      }
       const res = await fetch("/api/ibkr-sync", { headers: { Authorization: `Bearer ${session?.access_token || ""}` } });
       const json = await res.json();
       if (!json.ok) { setIbkrStatus("error"); setIbkrError(json.error || "Sync failed."); return; }
-      setIbkrData(buildIbkrPreview(json, positions, journaledTrades, softDeletedExecIds));
+      setIbkrData(buildIbkrPreview(json, positions, journaledTrades, softDeletedExecIds, ignoreTickers));
       setIbkrStatus("preview");
     } catch (e) {
       setIbkrStatus("error");
