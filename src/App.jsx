@@ -209,11 +209,13 @@ function useDragReorder(length) {
 }
 
 // Reorderable table row — reorders direct <td> children by index array
-function DragTr({ order, hiddenSet, children, ...props }) {
-  if (!order) return <tr {...props}>{children}</tr>;
+function DragTr({ order, hiddenSet, prefix, children, ...props }) {
+  // `prefix` renders as a non-draggable cell at the start of the row — used for selection checkboxes
+  // in tables that support bulk operations. Pass any number of <td> nodes (or a fragment).
+  if (!order) return <tr {...props}>{prefix}{children}</tr>;
   const arr = React.Children.toArray(children);
   const indices = hiddenSet ? order.filter(i => !hiddenSet.has(i)) : order;
-  return <tr {...props}>{indices.map(i => arr[i]).filter(Boolean)}</tr>;
+  return <tr {...props}>{prefix}{indices.map(i => arr[i]).filter(Boolean)}</tr>;
 }
 
 // ─── Count-Up Animation Hook ───
@@ -3073,8 +3075,18 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const [distTierInput, setDistTierInput] = useState(""); // input box for adding a custom tier
   const [drmaExplainerOpen, setDrmaExplainerOpen] = useState(false);
   // Drag reorder hooks — stat tiles, trade journal columns, open positions columns
-  const statDrag = useDragReorder(13); // 13 stat tiles (incl. Breakeven Rate)
+  const statDrag = useDragReorder(12); // 12 stat tiles
   const tradeDrag = useDragReorder(17); // 17 trade journal columns
+  // Bulk-edit state — selection survives sort/filter changes (lives on trade id, not row index).
+  const [selectedTradeIds, setSelectedTradeIds] = useState(() => new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkDraft, setBulkDraft] = useState({ stop: "", tradeType: "", setup: "", reason: "" });
+  const toggleSelectTrade = useCallback((id) => setSelectedTradeIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  }), []);
+  const clearTradeSelection = useCallback(() => setSelectedTradeIds(new Set()), []);
   const monthDrag = useDragReorder(18); // 18 monthly performance columns
   const distDrag = useDragReorder(7); // 7 distribution table columns
   const screenshotRef = useRef(null);
@@ -3228,25 +3240,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 
   const stats = useMemo(() => {
     const trades = filtered;
-    if (trades.length === 0) return { ba:0,beRate:0,lossRate:0,avgGain:0,avgLoss:0,glRatio:0,adjustedGL:0,ev:0,avgR:0,largestLoss:0,largestWin:0,totalPL:0,total:0,wins:0,losses:0,be:0,avgHoldWin:0,avgHoldLoss:0,holdRatio:0 };
-    // Classify by R-multiple when available (within ±0.1R = breakeven); otherwise fall back to plPct
-    // (any sub-tenth-of-a-percent trade also counts as breakeven). Breakevens are excluded from BOTH
-    // win and loss buckets so they don't inflate avg gain/loss or skew the win-rate denominator math.
-    const classify = (t) => {
-      if (t.rMult != null && !isNaN(t.rMult)) {
-        if (Math.abs(t.rMult) <= 0.1) return "be";
-        return t.rMult > 0 ? "win" : "loss";
-      }
-      const p = Number(t.plPct) || 0;
-      if (Math.abs(p) < 0.1) return "be";
-      return p > 0 ? "win" : "loss";
-    };
-    const wins = trades.filter(t => classify(t) === "win");
-    const losses = trades.filter(t => classify(t) === "loss");
-    const bes = trades.filter(t => classify(t) === "be");
+    if (trades.length === 0) return { ba:0,avgGain:0,avgLoss:0,glRatio:0,adjustedGL:0,ev:0,avgR:0,largestLoss:0,largestWin:0,totalPL:0,total:0,avgHoldWin:0,avgHoldLoss:0,holdRatio:0 };
+    const wins = trades.filter(t => t.plPct > 0), losses = trades.filter(t => t.plPct <= 0);
     const ba = (wins.length / trades.length) * 100;
-    const beRate = (bes.length / trades.length) * 100;
-    const lossRate = (losses.length / trades.length) * 100;
     // Equal-weighted avg gain/loss: simple average of trade percentages
     const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
     const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.plPct, 0) / losses.length) : 0;
@@ -3277,7 +3273,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     const avgHoldLoss = lossDays.length > 0 ? lossDays.reduce((s,d) => s + d, 0) / lossDays.length : 0;
     const holdRatio = avgHoldLoss > 0 ? avgHoldWin / avgHoldLoss : 0;
     const totalComm = trades.reduce((s, t) => s + (parseFloat(t.commission) || 0), 0);
-    return { ba, beRate, lossRate, avgGain, avgLoss, glRatio, adjustedGL, ev, avgR, largestLoss: Math.min(...trades.map(t => t.plPct)), largestWin: Math.max(...trades.map(t => t.plPct)), totalPL: trades.reduce((s, t) => s + t.plDollar, 0), total: trades.length, wins: wins.length, losses: losses.length, be: bes.length, avgHoldWin, avgHoldLoss, holdRatio, totalComm };
+    return { ba, avgGain, avgLoss, glRatio, adjustedGL, ev, avgR, largestLoss: Math.min(...trades.map(t => t.plPct)), largestWin: Math.max(...trades.map(t => t.plPct)), totalPL: trades.reduce((s, t) => s + t.plDollar, 0), total: trades.length, avgHoldWin, avgHoldLoss, holdRatio, totalComm };
   }, [filtered]);
 
   // ─── Distribution Analysis Data ───
@@ -3501,21 +3497,11 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       if (!months[key]) months[key] = [];
       months[key].push(t);
     });
-    // Same classifier as the main stats memo — keep monthly breakdown consistent with the headline tiles.
-    const classify = (t) => {
-      if (t.rMult != null && !isNaN(t.rMult)) {
-        if (Math.abs(t.rMult) <= 0.1) return "be";
-        return t.rMult > 0 ? "win" : "loss";
-      }
-      const p = Number(t.plPct) || 0;
-      if (Math.abs(p) < 0.1) return "be";
-      return p > 0 ? "win" : "loss";
-    };
     return Object.keys(months).sort().map(k => {
       const trades = months[k];
-      const wins = trades.filter(t => classify(t) === "win");
-      const losses = trades.filter(t => classify(t) === "loss");
-      const be = trades.filter(t => classify(t) === "be");
+      const wins = trades.filter(t => t.plPct > 0);
+      const losses = trades.filter(t => t.plPct <= 0);
+      const be = trades.filter(t => t.plPct === 0);
       const count = trades.length;
       const dollar = trades.reduce((s, t) => s + t.plDollar, 0);
       const avgGain = wins.length > 0 ? wins.reduce((s, t) => s + t.plPct, 0) / wins.length : 0;
@@ -3606,6 +3592,66 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       if (error) console.error("Trade delete error:", error.message);
     });
   };
+
+  // ── BULK EDIT / DELETE ── operates on selectedTradeIds. Bulk apply updates only the fields the user
+  // explicitly filled in the modal (empty = skip that field). When stop or tradeType change we recompute
+  // rMult per-trade using each trade's own entry/exit/shares — same formula as saveEdit (App.jsx:3543+).
+  const bulkApply = useCallback(() => {
+    if (selectedTradeIds.size === 0) return;
+    const draft = bulkDraft;
+    const hasStop = String(draft.stop).trim() !== "";
+    const hasType = !!draft.tradeType;
+    const hasSetup = !!draft.setup;
+    const hasReason = !!draft.reason;
+    if (!hasStop && !hasType && !hasSetup && !hasReason) { setBulkOpen(false); return; }
+    setJournaledTrades(prev => prev.map(t => {
+      if (!selectedTradeIds.has(t.id)) return t;
+      const nextStop = hasStop ? Number(draft.stop) : (Number(t.stop) || 0);
+      const nextType = hasType ? draft.tradeType : (t.tradeType || "Long");
+      const nextSetup = hasSetup ? draft.setup : t.setup;
+      const nextReason = hasReason ? draft.reason : t.reason;
+      // Recompute rMult only if stop or tradeType changed (otherwise t.rMult is already correct)
+      let rMult = t.rMult;
+      if (hasStop || hasType) {
+        const ep = parseFloat(t.entryP) || 0, xp = parseFloat(t.exitP) || 0;
+        const isShort = nextType === "Short";
+        const plPct = ep > 0 ? (isShort ? ((ep - xp) / ep) * 100 : ((xp - ep) / ep) * 100) : 0;
+        const initRisk = ep > 0 && nextStop > 0 ? (isShort ? (nextStop - ep) / ep : (ep - nextStop) / ep) : 0;
+        rMult = initRisk > 0 ? (plPct / 100) / initRisk : null;
+      }
+      return { ...t, stop: hasStop ? nextStop : t.stop, tradeType: nextType, setup: nextSetup, reason: nextReason, rMult };
+    }));
+    setBulkOpen(false);
+    setBulkDraft({ stop: "", tradeType: "", setup: "", reason: "" });
+    // Trigger immediate save via ref — avoids stale closure
+    setTimeout(() => onManualSaveRef.current(), 50);
+  }, [selectedTradeIds, bulkDraft]);
+
+  const bulkDelete = useCallback(() => {
+    if (selectedTradeIds.size === 0) return;
+    const ids = Array.from(selectedTradeIds);
+    if (!window.confirm(`Delete ${ids.length} trade${ids.length === 1 ? "" : "s"} from your journal? This soft-deletes them (recoverable from the database) but they will disappear from your journal immediately.`)) return;
+    setDeletedTradeIds(prev => [...prev, ...ids]);
+    setJournaledTrades(prev => prev.filter(t => !selectedTradeIds.has(t.id)));
+    if (editingId && selectedTradeIds.has(editingId)) setEditingId(null);
+    clearTradeSelection();
+    // Soft-delete in Supabase right away (per-row try/catch — one row failing shouldn't abort the others)
+    ids.forEach(id => {
+      supabase.from("trades").update({ is_deleted: true }).eq("id", id).then(({ error }) => {
+        if (error) console.error("Bulk trade delete error:", id, error.message);
+      });
+    });
+  }, [selectedTradeIds, editingId, clearTradeSelection]);
+
+  const selectAllVisible = useCallback(() => {
+    setSelectedTradeIds(prev => {
+      const next = new Set(prev);
+      filtered.forEach(t => next.add(t.id));
+      return next;
+    });
+  }, [filtered]);
+
+  const visibleAllSelected = filtered.length > 0 && filtered.every(t => selectedTradeIds.has(t.id));
 
   const activeFilterLabel = filterSetup !== "All" || filterTag !== "All" ? ` (filtered: ${filtered.length}/${allTrades.length})` : "";
 
@@ -3738,10 +3784,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
       {(() => {
         const tiles = [
           { label:"Total P/L", value:`$${Math.abs(stats.totalPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`, color:stats.totalPL>=0?C.green:C.red, prefix:stats.totalPL>=0?"+":"-", tip:"Total profit/loss in dollars across all closed trades in the current filter." },
-          { label:"Win Rate", value:`${stats.ba.toFixed(2)}%`, color:stats.ba>=50?C.green:C.red, sub:`${stats.wins}W · ${stats.losses}L · ${stats.be}BE`, tip:"Percentage of trades that finished outside ±0.1R (or ±0.1% when R is unavailable). Trades inside that band count as breakeven and are excluded — they neither help nor hurt win rate." },
-          { label:"Breakeven Rate", value:`${stats.beRate.toFixed(2)}%`, color:C.gold, sub:`${stats.be} of ${stats.total} trades`, tip:"Trades closed within ±0.1R (or ±0.1% if no R-multiple). These are scratch trades — moved your stop to entry, took a quick exit, or got a flat fill. Reported separately so wins and losses stay honest." },
-          { label:"Avg Gain", value:`${stats.avgGain.toFixed(2)}%`, color:C.green, prefix:"+", tip:"Average percentage return across winning trades only (breakevens excluded)." },
-          { label:"Avg Loss", value:`${stats.avgLoss.toFixed(2)}%`, color:C.red, prefix:"-", tip:"Average percentage loss across losing trades only (breakevens excluded)." },
+          { label:"Win Rate", value:`${stats.ba.toFixed(2)}%`, color:stats.ba>=50?C.green:C.red, tip:"Percentage of closed trades that finished profitable." },
+          { label:"Avg Gain", value:`${stats.avgGain.toFixed(2)}%`, color:C.green, prefix:"+", tip:"Average percentage return across winning trades only." },
+          { label:"Avg Loss", value:`${stats.avgLoss.toFixed(2)}%`, color:C.red, prefix:"-", tip:"Average percentage loss across losing trades only." },
           { label:"Win/Loss Ratio", value:stats.glRatio.toFixed(2), color:stats.glRatio>=2?C.green:stats.glRatio>=1?C.gold:C.red, tip:"Average % win ÷ average % loss — how much bigger a typical winner is than a typical loser. Ignores win rate and each trade's risk." },
           { label:"Adj. W/L Ratio", value:stats.adjustedGL.toFixed(2), color:stats.adjustedGL>=1?C.green:C.red, sub:stats.adjustedGL>=1?"Net profitable":"Net unprofitable", tip:"Win/Loss ratio weighted by your win rate. Above 1.0 means the system is net profitable." },
           { label:"Largest Win", value:`${stats.largestWin.toFixed(2)}%`, color:C.green, prefix:"+", tip:"Biggest single winning trade by percentage return." },
@@ -4159,6 +4204,72 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
           <div style={{ fontWeight: 700, fontSize: "0.76rem", color: C.white }}>Closed Trades</div>
           <ShareDropdown menuOpen={closedShareOpen} setMenuOpen={setClosedShareOpen} status={closedShareStatus} captureFn={captureClosedTrades} label="Trades" />
         </div>
+        {/* Bulk-action bar — appears when any trades are selected via the leading checkbox column. */}
+        {selectedTradeIds.size > 0 && (
+          <div style={{ margin: "6px 22px 10px", padding: "10px 16px", borderRadius: 10, background: "rgba(201,152,42,0.08)", border: `1px solid ${C.borderGold}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span style={{ fontWeight: 800, fontSize: "0.66rem", color: C.goldBright, letterSpacing: "0.06em" }}>
+              {selectedTradeIds.size} trade{selectedTradeIds.size === 1 ? "" : "s"} selected
+            </span>
+            <div style={{ flex: 1 }} />
+            <button onClick={() => setBulkOpen(true)} style={{ padding: "7px 16px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.66rem", cursor: "pointer", fontFamily: font }}>
+              ✎ Bulk edit
+            </button>
+            <button onClick={bulkDelete} style={{ padding: "7px 16px", borderRadius: 980, border: `1px solid rgba(239,68,68,0.4)`, background: "rgba(239,68,68,0.08)", color: C.red, fontWeight: 800, fontSize: "0.66rem", cursor: "pointer", fontFamily: font }}>
+              🗑 Delete
+            </button>
+            <button onClick={clearTradeSelection} style={{ padding: "7px 14px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.64rem", cursor: "pointer", fontFamily: font }}>
+              Clear
+            </button>
+          </div>
+        )}
+        {/* Bulk-edit modal — only renders fields with non-empty values, leaves everything else untouched. */}
+        {bulkOpen && createPortal(
+          <div onClick={() => setBulkOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(0,0,0,0.66)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+            <div onClick={e => e.stopPropagation()} style={{ width: "min(540px, 96vw)", maxHeight: "88vh", overflowY: "auto", background: C.bg2, border: `1px solid ${C.borderGold}`, borderRadius: 18, boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
+              <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}` }}>
+                <Eyebrow>Trade Journal</Eyebrow>
+                <div style={{ fontWeight: 800, fontSize: "1.05rem", color: C.white }}>Bulk edit · {selectedTradeIds.size} trade{selectedTradeIds.size === 1 ? "" : "s"}</div>
+                <div style={{ fontSize: "0.62rem", color: C.muted, marginTop: 4, lineHeight: 1.55 }}>Leave a field empty to skip it. Only fields you fill are applied. R-Multiple recomputes per-trade when Original Stop or Trade Type changes.</div>
+              </div>
+              <div style={{ padding: "18px 24px", display: "grid", gap: 14 }}>
+                <div>
+                  <label style={{ display: "block", fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>Original Stop</label>
+                  <input type="text" inputMode="decimal" value={bulkDraft.stop} onChange={e => setBulkDraft(d => ({...d, stop: e.target.value.replace(/[^0-9.\-]/g, "")}))} placeholder="leave blank to skip — e.g. 190.50" style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", color: C.white, fontSize: "0.82rem", fontFamily: font, outline: "none" }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
+                  <div style={{ fontSize: "0.56rem", color: C.muted, marginTop: 4 }}>Applied to all selected trades. R-Multiple recomputes per-trade from each trade's own entry/exit.</div>
+                </div>
+                <div>
+                  <label style={{ display: "block", fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>Trade Type</label>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {["", "Long", "Short"].map(v => (
+                      <button key={v || "skip"} onClick={() => setBulkDraft(d => ({...d, tradeType: v}))} style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${bulkDraft.tradeType === v ? C.borderGold : C.border}`, background: bulkDraft.tradeType === v ? C.goldDim : "transparent", color: bulkDraft.tradeType === v ? C.gold : C.muted, fontWeight: 700, fontSize: "0.66rem", cursor: "pointer", fontFamily: font }}>{v || "Skip"}</button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label style={{ display: "block", fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>Setup</label>
+                    <select value={bulkDraft.setup} onChange={e => setBulkDraft(d => ({...d, setup: e.target.value}))} style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", color: bulkDraft.setup ? C.white : C.muted, fontSize: "0.78rem", fontFamily: font, outline: "none" }}>
+                      <option value="">— Skip —</option>
+                      {(setupTypes || []).map(s => <option key={s} value={s} style={{ background: C.bg2 }}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>Exit Reason</label>
+                    <select value={bulkDraft.reason} onChange={e => setBulkDraft(d => ({...d, reason: e.target.value}))} style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", color: bulkDraft.reason ? C.white : C.muted, fontSize: "0.78rem", fontFamily: font, outline: "none" }}>
+                      <option value="">— Skip —</option>
+                      {(exitReasons || []).map(r => <option key={r} value={r} style={{ background: C.bg2 }}>{r}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button onClick={() => setBulkOpen(false)} style={{ padding: "9px 18px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.7rem", cursor: "pointer", fontFamily: font }}>Cancel</button>
+                <button onClick={bulkApply} style={{ padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.72rem", cursor: "pointer", fontFamily: font }}>Apply to {selectedTradeIds.size}</button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.72rem" }}>
             <thead>
@@ -4166,6 +4277,14 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                 const tradeHeaderDefs = [["Symbol","ticker"],["Entry","entry"],["Time","entryTime"],["Exit","exit"],["Time","exitTime"],["Entry $","entryP"],["Exit $","exitP"],["Shares","shares"],["Setup","setup"],["Tags",null],["P/L %","plPct"],["P/L $","plDollar"],["R-Mult","rMult"],["Reason","reason"],["Notes",null],["Chart",null],["",null]];
                 return (
                   <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <th style={{ padding:"9px 6px 9px 12px", width:28, cursor:"pointer", textAlign:"center" }} title={visibleAllSelected ? "Clear visible selection" : "Select all visible"}>
+                      <input
+                        type="checkbox"
+                        checked={visibleAllSelected}
+                        onChange={() => { if (visibleAllSelected) clearTradeSelection(); else selectAllVisible(); }}
+                        style={{ accentColor: C.gold, cursor:"pointer", width:14, height:14 }}
+                      />
+                    </th>
                     {tradeDrag.order.map((ci, vi) => {
                       const [h, k] = tradeHeaderDefs[ci] || ["",""];
                       return <th key={`${h}-${ci}`} {...tradeDrag.dragProps(vi)} onClick={k ? (e) => { e.stopPropagation(); setTradeSorts(s => toggleSort(s, k, e.shiftKey)); } : undefined} style={{ padding:"9px 8px",textAlign:"left",fontWeight:700,fontSize:"0.52rem",letterSpacing:"0.10em",textTransform:"uppercase",color:tradeSorts.find(s=>s.key===k)?C.gold:C.muted,whiteSpace:"nowrap",cursor:"grab",userSelect:"none" }}>{h}{k ? sortArrow(tradeSorts, k) : ""}</th>;
@@ -4199,6 +4318,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                 if (isEditing) {
                   return (<React.Fragment key={t.id}>
                     <tr style={{ background: "rgba(201,152,42,0.04)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                      <td style={{ padding: "6px 6px", width: 28 }} />
                       <td style={{ padding: "6px 6px" }}><TickerInput value={editRow.ticker} onChange={v => setEditRow(r => ({...r, ticker: v}))} /></td>
                       <td style={{ padding: "6px 6px" }}><input type="text" value={editRow.entry} onChange={e => setEditRow(r => ({...r, entry: e.target.value}))} style={{width:70,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 7px",color:C.white,fontSize:"0.72rem",fontFamily:font,outline:"none"}} /></td>
                       <td style={{ padding: "6px 6px" }}><input type="text" value={editRow.entryTime||""} onChange={e => setEditRow(r => ({...r, entryTime: e.target.value}))} placeholder="HH:MM" style={{width:50,background:"rgba(255,255,255,0.03)",border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 5px",color:C.white,fontSize:"0.66rem",fontFamily:font,outline:"none",textAlign:"center"}} /></td>
@@ -4220,7 +4340,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     </tr>
                     {/* Expanded edit area: structured notes + chart URL + image upload */}
                     <tr style={{ background: "rgba(201,152,42,0.03)", borderBottom: `2px solid ${C.borderGold}` }}>
-                      <td colSpan={17} style={{ padding: "14px 16px" }}>
+                      <td colSpan={18} style={{ padding: "14px 16px" }}>
                         {/* ── TRADE MATH strip ── Trade Type + Original Stop + live Initial Risk & R-Multiple. The
                              journal table doesn't expose a Stop column, so before this strip an imported/keyed
                              trade had no way to record its original stop and therefore no R-multiple could be
@@ -4322,7 +4442,11 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   </React.Fragment>);
                 }
                 return (<React.Fragment key={t.id}>
-                  <DragTr order={tradeDrag.order} style={{ borderBottom: isGroup && !isLastInGroup ? "1px dashed rgba(201,152,42,0.20)" : "1px solid rgba(255,255,255,0.03)", cursor: "pointer", borderLeft: groupBorder }} onDoubleClick={() => startEdit(t)}>
+                  <DragTr order={tradeDrag.order} prefix={
+                    <td style={{ padding: "11px 6px 11px 12px", textAlign: "center", width: 28 }} onClick={(e) => { e.stopPropagation(); toggleSelectTrade(t.id); }}>
+                      <input type="checkbox" checked={selectedTradeIds.has(t.id)} onChange={() => toggleSelectTrade(t.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: C.gold, cursor: "pointer", width: 14, height: 14 }} />
+                    </td>
+                  } style={{ borderBottom: isGroup && !isLastInGroup ? "1px dashed rgba(201,152,42,0.20)" : "1px solid rgba(255,255,255,0.03)", cursor: "pointer", borderLeft: groupBorder, background: selectedTradeIds.has(t.id) ? "rgba(201,152,42,0.06)" : "transparent" }} onDoubleClick={() => startEdit(t)}>
                     <td style={{ padding: "11px 8px", fontWeight: 700, color: C.gold }}>{isGroup && !isFirstInGroup ? <span style={{color:C.muted,fontSize:"0.56rem"}}>↳</span> : null} <SourceDot source={t.source} />{t.ticker}{isGroup && isFirstInGroup ? <span style={{marginLeft:4,fontSize:"0.48rem",fontWeight:600,color:C.muted,verticalAlign:"middle"}}>({groupSize})</span> : null}</td>
                     <td style={{ padding: "11px 8px", color: C.text }}>{tradeDateISO(t.entry) || t.entry || "—"}</td>
                     <td style={{ padding: "11px 6px", color: C.muted, fontSize: "0.62rem" }}>{t.entryTime||"—"}</td>
@@ -4355,7 +4479,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   {/* Unified Chart + Review panel — live chart on top, editable trade review below */}
                   {expandedTrade === t.id && (
                     <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: `1px solid ${C.border}` }}>
-                      <td colSpan={17} style={{ padding: "14px 20px" }}>
+                      <td colSpan={18} style={{ padding: "14px 20px" }}>
                         {/* Live candlestick chart — timeframes · MAs · volume · drawing tools · stats panel */}
                         <TradeChart trade={t} />
                         {/* Editable Trade Review */}
@@ -4398,6 +4522,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                     const avgR = gTrades.reduce((s,tr) => s + (tr.rMult || 0), 0) / gTrades.length;
                     return (
                       <tr style={{ borderBottom:`2px solid ${C.gold}22`, borderLeft: groupBorder, background:"rgba(201,152,42,0.04)" }}>
+                        <td style={{ padding:"6px 6px 6px 12px", width:28, textAlign:"center" }} title="Select all in this group">
+                          <input type="checkbox" checked={groupTrades.every(gt => selectedTradeIds.has(gt.id))} onChange={(e) => { e.stopPropagation(); setSelectedTradeIds(prev => { const next = new Set(prev); const allSel = groupTrades.every(gt => next.has(gt.id)); groupTrades.forEach(gt => { if (allSel) next.delete(gt.id); else next.add(gt.id); }); return next; }); }} onClick={(e) => e.stopPropagation()} style={{ accentColor: C.gold, cursor: "pointer", width: 14, height: 14 }} />
+                        </td>
                         <td style={{ padding:"6px 8px", fontWeight:800, fontSize:"0.58rem", color:C.gold, letterSpacing:"0.06em" }}>COMBINED</td>
                         <td colSpan={6} />
                         <td style={{ padding:"6px 8px", fontWeight:700, fontSize:"0.68rem", color:C.text }}>{totalShares.toLocaleString()}</td>
