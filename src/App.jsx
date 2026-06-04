@@ -3089,6 +3089,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const [linkWizardOpen, setLinkWizardOpen] = useState(false);
   const [linkChoices, setLinkChoices] = useState({}); // { tradeId: positionId | "past" | "skip" }
   const [linkStatus, setLinkStatus] = useState("");
+  const [linkError, setLinkError] = useState(""); // surfaced error so silent DB failures (column missing, RLS, FK) don't make the wizard appear to succeed
   // Bulk-edit state — selection survives sort/filter changes (lives on trade id, not row index).
   const [selectedTradeIds, setSelectedTradeIds] = useState(() => new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -3720,29 +3721,61 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
 
   const linkApply = useCallback(async () => {
     if (!linkWizardData) return;
+    setLinkError("");
     setLinkStatus("applying");
-    // Update journal state first (instant feedback). DB write happens immediately after via per-row
-    // updates (cheaper than a bulk save which would touch unrelated rows).
+    // Build write plan first. We do NOT touch local state until each DB write is verified —
+    // previously, local state was updated optimistically and any silent DB failure (missing column,
+    // RLS denial, FK mismatch) left the user thinking they had linked when refresh would wipe it.
     const updates = linkWizardData.map(r => {
       const choice = linkChoices[r.t.id] ?? r.suggestion;
       const positionId = (choice === "past" || choice === "skip") ? null : choice;
       return { tradeId: r.t.id, positionId, skip: choice === "skip" };
     });
-    setJournaledTrades(prev => prev.map(t => {
-      const u = updates.find(x => x.tradeId === t.id);
-      if (!u || u.skip) return t;
-      return { ...t, positionId: u.positionId };
+    if (!session) {
+      setLinkStatus("");
+      setLinkError("You're signed out — refresh and try again.");
+      return;
+    }
+    const writes = updates.filter(u => !u.skip);
+    const confirmedUpdates = []; // only updates whose DB row came back with the expected position_id
+    const failures = []; // { tradeId, reason }
+    // Per-row write + verify. We .select("id, position_id") to read back what was actually stored —
+    // catches silent failures where the UPDATE technically succeeded but RLS filtered the row, the
+    // column doesn't exist, or a server-side trigger overrode the value.
+    await Promise.all(writes.map(async u => {
+      try {
+        const { data, error } = await supabase
+          .from("trades")
+          .update({ position_id: u.positionId })
+          .eq("id", u.tradeId)
+          .select("id, position_id");
+        if (error) { failures.push({ tradeId: u.tradeId, reason: error.message }); return; }
+        if (!data || data.length === 0) { failures.push({ tradeId: u.tradeId, reason: "row not found or RLS blocked the update" }); return; }
+        const stored = data[0].position_id;
+        // Normalize: both null = match; otherwise compare as strings (handles uuid vs bigint).
+        const want = u.positionId == null ? null : String(u.positionId);
+        const got = stored == null ? null : String(stored);
+        if (want !== got) { failures.push({ tradeId: u.tradeId, reason: `wrote ${want}, DB returned ${got} — column may be missing or wrong type` }); return; }
+        confirmedUpdates.push(u);
+      } catch (err) {
+        failures.push({ tradeId: u.tradeId, reason: err.message || "unknown error" });
+      }
     }));
-    // Persist to DB (one update per touched row; per-row try/catch so one failure doesn't abort)
-    if (session) {
-      const writes = updates.filter(u => !u.skip);
-      await Promise.all(writes.map(async u => {
-        const { error } = await supabase.from("trades").update({ position_id: u.positionId }).eq("id", u.tradeId);
-        if (error) console.error("Link wizard write error:", u.tradeId, error.message);
+    // Apply local state changes ONLY for confirmed writes — never let local diverge from DB.
+    if (confirmedUpdates.length > 0) {
+      setJournaledTrades(prev => prev.map(t => {
+        const u = confirmedUpdates.find(x => x.tradeId === t.id);
+        return u ? { ...t, positionId: u.positionId } : t;
       }));
     }
+    if (failures.length > 0) {
+      const sample = failures[0];
+      setLinkError(`${failures.length} of ${writes.length} link${writes.length === 1 ? "" : "s"} failed to save. First error: ${sample.reason}. Run the schema migration: alter table trades add column if not exists position_id bigint references positions(id) on delete set null; create index if not exists trades_position_id_idx on trades(position_id);`);
+      setLinkStatus("");
+      return;
+    }
     setLinkStatus("done");
-    setTimeout(() => { setLinkWizardOpen(false); setLinkStatus(""); }, 800);
+    setTimeout(() => { setLinkWizardOpen(false); setLinkStatus(""); setLinkError(""); }, 1100);
   }, [linkWizardData, linkChoices, session, setJournaledTrades]);
 
   const activeFilterLabel = filterSetup !== "All" || filterTag !== "All" ? ` (filtered: ${filtered.length}/${allTrades.length})` : "";
@@ -4370,11 +4403,17 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                 </>
               )}
             </div>
+            {linkError && (
+              <div style={{ padding: "10px 24px", borderTop: `1px solid rgba(239,68,68,0.25)`, background: "rgba(239,68,68,0.08)", color: C.red, fontSize: "0.68rem", lineHeight: 1.5, fontFamily: font, wordBreak: "break-word" }}>
+                <strong style={{ display: "block", marginBottom: 4 }}>Database write failed</strong>
+                {linkError}
+              </div>
+            )}
             <div style={{ padding: "14px 24px", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
-              <button onClick={() => setLinkWizardOpen(false)} disabled={linkStatus === "applying"} style={{ padding: "9px 18px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.7rem", cursor: "pointer", fontFamily: font }}>Cancel</button>
+              <button onClick={() => { setLinkWizardOpen(false); setLinkError(""); }} disabled={linkStatus === "applying"} style={{ padding: "9px 18px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontWeight: 700, fontSize: "0.7rem", cursor: "pointer", fontFamily: font }}>Cancel</button>
               {linkWizardData.length > 0 && (
                 <button onClick={linkApply} disabled={linkStatus === "applying"} style={{ padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: linkStatus === "done" ? "rgba(34,197,94,0.16)" : C.goldDim, color: linkStatus === "done" ? C.green : C.gold, fontWeight: 800, fontSize: "0.72rem", cursor: linkStatus === "applying" ? "wait" : "pointer", fontFamily: font }}>
-                  {linkStatus === "applying" ? "Applying…" : linkStatus === "done" ? "Done ✓" : `Apply links`}
+                  {linkStatus === "applying" ? "Applying…" : linkStatus === "done" ? "Done ✓" : (linkError ? "Retry" : `Apply links`)}
                 </button>
               )}
             </div>
@@ -6349,6 +6388,11 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
               </DragTr>
             </tbody>
           </table>
+        </div>
+        {/* Add-row tail — duplicate of the header's "+ Add Position" so users at the bottom of a long
+             positions list don't have to scroll back up. Same handler, identical behavior. */}
+        <div style={{ padding:"10px 22px 6px",display:"flex",justifyContent:"center" }}>
+          <button onClick={addPosition} title="Add a new position row at the bottom" style={{ padding:"7px 18px",borderRadius:980,border:`1px dashed ${C.borderGold}`,background:"transparent",color:C.gold,fontWeight:700,fontSize:"0.66rem",cursor:"pointer",fontFamily:font,letterSpacing:"0.04em",display:"flex",alignItems:"center",gap:6,transition:"background 0.15s" }} onMouseEnter={e => e.currentTarget.style.background = C.goldDim} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>+ Add Position</button>
         </div>
         {/* RTS Bar — green=free, red=at risk. Bar fills green as RTS approaches $0 */}
         <div style={{ padding:"14px 24px 18px",borderTop:`1px solid ${C.border}` }}>
