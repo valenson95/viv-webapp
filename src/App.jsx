@@ -5227,47 +5227,56 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
       linkedByPosId[t.positionId].push(t);
     });
 
+    // Pre-bucket open lots by ticker once — we use the count to decide whether Stage 2 can safely fire
+    // (only when there's exactly ONE open lot of a ticker, so attribution is unambiguous).
+    const openCountByTicker = {};
+    positions.forEach(p => {
+      const s = String(p.sym || "").trim().toUpperCase();
+      if (!s) return;
+      openCountByTicker[s] = (openCountByTicker[s] || 0) + 1;
+    });
+
     positions.forEach(p => {
       if (!p.sym) { map[p.id] = { pl: 0, shares: 0 }; return; }
       const posSym = String(p.sym).trim().toUpperCase();
-      const posKey = tradeDateISO(p.entry); // may be empty for IBKR Summary-level positions (openDate omitted)
+      const posEntryISO = tradeDateISO(p.entry); // may be empty for IBKR Summary-level positions (openDate omitted)
 
-      // STAGE 1 — explicitly linked trades for this position.
+      // STAGE 1 — explicitly linked trades for this position. Pure id match, no heuristics.
+      // This is the deterministic gold path: Sell button, IBKR sync, and the Link Trades wizard all
+      // write `position_id` here.
       const linkedMatches = linkedByPosId[p.id] || [];
 
-      // STAGE 2 — heuristic fallback ONLY for trades with no positionId set. Trades that are
-      // explicitly linked to a DIFFERENT position are excluded from this pool entirely.
-      const sameTicker = journaledTrades.filter(t =>
-        !t.positionId &&
-        String(t.ticker || "").trim().toUpperCase() === posSym
-      );
-
-      // MATCH RULE for unlinked trades — three branches, ordered:
+      // STAGE 2 — date-anchored fallback for trades with NO positionId. The rule is provably safe:
       //
-      //   1. Trade is CLEARLY a partial trim of this ticker (`ib_exec_id` set OR `reason === "Partial Trim"`):
-      //      attribute it. No date check. This is the rule that catches IBKR partials whose entry-date
-      //      has drifted from the position's current entry-date (IBKR FIFO shifts openDate after each
-      //      trim, leaving older imported partials stranded under a strict same-day rule). It also
-      //      catches user-typed partial trims even if their entry-date field doesn't perfectly match
-      //      the position. A "Partial Trim" labeled trade on a ticker you still hold open is, by
-      //      definition, a partial of that open lot — there's no other reasonable interpretation.
+      //   match if: trade.ticker === position.ticker
+      //        AND  trade.exit_date >= position.entry_date
+      //        AND  exactly ONE open lot of this ticker exists (no ambiguity)
       //
-      //   2. Same-day match (`tKey === posKey`): the normal Sell-button / same-day partial case.
+      // Why "exit_date >= position.entry_date" is bulletproof: a *past cycle* of the same ticker
+      // necessarily exited before you re-entered (you have to be flat to open a new lot), so its
+      // exit_date is strictly less than the current position's entry_date — automatically excluded.
+      // A *genuine partial* of the current lot was sold on or after the lot opened — automatically
+      // included. No tags required, no wizard required. The INOD/TEAM "past loss leaking in" bug
+      // and the MDB "same-day round-trip" bug both stay fixed.
       //
-      //   3. Position has NO entry date: take all same-ticker trades. Permissive fallback for legacy
-      //      rows; without an anchor date there's no way to filter.
+      // We also still honor the "Partial Trim" reason marker as an *override* — it forces inclusion
+      // even when the date heuristic would skip (used by IBKR partial imports whose openDate FIFO-
+      // drifts off the current position's entry day).
       //
-      // MDB-style bug (separate same-ticker round-trip on a later day getting attributed) stays fixed
-      // because a fully-closed round-trip with reasons like "Sold Into Strength" / "Hit Initial Stop"
-      // carries NEITHER marker, so it falls through to rule 2 (strict day) and gets excluded.
-      const heuristicMatches = sameTicker.filter(t => {
-        // Stage 2 — ONLY trades with the explicit "Partial Trim" marker count. No same-day fallback,
-        // no ticker-only catch. A closed round-trip on the same day as the current open lot's entry
-        // (which the previous same-day rule wrongly attributed) won't slip in here — it has no marker.
-        // Users with legacy data who want a trade attributed must either set reason="Partial Trim"
-        // on the row, or run the 🔗 Link Trades wizard to give it an explicit positionId.
-        return t.reason === "Partial Trim";
-      });
+      // If position.entry is missing, the date rule can't run safely — we only match explicit
+      // "Partial Trim" trades in that case.
+      const onlyOneLot = openCountByTicker[posSym] === 1;
+      const heuristicMatches = onlyOneLot ? journaledTrades.filter(t => {
+        if (t.positionId) return false; // already attributed via Stage 1 (this position OR another)
+        if (String(t.ticker || "").trim().toUpperCase() !== posSym) return false;
+        // Hard override: explicit "Partial Trim" marker is always a match for this lot
+        if (t.reason === "Partial Trim") return true;
+        // Date rule: trade's exit must be on/after this position's entry day
+        if (!posEntryISO) return false;
+        const tExitISO = tradeDateISO(t.exit);
+        if (!tExitISO) return false;
+        return tExitISO >= posEntryISO;
+      }) : [];
 
       const matches = [...linkedMatches, ...heuristicMatches];
       const pl = matches.reduce((sum, t) => sum + (t.plDollar || 0), 0);
