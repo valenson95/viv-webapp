@@ -523,6 +523,45 @@ const tradeDateISO = (d) => {
   return s;
 };
 
+// ── Trade-link mirror (localStorage) ──────────────────────────────────────────
+// The DB column `trades.position_id` is the canonical store, but if the schema migration hasn't
+// landed (or RLS/type-mismatch silently drops the UPDATE) the link is lost on refresh. To make the
+// linkage refresh-proof regardless of DB state, every write the Link Trades wizard makes is also
+// mirrored to localStorage. On every load we backfill `positionId` from this mirror when the DB
+// value is missing — so the user's linking work persists even when the DB write fails silently.
+//
+// Shape: { [tradeId]: positionId | "past" }  ("past" = explicitly excluded; null/missing = unlinked)
+const TRADE_LINKS_KEY = "viv-trade-links";
+const loadTradeLinks = () => {
+  try { return JSON.parse(localStorage.getItem(TRADE_LINKS_KEY) || "{}") || {}; }
+  catch { return {}; }
+};
+const saveTradeLinks = (updates) => {
+  // updates = [{ tradeId, positionId: <id|null|"past"> }]
+  try {
+    const cur = loadTradeLinks();
+    updates.forEach(u => {
+      const key = String(u.tradeId);
+      if (u.positionId == null) delete cur[key]; // null means "clear the link"
+      else cur[key] = u.positionId; // id or "past"
+    });
+    localStorage.setItem(TRADE_LINKS_KEY, JSON.stringify(cur));
+  } catch {}
+};
+// Apply the localStorage mirror to a freshly-loaded trades array. DB value wins when present;
+// otherwise the mirror fills in. "past" in the mirror becomes a sentinel string so the matcher's
+// `if (t.positionId)` check treats it as truthy (excluding the trade from the heuristic pool).
+const applyTradeLinks = (trades) => {
+  const links = loadTradeLinks();
+  if (!trades || trades.length === 0) return trades;
+  return trades.map(t => {
+    if (t.positionId != null) return t; // DB already has a value — trust it
+    const mirrored = links[String(t.id)];
+    if (mirrored == null) return t;
+    return { ...t, positionId: mirrored };
+  });
+};
+
 // Reconstruct closed round-trips (flat-to-flat per symbol) + open positions, then diff against current data.
 function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds, ignoreTickers) {
   // Per-user ignore list — tickers the user has marked default-skip in Settings. Rows still get
@@ -3723,59 +3762,56 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     if (!linkWizardData) return;
     setLinkError("");
     setLinkStatus("applying");
-    // Build write plan first. We do NOT touch local state until each DB write is verified —
-    // previously, local state was updated optimistically and any silent DB failure (missing column,
-    // RLS denial, FK mismatch) left the user thinking they had linked when refresh would wipe it.
+    // Build write plan first. Choices: a positionId (id), "past" (mirror sentinel — explicit exclude),
+    // or "skip" (no change). For DB writes we collapse "past" → null (we don't add an explicit
+    // past_cycle column); the localStorage mirror records "past" so the matcher honors the exclusion.
     const updates = linkWizardData.map(r => {
       const choice = linkChoices[r.t.id] ?? r.suggestion;
-      const positionId = (choice === "past" || choice === "skip") ? null : choice;
-      return { tradeId: r.t.id, positionId, skip: choice === "skip" };
+      let mirroredValue, dbValue, skip = false;
+      if (choice === "skip") { skip = true; mirroredValue = undefined; dbValue = undefined; }
+      else if (choice === "past") { mirroredValue = "past"; dbValue = null; }
+      else { mirroredValue = choice; dbValue = choice; }
+      return { tradeId: r.t.id, mirroredValue, dbValue, skip };
     });
-    if (!session) {
-      setLinkStatus("");
-      setLinkError("You're signed out — refresh and try again.");
-      return;
-    }
     const writes = updates.filter(u => !u.skip);
-    const confirmedUpdates = []; // only updates whose DB row came back with the expected position_id
-    const failures = []; // { tradeId, reason }
-    // Per-row write + verify. We .select("id, position_id") to read back what was actually stored —
-    // catches silent failures where the UPDATE technically succeeded but RLS filtered the row, the
-    // column doesn't exist, or a server-side trigger overrode the value.
-    await Promise.all(writes.map(async u => {
-      try {
-        const { data, error } = await supabase
-          .from("trades")
-          .update({ position_id: u.positionId })
-          .eq("id", u.tradeId)
-          .select("id, position_id");
-        if (error) { failures.push({ tradeId: u.tradeId, reason: error.message }); return; }
-        if (!data || data.length === 0) { failures.push({ tradeId: u.tradeId, reason: "row not found or RLS blocked the update" }); return; }
-        const stored = data[0].position_id;
-        // Normalize: both null = match; otherwise compare as strings (handles uuid vs bigint).
-        const want = u.positionId == null ? null : String(u.positionId);
-        const got = stored == null ? null : String(stored);
-        if (want !== got) { failures.push({ tradeId: u.tradeId, reason: `wrote ${want}, DB returned ${got} — column may be missing or wrong type` }); return; }
-        confirmedUpdates.push(u);
-      } catch (err) {
-        failures.push({ tradeId: u.tradeId, reason: err.message || "unknown error" });
-      }
+    // STEP 1 — mirror to localStorage IMMEDIATELY. This is the safety net: even if the DB write
+    // silently fails (missing column, RLS, type mismatch), this mirror survives refresh and the
+    // load mapper backfills `positionId` from it. Refresh-proof, no schema migration required.
+    saveTradeLinks(writes.map(u => ({ tradeId: u.tradeId, positionId: u.mirroredValue })));
+    // STEP 2 — update local state from the mirror values (so the matcher sees the link this render).
+    setJournaledTrades(prev => prev.map(t => {
+      const u = writes.find(x => x.tradeId === t.id);
+      return u ? { ...t, positionId: u.mirroredValue } : t;
     }));
-    // Apply local state changes ONLY for confirmed writes — never let local diverge from DB.
-    if (confirmedUpdates.length > 0) {
-      setJournaledTrades(prev => prev.map(t => {
-        const u = confirmedUpdates.find(x => x.tradeId === t.id);
-        return u ? { ...t, positionId: u.positionId } : t;
+    // STEP 3 — best-effort DB write. Surfaced errors are informational, not blocking — the link is
+    // already persisted via the mirror. If DB writes succeed, the canonical store stays in sync.
+    let failures = [];
+    if (session) {
+      await Promise.all(writes.map(async u => {
+        try {
+          const { data, error } = await supabase
+            .from("trades")
+            .update({ position_id: u.dbValue })
+            .eq("id", u.tradeId)
+            .select("id, position_id");
+          if (error) { failures.push({ tradeId: u.tradeId, reason: error.message }); return; }
+          if (!data || data.length === 0) { failures.push({ tradeId: u.tradeId, reason: "row not found / RLS blocked" }); return; }
+          const stored = data[0].position_id;
+          const want = u.dbValue == null ? null : String(u.dbValue);
+          const got = stored == null ? null : String(stored);
+          if (want !== got) failures.push({ tradeId: u.tradeId, reason: `wrote ${want}, DB returned ${got}` });
+        } catch (err) {
+          failures.push({ tradeId: u.tradeId, reason: err.message || "unknown error" });
+        }
       }));
     }
     if (failures.length > 0) {
+      // Informational — the local mirror has the link, so the wizard still completes successfully.
       const sample = failures[0];
-      setLinkError(`${failures.length} of ${writes.length} link${writes.length === 1 ? "" : "s"} failed to save. First error: ${sample.reason}. Run the schema migration: alter table trades add column if not exists position_id bigint references positions(id) on delete set null; create index if not exists trades_position_id_idx on trades(position_id);`);
-      setLinkStatus("");
-      return;
+      setLinkError(`Links saved locally on this device (${writes.length - failures.length}/${writes.length} also saved to your account). To sync the rest across devices, run this in Supabase SQL: alter table trades add column if not exists position_id bigint references positions(id) on delete set null; create index if not exists trades_position_id_idx on trades(position_id);  First DB error: ${sample.reason}`);
     }
     setLinkStatus("done");
-    setTimeout(() => { setLinkWizardOpen(false); setLinkStatus(""); setLinkError(""); }, 1100);
+    setTimeout(() => { setLinkWizardOpen(false); setLinkStatus(""); setLinkError(""); }, failures.length > 0 ? 2200 : 1100);
   }, [linkWizardData, linkChoices, session, setJournaledTrades]);
 
   const activeFilterLabel = filterSetup !== "All" || filterTag !== "All" ? ` (filtered: ${filtered.length}/${allTrades.length})` : "";
@@ -5170,14 +5206,22 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
         const { data: inserted, error } = await supabase.from("trades").insert([dbRow]).select("id");
         if (!error && inserted && inserted.length > 0) {
           // Use real DB id so it won't be re-inserted on next trade save
-          onJournalTrade({ ...tradeObj, id: inserted[0].id });
+          const realId = inserted[0].id;
+          // Mirror the auto-link to localStorage so the partial's Realized attribution survives refresh
+          // even if the DB doesn't actually have the position_id column yet.
+          saveTradeLinks([{ tradeId: realId, positionId: pos.id }]);
+          onJournalTrade({ ...tradeObj, id: realId });
         } else {
           console.error("Sell trade insert failed:", error?.message);
           // Fallback: add to state with temp id — manual save will pick it up
-          onJournalTrade({ ...tradeObj, id: Date.now() });
+          const tempId = Date.now();
+          saveTradeLinks([{ tradeId: tempId, positionId: pos.id }]);
+          onJournalTrade({ ...tradeObj, id: tempId });
         }
       } else {
-        onJournalTrade({ ...tradeObj, id: Date.now() });
+        const tempId = Date.now();
+        saveTradeLinks([{ tradeId: tempId, positionId: pos.id }]);
+        onJournalTrade({ ...tradeObj, id: tempId });
       }
     }
 
@@ -7905,7 +7949,7 @@ function AppInner() {
       ]);
       if (softDelsRes.data) setSoftDeletedExecIds(new Set(softDelsRes.data.map(r => r.ib_exec_id).filter(Boolean)));
       if (tradesRes.data) {
-        setJournaledTrades(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null })));
+        setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null }))));
       }
       if (posRes.data) {
         const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
@@ -8219,7 +8263,7 @@ function AppInner() {
       const { data: trades, error: tradesErr } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_deleted", false).order("created_at", { ascending: false });
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       if (trades && trades.length > 0) {
-        setJournaledTrades(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null })));
+        setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null }))));
         lastLoadedTradeCount.current = trades.length;
       }
       // Soft-deleted IBKR exec ids — small parallel query, just the column we need. Used by the matcher
