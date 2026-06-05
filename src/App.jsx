@@ -548,6 +548,20 @@ const saveTradeLinks = (updates) => {
     localStorage.setItem(TRADE_LINKS_KEY, JSON.stringify(cur));
   } catch {}
 };
+// Push the FULL localStorage mirror to user_settings.trade_links (durable cross-device store).
+// Async, best-effort, never throws. Call this after any saveTradeLinks() write so the server copy
+// stays current — without it, links die when localStorage gets evicted (Safari ITP) or the user
+// signs in on a different device.
+const syncTradeLinksToSupabase = (supabaseClient, userId) => {
+  if (!supabaseClient || !userId) return;
+  try {
+    const full = loadTradeLinks();
+    supabaseClient.from("user_settings").upsert(
+      { user_id: userId, setting_key: "trade_links", setting_value: full, updated_at: new Date().toISOString() },
+      { onConflict: "user_id,setting_key" }
+    ).then(({ error }) => { if (error) console.error("trade_links sync failed:", error.message); });
+  } catch {}
+};
 // Apply the localStorage mirror to a freshly-loaded trades array. DB value wins when present;
 // otherwise the mirror fills in. "past" in the mirror becomes a sentinel string so the matcher's
 // `if (t.positionId)` check treats it as truthy (excluding the trade from the heuristic pool).
@@ -3706,45 +3720,80 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
   const visibleAllSelected = filtered.length > 0 && filtered.every(t => selectedTradeIds.has(t.id));
 
   // ── LINK HISTORICAL TRADES — auto-suggest engine ──
-  // For each unlinked trade, suggest a `positionId` (link to that open lot) or "past" (mark as
-  // past-cycle / unlinked-on-purpose). Rules:
-  //   1. Trade reason === "Partial Trim" AND a single open lot of that ticker exists → link to that lot.
-  //   2. Trade entry day === open lot's entry day for that ticker → link.
-  //   3. No matching open lot of that ticker → default "past" (this catches INOD/TEAM-style losing
-  //      round-trips for tickers where the user no longer holds an open position).
-  //   4. Open lot exists but neither (1) nor (2) applies → default "past" (the safe choice — better
-  //      to under-attribute, the user can override per-row in the wizard).
+  // Shows EVERY closed trade for tickers you currently hold open, plus any unlinked trades whose
+  // ticker doesn't match a current lot. The previous version only showed `!t.positionId` trades,
+  // which hid:
+  //   - trades that earlier wizard runs marked "past" (couldn't reverse the decision)
+  //   - trades linked to a now-deleted position id (orphaned, no Realized credit)
+  //   - trades the localStorage mirror set to a stale id
+  // The user couldn't find or fix these via the wizard. Now we show ALL trades for live tickers
+  // with their current link state visible and editable.
   const linkWizardData = useMemo(() => {
     if (!linkWizardOpen || !journaledTrades) return null;
-    const unlinked = journaledTrades.filter(t => !t.positionId);
     const openByTicker = {};
+    const liveTickers = new Set();
+    const livePosIds = new Set();
     (positions || []).forEach(p => {
       const sym = String(p.sym || "").toUpperCase();
       if (!sym) return;
+      liveTickers.add(sym);
+      livePosIds.add(String(p.id));
       (openByTicker[sym] = openByTicker[sym] || []).push(p);
     });
-    const rows = unlinked.map(t => {
+    // Eligible rows:
+    //   (a) ticker has an open lot — always show so user can review/fix every closed trade on a held ticker
+    //   (b) ticker has NO open lot AND the trade is unlinked — show so user can mark them past explicitly
+    // We hide closed trades on tickers without open lots that are already linked (positionId truthy)
+    // because there's nothing actionable to do.
+    const eligible = journaledTrades.filter(t => {
+      const sym = String(t.ticker || "").toUpperCase();
+      if (liveTickers.has(sym)) return true;
+      return !t.positionId;
+    });
+    const rows = eligible.map(t => {
       const sym = String(t.ticker || "").toUpperCase();
       const lots = openByTicker[sym] || [];
-      let suggestion = "past";
-      if (lots.length === 1) {
-        const p = lots[0];
-        const sameDay = tradeDateISO(t.entry) === tradeDateISO(p.entry);
-        const isPartialTrim = t.reason === "Partial Trim";
-        if (isPartialTrim || sameDay) suggestion = p.id;
-      } else if (lots.length > 1) {
-        // Multi-lot: try same-day match. If exactly one matches, suggest it. Else past.
-        const matches = lots.filter(p => tradeDateISO(t.entry) === tradeDateISO(p.entry));
-        if (matches.length === 1) suggestion = matches[0].id;
+      // Determine current state:
+      //   "unlinked" — positionId null/missing
+      //   "past"     — explicitly excluded (sentinel string)
+      //   "linked"   — points to a position that still exists
+      //   "orphan"   — points to a position that's gone (closed/deleted)
+      let state = "unlinked";
+      if (t.positionId === "past") state = "past";
+      else if (t.positionId != null && t.positionId !== "") {
+        state = livePosIds.has(String(t.positionId)) ? "linked" : "orphan";
       }
-      return { t, lots, suggestion };
+      // Auto-suggest: keep current link if it's valid; otherwise propose
+      let suggestion;
+      if (state === "linked") suggestion = t.positionId;
+      else if (state === "past") suggestion = "past";
+      else {
+        // Propose based on tickers/dates
+        suggestion = "past"; // safe default
+        if (lots.length === 1) {
+          const p = lots[0];
+          const sameDay = tradeDateISO(t.entry) === tradeDateISO(p.entry);
+          const isPartialTrim = t.reason === "Partial Trim";
+          // Date-rule match: trade exit >= position entry → this trade is provably a partial of
+          // the current open lot (you'd have to be flat to re-open, so exit-before-entry = past cycle).
+          const exitAfterPosEntry = (() => {
+            const tExit = tradeDateISO(t.exit);
+            const pEntry = tradeDateISO(p.entry);
+            return tExit && pEntry && tExit >= pEntry;
+          })();
+          if (isPartialTrim || sameDay || exitAfterPosEntry) suggestion = p.id;
+        } else if (lots.length > 1) {
+          const matches = lots.filter(p => tradeDateISO(t.entry) === tradeDateISO(p.entry));
+          if (matches.length === 1) suggestion = matches[0].id;
+        }
+      }
+      return { t, lots, suggestion, state };
     });
-    // Sort: rows where a current open lot exists first (so the user sees actionable ones up top);
-    // within each group, by ticker.
+    // Sort: orphans first (need fixing), then unlinked actionable rows, then everything else by ticker.
     rows.sort((a, b) => {
-      const aHas = a.lots.length > 0 ? 0 : 1;
-      const bHas = b.lots.length > 0 ? 0 : 1;
-      if (aHas !== bHas) return aHas - bHas;
+      const rank = r => r.state === "orphan" ? 0 : r.state === "unlinked" && r.lots.length > 0 ? 1 : r.state === "linked" ? 2 : r.state === "past" ? 3 : 4;
+      const ra = rank(a), rb = rank(b);
+      if (ra !== rb) return ra - rb;
       return String(a.t.ticker || "").localeCompare(String(b.t.ticker || ""));
     });
     return rows;
@@ -3778,6 +3827,10 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
     // silently fails (missing column, RLS, type mismatch), this mirror survives refresh and the
     // load mapper backfills `positionId` from it. Refresh-proof, no schema migration required.
     saveTradeLinks(writes.map(u => ({ tradeId: u.tradeId, positionId: u.mirroredValue })));
+    // STEP 1b — durable cross-device store via user_settings.trade_links (JSON blob). The full
+    // localStorage object is upserted so this row IS the source of truth on a fresh device / cleared
+    // browser. Async — doesn't block the wizard. No schema migration: user_settings already exists.
+    if (session) syncTradeLinksToSupabase(supabase, session.user.id);
     // STEP 2 — update local state from the mirror values (so the matcher sees the link this render).
     setJournaledTrades(prev => prev.map(t => {
       const u = writes.find(x => x.tradeId === t.id);
@@ -4389,7 +4442,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
             <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
               <Eyebrow>Trade Journal</Eyebrow>
               <div style={{ fontWeight: 800, fontSize: "1.05rem", color: C.white }}>🔗 Link historical trades to open positions</div>
-              <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 6, lineHeight: 1.55 }}>One-time setup. Each row's <strong style={{ color: C.text }}>Link</strong> column shows the suggested attribution: <strong style={{ color: C.gold }}>→ open position</strong> means "this trade counts toward that position's Realized P/L", <strong style={{ color: C.text }}>Past cycle</strong> means "this trade is from a closed lot — don't attribute to any current open position." Override any row via the dropdown. Nothing writes until you click <strong style={{ color: C.gold }}>Apply</strong>.</div>
+              <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 6, lineHeight: 1.55 }}>Shows every closed trade on a ticker you currently hold open, plus any unlinked trade. The <strong style={{ color: C.text }}>State</strong> column shows where each trade stands: <strong style={{ color: C.green }}>Linked</strong>, <strong style={{ color: C.red }}>Orphan</strong> (link points to a closed/deleted position — needs fixing), <strong style={{ color: C.muted }}>Past</strong>, or <strong style={{ color: C.gold }}>Unlinked</strong>. Change any row's attribution via its dropdown. Nothing writes until you click <strong style={{ color: C.gold }}>Apply</strong>.</div>
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
               {linkWizardData.length === 0 ? (
@@ -4399,7 +4452,7 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
               ) : (
                 <>
                   <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(201,152,42,0.06)", border: `1px solid ${C.borderGold}`, fontSize: "0.66rem", color: C.text, lineHeight: 1.5 }}>
-                    <strong style={{ color: C.goldBright }}>{linkWizardData.length}</strong> unlinked trade{linkWizardData.length === 1 ? "" : "s"} · <strong style={{ color: C.green }}>{Object.values(linkChoices).filter(v => v && v !== "past" && v !== "skip").length}</strong> will link to an open position · <strong style={{ color: C.muted }}>{Object.values(linkChoices).filter(v => v === "past").length}</strong> will be marked past cycle
+                    <strong style={{ color: C.goldBright }}>{linkWizardData.length}</strong> trade{linkWizardData.length === 1 ? "" : "s"} eligible · <strong style={{ color: C.green }}>{Object.values(linkChoices).filter(v => v && v !== "past" && v !== "skip").length}</strong> will link to an open position · <strong style={{ color: C.muted }}>{Object.values(linkChoices).filter(v => v === "past").length}</strong> will be marked past cycle · <strong style={{ color: C.red }}>{linkWizardData.filter(r => r.state === "orphan").length}</strong> orphan{linkWizardData.filter(r => r.state === "orphan").length === 1 ? "" : "s"}
                   </div>
                   <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
                     <button onClick={() => { const all = {}; linkWizardData.forEach(r => { all[r.t.id] = r.suggestion; }); setLinkChoices(all); }} style={{ padding: "6px 14px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.62rem", cursor: "pointer", fontFamily: font }}>Accept all suggestions</button>
@@ -4408,14 +4461,20 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                   </div>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.66rem" }}>
                     <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                      {["Ticker","Entry","Exit","Shares","P/L %","Reason","Suggested Link"].map(h => (
+                      {["Ticker","Entry","Exit","Shares","P/L %","Reason","State","Set To"].map(h => (
                         <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontSize: "0.48rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, fontWeight: 700, whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr></thead>
                     <tbody>
-                      {linkWizardData.map(({ t, lots, suggestion }) => {
+                      {linkWizardData.map(({ t, lots, suggestion, state }) => {
                         const choice = linkChoices[t.id] ?? suggestion;
                         const isLink = choice !== "past" && choice !== "skip";
+                        const stateBadge = (() => {
+                          if (state === "linked") return { label: "Linked", bg: "rgba(34,197,94,0.14)", color: C.green, border: "rgba(34,197,94,0.32)" };
+                          if (state === "orphan") return { label: "Orphan", bg: "rgba(239,68,68,0.14)", color: C.red, border: "rgba(239,68,68,0.32)" };
+                          if (state === "past")   return { label: "Past",   bg: "rgba(255,255,255,0.04)", color: C.muted, border: C.border };
+                          return { label: "Unlinked", bg: "rgba(201,152,42,0.10)", color: C.gold, border: C.borderGold };
+                        })();
                         return (
                           <tr key={t.id} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, background: choice === "skip" ? "rgba(255,255,255,0.02)" : "transparent" }}>
                             <td style={{ padding: "7px 6px", color: C.gold, fontWeight: 700 }}>{t.ticker}</td>
@@ -4424,6 +4483,9 @@ function TradeJournalPage({ journaledTrades, setJournaledTrades, setupTypes, tag
                             <td style={{ padding: "7px 6px", color: C.text }}>{Number(t.shares).toLocaleString()}</td>
                             <td style={{ padding: "7px 6px", color: (Number(t.plPct) || 0) >= 0 ? C.green : C.red, fontWeight: 600 }}>{(Number(t.plPct) || 0).toFixed(2)}%</td>
                             <td style={{ padding: "7px 6px", color: C.muted }}>{t.reason || "—"}</td>
+                            <td style={{ padding: "7px 6px" }}>
+                              <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 980, background: stateBadge.bg, color: stateBadge.color, border: `1px solid ${stateBadge.border}`, fontSize: "0.54rem", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{stateBadge.label}</span>
+                            </td>
                             <td style={{ padding: "7px 6px" }}>
                               <select value={choice} onChange={e => setLinkChoices(prev => ({ ...prev, [t.id]: e.target.value === "past" || e.target.value === "skip" ? e.target.value : Number(e.target.value) || e.target.value }))} disabled={linkStatus === "applying"} style={{ background: isLink ? "rgba(34,197,94,0.10)" : "rgba(255,255,255,0.04)", color: C.text, border: `1px solid ${isLink ? "rgba(34,197,94,0.32)" : C.border}`, borderRadius: 7, padding: "4px 8px", fontSize: "0.64rem", fontFamily: font, outline: "none" }}>
                                 {lots.map(p => <option key={p.id} value={p.id} style={{ background: C.bg2 }}>→ {p.sym} (open · {tradeDateISO(p.entry) || "?"})</option>)}
@@ -5210,17 +5272,20 @@ function DashboardPage({ onJournalTrade, setupTypes, tags: allTags, exitReasons,
           // Mirror the auto-link to localStorage so the partial's Realized attribution survives refresh
           // even if the DB doesn't actually have the position_id column yet.
           saveTradeLinks([{ tradeId: realId, positionId: pos.id }]);
+          syncTradeLinksToSupabase(supabase, uid); // durable cross-device store
           onJournalTrade({ ...tradeObj, id: realId });
         } else {
           console.error("Sell trade insert failed:", error?.message);
           // Fallback: add to state with temp id — manual save will pick it up
           const tempId = Date.now();
           saveTradeLinks([{ tradeId: tempId, positionId: pos.id }]);
+          syncTradeLinksToSupabase(supabase, uid);
           onJournalTrade({ ...tradeObj, id: tempId });
         }
       } else {
         const tempId = Date.now();
         saveTradeLinks([{ tradeId: tempId, positionId: pos.id }]);
+        if (session) syncTradeLinksToSupabase(supabase, session.user.id);
         onJournalTrade({ ...tradeObj, id: tempId });
       }
     }
@@ -8183,6 +8248,27 @@ function AppInner() {
           if (s.setting_key === "tags" && Array.isArray(s.setting_value)) { setTags(s.setting_value); hasTags = true; }
           if (s.setting_key === "exit_reasons" && Array.isArray(s.setting_value)) { setExitReasons(s.setting_value); hasExit = true; }
           if (s.setting_key === "target_rote" && s.setting_value != null) setTargetRote(String(s.setting_value));
+          // Trade-link mirror — durable cross-device store. The wizard writes both here and to
+          // localStorage; on load we MERGE the server copy with whatever's already in localStorage
+          // (rather than overwrite) so a device whose links never made it to the server isn't wiped
+          // just because the server copy is older / smaller. Server values WIN per-key on conflict
+          // because the server is the cross-device truth — but unique device-only keys are preserved.
+          if (s.setting_key === "trade_links" && s.setting_value && typeof s.setting_value === "object") {
+            try {
+              const local = JSON.parse(localStorage.getItem(TRADE_LINKS_KEY) || "{}") || {};
+              const merged = { ...local, ...s.setting_value }; // server wins per-key
+              localStorage.setItem(TRADE_LINKS_KEY, JSON.stringify(merged));
+              // If local had keys the server didn't, push the merged result back so the server catches up.
+              const serverKeys = Object.keys(s.setting_value);
+              const localOnly = Object.keys(local).filter(k => !serverKeys.includes(k));
+              if (localOnly.length > 0) {
+                supabase.from("user_settings").upsert(
+                  { user_id: uid, setting_key: "trade_links", setting_value: merged, updated_at: new Date().toISOString() },
+                  { onConflict: "user_id,setting_key" }
+                ).then(({ error }) => { if (error) console.error("trade_links merge-back failed:", error.message); });
+              }
+            } catch {}
+          }
         });
       }
       // First time? Save defaults to DB so they persist — ONLY if settings loaded successfully (no error)
