@@ -2899,6 +2899,7 @@ return (
           <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
           <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
         </div>
+        <WhatsNew />
         <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
       </div>
 
@@ -8841,8 +8842,6 @@ const appBgCSS = `
 @keyframes vivFadeIn{from{opacity:0;}to{opacity:1;}}
 @keyframes vivScaleIn{from{opacity:0;transform:scale(0.97);}to{opacity:1;transform:scale(1);}}
 @keyframes vivSheen{0%{transform:translateX(-130%) skewX(-18deg);}100%{transform:translateX(240%) skewX(-18deg);}}
-/* Page / tab transition — confident ease-out reveal (snappy) */
-.viv-page-enter{animation:vivFadeUp 0.30s cubic-bezier(0.22,1,0.36,1) backwards;}
 /* Stat-tile entrance — staggered so a grid reveals as a wave (pairs with the count-up) */
 .viv-tile-enter{animation:vivFadeUp 0.38s cubic-bezier(0.22,1,0.36,1) both;will-change:transform,opacity;}
 .viv-tile-enter:nth-child(1){animation-delay:0.00s}
@@ -10027,7 +10026,7 @@ function AppInner() {
           <Wordmark size="0.88rem" style={{ lineHeight: 1 }} />
         </div>
         <AppBackground />
-        <div key={page} className="viv-page-enter" style={{ flex: 1, overflowY: "auto", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80, position: "relative", zIndex: 1 }}>{pageContent}</div>
+        <div style={{ flex: 1, overflowY: "auto", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80, position: "relative", zIndex: 1 }}>{pageContent}</div>
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(8,8,14,0.97)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
           {NAV.map(item => {
             const active = page === item.id;
@@ -10055,7 +10054,7 @@ function AppInner() {
       <div style={{ flex: 1, padding: `${contentPadV}px ${contentPadH}px`, overflowY: "auto", minWidth: 0, position: "relative" }}>
         {/* Animated background */}
         <AppBackground />
-        <div key={page} className="viv-page-enter" style={{ position:"relative",zIndex:1 }}>{pageContent}</div>
+        <div style={{ position:"relative",zIndex:1 }}>{pageContent}</div>
       </div>
     </div>
   );
