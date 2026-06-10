@@ -3743,9 +3743,6 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
     border:1px solid var(--borderGold); border-radius:12px; padding:10px 12px; font-size:0.72rem; font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--text); z-index:30; box-shadow:0 14px 40px rgba(0,0,0,0.55); line-height:1.45; white-space:pre-line}
 .vj .term.tipright:hover::after{left:auto; right:0}
-/* opens the tooltip upward — used where the term sits low in an overflow:hidden card (e.g. the edge projection),
-   so a downward (top:140%) tooltip would be clipped by the card's bottom edge */
-.vj .term.tipup:hover::after{top:auto; bottom:150%}
 .vj .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
 .vj .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.74rem;
     font-weight:700; padding:7px 16px; border-radius:980px; letter-spacing:0.02em; transition:all .15s}
@@ -5559,7 +5556,10 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             {dstats.n > 0 && <div style={{ marginTop: 14 }}><span className="streak" style={{ color: dstats.streakWin ? "#86efac" : "#fca5a5" }}>{(dstats.streakWin ? "▲ " : "▼ ") + dstats.streakN + "-trade " + (dstats.streakWin ? "win streak" : "losing streak")}</span></div>}
             {dstats.n > 0 && (
               <div className="edgeproj">
-                <div className="projlabel">{edgePos ? <span className="term tipup" data-tip={"How this is calculated\nYour average result per trade × 100 — what 100 trades at your current average would return. A projection from your logged trades, not a repeat of your all-time total."}>{projProvisional ? <>If this <b>early</b> edge holds — your next <b>100 trades</b></> : <>If this holds for your next <b>100 trades</b></>}</span> : <>Your next 100 trades — let's fix the edge first</>}</div>
+                {/* Uses <Abbr> (portal tooltip to document.body) instead of the .term CSS ::after tooltip:
+                    the edge card has overflow:hidden (clips ::after) AND .vj.expert .term kills the tooltip
+                    in Pro mode. The portal escapes both, so "How this is calculated" shows in Guided AND Pro. */}
+                <div className="projlabel">{edgePos ? <Abbr tip={<><strong style={{ color: C.goldBright }}>How this is calculated</strong><br />Your average result per trade × 100 — what 100 trades at your current average would return. A projection from your logged trades, not a repeat of your all-time total.</>}>{projProvisional ? <>If this <b>early</b> edge holds — your next <b>100 trades</b></> : <>If this holds for your next <b>100 trades</b></>}</Abbr> : <>Your next 100 trades — let's fix the edge first</>}</div>
                 {edgePos ? (
                   <>
                     {projProvisional && (
