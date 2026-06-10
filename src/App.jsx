@@ -212,23 +212,32 @@ function useDragReorder(length) {
 // Add new entries to the TOP of WHATS_NEW as features ship.
 const WHATS_NEW = [
   {
-    tag: "Fixed",
-    date: "June 2026",
-    title: "Imported CSV trades now save reliably",
+    tag: "Improved",
+    date: "June 10, 2026",
+    title: "Journal & tracker improvements",
     items: [
-      "Fixed a bug where trades brought in through Import CSV would show up in your Journal but disappear after a refresh or re-login. The import was only loading them on-screen and never storing them to your account.",
-      "Importing now saves straight to your account the moment it succeeds — both closed trades and any open positions in a full backup file — so they survive refresh, logout, and switching devices.",
-      "Note: any rows lost to this before today were never actually stored, so just re-import that CSV and they'll stick. A heads-up: imported trades default to Long — open any short and flip its direction in the trade editor.",
+      "Edit any trade — including its Long/Short direction — from one Edit Trade button in the trade review. You can now set direction on open positions too.",
+      "Click any Best Winner or Worst Loser to jump straight to that trade in Recent Trades, with a gold highlight.",
+      "Your Edge: a hover card explains how the next-100-trades projection is worked out, and small samples (under 30 trades) are flagged as an early read.",
+      "Nicer touches: an animated delete-trade confirmation, and a What's New button that glows for new updates and stops once you've opened it.",
     ],
   },
   {
     tag: "Fixed",
-    date: "June 2026",
+    date: "June 10, 2026",
+    title: "Imported CSV trades now save reliably",
+    items: [
+      "Trades imported via Import CSV used to vanish after a refresh — they now save to your account instantly and stay put.",
+      "Lost an import before today? Just re-import the CSV. (Imported trades default to Long — flip any shorts in the trade editor.)",
+    ],
+  },
+  {
+    tag: "Fixed",
+    date: "June 10, 2026",
     title: "Closed trades now save reliably",
     items: [
-      "Fixed a bug where a trade created by closing a position could disappear after you left and re-opened the app — even though it showed in your Journal and you'd hit Save. Closing a position now logs the trade reliably and it stays put.",
-      "Your realized P/L and the link between a closed trade and the position it came from are fully preserved — only the disappearing-on-refresh problem was fixed.",
-      "Note: any closed trades lost to this before today were never actually stored, so they'll need to be re-entered. Everything from here on is safe.",
+      "Closing a position from the Dashboard could make the trade disappear after a refresh — it now logs reliably and stays put.",
+      "Trades lost to this before today were never stored and need re-entering; everything from here on is safe.",
     ],
   },
   {
