@@ -249,20 +249,39 @@ const WHATS_NEW = [
     ],
   },
 ];
+// Newest changelog entry — the button glows until the user opens (reads) this update.
+const WHATS_NEW_LATEST_KEY = WHATS_NEW[0] ? `${WHATS_NEW[0].date}|${WHATS_NEW[0].title}` : "";
+const WHATS_NEW_CSS = `
+@keyframes wnGlow{0%,100%{box-shadow:0 0 0 0 rgba(240,192,80,0)}50%{box-shadow:0 0 16px 2px rgba(240,192,80,0.6)}}
+@keyframes wnOverlayIn{from{opacity:0}to{opacity:1}}
+@keyframes wnOverlayOut{from{opacity:1}to{opacity:0}}
+@keyframes wnCardIn{from{opacity:0; transform:translateY(16px) scale(0.96)}to{opacity:1; transform:none}}
+@keyframes wnCardOut{from{opacity:1; transform:none}to{opacity:0; transform:translateY(10px) scale(0.985)}}
+@media(prefers-reduced-motion:reduce){.viv-wn-glow,.viv-wn-overlay,.viv-wn-card{animation:none !important}}
+`;
 function WhatsNew() {
   const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [unread, setUnread] = useState(() => { try { return localStorage.getItem("viv-whatsnew-read") !== WHATS_NEW_LATEST_KEY; } catch { return true; } });
+  const openModal = () => {
+    setClosing(false); setOpen(true);
+    setUnread(false); // opening it = read → glow stops
+    try { localStorage.setItem("viv-whatsnew-read", WHATS_NEW_LATEST_KEY); } catch {}
+  };
+  const closeModal = () => { setClosing(true); setTimeout(() => { setOpen(false); setClosing(false); }, 210); }; // play exit, then unmount
   return (
     <>
-      <button onClick={() => setOpen(true)} title="What's New" style={{ marginLeft: 10, display: "inline-flex", alignItems: "center", gap: 6, background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer", whiteSpace: "nowrap" }}>✦ What's New</button>
+      <style dangerouslySetInnerHTML={{ __html: WHATS_NEW_CSS }} />
+      <button onClick={openModal} title={unread ? "What's New — new update available" : "What's New"} className={unread ? "viv-wn-glow" : ""} style={{ marginLeft: 10, display: "inline-flex", alignItems: "center", gap: 6, background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer", whiteSpace: "nowrap", animation: unread ? "wnGlow 1.8s ease-in-out infinite" : "none" }}>✦ What's New{unread && <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.goldBright, boxShadow: `0 0 8px ${C.goldBright}` }} />}</button>
       {open && (
-        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "6vh 16px", overflowY: "auto" }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: 580, maxWidth: "100%", background: C.bg2, border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "24px 28px 28px", boxShadow: "0 30px 80px rgba(0,0,0,0.6)", fontFamily: font }}>
+        <div onClick={closeModal} className="viv-wn-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "6vh 16px", overflowY: "auto", animation: (closing ? "wnOverlayOut" : "wnOverlayIn") + " 0.2s ease forwards" }}>
+          <div onClick={e => e.stopPropagation()} className="viv-wn-card" style={{ width: 580, maxWidth: "100%", background: C.bg2, border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "24px 28px 28px", boxShadow: "0 30px 80px rgba(0,0,0,0.6)", fontFamily: font, animation: (closing ? "wnCardOut 0.2s cubic-bezier(0.4,0,1,1)" : "wnCardIn 0.28s cubic-bezier(0.22,1,0.36,1)") + " forwards" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 18 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>What's New</div>
                 <div style={{ fontSize: "1.25rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white }}>Product updates</div>
               </div>
-              <button onClick={() => setOpen(false)} aria-label="Close" style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.5rem", lineHeight: 1, cursor: "pointer", padding: 2 }}>&times;</button>
+              <button onClick={closeModal} aria-label="Close" style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.5rem", lineHeight: 1, cursor: "pointer", padding: 2 }}>&times;</button>
             </div>
             {WHATS_NEW.map((e, i) => (
               <div key={i} style={{ paddingTop: i ? 18 : 0, marginTop: i ? 18 : 0, borderTop: i ? `1px solid ${C.border}` : "none" }}>
@@ -3849,6 +3868,13 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .varow .green{color:var(--green)}
 .vj .varow .red{color:var(--red)}
 .vj .vaempty{font-size:0.82rem; color:var(--muted); padding:14px 4px}
+/* VIV Analytics winners/losers are clickable — jump to the trade row in Recent trades */
+.vj .varow.clickable{cursor:pointer; transition:border-color .15s, transform .15s, background .15s}
+.vj .varow.clickable:hover{border-color:var(--borderGold); transform:translateX(2px); background:rgba(201,152,42,0.07)}
+/* gold flash on the jumped-to trade row — smooth fade from a gold wash back to normal */
+.vj .traderow.jumphl{animation:jumpFlash 1.9s cubic-bezier(0.22,1,0.36,1) both}
+@keyframes jumpFlash{0%{background:rgba(201,152,42,0.34); box-shadow:inset 3px 0 0 0 var(--goldBright), inset 0 0 0 1px var(--borderGold)} 55%{background:rgba(201,152,42,0.16); box-shadow:inset 3px 0 0 0 var(--goldBright), inset 0 0 0 1px transparent} 100%{background:transparent; box-shadow:inset 0 0 0 0 transparent}}
+@media(prefers-reduced-motion:reduce){.vj .traderow.jumphl{animation:none; background:rgba(201,152,42,0.16)} .vj .varow.clickable:hover{transform:none}}
 .vj .vaseg button{font-size:0.66rem; padding:6px 12px}
 .vj .edgediag{margin-top:16px; padding:14px 16px; background:rgba(239,68,68,0.07); border:1px solid rgba(239,68,68,0.28); border-radius:13px}
 .vj .edgediag .dq{font-size:0.88rem; line-height:1.55; color:var(--text); font-weight:600}
@@ -4211,6 +4237,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const [deletedTradeIds, setDeletedTradeIds] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [expandedTrade, setExpandedTrade] = useState(null); // for expanded view with chart + notes
+  const [highlightTradeId, setHighlightTradeId] = useState(null); // gold flash on a trade row jumped-to from VIV Analytics
   const [tradeSorts, setTradeSorts] = useState([]); // [{key, dir}] multi-sort for trades
   const [eqYAxis, setEqYAxis] = useState("$"); // "$" or "%"
   const [eqXAxis, setEqXAxis] = useState("trades"); // "trades" or "months"
@@ -4813,6 +4840,23 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     setDeleteStep(0);
     setClosingReview(false);
     setExpandedTrade(t.id);
+  };
+  // Jump from a VIV Analytics winner/loser to its row in Recent Trades: smooth-scroll the row into view,
+  // flash it gold, then expand its Review panel ("enter the trade") once the highlight has registered.
+  const jumpToTrade = (t) => {
+    setHighlightTradeId(t.id);
+    requestAnimationFrame(() => {
+      const el = document.getElementById("jtrade-" + t.id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    setTimeout(() => { setExpandedTrade(cur => {
+      if (cur === t.id) return cur; // already open
+      const n = parseNotes(t.notes);
+      setReviewDraft({ right: n.right || "", wrong: n.wrong || "", lessons: n.lessons || n._plain || "" });
+      setReviewSavedId(null); setDeleteStep(0); setClosingReview(false);
+      return t.id;
+    }); }, 420);
+    setTimeout(() => setHighlightTradeId(cur => (cur === t.id ? null : cur)), 2000);
   };
   const saveReview = (id) => {
     const serialized = serializeNotes({ right: reviewDraft.right, wrong: reviewDraft.wrong, lessons: reviewDraft.lessons });
@@ -5780,7 +5824,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           <div className={"card vacard reveal guide" + gactive("vaWin")} onMouseEnter={guideEnter("vaWin", "Best winners", "Your biggest winning trades in this window. Study what they had in common — these are the setups to size up.", "/audio/journal-analytics-winners.mp3")} onMouseLeave={guideLeave("vaWin")}>
             <div className="eyebrow" style={{ color: "var(--green)" }}>▲ Best winners</div>
             <div className="vatrades">{va.winners.length ? va.winners.map(t => (
-              <div key={t.id} className="varow win"><span className="vtk">{t.ticker}</span><span className="vsetup">{t.setup || "—"}</span><span className="vret green">{sgnPct(Number(t.plPct))}</span><span className="vpl green">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></div>
+              <div key={t.id} className="varow win clickable" title="Jump to this trade in Recent trades" onClick={() => jumpToTrade(t)}><span className="vtk">{t.ticker}</span><span className="vsetup">{t.setup || "—"}</span><span className="vret green">{sgnPct(Number(t.plPct))}</span><span className="vpl green">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></div>
             )) : <div className="vaempty">No winning trades in this view.</div>}</div>
           </div>
 
@@ -5788,7 +5832,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           <div className={"card vacard reveal guide" + gactive("vaLose")} onMouseEnter={guideEnter("vaLose", "Worst losers", "Your biggest losing trades in this window. Look for the shared mistake — that's the leak to plug.", "/audio/journal-analytics-losers.mp3")} onMouseLeave={guideLeave("vaLose")}>
             <div className="eyebrow" style={{ color: "var(--red)" }}>▼ Worst losers</div>
             <div className="vatrades">{va.losers.length ? va.losers.map(t => (
-              <div key={t.id} className="varow loss"><span className="vtk">{t.ticker}</span><span className="vsetup">{t.setup || "—"}</span><span className="vret red">{sgnPct(Number(t.plPct))}</span><span className="vpl red">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></div>
+              <div key={t.id} className="varow loss clickable" title="Jump to this trade in Recent trades" onClick={() => jumpToTrade(t)}><span className="vtk">{t.ticker}</span><span className="vsetup">{t.setup || "—"}</span><span className="vret red">{sgnPct(Number(t.plPct))}</span><span className="vpl red">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></div>
             )) : <div className="vaempty">No losing trades in this view — clean slate.</div>}</div>
           </div>
         </div>
@@ -5835,7 +5879,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 const isOpen = expandedTrade === t.id;
                 return (
                   <React.Fragment key={t.id}>
-                    <tr className={"traderow" + (isOpen ? " rev-open" : "")} onDoubleClick={() => startEdit(t)}>
+                    <tr id={"jtrade-" + t.id} className={"traderow" + (isOpen ? " rev-open" : "") + (highlightTradeId === t.id ? " jumphl" : "")} onDoubleClick={() => startEdit(t)}>
                       <td data-l="Result"><span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span></td>
                       <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}</span></td>
                       <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
