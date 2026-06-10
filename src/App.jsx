@@ -214,6 +214,16 @@ const WHATS_NEW = [
   {
     tag: "Fixed",
     date: "June 2026",
+    title: "Imported CSV trades now save reliably",
+    items: [
+      "Fixed a bug where trades brought in through Import CSV would show up in your Journal but disappear after a refresh or re-login. The import was only loading them on-screen and never storing them to your account.",
+      "Importing now saves straight to your account the moment it succeeds — both closed trades and any open positions in a full backup file — so they survive refresh, logout, and switching devices.",
+      "Note: any rows lost to this before today were never actually stored, so just re-import that CSV and they'll stick. A heads-up: imported trades default to Long — open any short and flip its direction in the trade editor.",
+    ],
+  },
+  {
+    tag: "Fixed",
+    date: "June 2026",
     title: "Closed trades now save reliably",
     items: [
       "Fixed a bug where a trade created by closing a position could disappear after you left and re-opened the app — even though it showed in your Journal and you'd hit Save. Closing a position now logs the trade reliably and it stays put.",
@@ -3733,6 +3743,9 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
     border:1px solid var(--borderGold); border-radius:12px; padding:10px 12px; font-size:0.72rem; font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--text); z-index:30; box-shadow:0 14px 40px rgba(0,0,0,0.55); line-height:1.45; white-space:pre-line}
 .vj .term.tipright:hover::after{left:auto; right:0}
+/* opens the tooltip upward — used where the term sits low in an overflow:hidden card (e.g. the edge projection),
+   so a downward (top:140%) tooltip would be clipped by the card's bottom edge */
+.vj .term.tipup:hover::after{top:auto; bottom:150%}
 .vj .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
 .vj .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.74rem;
     font-weight:700; padding:7px 16px; border-radius:980px; letter-spacing:0.02em; transition:all .15s}
@@ -4190,7 +4203,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .jtoolbar .btn{flex:1 1 auto}
   }`;
 
-function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName }) {
+function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName }) {
   const [filterSetup, setFilterSetup] = useState("All");
   const [filterTag, setFilterTag] = useState("All");
   const [editingId, setEditingId] = useState(null);
@@ -4415,6 +4428,8 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   // setTimeout fires after setJournaledTrades (state update hasn't rendered yet)
   const onManualSaveRef = useRef(onManualSave);
   useEffect(() => { onManualSaveRef.current = onManualSave; }, [onManualSave]);
+  const onSavePositionsRef = useRef(onSavePositions);
+  useEffect(() => { onSavePositionsRef.current = onSavePositions; }, [onSavePositions]);
 
   // Smoothly expand/collapse + scroll the full Distribution section.
   // Open: mount → next frame flip to 1fr (so the height transition has a 0fr starting frame) → smooth-scroll into view.
@@ -4458,6 +4473,10 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
         }
         if (count > 0) {
           setImportResult({ success: true, count, master: true, posCount: master.positions.length, tradeCount: master.trades.length });
+          // Persist immediately so imported rows survive a refresh (state-only would be lost). Mirrors the
+          // sell-close flow which also auto-saves after the action. Refs avoid stale closures post-setState.
+          if (master.trades.length > 0) setTimeout(() => onManualSaveRef.current && onManualSaveRef.current(), 80);
+          if (master.positions.length > 0) setTimeout(() => onSavePositionsRef.current && onSavePositionsRef.current(), 140);
         } else {
           setImportResult({ success: false, count: 0 });
         }
@@ -4467,6 +4486,8 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
         if (parsed.length > 0) {
           setJournaledTrades(prev => [...prev, ...parsed]);
           setImportResult({ success: true, count: parsed.length });
+          // Persist immediately — without this the imported trades live only in state and vanish on refresh.
+          setTimeout(() => onManualSaveRef.current && onManualSaveRef.current(), 80);
         } else {
           setImportResult({ success: false, count: 0 });
         }
@@ -5538,7 +5559,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             {dstats.n > 0 && <div style={{ marginTop: 14 }}><span className="streak" style={{ color: dstats.streakWin ? "#86efac" : "#fca5a5" }}>{(dstats.streakWin ? "▲ " : "▼ ") + dstats.streakN + "-trade " + (dstats.streakWin ? "win streak" : "losing streak")}</span></div>}
             {dstats.n > 0 && (
               <div className="edgeproj">
-                <div className="projlabel">{edgePos ? <span className="term" data-tip={"How this is calculated\nYour average result per trade × 100 — what 100 trades at your current average would return. A projection from your logged trades, not a repeat of your all-time total."}>{projProvisional ? <>If this <b>early</b> edge holds — your next <b>100 trades</b></> : <>If this holds for your next <b>100 trades</b></>}</span> : <>Your next 100 trades — let's fix the edge first</>}</div>
+                <div className="projlabel">{edgePos ? <span className="term tipup" data-tip={"How this is calculated\nYour average result per trade × 100 — what 100 trades at your current average would return. A projection from your logged trades, not a repeat of your all-time total."}>{projProvisional ? <>If this <b>early</b> edge holds — your next <b>100 trades</b></> : <>If this holds for your next <b>100 trades</b></>}</span> : <>Your next 100 trades — let's fix the edge first</>}</div>
                 {edgePos ? (
                   <>
                     {projProvisional && (
@@ -9938,7 +9959,7 @@ function AppInner() {
       )}
       {page === "dashboard" && <DashboardPage setPage={setPage} onLogout={handleLogout} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
       {page === "tools" && <PremiumToolsPage setPage={setPage} onLogout={handleLogout} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} displayName={displayName} />}
-      {page === "journal" && <TradeJournalPage setPage={setPage} onLogout={handleLogout} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} />}
+      {page === "journal" && <TradeJournalPage setPage={setPage} onLogout={handleLogout} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} />}
       {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
       <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />
