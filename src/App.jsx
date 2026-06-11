@@ -7017,6 +7017,10 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
     const tsN = parseFloat(p.trailStop)||0; // trailing stop (member-editable)
     const hasS1 = s1 > 0, hasS2 = s2 > 0, hasTS = tsN > 0;
     const isDual = hasS1 && hasS2; // only split 50/50 when BOTH stops are filled
+    // Direction sign: Long +1, Short -1. A Short profits as price falls and its stop sits ABOVE entry,
+    // so every entry/stop/current price difference below must be multiplied by `dir` to stay correct.
+    const isShort = (p.tradeType || "Long") === "Short";
+    const dir = isShort ? -1 : 1;
 
     // Original stops — locked, used for R calculations
     const stop1 = hasS1 ? s1 : 0;
@@ -7030,31 +7034,33 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
     const posValue = epN * sharesN;
     const tier = autoTier(posValue, sizer);
 
-    // DTS uses active stop (trail stop if set, otherwise weighted original)
-    const dtsD = hasTS ? (cpN - tsN) : (sharesN > 0 ? ((cpN - stop1) * h1 + (isDual ? (cpN - stop2) * h2 : 0)) / sharesN : 0);
+    // DTS uses active stop (trail stop if set, otherwise weighted original). dir-signed for Short.
+    const dtsD = hasTS ? dir * (cpN - tsN) : (sharesN > 0 ? dir * ((cpN - stop1) * h1 + (isDual ? (cpN - stop2) * h2 : 0)) / sharesN : 0);
     const dtsPct = cpN > 0 ? (dtsD / cpN) * 100 : 0;
 
-    // DTS total $ — uses active stop
-    const dtsTotalD = hasTS ? (cpN - tsN) * sharesN : ((cpN - stop1) * h1 + (isDual ? (cpN - stop2) * h2 : 0));
+    // DTS total $ — uses active stop. dir-signed for Short.
+    const dtsTotalD = hasTS ? dir * (cpN - tsN) * sharesN : dir * ((cpN - stop1) * h1 + (isDual ? (cpN - stop2) * h2 : 0));
 
-    // RTS uses active stop: risk from entry to active stop. Goal: $0 when stop ≥ entry.
-    const rtsD = hasTS ? (epN - tsN) * sharesN : ((epN - stop1) * h1 + (isDual ? (epN - stop2) * h2 : 0));
+    // RTS uses active stop: risk from entry to active stop. dir-signed so a Short at risk reads positive.
+    // Goal: $0 when the stop is at/beyond entry on the favorable side (Long stop ≥ entry, Short stop ≤ entry).
+    const rtsD = hasTS ? dir * (epN - tsN) * sharesN : dir * ((epN - stop1) * h1 + (isDual ? (epN - stop2) * h2 : 0));
 
     // SBE = shares to sell at current price so if remaining shares get stopped, net P/L = $0
     // Formula: X = N × (EP - avgStop) / (CP - avgStop), where avgStop is weighted across halves
     const avgStop = sharesN > 0 ? (stop1 * h1 + stop2 * h2) / sharesN : 0;
-    const canFinanceSBE = cpN > epN && cpN > avgStop && avgStop > 0;
+    // In profit when the favorable move is positive; stop must still sit on the risk side of entry.
+    // The (epN-avgStop)/(cpN-avgStop) ratio is sign-robust (both terms flip for a Short), so only the guard needs dir.
+    const canFinanceSBE = dir * (cpN - epN) > 0 && dir * (epN - avgStop) > 0 && avgStop > 0;
     const sbe = canFinanceSBE ? Math.ceil(sharesN * (epN - avgStop) / (cpN - avgStop)) : 0;
     const sbePct = canFinanceSBE && sharesN > 0 ? (sbe / sharesN) * 100 : 0;
 
-    // P/L (commission subtracted from dollar P/L) — Short inverts direction
-    const isShort = (p.tradeType || "Long") === "Short";
-    const rawPL = isShort ? (epN - cpN) * sharesN : (cpN - epN) * sharesN;
+    // P/L (commission subtracted from dollar P/L) — direction-aware via dir.
+    const rawPL = dir * (cpN - epN) * sharesN;
     const plD = rawPL - commN;
     const plPct = epN > 0 && sharesN > 0 ? (plD / (epN * sharesN)) * 100 : 0;
 
-    // R-Multiple uses weighted initial risk
-    const initRiskD = epN > 0 ? (epN - stop1) * h1 + (isDual ? (epN - stop2) * h2 : 0) : 0;
+    // R-Multiple uses weighted initial risk. dir-signed so Short initial risk (stop above entry) is positive.
+    const initRiskD = epN > 0 ? dir * ((epN - stop1) * h1 + (isDual ? (epN - stop2) * h2 : 0)) : 0;
     const initRiskPct = epN > 0 && sharesN > 0 ? initRiskD / (epN * sharesN) : 0;
     const rMult = initRiskPct > 0 ? (plPct / 100) / initRiskPct : 0;
 
@@ -7062,19 +7068,21 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
     const ps = +portfolioSize || 0;
     const roteD = initRiskD > 0 ? initRiskD : 0;
     const rotePct = ps > 0 ? (roteD / ps) * 100 : 0;
-    const currentRoteD = activeStop >= epN ? 0 : Math.max(0, (epN - activeStop) * sharesN);
+    const currentRiskPerShare = dir * (epN - activeStop); // >0 = still at risk, <=0 = risk-free / locked
+    const currentRoteD = currentRiskPerShare <= 0 ? 0 : currentRiskPerShare * sharesN;
     const currentRotePct = compEquity > 0 ? (currentRoteD / compEquity) * 100 : 0;
 
     // Risk-free exposure: use trail stop if set, otherwise original stops
+    // Risk-free when the stop is at/beyond entry on the favorable side: Long stop ≥ entry, Short stop ≤ entry.
     let riskFreePct = 0;
     if (epN > 0) {
       if (hasTS) {
-        riskFreePct = tsN >= epN ? 100 : 0;
+        riskFreePct = dir * (tsN - epN) >= 0 ? 100 : 0;
       } else if (isDual) {
-        const s1Free = stop1 >= epN, s2Free = stop2 >= epN;
+        const s1Free = dir * (stop1 - epN) >= 0, s2Free = dir * (stop2 - epN) >= 0;
         riskFreePct = (s1Free && s2Free) ? 100 : (s1Free || s2Free) ? 50 : 0;
       } else if (hasS1) {
-        riskFreePct = stop1 >= epN ? 100 : 0;
+        riskFreePct = dir * (stop1 - epN) >= 0 ? 100 : 0;
       }
     }
     const riskExposurePct = 100 - riskFreePct;
@@ -7089,18 +7097,20 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
     // R-based fields — ALWAYS use original stops for R calculation
     // R = initial risk per share (entry - weighted avg original stop)
     const rPerShare = epN > 0 && sharesN > 0 ? initRiskD / sharesN : 0;
-    // Current R-level (how many R's the stock has moved from entry)
-    const currentRLevel = rPerShare > 0 ? Math.floor((cpN - epN) / rPerShare) : 0;
+    // Favorable move per share (Long: price up; Short: price down) drives the R-ladder.
+    const favMove = dir * (cpN - epN);
+    // Current R-level (how many R's the trade has moved in your favor from entry)
+    const currentRLevel = rPerShare > 0 ? Math.floor(favMove / rPerShare) : 0;
     // R-multiple (continuous, not floored)
-    const rAchieved = rPerShare > 0 ? (cpN - epN) / rPerShare : 0;
-    // Suggested trailing stop: at each R-level, lock in (level - 1) R
+    const rAchieved = rPerShare > 0 ? favMove / rPerShare : 0;
+    // Suggested trailing stop: at each R-level, lock in (level - 1) R. dir moves the stop the favorable way.
     const rSuggestedStop = rPerShare > 0 && currentRLevel >= 1
-      ? epN + (currentRLevel - 1) * rPerShare
+      ? epN + dir * (currentRLevel - 1) * rPerShare
       : (hasS1 ? stop1 : 0);
-    // Locked profit per share at suggested stop
-    const rLockedProfit = rSuggestedStop > epN ? rSuggestedStop - epN : 0;
+    // Locked profit per share at suggested stop (favorable distance from entry)
+    const rLockedProfit = dir * (rSuggestedStop - epN) > 0 ? dir * (rSuggestedStop - epN) : 0;
     // Next R-target price
-    const rNextTarget = rPerShare > 0 ? epN + (Math.max(0, currentRLevel) + 1) * rPerShare : 0;
+    const rNextTarget = rPerShare > 0 ? epN + dir * (Math.max(0, currentRLevel) + 1) * rPerShare : 0;
     // DTS in R terms — uses active stop (trail stop if set)
     const dtsR = rPerShare > 0 ? dtsD / rPerShare : 0;
     // RTS in R terms
@@ -7161,9 +7171,8 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
     const currentEquity = ps + realizedPL;
     const currentRoteD = enriched.reduce((s,p) => {
       if (!p.epN || (!p.stop1 && !p.stop2)) return s;
-      const isRiskFree = p.activeStop >= p.epN;
-      if (isRiskFree) return s;
-      const risk = (p.epN - p.activeStop) * p.sharesN;
+      const d = (p.tradeType || "Long") === "Short" ? -1 : 1;
+      const risk = d * (p.epN - p.activeStop) * p.sharesN; // dir-signed; Math.max(0) drops risk-free positions
       return s + Math.max(0, risk);
     }, 0);
     const currentRotePct = currentEquity > 0 ? (currentRoteD / currentEquity) * 100 : 0;
@@ -7198,15 +7207,16 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
       const isDual = s1 > 0 && s2 > 0;
       const h1 = isDual ? Math.ceil(sharesN / 2) : sharesN;
       const h2 = isDual ? sharesN - h1 : 0;
-      const initRiskD = (epN - s1) * h1 + (isDual ? (epN - s2) * h2 : 0);
+      const dir = (p.tradeType || "Long") === "Short" ? -1 : 1; // Long +1, Short -1
+      const initRiskD = dir * ((epN - s1) * h1 + (isDual ? (epN - s2) * h2 : 0));
       const activeStop = tsN > 0 ? tsN : (isDual ? (s1 * h1 + s2 * h2) / (h1 + h2) : s1);
-      const currentRiskD = (epN - activeStop) * sharesN;
-      const isRiskFree = activeStop >= epN && epN > 0 && (s1 > 0 || s2 > 0);
+      const currentRiskD = dir * (epN - activeStop) * sharesN;
+      const isRiskFree = dir * (activeStop - epN) >= 0 && epN > 0 && (s1 > 0 || s2 > 0);
       const roteD = initRiskD > 0 ? initRiskD : 0;
       const rotePct = compEquity > 0 ? (roteD / compEquity) * 100 : 0;
       const currentRoteD = isRiskFree ? 0 : Math.max(0, currentRiskD);
       const currentRotePct = compEquity > 0 ? (currentRoteD / compEquity) * 100 : 0;
-      const unrealizedPL = (cpN - epN) * sharesN - commN;
+      const unrealizedPL = dir * (cpN - epN) * sharesN - commN;
       return { sym: p.sym, epN, cpN, sharesN, s1, s2, tsN, activeStop, initRiskD: roteD, initRotePct: rotePct, currentRiskD: currentRoteD, currentRotePct, isRiskFree, unrealizedPL, isDual };
     });
   }, [positions, compEquity]);
