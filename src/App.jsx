@@ -1149,9 +1149,9 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   Object.entries(byKey).forEach(([k, group]) => {
     if (group.length < 2) return;
     add("critical", "duplicates", "The same trade appears twice",
-      `You have ${group.length} trades with the same ticker, entry, exit, share count, and P/L. This usually means you saved or imported the same trade twice, which inflates your stats and skews your win rate.`,
+      `This exact trade is saved ${group.length} times — same ticker, dates, shares, and profit/loss. Counting it more than once makes your win rate and totals wrong.`,
       group.map(t => `${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${t.shares} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)} · source: ${t.source || "manual"}`),
-      "Go to Trade Journal, find the duplicate rows, and delete the extra one — or open Settings → IBKR Sync and use the one-click duplicate-cleanup at the top of the modal."
+      "Open your Trade Journal, find the identical rows, and delete all but one — keep the copy that has your notes."
     );
   });
 
@@ -1160,9 +1160,9 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   journaledTrades.forEach(t => {
     if (t.ibExecId && deletedSet.has(t.ibExecId)) {
       add("critical", "duplicates", "A deleted IBKR trade came back",
-        `A ${t.ticker} trade you previously deleted has reappeared in your live Journal. This usually happens when an edit accidentally un-deleted it, and leaving it as-is will mess up your performance metrics.`,
+        `A ${t.ticker} trade you deleted before has shown up again in your journal. Left as-is, it throws off your numbers.`,
         [`${t.ticker} · ${tradeDateISO(t.entry)} · ${t.shares} sh · source: ${t.source || "manual"}`],
-        "Open Trade Journal, search the ticker, and delete the trade again — or, if you actually want to keep it, note that the next IBKR sync will skip importing it."
+        "Open your Trade Journal, find this trade, and delete it again."
       );
     }
   });
@@ -1173,9 +1173,9 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   Object.values(byConid).forEach(group => {
     if (group.length < 2) return;
     add("critical", "duplicates", "Same IBKR position listed twice",
-      `${group.length} open positions in your Dashboard point to the same underlying IBKR position. The next sync will try to update both rows, which can double-count your exposure and risk.`,
+      `Two open positions point to the same IBKR holding, so your exposure is being counted twice.`,
       group.map(p => `${p.sym} · entry ${tradeDateISO(p.entry)} · ${p.shares} sh · source: ${p.source || "manual"}`),
-      "Go to the Open Positions table, decide which row is the real one, and archive the duplicate via Settings → IBKR Sync (auto-close flow) — or contact support if you're unsure which to keep."
+      "On the Dashboard, in Open Positions, delete the duplicate row — keep the one with your notes."
     );
   });
 
@@ -1198,10 +1198,10 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     claimedIds.add(manual.id);
     picked.forEach(i => claimedIds.add(elig[i].id));
     add("warn", "duplicates", "One manual trade matches several IBKR fills",
-      `A ${manual.ticker} trade you logged by hand (${manualShares} sh) adds up to the same shares as ${picked.length} IBKR-synced fill${picked.length === 1 ? "" : "s"} for the same ticker within a few days. The same trade is being counted twice — once manually, once from IBKR.`,
+      `A ${manual.ticker} trade you typed in by hand (${manualShares} sh) matches ${picked.length} IBKR fill${picked.length === 1 ? "" : "s"} for the same ticker. The trade is being counted twice.`,
       [`Manual: ${manual.ticker} · ${tradeDateISO(manual.entry)} → ${tradeDateISO(manual.exit)} · ${manualShares} sh · ${(Number(manual.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(manual.plDollar) || 0).toFixed(2)}${manual.rMult != null ? ` · ${Number(manual.rMult).toFixed(2)}R` : ""}`,
        ...picked.map(i => { const t = elig[i]; return `IBKR: ${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${Number(t.shares) || 0} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)}`; })],
-      "Open Settings → IBKR Sync — the duplicate-cleanup section has a one-click \"Keep manual, delete IBKR copies\" button for this exact case."
+      "In your Trade Journal, delete either the hand-typed trade or the IBKR copies — keep whichever has your notes."
     );
   });
 
@@ -1220,10 +1220,10 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     claimedIbkrIds.add(ibkr.id);
     picked.forEach(i => claimedIds.add(elig[i].id));
     add("warn", "duplicates", "One IBKR trade matches several manual trims",
-      `A single IBKR round-trip on ${ibkr.ticker} (${ibkrShares} sh) lines up with ${picked.length} smaller trades you logged manually (likely from using the Sell button). The same trade is being counted on both sides, distorting your trim history and totals.`,
+      `One IBKR trade on ${ibkr.ticker} (${ibkrShares} sh) is the same as ${picked.length} smaller trades you typed in by hand. The trade is being counted twice.`,
       [`IBKR: ${ibkr.ticker} · ${tradeDateISO(ibkr.entry)} → ${tradeDateISO(ibkr.exit)} · ${ibkrShares} sh · ${(Number(ibkr.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(ibkr.plDollar) || 0).toFixed(2)}`,
        ...picked.map(i => { const t = elig[i]; return `Manual: ${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${Number(t.shares) || 0} sh · ${(Number(t.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(t.plDollar) || 0).toFixed(2)}`; })],
-      "Open Trade Journal, compare the two sets side-by-side, and delete whichever set is missing your notes, R-multiple, and setup — keep the one with your judgment."
+      "In your Trade Journal, delete whichever set is missing your notes — keep the other."
     );
   });
 
@@ -1237,9 +1237,9 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     if (!Number.isFinite(shares) || shares <= 0) missing.push(`shares (${p.shares == null ? "null" : p.shares})`);
     if (!Number.isFinite(ep) || ep <= 0) missing.push(`entry price (${p.ep == null ? "null" : p.ep})`);
     if (missing.length) add("critical", "orphans", "This open position is missing key info",
-      `An open position is missing its ${missing.join(", ")}. Without these, the Position Sizer, exposure %, and risk numbers on your Dashboard can't be calculated correctly.`,
+      `An open position is missing its ${missing.join(", ")}. Without these, your position size, exposure, and risk numbers can't be worked out.`,
       [`${p.sym || "(no ticker)"} · entry ${tradeDateISO(p.entry) || "?"} · source: ${p.source || "manual"}`],
-      "Go to the Dashboard, click the row in the Open Positions table, fill in the blank field, and press Save."
+      "On the Dashboard, open this position and fill in the missing details — or delete the row if it isn't a real trade."
     );
   });
 
@@ -1250,18 +1250,18 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     const pct = Number(t.plPct) || 0;
     if (d && pct && Math.sign(d) !== Math.sign(pct)) {
       add("warn", "formulas", "Your dollar and percent P/L disagree",
-        `Your ${t.ticker} trade shows a ${d >= 0 ? "profit" : "loss"} in dollars but a ${pct >= 0 ? "profit" : "loss"} in percent. It's almost always a typo on one of the two fields and will throw off your win rate and equity curve.`,
+        `Your ${t.ticker} trade shows a ${d >= 0 ? "profit" : "loss"} in dollars but a ${pct >= 0 ? "profit" : "loss"} in percent — usually a typo in one of them.`,
         [`${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · $${d.toFixed(2)} · ${pct.toFixed(2)}%`],
-        "Open the trade in Trade Journal, re-enter the correct number, and press Save — Save will recalculate everything from entry, exit, and shares."
+        "Open the trade in your Trade Journal, fix the wrong number, and Save."
       );
     }
     if (t.tradeType && Number(t.entryP) && Number(t.exitP) && d) {
       const derived = t.tradeType === "Short" ? (Number(t.entryP) - Number(t.exitP)) : (Number(t.exitP) - Number(t.entryP));
       if (derived && Math.sign(d) !== Math.sign(derived)) {
         add("warn", "formulas", "Your P/L doesn't match the entry and exit",
-          `The profit or loss on your ${t.ticker} ${t.tradeType} trade doesn't match what the entry and exit prices say it should be. The most common cause is a long trade mislabeled as a short (or vice versa).`,
+          `The profit/loss on your ${t.ticker} ${t.tradeType} trade doesn't match its entry and exit prices — usually a Long trade marked as Short (or the reverse).`,
           [`${t.ticker} ${t.tradeType} · entry $${Number(t.entryP).toFixed(2)} → exit $${Number(t.exitP).toFixed(2)} · $${d.toFixed(2)}`],
-          "Open the trade in Trade Journal, check the direction (long or short), correct it, and press Save."
+          "Open the trade, check Long vs Short, fix it, and Save."
         );
       }
     }
@@ -1271,9 +1271,9 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   journaledTrades.forEach(t => {
     if (t.rMult != null && Number(t.rMult) !== 0 && (!t.stop || Number(t.stop) <= 0)) {
       add("info", "formulas", "This trade has an R-multiple but no stop loss",
-        `Your ${t.ticker} trade shows ${Number(t.rMult).toFixed(2)}R but no stop loss is recorded, so the R-multiple can't be verified. It's usually old data from before stops were tracked.`,
+        `Your ${t.ticker} trade shows ${Number(t.rMult).toFixed(2)}R but no stop, so the R can't be checked. Usually old data.`,
         [`${t.ticker} · ${tradeDateISO(t.entry)} · ${Number(t.rMult).toFixed(2)}R · stop: ${t.stop || "not set"}`],
-        "Open the trade in Trade Journal and either enter the stop loss you used at entry, or clear the R-multiple field — then Save."
+        "Open the trade and either add the stop you used, or clear the R — then Save."
       );
     }
   });
@@ -1289,9 +1289,9 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     const original = trimmed + remaining;
     if (original > 0 && trimmed > original * 1.001) {
       add("critical", "formulas", "You sold more shares than you owned",
-        `Your partial sells on ${p.sym} add up to ${trimmed} sh but you only have ${remaining} sh remaining. This almost always means one of your trims was logged twice.`,
+        `Your partial sells on ${p.sym} add up to ${trimmed} shares, but you only have ${remaining} left — usually one sell got logged twice.`,
         [`${p.sym} · entry ${tradeDateISO(p.entry)} · ${matches.length} matching trim${matches.length === 1 ? "" : "s"} · sold ${trimmed} sh · remaining ${remaining} sh`],
-        "Go to Trade Journal, search for the ticker, find two partial sells with the same entry day, and delete the duplicate."
+        "In your Trade Journal, find the repeated partial sell and delete it."
       );
     }
   });
@@ -1301,9 +1301,9 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   journaledTrades.forEach(t => {
     if ((t.source === "ibkr" || t.source === "reconciled") && !t.ibExecId) {
       add("critical", "ibkr", "IBKR trade is missing its fill ID",
-        `Your ${t.ticker} trade is marked as coming from IBKR but has no IBKR fill ID attached. The next sync won't recognize it and will import it again as a brand-new trade — creating a duplicate.`,
+        `This ${t.ticker} trade is marked as from IBKR but has no IBKR ID, so a future sync could add it again as a duplicate.`,
         [`${t.ticker} · ${tradeDateISO(t.entry)} → ${tradeDateISO(t.exit)} · ${t.shares} sh · source: ${t.source}`],
-        "Open the trade in Trade Journal and change its source to Manual — this gives up IBKR linking but prevents the duplicate on your next sync."
+        "Open the trade and change its source to Manual — keeps the trade, stops the duplicate."
       );
     }
   });
@@ -1312,9 +1312,9 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   positions.forEach(p => {
     if ((p.source === "ibkr" || p.source === "reconciled") && !p.ibConid) {
       add("critical", "ibkr", "IBKR position is missing its position ID",
-        `Your ${p.sym} open position is marked as coming from IBKR but has no IBKR position ID attached. The next sync won't be able to match it and will likely add a second copy.`,
+        `This ${p.sym} position is marked as from IBKR but has no IBKR ID, so a sync could add a second copy.`,
         [`${p.sym} · entry ${tradeDateISO(p.entry)} · ${p.shares} sh · source: ${p.source}`],
-        "Go to Settings → IBKR Sync and run a fresh sync to re-link the position — or open the row in the Open Positions table and change its source to Manual."
+        "On the Dashboard, open the position and change its source to Manual."
       );
     }
   });
@@ -1330,7 +1330,7 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
   if (staleCount) {
     add("info", "ibkr", "IBKR data hasn't refreshed recently",
       `${staleCount} IBKR-linked row${staleCount === 1 ? " hasn't" : "s haven't"} been refreshed in over 30 days. Your prices, fills, and commissions may be out of date.`,
-      [], "Click the Sync button on the Dashboard or in Settings → IBKR Sync to pull the latest data from IBKR."
+      [], "Auto-sync refreshes these in the background. If this persists, check Settings → Interactive Brokers sync is still connected and turned on."
     );
   }
 
@@ -1351,10 +1351,10 @@ function runIntegrityChecks({ journaledTrades = [], positions = [], softDeletedE
     );
     if (matchingClosed) {
       add("warn", "orphans", `Your ${p.sym} position may already be closed`,
-        `You have ${p.sym} open on the Dashboard, but your Trade Journal shows a completed ${p.sym} round-trip starting the same day. IBKR probably closed this position (stop hit, target hit, or full sell) but the manual row is still showing on your Dashboard.`,
+        `${p.sym} is still open on your Dashboard, but your journal shows a finished ${p.sym} trade from the same day — it may already be closed.`,
         [`Open on Dashboard: ${p.sym} · entry ${posEntryDay} · ${p.shares} sh${p.notes ? ` · has notes` : ""}`,
          `Closed in Journal: ${matchingClosed.ticker} · ${tradeDateISO(matchingClosed.entry)} → ${tradeDateISO(matchingClosed.exit)} · ${matchingClosed.shares} sh · ${(Number(matchingClosed.plDollar) || 0) >= 0 ? "+" : ""}$${(Number(matchingClosed.plDollar) || 0).toFixed(2)}`],
-        "Go to Open Positions, click ✕ on the manual row to remove it — your Trade Journal already has the real closed trade with the correct numbers from IBKR. Copy any notes you want to keep into the journal trade before removing."
+        "If it's really closed, remove the open row on the Dashboard — your journal already has the finished trade. (If you only sold part of it, leave it.)"
       );
     }
   });
@@ -4236,7 +4236,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .jtoolbar .btn{flex:1 1 auto}
   }`;
 
-function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName }) {
+function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit }) {
   const [filterSetup, setFilterSetup] = useState("All");
   const [filterTag, setFilterTag] = useState("All");
   const [editingId, setEditingId] = useState(null);
@@ -4878,6 +4878,14 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const saveEdit = () => {
     if (!editingId) return;
     const serializedNotes = serializeNotes(editNotes);
+    // IBKR-synced trade: the server owns the facts (entry/exit/price/shares/P&L). Persist only the
+    // annotations via the targeted single-row save — never the bulk writer (which skips ibkr rows).
+    const editedTrade = journaledTrades.find(t => t.id === editingId);
+    if (isIbkrMode && editedTrade?.source === "ibkr" && onIbkrTradeEdit) {
+      onIbkrTradeEdit(editingId, { stop: editRow.stop, setup: editRow.setup, reason: editRow.reason, tags: editRow.tags, notes: serializedNotes });
+      setEditingId(null);
+      return;
+    }
     setJournaledTrades(prev => prev.map(t => {
       if (t.id !== editingId) return t;
       const ep = parseFloat(editRow.entryP) || 0, xp = parseFloat(editRow.exitP) || 0, sh = parseFloat(editRow.shares) || 0, st = parseFloat(editRow.stop) || 0;
@@ -5474,8 +5482,18 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             </div>
           </div>
           <button className="btn" onClick={() => exportMasterCSV(positions, dateFiltered)} title="Download your closed trades as a CSV file">Export CSV</button>
-          <label className="btn" title="Import trades from a CSV file" style={{ cursor: "pointer" }}>Import CSV<input type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} /></label>
-          <button className="btn" onClick={() => setShowImportGuide(g => !g)} title="How to format your CSV">{showImportGuide ? "Hide guide" : "Import guide"}</button>
+          {/* Manual CSV import is hidden on IBKR auto-sync — synced users never hand-enter trades. */}
+          {!isIbkrMode && (
+            <>
+              <label className="btn" title="Import trades from a CSV file" style={{ cursor: "pointer" }}>Import CSV<input type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} /></label>
+              <button className="btn" onClick={() => setShowImportGuide(g => !g)} title="How to format your CSV">{showImportGuide ? "Hide guide" : "Import guide"}</button>
+            </>
+          )}
+          {isIbkrMode && (
+            <span className="conn yes" title={ibkrSyncInfo?.last_synced_at ? "Last synced " + new Date(ibkrSyncInfo.last_synced_at).toLocaleString() : "Trades flow in automatically from IBKR"} style={{ marginLeft: "auto" }}>
+              <span className="d"></span>Auto-syncing from IBKR{ibkrSyncInfo?.last_synced_at ? " · " + new Date(ibkrSyncInfo.last_synced_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+            </span>
+          )}
         </div>
 
         {/* Import result toast + guide (kept from the existing component) */}
@@ -5897,12 +5915,20 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
                       <td data-l="Exit date">{tradeDateISO(t.exit) || t.exit || "—"}</td>
                       <td data-l="Setup">{t.setup ? <span className="tag">{t.setup}</span> : "—"}</td>
-                      <td className="pro-only" data-l="Stop">{t.stop ? "$" + Number(t.stop).toFixed(2) : "—"}</td>
+                      <td className="pro-only" data-l="Stop">{
+                        (isIbkrMode && t.source === "ibkr" && t.needsStop && !t.stop)
+                          ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "3px 9px", fontSize: "0.66rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Needs stop</button>
+                          : (t.stop ? "$" + Number(t.stop).toFixed(2) : "—")
+                      }</td>
                       <td className="pro-only" data-l="Exit reason">{t.reason || "—"}</td>
                       <td className="pro-only" data-l="Hold">{holdLabel(t)}</td>
                       <td data-l="Return"><span className={plc}>{sgnPct(Number(t.plPct))}</span></td>
                       <td data-l="P/L"><span className={plc}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></td>
-                      <td data-l="R"><span className={(Number(t.rMult) || 0) >= 0 ? "pl up" : "pl dn"}>{t.rMult == null ? "—" : sgnR(Number(t.rMult))}</span></td>
+                      <td data-l="R">{
+                        (isIbkrMode && t.source === "ibkr" && t.needsStop && !t.stop)
+                          ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "2px 8px", fontSize: "0.62rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Add stop</button>
+                          : <span className={(Number(t.rMult) || 0) >= 0 ? "pl up" : "pl dn"}>{t.rMult == null ? "—" : sgnR(Number(t.rMult))}</span>
+                      }</td>
                       <td className="revcell" data-l=""><button className="revbtn" onClick={() => openReview(t)}>Review</button></td>
                     </tr>
                     {isOpen && (
@@ -5997,12 +6023,16 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             <div onClick={e => e.stopPropagation()} className="modalcard" style={{ maxWidth: 640 }}>
               <div className="modalhead"><div><div className="sech">Edit trade · {editRow.ticker}</div><div className="sub" style={{ marginTop: 4 }}>Update the factual details. R-Multiple recomputes from entry/exit and your stop.</div></div><button className="revclose" onClick={cancelEdit}>&times;</button></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {[["ticker", "Ticker", "text"], ["entry", "Entry date", "text"], ["exit", "Exit date", "text"], ["entryP", "Entry $", "number"], ["exitP", "Exit $", "number"], ["shares", "Shares", "number"], ["stop", "Stop", "number"]].map(([k, label, type]) => (
+                {[["ticker", "Ticker", "text"], ["entry", "Entry date", "text"], ["exit", "Exit date", "text"], ["entryP", "Entry $", "number"], ["exitP", "Exit $", "number"], ["shares", "Shares", "number"], ["stop", "Stop", "number"]].map(([k, label, type]) => {
+                  // IBKR-synced trade: facts come straight from your broker and are locked. Only the stop is yours to enter.
+                  const locked = editRow.source === "ibkr" && k !== "stop";
+                  return (
                   <div key={k}>
-                    <div className="label" style={{ marginBottom: 6 }}>{label}</div>
-                    <input type={type} value={editRow[k] ?? ""} onChange={e => setEditRow(r => ({ ...r, [k]: type === "number" ? (e.target.value === "" ? "" : +e.target.value) : e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none" }} />
+                    <div className="label" style={{ marginBottom: 6 }}>{label}{locked && <span style={{ color: "var(--muted)", fontWeight: 600 }}> · from IBKR</span>}</div>
+                    <input type={type} disabled={locked} value={editRow[k] ?? ""} onChange={e => setEditRow(r => ({ ...r, [k]: type === "number" ? (e.target.value === "" ? "" : +e.target.value) : e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none", opacity: locked ? 0.55 : 1, cursor: locked ? "not-allowed" : "text" }} />
                   </div>
-                ))}
+                  );
+                })}
                 <div>
                   <div className="label" style={{ marginBottom: 6 }}>Setup</div>
                   <select value={editRow.setup || ""} onChange={e => setEditRow(r => ({ ...r, setup: e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none" }}><option value="">—</option>{setupTypes.map(s => <option key={s} value={s}>{s}</option>)}</select>
@@ -7930,7 +7960,14 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs .memrow .jd{margin-left:0; width:100%}
   }`;
 
-function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session, onIbkrSync, onRunIntegrity, integrityReport, integrityRunning, intradayFeatureEnabled, onToggleIntradayFeature, intradayColumnAvailable, isMobile }) {
+function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session, onIbkrSync, onRunIntegrity, integrityReport, integrityRunning, intradayFeatureEnabled, onToggleIntradayFeature, intradayColumnAvailable, isMobile, isIbkrMode = false, ibkrSyncInfo = null, onSetSyncMode }) {
+  const [syncModeBusy, setSyncModeBusy] = useState(false);
+  const toggleSyncMode = async (mode) => {
+    if (!onSetSyncMode) return;
+    setSyncModeBusy(true);
+    await onSetSyncMode(mode);
+    setSyncModeBusy(false);
+  };
   const isAdmin = userEmail && userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [ibkrTutOpen, setIbkrTutOpen] = useState(false);
   const [ibkrQueryId, setIbkrQueryId] = useState("");
@@ -8198,34 +8235,14 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
         </div>
 
         {/* ===== INTERACTIVE BROKERS ===== */}
-        <div style={{ display: "none" }} className={"card guide" + gactive("ibkr")} onMouseEnter={guideEnter("ibkr", "Interactive Brokers", "Connect Interactive Brokers to pull your positions and closed trades automatically. You paste two things from your broker — a query ID and a read-only token. It can only read your statements, never trade or move money. Press play on the tutorial if it's your first time.", "/audio/settings-ibkr.mp3")} onMouseLeave={guideLeave("ibkr")}>
+        <div className={"card guide" + gactive("ibkr")} onMouseEnter={guideEnter("ibkr", "Interactive Brokers", "Connect Interactive Brokers to pull your positions and closed trades automatically. You paste two things from your broker — a query ID and a read-only token. It can only read your statements, never trade or move money. Press play on the tutorial if it's your first time.", "/audio/settings-ibkr.mp3")} onMouseLeave={guideLeave("ibkr")}>
           <div className="eyebrow">Auto-log your trades</div>
           <div className="cardtitle">Interactive Brokers sync</div>
           <div className="carddesc">Connect your IBKR account and your real positions and closed trades flow in automatically — so you barely have to type anything. <b>It only ever reads your statements; it can never trade or move money.</b></div>
 
-          <div className="alert caution" style={{ marginTop: 14 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v5M12 16h.01" /></svg><div><b>Do I need this?</b> It's optional but recommended. Without it you log trades by hand; with it, they appear automatically (about a day after they happen, closed on/after {IBKR_SYNC_FLOOR}). New to it? <b>Watch the 1-minute tutorial below.</b></div></div>
+          <div className="alert caution" style={{ marginTop: 14 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v5M12 16h.01" /></svg><div><b>Do I need this?</b> It's optional but recommended. Without it you log every trade by hand. With it, your closed trades from your start date forward are logged <b>automatically</b> — you just add your stop. <b>Read-only: it can never place trades or move money.</b> One-time setup below takes about 5 minutes.</div></div>
 
-          {/* tutorial video — static placeholder (no backend); real walkthrough is the written steps + voiceover */}
-          {!expert && (
-            <div className="tourwrap">
-              <div className="tour">
-                <div className="tourbg"></div>
-                <div className="tourstage">
-                  <div className="tourchip">Setup tutorial · IBKR</div>
-                  <div className="tourtitle">How to connect Interactive Brokers</div>
-                  <div className="tourcap">A one-time, ~5-minute setup. Hover this card for the voiceover, or follow the written steps below — every step, in order.</div>
-                  <div className="tourdots"><i className="on"></i><i></i><i></i><i></i><i></i><i></i></div>
-                </div>
-                <div className="tourbar">
-                  <span className="tourbtn" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg></span>
-                  <div className="tourprog"><div className="fill" style={{ width: "0%" }}></div></div>
-                  <div className="tourtime">0 / 6</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* connection */}
+          {/* one-time connection (Flex Query ID + read-only token — the auto-sync engine reads your statements with these) */}
           <div className="row" style={{ marginTop: 20 }}><span className="label">Your IBKR connection</span>
             {ibkrLoaded && <span className={"conn " + (ibkrConnected ? "yes" : "no")}><span className="d"></span>{ibkrConnected ? "Connected ✓" : "Not connected"}</span>}</div>
           <div className="grid2" style={{ marginTop: 12 }}>
@@ -8237,25 +8254,34 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <span className="hint" style={{ maxWidth: 420 }}>Stored privately on your own account. The token is read-only — it can pull statements but can't trade or move money.</span>
           </div>
 
-          {/* sync trigger */}
-          {onIbkrSync && (
-            <div className="row" style={{ marginTop: 16 }}>
-              <button className="btn gold" onClick={onIbkrSync}>⟳ Sync from IBKR</button>
-              <span className="hint" style={{ maxWidth: 420 }}>Pulls your positions and closed trades. You always see a preview first — manual entries are never overwritten.</span>
+          {/* auto-sync control — replaces the old manual "preview & reconcile" flow.
+              ON  → trades flow in automatically from your cutover date forward (existing history untouched).
+              OFF → manual entry. A user is on one mode or the other, never both. */}
+          {onSetSyncMode && (
+            <div style={{ marginTop: 18, padding: "14px 16px", borderRadius: 12, border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--text)" }}>
+                    {isIbkrMode ? "Auto-sync is ON" : "Auto-sync is OFF"}
+                    <span className={"conn " + (isIbkrMode ? "yes" : "no")} style={{ marginLeft: 10 }}><span className="d"></span>{isIbkrMode ? "Live" : "Manual entry"}</span>
+                  </div>
+                  <div className="hint" style={{ marginTop: 4, maxWidth: 460 }}>
+                    {isIbkrMode
+                      ? <>Closed trades from <b>{ibkrSyncInfo?.cutover_date || "your cutover date"}</b> forward are logged automatically, a few minutes after they close. {ibkrSyncInfo?.last_synced_at ? <>Last synced <b>{new Date(ibkrSyncInfo.last_synced_at).toLocaleString()}</b>.</> : "Waiting for your first closed trade."} R-multiple stays blank until you add your stop. Read-only; your existing history is never touched.</>
+                      : ibkrConnected
+                        ? <>Turn this on to auto-log your closed trades from <b>today</b> forward. You stop hand-entering trades; everything already in your journal stays exactly as it is.</>
+                        : <>Connect your IBKR account above first, then turn this on.</>}
+                  </div>
+                </div>
+                {isIbkrMode
+                  ? <button className="btn" disabled={syncModeBusy} onClick={() => toggleSyncMode("manual")} title="Stop auto-sync and return to manual entry">{syncModeBusy ? "…" : "Pause auto-sync"}</button>
+                  : <button className="btn gold" disabled={syncModeBusy || !ibkrConnected} onClick={() => toggleSyncMode("ibkr")} title={ibkrConnected ? "Start auto-sync from today" : "Connect your IBKR account first"}>{syncModeBusy ? "…" : "Turn on auto-sync"}</button>}
+              </div>
             </div>
           )}
 
-          {/* ignore tickers */}
-          <div className="row" style={{ marginTop: 22 }}><span className="label">Ignore tickers on sync</span>
-            {ibkrIgnoreList.length > 0 && <span className="conn yes"><span className="d"></span>{ibkrIgnoreList.length} ignored</span>}</div>
-          <div className="carddesc" style={{ marginTop: 6 }}>Tickers here are skipped automatically on every sync (they still show in the preview so you can override). Good for index hedges or account-only tickers you don't track in VIV.</div>
-          <div className="row" style={{ marginTop: 10, alignItems: "flex-end" }}>
-            <div className="field" style={{ flex: 1, minWidth: 240 }}><input className="in" value={ibkrIgnoreText} onChange={e => setIbkrIgnoreText(e.target.value)} placeholder="e.g. SPY, QQQ, VXX, SOXL" /></div>
-            <button className={"btn" + (ibkrIgnoreStatus === "saved" ? " ok" : "")} onClick={saveIbkrIgnore} disabled={ibkrIgnoreStatus === "saving"}>{ibkrIgnoreStatus === "saving" ? "Saving…" : ibkrIgnoreStatus === "saved" ? "Saved ✓" : ibkrIgnoreStatus === "error" ? "Failed" : "Save list"}</button>
-          </div>
-          {ibkrIgnoreList.length > 0 && (
-            <div className="chips">{ibkrIgnoreList.map(t => (<span key={t} className="chip">⊘ {t}</span>))}</div>
-          )}
+          {/* "Ignore tickers on sync" removed — it belonged to the old client-side preview/reconcile flow.
+              An auto-sync skip-list will be reintroduced server-side (in the ingest) when needed. */}
 
           {/* written steps */}
           <div className="expander">
@@ -8266,13 +8292,13 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
                 <div className="step"><span className="sn">Step 1 · Log in on a computer</span><b>Open the IBKR Client Portal</b><p>Go to interactivebrokers.com → Client Portal (web, not the app). Top menu: <b>Performance &amp; Reports → Flex Queries</b>.</p></div>
                 <div className="step"><span className="sn">Step 2 · Create the query</span><b>New Activity Flex Query</b><p>Click the blue <b>+</b> next to "Activity Flex Query". In <b>Query Name</b> type <code>VIV</code>.</p></div>
                 <div className="step"><span className="sn">Step 3 · Tick two sections</span><b>Open Positions &amp; Trades</b><p>Under <b>Open Positions</b> click <b>Select All</b>. Under <b>Trades</b> click <b>Select All</b>. Leave everything else unticked.</p></div>
-                <div className="step"><span className="sn">Step 4 · Delivery settings</span><b>XML, last 365 days</b><p>Format = <code>XML</code>, Period = <b>Last 365 Calendar Days</b>. (We only keep trades from <b>{IBKR_SYNC_FLOOR}</b> on, so nothing recent is missed.)</p></div>
+                <div className="step"><span className="sn">Step 4 · Delivery settings</span><b>XML, last 365 days</b><p>Format = <code>XML</code>, Period = <b>Last 365 Calendar Days</b>. (Auto-sync only logs trades from your start date forward, so older history won't flood your journal.)</p></div>
                 <div className="step"><span className="sn">Step 5 · General settings</span><b>Leave the defaults</b><p>Date <code>yyyyMMdd</code>, Time <code>HHmmss</code>, Separator <code>;</code>, all Yes/No = No. Click <b>Continue → Create</b>.</p></div>
                 <div className="step"><span className="sn">Step 6 · Copy the Query ID</span><b>Write down the number</b><p>The query now shows a <b>Query ID</b> on the list. Copy it.</p></div>
                 <div className="step"><span className="sn">Step 7 · Get a token</span><b>Flex Web Service</b><p>Find <b>Flex Web Service Configuration</b>, switch <b>Status</b> to <b>on</b>, click <b>Generate New Token</b> (longest expiry), and copy it. <span style={{ color: "var(--goldBright)" }}>Treat it like a password.</span></p></div>
-                <div className="step"><span className="sn">Step 8 · Paste &amp; save</span><b>Link your account</b><p>Paste the <b>Query ID</b> and <b>token</b> into the fields above and click <b>Save connection</b>. Done — privately linked to you. The <b>Sync</b> button now pulls your data.</p></div>
+                <div className="step"><span className="sn">Step 8 · Paste &amp; save</span><b>Link your account</b><p>Paste the <b>Query ID</b> and <b>token</b> into the fields above and click <b>Save connection</b>. Then click <b>Turn on auto-sync</b> just below. Done — privately linked to you.</p></div>
               </div>
-              <div className="alert ok" style={{ marginTop: 14 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6 9 17l-5-5" /></svg><div><b>Good to know:</b> trades appear about <b>1 business day</b> after they happen (log manually for same-day, then reconcile). Every sync shows a <b>preview first</b> and only adds/updates IBKR rows — it never edits or deletes your manual entries. The dot next to each ticker shows where it came from: <SourceDot source="manual" /> manual · <SourceDot source="ibkr" /> auto-synced.</div></div>
+              <div className="alert ok" style={{ marginTop: 14 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6 9 17l-5-5" /></svg><div><b>Good to know:</b> once auto-sync is on, each closed trade is logged <b>automatically</b> a few minutes after it closes — you never re-type it. The figures come straight from IBKR; you just add your <b>stop</b> (R-multiple stays blank until you do). It's <b>read-only</b> and only ever adds your own broker trades — it never edits or deletes anything else. The dot next to each ticker shows the source: <SourceDot source="manual" /> manual · <SourceDot source="ibkr" /> auto-synced.</div></div>
             </div>
           </div>
         </div>
@@ -8295,7 +8321,9 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
         </div>
 
         {/* ===== BETA FEATURES (preserved) ===== */}
-        {onToggleIntradayFeature && (
+        {/* "Intraday Activity" beta hidden — it belonged to the old manual-log-then-reconcile-with-IBKR flow,
+            which the new auto-sync (IBKR gives real fills directly) makes redundant. Toggle preserved in code. */}
+        {false && onToggleIntradayFeature && (
           <div className="card">
             <div className="eyebrow">Beta features</div>
             <div className="cardtitle">Features in test</div>
@@ -8971,6 +8999,12 @@ function AppInner() {
   // to soft-deleted rows too (the physical row stays), so without this we'd hit the constraint and the
   // sync UI shows ugly "duplicate key" errors. Tracked here so the matcher can classify them as "synced".
   const [softDeletedExecIds, setSoftDeletedExecIds] = useState(() => new Set());
+  // ─── IBKR auto-sync (Phase 1+: server-side cron writes trades; client just displays & annotates) ───
+  // A user is EITHER on IBKR auto-sync OR manual entry — never both. isIbkrMode flips the UI:
+  // manual add/import is hidden, the old reconcile/preview flow is retired, synced trades appear
+  // automatically and are editable only for stop/setup/tags/notes. Driven by the ibkr_sync_state row.
+  const [isIbkrMode, setIsIbkrMode] = useState(false);
+  const [ibkrSyncInfo, setIbkrSyncInfo] = useState(null); // { cutover_date, last_synced_at, sync_mode }
   // Whether the positions.intraday_log column has been added to the DB schema. Detected on first load
   // (by checking whether the field appears in a SELECT * result). If FALSE, the bulk Save and IBKR sync
   // writers MUST NOT include intraday_log in the row payload — Supabase would reject the whole insert
@@ -9375,7 +9409,7 @@ function AppInner() {
       ]);
       if (softDelsRes.data) setSoftDeletedExecIds(new Set(softDelsRes.data.map(r => r.ib_exec_id).filter(Boolean)));
       if (tradesRes.data) {
-        setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null }))));
+        setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null }))));
       }
       if (posRes.data) {
         const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
@@ -9714,13 +9748,26 @@ function AppInner() {
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       console.log(`[load] trades fetched: ${(trades || []).length}`);
       if (trades && trades.length > 0) {
-        setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null }))));
+        setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null }))));
         lastLoadedTradeCount.current = trades.length;
       }
       // Soft-deleted IBKR exec ids — small parallel query, just the column we need. Used by the matcher
       // to skip re-importing rows the unique constraint trades_user_ib_exec would block anyway.
       const { data: softDels } = await supabase.from("trades").select("ib_exec_id").eq("user_id", uid).eq("is_deleted", true).not("ib_exec_id", "is", null);
       if (softDels) setSoftDeletedExecIds(new Set(softDels.map(r => r.ib_exec_id).filter(Boolean)));
+
+      // ─── IBKR auto-sync mode ─── a user is on auto-sync when they have an ibkr_sync_state row with
+      // sync_mode='ibkr' and a cutover_date set. Table may not exist on older deploys → tolerate errors.
+      try {
+        const { data: sstate } = await supabase.from("ibkr_sync_state")
+          .select("cutover_date, last_synced_at, sync_mode").eq("user_id", uid).maybeSingle();
+        if (sstate) {
+          setIbkrSyncInfo(sstate);
+          setIsIbkrMode((sstate.sync_mode || "ibkr") === "ibkr" && !!sstate.cutover_date);
+        } else {
+          setIbkrSyncInfo(null); setIsIbkrMode(false);
+        }
+      } catch (e) { /* table absent on this deploy — stay in manual mode */ }
 
       // ─── Recover any emergency offline saves from localStorage ───
       try {
@@ -9909,7 +9956,10 @@ function AppInner() {
         // loses the trade. Omitting it means INSERTs default to null and UPDATEs leave the existing DB value
         // untouched. The position↔trade link lives in trade_links and is restored by applyTradeLinks().
       });
-      const newTrades = journaledTrades.filter(t => !existingIds.has(t.id));
+      // IBKR-sourced trades are owned by the server-side sync pipeline (ibkr-ingest). The client must
+      // NEVER bulk-insert/update them here — that's the old duplication/clobber bug. Their editable fields
+      // (stop/setup/tags/notes) are saved one row at a time via handleIbkrTradeEdit instead.
+      const newTrades = journaledTrades.filter(t => !existingIds.has(t.id) && t.source !== "ibkr");
       if (newTrades.length > 0) {
         const { data: inserted, error } = await supabase.from("trades").insert(newTrades.map(tradeRow)).select("id");
         if (!error && inserted && inserted.length === newTrades.length) {
@@ -9920,7 +9970,7 @@ function AppInner() {
           });
         }
       }
-      const editedTrades = journaledTrades.filter(t => existingIds.has(t.id));
+      const editedTrades = journaledTrades.filter(t => existingIds.has(t.id) && t.source !== "ibkr");
       if (editedTrades.length > 0) {
         // Use individual updates — upsert fails because trades.id is GENERATED ALWAYS
         const updateResults = await Promise.all(editedTrades.map(t =>
@@ -9952,6 +10002,63 @@ function AppInner() {
   const appZoom = (fontSize === "large" || fontSize === "huge") ? 1.15 : fontSize === "small" ? 0.88 : 1.0;  // "huge" retired — folds into "large" so old saved values aren't stuck on the broken zoom
 
   const handleJournalTrade = useCallback((trade) => { setJournaledTrades(prev => [...prev, trade]); }, []);
+
+  // ─── Targeted save for an IBKR-synced trade ───────────────────────────────────────────────
+  // Server owns the factual columns (entry/exit/price/shares/P&L). The user may only annotate:
+  // stop / setup / tags / notes / exit reason. Writing a stop locks the INITIAL risk (stop_locked_at),
+  // clears the needs_stop flag, and recomputes R from IBKR's own entry/exit. One row, by id — never bulk.
+  const handleIbkrTradeEdit = useCallback(async (id, patch) => {
+    if (!session) return;
+    const t = journaledTrades.find(x => x.id === id);
+    if (!t) return;
+    const upd = {};
+    if ("setup" in patch) upd.setup = patch.setup || "";
+    if ("tags" in patch) upd.tags = patch.tags || [];
+    if ("notes" in patch) upd.notes = patch.notes || "";
+    if ("reason" in patch) upd.exit_reason = patch.reason || "";
+
+    let rMult = t.rMult;
+    if ("stop" in patch) {
+      const st = parseFloat(patch.stop) || 0;
+      const ep = parseFloat(t.entryP) || 0, xp = parseFloat(t.exitP) || 0;
+      const isShort = (t.tradeType || "Long") === "Short";
+      const plPct = ep > 0 ? (isShort ? ((ep - xp) / ep) * 100 : ((xp - ep) / ep) * 100) : 0;
+      const initRisk = ep > 0 && st > 0 ? (isShort ? (st - ep) / ep : (ep - st) / ep) : 0;
+      rMult = initRisk > 0 ? +((plPct / 100) / initRisk).toFixed(2) : null;
+      upd.stop_price = st > 0 ? st : null;            // locked INITIAL stop → drives R, never overwritten by trailing
+      upd.current_stop_price = st > 0 ? st : null;    // display value (user trails this up later)
+      upd.r_mult = rMult;
+      upd.needs_stop = !(st > 0);                     // stop entered → clear the flag
+      if (st > 0 && !t.stopLockedAt) upd.stop_locked_at = new Date().toISOString();
+    }
+    // Optimistic local update
+    setJournaledTrades(prev => prev.map(x => x.id === id ? {
+      ...x,
+      ...("setup" in patch ? { setup: upd.setup } : {}),
+      ...("tags" in patch ? { tags: upd.tags } : {}),
+      ...("notes" in patch ? { notes: upd.notes } : {}),
+      ...("reason" in patch ? { reason: upd.exit_reason } : {}),
+      ...("stop" in patch ? { stop: upd.stop_price, currentStop: upd.current_stop_price, rMult, needsStop: upd.needs_stop, stopLockedAt: upd.stop_locked_at || x.stopLockedAt } : {}),
+    } : x));
+    const { error } = await supabase.from("trades").update(upd).eq("id", id).eq("user_id", session.user.id);
+    if (error) console.error("IBKR trade edit failed:", error.message);
+  }, [session, journaledTrades]);
+
+  // ─── Turn IBKR auto-sync on / off ─────────────────────────────────────────────────────────
+  // 'ibkr' → opt in with cutover = today (only fills from today forward; existing history untouched).
+  // 'manual' → pause auto-sync and go back to manual entry. Idempotent upsert on ibkr_sync_state.
+  const handleSetSyncMode = useCallback(async (mode) => {
+    if (!session) return false;
+    const uid = session.user.id;
+    const today = new Date().toISOString().slice(0, 10);
+    const cutover = ibkrSyncInfo?.cutover_date || today; // keep existing cutover; first time = today
+    const row = { user_id: uid, sync_mode: mode, cutover_date: cutover, updated_at: new Date().toISOString() };
+    const { error } = await supabase.from("ibkr_sync_state").upsert(row, { onConflict: "user_id" });
+    if (error) { console.error("Set sync mode failed:", error.message); return false; }
+    setIbkrSyncInfo(prev => ({ ...(prev || {}), sync_mode: mode, cutover_date: cutover }));
+    setIsIbkrMode(mode === "ibkr");
+    return true;
+  }, [session, ibkrSyncInfo]);
 
   // ─── Display Name (editable, saved to Supabase) ───
   const [displayNameState, setDisplayNameState] = useState("");
@@ -10021,8 +10128,8 @@ function AppInner() {
       )}
       {page === "dashboard" && <DashboardPage setPage={setPage} onLogout={handleLogout} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
       {page === "tools" && <PremiumToolsPage setPage={setPage} onLogout={handleLogout} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} displayName={displayName} />}
-      {page === "journal" && <TradeJournalPage setPage={setPage} onLogout={handleLogout} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} />}
-      {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} />}
+      {page === "journal" && <TradeJournalPage setPage={setPage} onLogout={handleLogout} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} />}
+      {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
       <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />
     </>

@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# local env (never commit secrets — Vercel holds the real ones)
+.env
+.env.*
+!.env.example
+
+# build output
+dist/
+.vercel/
+
+# os / editor
+.DS_Store
+*.log

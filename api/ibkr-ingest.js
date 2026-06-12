@@ -76,20 +76,40 @@ export default async function handler(req, res) {
 
   if (!rows.length) return res.status(200).json({ ok: true, ingested: 0, note: "nothing new on/after cutover" });
 
-  // RULE 1+2: upsert by (user_id, ib_exec_id). On conflict we only refresh fields that can
-  // legitimately arrive late from IBKR (commission, realised P&L). We DO NOT touch the user's
-  // stop_price, r_mult, notes, tags, setup, or needs_stop once the row exists → no clobbering,
-  // no deletes, no duplicates.
-  const { data, error } = await sb
-    .from("trades")
-    .upsert(rows, { onConflict: "user_id,ib_exec_id", ignoreDuplicates: false })
-    .select("id, ticker, ib_exec_id, stop_price, needs_stop");
+  // RULES 1+2+3 — done WITHOUT upsert, on purpose:
+  //   • upsert(onConflict) can't target the PARTIAL unique index (where ib_exec_id is not null)
+  //     → PostgREST throws "no unique or exclusion constraint matching the ON CONFLICT".
+  //   • upsert would also re-write needs_stop/r_mult on every re-sync → it would WIPE the stop
+  //     you locked in. We must never do that.
+  // So: find which exec_ids already exist, INSERT only the new ones, and for ones we've seen
+  // before refresh ONLY the figures IBKR can settle late (commission / realised P&L / exit).
+  // We NEVER touch stop_price, current_stop_price, stop_locked_at, needs_stop, r_mult, setup,
+  // tags, or notes once a row exists. The unique index stays as a race-condition backstop.
+  const execIds = rows.map(r => r.ib_exec_id);
+  const { data: existing, error: exErr } = await sb
+    .from("trades").select("ib_exec_id").eq("user_id", user_id).in("ib_exec_id", execIds);
+  if (exErr) return res.status(500).json({ ok: false, error: exErr.message });
+  const seen = new Set((existing || []).map(r => r.ib_exec_id));
 
-  if (error) return res.status(500).json({ ok: false, error: error.message });
+  const toInsert = rows.filter(r => !seen.has(r.ib_exec_id));
+  const toRefresh = rows.filter(r => seen.has(r.ib_exec_id));
 
-  // If any matched row already had a locked stop (e.g. re-sync of a trade you later stopped),
-  // recompute R for those — keeps R correct without ever overwriting the locked stop.
-  // (Mental-stop trades stay needs_stop=true until you enter the stop in the UI → Step 3/UI.)
+  let ingested = 0;
+  if (toInsert.length) {
+    const { data: ins, error: insErr } = await sb.from("trades").insert(toInsert).select("id");
+    // 23505 = a concurrent run inserted it first; the index did its job, so tolerate it.
+    if (insErr && insErr.code !== "23505") return res.status(500).json({ ok: false, error: insErr.message });
+    ingested = ins?.length ?? 0;
+  }
 
-  return res.status(200).json({ ok: true, ingested: data?.length ?? 0, fetchedAt: nowIso });
+  let refreshed = 0;
+  for (const r of toRefresh) {
+    const { error: upErr } = await sb.from("trades")
+      .update({ commission: r.commission, pl_dollar: r.pl_dollar, pl_pct: r.pl_pct,
+                exit_price: r.exit_price, exit_date: r.exit_date, exit_time: r.exit_time, ib_synced_at: nowIso })
+      .eq("user_id", user_id).eq("ib_exec_id", r.ib_exec_id);
+    if (!upErr) refreshed++;
+  }
+
+  return res.status(200).json({ ok: true, ingested, refreshed, fetchedAt: nowIso });
 }
