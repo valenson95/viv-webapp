@@ -56,30 +56,45 @@ async function pullFlex(token, queryId) {
 // or a dedicated <ClosedLot>. We map both; field names are documented so we can confirm
 // against your real statement once before going live.
 function toFills(xml) {
-  // Prefer explicit closed lots; fall back to closing Trades carrying realized P&L.
-  const lots = parseElements(xml, "ClosedLot");
-  const src = lots.length ? lots : parseElements(xml, "Trade").filter(a =>
-    (a.openCloseIndicator || a.openClose || "").includes("C") && a.fifoPnlRealized != null);
+  // VALIDATED against Valen's real Flex output (12 Jun 2026):
+  // CLOSED_LOT <Lot> records carry the entry date (openDateTime). Build a lookup keyed by
+  // symbol|closeDateTime|absQty so we can stamp each closing execution with its entry date.
+  const lots = parseElements(xml, "Lot").filter(a => (a.levelOfDetail || "") === "CLOSED_LOT");
+  const openByKey = {};
+  for (const l of lots) {
+    const key = `${l.symbol}|${l.dateTime || ""}|${Math.abs(Number(l.quantity) || 0)}`;
+    if (l.openDateTime && !openByKey[key]) openByKey[key] = l.openDateTime;
+  }
 
-  return src.map(a => {
-    const isLong = (Number(a.quantity) || 0) < 0 ? false : (a.buySell === "SELL" ? true : true); // closing side heuristic; refined on validation
-    const exit = ymd(a.dateTime || a.tradeDate);
+  // Round-trips = CLOSING executions. IBKR has ALREADY FIFO-matched them, so on each closing
+  // trade `cost` is the matched ENTRY basis and `proceeds` is the EXIT value — no guess-pairing.
+  const closing = parseElements(xml, "Trade").filter(a =>
+    (a.openCloseIndicator || "").includes("C") && a.fifoPnlRealized !== undefined && a.ibExecID);
+
+  return closing.map(a => {
+    const qty = Math.abs(Number(a.quantity) || 0);
+    const cost = Math.abs(Number(a.cost) || 0);          // IBKR-matched entry basis
+    const proceeds = Math.abs(Number(a.proceeds) || 0);  // exit value
+    const entry_price = qty ? +(cost / qty).toFixed(6) : null;
+    const exit_price = (qty && proceeds) ? +(proceeds / qty).toFixed(6) : (Number(a.tradePrice) || null);
+    const pl = Number(a.fifoPnlRealized);
+    const openDT = openByKey[`${a.symbol}|${a.dateTime || ""}|${qty}`] || "";
     return {
-      exec_id: a.ibExecID || a.tradeID || a.transactionID || `${a.conid}-${a.dateTime || a.tradeDate}`,
+      exec_id: a.ibExecID,                                 // unique → idempotency key
       trade_id: a.tradeID || null,
       ticker: a.symbol || "",
-      trade_type: (a.openPrice != null && a.cost != null) ? ((Number(a.proceeds) > 0) ? "Long" : "Short") : "Long",
-      entry_date: ymd(a.openDateTime) || exit,   // closed lots carry the open datetime
-      entry_time: hm(a.openDateTime),
-      exit_date: exit, exit_time: hm(a.dateTime),
-      entry_price: Number(a.openPrice ?? a.basis ?? 0) || null,
-      exit_price: Number(a.tradePrice ?? a.price ?? 0) || null,
-      shares: Math.abs(Number(a.quantity) || 0),
+      trade_type: a.buySell === "SELL" ? "Long" : "Short", // sell-to-close = was long
+      entry_date: ymd(openDT) || ymd(a.tradeDate),         // from the matched closed lot
+      entry_time: hm(openDT),
+      exit_date: ymd(a.tradeDate), exit_time: hm(a.dateTime),
+      entry_price,
+      exit_price,
+      shares: qty,
       commission: Math.abs(Number(a.ibCommission) || 0),
-      pl_dollar: Number(a.fifoPnlRealized) || null,
-      pl_pct: null, // computed in-app from entry/exit if desired
+      pl_dollar: Number.isFinite(pl) ? +pl.toFixed(2) : null,
+      pl_pct: (entry_price && qty) ? +((pl / (entry_price * qty)) * 100).toFixed(2) : null,
     };
-  }).filter(f => f.exec_id && f.ticker && f.exit_date);
+  }).filter(f => f.exec_id && f.ticker && f.exit_date && f.shares > 0);
 }
 
 export default async function handler(req, res) {
