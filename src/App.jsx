@@ -703,6 +703,53 @@ function deriveRMult(entryP, exitP, stop, tradeType, storedR) {
   return +(ret / risk).toFixed(2);
 }
 
+// Collapse a position's separate fill-rows into ONE logical trade for display & stats. IBKR splits one
+// order into many executions; without this, the trade count and win rate count fills, not trades.
+// Group key = ticker + direction + entry price within 0.3%. Raw fills are kept on `_fills` (audit +
+// detail view); nothing is deleted. Single-fill trades pass through unchanged.
+function groupPositionFills(rows) {
+  const num = (v) => { const n = parseFloat(v); return Number.isNaN(n) ? null : n; };
+  const merge = (fills) => {
+    if (fills.length === 1) return { ...fills[0], _fills: fills, _fillCount: 1 };
+    const sh = fills.reduce((s, f) => s + (num(f.shares) || 0), 0) || 1;
+    const wEntry = fills.reduce((s, f) => s + (num(f.entryP) || 0) * (num(f.shares) || 0), 0) / sh;
+    const wExit = fills.reduce((s, f) => s + (num(f.exitP) || 0) * (num(f.shares) || 0), 0) / sh;
+    const plDollar = fills.reduce((s, f) => s + (num(f.plDollar) || 0), 0);
+    const cost = wEntry * sh;
+    const stop = (fills.find(f => num(f.stop) > 0) || {}).stop ?? null;
+    const firstOf = (k) => { const f = fills.find(x => x[k] != null && x[k] !== ""); return f ? f[k] : (fills[0][k] ?? null); };
+    const exits = fills.map(f => f.exit).filter(Boolean).sort();
+    const entries = fills.map(f => f.entry).filter(Boolean).sort();
+    return {
+      ...fills[0],
+      id: Math.min(...fills.map(f => f.id)),
+      shares: sh, entryP: +wEntry.toFixed(4), exitP: +wExit.toFixed(4),
+      plDollar: +plDollar.toFixed(2), plPct: cost ? +((plDollar / cost) * 100).toFixed(2) : 0,
+      stop, rMult: deriveRMult(wEntry, wExit, stop, fills[0].tradeType, null),
+      entry: entries[0] || fills[0].entry, exit: exits[exits.length - 1] || fills[0].exit,
+      setup: firstOf("setup"), reason: firstOf("reason"), notes: firstOf("notes"),
+      tags: [...new Set(fills.flatMap(f => f.tags || []))],
+      aiReview: firstOf("aiReview"), rationale: firstOf("rationale"), thesisId: firstOf("thesisId"),
+      _fills: fills, _fillCount: fills.length,
+    };
+  };
+  const byTD = {};
+  rows.forEach(r => { const k = (r.ticker || "") + "|" + (r.tradeType || "Long"); (byTD[k] = byTD[k] || []).push(r); });
+  const out = [];
+  Object.values(byTD).forEach(group => {
+    const sorted = [...group].sort((a, b) => (num(a.entryP) || 0) - (num(b.entryP) || 0));
+    let cluster = [];
+    const flush = () => { if (cluster.length) { out.push(merge(cluster)); cluster = []; } };
+    sorted.forEach(r => {
+      const p = num(r.entryP) || 0, base = cluster.length ? (num(cluster[0].entryP) || 0) : 0;
+      if (cluster.length && base > 0 && Math.abs(p - base) / base > 0.003) flush();
+      cluster.push(r);
+    });
+    flush();
+  });
+  return out;
+}
+
 // Reconstruct closed round-trips (flat-to-flat per symbol) + open positions, then diff against current data.
 function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds, ignoreTickers) {
   // Per-user ignore list — tickers the user has marked default-skip in Settings. Rows still get
@@ -4673,7 +4720,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     }
   }, [distExpanded]);
 
-  const allTrades = useMemo(() => journaledTrades.filter(t => !deletedTradeIds.includes(t.id)), [journaledTrades, deletedTradeIds]);
+  const allTrades = useMemo(() => groupPositionFills(journaledTrades.filter(t => !deletedTradeIds.includes(t.id))), [journaledTrades, deletedTradeIds]);
 
   const handleImport = (e) => {
     const file = e.target.files?.[0];
@@ -6133,7 +6180,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   <React.Fragment key={t.id}>
                     <tr id={"jtrade-" + t.id} className={"traderow" + (isOpen ? " rev-open" : "") + (highlightTradeId === t.id ? " jumphl" : "")} onDoubleClick={() => startEdit(t)}>
                       <td data-l="Result"><span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span></td>
-                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}</span></td>
+                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}</span></td>
                       <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Exit $">${(Number(t.exitP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
