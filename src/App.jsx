@@ -3290,6 +3290,7 @@ function TradeChart({ trade }) {
   const [volOn, setVolOn] = useState(true);  // show volume pane + 50-period volume average
   const [legend, setLegend] = useState(null); // crosshair OHLC + MA readout
   const [best, setBest] = useState(null);    // peak favorable price between entry & exit (from candles)
+  const [tradeMarks, setTradeMarks] = useState(null); // entry/exit/stop anchors → candle-anchored overlay rays
   const [chartW, setChartW] = useState(600); // live chart pixel width (for full-width horizontal-line drawings)
   // ── Drawing layer (SVG overlay) ──
   const [tool, setTool] = useState("cursor"); // "cursor" | "trend" | "hline" | "text"
@@ -3334,7 +3335,7 @@ function TradeChart({ trade }) {
     const LWC = window.LightweightCharts;
     if (!LWC) { setStatus("nolib"); return; }
     let disposed = false, onResize = null;
-    setBest(null);
+    setBest(null); setTradeMarks(null);
 
     // Render the chart from a candle array (runs after fetch or straight from cache)
     const build = (candles) => {
@@ -3390,21 +3391,22 @@ function TradeChart({ trade }) {
           candles.forEach(c => { if (c.time >= lo && c.time <= hi && (!peak || (isShort ? c.low < peak.low : c.high > peak.high))) peak = c; });
           if (peak) setBest({ price: isShort ? peak.low : peak.high, time: peak.time });
         }
-        // ── Claude-review styling: E/P/S letter arrows + dotted horizontal rays (entry=orange · profit=green · stop=red) ──
+        // ── Claude-review styling: on-candle E/P/S arrows here; candle-anchored horizontal rays on the SVG overlay ──
         const REV = { entry: "#ff8c00", profit: "#1ed980", stop: "#ff1744" };
         const exitWin = isShort ? (exitP < entryP) : (exitP > entryP); // profit exit vs loss/stop exit
         const exitCol = exitWin ? REV.profit : REV.stop, exitLetter = exitWin ? "P" : "S";
         const markers = [];
-        if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: REV.entry, shape: "arrowUp", size: 2, text: `E  $${entryP}` });
+        if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: REV.entry, shape: "arrowUp", size: 2, text: "E" });
         if (peak && entryBar && exitBar && peak.time !== exitBar.time && peak.time !== entryBar.time) markers.push({ time: peak.time, position: isShort ? "belowBar" : "aboveBar", color: C.goldBright, shape: "circle", size: 1, text: "Peak" });
-        if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: exitCol, shape: "arrowDown", size: 2, text: `${exitLetter}  $${exitP}` });
+        if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: exitCol, shape: "arrowDown", size: 2, text: exitLetter });
         markers.sort((a, b) => a.time - b.time);
         s.setMarkers(markers);
-        // Horizontal rays — subtle dotted, matching the Claude review. (LWC price lines span the full width;
-        // entry=orange dotted · exit=green/red dotted · stop=red dashed.)
-        if (entryP > 0) s.createPriceLine({ price: entryP, color: REV.entry, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "Entry" });
-        if (exitP > 0) s.createPriceLine({ price: exitP, color: exitCol, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: exitWin ? "Profit" : "Exit" });
-        if (+trade.stop > 0) s.createPriceLine({ price: +trade.stop, color: REV.stop, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "Stop" });
+        // Candle-anchored rays drawn on the SVG overlay (start at the fill candle, extend right) — NOT full-width lines.
+        setTradeMarks({
+          entry: entryBar ? { t: entryBar.time, p: entryP, color: REV.entry, letter: "E", dashed: false } : null,
+          exit: exitBar ? { t: exitBar.time, p: exitP, color: exitCol, letter: exitLetter, dashed: false } : null,
+          stop: (+trade.stop > 0 && entryBar) ? { t: entryBar.time, p: +trade.stop, color: REV.stop, label: "Stop", dashed: true } : null,
+        });
 
         // ── Default view: focus on the trade; the deep history stays scrollable ──
         const tsc = chart.timeScale();
@@ -3611,6 +3613,21 @@ function TradeChart({ trade }) {
     return null;
   };
 
+  // Candle-anchored trade ray + badge (entry/exit/stop), projected like the drawings, re-pinned on pan/zoom
+  const renderTradeMark = (m, key) => {
+    if (!m) return null;
+    const x = timeToX(m.t), y = priceToY(m.p);
+    if (x == null || y == null) return null;
+    const pw = paneW(), xs = Math.max(0, x);
+    return (<g key={key} style={{ pointerEvents: "none" }}>
+      <line x1={xs} y1={y} x2={pw} y2={y} stroke={m.color} strokeWidth={1.4} strokeDasharray={m.dashed ? "7 4" : "2 4"} opacity={0.95} />
+      {m.letter && <><rect x={x - 9} y={y - 9} width={18} height={18} rx={4} fill={m.color} /><text x={x} y={y + 4} fill="#08080e" fontSize={11} fontWeight={800} textAnchor="middle" fontFamily={font}>{m.letter}</text></>}
+      {m.label && <text x={xs + 3} y={y - 5} fill={m.color} fontSize={9} fontWeight={700} fontFamily={font}>{m.label}</text>}
+      <rect x={pw - 54} y={y - 8} width={50} height={15} rx={3} fill={m.color} />
+      <text x={pw - 29} y={y + 3} fill="#08080e" fontSize={9} fontWeight={700} textAnchor="middle" fontFamily={font}>{m.p.toFixed(2)}</text>
+    </g>);
+  };
+
   return (
     <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
       {/* Toolbar — symbol · timeframe switcher · chart controls */}
@@ -3688,6 +3705,7 @@ function TradeChart({ trade }) {
             {status === "ok" && (
               <svg data-tick={overlayTick} width={chartW} height={CHART_H} style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}>
                 {drawings.map(renderDrawing)}
+                {tradeMarks && <>{renderTradeMark(tradeMarks.entry, "tm-e")}{renderTradeMark(tradeMarks.stop, "tm-s")}{renderTradeMark(tradeMarks.exit, "tm-x")}</>}
                 {draft && hoverPt && (tool === "trend" || tool === "rect") && (() => {
                   const x1 = timeToX(draft.time), y1 = priceToY(draft.price); if (x1 == null || y1 == null) return null;
                   if (tool === "rect") { const rx = Math.min(x1, hoverPt.x), ry = Math.min(y1, hoverPt.y), rw = Math.abs(hoverPt.x - x1), rh = Math.abs(hoverPt.y - y1); return <rect x={rx} y={ry} width={rw} height={rh} fill="rgba(240,192,80,0.08)" stroke={C.goldBright} strokeWidth={1} strokeDasharray="4 4" />; }
