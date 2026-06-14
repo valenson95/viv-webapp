@@ -4358,7 +4358,7 @@ function AiReviewBlock({ review }) {
           {d.note && <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 3, lineHeight: 1.45 }}>{d.note}</div>}
         </div>
       ))}
-      {[["Narrative fit", r.narrative_fit], ["Regime fit", r.regime_fit], ["Stop-loss critique", r.sl_critique]].map(([t2, v], i) => v ? (
+      {[["Your rationale check", r.rationale_check], ["Plan vs action", r.plan_vs_action], ["Narrative fit", r.narrative_fit], ["Regime fit", r.regime_fit], ["Stop-loss critique", r.sl_critique]].map(([t2, v], i) => v ? (
         <div key={i} style={{ marginTop: 10 }}>
           <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.goldBright, fontWeight: 700, marginBottom: 2 }}>{t2}</div>
           <div style={{ fontSize: "0.68rem", color: C.text, lineHeight: 1.5 }}>{v}</div>
@@ -4445,15 +4445,45 @@ function CoachHero({ data }) {
           ))}
         </Card>
       )}
+      {data.viz && (
+        <Card title={`Behavioral metrics${data.viz.tagged_count != null ? ` · ${data.viz.tagged_count} trades tagged` : ""}`}>
+          {[["Avg R by conviction", data.viz.conviction_calibration], ["Avg R by idea source", data.viz.idea_source]].map(([t2, arr]) => Array.isArray(arr) && arr.length ? (
+            <div key={t2} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.goldBright, fontWeight: 700, marginBottom: 7 }}>{t2}</div>
+              {arr.map((r, j) => { const v = Number(r.avg_r) || 0, w = Math.min(100, Math.abs(v) / 3 * 100); return (
+                <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, fontSize: "0.64rem" }}>
+                  <div style={{ width: 130, color: C.text }}>{r.label} <span style={{ color: C.muted }}>· {r.n}</span></div>
+                  <div style={{ flex: 1, position: "relative", height: 14, background: "rgba(255,255,255,0.04)", borderRadius: 3 }}>
+                    <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "rgba(255,255,255,0.15)" }} />
+                    <div style={{ position: "absolute", top: 2, bottom: 2, borderRadius: 2, ...(v >= 0 ? { left: "50%", width: (w / 2) + "%", background: C.green } : { right: "50%", width: (w / 2) + "%", background: C.red }) }} />
+                  </div>
+                  <div style={{ width: 48, textAlign: "right", color: v >= 0 ? C.green : C.red, fontWeight: 700 }}>{v >= 0 ? "+" : ""}{v.toFixed(2)}R</div>
+                </div>); })}
+            </div>
+          ) : null)}
+          {Array.isArray(data.viz.plan_adherence) && data.viz.plan_adherence.length > 0 && (
+            <div>
+              <div style={{ fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.goldBright, fontWeight: 700, marginBottom: 7 }}>Plan adherence</div>
+              {data.viz.plan_adherence.map((r, j) => (
+                <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.64rem", padding: "2px 0" }}><span style={{ color: C.text }}>{r.label}</span><b style={{ color: r.good ? C.green : C.red }}>{r.n}</b></div>
+              ))}
+            </div>
+          )}
+          {data.viz.note && <div style={{ fontSize: "0.58rem", color: C.muted, marginTop: 8, fontStyle: "italic" }}>{data.viz.note}</div>}
+        </Card>
+      )}
       {Array.isArray(data.open_runners) && data.open_runners.length > 0 && (
         <Card title="Open runners — live read">
           {data.open_runners.map((p, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "5px 0", borderBottom: i < data.open_runners.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.66rem" }}>
-              <div style={{ width: 48 }}><b>{p.ticker}</b></div>
-              <div style={{ width: 54, color: (p.upl_pct || 0) >= 0 ? C.green : C.red }}>{p.upl_pct}%</div>
-              <div style={{ width: 62, color: C.muted }}>{p.stop || "—"}</div>
-              <div style={{ width: 66 }}><span style={{ fontSize: "0.5rem", fontWeight: 700, textTransform: "uppercase", padding: "2px 7px", borderRadius: 20, border: `1px solid ${vcol(p.status)}`, color: vcol(p.status) }}>{p.status}</span></div>
-              <div style={{ flex: 1, color: C.muted, fontSize: "0.6rem", lineHeight: 1.4 }}>{(p.flags || []).join(" · ") || "ok"}</div>
+            <div key={i} style={{ padding: "8px 0", borderBottom: i < data.open_runners.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "0.66rem" }}>
+                <div style={{ width: 48 }}><b>{p.ticker}</b></div>
+                <div style={{ width: 54, color: (p.upl_pct || 0) >= 0 ? C.green : C.red }}>{p.upl_pct}%</div>
+                <div style={{ width: 62, color: C.muted }}>{p.stop || "—"}</div>
+                <div style={{ width: 66 }}><span style={{ fontSize: "0.5rem", fontWeight: 700, textTransform: "uppercase", padding: "2px 7px", borderRadius: 20, border: `1px solid ${vcol(p.status)}`, color: vcol(p.status) }}>{p.status}</span></div>
+                <div style={{ flex: 1, color: C.muted, fontSize: "0.6rem", lineHeight: 1.4 }}>{(p.flags || []).join(" · ") || "ok"}</div>
+              </div>
+              {p.take && <div style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.55, marginTop: 6, paddingLeft: 11, borderLeft: `2px solid ${vcol(p.status)}` }}>{p.take}</div>}
             </div>
           ))}
         </Card>
