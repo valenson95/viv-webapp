@@ -3395,16 +3395,18 @@ function TradeChart({ trade }) {
         const REV = { entry: "#ff8c00", profit: "#1ed980", stop: "#ff1744" };
         const exitWin = isShort ? (exitP < entryP) : (exitP > entryP); // profit exit vs loss/stop exit
         const exitCol = exitWin ? REV.profit : REV.stop, exitLetter = exitWin ? "P" : "S";
+        // Slim arrows, NO letter text (the ray's word-label carries the meaning → no double-labelling / clutter).
         const markers = [];
-        if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: REV.entry, shape: "arrowUp", size: 2, text: "E" });
+        if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: REV.entry, shape: "arrowUp", size: 1 });
         if (peak && entryBar && exitBar && peak.time !== exitBar.time && peak.time !== entryBar.time) markers.push({ time: peak.time, position: isShort ? "belowBar" : "aboveBar", color: C.goldBright, shape: "circle", size: 1, text: "Peak" });
-        if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: exitCol, shape: "arrowDown", size: 2, text: exitLetter });
+        if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: exitCol, shape: "arrowDown", size: 1 });
         markers.sort((a, b) => a.time - b.time);
         s.setMarkers(markers);
-        // Candle-anchored rays drawn on the SVG overlay (start at the fill candle, extend right) — NOT full-width lines.
+        // Candle-anchored rays on the SVG overlay: start at the fill candle, extend right, one small word-label each.
+        // No badge boxes, no price pills (the stats panel already shows exact entry/exit/stop).
         setTradeMarks({
-          entry: entryBar ? { t: entryBar.time, p: entryP, color: REV.entry, letter: "E", dashed: false } : null,
-          exit: exitBar ? { t: exitBar.time, p: exitP, color: exitCol, letter: exitLetter, dashed: false } : null,
+          entry: entryBar ? { t: entryBar.time, p: entryP, color: REV.entry, label: "Entry", dashed: false } : null,
+          exit: exitBar ? { t: exitBar.time, p: exitP, color: exitCol, label: exitWin ? "Profit" : "Exit", dashed: false } : null,
           stop: (+trade.stop > 0 && entryBar) ? { t: entryBar.time, p: +trade.stop, color: REV.stop, label: "Stop", dashed: true } : null,
         });
 
@@ -3620,11 +3622,8 @@ function TradeChart({ trade }) {
     if (x == null || y == null) return null;
     const pw = paneW(), xs = Math.max(0, x);
     return (<g key={key} style={{ pointerEvents: "none" }}>
-      <line x1={xs} y1={y} x2={pw} y2={y} stroke={m.color} strokeWidth={1.4} strokeDasharray={m.dashed ? "7 4" : "2 4"} opacity={0.95} />
-      {m.letter && <><rect x={x - 9} y={y - 9} width={18} height={18} rx={4} fill={m.color} /><text x={x} y={y + 4} fill="#08080e" fontSize={11} fontWeight={800} textAnchor="middle" fontFamily={font}>{m.letter}</text></>}
-      {m.label && <text x={xs + 3} y={y - 5} fill={m.color} fontSize={9} fontWeight={700} fontFamily={font}>{m.label}</text>}
-      <rect x={pw - 54} y={y - 8} width={50} height={15} rx={3} fill={m.color} />
-      <text x={pw - 29} y={y + 3} fill="#08080e" fontSize={9} fontWeight={700} textAnchor="middle" fontFamily={font}>{m.p.toFixed(2)}</text>
+      <line x1={xs} y1={y} x2={pw} y2={y} stroke={m.color} strokeWidth={1.2} strokeDasharray={m.dashed ? "7 4" : "2 4"} opacity={0.9} />
+      <text x={xs + 4} y={y - 4} fill={m.color} stroke="#08080e" strokeWidth={2.5} style={{ paintOrder: "stroke" }} fontSize={9} fontWeight={700} fontFamily={font}>{m.label}</text>
     </g>);
   };
 
