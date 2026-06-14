@@ -3623,7 +3623,7 @@ function TradeChart({ trade }) {
     const pw = paneW(), xs = Math.max(0, x);
     return (<g key={key} style={{ pointerEvents: "none" }}>
       <line x1={xs} y1={y} x2={pw} y2={y} stroke={m.color} strokeWidth={1.2} strokeDasharray={m.dashed ? "7 4" : "2 4"} opacity={0.9} />
-      <text x={xs + 4} y={y - 4} fill={m.color} stroke="#08080e" strokeWidth={2.5} style={{ paintOrder: "stroke" }} fontSize={9} fontWeight={700} fontFamily={font}>{m.label}</text>
+      <text x={pw - 4} y={y - 4} textAnchor="end" fill={m.color} stroke="#08080e" strokeWidth={2.5} style={{ paintOrder: "stroke" }} fontSize={9} fontWeight={700} fontFamily={font}>{m.label}</text>
     </g>);
   };
 
