@@ -4394,7 +4394,7 @@ function CoachHero({ data }) {
     <div className="reveal" style={{ marginTop: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.gold }} />
-        <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".04em", textTransform: "uppercase", color: C.goldBright }}>Coach · admin</span>
+        <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".04em", textTransform: "uppercase", color: C.goldBright }}>Jarvis · admin</span>
         {data.scope && <span style={{ fontSize: "0.58rem", color: C.muted }}>{data.scope}</span>}
       </div>
       <Card>
