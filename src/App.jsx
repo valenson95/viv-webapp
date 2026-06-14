@@ -4322,8 +4322,109 @@ function AiReviewBlock({ review }) {
   );
 }
 
+// Admin-only account COACH hero — Claude's standing read (recent vs peak vs system + open runners),
+// written to public.claude_insights. Members never see this. Mirrors render_coach.py.
+function CoachHero({ data }) {
+  if (!data || typeof data !== "object") return null;
+  const vcol = (v) => ({ good: C.green, improving: C.green, holding: C.gold, watch: C.gold, risk: C.red, degrading: C.red }[String(v || "").toLowerCase()] || C.muted);
+  const d = data.drift || {}, sc = data.scorecards || {}, pw = data.peak_window || {};
+  const bd = "1px solid rgba(255,255,255,0.08)";
+  const Card = ({ title, children }) => (
+    <div style={{ background: "rgba(255,255,255,0.02)", border: bd, borderRadius: 12, padding: "16px 18px", marginBottom: 14 }}>
+      {title && <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.muted, marginBottom: 12, fontWeight: 700 }}>{title}</div>}
+      {children}
+    </div>
+  );
+  const Scorecard = ({ title, s, accent }) => (
+    <div style={{ background: "rgba(0,0,0,0.25)", border: `1px solid ${accent ? C.gold : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "12px 14px" }}>
+      <div style={{ fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.goldBright, fontWeight: 700, marginBottom: 8 }}>{title}</div>
+      {[["Win rate", (s.win_rate ?? "—") + "%"], ["Expectancy", (s.expectancy ?? "—") + "R"], ["Profit factor", s.pf ?? "—"], ["In-theme", (s.pct_in_theme ?? "—") + "%"], ["Trades", s.n ?? "—"]].map(([k, v]) => (
+        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", padding: "2px 0" }}><span style={{ color: C.muted }}>{k}</span><b>{v}</b></div>
+      ))}
+    </div>
+  );
+  return (
+    <div className="reveal" style={{ marginTop: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.gold }} />
+        <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".04em", textTransform: "uppercase", color: C.goldBright }}>Coach · admin</span>
+        {data.scope && <span style={{ fontSize: "0.58rem", color: C.muted }}>{data.scope}</span>}
+      </div>
+      <Card>
+        <div style={{ fontSize: "0.95rem", lineHeight: 1.55, fontWeight: 700, color: C.white }}>{data.headline}</div>
+        <div style={{ display: "flex", gap: 8, margin: "12px 0 6px", flexWrap: "wrap" }}>
+          {[["vs peak", d.vs_peak], ["vs system", d.vs_system]].map(([k, v]) => v ? (
+            <span key={k} style={{ fontSize: "0.6rem", fontWeight: 700, padding: "4px 11px", borderRadius: 20, border: `1px solid ${vcol(v)}`, color: vcol(v) }}>{k} · {v}</span>
+          ) : null)}
+        </div>
+        {d.summary && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
+      </Card>
+      <Card title="Recent vs peak vs baseline">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <Scorecard title="Last 10 closed" s={sc.recent || {}} />
+          <Scorecard title={`Peak ${pw.start ? `(${pw.start}–${pw.end})` : ""}`} s={sc.peak || {}} accent />
+          <Scorecard title="Baseline · since May 1" s={sc.baseline || {}} />
+        </div>
+      </Card>
+      {Array.isArray(data.attention) && data.attention.length > 0 && (
+        <Card title="Pay attention now">
+          {data.attention.map((a, i) => (
+            <div key={i} style={{ borderLeft: `3px solid ${C.red}`, background: "rgba(0,0,0,0.25)", borderRadius: 6, padding: "10px 14px", marginBottom: 9 }}>
+              <div style={{ fontSize: "0.54rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.red, fontWeight: 700 }}>{a.lens}</div>
+              <div style={{ fontSize: "0.78rem", fontWeight: 700, margin: "2px 0 4px" }}>{a.title}</div>
+              <div style={{ fontSize: "0.7rem", color: C.text, lineHeight: 1.55 }}>{a.detail}</div>
+            </div>
+          ))}
+        </Card>
+      )}
+      {Array.isArray(data.working) && data.working.length > 0 && (
+        <Card title="Keep doing">
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {data.working.map((w, i) => <li key={i} style={{ fontSize: "0.7rem", color: C.text, lineHeight: 1.7 }}>{w}</li>)}
+          </ul>
+        </Card>
+      )}
+      {Array.isArray(data.lenses) && data.lenses.length > 0 && (
+        <Card title="Lens sweep">
+          {data.lenses.map((l, i) => (
+            <div key={i} style={{ padding: "6px 0", borderBottom: i < data.lenses.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: vcol(l.verdict) }} />
+                <span style={{ fontSize: "0.7rem", flex: 1 }}>{l.name}</span>
+                <span style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", color: vcol(l.verdict) }}>{l.verdict}</span>
+              </div>
+              {l.note && <div style={{ fontSize: "0.62rem", color: C.muted, marginLeft: 16, marginTop: 2, lineHeight: 1.45 }}>{l.note}</div>}
+            </div>
+          ))}
+        </Card>
+      )}
+      {Array.isArray(data.open_runners) && data.open_runners.length > 0 && (
+        <Card title="Open runners — live read">
+          {data.open_runners.map((p, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "5px 0", borderBottom: i < data.open_runners.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.66rem" }}>
+              <div style={{ width: 48 }}><b>{p.ticker}</b></div>
+              <div style={{ width: 54, color: (p.upl_pct || 0) >= 0 ? C.green : C.red }}>{p.upl_pct}%</div>
+              <div style={{ width: 62, color: C.muted }}>{p.stop || "—"}</div>
+              <div style={{ width: 66 }}><span style={{ fontSize: "0.5rem", fontWeight: 700, textTransform: "uppercase", padding: "2px 7px", borderRadius: 20, border: `1px solid ${vcol(p.status)}`, color: vcol(p.status) }}>{p.status}</span></div>
+              <div style={{ flex: 1, color: C.muted, fontSize: "0.6rem", lineHeight: 1.4 }}>{(p.flags || []).join(" · ") || "ok"}</div>
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const [coachRead, setCoachRead] = useState(null);
+  useEffect(() => {
+    if (!isAdmin || !session?.user?.id) return;
+    let alive = true;
+    supabase.from("claude_insights").select("payload").eq("user_id", session.user.id).maybeSingle()
+      .then(({ data }) => { if (alive && data?.payload) setCoachRead(data.payload); });
+    return () => { alive = false; };
+  }, [isAdmin, session?.user?.id]);
   const [filterSetup, setFilterSetup] = useState("All");
   const [filterTag, setFilterTag] = useState("All");
   const [editingId, setEditingId] = useState(null);
@@ -5554,6 +5655,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           <div className="h1" style={{ marginTop: 6 }}>Your track record, <span className="goldname">{firstName}</span></div>
           <div className="sub">Every closed trade, your performance, and whether your system actually has an edge.</div>
         </div>
+
+        {/* COACH — admin-only standing read from Claude (claude_insights) */}
+        {isAdmin && coachRead && <CoachHero data={coachRead} />}
 
         {/* TOOLBAR (Performance Tracker actions) */}
         <div className="jtoolbar">
