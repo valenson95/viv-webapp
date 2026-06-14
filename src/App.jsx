@@ -4259,7 +4259,56 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .jtoolbar .btn{flex:1 1 auto}
   }`;
 
+// Admin-only AI deep-review block — renders the ai_review JSON Claude writes to Supabase
+// (score · process dimensions · narrative/regime/SL · the read). Members never see this.
+function AiReviewBlock({ review }) {
+  const sc = (s) => s >= 85 ? C.green : s >= 70 ? C.gold : C.red;
+  const lbl = { fontSize: "0.55rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.muted };
+  if (!review || typeof review !== "object") {
+    return (
+      <div className="revnotes">
+        <div className="revcoltitle" style={{ marginBottom: 8 }}>AI Review <span style={{ color: C.muted, fontWeight: 600 }}>· admin</span></div>
+        <div style={{ fontSize: "0.72rem", color: C.muted, lineHeight: 1.6 }}>No AI review yet. Close the position fully, then tell Claude <b style={{ color: C.goldBright }}>"log it"</b> — the deep analysis + score appear here.</div>
+      </div>
+    );
+  }
+  const r = review, o = r.outcome || {};
+  return (
+    <div className="revnotes">
+      <div className="revcoltitle" style={{ marginBottom: 10 }}>AI Review <span style={{ color: C.muted, fontWeight: 600 }}>· admin · process score</span></div>
+      <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 6 }}>
+        <div style={{ fontSize: "2.2rem", fontWeight: 800, lineHeight: 1, color: sc(Number(r.score) || 0) }}>{r.score}%</div>
+        <div style={{ fontSize: "0.72rem", color: C.text }}>{r.grade}</div>
+      </div>
+      {r.process_vs_outcome && <div style={{ fontSize: "0.66rem", color: C.muted, fontStyle: "italic", marginBottom: 10 }}>{r.process_vs_outcome}</div>}
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 12 }}>
+        {o.pl && <div><div style={lbl}>P/L</div><b style={{ color: C.green }}>{o.pl}</b></div>}
+        {o.return && <div><div style={lbl}>Return</div><b style={{ color: C.green }}>{o.return}</b></div>}
+        {o.r && <div><div style={lbl}>R-multiple</div><b style={{ color: C.text }}>{o.r}</b></div>}
+      </div>
+      {Array.isArray(r.dimensions) && r.dimensions.map((d, i) => (
+        <div key={i} style={{ marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.66rem", marginBottom: 3 }}>
+            <span style={{ color: C.text }}>{d.name} <span style={{ color: C.muted }}>· {d.weight}%</span></span>
+            <b style={{ color: sc(Number(d.score) || 0) }}>{d.score}</b>
+          </div>
+          <div style={{ height: 7, background: "rgba(255,255,255,0.05)", borderRadius: 4, overflow: "hidden" }}><div style={{ width: (Number(d.score) || 0) + "%", height: "100%", background: sc(Number(d.score) || 0) }} /></div>
+          {d.note && <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 3, lineHeight: 1.45 }}>{d.note}</div>}
+        </div>
+      ))}
+      {[["Narrative fit", r.narrative_fit], ["Regime fit", r.regime_fit], ["Stop-loss critique", r.sl_critique]].map(([t2, v], i) => v ? (
+        <div key={i} style={{ marginTop: 10 }}>
+          <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.goldBright, fontWeight: 700, marginBottom: 2 }}>{t2}</div>
+          <div style={{ fontSize: "0.68rem", color: C.text, lineHeight: 1.5 }}>{v}</div>
+        </div>
+      ) : null)}
+      {r.read && <div style={{ marginTop: 12, padding: "10px 13px", background: "rgba(255,255,255,0.02)", borderLeft: `3px solid ${C.gold}`, borderRadius: 6, fontSize: "0.72rem", lineHeight: 1.6, color: C.white }}>{r.read}</div>}
+    </div>
+  );
+}
+
 function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit }) {
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [filterSetup, setFilterSetup] = useState("All");
   const [filterTag, setFilterTag] = useState("All");
   const [editingId, setEditingId] = useState(null);
@@ -5989,6 +6038,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                             <TradeChart trade={t} />
                           </div>
 
+                          {isAdmin ? (<AiReviewBlock review={t.ai_review} />) : (
                           <div className="revnotes">
                             <div className="revchart-head" style={{ marginBottom: 0 }}>
                               <span className="revcoltitle" style={{ margin: 0 }}>Trade review</span>
@@ -6001,6 +6051,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                               <div><div className="nlabel l">Lesson learned</div><textarea className="mgta" value={reviewDraft.lessons} onChange={e => setReviewDraft(r => ({ ...r, lessons: e.target.value }))} placeholder="Lesson learned..." /></div>
                             </div>
                           </div>
+                          )}
                           <div className="revfoot">
                             {deleteStep === 0 && (
                               <>
