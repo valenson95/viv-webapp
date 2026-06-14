@@ -6038,7 +6038,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                             <TradeChart trade={t} />
                           </div>
 
-                          {isAdmin ? (<AiReviewBlock review={t.ai_review} />) : (
+                          {isAdmin ? (<AiReviewBlock review={t.aiReview} />) : (
                           <div className="revnotes">
                             <div className="revchart-head" style={{ marginBottom: 0 }}>
                               <span className="revcoltitle" style={{ margin: 0 }}>Trade review</span>
@@ -9243,7 +9243,7 @@ function AppInner() {
       else if (ins) {
         res.tInserted = ins.length;
         ins.forEach(t => { if (t.ib_exec_id) journaledExecIds.add(t.ib_exec_id); audit.tradesInserted.push(t.id); });
-        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null }));
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
     }
@@ -9315,7 +9315,7 @@ function AppInner() {
       else if (ins) {
         res.partialsInserted = ins.length;
         ins.forEach(t => audit.tradesInserted.push(t.id));
-        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null }));
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
     }
@@ -9483,7 +9483,7 @@ function AppInner() {
       ]);
       if (softDelsRes.data) setSoftDeletedExecIds(new Set(softDelsRes.data.map(r => r.ib_exec_id).filter(Boolean)));
       if (tradesRes.data) {
-        setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null }))));
+        setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null }))));
       }
       if (posRes.data) {
         const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
@@ -9822,7 +9822,7 @@ function AppInner() {
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       console.log(`[load] trades fetched: ${(trades || []).length}`);
       if (trades && trades.length > 0) {
-        setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null }))));
+        setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null }))));
         lastLoadedTradeCount.current = trades.length;
       }
       // Soft-deleted IBKR exec ids — small parallel query, just the column we need. Used by the matcher
