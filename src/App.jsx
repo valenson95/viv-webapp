@@ -5545,13 +5545,21 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   }, [dateFiltered, startCap, eqMode, eqXAxis]);
 
   // ── NEW: return-distribution buckets (mockup's fixed 10 buckets, editable what-if) ──
-  const DIST_BUCKETS = useMemo(() => ([
-    { lo: -Infinity, hi: -6, side: "neg", lab: "−6% or worse", mid: -8 }, { lo: -6, hi: -4, side: "neg", lab: "−6% to −4%", mid: -5 },
-    { lo: -4, hi: -2, side: "neg", lab: "−4% to −2%", mid: -3 }, { lo: -2, hi: 0, side: "neg", lab: "−2% to 0%", mid: -1 },
-    { lo: 0, hi: 4, side: "pos", lab: "0% to +4%", mid: 2 }, { lo: 4, hi: 8, side: "pos", lab: "+4% to +8%", mid: 6 },
-    { lo: 8, hi: 12, side: "pos", lab: "+8% to +12%", mid: 10 }, { lo: 12, hi: 16, side: "pos", lab: "+12% to +16%", mid: 14 },
-    { lo: 16, hi: 20, side: "pos", lab: "+16% to +20%", mid: 18 }, { lo: 20, hi: Infinity, side: "pos", lab: "+20% or more", mid: 24 },
-  ]), []);
+  // Fixed-scale histogram: symmetric ±30% by default, auto-EXPANDED (never shrunk) to fit any outlier.
+  // Uniform 2% bins so the axis is a stable ruler the data plots into — not refitted to each slice.
+  const DIST_RANGE = useMemo(() => {
+    const maxAbs = dateFiltered.reduce((m, t) => Math.max(m, Math.abs(Number(t.plPct) || 0)), 0);
+    return Math.max(30, Math.ceil(maxAbs / 2) * 2);
+  }, [dateFiltered]);
+  const DIST_BUCKETS = useMemo(() => {
+    const R = DIST_RANGE, out = [];
+    const sgn = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n) + "%";
+    out.push({ lo: -Infinity, hi: -R, side: "neg", mid: -R - 2, lab: `≤ −${R}%` });
+    for (let i = -R; i < 0; i += 2) out.push({ lo: i, hi: i + 2, side: "neg", mid: i + 1, lab: `${sgn(i)} to ${sgn(i + 2)}` });
+    for (let i = 0; i < R; i += 2) out.push({ lo: i, hi: i + 2, side: "pos", mid: i + 1, lab: `${sgn(i)} to ${sgn(i + 2)}` });
+    out.push({ lo: R, hi: Infinity, side: "pos", mid: R + 2, lab: `≥ +${R}%` });
+    return out;
+  }, [DIST_RANGE]);
   const [distPanelOpen, setDistPanelOpen] = useState(false);
   const [distEdits, setDistEdits] = useState({});        // {bucketIdx: count} what-if overrides
   const distBase = useMemo(() => DIST_BUCKETS.map(b => dateFiltered.filter(t => { const r = Number(t.plPct) || 0; return r >= b.lo && r < b.hi; }).length), [DIST_BUCKETS, dateFiltered]);
@@ -5952,18 +5960,43 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 <button className={"distbtn" + (distPanelOpen ? " on" : "")} type="button" onClick={(e) => { e.stopPropagation(); setDistPanelOpen(o => !o); }}>{distPanelOpen ? "Hide data ▴" : "Open & edit data ▾"}</button>
                 <span className="chev2" style={{ marginLeft: 6 }}>&#9662;</span>
               </div>
-              <div className="bars" style={{ marginTop: 18 }}>
-                <div className="zeroline"></div>
-                {(() => { const maxC = Math.max(...distCounts, 1); return DIST_BUCKETS.map((b, i) => {
-                  const c = distCounts[i], hPct = c ? Math.max(18, Math.round(c / maxC * 90)) : 0, title = `${b.lab}: ${c} trade${c === 1 ? "" : "s"}`;
-                  return b.side === "neg"
-                    ? <div key={i} className="barcol" title={title}><div className="up"></div><div className="down">{c ? <div className="bar neg" style={{ height: hPct + "%", animationDelay: (i * 0.045).toFixed(3) + "s" }}></div> : null}</div></div>
-                    : <div key={i} className="barcol" title={title}><div className="up">{c ? <div className="bar pos" style={{ height: hPct + "%", animationDelay: (i * 0.045).toFixed(3) + "s" }}></div> : null}</div><div className="down"></div></div>;
-                }); })()}
-              </div>
-              <div className="distx">{DIST_BUCKETS.map((b, i) => {
-                const lab = b.lo === -Infinity ? "≤−6%" : b.hi === Infinity ? "+20%+" : (b.lo > 0 ? "+" : b.lo < 0 ? "−" : "") + Math.abs(b.lo) + "%";
-                return <span key={i} style={{ flex: 1, textAlign: "center" }}>{lab}</span>;
+              {(() => {
+                const CH = 270, halfH = (CH - 26) / 2, maxC = Math.max(...distCounts, 1);
+                const step = maxC <= 4 ? 1 : maxC <= 8 ? 2 : maxC <= 20 ? 5 : maxC <= 40 ? 10 : Math.ceil(maxC / 50) * 10;
+                const niceMax = Math.max(step, Math.ceil(maxC / step) * step);
+                const yFor = (v) => v / niceMax * halfH;
+                const ticks = []; for (let v = 0; v <= niceMax; v += step) ticks.push(v);
+                const yLab = { position: "absolute", right: 2, fontSize: "0.5rem", color: "var(--muted)" };
+                const gl = (v) => ({ position: "absolute", left: 0, right: 0, borderTop: v === 0 ? "1px solid rgba(255,255,255,0.18)" : "1px dashed rgba(255,255,255,0.06)" });
+                return (
+                <div style={{ display: "flex", gap: 6, marginTop: 18 }}>
+                  <div style={{ position: "relative", width: 24, height: CH, flexShrink: 0 }}>
+                    {ticks.map(v => (<React.Fragment key={"y" + v}>
+                      <span style={{ ...yLab, top: halfH - yFor(v) - 5 }}>{v}</span>
+                      {v > 0 && <span style={{ ...yLab, top: halfH + yFor(v) - 5 }}>{v}</span>}
+                    </React.Fragment>))}
+                  </div>
+                  <div style={{ position: "relative", flex: 1, height: CH }}>
+                    {ticks.map(v => (<React.Fragment key={"g" + v}>
+                      <div style={{ ...gl(v), top: halfH - yFor(v) }} />
+                      {v > 0 && <div style={{ ...gl(v), top: halfH + yFor(v) }} />}
+                    </React.Fragment>))}
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "stretch" }}>
+                      {DIST_BUCKETS.map((b, i) => {
+                        const c = distCounts[i], h = yFor(c);
+                        return (<div key={i} title={`${b.lab}: ${c} trade${c === 1 ? "" : "s"}`} style={{ flex: 1, position: "relative" }}>
+                          {c ? <div style={{ position: "absolute", left: "14%", right: "14%", height: h, ...(b.side === "neg" ? { top: halfH } : { top: halfH - h }), background: b.side === "neg" ? "linear-gradient(180deg,#ff6b6b,#b83232)" : "linear-gradient(180deg,#33d484,#1f8f57)", borderRadius: b.side === "neg" ? "0 0 3px 3px" : "3px 3px 0 0" }} /> : null}
+                        </div>);
+                      })}
+                    </div>
+                  </div>
+                </div>);
+              })()}
+              <div className="distx" style={{ paddingLeft: 30 }}>{DIST_BUCKETS.map((b, i) => {
+                if (b.lo === -Infinity) return <span key={i} style={{ flex: 1, textAlign: "center" }}>≤−{DIST_RANGE}</span>;
+                if (b.hi === Infinity) return <span key={i} style={{ flex: 1, textAlign: "center" }}>+{DIST_RANGE}</span>;
+                const major = b.lo % 10 === 0, show = b.lo % 4 === 0;
+                return <span key={i} style={{ flex: 1, textAlign: "center" }}>{show ? (b.lo > 0 ? "+" : b.lo < 0 ? "−" : "") + Math.abs(b.lo) + (major ? "%" : "") : ""}</span>;
               })}</div>
               <div className="charthint">{!dateFiltered.length ? "No trades match this filter."
                 : dstats.wins ? <>Wins reach up to <span className="g">{dstats.lw ? sgnPct(Number(dstats.lw.plPct)) : "—"}</span>{dstats.losses ? <>, while losses stay contained (worst <span className="rd">−{Math.abs(Number(dstats.ll?.plPct) || 0).toFixed(2)}%</span>)</> : " with no losing trades in this slice"}. Small losses, larger wins is the shape of an edge.</>
