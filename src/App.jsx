@@ -3390,15 +3390,21 @@ function TradeChart({ trade }) {
           candles.forEach(c => { if (c.time >= lo && c.time <= hi && (!peak || (isShort ? c.low < peak.low : c.high > peak.high))) peak = c; });
           if (peak) setBest({ price: isShort ? peak.low : peak.high, time: peak.time });
         }
+        // ── Claude-review styling: E/P/S letter arrows + dotted horizontal rays (entry=orange · profit=green · stop=red) ──
+        const REV = { entry: "#ff8c00", profit: "#1ed980", stop: "#ff1744" };
+        const exitWin = isShort ? (exitP < entryP) : (exitP > entryP); // profit exit vs loss/stop exit
+        const exitCol = exitWin ? REV.profit : REV.stop, exitLetter = exitWin ? "P" : "S";
         const markers = [];
-        if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: C.green, shape: "arrowUp", size: 2, text: `ENTRY $${entryP}` });
+        if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: REV.entry, shape: "arrowUp", size: 2, text: `E  $${entryP}` });
         if (peak && entryBar && exitBar && peak.time !== exitBar.time && peak.time !== entryBar.time) markers.push({ time: peak.time, position: isShort ? "belowBar" : "aboveBar", color: C.goldBright, shape: "circle", size: 1, text: "Peak" });
-        if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: C.red, shape: "arrowDown", size: 2, text: `EXIT $${exitP}` });
+        if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: exitCol, shape: "arrowDown", size: 2, text: `${exitLetter}  $${exitP}` });
         markers.sort((a, b) => a.time - b.time);
         s.setMarkers(markers);
-        // Entry/exit are shown by the on-candle arrows only (no full-width lines — they were distracting).
-        // Stop stays as a subtle dashed reference line when set.
-        if (+trade.stop > 0) s.createPriceLine({ price: +trade.stop, color: C.gold, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "Stop" });
+        // Horizontal rays — subtle dotted, matching the Claude review. (LWC price lines span the full width;
+        // entry=orange dotted · exit=green/red dotted · stop=red dashed.)
+        if (entryP > 0) s.createPriceLine({ price: entryP, color: REV.entry, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: "Entry" });
+        if (exitP > 0) s.createPriceLine({ price: exitP, color: exitCol, lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: exitWin ? "Profit" : "Exit" });
+        if (+trade.stop > 0) s.createPriceLine({ price: +trade.stop, color: REV.stop, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "Stop" });
 
         // ── Default view: focus on the trade; the deep history stays scrollable ──
         const tsc = chart.timeScale();
