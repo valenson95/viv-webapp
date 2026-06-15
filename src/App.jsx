@@ -4418,7 +4418,7 @@ function RationaleBlock({ rationale }) {
 // written to public.claude_insights. Members never see this. Mirrors render_coach.py.
 function CoachHero({ data }) {
   if (!data || typeof data !== "object") return null;
-  const vcol = (v) => ({ good: C.green, improving: C.green, holding: C.gold, watch: C.gold, risk: C.red, degrading: C.red }[String(v || "").toLowerCase()] || C.muted);
+  const vcol = (v) => ({ good: C.green, improving: C.green, aligned: C.green, holding: C.gold, watch: C.gold, risk: C.red, degrading: C.red }[String(v || "").toLowerCase()] || C.muted);
   const d = data.drift || {}, sc = data.scorecards || {}, pw = data.peak_window || {};
   const bd = "1px solid rgba(255,255,255,0.08)";
   const Card = ({ title, children }) => (
@@ -4451,6 +4451,72 @@ function CoachHero({ data }) {
         </div>
         {d.summary && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
       </Card>
+      {data.charts && (() => {
+        const ch = data.charts, hs = ch.headline_stats || {};
+        const tile = (label, val, color) => (
+          <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "12px 10px", textAlign: "center", flex: 1, minWidth: 90 }}>
+            <div style={{ fontSize: "1.4rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
+            <div style={{ fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.muted, marginTop: 5 }}>{label}</div>
+          </div>
+        );
+        const rc = Array.isArray(ch.r_curve) ? ch.r_curve : [];
+        const W = 320, H = 90, rsv = rc.map(p => p.r);
+        const mn = Math.min(0, ...rsv), mx = Math.max(1, ...rsv);
+        const xx = i => rc.length > 1 ? (i / (rc.length - 1)) * W : 0;
+        const yy = r => H - ((r - mn) / (mx - mn || 1)) * H;
+        const path = rc.map((p, i) => (i ? "L" : "M") + xx(i).toFixed(1) + "," + yy(p.r).toFixed(1)).join(" ");
+        const maxAbsR = Math.max(1, ...(ch.by_setup || []).map(s => Math.abs(s.avg_r)));
+        const maxCount = Math.max(1, ...(ch.r_dist || []).map(b => b.count));
+        return (
+          <>
+            <Card title="Performance at a glance">
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {tile("Win rate", (hs.win_rate ?? "—") + "%", C.gold)}
+                {tile("Expectancy", "+" + (hs.expectancy ?? "—") + "R", (hs.expectancy || 0) >= 0 ? C.green : C.red)}
+                {tile("Profit factor", hs.profit_factor ?? "—", (hs.profit_factor || 0) >= 2 ? C.green : C.gold)}
+                {tile("Net P/L", "$" + Math.round((hs.net || 0) / 1000) + "k", (hs.net || 0) >= 0 ? C.green : C.red)}
+                {tile("Avg win", "+" + (hs.avg_win_r ?? "—") + "R", C.green)}
+                {tile("Avg loss", (hs.avg_loss_r ?? "—") + "R", C.red)}
+              </div>
+            </Card>
+            {rc.length > 1 && (
+              <Card title="Equity curve · cumulative R">
+                <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 110, display: "block" }} preserveAspectRatio="none">
+                  <line x1="0" y1={yy(0)} x2={W} y2={yy(0)} stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+                  <path d={`${path} L ${W},${H} L 0,${H} Z`} fill="rgba(201,152,42,0.10)" />
+                  <path d={path} fill="none" stroke={C.gold} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                </svg>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.56rem", color: C.muted, marginTop: 4 }}><span>{rc.length} trades</span><span style={{ color: C.green, fontWeight: 700 }}>+{(rsv[rsv.length - 1] || 0).toFixed(0)}R total</span></div>
+              </Card>
+            )}
+            {Array.isArray(ch.by_setup) && ch.by_setup.length > 0 && (
+              <Card title="Avg R by setup · what makes you money">
+                {ch.by_setup.map((s, i) => { const w = Math.min(100, Math.abs(s.avg_r) / maxAbsR * 100); const pos = s.avg_r >= 0; return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: "0.64rem" }}>
+                    <div style={{ width: 150, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label} <span style={{ color: C.muted }}>· {s.n} · {s.win_rate}%</span></div>
+                    <div style={{ flex: 1, position: "relative", height: 14, background: "rgba(255,255,255,0.04)", borderRadius: 3 }}>
+                      <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "rgba(255,255,255,0.15)" }} />
+                      <div style={{ position: "absolute", top: 2, bottom: 2, borderRadius: 2, ...(pos ? { left: "50%", width: (w / 2) + "%", background: C.green } : { right: "50%", width: (w / 2) + "%", background: C.red }) }} />
+                    </div>
+                    <div style={{ width: 50, textAlign: "right", color: pos ? C.green : C.red, fontWeight: 700 }}>{pos ? "+" : ""}{s.avg_r}R</div>
+                  </div>); })}
+              </Card>
+            )}
+            {Array.isArray(ch.r_dist) && ch.r_dist.length > 0 && (
+              <Card title="R distribution · your win/loss shape">
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 96 }}>
+                  {ch.r_dist.map((b, i) => { const h = (b.count / maxCount) * 74; const neg = b.bucket.startsWith("<") || b.bucket.startsWith("-"); return (
+                    <div key={i} style={{ flex: 1, textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                      <div style={{ fontSize: "0.56rem", color: C.muted, marginBottom: 3 }}>{b.count}</div>
+                      <div style={{ height: Math.max(2, h), background: neg ? C.red : C.green, borderRadius: "3px 3px 0 0", opacity: 0.85 }} />
+                      <div style={{ fontSize: "0.52rem", color: C.muted, marginTop: 4 }}>{b.bucket}</div>
+                    </div>); })}
+                </div>
+              </Card>
+            )}
+          </>
+        );
+      })()}
       <Card title="Recent vs peak vs baseline">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
           <Scorecard title="Last 10 closed" s={sc.recent || {}} />
@@ -4529,6 +4595,30 @@ function CoachHero({ data }) {
                 <div style={{ flex: 1, color: C.muted, fontSize: "0.6rem", lineHeight: 1.4 }}>{(p.flags || []).join(" · ") || "ok"}</div>
               </div>
               {p.take && <div style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.55, marginTop: 6, paddingLeft: 11, borderLeft: `2px solid ${vcol(p.status)}` }}>{p.take}</div>}
+            </div>
+          ))}
+        </Card>
+      )}
+      {Array.isArray(data.deep_dive) && data.deep_dive.length > 0 && (
+        <Card title="Deep dive · performance analysis">
+          {data.deep_dive.map((s, i) => (
+            <div key={i} style={{ marginBottom: 15, paddingBottom: 13, borderBottom: i < data.deep_dive.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+              <div style={{ fontSize: "0.76rem", fontWeight: 800, color: C.goldBright, marginBottom: 5 }}>{s.title}</div>
+              <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7 }}>{s.body}</div>
+            </div>
+          ))}
+        </Card>
+      )}
+      {Array.isArray(data.mentor_lenses) && data.mentor_lenses.length > 0 && (
+        <Card title="Mentor lenses · JLaw · Qullamaggie · Martin Luk">
+          {data.mentor_lenses.map((m, i) => (
+            <div key={i} style={{ padding: "8px 0", borderBottom: i < data.mentor_lenses.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: vcol(m.verdict) }} />
+                <span style={{ fontSize: "0.72rem", flex: 1, fontWeight: 700 }}>{m.mentor}</span>
+                <span style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", color: vcol(m.verdict) }}>{m.verdict}</span>
+              </div>
+              {m.note && <div style={{ fontSize: "0.66rem", color: C.muted, marginLeft: 16, marginTop: 3, lineHeight: 1.55 }}>{m.note}</div>}
             </div>
           ))}
         </Card>
