@@ -6773,7 +6773,7 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .mgmeta b{color:var(--text); font-weight:700; font-variant-numeric:tabular-nums}
 .vd .mgclose{margin-left:auto; background:transparent; border:none; color:var(--faint); font-size:1.4rem; line-height:1; cursor:pointer}
 .vd .mgclose:hover{color:var(--text)}
-.vd .mggrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0}
+.vd .mggrid{display:grid; grid-template-columns:1fr 1fr; gap:0}
 .vd .mgcol{padding:0 22px; border-left:1px solid var(--border)}
 .vd .mgcol:first-child{padding-left:0; border-left:none}
 .vd .mgcol:last-child{padding-right:0}
@@ -6883,6 +6883,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
   // Alias so existing `INTRADAY_FEATURE_ENABLED` references inside this component keep reading as a single
   // flag without rewriting every callsite. Reactive — flipping the Settings toggle re-renders the table.
   const INTRADAY_FEATURE_ENABLED = intradayFeatureEnabled;
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [compactTable, setCompactTable] = useState(false);
   // Open Positions zoom — scales the whole table (5 steps each way, 70%–130%, 6% per step). Persisted as a UI-only pref.
   const [posZoom, setPosZoom] = useState(() => { const s = parseFloat(localStorage.getItem("viv-pos-zoom")); return Number.isFinite(s) ? Math.min(1.3, Math.max(0.7, s)) : 1; });
@@ -8001,11 +8002,6 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                               <button className="btn gold mgsave" onClick={() => onManualSave && onManualSave()}>Save stops</button>
                             </div>
                             <div className="mgcol">
-                              <div className="mgcoltitle">Activity today</div>
-                              <div className="mgactlist">Logging happens automatically — IBKR sync fills the journal overnight.</div>
-                              <div className="mgnote">Calculation only — editing stops here doesn't create a trade. Use Sell / Close below to book an exit to your journal.</div>
-                            </div>
-                            <div className="mgcol">
                               <div className="mgcoltitle">Risk &amp; P/L</div>
                               <div className="mgreadout">
                                 <div className="mgr"><span className="term tipright" data-tip="Dollars you'd lose if price hits your stop from here.">Risk to stop</span><b className={p.rtsD > 0 ? "red" : "green"}>{p.rtsD <= 0 ? "Locked" : usd0(p.rtsD)}</b></div>
@@ -8020,6 +8016,8 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                               </div>
                             </div>
                           </div>
+
+                          {isAdmin && p.rationale && <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border)" }}><RationaleBlock rationale={p.rationale} /></div>}
 
                           <div className="mgfoot">
                             <button className={"btn mgsell" + (sellOpen ? " open" : "")} onClick={() => sellOpen ? setSellOpen(false) : openSell(p)}>Sell / Close position</button>
@@ -9537,7 +9535,7 @@ function AppInner() {
       else if (ins) {
         res.pInserted = ins.length;
         ins.forEach(p => audit.positionsInserted.push(p.id));
-        const mapped = ins.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "ibkr", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
+        const mapped = ins.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "ibkr", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
         setPositions(prev => [...prev, ...mapped]);
         lastLoadedCount.current = (lastLoadedCount.current || 0) + mapped.length;
       }
@@ -9751,7 +9749,7 @@ function AppInner() {
         setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null }))));
       }
       if (posRes.data) {
-        const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
+        const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
         setPositions(mapped);
         positionsRef.current = mapped;
         lastLoadedCount.current = mapped.length;
@@ -10047,7 +10045,7 @@ function AppInner() {
         const snap = new Map();
         clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
         loadedSnapshot.current = snap;
-        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) })));
+        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) })));
       } else if (!posErr) {
         // Query succeeded but returned empty — check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
@@ -10064,7 +10062,7 @@ function AppInner() {
             const { data: seeded } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).order("created_at");
             if (seeded && seeded.length > 0) {
               lastLoadedCount.current = seeded.length;
-              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", intradayLog: normalizeIntradayLog(p.intraday_log) })));
+              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) })));
             }
           }
           await saveSettingNow(uid, "initialized", true);
@@ -10133,7 +10131,7 @@ function AppInner() {
                 const snap2 = new Map();
                 refreshed.forEach(p => { if (p.symbol) snap2.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
                 loadedSnapshot.current = snap2;
-                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", intradayLog: normalizeIntradayLog(p.intraday_log) }));
+                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
                 positionsRef.current = next;
                 setPositions(next);
               }
