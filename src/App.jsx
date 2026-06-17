@@ -129,7 +129,7 @@ const DEFAULT_SETUP_TYPES = ["VCP", "Pivot", "Power Play", "Low-Risk Entry", "Ba
 const DEFAULT_TAGS = ["Breakout", "Earnings", "Momentum", "Sector Leader", "High Volume", "Gap Up", "Follow-Through Day"];
 const DEFAULT_EXIT_REASONS = ["Sold Into Strength", "Hit Initial Stop", "Hit Trailing Stop", "Time Stop", "Risk Reduction", "Changed Thesis"];
 
-const DEMO_RISK = { sym: "NVDA", sharePrice: "142.50", posSizePct: "20", portfolio: "500000", stopVal: "6.11" };
+const DEMO_RISK = { sym: "NVDA", sharePrice: "142.50", riskPct: "1", portfolio: "500000", stopVal: "6.11" };
 const DEMO_EXPECT = { port: "500000", posSize: "20", desRet: "15", avgGain: "12.5", avgLoss: "5.8", winRate: "52" };
 const DEMO_FINANCE = { buyPrice: "142.50", shares: "575", stopPrice: "133.80", stopPct: "6.11", curPrice: "168.30" };
 
@@ -539,33 +539,16 @@ const TIER_STYLES = {
   Quarter: { bg: C.blueDim, color: C.blue, border: "rgba(59,130,246,0.25)" },
   Pilot: { bg: C.purpleDim, color: C.purple, border: "rgba(167,139,250,0.25)" },
 };
-function autoTier(posValue, sizer) {
-  if (!sizer || !posValue || posValue <= 0) return "Pilot";
+// A position's tier = how much RISK it carries vs the per-trade risk budget (risk-first).
+// fullR/halfR/quarterR come from rSizer (equity × ROTE% ÷ max positions). Size floats off the stop;
+// the tier reflects the $-at-risk, not the position's dollar value.
+function autoTier(riskD, rSizer) {
+  if (!rSizer || !riskD || riskD <= 0) return "Pilot";
   const buf = 0.88;
-  if (posValue >= sizer.full * buf) return "Full";
-  if (posValue >= sizer.half * buf) return "Half";
-  if (posValue >= sizer.quarter * buf) return "Quarter";
+  if (riskD >= rSizer.fullR * buf) return "Full";
+  if (riskD >= rSizer.halfR * buf) return "Half";
+  if (riskD >= rSizer.quarterR * buf) return "Quarter";
   return "Pilot";
-}
-
-function TierStrip({ sizer }) {
-  if (!sizer) return null;
-  const tiers = [
-    { label: "Full", amount: sizer.full, color: C.green, bg: C.greenDim },
-    { label: "Half", amount: sizer.half, color: C.gold, bg: C.goldDim },
-    { label: "Quarter", amount: sizer.quarter, color: C.blue, bg: C.blueDim },
-    { label: "Pilot", amount: sizer.pilot, color: C.purple, bg: C.purpleDim },
-  ];
-  return (
-    <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-      {tiers.map(t => (
-        <div key={t.label} style={{ flex: 1, padding: "10px 12px", borderRadius: 10, background: t.bg, borderLeft: `3px solid ${t.color}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontWeight: 700, fontSize: "0.56rem", letterSpacing: "0.10em", textTransform: "uppercase", color: t.color }}>{t.label}</span>
-          <span style={{ fontWeight: 800, fontSize: "0.82rem", letterSpacing: "-0.03em", color: C.white }}>{fmt$(t.amount)}</span>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 // ExposureGrid removed — Compounder now embedded in DashboardPage
@@ -687,6 +670,68 @@ const applyTradeLinks = (trades) => {
     return { ...t, positionId: mirrored };
   });
 };
+
+// Realized R from the trade's own facts. We DERIVE it only when the stored r_mult is missing/zero
+// but a stop exists — so genuine scaled-exit R values (which the naive formula can't reproduce) are
+// preserved, while trades synced without a computed R (e.g. a stop added later) still show their R.
+function deriveRMult(entryP, exitP, stop, tradeType, storedR) {
+  const sr = storedR == null || storedR === "" ? null : Number(storedR);
+  if (sr != null && sr !== 0 && !Number.isNaN(sr)) return sr;   // trust a real stored R (incl. scaled exits)
+  const ep = parseFloat(entryP), xp = parseFloat(exitP), st = parseFloat(stop);
+  if (!(ep > 0) || !(xp > 0) || !(st > 0)) return sr;           // can't derive without all three
+  const isShort = (tradeType || "Long") === "Short";
+  const risk = isShort ? (st - ep) / ep : (ep - st) / ep;
+  if (!(risk > 0)) return sr;                                   // stop on the wrong side → leave as-is
+  const ret = isShort ? (ep - xp) / ep : (xp - ep) / ep;
+  return +(ret / risk).toFixed(2);
+}
+
+// Collapse a position's separate fill-rows into ONE logical trade for display & stats. IBKR splits one
+// order into many executions; without this, the trade count and win rate count fills, not trades.
+// Group key = ticker + direction + entry price within 0.3%. Raw fills are kept on `_fills` (audit +
+// detail view); nothing is deleted. Single-fill trades pass through unchanged.
+function groupPositionFills(rows) {
+  const num = (v) => { const n = parseFloat(v); return Number.isNaN(n) ? null : n; };
+  const merge = (fills) => {
+    if (fills.length === 1) return { ...fills[0], _fills: fills, _fillCount: 1 };
+    const sh = fills.reduce((s, f) => s + (num(f.shares) || 0), 0) || 1;
+    const wEntry = fills.reduce((s, f) => s + (num(f.entryP) || 0) * (num(f.shares) || 0), 0) / sh;
+    const wExit = fills.reduce((s, f) => s + (num(f.exitP) || 0) * (num(f.shares) || 0), 0) / sh;
+    const plDollar = fills.reduce((s, f) => s + (num(f.plDollar) || 0), 0);
+    const cost = wEntry * sh;
+    const stop = (fills.find(f => num(f.stop) > 0) || {}).stop ?? null;
+    const firstOf = (k) => { const f = fills.find(x => x[k] != null && x[k] !== ""); return f ? f[k] : (fills[0][k] ?? null); };
+    const exits = fills.map(f => f.exit).filter(Boolean).sort();
+    const entries = fills.map(f => f.entry).filter(Boolean).sort();
+    return {
+      ...fills[0],
+      id: Math.min(...fills.map(f => f.id)),
+      shares: sh, entryP: +wEntry.toFixed(4), exitP: +wExit.toFixed(4),
+      plDollar: +plDollar.toFixed(2), plPct: cost ? +((plDollar / cost) * 100).toFixed(2) : 0,
+      stop, rMult: deriveRMult(wEntry, wExit, stop, fills[0].tradeType, null),
+      entry: entries[0] || fills[0].entry, exit: exits[exits.length - 1] || fills[0].exit,
+      setup: firstOf("setup"), reason: firstOf("reason"), notes: firstOf("notes"),
+      tags: [...new Set(fills.flatMap(f => f.tags || []))],
+      aiReview: firstOf("aiReview"), rationale: firstOf("rationale"), thesisId: firstOf("thesisId"),
+      _fills: fills, _fillCount: fills.length,
+    };
+  };
+  const byTD = {};
+  rows.forEach(r => { const k = (r.ticker || "") + "|" + (r.tradeType || "Long"); (byTD[k] = byTD[k] || []).push(r); });
+  const out = [];
+  Object.values(byTD).forEach(group => {
+    const sorted = [...group].sort((a, b) => (num(a.entryP) || 0) - (num(b.entryP) || 0));
+    let cluster = [];
+    const flush = () => { if (cluster.length) { out.push(merge(cluster)); cluster = []; } };
+    sorted.forEach(r => {
+      const p = num(r.entryP) || 0, base = cluster.length ? (num(cluster[0].entryP) || 0) : 0;
+      if (cluster.length && base > 0 && Math.abs(p - base) / base > 0.003) flush();
+      cluster.push(r);
+    });
+    flush();
+  });
+  return out;
+}
 
 // Reconstruct closed round-trips (flat-to-flat per symbol) + open positions, then diff against current data.
 function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds, ignoreTickers) {
@@ -1795,35 +1840,39 @@ function RiskTab({ guideEnter, guideLeave, gactive, expert, demo }) {
   const [sym, setSym] = useState(demo ? DEMO_RISK.sym : "");
   const [mode, setMode] = useState("%");
   const [sharePrice, setSharePrice] = useState(demo ? DEMO_RISK.sharePrice : "");
-  const [posSizePct, setPosSizePct] = useState(demo ? DEMO_RISK.posSizePct : "");
+  const [riskPct, setRiskPct] = useState(demo ? DEMO_RISK.riskPct : "");
   const [portfolio, setPortfolio] = useState(demo ? DEMO_RISK.portfolio : "");
   const [stopVal, setStopVal] = useState(demo ? DEMO_RISK.stopVal : "");
-  useEffect(() => { if (demo) { setSym(DEMO_RISK.sym); setSharePrice(DEMO_RISK.sharePrice); setPosSizePct(DEMO_RISK.posSizePct); setPortfolio(DEMO_RISK.portfolio); setStopVal(DEMO_RISK.stopVal); } else { setSym(""); setSharePrice(""); setPosSizePct(""); setPortfolio(""); setStopVal(""); } }, [demo]);
+  useEffect(() => { if (demo) { setSym(DEMO_RISK.sym); setSharePrice(DEMO_RISK.sharePrice); setRiskPct(DEMO_RISK.riskPct); setPortfolio(DEMO_RISK.portfolio); setStopVal(DEMO_RISK.stopVal); } else { setSym(""); setSharePrice(""); setRiskPct(""); setPortfolio(""); setStopVal(""); } }, [demo]);
+  // RISK-FIRST sizing (how the mentors actually size): you FIX the risk %, the stop distance
+  // determines the share count → position size is the OUTPUT, not the input. size = risk$ ÷ (entry − stop).
   const r = useMemo(() => {
-    const sp = +sharePrice, psPct = +posSizePct, p = +portfolio, sv = +stopVal;
-    if (!sp || !psPct || !p || !sv || sp <= 0 || psPct <= 0 || p <= 0 || sv <= 0) return null;
+    const sp = +sharePrice, rkPct = +riskPct, p = +portfolio, sv = +stopVal;
+    if (!sp || !rkPct || !p || !sv || sp <= 0 || rkPct <= 0 || p <= 0 || sv <= 0) return null;
     const stopPct = mode === "%" ? sv : (sv / sp) * 100;
     if (stopPct <= 0 || stopPct >= 100) return null;
     const stopPrice = mode === "%" ? sp * (1 - sv / 100) : sp - sv;
     if (stopPrice <= 0 || stopPrice >= sp) return null;
-    const posValue = p * (psPct / 100);
-    const shares = Math.floor(posValue / sp);
-    if (shares <= 0) return null;
     const riskPerShare = sp - stopPrice;
-    const totalRisk = shares * riskPerShare;
-    const riskPctEquity = (totalRisk / p) * 100;
+    const riskBudget = p * (rkPct / 100);              // the lever you choose: $ you'll lose if stopped
+    const shares = Math.floor(riskBudget / riskPerShare); // shares follow from the stop — tighter stop ⇒ more shares
+    if (shares <= 0) return null;
+    const posValue = shares * sp;
+    const posSizePct = (posValue / p) * 100;            // OUTPUT: what slice of the account that works out to
+    const totalRisk = shares * riskPerShare;            // ≈ riskBudget (after rounding shares down)
+    const riskPctEquity = (totalRisk / p) * 100;        // ≈ the risk % you chose (confirmation)
     const rTargets = [1,2,3,4,5,6].map(n => {
       const dollarR = riskPerShare * n;
       const target = sp + dollarR;
       const pctGain = (dollarR / sp) * 100;
       return { n, dollarR: dollarR * shares, target, pctGain };
     });
-    return { shares, riskPctEquity, totalRisk, stopPrice, stopPct, posValue, riskPerShare, rTargets };
-  }, [sharePrice, posSizePct, portfolio, stopVal, mode]);
+    return { shares, riskPctEquity, totalRisk, stopPrice, stopPct, posValue, posSizePct, riskBudget, riskPerShare, rTargets };
+  }, [sharePrice, riskPct, portfolio, stopVal, mode]);
 // ════════════════════════════════════════════════════════════════════════
 // POSITION RISK — new render block for RiskTab
 // Replaces its existing `return ( … );`. KEEPS the existing `r` memo + state
-// (sym, mode, sharePrice, posSizePct, portfolio, stopVal) verbatim. Markup
+// (sym, mode, sharePrice, riskPct, portfolio, stopVal) — RISK-FIRST sizing. Markup
 // matches the mockup's #panel-risk. Receives guide props.
 //
 // SIGNATURE CHANGE: function RiskTab({ demo, guideEnter, guideLeave, gactive, expert })
@@ -1840,7 +1889,7 @@ return (
   <div className={"toolpanel on" + (exampleMode ? " example" : "")} id="panel-risk" onInput={() => exampleMode && setExampleMode(false)}>
     <div className={"intro guide" + gactive("risk")} data-gtitle="Position Risk" onMouseEnter={guideEnter("risk", "Position Risk", "Before you buy, this tells you exactly how many shares to take so that hitting your stop only costs a small, planned slice of your account — usually one to two percent. It also maps out your profit targets in R, your unit of risk.", "/audio/premium-risk.mp3")} onMouseLeave={guideLeave("risk")}>
       <div className="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg></div>
-      <div><h3>What is Position Risk?</h3><p>The #1 rule is to never lose much on one trade. Enter a stock's price, where you'd sell if wrong (your <b>stop</b>), and how much of your account to commit — and it tells you <b>exactly how many shares to buy</b> so a stop-out only costs a small, planned amount.</p></div>
+      <div><h3>What is Position Risk?</h3><p>The #1 rule is to never lose much on one trade — so you decide that <b>first</b>. Enter the price, your <b>stop</b> (where you'll sell if wrong), and <b>how much of your account you're willing to risk</b> — and it tells you <b>exactly how many shares to buy</b> and what slice of your account that works out to. Your stop sets the size, not the other way around.</p></div>
     </div>
     <div className="card">
       <div className="io">
@@ -1849,7 +1898,7 @@ return (
           <div className="iogrid">
             <div className="field"><label>Symbol</label><input className="in" value={sym} onChange={e => setSym(e.target.value)} placeholder="NVDA" /><div className="hint">Just a label.</div></div>
             <div className="field"><label><span className="term" data-tip="The price you'd pay per share right now.">Share price $</span></label><input className="in" value={sharePrice} onChange={e => setSharePrice(e.target.value)} placeholder="142.50" /><div className="hint">Price per share.</div></div>
-            <div className="field"><label><span className="term" data-tip="How much of your whole account to put into this one position, as a percent.">Position size %</span></label><input className="in" value={posSizePct} onChange={e => setPosSizePct(e.target.value)} placeholder="20" /><div className="hint">% of account in this trade.</div></div>
+            <div className="field"><label><span className="term" data-tip="How much of your whole account you're willing to lose if your stop is hit. This is the one number you choose — the share count and position size follow from it. Pros keep it small: usually 0.25%–1%.">Risk per trade %</span></label><input className="in" value={riskPct} onChange={e => setRiskPct(e.target.value)} placeholder="1" /><div className="hint">% of account you'll risk if stopped (try 0.5–1).</div></div>
             <div className="field"><label><span className="term" data-tip="Your total trading capital.">Portfolio $</span></label><input className="in" value={portfolio} onChange={e => setPortfolio(e.target.value)} placeholder="500000" /><div className="hint">Total account size.</div></div>
             <div className="field full"><label><span className="term" data-tip="Your stop is where you'll sell if the trade goes against you. Enter it as a percent below entry, or as a dollar amount below entry.">Stop</span> — how it's measured</label>
               <div className="miniseg">
@@ -1864,8 +1913,9 @@ return (
           <div className="panelhead">Your plan</div>
           {r ? (<>
             <div className="results">
-              <div className="tile big-emph"><div className="label"><span className="term" data-tip="How many shares to buy so the position equals your chosen % of the account.">Shares to buy</span></div><div className="v gold">{f0(r.shares)}</div><div className="vsub">{money(r.posValue)} position</div></div>
-              <div className="tile big-emph"><div className="label"><span className="term" data-tip="If your stop is hit, this is the loss as a percent of your whole account. Keep it at or under 2%.">Account risk</span></div><div className={"v " + (r.riskPctEquity > 2 ? "red" : r.riskPctEquity > 1.5 ? "gold" : "")}>{r.riskPctEquity.toFixed(2)}%</div><div className="vsub">= {money(r.totalRisk)} at risk</div></div>
+              <div className="tile big-emph"><div className="label"><span className="term" data-tip="How many shares to buy so a stop-out loses exactly the risk you chose. A tighter stop earns you more shares; a wider stop, fewer.">Shares to buy</span></div><div className="v gold">{f0(r.shares)}</div><div className="vsub">{money(r.posValue)} position</div></div>
+              <div className="tile big-emph"><div className="label"><span className="term" data-tip="The RESULT of fixing your risk — how much of your account this position works out to. Keep any single position under ~30%.">Position size</span></div><div className={"v " + (r.posSizePct > 30 ? "red" : r.posSizePct > 25 ? "gold" : "")}>{r.posSizePct.toFixed(1)}%</div><div className="vsub">of your account</div></div>
+              <div className="tile"><div className="label"><span className="term" data-tip="If your stop is hit, the loss as a percent of your whole account — this matches the risk you chose above.">Account risk</span></div><div className={"v " + (r.riskPctEquity > 2 ? "red" : r.riskPctEquity > 1.5 ? "gold" : "")}>{r.riskPctEquity.toFixed(2)}%</div><div className="vsub">= {money(r.totalRisk)} at risk</div></div>
               <div className="tile"><div className="label"><span className="term" data-tip="The price your stop sits at.">Stop price</span></div><div className="v">${f2(r.stopPrice)}</div><div className="vsub">sell-if-wrong level</div></div>
             </div>
             <div className="label" style={{ marginTop: 18 }}><span className="term" data-tip="R is your risk on the trade — one unit of what you'd lose if stopped. A 3R winner makes three times what you risked. Pros think in R, not dollars.">Profit targets in R (your unit of risk)</span></div>
@@ -1885,7 +1935,7 @@ return (
             </table>
             </div>
             <div className="interp"><svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
-              <div>Buy <b>{f0(r.shares)} shares</b> ({money(r.posValue)}). If your stop at <b>${f2(r.stopPrice)}</b> is hit you lose <b className="red">{money(r.totalRisk)}</b> — just <b>{r.riskPctEquity.toFixed(2)}%</b> of your account. A <b>3R</b> winner would make <b className="green">+${f0(r.riskPerShare * 3 * r.shares)}</b>.</div>
+              <div>You chose to risk <b>{r.riskPctEquity.toFixed(2)}%</b> ({money(r.totalRisk)}) → buy <b>{f0(r.shares)} shares</b>, a <b>{money(r.posValue)}</b> position ({r.posSizePct.toFixed(1)}% of your account). If your stop at <b>${f2(r.stopPrice)}</b> is hit you lose that planned <b className="red">{money(r.totalRisk)}</b> — no more. A <b>3R</b> winner would make <b className="green">+${f0(r.riskPerShare * 3 * r.shares)}</b>.</div>
             </div>
             {r.stopPct > 10 && (
               <div className="alert warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><path d="M12 9v4M12 17h.01" /></svg><div>Your stop is <b>{r.stopPct.toFixed(1)}%</b> wide — over 10%. Consider a tighter entry or a closer stop.</div></div>
@@ -1893,11 +1943,14 @@ return (
             {r.riskPctEquity > 2 && (
               <div className="alert warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><path d="M12 9v4M12 17h.01" /></svg><div>This risks <b>{r.riskPctEquity.toFixed(2)}%</b> of your account — above the 2% safety rule. Buy fewer shares or tighten the stop.</div></div>
             )}
-            {r.stopPct <= 10 && r.riskPctEquity <= 2 && r.riskPctEquity > 0 && (
-              <div className="alert ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6 9 17l-5-5" /></svg><div>Risk is within the safe zone (≤2% of account). Good to go.</div></div>
+            {r.posSizePct > 30 && (
+              <div className="alert warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><path d="M12 9v4M12 17h.01" /></svg><div>This works out to <b>{r.posSizePct.toFixed(1)}%</b> of your account in one position — above the ~30% single-position ceiling. Your risk is still controlled (that's what the stop is for), but that's heavy concentration. Consider risking less, or splitting across names.</div></div>
+            )}
+            {r.stopPct <= 10 && r.riskPctEquity <= 2 && r.riskPctEquity > 0 && r.posSizePct <= 30 && (
+              <div className="alert ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6 9 17l-5-5" /></svg><div>Risk is within the safe zone (≤2% of account) and the position fits under ~30%. Good to go.</div></div>
             )}
           </>) : (
-            <div className="interp"><svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg><div>Fill in share price, position size, portfolio, and a valid stop to see your plan.</div></div>
+            <div className="interp"><svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg><div>Fill in share price, risk per trade %, portfolio, and a valid stop to see your plan.</div></div>
           )}
         </div>
       </div>
@@ -3290,6 +3343,7 @@ function TradeChart({ trade }) {
   const [volOn, setVolOn] = useState(true);  // show volume pane + 50-period volume average
   const [legend, setLegend] = useState(null); // crosshair OHLC + MA readout
   const [best, setBest] = useState(null);    // peak favorable price between entry & exit (from candles)
+  const [tradeMarks, setTradeMarks] = useState(null); // entry/exit/stop anchors → candle-anchored overlay rays
   const [chartW, setChartW] = useState(600); // live chart pixel width (for full-width horizontal-line drawings)
   // ── Drawing layer (SVG overlay) ──
   const [tool, setTool] = useState("cursor"); // "cursor" | "trend" | "hline" | "text"
@@ -3334,7 +3388,7 @@ function TradeChart({ trade }) {
     const LWC = window.LightweightCharts;
     if (!LWC) { setStatus("nolib"); return; }
     let disposed = false, onResize = null;
-    setBest(null);
+    setBest(null); setTradeMarks(null);
 
     // Render the chart from a candle array (runs after fetch or straight from cache)
     const build = (candles) => {
@@ -3390,15 +3444,24 @@ function TradeChart({ trade }) {
           candles.forEach(c => { if (c.time >= lo && c.time <= hi && (!peak || (isShort ? c.low < peak.low : c.high > peak.high))) peak = c; });
           if (peak) setBest({ price: isShort ? peak.low : peak.high, time: peak.time });
         }
+        // ── Claude-review styling: on-candle E/P/S arrows here; candle-anchored horizontal rays on the SVG overlay ──
+        const REV = { entry: "#ff8c00", profit: "#1ed980", stop: "#ff1744" };
+        const exitWin = isShort ? (exitP < entryP) : (exitP > entryP); // profit exit vs loss/stop exit
+        const exitCol = exitWin ? REV.profit : REV.stop, exitLetter = exitWin ? "P" : "S";
+        // Slim arrows, NO letter text (the ray's word-label carries the meaning → no double-labelling / clutter).
         const markers = [];
-        if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: C.green, shape: "arrowUp", size: 2, text: `ENTRY $${entryP}` });
+        if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: REV.entry, shape: "arrowUp", size: 1 });
         if (peak && entryBar && exitBar && peak.time !== exitBar.time && peak.time !== entryBar.time) markers.push({ time: peak.time, position: isShort ? "belowBar" : "aboveBar", color: C.goldBright, shape: "circle", size: 1, text: "Peak" });
-        if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: C.red, shape: "arrowDown", size: 2, text: `EXIT $${exitP}` });
+        if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: exitCol, shape: "arrowDown", size: 1 });
         markers.sort((a, b) => a.time - b.time);
         s.setMarkers(markers);
-        // Entry/exit are shown by the on-candle arrows only (no full-width lines — they were distracting).
-        // Stop stays as a subtle dashed reference line when set.
-        if (+trade.stop > 0) s.createPriceLine({ price: +trade.stop, color: C.gold, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "Stop" });
+        // Candle-anchored rays on the SVG overlay: start at the fill candle, extend right, one small word-label each.
+        // No badge boxes, no price pills (the stats panel already shows exact entry/exit/stop).
+        setTradeMarks({
+          entry: entryBar ? { t: entryBar.time, p: entryP, color: REV.entry, label: "Entry", dashed: false } : null,
+          exit: exitBar ? { t: exitBar.time, p: exitP, color: exitCol, label: exitWin ? "Profit" : "Exit", dashed: false } : null,
+          stop: (+trade.stop > 0 && entryBar) ? { t: entryBar.time, p: +trade.stop, color: REV.stop, label: "Stop", dashed: true } : null,
+        });
 
         // ── Default view: focus on the trade; the deep history stays scrollable ──
         const tsc = chart.timeScale();
@@ -3605,6 +3668,18 @@ function TradeChart({ trade }) {
     return null;
   };
 
+  // Candle-anchored trade ray + badge (entry/exit/stop), projected like the drawings, re-pinned on pan/zoom
+  const renderTradeMark = (m, key) => {
+    if (!m) return null;
+    const x = timeToX(m.t), y = priceToY(m.p);
+    if (x == null || y == null) return null;
+    const pw = paneW(), xs = Math.max(0, x);
+    return (<g key={key} style={{ pointerEvents: "none" }}>
+      <line x1={xs} y1={y} x2={pw} y2={y} stroke={m.color} strokeWidth={1.2} strokeDasharray={m.dashed ? "7 4" : "2 4"} opacity={0.9} />
+      <text x={pw - 4} y={y - 4} textAnchor="end" fill={m.color} stroke="#08080e" strokeWidth={2.5} style={{ paintOrder: "stroke" }} fontSize={9} fontWeight={700} fontFamily={font}>{m.label}</text>
+    </g>);
+  };
+
   return (
     <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
       {/* Toolbar — symbol · timeframe switcher · chart controls */}
@@ -3682,6 +3757,7 @@ function TradeChart({ trade }) {
             {status === "ok" && (
               <svg data-tick={overlayTick} width={chartW} height={CHART_H} style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}>
                 {drawings.map(renderDrawing)}
+                {tradeMarks && <>{renderTradeMark(tradeMarks.entry, "tm-e")}{renderTradeMark(tradeMarks.stop, "tm-s")}{renderTradeMark(tradeMarks.exit, "tm-x")}</>}
                 {draft && hoverPt && (tool === "trend" || tool === "rect") && (() => {
                   const x1 = timeToX(draft.time), y1 = priceToY(draft.price); if (x1 == null || y1 == null) return null;
                   if (tool === "rect") { const rx = Math.min(x1, hoverPt.x), ry = Math.min(y1, hoverPt.y), rw = Math.abs(hoverPt.x - x1), rh = Math.abs(hoverPt.y - y1); return <rect x={rx} y={ry} width={rw} height={rh} fill="rgba(240,192,80,0.08)" stroke={C.goldBright} strokeWidth={1} strokeDasharray="4 4" />; }
@@ -4236,7 +4312,331 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .jtoolbar .btn{flex:1 1 auto}
   }`;
 
+// Admin-only AI deep-review block — renders the ai_review JSON Claude writes to Supabase
+// (score · process dimensions · narrative/regime/SL · the read). Members never see this.
+function AiReviewBlock({ review }) {
+  const sc = (s) => s >= 85 ? C.green : s >= 70 ? C.gold : C.red;
+  const lbl = { fontSize: "0.55rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.muted };
+  if (!review || typeof review !== "object") {
+    return (
+      <div className="revnotes">
+        <div className="revcoltitle" style={{ marginBottom: 8 }}>AI Review <span style={{ color: C.muted, fontWeight: 600 }}>· admin</span></div>
+        <div style={{ fontSize: "0.72rem", color: C.muted, lineHeight: 1.6 }}>No AI review yet. Close the position fully, then tell Claude <b style={{ color: C.goldBright }}>"log it"</b> — the deep analysis + score appear here.</div>
+      </div>
+    );
+  }
+  const r = review, o = r.outcome || {};
+  return (
+    <div className="revnotes">
+      <div className="revcoltitle" style={{ marginBottom: 10 }}>AI Review <span style={{ color: C.muted, fontWeight: 600 }}>· admin · process score</span></div>
+      <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 6 }}>
+        <div style={{ fontSize: "2.2rem", fontWeight: 800, lineHeight: 1, color: sc(Number(r.score) || 0) }}>{r.score}%</div>
+        <div style={{ fontSize: "0.72rem", color: C.text }}>{r.grade}</div>
+      </div>
+      {r.process_vs_outcome && <div style={{ fontSize: "0.66rem", color: C.muted, fontStyle: "italic", marginBottom: 10 }}>{r.process_vs_outcome}</div>}
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 12 }}>
+        {o.pl && <div><div style={lbl}>P/L</div><b style={{ color: C.green }}>{o.pl}</b></div>}
+        {o.return && <div><div style={lbl}>Return</div><b style={{ color: C.green }}>{o.return}</b></div>}
+        {o.r && <div><div style={lbl}>R-multiple</div><b style={{ color: C.text }}>{o.r}</b></div>}
+      </div>
+      {Array.isArray(r.dimensions) && r.dimensions.map((d, i) => (
+        <div key={i} style={{ marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.66rem", marginBottom: 3 }}>
+            <span style={{ color: C.text }}>{d.name} <span style={{ color: C.muted }}>· {d.weight}%</span></span>
+            <b style={{ color: sc(Number(d.score) || 0) }}>{d.score}</b>
+          </div>
+          <div style={{ height: 7, background: "rgba(255,255,255,0.05)", borderRadius: 4, overflow: "hidden" }}><div style={{ width: (Number(d.score) || 0) + "%", height: "100%", background: sc(Number(d.score) || 0) }} /></div>
+          {d.note && <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 3, lineHeight: 1.45 }}>{d.note}</div>}
+        </div>
+      ))}
+      {[["Your rationale check", r.rationale_check], ["Plan vs action", r.plan_vs_action], ["Narrative fit", r.narrative_fit], ["Regime fit", r.regime_fit], ["Stop-loss critique", r.sl_critique]].map(([t2, v], i) => v ? (
+        <div key={i} style={{ marginTop: 10 }}>
+          <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.goldBright, fontWeight: 700, marginBottom: 2 }}>{t2}</div>
+          <div style={{ fontSize: "0.68rem", color: C.text, lineHeight: 1.5 }}>{v}</div>
+        </div>
+      ) : null)}
+      {Array.isArray(r.mentor_board) && r.mentor_board.length > 0 && (() => {
+        const vc = (v) => ({ aligned: C.green, take: C.green, yes: C.green, pass: C.red, avoid: C.red, no: C.red, caution: C.gold, mixed: C.gold, wait: C.gold }[String(v || "").toLowerCase()] || C.muted);
+        return (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.goldBright, fontWeight: 700, marginBottom: 6 }}>Mentor board</div>
+            {r.mentor_board.map((m, i) => (
+              <div key={i} style={{ padding: "6px 0", borderBottom: i < r.mentor_board.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: vc(m.verdict) }} />
+                  <span style={{ fontSize: "0.68rem", flex: 1, color: C.text }}>{m.mentor}</span>
+                  <span style={{ fontSize: "0.56rem", fontWeight: 700, textTransform: "uppercase", color: vc(m.verdict) }}>{m.verdict}</span>
+                </div>
+                {m.note && <div style={{ fontSize: "0.62rem", color: C.muted, marginLeft: 15, marginTop: 2, lineHeight: 1.45 }}>{m.note}</div>}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+      {r.read && <div style={{ marginTop: 12, padding: "10px 13px", background: "rgba(255,255,255,0.02)", borderLeft: `3px solid ${C.gold}`, borderRadius: 6, fontSize: "0.72rem", lineHeight: 1.6, color: C.white }}>{r.read}</div>}
+    </div>
+  );
+}
+
+// Admin-only "Thought process" block — renders the rationale JSON Claude logs (your why, in plain English).
+// Leads with a simple-English summary anyone can read, then the supporting detail. Members never see this.
+function RationaleBlock({ rationale }) {
+  if (!rationale || typeof rationale !== "object" || !Object.keys(rationale).length) return null;
+  const r = rationale;
+  const LABELS = {
+    setup: "Setup", entry_thesis: "Why I entered", in_own_words: "In my words", entry_method: "How I entered",
+    entry_type: "Entry type", idea_source: "Idea source", stop: "Stop", initial_stop: "Initial stop",
+    stop_logic: "Stop logic", stop_now: "Stop now", base: "Base lot", add: "Add-on", total_risk: "Total risk",
+    risk: "Risk", management_20260615: "Management", management: "Management", sizing_note: "Sizing",
+    conviction: "Conviction", intent: "Intent", mgmt_intent: "Management intent", what_happened: "What happened",
+    exit_thesis: "Why I exited", exit_reason: "Exit reason", review_note: "Review note", mentor_fit: "Mentor lens",
+    cost_basis_note: "Cost note", entry_level_ref: "Entry level", structure: "Structure", plan: "Plan",
+  };
+  const order = Object.keys(LABELS);
+  const skip = new Set(["summary", "captured", "blended_avg"]);
+  const keys = Object.keys(r).filter(k => !skip.has(k)).sort((a, b) => {
+    const ia = order.indexOf(a), ib = order.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  const val = (v) => typeof v === "object" && v !== null
+    ? Object.entries(v).map(([k, x]) => `${k.replace(/_/g, " ")}: ${x}`).join(" · ") : String(v);
+  return (
+    <div className="revnotes" style={{ marginBottom: 12 }}>
+      <div className="revcoltitle" style={{ marginBottom: 8 }}>💭 Thought process <span style={{ color: C.muted, fontWeight: 600 }}>· admin · your why</span></div>
+      {r.summary && <div style={{ marginBottom: 10, padding: "10px 13px", background: "rgba(255,255,255,0.02)", borderLeft: `3px solid ${C.gold}`, borderRadius: 6, fontSize: "0.74rem", lineHeight: 1.6, color: C.white }}>{r.summary}</div>}
+      {keys.map((k, i) => (
+        <div key={i} style={{ marginBottom: 7 }}>
+          <div style={{ fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.goldBright, fontWeight: 700, marginBottom: 2 }}>{LABELS[k] || k.replace(/_/g, " ")}</div>
+          <div style={{ fontSize: "0.68rem", color: C.text, lineHeight: 1.5 }}>{val(r[k])}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Admin-only account COACH hero — Claude's standing read (recent vs peak vs system + open runners),
+// written to public.claude_insights. Members never see this. Mirrors render_coach.py.
+function CoachHero({ data }) {
+  if (!data || typeof data !== "object") return null;
+  const vcol = (v) => ({ good: C.green, improving: C.green, aligned: C.green, holding: C.gold, watch: C.gold, risk: C.red, degrading: C.red }[String(v || "").toLowerCase()] || C.muted);
+  const d = data.drift || {}, sc = data.scorecards || {}, pw = data.peak_window || {};
+  const bd = "1px solid rgba(255,255,255,0.08)";
+  const Card = ({ title, children }) => (
+    <div style={{ background: "rgba(255,255,255,0.02)", border: bd, borderRadius: 12, padding: "16px 18px", marginBottom: 14 }}>
+      {title && <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.muted, marginBottom: 12, fontWeight: 700 }}>{title}</div>}
+      {children}
+    </div>
+  );
+  const Scorecard = ({ title, s, accent }) => (
+    <div style={{ background: "rgba(0,0,0,0.25)", border: `1px solid ${accent ? C.gold : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "12px 14px" }}>
+      <div style={{ fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.goldBright, fontWeight: 700, marginBottom: 8 }}>{title}</div>
+      {[["Win rate", (s.win_rate ?? "—") + "%"], ["Expectancy", (s.expectancy ?? "—") + "R"], ["Profit factor", s.pf ?? "—"], ["In-theme", (s.pct_in_theme ?? "—") + "%"], ["Trades", s.n ?? "—"]].map(([k, v]) => (
+        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", padding: "2px 0" }}><span style={{ color: C.muted }}>{k}</span><b>{v}</b></div>
+      ))}
+    </div>
+  );
+  return (
+    <div className="reveal" style={{ marginTop: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.gold }} />
+        <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".04em", textTransform: "uppercase", color: C.goldBright }}>Jarvis · admin</span>
+        {data.scope && <span style={{ fontSize: "0.58rem", color: C.muted }}>{data.scope}</span>}
+      </div>
+      <Card>
+        <div style={{ fontSize: "0.95rem", lineHeight: 1.55, fontWeight: 700, color: C.white }}>{data.headline}</div>
+        <div style={{ display: "flex", gap: 8, margin: "12px 0 6px", flexWrap: "wrap" }}>
+          {[["vs peak", d.vs_peak], ["vs system", d.vs_system]].map(([k, v]) => v ? (
+            <span key={k} style={{ fontSize: "0.6rem", fontWeight: 700, padding: "4px 11px", borderRadius: 20, border: `1px solid ${vcol(v)}`, color: vcol(v) }}>{k} · {v}</span>
+          ) : null)}
+        </div>
+        {d.summary && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
+      </Card>
+      {data.charts && (() => {
+        const ch = data.charts, hs = ch.headline_stats || {};
+        const tile = (label, val, color) => (
+          <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "12px 10px", textAlign: "center", flex: 1, minWidth: 90 }}>
+            <div style={{ fontSize: "1.4rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
+            <div style={{ fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.muted, marginTop: 5 }}>{label}</div>
+          </div>
+        );
+        const rc = Array.isArray(ch.r_curve) ? ch.r_curve : [];
+        const W = 320, H = 90, rsv = rc.map(p => p.r);
+        const mn = Math.min(0, ...rsv), mx = Math.max(1, ...rsv);
+        const xx = i => rc.length > 1 ? (i / (rc.length - 1)) * W : 0;
+        const yy = r => H - ((r - mn) / (mx - mn || 1)) * H;
+        const path = rc.map((p, i) => (i ? "L" : "M") + xx(i).toFixed(1) + "," + yy(p.r).toFixed(1)).join(" ");
+        const maxAbsR = Math.max(1, ...(ch.by_setup || []).map(s => Math.abs(s.avg_r)));
+        const maxCount = Math.max(1, ...(ch.r_dist || []).map(b => b.count));
+        return (
+          <>
+            <Card title="Performance at a glance">
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {tile("Win rate", (hs.win_rate ?? "—") + "%", C.gold)}
+                {tile("Expectancy", "+" + (hs.expectancy ?? "—") + "R", (hs.expectancy || 0) >= 0 ? C.green : C.red)}
+                {tile("Profit factor", hs.profit_factor ?? "—", (hs.profit_factor || 0) >= 2 ? C.green : C.gold)}
+                {tile("Net P/L", "$" + Math.round((hs.net || 0) / 1000) + "k", (hs.net || 0) >= 0 ? C.green : C.red)}
+                {tile("Avg win", "+" + (hs.avg_win_r ?? "—") + "R", C.green)}
+                {tile("Avg loss", (hs.avg_loss_r ?? "—") + "R", C.red)}
+              </div>
+            </Card>
+            {rc.length > 1 && (
+              <Card title="Equity curve · cumulative R">
+                <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 110, display: "block" }} preserveAspectRatio="none">
+                  <line x1="0" y1={yy(0)} x2={W} y2={yy(0)} stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+                  <path d={`${path} L ${W},${H} L 0,${H} Z`} fill="rgba(201,152,42,0.10)" />
+                  <path d={path} fill="none" stroke={C.gold} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                </svg>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.56rem", color: C.muted, marginTop: 4 }}><span>{rc.length} trades</span><span style={{ color: C.green, fontWeight: 700 }}>+{(rsv[rsv.length - 1] || 0).toFixed(0)}R total</span></div>
+              </Card>
+            )}
+            {Array.isArray(ch.by_setup) && ch.by_setup.length > 0 && (
+              <Card title="Avg R by setup · what makes you money">
+                {ch.by_setup.map((s, i) => { const w = Math.min(100, Math.abs(s.avg_r) / maxAbsR * 100); const pos = s.avg_r >= 0; return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: "0.64rem" }}>
+                    <div style={{ width: 150, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label} <span style={{ color: C.muted }}>· {s.n} · {s.win_rate}%</span></div>
+                    <div style={{ flex: 1, position: "relative", height: 14, background: "rgba(255,255,255,0.04)", borderRadius: 3 }}>
+                      <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "rgba(255,255,255,0.15)" }} />
+                      <div style={{ position: "absolute", top: 2, bottom: 2, borderRadius: 2, ...(pos ? { left: "50%", width: (w / 2) + "%", background: C.green } : { right: "50%", width: (w / 2) + "%", background: C.red }) }} />
+                    </div>
+                    <div style={{ width: 50, textAlign: "right", color: pos ? C.green : C.red, fontWeight: 700 }}>{pos ? "+" : ""}{s.avg_r}R</div>
+                  </div>); })}
+              </Card>
+            )}
+            {Array.isArray(ch.r_dist) && ch.r_dist.length > 0 && (
+              <Card title="R distribution · your win/loss shape">
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 96 }}>
+                  {ch.r_dist.map((b, i) => { const h = (b.count / maxCount) * 74; const neg = b.bucket.startsWith("<") || b.bucket.startsWith("-"); return (
+                    <div key={i} style={{ flex: 1, textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                      <div style={{ fontSize: "0.56rem", color: C.muted, marginBottom: 3 }}>{b.count}</div>
+                      <div style={{ height: Math.max(2, h), background: neg ? C.red : C.green, borderRadius: "3px 3px 0 0", opacity: 0.85 }} />
+                      <div style={{ fontSize: "0.52rem", color: C.muted, marginTop: 4 }}>{b.bucket}</div>
+                    </div>); })}
+                </div>
+              </Card>
+            )}
+          </>
+        );
+      })()}
+      <Card title="Recent vs peak vs baseline">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <Scorecard title="Last 10 closed" s={sc.recent || {}} />
+          <Scorecard title={`Peak ${pw.start ? `(${pw.start}–${pw.end})` : ""}`} s={sc.peak || {}} accent />
+          <Scorecard title="Baseline · since May 1" s={sc.baseline || {}} />
+        </div>
+      </Card>
+      {Array.isArray(data.attention) && data.attention.length > 0 && (
+        <Card title="Pay attention now">
+          {data.attention.map((a, i) => (
+            <div key={i} style={{ borderLeft: `3px solid ${C.red}`, background: "rgba(0,0,0,0.25)", borderRadius: 6, padding: "10px 14px", marginBottom: 9 }}>
+              <div style={{ fontSize: "0.54rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.red, fontWeight: 700 }}>{a.lens}</div>
+              <div style={{ fontSize: "0.78rem", fontWeight: 700, margin: "2px 0 4px" }}>{a.title}</div>
+              <div style={{ fontSize: "0.7rem", color: C.text, lineHeight: 1.55 }}>{a.detail}</div>
+            </div>
+          ))}
+        </Card>
+      )}
+      {Array.isArray(data.working) && data.working.length > 0 && (
+        <Card title="Keep doing">
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {data.working.map((w, i) => <li key={i} style={{ fontSize: "0.7rem", color: C.text, lineHeight: 1.7 }}>{w}</li>)}
+          </ul>
+        </Card>
+      )}
+      {Array.isArray(data.lenses) && data.lenses.length > 0 && (
+        <Card title="Lens sweep">
+          {data.lenses.map((l, i) => (
+            <div key={i} style={{ padding: "6px 0", borderBottom: i < data.lenses.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: vcol(l.verdict) }} />
+                <span style={{ fontSize: "0.7rem", flex: 1 }}>{l.name}</span>
+                <span style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", color: vcol(l.verdict) }}>{l.verdict}</span>
+              </div>
+              {l.note && <div style={{ fontSize: "0.62rem", color: C.muted, marginLeft: 16, marginTop: 2, lineHeight: 1.45 }}>{l.note}</div>}
+            </div>
+          ))}
+        </Card>
+      )}
+      {data.viz && (
+        <Card title={`Behavioral metrics${data.viz.tagged_count != null ? ` · ${data.viz.tagged_count} trades tagged` : ""}`}>
+          {[["Avg R by conviction", data.viz.conviction_calibration], ["Avg R by idea source", data.viz.idea_source]].map(([t2, arr]) => Array.isArray(arr) && arr.length ? (
+            <div key={t2} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.goldBright, fontWeight: 700, marginBottom: 7 }}>{t2}</div>
+              {arr.map((r, j) => { const v = Number(r.avg_r) || 0, w = Math.min(100, Math.abs(v) / 3 * 100); return (
+                <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, fontSize: "0.64rem" }}>
+                  <div style={{ width: 130, color: C.text }}>{r.label} <span style={{ color: C.muted }}>· {r.n}</span></div>
+                  <div style={{ flex: 1, position: "relative", height: 14, background: "rgba(255,255,255,0.04)", borderRadius: 3 }}>
+                    <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "rgba(255,255,255,0.15)" }} />
+                    <div style={{ position: "absolute", top: 2, bottom: 2, borderRadius: 2, ...(v >= 0 ? { left: "50%", width: (w / 2) + "%", background: C.green } : { right: "50%", width: (w / 2) + "%", background: C.red }) }} />
+                  </div>
+                  <div style={{ width: 48, textAlign: "right", color: v >= 0 ? C.green : C.red, fontWeight: 700 }}>{v >= 0 ? "+" : ""}{v.toFixed(2)}R</div>
+                </div>); })}
+            </div>
+          ) : null)}
+          {Array.isArray(data.viz.plan_adherence) && data.viz.plan_adherence.length > 0 && (
+            <div>
+              <div style={{ fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.goldBright, fontWeight: 700, marginBottom: 7 }}>Plan adherence</div>
+              {data.viz.plan_adherence.map((r, j) => (
+                <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.64rem", padding: "2px 0" }}><span style={{ color: C.text }}>{r.label}</span><b style={{ color: r.good ? C.green : C.red }}>{r.n}</b></div>
+              ))}
+            </div>
+          )}
+          {data.viz.note && <div style={{ fontSize: "0.58rem", color: C.muted, marginTop: 8, fontStyle: "italic" }}>{data.viz.note}</div>}
+        </Card>
+      )}
+      {Array.isArray(data.open_runners) && data.open_runners.length > 0 && (
+        <Card title="Open runners — live read">
+          {data.open_runners.map((p, i) => (
+            <div key={i} style={{ padding: "8px 0", borderBottom: i < data.open_runners.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "0.66rem" }}>
+                <div style={{ width: 48 }}><b>{p.ticker}</b></div>
+                <div style={{ width: 54, color: (p.upl_pct || 0) >= 0 ? C.green : C.red }}>{p.upl_pct}%</div>
+                <div style={{ width: 62, color: C.muted }}>{p.stop || "—"}</div>
+                <div style={{ width: 66 }}><span style={{ fontSize: "0.5rem", fontWeight: 700, textTransform: "uppercase", padding: "2px 7px", borderRadius: 20, border: `1px solid ${vcol(p.status)}`, color: vcol(p.status) }}>{p.status}</span></div>
+                <div style={{ flex: 1, color: C.muted, fontSize: "0.6rem", lineHeight: 1.4 }}>{(p.flags || []).join(" · ") || "ok"}</div>
+              </div>
+              {p.take && <div style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.55, marginTop: 6, paddingLeft: 11, borderLeft: `2px solid ${vcol(p.status)}` }}>{p.take}</div>}
+            </div>
+          ))}
+        </Card>
+      )}
+      {Array.isArray(data.deep_dive) && data.deep_dive.length > 0 && (
+        <Card title="Deep dive · performance analysis">
+          {data.deep_dive.map((s, i) => (
+            <div key={i} style={{ marginBottom: 15, paddingBottom: 13, borderBottom: i < data.deep_dive.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+              <div style={{ fontSize: "0.76rem", fontWeight: 800, color: C.goldBright, marginBottom: 5 }}>{s.title}</div>
+              <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7 }}>{s.body}</div>
+            </div>
+          ))}
+        </Card>
+      )}
+      {Array.isArray(data.mentor_lenses) && data.mentor_lenses.length > 0 && (
+        <Card title="Mentor lenses · JLaw · Qullamaggie · Martin Luk">
+          {data.mentor_lenses.map((m, i) => (
+            <div key={i} style={{ padding: "8px 0", borderBottom: i < data.mentor_lenses.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: vcol(m.verdict) }} />
+                <span style={{ fontSize: "0.72rem", flex: 1, fontWeight: 700 }}>{m.mentor}</span>
+                <span style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", color: vcol(m.verdict) }}>{m.verdict}</span>
+              </div>
+              {m.note && <div style={{ fontSize: "0.66rem", color: C.muted, marginLeft: 16, marginTop: 3, lineHeight: 1.55 }}>{m.note}</div>}
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit }) {
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const [coachRead, setCoachRead] = useState(null);
+  useEffect(() => {
+    if (!isAdmin || !session?.user?.id) return;
+    let alive = true;
+    supabase.from("claude_insights").select("payload").eq("user_id", session.user.id).maybeSingle()
+      .then(({ data }) => { if (alive && data?.payload) setCoachRead(data.payload); });
+    return () => { alive = false; };
+  }, [isAdmin, session?.user?.id]);
   const [filterSetup, setFilterSetup] = useState("All");
   const [filterTag, setFilterTag] = useState("All");
   const [editingId, setEditingId] = useState(null);
@@ -4485,7 +4885,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     }
   }, [distExpanded]);
 
-  const allTrades = useMemo(() => journaledTrades.filter(t => !deletedTradeIds.includes(t.id)), [journaledTrades, deletedTradeIds]);
+  const allTrades = useMemo(() => groupPositionFills(journaledTrades.filter(t => !deletedTradeIds.includes(t.id))), [journaledTrades, deletedTradeIds]);
 
   const handleImport = (e) => {
     const file = e.target.files?.[0];
@@ -5357,13 +5757,21 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   }, [dateFiltered, startCap, eqMode, eqXAxis]);
 
   // ── NEW: return-distribution buckets (mockup's fixed 10 buckets, editable what-if) ──
-  const DIST_BUCKETS = useMemo(() => ([
-    { lo: -Infinity, hi: -6, side: "neg", lab: "−6% or worse", mid: -8 }, { lo: -6, hi: -4, side: "neg", lab: "−6% to −4%", mid: -5 },
-    { lo: -4, hi: -2, side: "neg", lab: "−4% to −2%", mid: -3 }, { lo: -2, hi: 0, side: "neg", lab: "−2% to 0%", mid: -1 },
-    { lo: 0, hi: 4, side: "pos", lab: "0% to +4%", mid: 2 }, { lo: 4, hi: 8, side: "pos", lab: "+4% to +8%", mid: 6 },
-    { lo: 8, hi: 12, side: "pos", lab: "+8% to +12%", mid: 10 }, { lo: 12, hi: 16, side: "pos", lab: "+12% to +16%", mid: 14 },
-    { lo: 16, hi: 20, side: "pos", lab: "+16% to +20%", mid: 18 }, { lo: 20, hi: Infinity, side: "pos", lab: "+20% or more", mid: 24 },
-  ]), []);
+  // Fixed-scale histogram: symmetric ±30% by default, auto-EXPANDED (never shrunk) to fit any outlier.
+  // Uniform 2% bins so the axis is a stable ruler the data plots into — not refitted to each slice.
+  const DIST_RANGE = useMemo(() => {
+    const maxAbs = dateFiltered.reduce((m, t) => Math.max(m, Math.abs(Number(t.plPct) || 0)), 0);
+    return Math.max(30, Math.ceil(maxAbs / 2) * 2);
+  }, [dateFiltered]);
+  const DIST_BUCKETS = useMemo(() => {
+    const R = DIST_RANGE, out = [];
+    const sgn = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n) + "%";
+    out.push({ lo: -Infinity, hi: -R, side: "neg", mid: -R - 2, lab: `≤ −${R}%` });
+    for (let i = -R; i < 0; i += 2) out.push({ lo: i, hi: i + 2, side: "neg", mid: i + 1, lab: `${sgn(i)} to ${sgn(i + 2)}` });
+    for (let i = 0; i < R; i += 2) out.push({ lo: i, hi: i + 2, side: "pos", mid: i + 1, lab: `${sgn(i)} to ${sgn(i + 2)}` });
+    out.push({ lo: R, hi: Infinity, side: "pos", mid: R + 2, lab: `≥ +${R}%` });
+    return out;
+  }, [DIST_RANGE]);
   const [distPanelOpen, setDistPanelOpen] = useState(false);
   const [distEdits, setDistEdits] = useState({});        // {bucketIdx: count} what-if overrides
   const distBase = useMemo(() => DIST_BUCKETS.map(b => dateFiltered.filter(t => { const r = Number(t.plPct) || 0; return r >= b.lo && r < b.hi; }).length), [DIST_BUCKETS, dateFiltered]);
@@ -5467,6 +5875,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           <div className="h1" style={{ marginTop: 6 }}>Your track record, <span className="goldname">{firstName}</span></div>
           <div className="sub">Every closed trade, your performance, and whether your system actually has an edge.</div>
         </div>
+
+        {/* COACH — admin-only standing read from Claude (claude_insights) */}
+        {isAdmin && coachRead && <CoachHero data={coachRead} />}
 
         {/* TOOLBAR (Performance Tracker actions) */}
         <div className="jtoolbar">
@@ -5761,18 +6172,43 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 <button className={"distbtn" + (distPanelOpen ? " on" : "")} type="button" onClick={(e) => { e.stopPropagation(); setDistPanelOpen(o => !o); }}>{distPanelOpen ? "Hide data ▴" : "Open & edit data ▾"}</button>
                 <span className="chev2" style={{ marginLeft: 6 }}>&#9662;</span>
               </div>
-              <div className="bars" style={{ marginTop: 18 }}>
-                <div className="zeroline"></div>
-                {(() => { const maxC = Math.max(...distCounts, 1); return DIST_BUCKETS.map((b, i) => {
-                  const c = distCounts[i], hPct = c ? Math.max(18, Math.round(c / maxC * 90)) : 0, title = `${b.lab}: ${c} trade${c === 1 ? "" : "s"}`;
-                  return b.side === "neg"
-                    ? <div key={i} className="barcol" title={title}><div className="up"></div><div className="down">{c ? <div className="bar neg" style={{ height: hPct + "%", animationDelay: (i * 0.045).toFixed(3) + "s" }}></div> : null}</div></div>
-                    : <div key={i} className="barcol" title={title}><div className="up">{c ? <div className="bar pos" style={{ height: hPct + "%", animationDelay: (i * 0.045).toFixed(3) + "s" }}></div> : null}</div><div className="down"></div></div>;
-                }); })()}
-              </div>
-              <div className="distx">{DIST_BUCKETS.map((b, i) => {
-                const lab = b.lo === -Infinity ? "≤−6%" : b.hi === Infinity ? "+20%+" : (b.lo > 0 ? "+" : b.lo < 0 ? "−" : "") + Math.abs(b.lo) + "%";
-                return <span key={i} style={{ flex: 1, textAlign: "center" }}>{lab}</span>;
+              {(() => {
+                const CH = 270, halfH = (CH - 26) / 2, maxC = Math.max(...distCounts, 1);
+                const step = maxC <= 4 ? 1 : maxC <= 8 ? 2 : maxC <= 20 ? 5 : maxC <= 40 ? 10 : Math.ceil(maxC / 50) * 10;
+                const niceMax = Math.max(step, Math.ceil(maxC / step) * step);
+                const yFor = (v) => v / niceMax * halfH;
+                const ticks = []; for (let v = 0; v <= niceMax; v += step) ticks.push(v);
+                const yLab = { position: "absolute", right: 2, fontSize: "0.5rem", color: "var(--muted)" };
+                const gl = (v) => ({ position: "absolute", left: 0, right: 0, borderTop: v === 0 ? "1px solid rgba(255,255,255,0.18)" : "1px dashed rgba(255,255,255,0.06)" });
+                return (
+                <div style={{ display: "flex", gap: 6, marginTop: 18 }}>
+                  <div style={{ position: "relative", width: 24, height: CH, flexShrink: 0 }}>
+                    {ticks.map(v => (<React.Fragment key={"y" + v}>
+                      <span style={{ ...yLab, top: halfH - yFor(v) - 5 }}>{v}</span>
+                      {v > 0 && <span style={{ ...yLab, top: halfH + yFor(v) - 5 }}>{v}</span>}
+                    </React.Fragment>))}
+                  </div>
+                  <div style={{ position: "relative", flex: 1, height: CH }}>
+                    {ticks.map(v => (<React.Fragment key={"g" + v}>
+                      <div style={{ ...gl(v), top: halfH - yFor(v) }} />
+                      {v > 0 && <div style={{ ...gl(v), top: halfH + yFor(v) }} />}
+                    </React.Fragment>))}
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "stretch" }}>
+                      {DIST_BUCKETS.map((b, i) => {
+                        const c = distCounts[i], h = yFor(c);
+                        return (<div key={i} title={`${b.lab}: ${c} trade${c === 1 ? "" : "s"}`} style={{ flex: 1, position: "relative" }}>
+                          {c ? <div style={{ position: "absolute", left: "14%", right: "14%", height: h, ...(b.side === "neg" ? { top: halfH } : { top: halfH - h }), background: b.side === "neg" ? "linear-gradient(180deg,#ff6b6b,#b83232)" : "linear-gradient(180deg,#33d484,#1f8f57)", borderRadius: b.side === "neg" ? "0 0 3px 3px" : "3px 3px 0 0" }} /> : null}
+                        </div>);
+                      })}
+                    </div>
+                  </div>
+                </div>);
+              })()}
+              <div className="distx" style={{ paddingLeft: 30 }}>{DIST_BUCKETS.map((b, i) => {
+                if (b.lo === -Infinity) return <span key={i} style={{ flex: 1, textAlign: "center" }}>≤−{DIST_RANGE}</span>;
+                if (b.hi === Infinity) return <span key={i} style={{ flex: 1, textAlign: "center" }}>+{DIST_RANGE}</span>;
+                const major = b.lo % 10 === 0, show = b.lo % 4 === 0;
+                return <span key={i} style={{ flex: 1, textAlign: "center" }}>{show ? (b.lo > 0 ? "+" : b.lo < 0 ? "−" : "") + Math.abs(b.lo) + (major ? "%" : "") : ""}</span>;
               })}</div>
               <div className="charthint">{!dateFiltered.length ? "No trades match this filter."
                 : dstats.wins ? <>Wins reach up to <span className="g">{dstats.lw ? sgnPct(Number(dstats.lw.plPct)) : "—"}</span>{dstats.losses ? <>, while losses stay contained (worst <span className="rd">−{Math.abs(Number(dstats.ll?.plPct) || 0).toFixed(2)}%</span>)</> : " with no losing trades in this slice"}. Small losses, larger wins is the shape of an edge.</>
@@ -5909,7 +6345,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   <React.Fragment key={t.id}>
                     <tr id={"jtrade-" + t.id} className={"traderow" + (isOpen ? " rev-open" : "") + (highlightTradeId === t.id ? " jumphl" : "")} onDoubleClick={() => startEdit(t)}>
                       <td data-l="Result"><span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span></td>
-                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}</span></td>
+                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}</span></td>
                       <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Exit $">${(Number(t.exitP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
@@ -5966,6 +6402,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                             <TradeChart trade={t} />
                           </div>
 
+                          {isAdmin ? (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>) : (
                           <div className="revnotes">
                             <div className="revchart-head" style={{ marginBottom: 0 }}>
                               <span className="revcoltitle" style={{ margin: 0 }}>Trade review</span>
@@ -5978,6 +6415,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                               <div><div className="nlabel l">Lesson learned</div><textarea className="mgta" value={reviewDraft.lessons} onChange={e => setReviewDraft(r => ({ ...r, lessons: e.target.value }))} placeholder="Lesson learned..." /></div>
                             </div>
                           </div>
+                          )}
                           <div className="revfoot">
                             {deleteStep === 0 && (
                               <>
@@ -6163,7 +6601,7 @@ const GLOSSARY = [
   ["R-Mult","R-Multiple","Return ÷ weighted initial risk. 2R = made 2× what you risked."],
   ["R Suggest","R-Based Suggested Stop","In R Mode: shows where the R system would place your stop based on current R-level. At 1R → stop to breakeven. At 2R → stop to 1R. At 3R → stop to 2R. Use this as a reference to update your Trail Stop."],
   ["Locked","Locked Profit","In R Mode: profit per share locked in at the R-suggested stop. If you set your Trail Stop to this value and get stopped out, this is your guaranteed gain."],
-  ["Tier","Position Tier","Auto-assigned from position value vs sizer. 12% buffer for slippage."],
+  ["Tier","Position Tier","Auto-assigned from $-at-risk vs your per-trade risk budget (Full / Half / Quarter / Pilot). 12% buffer for slippage."],
 ];
 
 const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
@@ -6425,7 +6863,7 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .mgmeta b{color:var(--text); font-weight:700; font-variant-numeric:tabular-nums}
 .vd .mgclose{margin-left:auto; background:transparent; border:none; color:var(--faint); font-size:1.4rem; line-height:1; cursor:pointer}
 .vd .mgclose:hover{color:var(--text)}
-.vd .mggrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0}
+.vd .mggrid{display:grid; grid-template-columns:1fr 1fr; gap:0}
 .vd .mgcol{padding:0 22px; border-left:1px solid var(--border)}
 .vd .mgcol:first-child{padding-left:0; border-left:none}
 .vd .mgcol:last-child{padding-right:0}
@@ -6531,10 +6969,11 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .hero{grid-template-columns:1fr}
   }`;
 
-function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, fullSizePct, setFullSizePct, numStocks, setNumStocks, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning, displayName }) {
+function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning, displayName }) {
   // Alias so existing `INTRADAY_FEATURE_ENABLED` references inside this component keep reading as a single
   // flag without rewriting every callsite. Reactive — flipping the Settings toggle re-renders the table.
   const INTRADAY_FEATURE_ENABLED = intradayFeatureEnabled;
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [compactTable, setCompactTable] = useState(false);
   // Open Positions zoom — scales the whole table (5 steps each way, 70%–130%, 6% per step). Persisted as a UI-only pref.
   const [posZoom, setPosZoom] = useState(() => { const s = parseFloat(localStorage.getItem("viv-pos-zoom")); return Number.isFinite(s) ? Math.min(1.3, Math.max(0.7, s)) : 1; });
@@ -6604,17 +7043,8 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
   // includes trail-locked profit; when off, identical to bookedEquity (conservative).
   const compEquity = bookedEquity + (useSecuredProfit ? securedProfit : 0);
 
-  // fullSizePct is the TARGET POSITION SIZE PER TRADE (%). Sizing is on current (compounded)
-  // equity, not starting capital — perStock = $ at full size; fullSizeAmt = implied total if fully loaded.
-  const sizer = useMemo(() => {
-    const ps = compEquity;
-    if (!ps || ps <= 0) return null;
-    const perTradePct = +fullSizePct || 0;
-    const perStock = ps * (perTradePct / 100);
-    const fullSizeAmt = perStock * numStocks;
-    return { perTradePct, fullSizeAmt, impliedTotalPct: perTradePct * numStocks, full: perStock, half: perStock / 2, quarter: perStock / 4, pilot: perStock / 8 };
-  }, [compEquity, fullSizePct, numStocks]);
-  const targetPosPct = +fullSizePct || 0; // benchmark for Open Positions Exp % colour coding
+  // (Position-size-first sizer removed — sizing is RISK-FIRST via rSizer below: you fix the risk %,
+  // the stop sets the share count, position size is the output. Tiers + health key off $-at-risk.)
 
   // R-based sizer: current equity × ROTE% = total risk budget, ÷ max positions = R$ per trade
   const rSizer = useMemo(() => {
@@ -7070,7 +7500,6 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
     const activeStop = hasTS ? tsN : (isDual ? (stop1 * h1 + stop2 * h2) / (h1 + h2) : stop1);
 
     const posValue = epN * sharesN;
-    const tier = autoTier(posValue, sizer);
 
     // DTS uses active stop (trail stop if set, otherwise weighted original). dir-signed for Short.
     const dtsD = hasTS ? dir * (cpN - tsN) : (sharesN > 0 ? dir * ((cpN - stop1) * h1 + (isDual ? (cpN - stop2) * h2 : 0)) / sharesN : 0);
@@ -7105,6 +7534,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
     // ROTE — initial (original stops) and current (active stop = trail if set)
     const ps = +portfolioSize || 0;
     const roteD = initRiskD > 0 ? initRiskD : 0;
+    const tier = autoTier(roteD, rSizer); // risk-first: tier by $-at-risk vs per-trade risk budget
     const rotePct = ps > 0 ? (roteD / ps) * 100 : 0;
     const currentRiskPerShare = dir * (epN - activeStop); // >0 = still at risk, <=0 = risk-free / locked
     const currentRoteD = currentRiskPerShare <= 0 ? 0 : currentRiskPerShare * sharesN;
@@ -7193,7 +7623,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
 
     return { ...p, epN, cpN, commN, stop1, stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR, sumTrimsLogged, sumAddsLogged, sharesNProj, realizedProjAdd, trimProjPct, todayTrimPct, remainingProjPct, intradayEventCount, intradayLiveCount, intradayAllReconciled };
   } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, realizedShares:0, origShares:0, trimPct:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0, sumTrimsLogged:0, sumAddsLogged:0, sharesNProj:0, realizedProjAdd:0, trimProjPct:0, todayTrimPct:0, remainingProjPct:0, intradayEventCount:0, intradayLiveCount:0, intradayAllReconciled:false }; }
-  }), [positions, sizer, portfolioSize, compEquity, realizedByPosition]);
+  }), [positions, rSizer, portfolioSize, compEquity, realizedByPosition]);
 
   const totals = useMemo(() => {
     const active = enriched.filter(p => p.sym && p.cpN > 0);
@@ -7619,10 +8049,10 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
             <tbody>
               {sortedOpen.map(p => {
                 const sc = statusClass(p.riskStatus);
-                // Position-sizing health vs target (shown in the Manage panel readout).
-                const sizeRatio = targetPosPct > 0 ? p.expPct / targetPosPct : 0;
-                const sizeLabel = !targetPosPct ? "—" : sizeRatio > 1.2 ? "Oversized" : sizeRatio < 0.8 ? "Undersized" : "On size";
-                const sizeColor = !targetPosPct ? "var(--muted)" : sizeRatio > 1.2 ? "var(--red)" : sizeRatio < 0.8 ? "var(--blue)" : "var(--green)";
+                // Risk-health (risk-first): this position's $-at-risk vs the per-trade risk budget.
+                const sizeRatio = rPerTrade > 0 ? p.roteD / rPerTrade : 0;
+                const sizeLabel = !rPerTrade ? "—" : sizeRatio > 1.2 ? "Over-risked" : sizeRatio < 0.8 ? "Under-risked" : "On budget";
+                const sizeColor = !rPerTrade ? "var(--muted)" : sizeRatio > 1.2 ? "var(--red)" : sizeRatio < 0.8 ? "var(--blue)" : "var(--green)";
                 const isOpen = manageId === p.id;
                 // Profit Locked → the active stop sits above entry, so show the locked-in profit ($)
                 // instead of risk-to-stop (which is negative here). Locked profit = −rtsD = (stop − entry) × shares.
@@ -7684,16 +8114,11 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                               <button className="btn gold mgsave" onClick={() => onManualSave && onManualSave()}>Save stops</button>
                             </div>
                             <div className="mgcol">
-                              <div className="mgcoltitle">Activity today</div>
-                              <div className="mgactlist">Logging happens automatically — IBKR sync fills the journal overnight.</div>
-                              <div className="mgnote">Calculation only — editing stops here doesn't create a trade. Use Sell / Close below to book an exit to your journal.</div>
-                            </div>
-                            <div className="mgcol">
                               <div className="mgcoltitle">Risk &amp; P/L</div>
                               <div className="mgreadout">
                                 <div className="mgr"><span className="term tipright" data-tip="Dollars you'd lose if price hits your stop from here.">Risk to stop</span><b className={p.rtsD > 0 ? "red" : "green"}>{p.rtsD <= 0 ? "Locked" : usd0(p.rtsD)}</b></div>
                                 <div className="mgr"><span className="term tipright" data-tip="This position's risk as a % of your whole account.">Risk on equity</span><b>{pct2(p.currentRotePct)}</b></div>
-                                <div className="mgr"><span className="term tipright" data-tip="Whether this position matches your target size. Undersized is below your target, Oversized is above.">Size health</span><b style={{ color: sizeColor }}>{sizeLabel}</b></div>
+                                <div className="mgr"><span className="term tipright" data-tip="Whether this position's $-at-risk matches your per-trade risk budget. Under-risked is below budget, Over-risked is above.">Risk health</span><b style={{ color: sizeColor }}>{sizeLabel}</b></div>
                                 <div className="mgr"><span className="term tipright" data-tip="Profit or loss in units of your initial risk.">R-multiple</span><b className={p.rMult >= 0 ? "green" : "red"}>{(p.rMult >= 0 ? "+" : "") + p.rMult.toFixed(1)}R</b></div>
                                 <div className="mgr"><span className="term tipright" data-tip="Profit secured because your stop sits above entry.">Locked profit</span><b className={p.rLockedProfit > 0 ? "green" : ""}>{usd0(p.rLockedProfit * p.sharesN)}</b></div>
                                 <div className="mgr"><span className="term tipright" data-tip="Shares to sell at the current price to recover your full cost basis.">SBE · break-even</span><b>{p.sbe > 0 ? p.sbe + " sh" : "—"}</b></div>
@@ -7703,6 +8128,8 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                               </div>
                             </div>
                           </div>
+
+                          {isAdmin && p.rationale && <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border)" }}><RationaleBlock rationale={p.rationale} /></div>}
 
                           <div className="mgfoot">
                             <button className={"btn mgsell" + (sellOpen ? " open" : "")} onClick={() => sellOpen ? setSellOpen(false) : openSell(p)}>Sell / Close position</button>
@@ -9191,7 +9618,7 @@ function AppInner() {
       else if (ins) {
         res.tInserted = ins.length;
         ins.forEach(t => { if (t.ib_exec_id) journaledExecIds.add(t.ib_exec_id); audit.tradesInserted.push(t.id); });
-        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null }));
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
     }
@@ -9220,7 +9647,7 @@ function AppInner() {
       else if (ins) {
         res.pInserted = ins.length;
         ins.forEach(p => audit.positionsInserted.push(p.id));
-        const mapped = ins.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "ibkr", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
+        const mapped = ins.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "ibkr", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
         setPositions(prev => [...prev, ...mapped]);
         lastLoadedCount.current = (lastLoadedCount.current || 0) + mapped.length;
       }
@@ -9263,7 +9690,7 @@ function AppInner() {
       else if (ins) {
         res.partialsInserted = ins.length;
         ins.forEach(t => audit.tradesInserted.push(t.id));
-        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null }));
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
     }
@@ -9431,10 +9858,10 @@ function AppInner() {
       ]);
       if (softDelsRes.data) setSoftDeletedExecIds(new Set(softDelsRes.data.map(r => r.ib_exec_id).filter(Boolean)));
       if (tradesRes.data) {
-        setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null }))));
+        setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null }))));
       }
       if (posRes.data) {
-        const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
+        const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
         setPositions(mapped);
         positionsRef.current = mapped;
         lastLoadedCount.current = mapped.length;
@@ -9446,8 +9873,6 @@ function AppInner() {
     setUndoResult(r);
     setUndoStatus("done");
   }, [session, lastSync, undoStatus, undoStorageKey]);
-  const [fullSizePct, setFullSizePct] = useState(25);
-  const [numStocks, setNumStocks] = useState(5);
   const [fontSize, setFontSize] = useState("standard");
   const [targetRote, setTargetRote] = useState("2");
   const dataLoaded = useRef(false);
@@ -9650,8 +10075,6 @@ function AppInner() {
       if (prof) {
         setProfile(prof);
         if (prof.portfolio_size) setPortfolioSize(String(prof.portfolio_size));
-        if (prof.full_size_pct != null) setFullSizePct(prof.full_size_pct);
-        if (prof.num_stocks != null) setNumStocks(prof.num_stocks);
         if (prof.font_size) setFontSize(prof.font_size);
       }
 
@@ -9734,7 +10157,7 @@ function AppInner() {
         const snap = new Map();
         clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
         loadedSnapshot.current = snap;
-        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, intradayLog: normalizeIntradayLog(p.intraday_log) })));
+        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) })));
       } else if (!posErr) {
         // Query succeeded but returned empty — check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
@@ -9751,7 +10174,7 @@ function AppInner() {
             const { data: seeded } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).order("created_at");
             if (seeded && seeded.length > 0) {
               lastLoadedCount.current = seeded.length;
-              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", intradayLog: normalizeIntradayLog(p.intraday_log) })));
+              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) })));
             }
           }
           await saveSettingNow(uid, "initialized", true);
@@ -9770,7 +10193,7 @@ function AppInner() {
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       console.log(`[load] trades fetched: ${(trades || []).length}`);
       if (trades && trades.length > 0) {
-        setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: t.r_mult, reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null }))));
+        setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null }))));
         lastLoadedTradeCount.current = trades.length;
       }
       // Soft-deleted IBKR exec ids — small parallel query, just the column we need. Used by the matcher
@@ -9820,7 +10243,7 @@ function AppInner() {
                 const snap2 = new Map();
                 refreshed.forEach(p => { if (p.symbol) snap2.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
                 loadedSnapshot.current = snap2;
-                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", intradayLog: normalizeIntradayLog(p.intraday_log) }));
+                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
                 positionsRef.current = next;
                 setPositions(next);
               }
@@ -9911,8 +10334,6 @@ function AppInner() {
   }, [session]);
 
   useEffect(() => { if (dataLoaded.current && !loadFailed.current) saveProfile("portfolio_size", +portfolioSize || 0); }, [portfolioSize]);
-  useEffect(() => { if (dataLoaded.current && !loadFailed.current) saveProfile("full_size_pct", fullSizePct); }, [fullSizePct]);
-  useEffect(() => { if (dataLoaded.current && !loadFailed.current) saveProfile("num_stocks", numStocks); }, [numStocks]);
   useEffect(() => { if (dataLoaded.current && !loadFailed.current) saveProfile("font_size", fontSize); }, [fontSize]);
 
   // ─── Auto-save settings to Supabase — blocked if data load failed to prevent overwriting with defaults ───
@@ -10107,8 +10528,6 @@ function AppInner() {
     setTags(DEFAULT_TAGS);
     setExitReasons(DEFAULT_EXIT_REASONS);
     setPortfolioSize("500000");
-    setFullSizePct(25);
-    setNumStocks(5);
     setFontSize("standard");
     setTargetRote("2");
     lastLoadedCount.current = 0;
@@ -10148,7 +10567,7 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage setPage={setPage} onLogout={handleLogout} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} fullSizePct={fullSizePct} setFullSizePct={setFullSizePct} numStocks={numStocks} setNumStocks={setNumStocks} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
+      {page === "dashboard" && <DashboardPage setPage={setPage} onLogout={handleLogout} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
       {page === "tools" && <PremiumToolsPage setPage={setPage} onLogout={handleLogout} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} displayName={displayName} />}
       {page === "journal" && <TradeJournalPage setPage={setPage} onLogout={handleLogout} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} />}
       {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
