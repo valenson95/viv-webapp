@@ -6553,7 +6553,15 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
   });
   useEffect(() => { try { localStorage.setItem("viv-secured-profit", useSecuredProfit ? "1" : "0"); } catch {} }, [useSecuredProfit]);
   const [glossaryOpen, setGlossaryOpen] = useState(false);
-  const [posSorts, setPosSorts] = useState([]); // [{key, dir}] multi-sort for positions
+  // Open Positions column sort — members can sort the table by ticker / R-multiple / P/L $ / P/L % /
+  // position size. First click on a header sorts DESCENDING, second click toggles to ascending; a ▲/▼
+  // shows on the active column. Persisted as a UI-only pref (matches viv-pos-zoom / viv-view pattern).
+  const [posSort, setPosSort] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem("viv-pos-sort")); return (s && s.key && (s.dir === "asc" || s.dir === "desc")) ? s : null; } catch { return null; }
+  });
+  useEffect(() => { try { posSort ? localStorage.setItem("viv-pos-sort", JSON.stringify(posSort)) : localStorage.removeItem("viv-pos-sort"); } catch {} }, [posSort]);
+  // Toggle: first click on a new column = desc, second click on the same column = asc, third = back to desc.
+  const togglePosSort = (key) => setPosSort(s => (s && s.key === key) ? { key, dir: s.dir === "desc" ? "asc" : "desc" } : { key, dir: "desc" });
   const [posColWidths, setPosColWidths] = useState({}); // {colKey: width} for resizable columns
   const posDrag = useDragReorder(25); // 25 open positions columns (24 + "Today" intraday activity)
 
@@ -7271,7 +7279,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
 
   const compTh = (text, align = "right") => <th style={{padding:"10px 8px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap"}}>{text}</th>;
 
-  const th = (text, align = "right", sortKey = null) => <th onClick={sortKey ? (e) => setPosSorts(s => toggleSort(s, sortKey, e.shiftKey)) : undefined} style={{ padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.10em",textTransform:"uppercase",color:posSorts.find(s=>s.key===sortKey)?C.gold:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"default",userSelect:"none" }}>{text}{sortKey ? sortArrow(posSorts, sortKey) : ""}</th>;
+  const th = (text, align = "right", sortKey = null) => <th onClick={sortKey ? () => togglePosSort(sortKey) : undefined} style={{ padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.10em",textTransform:"uppercase",color:posSort&&posSort.key===sortKey?C.gold:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"default",userSelect:"none" }}>{text}{sortKey && posSort && posSort.key === sortKey ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>;
 
   // ═══════════════════════════════════════════════════════════════════════
   // ─── MOCKUP-UI RENDER (dashboard-recommended.html) ───
@@ -7362,6 +7370,19 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
   }, [journaledTrades]);
   const sparkLine = spark ? spark.line : "M0,44 L32,46 L64,40 L96,42 L128,33 L160,36 L192,26 L224,30 L256,18 L288,22 L320,9";
   const sparkArea = spark ? spark.area : "M0,44 L32,46 L64,40 L96,42 L128,33 L160,36 L192,26 L224,30 L256,18 L288,22 L320,9 L320,56 L0,56 Z";
+
+  // Open Positions rows to render, with the member's chosen column sort applied. Keys map to enriched
+  // fields: sym (ticker), rMult (R-multiple), plD (P/L $), plPct (P/L %), posValue (position size).
+  // Default (no explicit sort) = descending R, falling back to descending P/L for rows without an R.
+  const sortedOpen = useMemo(() => {
+    const rows = enriched.filter(p => p.sym || p.id === manageId);
+    if (posSort) return multiSort(rows, [{ key: posSort.key, dir: posSort.dir }]);
+    return [...rows].sort((a, b) => {
+      const ar = a.rMult || 0, br = b.rMult || 0;
+      if (ar !== br) return br - ar;            // descending R
+      return (b.plD || 0) - (a.plD || 0);       // fallback: descending P/L
+    });
+  }, [enriched, manageId, posSort]);
 
   // live "this sale" readout for the Manage sell form
   const manageRow = manageId != null ? enriched.find(p => p.id === manageId) : null;
@@ -7576,26 +7597,27 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
 
         <div className={"card guide" + gactive("pos")} style={{ padding: "8px 6px" }} onMouseEnter={guideEnter("pos", "Open positions", "Every trade you currently hold. The colored status shows which positions are at risk.", "/audio/positions.mp3")} onMouseLeave={guideLeave("pos")}>
           <div className="pos-scroll">
+          {/* Click a sortable header (Symbol / Position size / R / P/L) to sort the open positions. */}
           <table>
             <thead>
               <tr>
                 <th><span className="term" data-tip="Where this position sits on risk.&#10;At Risk = stop below entry.&#10;Risk-Free = stop at entry.&#10;Profit Locked = stop above entry.">Status</span></th>
-                <th><span className="term" data-tip="The ticker symbol. The dot shows the source: gold = auto-synced from IBKR, grey = entered manually.">Symbol</span></th>
+                <th onClick={() => togglePosSort("sym")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "sym" ? C.gold : undefined }} title="Sort by ticker"><span className="term" data-tip="The ticker symbol. The dot shows the source: gold = auto-synced from IBKR, grey = entered manually.">Symbol</span>{posSort && posSort.key === "sym" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th className="pro-only"><span className="term" data-tip="How many shares you currently hold.">Shares</span></th>
                 <th className="pro-only"><span className="term" data-tip="Your average entry price per share.">Avg Cost</span></th>
                 <th className="pro-only"><span className="term" data-tip="Total broker fees paid on this position so far.">Commission</span></th>
                 <th className="pro-only"><span className="term" data-tip="The pattern or reason you took the trade.">Setup</span></th>
-                <th><span className="term" data-tip="Total dollars in this position — shares × average cost.">Position size</span></th>
+                <th onClick={() => togglePosSort("posValue")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "posValue" ? C.gold : undefined }} title="Sort by position size"><span className="term" data-tip="Total dollars in this position — shares × average cost.">Position size</span>{posSort && posSort.key === "posValue" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th><span className="term" data-tip="Profit banked from partial sells of this position. The bar fills to the percentage of your original shares you've sold (trimmed).">Realized</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="Your current protective stop price.">Stop</span></th>
                 <th><span className="term tipright" data-tip="Dollars you'd lose if price falls to your stop from here.">Risk to stop</span></th>
-                <th className="pro-only"><span className="term tipright" data-tip="R-multiple — profit/loss in units of your initial risk.">R</span></th>
-                <th><span className="term tipright" data-tip="Open profit or loss on this position right now.">P/L</span></th>
+                <th className="pro-only" onClick={() => togglePosSort("rMult")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "rMult" ? C.gold : undefined }} title="Sort by R-multiple"><span className="term tipright" data-tip="R-multiple — profit/loss in units of your initial risk.">R</span>{posSort && posSort.key === "rMult" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
+                <th><span className="term tipright" data-tip="Open profit or loss on this position right now.">P/L</span>{" "}<span onClick={(e) => { e.stopPropagation(); togglePosSort("plD"); }} title="Sort by P/L ($)" style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "plD" ? C.gold : C.muted }}>${posSort && posSort.key === "plD" ? (posSort.dir === "asc" ? "▲" : "▼") : ""}</span>{" "}<span onClick={(e) => { e.stopPropagation(); togglePosSort("plPct"); }} title="Sort by P/L (%)" style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "plPct" ? C.gold : C.muted }}>%{posSort && posSort.key === "plPct" ? (posSort.dir === "asc" ? "▲" : "▼") : ""}</span></th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {enriched.filter(p => p.sym || p.id === manageId).map(p => {
+              {sortedOpen.map(p => {
                 const sc = statusClass(p.riskStatus);
                 // Position-sizing health vs target (shown in the Manage panel readout).
                 const sizeRatio = targetPosPct > 0 ? p.expPct / targetPosPct : 0;
