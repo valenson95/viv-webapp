@@ -3351,7 +3351,6 @@ function TradeChart({ trade }) {
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState(null);  // first endpoint of an in-progress trendline {time,price}
   const [hoverPt, setHoverPt] = useState(null); // live cursor {x,y} for the trendline rubber-band preview
-  const [cursorTip, setCursorTip] = useState(null); // interactive price + P&L readout that follows the crosshair
   const [editingText, setEditingText] = useState(null); // {id,x,y,value} text being typed
   const [overlayTick, setOverlayTick] = useState(0); // bumped on pan/zoom/resize to re-project the overlay
   const drawKey = `viv-draw-${trade.id}`;
@@ -3432,14 +3431,24 @@ function TradeChart({ trade }) {
           });
         }
 
-        // ── Entry / exit / peak markers — anchored to the ACTUAL trade DATE/TIME (single source = UTC),
-        //    NOT price-matched. (Price-matching put the arrow on an earlier candle at a similar price — the GFS bug.) ──
+        // ── Entry / exit markers — pinned to the EXACT candle you entered/exited. ──
+        // FACT: /api/candles proxies Polygon → candle.time is a UTC epoch (intraday = the true UTC instant).
+        // Stored trade.entryTime/exitTime are ET wall-clock (what the trade row shows, e.g. 09:34:57). So we
+        // convert ET→UTC (DST-aware via Intl) before locating the bar — one consistent clock (ET in the DB).
+        // (Intraday was 4h off because ET was being read as UTC; daily matches by ET session date.)
         const entryP = +trade.entryP, exitP = +trade.exitP;
-        const hhmm = (s) => (s && /^\d{1,2}:\d{2}/.test(s)) ? (s.length === 5 ? s : s.slice(0, 5)) : null;
-        const tgt = (iso, time) => Date.parse(iso + "T" + ((activeRes !== "1day" && hhmm(time)) ? hhmm(time) : "12:00") + ":00Z");
-        const nearestT = (target) => candles.reduce((b, c) => Math.abs(c.time * 1000 - target) < Math.abs((b ? b.time * 1000 : 1e18) - target) ? c : b, null);
-        const entryBar = nearestT(tgt(entryISO, trade.entryTime));
-        const exitBar = nearestT(tgt(exitISO, trade.exitTime));
+        const _etParts = (ms) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(ms)).reduce((a, x) => (a[x.type] = x.value, a), {});
+        const _etWallToUTC = (iso, time) => { const [Y, M, D] = iso.split("-").map(Number); const t = (time && /^\d{1,2}:\d{2}/.test(time)) ? time : "12:00:00"; const [h, mi, s] = t.split(":").map(n => +n || 0); const guess = Date.UTC(Y, M - 1, D, h, mi, s); const p = _etParts(guess); const asET = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second); return guess - (asET - guess); };
+        const _etDate = (sec) => { const p = _etParts(sec * 1000); return `${p.year}-${p.month}-${p.day}`; };
+        const nearestT = (utcMs) => candles.reduce((b, c) => Math.abs(c.time * 1000 - utcMs) < Math.abs((b ? b.time * 1000 : 1e18) - utcMs) ? c : b, null);
+        let entryBar, exitBar;
+        if (activeRes === "1day") {
+          entryBar = candles.find(c => _etDate(c.time) === entryISO) || nearestT(_etWallToUTC(entryISO, "12:00"));
+          exitBar = candles.find(c => _etDate(c.time) === exitISO) || nearestT(_etWallToUTC(exitISO, "12:00"));
+        } else {
+          entryBar = nearestT(_etWallToUTC(entryISO, trade.entryTime));
+          exitBar = nearestT(_etWallToUTC(exitISO, trade.exitTime));
+        }
         let peak = null;
         if (entryBar && exitBar) {
           const lo = Math.min(entryBar.time, exitBar.time), hi = Math.max(entryBar.time, exitBar.time);
@@ -3503,11 +3512,6 @@ function TradeChart({ trade }) {
         chart.subscribeCrosshairMove((param) => {
           const bar = (param && param.time && param.seriesData) ? param.seriesData.get(s) : null;
           setLegend(legendFor(bar || lastBar, param));
-          if (param.point) {
-            const price = s.coordinateToPrice(param.point.y);
-            if (price != null) { const dP = isShort ? (entryP - price) : (price - entryP); setCursorTip({ x: param.point.x, y: param.point.y, price, plPct: entryP ? dP / entryP * 100 : 0, plDollar: dP * (+trade.shares || 0) }); }
-            else setCursorTip(null);
-          } else setCursorTip(null);
           if ((toolRef.current === "trend" || toolRef.current === "rect") && draftRef.current && param.point) setHoverPt({ x: param.point.x, y: param.point.y });
         });
 
@@ -3756,19 +3760,6 @@ function TradeChart({ trade }) {
                     <span style={{ color: MA_COLORS[50] }}>{maType}50 {fmtMA(legend.ma[50])}</span>
                   </div>
                 )}
-              </div>
-            )}
-            {/* Interactive crosshair readout — price + what you'd make/lose if you exited there, follows the cursor */}
-            {status === "ok" && cursorTip && (
-              <div style={{ position: "absolute", pointerEvents: "none", zIndex: 6,
-                left: cursorTip.x + (cursorTip.x > chartW - 150 ? -138 : 16), top: Math.max(4, cursorTip.y - 28),
-                background: "rgba(8,8,14,0.95)", border: `1px solid ${C.borderGold}`, borderRadius: 8, padding: "6px 10px",
-                fontFamily: font, fontSize: "0.66rem", fontWeight: 700, color: C.white, whiteSpace: "nowrap", boxShadow: "0 8px 24px rgba(0,0,0,0.6)" }}>
-                <div>${cursorTip.price.toFixed(2)}</div>
-                <div style={{ color: cursorTip.plDollar >= 0 ? C.green : C.red, marginTop: 2 }}>
-                  {cursorTip.plPct >= 0 ? "+" : ""}{cursorTip.plPct.toFixed(2)}% · {cursorTip.plDollar >= 0 ? "+" : "−"}${Math.abs(Math.round(cursorTip.plDollar)).toLocaleString()}
-                </div>
-                <div style={{ color: C.muted, fontWeight: 500, fontSize: "0.54rem", marginTop: 1 }}>if exited here</div>
               </div>
             )}
             {/* Drawing overlay — render-only SVG pinned to the chart (re-projected on pan/zoom via overlayTick).
@@ -4684,6 +4675,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const [tradeSorts, setTradeSorts] = useState([]); // [{key, dir}] multi-sort for trades
   const [eqYAxis, setEqYAxis] = useState("$"); // "$" or "%"
   const [eqXAxis, setEqXAxis] = useState("trades"); // "trades" or "months"
+  const [eqHover, setEqHover] = useState(null); // hovered equity-curve point index → interactive readout
   const [distExpanded, setDistExpanded] = useState(false); // expand/collapse distribution analysis
   // Smooth expand/collapse animation state for the full Distribution section:
   // distMounted = node is in the DOM · distOpen = grid-rows 0fr→1fr target · distSettled = overflow released after the transition
@@ -5786,7 +5778,8 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
       else { const step = (ds.length - 1) / 7; xs = Array.from({ length: 8 }, (_, k) => ds[Math.round(k * step)]); }
     }
     const totalPL = eq[eq.length - 1] - startCap, totalRet = startCap > 0 ? totalPL / startCap * 100 : 0, n = sorted.length;
-    return { yb, linePos: linePath(posSegs), lineNeg: linePath(negSegs), areaPos: areaPath(posSegs), areaNeg: areaPath(negSegs), yLabels, xs, totalPL, totalRet, n, pct };
+    return { yb, linePos: linePath(posSegs), lineNeg: linePath(negSegs), areaPos: areaPath(posSegs), areaNeg: areaPath(negSegs), yLabels, xs, totalPL, totalRet, n, pct,
+      pts: eq.map((v, i) => ({ x: X(i), y: Y(v), v, key: i === 0 ? "Start" : groupKeys[i - 1], delta: i === 0 ? 0 : (eq[i] - eq[i - 1]) })), startCap, W, H };
   }, [dateFiltered, startCap, eqMode, eqXAxis]);
 
   // ── NEW: return-distribution buckets (mockup's fixed 10 buckets, editable what-if) ──
@@ -6172,7 +6165,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
               </div>
               <div className="chartwrap">
                 <div className="yaxis">{eqSvg.yLabels.map((l, i) => <span key={i}>{l}</span>)}</div>
-                <div className="plot">
+                <div className="plot" style={{ position: "relative" }}
+                  onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); if (!r.width || !eqSvg.pts || !eqSvg.pts.length) return; const sx = ((e.clientX - r.left) / r.width) * eqSvg.W; let bi = 0, bd = 1e18; eqSvg.pts.forEach((p, i) => { const d = Math.abs(p.x - sx); if (d < bd) { bd = d; bi = i; } }); setEqHover(bi); }}
+                  onMouseLeave={() => setEqHover(null)}>
                   <svg viewBox="0 0 600 210" preserveAspectRatio="none" className="eqsvg" role="img" aria-label="Equity curve">
                     <defs>
                       <linearGradient id="jeqgPos" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(34,197,94,0.32)" /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient>
@@ -6186,7 +6181,24 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       <path d={eqSvg.linePos} fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                       <path d={eqSvg.lineNeg} fill="none" stroke="var(--red)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                     </g>
+                    {eqHover != null && eqSvg.pts[eqHover] && <line x1={eqSvg.pts[eqHover].x.toFixed(1)} y1="0" x2={eqSvg.pts[eqHover].x.toFixed(1)} y2="210" stroke="rgba(255,255,255,0.4)" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
                   </svg>
+                  {eqHover != null && eqSvg.pts[eqHover] && (() => {
+                    const p = eqSvg.pts[eqHover];
+                    const leftPct = (p.x / eqSvg.W) * 100, topPct = (p.y / eqSvg.H) * 100;
+                    const ret = eqSvg.startCap > 0 ? (p.v - eqSvg.startCap) / eqSvg.startCap * 100 : 0;
+                    const dpct = eqSvg.startCap > 0 ? p.delta / eqSvg.startCap * 100 : 0;
+                    const valStr = privacyMode ? ((ret >= 0 ? "+" : "−") + Math.abs(ret).toFixed(1) + "%") : ("$" + Math.round(p.v).toLocaleString());
+                    const dStr = privacyMode ? ((p.delta >= 0 ? "+" : "−") + Math.abs(dpct).toFixed(1) + "%") : ((p.delta >= 0 ? "+" : "−") + "$" + Math.abs(Math.round(p.delta)).toLocaleString());
+                    return (<>
+                      <div style={{ position: "absolute", left: leftPct + "%", top: topPct + "%", width: 9, height: 9, borderRadius: "50%", background: "#fff", border: "2px solid var(--gold)", transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: 4 }} />
+                      <div style={{ position: "absolute", left: leftPct + "%", top: 4, transform: leftPct > 65 ? "translateX(calc(-100% - 10px))" : "translateX(10px)", pointerEvents: "none", zIndex: 5, background: "rgba(8,8,14,0.96)", border: "1px solid var(--borderGold)", borderRadius: 8, padding: "6px 9px", fontSize: "0.62rem", fontWeight: 700, whiteSpace: "nowrap", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,0.55)" }}>
+                        <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: "0.52rem", marginBottom: 2 }}>{p.key === "Start" ? "Starting capital" : (eqXAxis === "months" ? "Month " : "") + p.key}</div>
+                        <div>{valStr}</div>
+                        {p.key !== "Start" && <div style={{ color: p.delta >= 0 ? "var(--green)" : "var(--red)", marginTop: 1, fontSize: "0.55rem" }}>{dStr} that {eqXAxis === "months" ? "month" : "day"}</div>}
+                      </div>
+                    </>);
+                  })()}
                 </div>
               </div>
               <div className="xaxis">{eqSvg.xs.length ? eqSvg.xs.map((s, i) => <span key={i}>{s}</span>) : <span>—</span>}</div>
@@ -6354,6 +6366,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 <th className="pro-only"><span className="term" data-tip="Average price you entered the trade at.">Entry $</span></th>
                 <th className="pro-only"><span className="term" data-tip="Price you exited the trade at.">Exit $</span></th>
                 <th className="pro-only"><span className="term" data-tip="Number of shares traded.">Shares</span></th>
+                <th><span className="term" data-tip="The date you opened the trade.">Entry date</span></th>
                 <th><span className="term" data-tip="The date you closed the trade.">Exit date</span></th>
                 <th><span className="term" data-tip="The pattern or reason you took the trade.">Setup</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="Your protective stop on this trade.">Stop</span></th>
@@ -6367,7 +6380,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             </thead>
             <tbody>
               {dateFiltered.length === 0 && (
-                <tr><td colSpan={14} className="nodata">No trades match this filter. Clear the filters to see your full track record.</td></tr>
+                <tr><td colSpan={15} className="nodata">No trades match this filter. Clear the filters to see your full track record.</td></tr>
               )}
               {dateFiltered.map(t => {
                 const up = (Number(t.plPct) || 0) > 0;
@@ -6382,6 +6395,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Exit $">${(Number(t.exitP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
+                      <td data-l="Entry date">{tradeDateISO(t.entry) || t.entry || "—"}</td>
                       <td data-l="Exit date">{tradeDateISO(t.exit) || t.exit || "—"}</td>
                       <td data-l="Setup">{t.setup ? <span className="tag">{t.setup}</span> : "—"}</td>
                       <td className="pro-only" data-l="Stop">{
