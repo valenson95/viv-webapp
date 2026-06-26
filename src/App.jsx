@@ -3351,6 +3351,7 @@ function TradeChart({ trade }) {
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState(null);  // first endpoint of an in-progress trendline {time,price}
   const [hoverPt, setHoverPt] = useState(null); // live cursor {x,y} for the trendline rubber-band preview
+  const [cursorTip, setCursorTip] = useState(null); // interactive price + P&L readout that follows the crosshair
   const [editingText, setEditingText] = useState(null); // {id,x,y,value} text being typed
   const [overlayTick, setOverlayTick] = useState(0); // bumped on pan/zoom/resize to re-project the overlay
   const drawKey = `viv-draw-${trade.id}`;
@@ -3398,7 +3399,7 @@ function TradeChart({ trade }) {
         if (disposed || !elRef.current) return;
         const w = elRef.current.clientWidth || 600;
         const chart = LWC.createChart(elRef.current, {
-          width: w, height: 480, layout: { background: { color: "transparent" }, textColor: "rgba(255,255,255,0.6)", fontFamily: font },
+          autoSize: true, width: w, height: 480, layout: { background: { color: "transparent" }, textColor: "rgba(255,255,255,0.6)", fontFamily: font },
           grid: { vertLines: { color: "rgba(255,255,255,0.05)" }, horzLines: { color: "rgba(255,255,255,0.05)" } },
           timeScale: { timeVisible: activeRes !== "1day", borderColor: "rgba(255,255,255,0.1)", rightOffset: 6 },
           rightPriceScale: { borderColor: "rgba(255,255,255,0.1)", scaleMargins: volOn ? { top: 0.08, bottom: 0.26 } : { top: 0.12, bottom: 0.12 }, mode: logScale ? 1 : 0 }, crosshair: { mode: 0 },
@@ -3448,10 +3449,13 @@ function TradeChart({ trade }) {
         const REV = { entry: "#ff8c00", profit: "#1ed980", stop: "#ff1744" };
         const exitWin = isShort ? (exitP < entryP) : (exitP > entryP); // profit exit vs loss/stop exit
         const exitCol = exitWin ? REV.profit : REV.stop, exitLetter = exitWin ? "P" : "S";
-        // RAYS-ONLY (per Valen): no on-candle arrows or "Peak" circle — they cluttered/misaligned the chart.
-        // Entry / Profit / Stop are shown purely as clean horizontal rays with word-labels (the SVG overlay below),
-        // matching a TradingView feel. (Peak price still appears in the stats panel as "Best Exit Price".)
-        s.setMarkers([]);
+        // Rays for entry/profit/stop (SVG overlay) + SMALL entry/exit arrows that just point (no "Peak" circle —
+        // it cluttered). Per Valen 2026-06-26.
+        const markers = [];
+        if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: REV.entry, shape: "arrowUp", size: 1 });
+        if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: exitCol, shape: "arrowDown", size: 1 });
+        markers.sort((a, b) => a.time - b.time);
+        s.setMarkers(markers);
         // Candle-anchored rays on the SVG overlay: start at the fill candle, extend right, one small word-label each.
         // No badge boxes, no price pills (the stats panel already shows exact entry/exit/stop).
         setTradeMarks({
@@ -3498,10 +3502,15 @@ function TradeChart({ trade }) {
         chart.subscribeCrosshairMove((param) => {
           const bar = (param && param.time && param.seriesData) ? param.seriesData.get(s) : null;
           setLegend(legendFor(bar || lastBar, param));
+          if (param.point) {
+            const price = s.coordinateToPrice(param.point.y);
+            if (price != null) { const dP = isShort ? (entryP - price) : (price - entryP); setCursorTip({ x: param.point.x, y: param.point.y, price, plPct: entryP ? dP / entryP * 100 : 0, plDollar: dP * (+trade.shares || 0) }); }
+            else setCursorTip(null);
+          } else setCursorTip(null);
           if ((toolRef.current === "trend" || toolRef.current === "rect") && draftRef.current && param.point) setHoverPt({ x: param.point.x, y: param.point.y });
         });
 
-        onResize = () => { if (elRef.current && chart) { const cw = elRef.current.clientWidth; chart.applyOptions({ width: cw }); setChartW(cw); setOverlayTick(t => (t + 1) % 1e9); } };
+        onResize = () => { if (elRef.current && chart) { const cw = elRef.current.clientWidth; setChartW(cw); setOverlayTick(t => (t + 1) % 1e9); } };
         window.addEventListener("resize", onResize);
       }, 30);
     };
@@ -3722,7 +3731,7 @@ function TradeChart({ trade }) {
         </div>
         <div style={{ flex: "1 1 420px", minWidth: 0 }}>
           <div style={{ position: "relative" }}>
-            <div ref={elRef} style={{ width: "100%", minHeight: 480, cursor: tool === "cursor" ? "default" : "crosshair" }}>
+            <div ref={elRef} style={{ width: "100%", height: 480, cursor: tool === "cursor" ? "default" : "crosshair" }}>
               {status !== "ok" && (
                 <div style={{ height: 480, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: "0.74rem", textAlign: "center", padding: "0 20px" }}>
                   {status === "loading" && "Loading chart…"}
@@ -3746,6 +3755,19 @@ function TradeChart({ trade }) {
                     <span style={{ color: MA_COLORS[50] }}>{maType}50 {fmtMA(legend.ma[50])}</span>
                   </div>
                 )}
+              </div>
+            )}
+            {/* Interactive crosshair readout — price + what you'd make/lose if you exited there, follows the cursor */}
+            {status === "ok" && cursorTip && (
+              <div style={{ position: "absolute", pointerEvents: "none", zIndex: 6,
+                left: cursorTip.x + (cursorTip.x > chartW - 150 ? -138 : 16), top: Math.max(4, cursorTip.y - 28),
+                background: "rgba(8,8,14,0.95)", border: `1px solid ${C.borderGold}`, borderRadius: 8, padding: "6px 10px",
+                fontFamily: font, fontSize: "0.66rem", fontWeight: 700, color: C.white, whiteSpace: "nowrap", boxShadow: "0 8px 24px rgba(0,0,0,0.6)" }}>
+                <div>${cursorTip.price.toFixed(2)}</div>
+                <div style={{ color: cursorTip.plDollar >= 0 ? C.green : C.red, marginTop: 2 }}>
+                  {cursorTip.plPct >= 0 ? "+" : ""}{cursorTip.plPct.toFixed(2)}% · {cursorTip.plDollar >= 0 ? "+" : "−"}${Math.abs(Math.round(cursorTip.plDollar)).toLocaleString()}
+                </div>
+                <div style={{ color: C.muted, fontWeight: 500, fontSize: "0.54rem", marginTop: 1 }}>if exited here</div>
               </div>
             )}
             {/* Drawing overlay — render-only SVG pinned to the chart (re-projected on pan/zoom via overlayTick).
@@ -4943,7 +4965,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
       if (filterSetup !== "All" && t.setup !== filterSetup) return false;
       if (filterTag !== "All" && !(t.tags || []).includes(filterTag)) return false;
       return true;
-    });
+    }).sort((a, b) => (Date.parse(tradeDateISO(b.entry)) || 0) - (Date.parse(tradeDateISO(a.entry)) || 0)); // default order: newest ENTRY date first (per Valen)
   }, [allTrades, filterSetup, filterTag]);
 
   const stats = useMemo(() => {
