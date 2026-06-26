@@ -3448,13 +3448,10 @@ function TradeChart({ trade }) {
         const REV = { entry: "#ff8c00", profit: "#1ed980", stop: "#ff1744" };
         const exitWin = isShort ? (exitP < entryP) : (exitP > entryP); // profit exit vs loss/stop exit
         const exitCol = exitWin ? REV.profit : REV.stop, exitLetter = exitWin ? "P" : "S";
-        // Slim arrows, NO letter text (the ray's word-label carries the meaning → no double-labelling / clutter).
-        const markers = [];
-        if (entryBar) markers.push({ time: entryBar.time, position: "belowBar", color: REV.entry, shape: "arrowUp", size: 1 });
-        if (peak && entryBar && exitBar && peak.time !== exitBar.time && peak.time !== entryBar.time) markers.push({ time: peak.time, position: isShort ? "belowBar" : "aboveBar", color: C.goldBright, shape: "circle", size: 1, text: "Peak" });
-        if (exitBar) markers.push({ time: exitBar.time, position: "aboveBar", color: exitCol, shape: "arrowDown", size: 1 });
-        markers.sort((a, b) => a.time - b.time);
-        s.setMarkers(markers);
+        // RAYS-ONLY (per Valen): no on-candle arrows or "Peak" circle — they cluttered/misaligned the chart.
+        // Entry / Profit / Stop are shown purely as clean horizontal rays with word-labels (the SVG overlay below),
+        // matching a TradingView feel. (Peak price still appears in the stats panel as "Best Exit Price".)
+        s.setMarkers([]);
         // Candle-anchored rays on the SVG overlay: start at the fill candle, extend right, one small word-label each.
         // No badge boxes, no price pills (the stats panel already shows exact entry/exit/stop).
         setTradeMarks({
@@ -4451,6 +4448,22 @@ function CoachHero({ data }) {
         </div>
         {d.summary && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
       </Card>
+      {data.goldilocks && (() => { const g = data.goldilocks; const tl = (label, val, color) => (
+        <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "11px 8px", textAlign: "center", flex: 1, minWidth: 78 }}>
+          <div style={{ fontSize: "1.2rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
+          <div style={{ fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.muted, marginTop: 5 }}>{label}</div>
+        </div>); return (
+        <div style={{ background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "16px 18px", marginBottom: 14 }}>
+          <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, marginBottom: 12, fontWeight: 700 }}>⚖️ Goldilocks zone · your gain/loss balance</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: g.verdict ? 11 : 0 }}>
+            {tl("Win rate", (g.wr ?? "—") + "%", C.gold)}
+            {tl("Avg gain", "+" + (g.ag ?? "—") + "%", C.green)}
+            {tl("Avg loss", "−" + (g.al ?? "—") + "%", C.red)}
+            {tl("G/L ratio", (g.gl ?? "—") + ":1", (Number(g.gl) >= 2) ? C.green : C.gold)}
+            {g.proj10 != null && tl("10-trade proj", (g.proj10 >= 0 ? "+" : "") + g.proj10 + "%", g.proj10 >= 0 ? C.green : C.red)}
+          </div>
+          {g.verdict && <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.65 }}>{g.verdict}</div>}
+        </div>); })()}
       {data.charts && (() => {
         const ch = data.charts, hs = ch.headline_stats || {};
         const tile = (label, val, color) => (
@@ -4489,41 +4502,18 @@ function CoachHero({ data }) {
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.56rem", color: C.muted, marginTop: 4 }}><span>{rc.length} trades</span><span style={{ color: C.green, fontWeight: 700 }}>+{(rsv[rsv.length - 1] || 0).toFixed(0)}R total</span></div>
               </Card>
             )}
-            {Array.isArray(ch.by_setup) && ch.by_setup.length > 0 && (
-              <Card title="Avg R by setup · what makes you money">
-                {ch.by_setup.map((s, i) => { const w = Math.min(100, Math.abs(s.avg_r) / maxAbsR * 100); const pos = s.avg_r >= 0; return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: "0.64rem" }}>
-                    <div style={{ width: 150, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label} <span style={{ color: C.muted }}>· {s.n} · {s.win_rate}%</span></div>
-                    <div style={{ flex: 1, position: "relative", height: 14, background: "rgba(255,255,255,0.04)", borderRadius: 3 }}>
-                      <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "rgba(255,255,255,0.15)" }} />
-                      <div style={{ position: "absolute", top: 2, bottom: 2, borderRadius: 2, ...(pos ? { left: "50%", width: (w / 2) + "%", background: C.green } : { right: "50%", width: (w / 2) + "%", background: C.red }) }} />
-                    </div>
-                    <div style={{ width: 50, textAlign: "right", color: pos ? C.green : C.red, fontWeight: 700 }}>{pos ? "+" : ""}{s.avg_r}R</div>
-                  </div>); })}
-              </Card>
-            )}
-            {Array.isArray(ch.r_dist) && ch.r_dist.length > 0 && (
-              <Card title="R distribution · your win/loss shape">
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 96 }}>
-                  {ch.r_dist.map((b, i) => { const h = (b.count / maxCount) * 74; const neg = b.bucket.startsWith("<") || b.bucket.startsWith("-"); return (
-                    <div key={i} style={{ flex: 1, textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-                      <div style={{ fontSize: "0.56rem", color: C.muted, marginBottom: 3 }}>{b.count}</div>
-                      <div style={{ height: Math.max(2, h), background: neg ? C.red : C.green, borderRadius: "3px 3px 0 0", opacity: 0.85 }} />
-                      <div style={{ fontSize: "0.52rem", color: C.muted, marginTop: 4 }}>{b.bucket}</div>
-                    </div>); })}
-                </div>
-              </Card>
-            )}
+            {/* "Avg R by setup" and "R distribution" removed per Valen (2026-06-26) — replaced by the Goldilocks card + single deep-dive analysis below. */}
           </>
         );
       })()}
+      {(sc.recent || sc.peak || sc.baseline) && (
       <Card title="Recent vs peak vs baseline">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
           <Scorecard title="Last 10 closed" s={sc.recent || {}} />
           <Scorecard title={`Peak ${pw.start ? `(${pw.start}–${pw.end})` : ""}`} s={sc.peak || {}} accent />
           <Scorecard title="Baseline · since May 1" s={sc.baseline || {}} />
         </div>
-      </Card>
+      </Card>)}
       {Array.isArray(data.attention) && data.attention.length > 0 && (
         <Card title="Pay attention now">
           {data.attention.map((a, i) => (
@@ -4600,7 +4590,7 @@ function CoachHero({ data }) {
         </Card>
       )}
       {Array.isArray(data.deep_dive) && data.deep_dive.length > 0 && (
-        <Card title="Deep dive · performance analysis">
+        <Card title="The deep dive · all angles">
           {data.deep_dive.map((s, i) => (
             <div key={i} style={{ marginBottom: 15, paddingBottom: 13, borderBottom: i < data.deep_dive.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
               <div style={{ fontSize: "0.76rem", fontWeight: 800, color: C.goldBright, marginBottom: 5 }}>{s.title}</div>
@@ -4608,6 +4598,22 @@ function CoachHero({ data }) {
             </div>
           ))}
         </Card>
+      )}
+      {(Array.isArray(data.focus_on) || Array.isArray(data.avoid)) && (
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+          {Array.isArray(data.focus_on) && data.focus_on.length > 0 && (
+            <div style={{ flex: 1, minWidth: 240, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.green, fontWeight: 800, marginBottom: 8 }}>✓ Focus on</div>
+              <ul style={{ margin: 0, paddingLeft: 16 }}>{data.focus_on.map((x, i) => <li key={i} style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7, marginBottom: 4 }}>{x}</li>)}</ul>
+            </div>
+          )}
+          {Array.isArray(data.avoid) && data.avoid.length > 0 && (
+            <div style={{ flex: 1, minWidth: 240, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.red, fontWeight: 800, marginBottom: 8 }}>✕ Don't focus on</div>
+              <ul style={{ margin: 0, paddingLeft: 16 }}>{data.avoid.map((x, i) => <li key={i} style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7, marginBottom: 4 }}>{x}</li>)}</ul>
+            </div>
+          )}
+        </div>
       )}
       {Array.isArray(data.mentor_lenses) && data.mentor_lenses.length > 0 && (
         <Card title="Mentor lenses · JLaw · Qullamaggie · Martin Luk">
