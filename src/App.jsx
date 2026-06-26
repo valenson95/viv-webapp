@@ -3432,13 +3432,14 @@ function TradeChart({ trade }) {
           });
         }
 
-        // ── Entry / exit / peak markers (price-matched within the bar — timezone-proof) ──
+        // ── Entry / exit / peak markers — anchored to the ACTUAL trade DATE/TIME (single source = UTC),
+        //    NOT price-matched. (Price-matching put the arrow on an earlier candle at a similar price — the GFS bug.) ──
         const entryP = +trade.entryP, exitP = +trade.exitP;
-        const inBar = (c, p) => c.low <= p && p <= c.high;
-        const nearest = (p) => candles.reduce((b, c) => Math.abs(c.close - p) < Math.abs((b ? b.close : 1e18) - p) ? c : b, null);
-        const entryBar = candles.find(c => inBar(c, entryP)) || nearest(entryP);
-        let exitBar = null; for (let i = candles.length - 1; i >= 0; i--) { if (inBar(candles[i], exitP)) { exitBar = candles[i]; break; } }
-        if (!exitBar) exitBar = nearest(exitP);
+        const hhmm = (s) => (s && /^\d{1,2}:\d{2}/.test(s)) ? (s.length === 5 ? s : s.slice(0, 5)) : null;
+        const tgt = (iso, time) => Date.parse(iso + "T" + ((activeRes !== "1day" && hhmm(time)) ? hhmm(time) : "12:00") + ":00Z");
+        const nearestT = (target) => candles.reduce((b, c) => Math.abs(c.time * 1000 - target) < Math.abs((b ? b.time * 1000 : 1e18) - target) ? c : b, null);
+        const entryBar = nearestT(tgt(entryISO, trade.entryTime));
+        const exitBar = nearestT(tgt(exitISO, trade.exitTime));
         let peak = null;
         if (entryBar && exitBar) {
           const lo = Math.min(entryBar.time, exitBar.time), hi = Math.max(entryBar.time, exitBar.time);
@@ -4470,21 +4471,25 @@ function CoachHero({ data }) {
         </div>
         {d.summary && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
       </Card>
-      {data.goldilocks && (() => { const g = data.goldilocks; const tl = (label, val, color) => (
-        <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "11px 8px", textAlign: "center", flex: 1, minWidth: 78 }}>
-          <div style={{ fontSize: "1.2rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
-          <div style={{ fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.muted, marginTop: 5 }}>{label}</div>
-        </div>); return (
+      {data.goldilocks && (() => { const g = data.goldilocks;
+        const row = (label, mine, opt, ok) => (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid rgba(255,255,255,0.05)", fontSize: "0.68rem" }}>
+            <div style={{ flex: 1, color: C.text }}>{label}</div>
+            <div style={{ width: 88, textAlign: "right", fontWeight: 800, color: ok ? C.green : C.red }}>{mine}{ok ? " ✓" : " ✕"}</div>
+            <div style={{ width: 118, textAlign: "right", color: C.goldBright, fontWeight: 700 }}>{opt}</div>
+          </div>); return (
         <div style={{ background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "16px 18px", marginBottom: 14 }}>
-          <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, marginBottom: 12, fontWeight: 700 }}>⚖️ Goldilocks zone · your gain/loss balance</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: g.verdict ? 11 : 0 }}>
-            {tl("Win rate", (g.wr ?? "—") + "%", C.gold)}
-            {tl("Avg gain", "+" + (g.ag ?? "—") + "%", C.green)}
-            {tl("Avg loss", "−" + (g.al ?? "—") + "%", C.red)}
-            {tl("G/L ratio", (g.gl ?? "—") + ":1", (Number(g.gl) >= 2) ? C.green : C.gold)}
-            {g.proj10 != null && tl("10-trade proj", (g.proj10 >= 0 ? "+" : "") + g.proj10 + "%", g.proj10 >= 0 ? C.green : C.red)}
+          <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, marginBottom: 8, fontWeight: 700 }}>⚖️ Goldilocks zone · optimal vs yours</div>
+          <div style={{ display: "flex", gap: 8, fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.muted, fontWeight: 700, paddingBottom: 2 }}>
+            <div style={{ flex: 1 }}>Metric</div><div style={{ width: 88, textAlign: "right" }}>Yours</div><div style={{ width: 118, textAlign: "right" }}>Optimal</div>
           </div>
-          {g.verdict && <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.65 }}>{g.verdict}</div>}
+          {row("Win rate", (g.wr ?? "—") + "%", "fine as-is", true)}
+          {row("Avg gain (winners)", "+" + (g.ag ?? "—") + "%", "aim +" + (g.target_ag ?? "—") + "%", Number(g.ag) >= Number(g.target_ag))}
+          {row("Avg loss (losers)", "−" + (g.al ?? "—") + "%", "≤ −" + (g.target_al ?? "—") + "%", Number(g.al) <= Number(g.target_al))}
+          {row("Gain/Loss ratio", (g.gl ?? "—") + ":1", "≥ " + (g.target_gl ?? "—") + ":1", Number(g.gl) >= Number(g.target_gl))}
+          {g.breakeven_gl != null && row("Breakeven G/L (at your WR)", (g.gl ?? "—") + ":1", (g.breakeven_gl) + ":1 needed", Number(g.gl) >= Number(g.breakeven_gl))}
+          {g.proj10 != null && row("10-trade compounded", (g.proj10 >= 0 ? "+" : "") + g.proj10 + "%", "positive", g.proj10 >= 0)}
+          {g.verdict && <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.65, marginTop: 11 }}>{g.verdict}</div>}
         </div>); })()}
       {data.charts && (() => {
         const ch = data.charts, hs = ch.headline_stats || {};
