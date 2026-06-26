@@ -4468,9 +4468,43 @@ function CoachHero({ data }) {
             <div style={{ flex: 1, color: C.text }}>{label}</div>
             <div style={{ width: 88, textAlign: "right", fontWeight: 800, color: ok ? C.green : C.red }}>{mine}{ok ? " ✓" : " ✕"}</div>
             <div style={{ width: 118, textAlign: "right", color: C.goldBright, fontWeight: 700 }}>{opt}</div>
+          </div>);
+        const tile = (label, val, color) => (
+          <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "10px 6px", textAlign: "center", flex: 1, minWidth: 64 }}>
+            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
+            <div style={{ fontSize: "0.46rem", textTransform: "uppercase", letterSpacing: ".04em", color: C.muted, marginTop: 5 }}>{label}</div>
           </div>); return (
         <div style={{ background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "16px 18px", marginBottom: 14 }}>
-          <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, marginBottom: 8, fontWeight: 700 }}>⚖️ Goldilocks zone · optimal vs yours</div>
+          <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, marginBottom: 10, fontWeight: 700 }}>⚖️ Goldilocks zone · where you stand</div>
+
+          {/* Your live stats strip */}
+          <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+            {tile("Win rate", (g.wr ?? "—") + "%", C.gold)}
+            {tile("Avg gain", "+" + (g.ag ?? "—") + "%", C.green)}
+            {tile("Avg loss", "−" + (g.al ?? "—") + "%", C.red)}
+            {tile("Your G/L", (g.gl ?? "—") + ":1", Number(g.gl) >= Number(g.breakeven_gl) ? C.green : C.red)}
+            {g.proj10 != null && tile("10-trade", (g.proj10 >= 0 ? "+" : "") + g.proj10 + "%", g.proj10 >= 0 ? C.green : C.red)}
+          </div>
+
+          {/* Break-even ladder by win rate — your row highlighted */}
+          {Array.isArray(g.ladder) && g.ladder.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.muted, fontWeight: 700, marginBottom: 7 }}>The math — break-even gain/loss ratio you must beat at each win rate</div>
+              {g.ladder.map((r, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, marginBottom: 3,
+                  background: r.you ? "rgba(201,152,42,0.16)" : "rgba(255,255,255,0.02)", border: r.you ? `1px solid ${C.borderGold}` : "1px solid transparent" }}>
+                  <div style={{ width: 96, fontWeight: r.you ? 800 : 600, color: r.you ? C.goldBright : C.text, fontSize: "0.7rem" }}>{r.wr}% win rate{r.you ? " ← YOU" : ""}</div>
+                  <div style={{ flex: 1, color: C.muted, fontSize: "0.62rem" }}>break-even needs</div>
+                  <div style={{ width: 56, textAlign: "right", fontWeight: 800, color: r.you ? C.goldBright : C.text, fontSize: "0.72rem" }}>{r.be}:1</div>
+                  <div style={{ width: 116, textAlign: "right", fontWeight: 800, fontSize: "0.64rem", color: r.you ? (Number(g.gl) >= Number(r.be) ? C.green : C.red) : "transparent" }}>
+                    {r.you ? "you're " + g.gl + ":1 " + (Number(g.gl) >= Number(r.be) ? "✓" : "✕ below") : "·"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Optimal vs yours */}
           <div style={{ display: "flex", gap: 8, fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.muted, fontWeight: 700, paddingBottom: 2 }}>
             <div style={{ flex: 1 }}>Metric</div><div style={{ width: 88, textAlign: "right" }}>Yours</div><div style={{ width: 118, textAlign: "right" }}>Optimal</div>
           </div>
@@ -4478,7 +4512,7 @@ function CoachHero({ data }) {
           {row("Avg gain (winners)", "+" + (g.ag ?? "—") + "%", "aim +" + (g.target_ag ?? "—") + "%", Number(g.ag) >= Number(g.target_ag))}
           {row("Avg loss (losers)", "−" + (g.al ?? "—") + "%", "≤ −" + (g.target_al ?? "—") + "%", Number(g.al) <= Number(g.target_al))}
           {row("Gain/Loss ratio", (g.gl ?? "—") + ":1", "≥ " + (g.target_gl ?? "—") + ":1", Number(g.gl) >= Number(g.target_gl))}
-          {g.breakeven_gl != null && row("Breakeven G/L (at your WR)", (g.gl ?? "—") + ":1", (g.breakeven_gl) + ":1 needed", Number(g.gl) >= Number(g.breakeven_gl))}
+          {g.breakeven_gl != null && row("Break-even G/L (your WR)", (g.gl ?? "—") + ":1", (g.breakeven_gl) + ":1 needed", Number(g.gl) >= Number(g.breakeven_gl))}
           {g.proj10 != null && row("10-trade compounded", (g.proj10 >= 0 ? "+" : "") + g.proj10 + "%", "positive", g.proj10 >= 0)}
           {g.verdict && <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.65, marginTop: 11 }}>{g.verdict}</div>}
         </div>); })()}
