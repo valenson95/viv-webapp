@@ -4463,17 +4463,48 @@ function CoachHero({ data }) {
         {d.summary && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
       </Card>
       {data.goldilocks && (() => { const g = data.goldilocks;
-        const row = (label, mine, opt, ok) => (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid rgba(255,255,255,0.05)", fontSize: "0.68rem" }}>
-            <div style={{ flex: 1, color: C.text }}>{label}</div>
-            <div style={{ width: 88, textAlign: "right", fontWeight: 800, color: ok ? C.green : C.red }}>{mine}{ok ? " ✓" : " ✕"}</div>
-            <div style={{ width: 118, textAlign: "right", color: C.goldBright, fontWeight: 700 }}>{opt}</div>
-          </div>);
         const tile = (label, val, color) => (
           <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "10px 6px", textAlign: "center", flex: 1, minWidth: 64 }}>
             <div style={{ fontSize: "1.05rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
             <div style={{ fontSize: "0.46rem", textTransform: "uppercase", letterSpacing: ".04em", color: C.muted, marginTop: 5 }}>{label}</div>
-          </div>); return (
+          </div>);
+        // Universal math: compounded return over N trades = (1+G)^(N·W) · (1−L)^(N·(1−W)) − 1
+        const N = 10;
+        const WRS = [30, 40, 50, 60, 70];                          // columns = win rate
+        const yourWR = Number(g.wr) || 0;
+        const nearWR = WRS.reduce((b, w) => Math.abs(w - yourWR) < Math.abs(b - yourWR) ? w : b, WRS[0]);
+        const comp = (gn, ls, w) => (Math.pow(1 + gn / 100, N * w / 100) * Math.pow(1 - ls / 100, N * (1 - w / 100)) - 1) * 100;
+        const cellBg = (v) => v <= 0 ? "rgba(239,68,68,0.20)" : v < 25 ? "rgba(34,197,94,0.10)" : v < 200 ? "rgba(34,197,94,0.32)" : "rgba(234,179,8,0.16)";
+        const TABLES = [
+          { rr: "2 : 1", zone: [14, 20, 24], rows: [[4, 2], [6, 3], [8, 4], [10, 5], [14, 7], [20, 10], [24, 12], [40, 20]] },
+          { rr: "3 : 1", zone: [18, 21, 30], rows: [[6, 2], [9, 3], [12, 4], [15, 5], [18, 6], [21, 7], [30, 10], [60, 20]] },
+        ];
+        const fmtV = (v) => (v >= 0 ? "+" : "−") + Math.abs(Math.round(v)) + "%";
+        const grid = (T) => (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: "0.55rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.goldBright, fontWeight: 800, marginBottom: 6 }}>Reward : Risk = {T.rr} — return compounded over {N} trades</div>
+            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 2, fontSize: "0.58rem", tableLayout: "fixed" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", color: C.muted, fontWeight: 700, fontSize: "0.48rem", padding: "2px 4px", width: 74 }}>Win / Loss ↓</th>
+                  {WRS.map(w => <th key={w} style={{ textAlign: "center", padding: "3px 2px", borderRadius: 4, fontWeight: 800, fontSize: "0.6rem",
+                    color: w === nearWR ? "#0b0b10" : C.text, background: w === nearWR ? C.gold : "rgba(255,255,255,0.05)" }}>{w}%{w === nearWR ? " ◀" : ""}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {T.rows.map(([gn, ls]) => { const inZone = T.zone.includes(gn); return (
+                  <tr key={gn}>
+                    <td style={{ padding: "4px 4px", fontWeight: 700, whiteSpace: "nowrap", fontSize: "0.56rem", color: inZone ? C.goldBright : C.text, background: inZone ? "rgba(201,152,42,0.10)" : "transparent", borderRadius: 4 }}>+{gn}/−{ls}{inZone ? " ★" : ""}</td>
+                    {WRS.map(w => { const v = comp(gn, ls, w); const you = w === nearWR; return (
+                      <td key={w} style={{ textAlign: "center", padding: "4px 1px", borderRadius: 4, fontWeight: 700, color: v < 0 ? "#fca5a5" : "#86efac",
+                        background: cellBg(v), outline: (you && inZone) ? `2px solid ${C.gold}` : "none" }}>{fmtV(v)}</td>
+                    ); })}
+                  </tr>
+                ); })}
+              </tbody>
+            </table>
+          </div>);
+        return (
         <div style={{ background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "16px 18px", marginBottom: 14 }}>
           <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, marginBottom: 10, fontWeight: 700 }}>⚖️ Goldilocks zone · where you stand</div>
 
@@ -4482,39 +4513,23 @@ function CoachHero({ data }) {
             {tile("Win rate", (g.wr ?? "—") + "%", C.gold)}
             {tile("Avg gain", "+" + (g.ag ?? "—") + "%", C.green)}
             {tile("Avg loss", "−" + (g.al ?? "—") + "%", C.red)}
-            {tile("Your G/L", (g.gl ?? "—") + ":1", Number(g.gl) >= Number(g.breakeven_gl) ? C.green : C.red)}
+            {tile("Your R:R", (g.gl ?? "—") + ":1", Number(g.gl) >= Number(g.breakeven_gl) ? C.green : C.red)}
             {g.proj10 != null && tile("10-trade", (g.proj10 >= 0 ? "+" : "") + g.proj10 + "%", g.proj10 >= 0 ? C.green : C.red)}
           </div>
 
-          {/* Break-even ladder by win rate — your row highlighted */}
-          {Array.isArray(g.ladder) && g.ladder.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.muted, fontWeight: 700, marginBottom: 7 }}>The math — break-even gain/loss ratio you must beat at each win rate</div>
-              {g.ladder.map((r, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, marginBottom: 3,
-                  background: r.you ? "rgba(201,152,42,0.16)" : "rgba(255,255,255,0.02)", border: r.you ? `1px solid ${C.borderGold}` : "1px solid transparent" }}>
-                  <div style={{ width: 96, fontWeight: r.you ? 800 : 600, color: r.you ? C.goldBright : C.text, fontSize: "0.7rem" }}>{r.wr}% win rate{r.you ? " ← YOU" : ""}</div>
-                  <div style={{ flex: 1, color: C.muted, fontSize: "0.62rem" }}>break-even needs</div>
-                  <div style={{ width: 56, textAlign: "right", fontWeight: 800, color: r.you ? C.goldBright : C.text, fontSize: "0.72rem" }}>{r.be}:1</div>
-                  <div style={{ width: 116, textAlign: "right", fontWeight: 800, fontSize: "0.64rem", color: r.you ? (Number(g.gl) >= Number(r.be) ? C.green : C.red) : "transparent" }}>
-                    {r.you ? "you're " + g.gl + ":1 " + (Number(g.gl) >= Number(r.be) ? "✓" : "✕ below") : "·"}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* The two grids — win-rate columns × win/loss rows; your column gold, Goldilocks zone ★ */}
+          {grid(TABLES[0])}
+          {grid(TABLES[1])}
 
-          {/* Optimal vs yours */}
-          <div style={{ display: "flex", gap: 8, fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.muted, fontWeight: 700, paddingBottom: 2 }}>
-            <div style={{ flex: 1 }}>Metric</div><div style={{ width: 88, textAlign: "right" }}>Yours</div><div style={{ width: 118, textAlign: "right" }}>Optimal</div>
+          <div style={{ fontSize: "0.52rem", color: C.muted, marginBottom: 12, lineHeight: 1.5 }}>Gold column ◀ = your win rate (~{nearWR}%). ★ rows = the Goldilocks zone — gains big enough to compound, losses small enough to recover. Red = loses money over {N} trades. Read DOWN your gold column to see what each reward:risk would do for you.</div>
+
+          {/* You-are-here callout */}
+          <div style={{ background: "rgba(239,68,68,0.10)", border: `1px solid ${C.red}`, borderRadius: 10, padding: "11px 13px", marginBottom: g.verdict ? 12 : 0 }}>
+            <div style={{ fontSize: "0.7rem", fontWeight: 800, color: C.white, marginBottom: 4 }}>📍 You are here: {g.wr}% win rate · +{g.ag}% / −{g.al}% = {g.gl}:1</div>
+            <div style={{ fontSize: "0.68rem", color: C.text, lineHeight: 1.6 }}>At a ~{nearWR}% win rate the <b style={{ color: C.red }}>2:1 table is mostly red</b> — 2:1 isn't enough edge. Your gold column only turns <b style={{ color: C.green }}>green on the 3:1 table</b> (the ★ zone). You're at {g.gl}:1, so you compound <b style={{ color: C.red }}>{g.proj10}% / {N} trades</b>. Climb toward ~3:1 by cutting avg loss toward {g.target_al}% or letting winners run toward +{g.target_ag}%.</div>
           </div>
-          {row("Win rate", (g.wr ?? "—") + "%", "fine as-is", true)}
-          {row("Avg gain (winners)", "+" + (g.ag ?? "—") + "%", "aim +" + (g.target_ag ?? "—") + "%", Number(g.ag) >= Number(g.target_ag))}
-          {row("Avg loss (losers)", "−" + (g.al ?? "—") + "%", "≤ −" + (g.target_al ?? "—") + "%", Number(g.al) <= Number(g.target_al))}
-          {row("Gain/Loss ratio", (g.gl ?? "—") + ":1", "≥ " + (g.target_gl ?? "—") + ":1", Number(g.gl) >= Number(g.target_gl))}
-          {g.breakeven_gl != null && row("Break-even G/L (your WR)", (g.gl ?? "—") + ":1", (g.breakeven_gl) + ":1 needed", Number(g.gl) >= Number(g.breakeven_gl))}
-          {g.proj10 != null && row("10-trade compounded", (g.proj10 >= 0 ? "+" : "") + g.proj10 + "%", "positive", g.proj10 >= 0)}
-          {g.verdict && <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.65, marginTop: 11 }}>{g.verdict}</div>}
+
+          {g.verdict && <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.65 }}>{g.verdict}</div>}
         </div>); })()}
       {data.charts && (() => {
         const ch = data.charts, hs = ch.headline_stats || {};
