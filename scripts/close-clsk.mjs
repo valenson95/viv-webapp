@@ -1,0 +1,12 @@
+import { createClient } from '@supabase/supabase-js';
+import { readFileSync } from 'fs';
+const env=Object.fromEntries(readFileSync('.env.local','utf8').split('\n').filter(l=>l&&!l.startsWith('#')&&l.includes('=')).map(l=>{const i=l.indexOf('=');return[l.slice(0,i).trim(),l.slice(i+1).trim()];}));
+const sb=createClient(env.SUPABASE_URL||env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}});
+const UID='0e32b092-029a-436d-8cb5-67621e1467b0';
+const now=new Date().toISOString();
+const {data:pos}=await sb.from('positions').select('id').eq('user_id',UID).eq('symbol','CLSK').eq('is_closed',false);
+const pid=pos?.[0]?.id;
+await sb.from('positions').update({is_closed:true,shares:0,current_price:18.15,ib_synced_at:now,updated_at:now}).eq('user_id',UID).eq('symbol','CLSK').eq('is_closed',false);
+const {data:d}=await sb.from('trades').select('id').eq('user_id',UID).eq('ib_exec_id','clsk-exit-20260622').limit(1);
+if(!d?.length) await sb.from('trades').insert({user_id:UID,ticker:'CLSK',trade_type:'Long',entry_date:'2026-06-22',exit_date:'2026-06-22',entry_price:18.205,exit_price:18.15,shares:5000,pl_dollar:-302.87,exit_reason:'Cut - no continuation',setup:'5-min ORB (chased)',position_id:pid,source:'claude_ibkr',ib_exec_id:'clsk-exit-20260622',rationale:'EXIT thoughtprocess: closed CLSK - lacks continuation (no follow-through after the ORB break). Cut fast for a scratch (-302.87). Leaving ON + NBIS to run. Discipline: weak-RS spec, cut quick = correct.',notes:'process-correct quick cut',is_sample:false,is_deleted:false,created_at:now});
+console.log(`CLSK closed (pid ${pid}). Logged exit: 5000@18.15 = -302.87, reason "no continuation".`);

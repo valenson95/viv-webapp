@@ -1,0 +1,12 @@
+import { createClient } from '@supabase/supabase-js';
+import { readFileSync } from 'fs';
+const env=Object.fromEntries(readFileSync('.env.local','utf8').split('\n').filter(l=>l&&!l.startsWith('#')&&l.includes('=')).map(l=>{const i=l.indexOf('=');return[l.slice(0,i).trim(),l.slice(i+1).trim()];}));
+const sb=createClient(env.SUPABASE_URL||env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}});
+const UID='0e32b092-029a-436d-8cb5-67621e1467b0';
+const now=new Date().toISOString();
+const {data:pos}=await sb.from('positions').select('id').eq('user_id',UID).eq('symbol','DOCN').eq('is_closed',false);
+const pid=pos?.[0]?.id;
+await sb.from('positions').update({is_closed:true,shares:0,current_price:165.54,ib_synced_at:now,updated_at:now}).eq('user_id',UID).eq('symbol','DOCN').eq('is_closed',false);
+const {data:d}=await sb.from('trades').select('id').eq('user_id',UID).eq('ib_exec_id','docn-stop-20260622').limit(1);
+if(!d?.length) await sb.from('trades').insert({user_id:UID,ticker:'DOCN',trade_type:'Long',entry_date:'2026-06-11',exit_date:'2026-06-22',entry_price:182.86,exit_price:165.41,shares:481,pl_dollar:-8398.38,exit_reason:'Stopped at stop (165.50)',setup:'base+add',position_id:pid,source:'claude_ibkr',ib_exec_id:'docn-stop-20260622',notes:'Final lot stopped; campaign total w/ 6/17 trim ~ -11,758. Honored stop = process-correct.',is_sample:false,is_deleted:false,created_at:now});
+console.log(`DOCN closed (was pid ${pid}). Logged stop: 481sh @165.41 = -8398.38.`);

@@ -3,6 +3,12 @@ import { createPortal } from "react-dom";
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from "recharts";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import html2canvas from "html2canvas";
+import TradeCalendar from "./Calendar.jsx";
+import TradeReplayChart from "./TradeReplayChart.jsx";
+import { sectorFor } from "./sectors.js";
+import { themeFit, themeRanks, consistentTop, top5, latestSnapshot } from "./themes.js";
+import ThemeTracker from "./ThemeTracker.jsx";
+import ThemeStrip from "./ThemeStrip.jsx";
 
 // ─── Error Boundary — catches rendering crashes so the page doesn't go blank ───
 class ErrorBoundary extends React.Component {
@@ -6204,6 +6210,18 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           })()}
         </div>
 
+        {/* PERFORMANCE CALENDAR (monthly + yearly, TradeZella-style) */}
+        <div className="toolbar"><h2 className="sech">Performance calendar</h2></div>
+        <div className="card reveal" style={{ padding: "18px 20px", marginBottom: 18 }}>
+          <TradeCalendar trades={journaledTrades} C={C} font={font} />
+        </div>
+
+        {/* THEME TRACKER (DeepVue leaderboard + in/off-theme) */}
+        <div className="toolbar"><h2 className="sech">Theme tracker</h2></div>
+        <div className="card reveal" style={{ padding: "18px 20px", marginBottom: 18 }}>
+          <ThemeTracker C={C} font={font} />
+        </div>
+
         {/* EQUITY CURVE + RETURN DISTRIBUTION */}
         <div className={"chartrow" + (distPanelOpen ? " dist-open" : "")}>
           <div className="chartcol eqcol">
@@ -6427,6 +6445,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 <th><span className="term" data-tip="The date you opened the trade.">Entry date</span></th>
                 <th><span className="term" data-tip="The date you closed the trade.">Exit date</span></th>
                 <th><span className="term" data-tip="The pattern or reason you took the trade.">Setup</span></th>
+                <th className="pro-only"><span className="term" data-tip="DeepVue sector, in/off-theme judged against the tracker at your entry date. Green = top-5 leader (with the trend); red = off-theme.">Theme</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="Your protective stop on this trade.">Stop</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="Why you exited — kept for reviewing your decisions.">Exit reason</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="How many days you held the trade.">Hold</span></th>
@@ -6438,7 +6457,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             </thead>
             <tbody>
               {dateFiltered.length === 0 && (
-                <tr><td colSpan={15} className="nodata">No trades match this filter. Clear the filters to see your full track record.</td></tr>
+                <tr><td colSpan={16} className="nodata">No trades match this filter. Clear the filters to see your full track record.</td></tr>
               )}
               {dateFiltered.map(t => {
                 const up = (Number(t.plPct) || 0) > 0;
@@ -6456,6 +6475,16 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       <td data-l="Entry date">{tradeDateISO(t.entry) || t.entry || "—"}</td>
                       <td data-l="Exit date">{tradeDateISO(t.exit) || t.exit || "—"}</td>
                       <td data-l="Setup">{t.setup ? <span className="tag">{t.setup}</span> : "—"}</td>
+                      <td className="pro-only" data-l="Theme">{(() => {
+                        const th = sectorFor(t.ticker);
+                        if (!th) return <span className="term" data-tip="No DeepVue sector mapped for this ticker yet.">—</span>;
+                        const fit = themeFit(th, t.entry), r = themeRanks(th, t.entry) || {}, rk = (x) => x ? "#" + x : "—";
+                        const tip = fit === "in"
+                          ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend.`
+                          : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. Leaders that week: ${top5("week", t.entry).slice(0,3).join(", ")}.`;
+                        const g = fit === "in";
+                        return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: "0.62rem", fontWeight: 700, background: g ? "var(--greenDim)" : "var(--redDim)", border: `1px solid ${g ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)"}`, color: g ? "var(--green)" : "var(--red)", whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
+                      })()}</td>
                       <td className="pro-only" data-l="Stop">{
                         (isIbkrMode && t.source === "ibkr" && t.needsStop && !t.stop)
                           ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "3px 9px", fontSize: "0.66rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Needs stop</button>
@@ -6473,7 +6502,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       <td className="revcell" data-l=""><button className="revbtn" onClick={() => openReview(t)}>Review</button></td>
                     </tr>
                     {isOpen && (
-                      <tr className="revrow"><td colSpan={14}>
+                      <tr className="revrow"><td colSpan={15}>
                         <div className={"revpanel" + (closingReview ? " closing" : "")}>
                           <div className="revhead">
                             <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
@@ -6504,7 +6533,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
 
                           {/* Live candlestick chart — real TradeChart (mockup canvas is a placeholder) */}
                           <div className="revchart">
-                            <TradeChart trade={t} />
+                            <TradeReplayChart trade={t} C={C} font={font} />
                           </div>
 
                           {isAdmin ? (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>) : (
@@ -8111,6 +8140,9 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
           </div>
         )}
 
+        {/* THEME LEADERS STRIP (this week's DeepVue leaders) */}
+        <ThemeStrip C={C} font={font} />
+
         {/* TABLE */}
         <div className="toolbar">
           <h2>Open Positions</h2>
@@ -8142,6 +8174,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                 <th className="pro-only"><span className="term" data-tip="Your average entry price per share.">Avg Cost</span></th>
                 <th className="pro-only"><span className="term" data-tip="Total broker fees paid on this position so far.">Commission</span></th>
                 <th className="pro-only"><span className="term" data-tip="The pattern or reason you took the trade.">Setup</span></th>
+                <th className="pro-only"><span className="term" data-tip="DeepVue-style sector, auto-recognized from the ticker — no AI needed. Unknown tickers show a dash.">Theme</span></th>
                 <th onClick={() => togglePosSort("posValue")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "posValue" ? C.gold : undefined }} title="Sort by position size"><span className="term" data-tip="Total dollars in this position — shares × average cost.">Position size</span>{posSort && posSort.key === "posValue" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th><span className="term" data-tip="Profit banked from partial sells of this position. The bar fills to the percentage of your original shares you've sold (trimmed).">Realized</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="Your current protective stop price.">Stop</span></th>
@@ -8172,6 +8205,17 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                       <td className="pro-only" data-l="Avg Cost">${(p.epN || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Commission">${(p.commN || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Setup"><select value={p.setup || ""} onChange={e => updateField(p.id, "setup", e.target.value)} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 7, color: p.setup ? "var(--text)" : "var(--faint)", fontFamily: font, fontSize: "0.68rem", fontWeight: 600, padding: "4px 8px", outline: "none", cursor: "pointer", maxWidth: 130 }}><option value="">— Setup —</option>{(setupTypes || []).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                      <td className="pro-only" data-l="Theme">{(() => {
+                        const th = sectorFor(p.sym);
+                        if (!th) return <span className="term" data-tip="No DeepVue sector mapped for this ticker yet — it'll tag automatically once added to the theme map.">—</span>;
+                        const fit = themeFit(th, p.entry), r = themeRanks(th, p.entry) || {};
+                        const rk = (x) => x ? "#" + x : "—";
+                        const tip = fit === "in"
+                          ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend — where the money was rotating.`
+                          : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. The leaders that week were ${top5("week", p.entry).slice(0,3).join(", ")}.`;
+                        const g = fit === "in", bg = g ? "var(--greenDim)" : "var(--redDim)", bd = g ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)", cl = g ? "var(--green)" : "var(--red)";
+                        return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.66rem", fontWeight: 700, background: bg, border: `1px solid ${bd}`, color: cl, whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
+                      })()}</td>
                       <td data-l="Position size">{usd0(p.posValue)}</td>
                       <td data-l="Realized">
                         <span className="sizebar" title={p.realizedShares > 0 ? `${p.realizedShares} of ${p.origShares} shares sold (${p.trimPct.toFixed(0)}% trimmed)` : "Nothing sold yet — fully unrealized"}>
@@ -8191,7 +8235,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                       </td>
                     </tr>
                     {isOpen && (
-                      <tr className="mgrow"><td colSpan={13}>
+                      <tr className="mgrow"><td colSpan={14}>
                         <div className="mgpanel">
                           <div className="mghead">
                             <span className={"status " + sc}><span className="d"></span>{p.riskStatus === "—" ? "Risk-Free" : p.riskStatus}</span>
@@ -8292,7 +8336,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                 );
               })}
               {enriched.filter(p => p.sym).length === 0 && (
-                <tr><td colSpan={13} style={{ padding: "32px 14px", textAlign: "center", color: "var(--muted)" }}>No open positions yet. Click <b style={{ color: "var(--goldBright)" }}>+ Add Position</b> to start.</td></tr>
+                <tr><td colSpan={14} style={{ padding: "32px 14px", textAlign: "center", color: "var(--muted)" }}>No open positions yet. Click <b style={{ color: "var(--goldBright)" }}>+ Add Position</b> to start.</td></tr>
               )}
             </tbody>
           </table>

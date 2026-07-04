@@ -32,7 +32,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const url = `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/${mult}/${span}/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${KEY}`;
+    // adjusted=false → RAW traded prices that line up with the member's actual entry/exit fills (adjusted prices shift after splits/dividends and misalign the trade markers).
+    const url = `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/${mult}/${span}/${from}/${to}?adjusted=false&sort=asc&limit=50000&apiKey=${KEY}`;
     const r = await fetch(url);
     const j = await r.json();
     if (j.status === "ERROR" || j.error) return res.status(502).json({ ok: false, error: j.error || j.message || "Polygon error." });
