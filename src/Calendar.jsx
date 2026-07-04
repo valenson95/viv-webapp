@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from "react";
 
 // ─────────────────────────────────────────────────────────────
-// VIV Trade Calendar — TradeZella-style monthly + yearly views
-// Self-contained: pass `trades` (each with .exit date + .plDollar),
+// VIV Trade Calendar — monthly + yearly, TradeZella layout in VIV brand.
+// Books each closed trade's P&L on its EXIT date (same as TradeZella).
+// Pass `trades` (each with .exit / .exit_date + .plDollar / .pl_dollar),
 // plus the app's `C` palette and `font`. Zero external deps.
 // ─────────────────────────────────────────────────────────────
 
@@ -16,26 +17,41 @@ function fmtK(v) {
   return (v < 0 ? "-" : "") + "$" + a.toFixed(0);
 }
 
-// Aggregate closed trades → { "YYYY-MM-DD": {net, n, w} } by exit date
+// Robust date → "YYYY-MM-DD". Handles ISO, ISO timestamps, and M/D/YY(YY).
+function toISO(s) {
+  if (!s) return null;
+  s = String(s).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) { let y = m[3]; if (y.length === 2) y = "20" + y; return `${y}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`; }
+  const dt = new Date(s);
+  if (!isNaN(dt.getTime())) return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  return null;
+}
+
+// Aggregate closed trades → { "YYYY-MM-DD": {net, n, w} } by EXIT date.
 function useDailyMap(trades) {
   return useMemo(() => {
     const m = {};
     for (const t of (trades || [])) {
       const pl = t.plDollar == null ? (t.pl_dollar == null ? null : Number(t.pl_dollar)) : Number(t.plDollar);
-      const ex = t.exit || t.exit_date;
-      if (pl == null || isNaN(pl) || !ex) continue;
-      const d = String(ex).slice(0, 10);
-      if (!m[d]) m[d] = { net: 0, n: 0, w: 0 };
-      m[d].net += pl; m[d].n += 1; if (pl > 0) m[d].w += 1;
+      const iso = toISO(t.exit || t.exit_date);
+      if (pl == null || isNaN(pl) || !iso) continue;
+      if (!m[iso]) m[iso] = { net: 0, n: 0, w: 0 };
+      m[iso].net += pl; m[iso].n += 1; if (pl > 0) m[iso].w += 1;
     }
     return m;
   }, [trades]);
 }
 
-function monthKeyList(daily) {
-  const s = new Set();
-  Object.keys(daily).forEach(d => s.add(d.slice(0, 7)));
-  return [...s].sort();
+function nowYM() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+
+function navBtn(C) {
+  return { width: 34, height: 34, borderRadius: 9, background: C.glass, border: `1px solid ${C.border}`, color: C.white, fontSize: "1.1rem", cursor: "pointer", lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center" };
+}
+function dowStyle(C) {
+  return { fontSize: "0.62rem", letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, fontWeight: 700, textAlign: "center", padding: "6px 0" };
 }
 
 // ─── Monthly view ───
@@ -47,12 +63,12 @@ function Monthly({ daily, C, font, ym, setYm }) {
 
   const cells = [];
   for (let i = 0; i < startDow; i++) cells.push(null);
-  let monthNet = 0, monthDays = 0;
+  let monthNet = 0, monthDays = 0, monthTrades = 0;
   for (let d = 1; d <= days; d++) {
     const key = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const info = daily[key];
     cells.push({ d, info });
-    if (info) { monthNet += info.net; monthDays += 1; }
+    if (info) { monthNet += info.net; monthDays += 1; monthTrades += info.n; }
   }
   while (cells.length % 7) cells.push(null);
   const weeks = [];
@@ -65,30 +81,29 @@ function Monthly({ daily, C, font, ym, setYm }) {
   };
 
   const cellStyle = (info) => {
-    let bg = C.glass, bd = C.border, tint = "";
+    let bg = "rgba(255,255,255,0.02)", bd = C.border;
     if (info) {
-      if (info.net > 0) { bg = "rgba(34,197,94,0.14)"; bd = "rgba(34,197,94,0.30)"; }
-      else if (info.net < 0) { bg = "rgba(239,68,68,0.13)"; bd = "rgba(239,68,68,0.28)"; }
+      if (info.net > 0) { bg = "rgba(34,197,94,0.13)"; bd = "rgba(34,197,94,0.34)"; }
+      else if (info.net < 0) { bg = "rgba(239,68,68,0.12)"; bd = "rgba(239,68,68,0.30)"; }
       else { bg = "rgba(255,255,255,0.05)"; }
     }
-    return { background: bg, border: `1px solid ${bd}`, borderRadius: 12, minHeight: 84, padding: "9px 10px", position: "relative", transition: "transform .12s", cursor: info ? "default" : "default" };
+    return { background: bg, border: `1px solid ${bd}`, borderRadius: 12, minHeight: 96, padding: "8px 11px", display: "flex", flexDirection: "column" };
   };
 
   return (
     <div style={{ fontFamily: font }}>
-      {/* header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <button onClick={() => nav(-1)} style={navBtn(C)}>‹</button>
-        <div style={{ fontSize: "1.15rem", fontWeight: 800, color: C.white, minWidth: 168 }}>{MONTHS[m - 1]} {y}</div>
+        <div style={{ fontSize: "1.15rem", fontWeight: 800, color: C.white, minWidth: 150 }}>{MONTHS[m - 1]} {y}</div>
         <button onClick={() => nav(1)} style={navBtn(C)}>›</button>
-        <button onClick={() => { const now = new Date(); setYm(`${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`); }} style={{ ...navBtn(C), width: "auto", padding: "0 14px", fontSize: "0.72rem", fontWeight: 700 }}>This month</button>
-        <div style={{ marginLeft: "auto", textAlign: "right" }}>
-          <div style={{ fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, fontWeight: 700 }}>Monthly net · {monthDays} days</div>
-          <div style={{ fontSize: "1.4rem", fontWeight: 800, color: monthNet > 0 ? C.green : monthNet < 0 ? C.red : C.muted }}>{monthNet ? fmtK(monthNet) : "$0"}</div>
+        <button onClick={() => setYm(nowYM())} style={{ ...navBtn(C), width: "auto", padding: "0 14px", fontSize: "0.72rem", fontWeight: 700 }}>This month</button>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, fontWeight: 700 }}>Monthly stats</span>
+          <span style={{ fontSize: "0.94rem", fontWeight: 800, padding: "5px 11px", borderRadius: 9, background: monthNet > 0 ? "rgba(34,197,94,0.12)" : monthNet < 0 ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.05)", color: monthNet > 0 ? C.green : monthNet < 0 ? C.red : C.muted }}>{monthNet ? fmtK(monthNet) : "$0"}</span>
+          <span style={{ fontSize: "0.78rem", fontWeight: 700, padding: "5px 11px", borderRadius: 9, background: C.goldDim, color: C.gold }}>{monthDays} day{monthDays !== 1 ? "s" : ""}</span>
         </div>
       </div>
-      {/* grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr) 126px", gap: 7 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr) 130px", gap: 7 }}>
         {DOW.map(d => <div key={d} style={dowStyle(C)}>{d}</div>)}
         <div style={dowStyle(C)}>Week</div>
         {weeks.map((wk, wi) => {
@@ -97,20 +112,20 @@ function Monthly({ daily, C, font, ym, setYm }) {
           return (
             <React.Fragment key={wi}>
               {wk.map((c, ci) => {
-                if (!c) return <div key={ci} style={{ background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 12, minHeight: 84 }} />;
+                if (!c) return <div key={ci} style={{ background: "rgba(255,255,255,0.012)", border: "1px solid rgba(255,255,255,0.03)", borderRadius: 12, minHeight: 96 }} />;
                 return (
                   <div key={ci} style={cellStyle(c.info)}>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 700, color: C.muted }}>{c.d}</div>
-                    {c.info && <>
-                      <div style={{ fontWeight: 800, fontSize: "0.92rem", marginTop: 8, color: c.info.net > 0 ? C.green : c.info.net < 0 ? C.red : C.muted }}>{fmtK(c.info.net)}</div>
-                      <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 1 }}>{c.info.n} trade{c.info.n > 1 ? "s" : ""} · {Math.round(100 * c.info.w / c.info.n)}%</div>
-                    </>}
+                    <div style={{ fontSize: "0.72rem", fontWeight: 700, color: c.info ? C.white : C.muted, textAlign: "right" }}>{c.d}</div>
+                    {c.info && <div style={{ marginTop: "auto" }}>
+                      <div style={{ fontWeight: 800, fontSize: "0.98rem", color: c.info.net > 0 ? C.green : c.info.net < 0 ? C.red : C.muted }}>{fmtK(c.info.net)}</div>
+                      <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 2 }}>{c.info.n} trade{c.info.n > 1 ? "s" : ""} · {Math.round(100 * c.info.w / c.info.n)}%</div>
+                    </div>}
                   </div>
                 );
               })}
-              <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 12, padding: 9, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                <div style={{ fontSize: "0.58rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, fontWeight: 700 }}>Week {wi + 1}</div>
-                <div style={{ fontWeight: 800, fontSize: "0.95rem", marginTop: 3, color: wnet > 0 ? C.green : wnet < 0 ? C.red : C.muted }}>{wdays ? fmtK(wnet) : "—"}</div>
+              <div style={{ background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: 10, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={{ fontSize: "0.58rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.gold, fontWeight: 800 }}>Week {wi + 1}</div>
+                <div style={{ fontWeight: 800, fontSize: "1rem", marginTop: 3, color: wnet > 0 ? C.green : wnet < 0 ? C.red : C.muted }}>{wdays ? fmtK(wnet) : "—"}</div>
                 <div style={{ fontSize: "0.56rem", color: C.muted }}>{wdays} day{wdays !== 1 ? "s" : ""}</div>
               </div>
             </React.Fragment>
@@ -121,78 +136,101 @@ function Monthly({ daily, C, font, ym, setYm }) {
   );
 }
 
-// ─── Yearly view (12 mini-month heatmaps) ───
-function Yearly({ daily, C, font, year, setYear, onPickMonth }) {
-  const miniCell = (info) => {
-    let bg = "rgba(255,255,255,0.04)";
-    if (info) {
-      const mag = Math.min(1, Math.abs(info.net) / 8000);
-      bg = info.net > 0 ? `rgba(34,197,94,${0.22 + mag * 0.5})` : info.net < 0 ? `rgba(239,68,68,${0.20 + mag * 0.5})` : "rgba(255,255,255,0.10)";
+// ─── Yearly view — year × month matrix (TradeZella layout, VIV brand) ───
+function Yearly({ daily, C, font, onPickMonth }) {
+  const [metric, setMetric] = useState("pnl"); // pnl | winrate | trades
+
+  const { monthly, years, maxAbsNet, maxN } = useMemo(() => {
+    const monthly = {}; // "YYYY-MM" -> {net,n,w}
+    Object.entries(daily).forEach(([d, v]) => {
+      const k = d.slice(0, 7);
+      if (!monthly[k]) monthly[k] = { net: 0, n: 0, w: 0 };
+      monthly[k].net += v.net; monthly[k].n += v.n; monthly[k].w += v.w;
+    });
+    const ys = new Set(Object.keys(monthly).map(k => k.slice(0, 4)));
+    ys.add(String(new Date().getFullYear()));
+    const years = [...ys].map(Number).sort((a, b) => b - a);
+    let maxAbsNet = 1, maxN = 1;
+    Object.values(monthly).forEach(v => { maxAbsNet = Math.max(maxAbsNet, Math.abs(v.net)); maxN = Math.max(maxN, v.n); });
+    return { monthly, years, maxAbsNet, maxN };
+  }, [daily]);
+
+  const cellBg = (info) => {
+    if (!info) return "rgba(255,255,255,0.02)";
+    if (metric === "winrate") {
+      const wr = info.n ? info.w / info.n : 0; const mag = Math.min(1, Math.abs(wr - 0.5) * 2);
+      return wr >= 0.5 ? `rgba(34,197,94,${0.14 + mag * 0.5})` : `rgba(239,68,68,${0.12 + mag * 0.5})`;
     }
-    return { width: "100%", aspectRatio: "1", borderRadius: 3, background: bg };
+    if (metric === "trades") { const mag = Math.min(1, info.n / maxN); return `rgba(201,152,42,${0.10 + mag * 0.45})`; }
+    const mag = Math.min(1, Math.abs(info.net) / maxAbsNet);
+    return info.net > 0 ? `rgba(34,197,94,${0.14 + mag * 0.52})` : info.net < 0 ? `rgba(239,68,68,${0.12 + mag * 0.52})` : "rgba(255,255,255,0.06)";
   };
-  let yearNet = 0;
-  Object.entries(daily).forEach(([d, v]) => { if (d.slice(0, 4) === String(year)) yearNet += v.net; });
+  const cellMain = (info) => {
+    if (!info) return "--";
+    if (metric === "winrate") return `${Math.round(100 * info.w / info.n)}%`;
+    if (metric === "trades") return `${info.n}`;
+    return fmtK(info.net);
+  };
+  const yearTotal = (yr) => {
+    let net = 0, n = 0, w = 0;
+    for (let mi = 0; mi < 12; mi++) { const v = monthly[`${yr}-${String(mi + 1).padStart(2, "0")}`]; if (v) { net += v.net; n += v.n; w += v.w; } }
+    return { net, n, w };
+  };
+
+  const HEAD = ["Year", ...MONTHS_SHORT, "Total"];
+  const TOGGLES = [["winrate", "Win rate"], ["pnl", "P&L"], ["trades", "Trades"]];
 
   return (
     <div style={{ fontFamily: font }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-        <button onClick={() => setYear(year - 1)} style={navBtn(C)}>‹</button>
-        <div style={{ fontSize: "1.2rem", fontWeight: 800, color: C.white }}>{year}</div>
-        <button onClick={() => setYear(year + 1)} style={navBtn(C)}>›</button>
-        <div style={{ marginLeft: "auto", textAlign: "right" }}>
-          <div style={{ fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, fontWeight: 700 }}>Year net</div>
-          <div style={{ fontSize: "1.4rem", fontWeight: 800, color: yearNet > 0 ? C.green : yearNet < 0 ? C.red : C.muted }}>{yearNet ? fmtK(yearNet) : "$0"}</div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+        <div style={{ display: "flex", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+          {TOGGLES.map(([k, lbl]) => (
+            <button key={k} onClick={() => setMetric(k)} style={{ background: metric === k ? C.gold : "transparent", color: metric === k ? "#1a1206" : C.muted, border: "none", padding: "7px 15px", fontFamily: font, fontWeight: 700, fontSize: "0.76rem", cursor: "pointer" }}>{lbl}</button>
+          ))}
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
-        {MONTHS.map((mn, mi) => {
-          const first = new Date(Date.UTC(year, mi, 1));
-          const startDow = first.getUTCDay();
-          const days = new Date(Date.UTC(year, mi + 1, 0)).getUTCDate();
-          const cells = [];
-          for (let i = 0; i < startDow; i++) cells.push(null);
-          let mNet = 0, hasData = false;
-          for (let d = 1; d <= days; d++) {
-            const key = `${year}-${String(mi + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-            const info = daily[key];
-            cells.push(info || undefined);
-            if (info) { mNet += info.net; hasData = true; }
-          }
-          while (cells.length % 7) cells.push(null);
-          return (
-            <div key={mi} onClick={() => onPickMonth(`${year}-${String(mi + 1).padStart(2, "0")}`)} style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 13px", cursor: "pointer", transition: "border-color .15s" }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = C.borderGold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 9 }}>
-                <div style={{ fontWeight: 800, fontSize: "0.82rem", color: C.white }}>{MONTHS_SHORT[mi]}</div>
-                <div style={{ fontWeight: 800, fontSize: "0.76rem", color: !hasData ? C.muted : mNet > 0 ? C.green : mNet < 0 ? C.red : C.muted }}>{hasData ? fmtK(mNet) : "—"}</div>
+      <div style={{ overflowX: "auto" }}>
+        <div style={{ minWidth: 900 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "62px repeat(12, 1fr) 84px", gap: 7, marginBottom: 7 }}>
+            {HEAD.map((h, i) => <div key={i} style={{ ...dowStyle(C), textAlign: i === 0 ? "left" : "center", paddingLeft: i === 0 ? 4 : 0 }}>{h}</div>)}
+          </div>
+          {years.map(yr => {
+            const tot = yearTotal(yr);
+            return (
+              <div key={yr} style={{ display: "grid", gridTemplateColumns: "62px repeat(12, 1fr) 84px", gap: 7, marginBottom: 7 }}>
+                <div style={{ display: "flex", alignItems: "center", fontWeight: 800, fontSize: "0.9rem", color: C.white, paddingLeft: 4 }}>{yr}</div>
+                {MONTHS_SHORT.map((_, mi) => {
+                  const info = monthly[`${yr}-${String(mi + 1).padStart(2, "0")}`];
+                  return (
+                    <div key={mi} onClick={() => info && onPickMonth(`${yr}-${String(mi + 1).padStart(2, "0")}`)} title={info ? `${MONTHS_SHORT[mi]} ${yr}` : ""}
+                      style={{ background: cellBg(info), border: `1px solid ${info ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)"}`, borderRadius: 10, minHeight: 60, padding: "8px 6px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", cursor: info ? "pointer" : "default", textAlign: "center" }}>
+                      <div style={{ fontWeight: 800, fontSize: "0.82rem", color: info ? C.white : C.muted }}>{cellMain(info)}</div>
+                      {info && <div style={{ fontSize: "0.58rem", color: "rgba(255,255,255,0.6)", marginTop: 2 }}>{info.n} trade{info.n > 1 ? "s" : ""}</div>}
+                    </div>
+                  );
+                })}
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                  <div style={{ fontWeight: 800, fontSize: "0.82rem", color: metric === "pnl" ? (tot.net > 0 ? C.green : tot.net < 0 ? C.red : C.muted) : C.white }}>
+                    {tot.n === 0 ? "--" : metric === "winrate" ? `${Math.round(100 * tot.w / tot.n)}%` : metric === "trades" ? `${tot.n}` : fmtK(tot.net)}
+                  </div>
+                  {tot.n > 0 && <div style={{ fontSize: "0.58rem", color: "rgba(255,255,255,0.6)", marginTop: 2 }}>{tot.n} trades</div>}
+                </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
-                {cells.map((c, ci) => c === null ? <div key={ci} /> : <div key={ci} title={c ? fmtK(c.net) : ""} style={miniCell(c)} />)}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
-function navBtn(C) {
-  return { width: 34, height: 34, borderRadius: 9, background: C.glass, border: `1px solid ${C.border}`, color: C.white, fontSize: "1.1rem", cursor: "pointer", lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center" };
-}
-function dowStyle(C) {
-  return { fontSize: "0.62rem", letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, fontWeight: 700, textAlign: "center", paddingBottom: 2 };
-}
-
 // ─── Public component: month/year toggle wrapper ───
 export default function TradeCalendar({ trades, C, font }) {
   const daily = useDailyMap(trades);
-  const keys = monthKeyList(daily);
-  const latest = keys.length ? keys[keys.length - 1] : `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth() + 1).padStart(2, "0")}`;
+  const keys = useMemo(() => [...new Set(Object.keys(daily).map(d => d.slice(0, 7)))].sort(), [daily]);
+  const latest = keys.length ? keys[keys.length - 1] : nowYM();
   const [mode, setMode] = useState("month");
   const [ym, setYm] = useState(latest);
-  const [year, setYear] = useState(Number(latest.slice(0, 4)));
 
   const toggle = (m) => ({ background: mode === m ? C.gold : "transparent", color: mode === m ? "#1a1206" : C.muted, border: "none", padding: "7px 15px", fontFamily: font, fontWeight: 700, fontSize: "0.78rem", cursor: "pointer" });
 
@@ -206,7 +244,7 @@ export default function TradeCalendar({ trades, C, font }) {
       </div>
       {mode === "month"
         ? <Monthly daily={daily} C={C} font={font} ym={ym} setYm={setYm} />
-        : <Yearly daily={daily} C={C} font={font} year={year} setYear={setYear} onPickMonth={(k) => { setYm(k); setMode("month"); }} />}
+        : <Yearly daily={daily} C={C} font={font} onPickMonth={(k) => { setYm(k); setMode("month"); }} />}
     </div>
   );
 }

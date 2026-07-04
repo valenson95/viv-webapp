@@ -10,6 +10,7 @@ import { themeFit, themeRanks, consistentTop, top5, latestSnapshot } from "./the
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
+import { getGrade as getSavedGrade, useGrades as useSavedGrades } from "./grades.js";
 
 // ─── Error Boundary — catches rendering crashes so the page doesn't go blank ───
 class ErrorBoundary extends React.Component {
@@ -2877,7 +2878,7 @@ function PremiumTour({ onPlayStateChange }) {
     </div>
   );
 }
-function PremiumToolsPage({ setPage, onLogout, session, demo, portfolioSize, journaledTrades, displayName }) {
+function PremiumToolsPage({ setPage, onLogout, session, demo, portfolioSize, journaledTrades, positions, displayName }) {
   const[tab,setTab]=useState(0);const tabs=["Setup Grader","Return Simulator","Risk","Expectancy","Risk Finance"];
   const realizedPL = useMemo(() => (journaledTrades || []).reduce((s, t) => s + (t.plDollar || 0), 0), [journaledTrades]);
   const currentCapital = (+portfolioSize || 0) + realizedPL;
@@ -2990,7 +2991,7 @@ return (
       </div>
 
       {/* ACTIVE PANEL */}
-      {tab === 0 && <SetupGraderTab C={C} font={font} {...guideProps} />}
+      {tab === 0 && <SetupGraderTab C={C} font={font} positions={positions} {...guideProps} />}
       {tab === 1 && <ReturnSimulatorTab portfolioSize={portfolioSize} currentCapital={currentCapital} {...guideProps} />}
       {tab === 2 && <RiskTab demo={demo} {...guideProps} />}
       {tab === 3 && <ExpectancyTab demo={demo} {...guideProps} />}
@@ -4328,7 +4329,47 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .tabs::-webkit-scrollbar{display:none}
 .vj .tabs a{white-space:nowrap}
 .vj .jtoolbar .btn{flex:1 1 auto}
-  }`;
+  }
+/* ── Recent Trades: premium aligned rows (TradeZella-style) ── */
+.vj tr.clickrow{cursor:pointer; transition:background .13s}
+.vj tbody tr.clickrow:hover td{background:rgba(201,152,42,0.05)}
+.vj tbody tr.traderow.rev-open td{background:rgba(201,152,42,0.08)}
+.vj tbody tr.traderow td{white-space:nowrap; vertical-align:middle; height:52px}
+.vj .revbtn.tp-go,.vj button.tp-go{white-space:nowrap}
+/* ── Trade Preview (slide-in) ── */
+.vj .tp-back{position:fixed; inset:0; z-index:1200; background:rgba(4,4,8,0.62); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); display:flex; justify-content:flex-end; animation:tpFade .18s ease}
+@keyframes tpFade{from{opacity:0}to{opacity:1}}
+@keyframes tpSlide{from{transform:translateX(40px); opacity:0}to{transform:translateX(0); opacity:1}}
+.vj .tp-panel{width:min(440px,92vw); height:100%; overflow-y:auto; background:linear-gradient(180deg,#0c0c14,#08080e); border-left:1px solid var(--borderGold); box-shadow:-24px 0 60px rgba(0,0,0,0.6); padding:22px 22px 40px; animation:tpSlide .22s cubic-bezier(0.22,1,0.36,1); font-family:var(--font)}
+.vj .tp-head{display:flex; align-items:center; gap:12px}
+.vj .tp-tick{font-size:1.5rem; font-weight:800; color:var(--white); letter-spacing:-0.02em}
+.vj .tp-x{margin-left:auto; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--muted); width:32px; height:32px; border-radius:9px; font-size:1.2rem; cursor:pointer; line-height:1}
+.vj .tp-sub{color:var(--muted); font-size:0.74rem; margin:10px 0 16px}
+.vj .tp-pnl{border-radius:14px; padding:16px 18px; margin-bottom:18px; border:1px solid var(--border)}
+.vj .tp-pnl.up{background:rgba(34,197,94,0.08); border-color:rgba(34,197,94,0.28)}
+.vj .tp-pnl.dn{background:rgba(239,68,68,0.07); border-color:rgba(239,68,68,0.26)}
+.vj .tp-pnl-lbl{font-size:0.6rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted)}
+.vj .tp-pnl.up .tp-pnl-v{color:var(--green)} .vj .tp-pnl.dn .tp-pnl-v{color:var(--red)}
+.vj .tp-pnl-v{font-size:1.9rem; font-weight:800; letter-spacing:-0.02em; margin:2px 0 4px; font-variant-numeric:tabular-nums}
+.vj .tp-pnl-meta{font-size:0.74rem; color:var(--muted)}
+.vj .tp-grid{display:flex; flex-direction:column; border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:16px}
+.vj .tp-row{display:flex; justify-content:space-between; align-items:center; gap:14px; padding:11px 14px; border-bottom:1px solid rgba(255,255,255,0.05)}
+.vj .tp-row:last-child{border-bottom:none}
+.vj .tp-row span{color:var(--muted); font-size:0.78rem}
+.vj .tp-row b{color:var(--text); font-size:0.84rem; font-weight:700; text-align:right}
+.vj .tp-reason{border:1px solid var(--border); border-radius:12px; padding:13px 15px; margin-bottom:18px; background:rgba(255,255,255,0.02)}
+.vj .tp-reason-h{font-size:0.6rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:7px}
+.vj .tp-reason-b{font-size:0.82rem; color:var(--text); line-height:1.5}
+.vj .tp-foot{display:flex; gap:10px}
+.vj .tp-go{flex:1; background:linear-gradient(135deg,var(--goldBright),var(--goldMid)); color:#08080e; border:none; font-family:var(--font); font-weight:800; font-size:0.82rem; padding:12px 16px; border-radius:11px; cursor:pointer}
+/* ── Trade Details (full page) ── */
+.vj .td-back{position:fixed; inset:0; z-index:1300; background:var(--bg); overflow-y:auto; animation:tpFade .16s ease}
+.vj .td-page{max-width:1080px; margin:0 auto; padding:22px 20px 60px; font-family:var(--font)}
+.vj .td-top{display:flex; align-items:center; gap:14px; padding:6px 0 18px; position:sticky; top:0; background:linear-gradient(180deg,var(--bg) 70%,transparent); z-index:2}
+.vj .td-top .revtick{font-size:1.4rem; font-weight:800; color:var(--white)}
+.vj .td-grade{font-size:0.78rem; font-weight:800; padding:4px 10px; border:1px solid var(--border); border-radius:99px}
+.vj .td-top .spacer{flex:1}
+.vj .td-body .revgrid{margin-bottom:18px}`;
 
 // Admin-only AI deep-review block — renders the ai_review JSON Claude writes to Supabase
 // (score · process dimensions · narrative/regime/SL · the read). Members never see this.
@@ -4469,7 +4510,7 @@ function CoachHero({ data }) {
         </div>
         {d.summary && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
       </Card>
-      {data.goldilocks && (() => { const g = data.goldilocks;
+      {false /* Goldilocks zone hidden per Valen (2026-07-04) */ && data.goldilocks && (() => { const g = data.goldilocks;
         const tile = (label, val, color) => (
           <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "10px 6px", textAlign: "center", flex: 1, minWidth: 64 }}>
             <div style={{ fontSize: "1.05rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
@@ -4735,7 +4776,8 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const [importResult, setImportResult] = useState(null);
   const [deletedTradeIds, setDeletedTradeIds] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [expandedTrade, setExpandedTrade] = useState(null); // for expanded view with chart + notes
+  const [expandedTrade, setExpandedTrade] = useState(null); // full-page trade details overlay
+  const [previewTrade, setPreviewTrade] = useState(null); // TradeZella-style slide-in overview preview
   const [highlightTradeId, setHighlightTradeId] = useState(null); // gold flash on a trade row jumped-to from VIV Analytics
   const [tradeSorts, setTradeSorts] = useState([]); // [{key, dir}] multi-sort for trades
   const [eqYAxis, setEqYAxis] = useState("$"); // "$" or "%"
@@ -6217,12 +6259,6 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           <TradeCalendar trades={journaledTrades} C={C} font={font} />
         </div>
 
-        {/* THEME TRACKER (DeepVue leaderboard + in/off-theme) */}
-        <div className="toolbar"><h2 className="sech">Theme tracker</h2></div>
-        <div className="card reveal" style={{ padding: "18px 20px", marginBottom: 18 }}>
-          <ThemeTracker C={C} font={font} />
-        </div>
-
         {/* EQUITY CURVE + RETURN DISTRIBUTION */}
         <div className={"chartrow" + (distPanelOpen ? " dist-open" : "")}>
           <div className="chartcol eqcol">
@@ -6448,7 +6484,6 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 <th><span className="term" data-tip="The pattern or reason you took the trade.">Setup</span></th>
                 <th className="pro-only"><span className="term" data-tip="DeepVue sector, in/off-theme judged against the tracker at your entry date. Green = top-5 leader (with the trend); red = off-theme.">Theme</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="Your protective stop on this trade.">Stop</span></th>
-                <th className="pro-only"><span className="term tipright" data-tip="Why you exited — kept for reviewing your decisions.">Exit reason</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="How many days you held the trade.">Hold</span></th>
                 <th><span className="term tipright" data-tip="Percentage gain or loss on the trade.">Return</span></th>
                 <th><span className="term tipright" data-tip="Dollar profit or loss banked on the trade.">P/L</span></th>
@@ -6458,7 +6493,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             </thead>
             <tbody>
               {dateFiltered.length === 0 && (
-                <tr><td colSpan={16} className="nodata">No trades match this filter. Clear the filters to see your full track record.</td></tr>
+                <tr><td colSpan={15} className="nodata">No trades match this filter. Clear the filters to see your full track record.</td></tr>
               )}
               {dateFiltered.map(t => {
                 const up = (Number(t.plPct) || 0) > 0;
@@ -6467,7 +6502,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 const isOpen = expandedTrade === t.id;
                 return (
                   <React.Fragment key={t.id}>
-                    <tr id={"jtrade-" + t.id} className={"traderow" + (isOpen ? " rev-open" : "") + (highlightTradeId === t.id ? " jumphl" : "")} onDoubleClick={() => startEdit(t)}>
+                    <tr id={"jtrade-" + t.id} className={"traderow clickrow" + (isOpen ? " rev-open" : "") + (highlightTradeId === t.id ? " jumphl" : "")} onClick={() => setPreviewTrade(t)} onDoubleClick={() => startEdit(t)}>
                       <td data-l="Result"><span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span></td>
                       <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}</span></td>
                       <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
@@ -6491,7 +6526,6 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                           ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "3px 9px", fontSize: "0.66rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Needs stop</button>
                           : (t.stop ? "$" + Number(t.stop).toFixed(2) : "—")
                       }</td>
-                      <td className="pro-only" data-l="Exit reason">{t.reason || "—"}</td>
                       <td className="pro-only" data-l="Hold">{holdLabel(t)}</td>
                       <td data-l="Return"><span className={plc}>{sgnPct(Number(t.plPct))}</span></td>
                       <td data-l="P/L"><span className={plc}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></td>
@@ -6500,9 +6534,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                           ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "2px 8px", fontSize: "0.62rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Add stop</button>
                           : <span className={(Number(t.rMult) || 0) >= 0 ? "pl up" : "pl dn"}>{t.rMult == null ? "—" : sgnR(Number(t.rMult))}</span>
                       }</td>
-                      <td className="revcell" data-l=""><button className="revbtn" onClick={() => openReview(t)}>Review</button></td>
+                      <td className="revcell" data-l=""><button className="revbtn" onClick={(e) => { e.stopPropagation(); setPreviewTrade(t); }}>View ›</button></td>
                     </tr>
-                    {isOpen && (
+                    {false && (
                       <tr className="revrow"><td colSpan={15}>
                         <div className={"revpanel" + (closingReview ? " closing" : "")}>
                           <div className="revhead">
@@ -6583,7 +6617,114 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           </table>
           </div>
         </div>
-        <div className="charthint">Showing the essentials. Switch to <b>Pro</b> above for entry/exit price, shares, stop, exit reason and hold time.</div>
+        <div className="charthint">Click any trade for its overview; open <b>trade details</b> for the full chart, stats and review. Switch to <b>Pro</b> above for all columns.</div>
+
+        {/* ── TRADE PREVIEW (slide-in overview, TradeZella-style) ── */}
+        {previewTrade && createPortal((() => {
+          const t = previewTrade;
+          const up = (Number(t.plPct) || 0) > 0, cls = up ? "st-win" : "st-loss";
+          const th = sectorFor(t.ticker), fit = th ? themeFit(th, t.entry) : null;
+          const gr = getSavedGrade(t.ticker);
+          const gcol = !gr ? "var(--muted)" : gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--goldBright)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
+          const Row = ({ k, v, c }) => (<div className="tp-row"><span>{k}</span><b style={c ? { color: c } : undefined}>{v}</b></div>);
+          return (
+            <div className="vj tp-back" onClick={(e) => { if (e.target === e.currentTarget) setPreviewTrade(null); }}>
+              <div className="tp-panel" role="dialog" aria-label={`${t.ticker} trade preview`}>
+                <div className="tp-head">
+                  <span className="tp-tick">{t.ticker}</span>
+                  <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
+                  <button className="tp-x" aria-label="Close" onClick={() => setPreviewTrade(null)}>&times;</button>
+                </div>
+                <div className="tp-sub">Opened {tradeDateISO(t.entry) || t.entry || "—"} · Closed {tradeDateISO(t.exit) || t.exit || "—"} · Held {holdLabel(t)}</div>
+                <div className={"tp-pnl " + (up ? "up" : "dn")}>
+                  <div className="tp-pnl-lbl">Net P/L</div>
+                  <div className="tp-pnl-v">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</div>
+                  <div className="tp-pnl-meta">Return {sgnPct(Number(t.plPct))} · R {t.rMult == null ? "—" : sgnR(Number(t.rMult))}</div>
+                </div>
+                <div className="tp-grid">
+                  <Row k="Entry price" v={"$" + (Number(t.entryP) || 0).toFixed(2)} />
+                  <Row k="Exit price" v={"$" + (Number(t.exitP) || 0).toFixed(2)} />
+                  <Row k="Shares" v={(Number(t.shares) || 0).toLocaleString()} />
+                  <Row k="Stop" v={t.stop ? "$" + Number(t.stop).toFixed(2) : "—"} />
+                  <Row k="Setup" v={t.setup || "—"} />
+                  <Row k="Theme" v={th ? `${fit === "in" ? "🟢" : "🔴"} ${th}` : "—"} />
+                  <Row k="Setup grade" v={gr ? `${gr.letter} · ${gr.stars}★` : "Not graded"} c={gcol} />
+                  <Row k="Commission" v={privacyMode ? "••••" : "$" + (parseFloat(t.commission) || 0).toFixed(2)} />
+                </div>
+                {t.reason && <div className="tp-reason"><div className="tp-reason-h">Exit reason</div><div className="tp-reason-b">{t.reason}</div></div>}
+                <div className="tp-foot">
+                  <button className="tp-go" onClick={() => { setPreviewTrade(null); openReview(t); }}>Go to trade details ›</button>
+                  <button className="revbtn" onClick={() => { setPreviewTrade(null); startEdit(t); }}>Edit</button>
+                </div>
+              </div>
+            </div>
+          );
+        })(), document.body)}
+
+        {/* ── TRADE DETAILS (full-page) ── */}
+        {expandedTrade && createPortal((() => {
+          const t = journaledTrades.find(x => x.id === expandedTrade);
+          if (!t) return null;
+          const up = (Number(t.plPct) || 0) > 0, cls = up ? "st-win" : "st-loss";
+          const gr = getSavedGrade(t.ticker);
+          const gcol = !gr ? "var(--muted)" : gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--goldBright)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
+          return (
+            <div className="vj td-back">
+              <div className="td-page">
+                <div className="td-top">
+                  <button className="revbtn" onClick={closeReview}>‹ Back to trades</button>
+                  <span className="revtick">{t.ticker}</span>
+                  <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
+                  {gr && <span className="td-grade" style={{ color: gcol }} title={`Setup grade ${gr.letter} · ${gr.stars}/5★`}>{gr.letter} · {gr.stars}★</span>}
+                  <div className="spacer"></div>
+                  <button className="revbtn" onClick={() => startEdit(t)} style={{ background: "var(--goldDim)", color: "var(--goldBright)", borderColor: "var(--borderGold)", fontWeight: 700 }}>Edit trade</button>
+                </div>
+                <div className="td-body">
+                  <div className="revgrid">
+                    <div className="revcol">
+                      <div className="revcoltitle">Trade stats</div>
+                      <div className="mgr"><span>Entry price</span><b>${(Number(t.entryP) || 0).toFixed(2)}</b></div>
+                      <div className="mgr"><span>Exit price</span><b>${(Number(t.exitP) || 0).toFixed(2)}</b></div>
+                      <div className="mgr"><span>Shares</span><b>{(Number(t.shares) || 0).toLocaleString()}</b></div>
+                      <div className="mgr"><span>Hold time</span><b>{holdLabel(t)}</b></div>
+                      <div className="mgr"><span>Stop</span><b>{t.stop ? "$" + Number(t.stop).toFixed(2) : "—"}</b></div>
+                      <div className="mgr"><span>Commission</span><b>{privacyMode ? "••••" : "$" + (parseFloat(t.commission) || 0).toFixed(2)}</b></div>
+                    </div>
+                    <div className="revcol">
+                      <div className="revcoltitle">Result</div>
+                      <div className="mgr"><span>Return</span><b className={up ? "green" : "red"}>{sgnPct(Number(t.plPct))}</b></div>
+                      <div className="mgr"><span>P/L</span><b className={(Number(t.plDollar) || 0) >= 0 ? "green" : "red"}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</b></div>
+                      <div className="mgr"><span>Realized R</span><b className={(Number(t.rMult) || 0) >= 0 ? "green" : "red"}>{t.rMult == null ? "—" : sgnR(Number(t.rMult))}</b></div>
+                      <div className="mgr"><span>Setup</span><b>{t.setup || "—"}</b></div>
+                      <div className="mgr"><span>Setup grade</span><b style={{ color: gcol }}>{gr ? `${gr.letter} · ${gr.stars}★ · ${Math.round((gr.pct || 0) * 100)}%` : "Not graded"}</b></div>
+                      <div className="mgr"><span>Exit reason</span><b>{t.reason || "—"}</b></div>
+                    </div>
+                  </div>
+                  <div className="revchart"><TradeReplayChart trade={t} C={C} font={font} /></div>
+                  {isAdmin ? (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>) : (
+                    <div className="revnotes">
+                      <div className="revchart-head" style={{ marginBottom: 0 }}>
+                        <span className="revcoltitle" style={{ margin: 0 }}>Trade review</span>
+                        <div className="spacer"></div>
+                        <button className="simbtn" onClick={() => saveReview(t.id)}>{reviewSavedId === t.id ? "Saved ✓" : "Save review"}</button>
+                      </div>
+                      <div className="notesgrid">
+                        <div><div className="nlabel r">What went right</div><textarea className="mgta" value={reviewDraft.right} onChange={e => setReviewDraft(r => ({ ...r, right: e.target.value }))} placeholder="What went right..." /></div>
+                        <div><div className="nlabel w">What went wrong</div><textarea className="mgta" value={reviewDraft.wrong} onChange={e => setReviewDraft(r => ({ ...r, wrong: e.target.value }))} placeholder="What went wrong..." /></div>
+                        <div><div className="nlabel l">Lesson learned</div><textarea className="mgta" value={reviewDraft.lessons} onChange={e => setReviewDraft(r => ({ ...r, lessons: e.target.value }))} placeholder="Lesson learned..." /></div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="revfoot">
+                    {deleteStep === 0 && (<button className="revdelbtn" onClick={() => setDeleteStep(1)} title="Delete this trade from your journal">Delete trade</button>)}
+                    {deleteStep === 1 && (<div className="revdelconfirm"><span className="revdelmsg">Delete this trade? This cannot be undone.</span><button className="revdelbtn" onClick={() => setDeleteStep(2)}>Confirm</button><button className="revbtn" onClick={() => setDeleteStep(0)}>Cancel</button></div>)}
+                    {deleteStep === 2 && (<div className="revdelconfirm final"><span className="revdelmsg">Are you absolutely sure? This permanently removes the trade.</span><button className="revdelbtn" onClick={() => { deleteTrade(t.id, true); closeReview(); setDeleteStep(0); }}>Yes, delete permanently</button><button className="revbtn" onClick={() => setDeleteStep(0)}>Cancel</button></div>)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })(), document.body)}
 
         {/* INLINE FACTUAL EDITOR — opens over a modal when an inline Edit is triggered */}
         {editingId && createPortal(
@@ -7108,6 +7249,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
   // Alias so existing `INTRADAY_FEATURE_ENABLED` references inside this component keep reading as a single
   // flag without rewriting every callsite. Reactive — flipping the Settings toggle re-renders the table.
   const INTRADAY_FEATURE_ENABLED = intradayFeatureEnabled;
+  useSavedGrades(); // re-render the Grade column when a setup grade is saved/synced
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [compactTable, setCompactTable] = useState(false);
   // Open Positions zoom — scales the whole table (5 steps each way, 70%–130%, 6% per step). Persisted as a UI-only pref.
@@ -8176,6 +8318,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                 <th className="pro-only"><span className="term" data-tip="Total broker fees paid on this position so far.">Commission</span></th>
                 <th className="pro-only"><span className="term" data-tip="The pattern or reason you took the trade.">Setup</span></th>
                 <th className="pro-only"><span className="term" data-tip="DeepVue-style sector, auto-recognized from the ticker — no AI needed. Unknown tickers show a dash.">Theme</span></th>
+                <th className="pro-only"><span className="term" data-tip="The Setup Grader score for this position (★ / letter / %). Grade a name in Premium Tools → Setup Grader, then Sync to Open Position.">Grade</span></th>
                 <th onClick={() => togglePosSort("posValue")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "posValue" ? C.gold : undefined }} title="Sort by position size"><span className="term" data-tip="Total dollars in this position — shares × average cost.">Position size</span>{posSort && posSort.key === "posValue" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th><span className="term" data-tip="Profit banked from partial sells of this position. The bar fills to the percentage of your original shares you've sold (trimmed).">Realized</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="Your current protective stop price.">Stop</span></th>
@@ -8217,6 +8360,16 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                         const g = fit === "in", bg = g ? "var(--greenDim)" : "var(--redDim)", bd = g ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)", cl = g ? "var(--green)" : "var(--red)";
                         return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.66rem", fontWeight: 700, background: bg, border: `1px solid ${bd}`, color: cl, whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
                       })()}</td>
+                      <td className="pro-only" data-l="Grade">{(() => {
+                        const gr = getSavedGrade(p.sym);
+                        if (!gr) return <span className="term" data-tip="Not graded yet. Grade it in Premium Tools → Setup Grader, then Sync to Open Position." style={{ color: "var(--faint)" }}>—</span>;
+                        const col = gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--goldBright)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
+                        return <span className="term" data-tip={`Setup grade ${gr.letter} · ${gr.stars}/5★ · ${Math.round((gr.pct || 0) * 100)}% of criteria. Set in the Setup Grader.`} style={{ display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", cursor: "help" }}>
+                          <span style={{ letterSpacing: 0.5, fontSize: "0.7rem" }}>{[0, 1, 2, 3, 4].map(k => <span key={k} style={{ color: k < gr.stars ? "var(--goldBright)" : "rgba(255,255,255,0.16)" }}>★</span>)}</span>
+                          <b style={{ color: col, fontSize: "0.72rem" }}>{gr.letter}</b>
+                          <span style={{ color: "var(--muted)", fontSize: "0.68rem", fontVariantNumeric: "tabular-nums" }}>{Math.round((gr.pct || 0) * 100)}%</span>
+                        </span>;
+                      })()}</td>
                       <td data-l="Position size">{usd0(p.posValue)}</td>
                       <td data-l="Realized">
                         <span className="sizebar" title={p.realizedShares > 0 ? `${p.realizedShares} of ${p.origShares} shares sold (${p.trimPct.toFixed(0)}% trimmed)` : "Nothing sold yet — fully unrealized"}>
@@ -8236,7 +8389,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                       </td>
                     </tr>
                     {isOpen && (
-                      <tr className="mgrow"><td colSpan={14}>
+                      <tr className="mgrow"><td colSpan={15}>
                         <div className="mgpanel">
                           <div className="mghead">
                             <span className={"status " + sc}><span className="d"></span>{p.riskStatus === "—" ? "Risk-Free" : p.riskStatus}</span>
@@ -8337,7 +8490,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                 );
               })}
               {enriched.filter(p => p.sym).length === 0 && (
-                <tr><td colSpan={14} style={{ padding: "32px 14px", textAlign: "center", color: "var(--muted)" }}>No open positions yet. Click <b style={{ color: "var(--goldBright)" }}>+ Add Position</b> to start.</td></tr>
+                <tr><td colSpan={15} style={{ padding: "32px 14px", textAlign: "center", color: "var(--muted)" }}>No open positions yet. Click <b style={{ color: "var(--goldBright)" }}>+ Add Position</b> to start.</td></tr>
               )}
             </tbody>
           </table>
@@ -10718,7 +10871,7 @@ function AppInner() {
         </div>
       )}
       {page === "dashboard" && <DashboardPage setPage={setPage} onLogout={handleLogout} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
-      {page === "tools" && <PremiumToolsPage setPage={setPage} onLogout={handleLogout} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} displayName={displayName} />}
+      {page === "tools" && <PremiumToolsPage setPage={setPage} onLogout={handleLogout} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} positions={positions} displayName={displayName} />}
       {page === "journal" && <TradeJournalPage setPage={setPage} onLogout={handleLogout} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} />}
       {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />

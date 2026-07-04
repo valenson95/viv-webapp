@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { loadGrades, getGrade, saveGrade, removeGrade, letterFor, useGrades } from "./grades.js";
 
 // ══════════════════════════════════════════════════════════════════
 // SETUP GRADER — Premium Tools sub-tab. 5-star A+ breakout/continuation
@@ -92,8 +93,19 @@ const GRADES = {
   0: ["—", "Tick what's true to grade the setup."],
 };
 
-export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactive, expert }) {
+const letterColor = (C, l) => l === "A+" ? C.green : l === "A" ? C.goldBright : l === "B" ? C.muted : (l === "—" ? C.muted : C.red);
+const MiniStars = ({ C, n, size = 0.72 }) => (
+  <span style={{ letterSpacing: 1, fontSize: `${size}rem`, whiteSpace: "nowrap" }}>
+    {[0, 1, 2, 3, 4].map(k => <span key={k} style={{ color: k < n ? C.goldBright : "rgba(255,255,255,0.16)" }}>★</span>)}
+  </span>
+);
+
+export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactive, expert, positions = [] }) {
+  useGrades(); // re-render when a grade is saved/removed
   const [on, setOn] = useState(() => new Set());
+  const [ticker, setTicker] = useState("");
+  const [showSync, setShowSync] = useState(false);
+  const [flash, setFlash] = useState("");
   const toggle = (key) => setOn(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
   const reset = () => setOn(new Set());
 
@@ -111,6 +123,30 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   if (stars >= 5 && starHit < STARMAKERS) stars = 4; // A+ requires full confluence
   if (passed === 0) stars = 0;
   const [gLabel, gDesc] = GRADES[stars];
+  const letter = letterFor(stars);
+
+  // ── grade object + persistence ──
+  const grade = { stars, pct, passed, total: TOTAL, starHit, starmakers: STARMAKERS, letter, label: gLabel, ticked: [...on] };
+  const posSyms = Array.from(new Set((positions || []).map(p => String(p.sym || p.symbol || "").toUpperCase().trim()).filter(Boolean)));
+  const posSet = new Set(posSyms);
+  const saved = loadGrades();
+  const savedRows = Object.values(saved).sort((a, b) => (b.stars - a.stars) || (a.sym < b.sym ? -1 : 1));
+
+  const flashMsg = (m) => { setFlash(m); setTimeout(() => setFlash(""), 2600); };
+  const loadTicker = (sym) => { const g = getGrade(sym); setTicker(sym); setOn(new Set(g && g.ticked ? g.ticked : [])); };
+  const startTicker = () => { const s = ticker.toUpperCase().trim(); if (!s) return; loadTicker(s); };
+  const doSave = (symArg) => {
+    const s = (symArg || ticker || "").toUpperCase().trim();
+    if (!s) { flashMsg("Enter a ticker first ↑"); return; }
+    if (passed === 0) { flashMsg("Tick some criteria first"); return; }
+    saveGrade(s, grade); setTicker(s);
+    flashMsg(posSet.has(s) ? `Saved ${s} — synced to its Open Position row` : `Saved grade for ${s}`);
+  };
+  const syncTo = (sym) => {
+    if (passed === 0) { flashMsg("Tick some criteria first, then sync"); return; }
+    saveGrade(sym, grade); setTicker(sym); setShowSync(false);
+    flashMsg(`Synced to ${sym} — shows on its Open Positions row & is kept if it closes`);
+  };
 
   return (
     <div className="toolpanel on" id="panel-grader">
@@ -123,6 +159,55 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
           <h3>What is the Setup Grader?</h3>
           <p>Use it while <b>scanning and screening</b> for the best stocks — <b>not during live trading</b>. Tick every characteristic that's true and it scores the chart out of <b>5 stars</b> across three areas: <b>leadership</b>, the <b>prior move</b>, and <b>base quality</b>. A <b style={{ color: C.gold }}>★ maker</b> is a <b>confluence factor</b> — a high-signal criterion that independently raises the odds the breakout works. You can tick most boxes and still cap at 4★; the <b>fifth star (A+) only unlocks when the ★-makers stack</b> — because {STARMAKERS} unrelated signals agreeing is an edge, one alone is luck. When you're ready to enter, the <b style={{ color: C.blue }}>Trigger &amp; Stop</b> live-checklist at the bottom covers execution.</p>
         </div>
+      </div>
+
+      {/* SCREENING WATCHLIST — key in tickers, save grades */}
+      <div style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "14px 16px 8px", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Screening watchlist</span>
+          <span style={{ fontSize: "0.72rem", color: C.muted }}>grade names as you scan — each saves with its ★ score</span>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+            <input value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} onKeyDown={e => { if (e.key === "Enter") startTicker(); }}
+              placeholder="Ticker e.g. NVDA" maxLength={8}
+              style={{ width: 130, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontWeight: 700, fontSize: "0.82rem", letterSpacing: "0.04em", padding: "8px 12px", outline: "none" }} />
+            <button onClick={startTicker} style={{ background: C.goldDim, color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 800, fontSize: "0.74rem", padding: "8px 14px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>Grade this ↓</button>
+          </div>
+        </div>
+        {savedRows.length === 0 ? (
+          <div style={{ fontSize: "0.8rem", color: C.muted, padding: "6px 2px 12px" }}>No graded names yet — type a ticker, tick the criteria below, then <b style={{ color: C.gold }}>Save grade</b>. It'll appear here.</div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460 }}>
+              <thead>
+                <tr style={{ textAlign: "left" }}>
+                  {["Ticker", "Grade", "Stars", "%", "", ""].map((h, i) => (
+                    <th key={i} style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, padding: "6px 8px", borderBottom: `1px solid ${C.border}`, textAlign: i >= 3 ? "right" : "left" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {savedRows.map((g) => {
+                  const active = g.sym === ticker.toUpperCase().trim();
+                  return (
+                    <tr key={g.sym} onClick={() => loadTicker(g.sym)} style={{ cursor: "pointer", background: active ? "rgba(201,152,42,0.07)" : "transparent" }}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(201,152,42,0.07)" : "transparent"; }}>
+                      <td style={{ padding: "9px 8px", fontWeight: 800, fontSize: "0.86rem", color: C.white, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                        {g.sym}
+                        {posSet.has(g.sym) && <span title="Open position" style={{ marginLeft: 7, fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.06em", color: C.green, background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)", padding: "2px 6px", borderRadius: 99, verticalAlign: "middle" }}>OPEN</span>}
+                      </td>
+                      <td style={{ padding: "9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><span style={{ fontWeight: 800, fontSize: "0.86rem", color: letterColor(C, g.letter) }}>{g.letter}</span></td>
+                      <td style={{ padding: "9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><MiniStars C={C} n={g.stars} /></td>
+                      <td style={{ padding: "9px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: "0.82rem", color: C.text, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>{Math.round((g.pct || 0) * 100)}%</td>
+                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button onClick={(e) => { e.stopPropagation(); loadTicker(g.sym); }} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 11px", borderRadius: 8, cursor: "pointer" }}>Open</button></td>
+                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button title="Remove" onClick={(e) => { e.stopPropagation(); removeGrade(g.sym); }} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>×</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* SCORE PANEL */}
@@ -154,7 +239,29 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
           </div>
           <div style={{ fontSize: "0.62rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.12em" }}>criteria passed</div>
         </div>
-        <button onClick={reset} style={{ background: "rgba(255,255,255,0.06)", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>Reset</button>
+        <div style={{ position: "relative", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={() => doSave()} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontSize: "0.74rem", fontWeight: 800, padding: "9px 16px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Save grade{ticker ? ` · ${ticker.toUpperCase().trim()}` : ""}</button>
+          <button onClick={() => setShowSync(s => !s)} style={{ background: "rgba(59,130,246,0.12)", color: C.blue, border: "1px solid rgba(59,130,246,0.3)", fontFamily: font, fontSize: "0.74rem", fontWeight: 800, padding: "9px 14px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Sync to Open Position ▾</button>
+          <button onClick={reset} style={{ background: "rgba(255,255,255,0.06)", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "9px 16px", borderRadius: 99, cursor: "pointer" }}>Reset</button>
+          {showSync && (
+            <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 30, minWidth: 220, maxHeight: 260, overflowY: "auto", background: "#0c0c14", border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, boxShadow: "0 18px 44px rgba(0,0,0,0.6)" }}>
+              <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, padding: "7px 10px 6px" }}>Attach this grade to…</div>
+              {posSyms.length === 0 ? (
+                <div style={{ fontSize: "0.76rem", color: C.muted, padding: "8px 10px 12px" }}>No open positions found. Grade shows on a position once you hold it.</div>
+              ) : posSyms.map(s => {
+                const g = getGrade(s);
+                return (
+                  <div key={s} onClick={() => syncTo(s)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 10px", borderRadius: 8, cursor: "pointer" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <span style={{ fontWeight: 800, fontSize: "0.84rem", color: C.white }}>{s}</span>
+                    {g ? <span style={{ fontSize: "0.68rem", fontWeight: 700, color: letterColor(C, g.letter) }}>{g.letter} · {g.stars}★</span> : <span style={{ fontSize: "0.66rem", color: C.muted }}>ungraded</span>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        {flash && <div style={{ flexBasis: "100%", fontSize: "0.74rem", color: C.green, fontWeight: 700, marginTop: 2 }}>✓ {flash}</div>}
       </div>
 
       {/* SECTIONS */}
