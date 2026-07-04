@@ -4167,8 +4167,8 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj.pro .pro-only{display:table-cell}
 /* Freeze the Review (action) column to the right edge so it's never cropped when the table is wider
    than the card — happens in Pro view and especially at Text Size = Large (zoom 1.15). */
-.vj .revcell{text-align:right; white-space:nowrap; position:sticky; right:0; z-index:2; background:#0c0c14; box-shadow:-12px 0 14px -10px rgba(0,0,0,0.65)}
-.vj thead th:last-child{position:sticky; right:0; z-index:2; background:#0c0c14}
+.vj .revcell{text-align:right; white-space:nowrap; position:static; background:transparent}
+.vj thead th:last-child{position:static; background:transparent}
 .vj .revbtn{background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
     font-size:0.68rem; font-weight:700; padding:6px 13px; border-radius:980px; cursor:pointer}
 .vj .revbtn:hover{color:var(--text); border-color:var(--borderGold)}
@@ -4337,7 +4337,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj tbody tr.traderow td{white-space:nowrap; vertical-align:middle; height:52px}
 .vj .revbtn.tp-go,.vj button.tp-go{white-space:nowrap}
 /* ── Trade Preview (slide-in) ── */
-.vj .tp-back{position:fixed; inset:0; z-index:1200; background:rgba(4,4,8,0.62); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); display:flex; justify-content:flex-end; animation:tpFade .18s ease}
+.vj.tp-back{position:fixed; inset:0; z-index:1200; background:rgba(4,4,8,0.62); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); display:flex; justify-content:flex-end; animation:tpFade .18s ease}
 @keyframes tpFade{from{opacity:0}to{opacity:1}}
 @keyframes tpSlide{from{transform:translateX(40px); opacity:0}to{transform:translateX(0); opacity:1}}
 .vj .tp-panel{width:min(440px,92vw); height:100%; overflow-y:auto; background:linear-gradient(180deg,#0c0c14,#08080e); border-left:1px solid var(--borderGold); box-shadow:-24px 0 60px rgba(0,0,0,0.6); padding:22px 22px 40px; animation:tpSlide .22s cubic-bezier(0.22,1,0.36,1); font-family:var(--font)}
@@ -4363,7 +4363,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .tp-foot{display:flex; gap:10px}
 .vj .tp-go{flex:1; background:linear-gradient(135deg,var(--goldBright),var(--goldMid)); color:#08080e; border:none; font-family:var(--font); font-weight:800; font-size:0.82rem; padding:12px 16px; border-radius:11px; cursor:pointer}
 /* ── Trade Details (full page) ── */
-.vj .td-back{position:fixed; inset:0; z-index:1300; background:var(--bg); overflow-y:auto; animation:tpFade .16s ease}
+.vj.td-back{position:fixed; inset:0; z-index:1300; background:var(--bg); overflow-y:auto; animation:tpFade .16s ease}
 .vj .td-page{max-width:1080px; margin:0 auto; padding:22px 20px 60px; font-family:var(--font)}
 .vj .td-top{display:flex; align-items:center; gap:14px; padding:6px 0 18px; position:sticky; top:0; background:linear-gradient(180deg,var(--bg) 70%,transparent); z-index:2}
 .vj .td-top .revtick{font-size:1.4rem; font-weight:800; color:var(--white)}
@@ -5682,7 +5682,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   useEffect(() => { try { localStorage.setItem("viv-mode", uiMode); } catch {} }, [uiMode]);
   useEffect(() => { try { localStorage.setItem("viv-view", tableView); } catch {} }, [tableView]);
   const expert = uiMode === "pro";
-  const showPro = expert || tableView === "pro";
+  const showPro = tableView === "pro"; // columns controlled ONLY by the Simple/Pro toggle (not Guided/Pro mode), matching the Dashboard
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => { try { return localStorage.getItem("viv-jwelcome-x") === "1"; } catch { return false; } });
 
   // guide assistant (hover → narrate), mirrors DashboardPage
