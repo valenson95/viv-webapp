@@ -9,6 +9,7 @@ import { sectorFor } from "./sectors.js";
 import { themeFit, themeRanks, consistentTop, top5, latestSnapshot } from "./themes.js";
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
+import SetupGraderTab from "./SetupGrader.jsx";
 
 // ─── Error Boundary — catches rendering crashes so the page doesn't go blank ───
 class ErrorBoundary extends React.Component {
@@ -257,7 +258,7 @@ const WHATS_NEW = [
       "Dashboard: one dominant Open P/L number with a live equity trend, a clearer Live Risk Budget & Sizing console, and a plain-English risk-allocation guide.",
       "Open Positions: status pills (At Risk / Risk-Free / Profit Locked), size-health bars, and a per-row Manage panel. The Setup is now an editable dropdown, and Add Position opens a panel to fill in ticker, shares, cost, stops and setup.",
       "Key Metrics in the Journal are now drag-to-reorder — arrange them however you like.",
-      "Premium Tools: a 1-minute narrated tour, plus the five calculators (Return Simulator, Position Risk, Expectancy, Risk Finance, Expected Move) in a cleaner layout.",
+      "Premium Tools: a 1-minute narrated tour, plus the tools (Return Simulator, Position Risk, Expectancy, Risk Finance, and the new Setup Grader) in a cleaner layout.",
       "Journal: a track-record hero, your edge & expectancy, an equity curve, return distribution, and a new VIV Analytics section (best/worst trades, insights, recap).",
       "Settings: redesigned preferences (mode, privacy, text size), your IBKR connection, and a read-only data-integrity scan.",
       "Subtle entrance animations and a count-up roll on the headline numbers.",
@@ -2808,7 +2809,7 @@ const PREMIUM_TOUR = [
   { chip: "Tool 2 · Position Risk", t: "Position Risk", c: "Get the exact number of shares to buy so a stop-out only costs a small, planned amount of your account.", a: "/audio/premium-tour-2.mp3" },
   { chip: "Tool 3 · Expectancy", t: "Expectancy", c: "Find out whether your system actually makes money — your edge per trade, and the trades needed to hit your goal.", a: "/audio/premium-tour-3.mp3" },
   { chip: "Tool 4 · Risk Finance", t: "Risk Finance", c: "Once a trade is up, see how many shares to sell to make it risk-free and let the rest run on house money.", a: "/audio/premium-tour-4.mp3" },
-  { chip: "Tool 5 · Expected Move", t: "Expected Move", c: "Before earnings, estimate how far a stock could swing so you can decide to hold, trim, or step aside.", a: "/audio/premium-tour-5.mp3" },
+  { chip: "Tool 5 · Setup Grader", t: "Setup Grader", c: "Your pre-trade gate — tick the characteristics of an A+ breakout and it scores the chart out of five stars, so you only take the best setups.", a: "/audio/premium-tour-5.mp3" },
 ];
 function PremiumTour({ onPlayStateChange }) {
   const [i, setI] = useState(0);
@@ -2877,7 +2878,7 @@ function PremiumTour({ onPlayStateChange }) {
   );
 }
 function PremiumToolsPage({ setPage, onLogout, session, demo, portfolioSize, journaledTrades, displayName }) {
-  const[tab,setTab]=useState(0);const tabs=["Return Simulator","Risk","Expectancy","Risk Finance","Expected Move"];
+  const[tab,setTab]=useState(0);const tabs=["Return Simulator","Risk","Expectancy","Risk Finance","Setup Grader"];
   const realizedPL = useMemo(() => (journaledTrades || []).reduce((s, t) => s + (t.plDollar || 0), 0), [journaledTrades]);
   const currentCapital = (+portfolioSize || 0) + realizedPL;
 // ════════════════════════════════════════════════════════════════════════
@@ -2934,7 +2935,7 @@ const TOOLTABS = [
   { k: "risk", label: "Position Risk" },
   { k: "exp", label: "Expectancy" },
   { k: "fin", label: "Risk Finance" },
-  { k: "move", label: "Expected Move" },
+  { k: "grader", label: "Setup Grader" },
 ];
 
 // ─── RETURN ───
@@ -2993,7 +2994,7 @@ return (
       {tab === 1 && <RiskTab demo={demo} {...guideProps} />}
       {tab === 2 && <ExpectancyTab demo={demo} {...guideProps} />}
       {tab === 3 && <RiskFinanceTab demo={demo} {...guideProps} />}
-      {tab === 4 && <ExpectedMoveTab demo={demo} {...guideProps} />}
+      {tab === 4 && <SetupGraderTab C={C} font={font} {...guideProps} />}
 
       {/* Guided assistant */}
       <div className={"guidepanel" + (speaking ? " speaking" : "")} aria-live="polite">
