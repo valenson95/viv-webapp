@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "./supabaseClient";
 
 // ══════════════════════════════════════════════════════════════════
@@ -102,11 +103,11 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
 
   const catColor = (c) => c === "Bug" ? C.red : c === "Feature request" ? C.blue : c === "Question" ? C.purple : C.gold;
 
-  return (
+  return createPortal(
     <>
       {/* Floating launcher */}
       <button onClick={() => setOpen(true)} title="Community feedback" style={{
-        position: "fixed", right: isMobile ? 16 : 22, bottom: isMobile ? 78 : 22, zIndex: 90, display: "inline-flex", alignItems: "center", gap: 9,
+        position: "fixed", right: isMobile ? 16 : 22, bottom: isMobile ? 78 : 22, zIndex: 1000, display: "inline-flex", alignItems: "center", gap: 9,
         background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none",
         fontFamily: font, fontWeight: 800, fontSize: "0.82rem", padding: "12px 18px", borderRadius: 99, cursor: "pointer",
         boxShadow: "0 12px 34px rgba(201,152,42,0.4)",
@@ -217,6 +218,7 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
           </div>
         </div>
       )}
-    </>
+    </>,
+    document.body
   );
 }
