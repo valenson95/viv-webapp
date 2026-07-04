@@ -221,6 +221,18 @@ function useDragReorder(length) {
 // Add new entries to the TOP of WHATS_NEW as features ship.
 const WHATS_NEW = [
   {
+    tag: "New",
+    date: "July 4, 2026",
+    title: "Setup Grader, Community Feedback & a cleaner journal",
+    items: [
+      "Setup Grader (Premium Tools → first tab): grade any breakout out of 5 stars across Leadership, Prior Move and Base Quality — the 5th star only unlocks when the high-signal factors line up. Keep a screening watchlist of graded tickers, and Sync a grade to an open position: its ★ grade then shows on Open Positions and stays with the trade after it closes.",
+      "Community Feedback: tap the Feedback button (bottom-right) to post suggestions, report bugs, upvote ideas and comment. We reply and mark items Resolved — your feedback shapes what gets built next.",
+      "Recent Trades, reimagined: click any trade for a quick overview, then open full Trade Details for its chart, stats and review. Cleaner, aligned rows.",
+      "Performance calendar: now books each trade's P&L on its exit date, with a polished monthly view and a new Yearly view you can switch between P&L, Win rate and Trades, month by month.",
+      "Open Positions now shows a Grade column — see at a glance how strong each setup you're holding is.",
+    ],
+  },
+  {
     tag: "Improved",
     date: "June 10, 2026",
     title: "Journal & tracker improvements",
@@ -6462,7 +6474,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
 
         {/* RECENT / CLOSED TRADES */}
         <div className="toolbar">
-          <h2 className="sech guide" onMouseEnter={guideEnter("trades", "Recent trades", "Every closed trade. Click Review on any trade to see its chart, key stats, and your notes on what went right, wrong, and the lesson learned.", "/audio/journal-trades.mp3")} onMouseLeave={guideLeave("trades")}>Recent trades</h2>
+          <h2 className="sech guide" onMouseEnter={guideEnter("trades", "Recent trades", "Every closed trade. Click any trade for a quick overview, then open Trade Details for its chart, key stats, and your review — what went right, what went wrong, and the lesson learned.", "/audio/journal-trades.mp3")} onMouseLeave={guideLeave("trades")}>Recent trades</h2>
           <div className="spacer"></div>
           <div className="seg" id="viewSeg">
             <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
