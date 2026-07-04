@@ -55,6 +55,23 @@ const SECTIONS = [
         s: "Long enough to reset the prior move, not so long the base goes stale." },
     ],
   },
+  {
+    title: "Trigger & Stop",
+    reminder: true,
+    note: "Live-market checklist — run these at your entry. The grade above is decided pre-market; this is execution, so it's a reminder, not part of the star score.",
+    items: [
+      { c: "Range-expansion breakout on volume",
+        s: "The stock breaks out of the base with a clear range expansion AND a surge of above-average volume — real demand stepping in, not a quiet drift over the line." },
+      { c: "Opening-range confirmation",
+        s: "Enter on the break of the opening range high (1-, 5-, or 60-minute depending on when it fires) — you let it prove itself, you don't guess ahead of the move." },
+      { c: "Entry near the pivot, not extended",
+        s: "You're buying right at the breakout pivot, not chasing 5–10% above it. A close entry keeps the stop tight and the reward-to-risk high." },
+      { c: "Tight stop — under 1 ADR (ideally < ½)", key: true,
+        s: "Your stop (low of day / base low) sits less than one ADR below entry — ideally under half. This is what makes the R:R explosive: a tight stop means tiny risk against a 10–20R runner, so one winner pays for many losers." },
+      { c: "Invalidation defined before entry",
+        s: "You know your exact 'I'm wrong' price BEFORE you click buy — a logical level where the setup is broken and you're out, no thinking." },
+    ],
+  },
 ];
 
 const CHECK = (
@@ -64,7 +81,7 @@ const CHECK = (
 );
 
 let TOTAL = 0, STARMAKERS = 0;
-SECTIONS.forEach(s => s.items.forEach(i => { TOTAL++; if (i.star) STARMAKERS++; }));
+SECTIONS.forEach(s => { if (s.reminder) return; s.items.forEach(i => { TOTAL++; if (i.star) STARMAKERS++; }); });
 
 const GRADES = {
   5: ["A+ · Table-pounder", "Everything agrees — full size, this is the trade."],
@@ -83,7 +100,9 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   let passed = 0, starHit = 0;
   const secCounts = SECTIONS.map((sec, si) => {
     let sc = 0;
-    sec.items.forEach((it, ii) => { if (on.has(si + "-" + ii)) { sc++; passed++; if (it.star) starHit++; } });
+    sec.items.forEach((it, ii) => {
+      if (on.has(si + "-" + ii)) { sc++; if (!sec.reminder) { passed++; if (it.star) starHit++; } }
+    });
     return sc;
   });
 
@@ -97,12 +116,12 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     <div className="toolpanel on" id="panel-grader">
       {/* intro / guide */}
       <div className={"intro guide" + gactive("grader")} data-gtitle="Setup Grader"
-        onMouseEnter={guideEnter("grader", "Setup Grader", "This is your pre-trade gate. Tick every characteristic that's true of the chart in front of you, and it grades the setup out of five stars. The fifth star — an A-plus — only unlocks when the highest-signal factors line up together.", undefined)}
+        onMouseEnter={guideEnter("grader", "Setup Grader", "Use this while you're scanning and screening for the best stocks in the market — not during live trading. Tick every characteristic that's true of the chart, and it grades the setup out of five stars across three areas: leadership, the prior move, and base quality. The fifth star — an A-plus — only unlocks when the highest-signal factors line up together.", undefined)}
         onMouseLeave={guideLeave("grader")}>
         <div className="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg></div>
         <div>
           <h3>What is the Setup Grader?</h3>
-          <p>Your <b>pre-trade gate</b> for A+ breakouts. Tick every characteristic that's true, and it scores the chart out of <b>5 stars</b>. A <b style={{ color: C.gold }}>★ maker</b> is a <b>confluence factor</b> — a high-signal criterion that independently raises the odds the breakout works. You can tick most boxes and still cap at 4★; the <b>fifth star (A+) only unlocks when the ★-makers stack</b> — because {STARMAKERS} unrelated signals agreeing is an edge, one alone is luck.</p>
+          <p>Use it while <b>scanning and screening</b> for the best stocks — <b>not during live trading</b>. Tick every characteristic that's true and it scores the chart out of <b>5 stars</b> across three areas: <b>leadership</b>, the <b>prior move</b>, and <b>base quality</b>. A <b style={{ color: C.gold }}>★ maker</b> is a <b>confluence factor</b> — a high-signal criterion that independently raises the odds the breakout works. You can tick most boxes and still cap at 4★; the <b>fifth star (A+) only unlocks when the ★-makers stack</b> — because {STARMAKERS} unrelated signals agreeing is an edge, one alone is luck. When you're ready to enter, the <b style={{ color: C.blue }}>Trigger &amp; Stop</b> live-checklist at the bottom covers execution.</p>
         </div>
       </div>
 
@@ -141,19 +160,30 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
       {/* SECTIONS */}
       {SECTIONS.map((sec, si) => {
         const full = secCounts[si] === sec.items.length;
+        const rem = sec.reminder;
+        const scoredNum = SECTIONS.slice(0, si).filter(s => !s.reminder).length + 1;
         return (
-          <div key={si} style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "6px 8px 10px", marginBottom: 16 }}>
+          <div key={si} style={{ fontFamily: font, background: rem ? "rgba(59,130,246,0.04)" : C.glass, border: `1px ${rem ? "dashed" : "solid"} ${rem ? "rgba(59,130,246,0.28)" : C.border}`, borderRadius: 16, padding: "6px 8px 10px", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 14px 10px" }}>
-              <div style={{ width: 26, height: 26, borderRadius: 8, display: "grid", placeItems: "center", background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.82rem", border: `1px solid ${C.borderGold}` }}>{si + 1}</div>
+              <div style={{ width: 26, height: 26, borderRadius: 8, display: "grid", placeItems: "center", background: rem ? "rgba(59,130,246,0.12)" : C.goldDim, color: rem ? C.blue : C.gold, fontWeight: 800, fontSize: "0.82rem", border: `1px solid ${rem ? "rgba(59,130,246,0.3)" : C.borderGold}` }}>
+                {rem ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 15, height: 15 }}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" strokeLinecap="round" /></svg> : scoredNum}
+              </div>
               <div style={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "-0.01em", color: C.white }}>{sec.title}</div>
+              {rem && <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.blue, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", padding: "3px 9px", borderRadius: 99 }}>Not scored</span>}
               <div style={{
                 marginLeft: "auto", fontSize: "0.74rem", fontWeight: 700, fontVariantNumeric: "tabular-nums",
                 padding: "5px 13px", borderRadius: 99,
                 border: `1px solid ${full ? "rgba(34,197,94,0.4)" : C.border}`,
                 background: full ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.05)",
                 color: full ? C.green : C.muted,
-              }}>{secCounts[si]} / {sec.items.length} passed</div>
+              }}>{secCounts[si]} / {sec.items.length} {rem ? "checked" : "passed"}</div>
             </div>
+            {rem && sec.note && (
+              <div style={{ display: "flex", gap: 9, alignItems: "flex-start", margin: "0 14px 8px", padding: "9px 12px", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.18)", borderRadius: 10, fontSize: "0.76rem", color: C.muted, lineHeight: 1.45 }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2" style={{ width: 15, height: 15, flex: "0 0 auto", marginTop: 1 }}><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" strokeLinecap="round" /></svg>
+                <span>{sec.note}</span>
+              </div>
+            )}
 
             {sec.items.map((it, ii) => {
               const key = si + "-" + ii, isOn = on.has(key);
@@ -178,6 +208,9 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                   {it.star && (
                     <div style={{ flex: "0 0 auto", fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.goldMid, background: "rgba(201,152,42,0.12)", border: `1px solid ${C.borderGold}`, padding: "3px 8px", borderRadius: 99, marginTop: 2, whiteSpace: "nowrap" }}>★ maker</div>
                   )}
+                  {it.key && (
+                    <div style={{ flex: "0 0 auto", fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.blue, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", padding: "3px 8px", borderRadius: 99, marginTop: 2, whiteSpace: "nowrap" }}>R:R driver</div>
+                  )}
                 </div>
               );
             })}
@@ -187,7 +220,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
 
       {/* footnote */}
       <div style={{ fontFamily: font, fontSize: "0.76rem", color: C.muted, lineHeight: 1.6, padding: "4px 6px" }}>
-        <b style={{ color: "rgba(255,255,255,0.75)" }}>Check separately (not scored here):</b> the market regime — is the overall market trending up with leaders working? If it's in a downtrend, even a perfect chart usually fails. And your <b style={{ color: "rgba(255,255,255,0.75)" }}>entry trigger &amp; stop</b> — a breakout on expanding volume with a stop under 1 ADR is what turns an A+ base into a big R-multiple trade.
+        <b style={{ color: "rgba(255,255,255,0.75)" }}>One more thing to check (not scored):</b> the market regime — is the overall market trending up with leaders working? If it's in a downtrend, even a perfect chart usually fails, so grade the market before you grade the stock.
       </div>
     </div>
   );

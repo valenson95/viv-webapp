@@ -2804,12 +2804,12 @@ function Cu({ children, dur }) {
 // Poster → click/play runs chapters with audio (public/audio/premium-tour-*.mp3); progress
 // bar + dots + auto-advance. Hidden in Pro via CSS (.vp.expert .tourwrap).
 const PREMIUM_TOUR = [
-  { chip: "Guided tour · 1 of 6", t: "Welcome to Premium Tools", c: "Five calculators that answer the big money questions before you trade. Each one explains itself — let's take a quick tour.", a: "/audio/premium-tour-0.mp3" },
-  { chip: "Tool 1 · Return Simulator", t: "Return Simulator", c: "See what your account could grow to from your win rate, average loss, and winner sizes. Compounding, made visual.", a: "/audio/premium-tour-1.mp3" },
-  { chip: "Tool 2 · Position Risk", t: "Position Risk", c: "Get the exact number of shares to buy so a stop-out only costs a small, planned amount of your account.", a: "/audio/premium-tour-2.mp3" },
-  { chip: "Tool 3 · Expectancy", t: "Expectancy", c: "Find out whether your system actually makes money — your edge per trade, and the trades needed to hit your goal.", a: "/audio/premium-tour-3.mp3" },
-  { chip: "Tool 4 · Risk Finance", t: "Risk Finance", c: "Once a trade is up, see how many shares to sell to make it risk-free and let the rest run on house money.", a: "/audio/premium-tour-4.mp3" },
-  { chip: "Tool 5 · Setup Grader", t: "Setup Grader", c: "Your pre-trade gate — tick the characteristics of an A+ breakout and it scores the chart out of five stars, so you only take the best setups.", a: "/audio/premium-tour-5.mp3" },
+  { chip: "Guided tour · 1 of 6", t: "Welcome to Premium Tools", c: "Five tools that answer the big money questions before you trade. Each one explains itself — let's take a quick tour.", a: "/audio/premium-tour-0.mp3" },
+  { chip: "Tool 1 · Setup Grader", t: "Setup Grader", c: "Use this while scanning and screening for the best stocks in the market — not during live trading. Tick the characteristics of an A+ breakout across three areas — leadership & stock selection, the prior move, and base quality — and it scores the chart out of five stars, so you spend your time only on the strongest setups. The fifth star (A+) unlocks only when the highest-signal factors line up together.", a: "" },
+  { chip: "Tool 2 · Return Simulator", t: "Return Simulator", c: "See what your account could grow to from your win rate, average loss, and winner sizes. Compounding, made visual.", a: "/audio/premium-tour-1.mp3" },
+  { chip: "Tool 3 · Position Risk", t: "Position Risk", c: "Get the exact number of shares to buy so a stop-out only costs a small, planned amount of your account.", a: "/audio/premium-tour-2.mp3" },
+  { chip: "Tool 4 · Expectancy", t: "Expectancy", c: "Find out whether your system actually makes money — your edge per trade, and the trades needed to hit your goal.", a: "/audio/premium-tour-3.mp3" },
+  { chip: "Tool 5 · Risk Finance", t: "Risk Finance", c: "Once a trade is up, see how many shares to sell to make it risk-free and let the rest run on house money.", a: "/audio/premium-tour-4.mp3" },
 ];
 function PremiumTour({ onPlayStateChange }) {
   const [i, setI] = useState(0);
@@ -2878,7 +2878,7 @@ function PremiumTour({ onPlayStateChange }) {
   );
 }
 function PremiumToolsPage({ setPage, onLogout, session, demo, portfolioSize, journaledTrades, displayName }) {
-  const[tab,setTab]=useState(0);const tabs=["Return Simulator","Risk","Expectancy","Risk Finance","Setup Grader"];
+  const[tab,setTab]=useState(0);const tabs=["Setup Grader","Return Simulator","Risk","Expectancy","Risk Finance"];
   const realizedPL = useMemo(() => (journaledTrades || []).reduce((s, t) => s + (t.plDollar || 0), 0), [journaledTrades]);
   const currentCapital = (+portfolioSize || 0) + realizedPL;
 // ════════════════════════════════════════════════════════════════════════
@@ -2931,11 +2931,11 @@ const gactive = (key) => (!expert && activeGuide === key ? " guide-active" : "")
 const guideProps = { guideEnter, guideLeave, gactive, expert };
 
 const TOOLTABS = [
+  { k: "grader", label: "Setup Grader" },
   { k: "sim", label: "Return Simulator" },
   { k: "risk", label: "Position Risk" },
   { k: "exp", label: "Expectancy" },
   { k: "fin", label: "Risk Finance" },
-  { k: "grader", label: "Setup Grader" },
 ];
 
 // ─── RETURN ───
@@ -2990,11 +2990,11 @@ return (
       </div>
 
       {/* ACTIVE PANEL */}
-      {tab === 0 && <ReturnSimulatorTab portfolioSize={portfolioSize} currentCapital={currentCapital} {...guideProps} />}
-      {tab === 1 && <RiskTab demo={demo} {...guideProps} />}
-      {tab === 2 && <ExpectancyTab demo={demo} {...guideProps} />}
-      {tab === 3 && <RiskFinanceTab demo={demo} {...guideProps} />}
-      {tab === 4 && <SetupGraderTab C={C} font={font} {...guideProps} />}
+      {tab === 0 && <SetupGraderTab C={C} font={font} {...guideProps} />}
+      {tab === 1 && <ReturnSimulatorTab portfolioSize={portfolioSize} currentCapital={currentCapital} {...guideProps} />}
+      {tab === 2 && <RiskTab demo={demo} {...guideProps} />}
+      {tab === 3 && <ExpectancyTab demo={demo} {...guideProps} />}
+      {tab === 4 && <RiskFinanceTab demo={demo} {...guideProps} />}
 
       {/* Guided assistant */}
       <div className={"guidepanel" + (speaking ? " speaking" : "")} aria-live="polite">
