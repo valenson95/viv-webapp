@@ -19,7 +19,17 @@ export const THEME_SNAPSHOTS = {
   },
 };
 
-const dnorm = (d) => (d ? String(d).slice(0, 10) : "");
+// Normalize ANY date shape to ISO (YYYY-MM-DD) — manual positions carry M/D/YY strings,
+// which compare lexically ABOVE every ISO key and silently resolved to the LATEST snapshot.
+const dnorm = (d) => {
+  if (!d) return "";
+  const s = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const m = s.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})/); // M/D/YY or M/D/YYYY
+  if (m) return `${m[3].length === 2 ? "20" + m[3] : m[3]}-${String(m[1]).padStart(2, "0")}-${String(m[2]).padStart(2, "0")}`;
+  const t = new Date(s);
+  return isNaN(t) ? "" : t.toISOString().slice(0, 10);
+};
 // nearest snapshot on or before the given date (fallback: earliest)
 export function snapshotFor(date) {
   const keys = Object.keys(THEME_SNAPSHOTS).sort();

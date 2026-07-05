@@ -11,7 +11,7 @@ import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
 import ModelBookPage, { outcomeFromR } from "./ModelBook.jsx";
-import { getGrade as getSavedGrade, useGrades as useSavedGrades, initGrades } from "./grades.js";
+import { getGrade as getSavedGrade, useGrades as useSavedGrades, initGrades, isGradesReady } from "./grades.js";
 import FeedbackWidget from "./Feedback.jsx";
 
 // ─── Error Boundary — catches rendering crashes so the page doesn't go blank ───
@@ -2506,6 +2506,9 @@ const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vp .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.74rem;
     font-weight:700; padding:7px 16px; border-radius:980px; transition:all .15s}
 .vp .seg button.on{background:var(--goldDim); color:var(--goldBright)}
+.vp select{color-scheme:dark}
+.vp .btn{transition:border-color .15s,color .15s,background .15s}
+.vp .btn:hover{border-color:var(--borderGold); color:var(--white); background:rgba(255,255,255,0.05)}
 .vp .btn{border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text); font-family:var(--font);
     font-size:0.74rem; font-weight:700; padding:8px 16px; border-radius:980px; cursor:pointer}
 .vp .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
@@ -2637,7 +2640,7 @@ const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vp .scencompare{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:16px}
 .vp .scencard{border:1px solid var(--borderGold); border-radius:14px; padding:13px 15px; background:rgba(201,152,42,0.05)}
 .vp .scencard .n{font-size:0.6rem; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold)}
-.vp .guidepanel{position:fixed; right:24px; bottom:24px; width:330px; max-width:calc(100vw - 40px); z-index:200;
+.vp .guidepanel{position:fixed; right:24px; bottom:88px; width:330px; max-width:calc(100vw - 40px); z-index:200;
     background:#11111b; border:1px solid var(--borderGold); border-radius:16px; padding:15px 17px; box-shadow:0 22px 60px rgba(0,0,0,0.6); display:none}
 .vp:not(.expert) .guidepanel{display:block}
 .vp .guidepanel.speaking{border-color:var(--goldBright); box-shadow:0 0 0 1px var(--goldBright), 0 22px 60px rgba(0,0,0,0.6)}
@@ -3279,7 +3282,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .sech{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
 .vj .row{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
 .vj .spacer{flex:1}
-.vj .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px}
+.vj .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:wrap}
 .vj .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem}
 .vj .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
     background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
@@ -3313,6 +3316,9 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .fcount{color:var(--muted); font-size:0.78rem; font-weight:600; font-variant-numeric:tabular-nums}
 .vj .filterbar .btn{padding:7px 14px; font-size:0.74rem}
 .vj .nodata{padding:26px; text-align:center; color:var(--muted); font-size:0.86rem}
+.vj select{color-scheme:dark}
+.vj .btn{transition:border-color .15s,color .15s,background .15s}
+.vj .btn:hover{border-color:var(--borderGold); color:var(--white); background:rgba(255,255,255,0.05)}
 .vj .btn{border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text); font-family:var(--font);
     font-size:0.74rem; font-weight:700; padding:8px 16px; border-radius:980px; cursor:pointer}
 .vj .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
@@ -3593,7 +3599,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj.pro .pro-only{display:table-cell}
 /* Freeze the Review (action) column to the right edge so it's never cropped when the table is wider
    than the card — happens in Pro view and especially at Text Size = Large (zoom 1.15). */
-.vj .revcell{text-align:right; white-space:nowrap; position:static; background:transparent}
+.vj .revcell{text-align:right; white-space:nowrap; position:static; background:transparent} /* keep static — sticky version overlapped the last column (bug fixed 2026-07-05, do not re-stick) */
 .vj thead th:last-child{position:static; background:transparent}
 .vj .revbtn{background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
     font-size:0.68rem; font-weight:700; padding:6px 13px; border-radius:980px; cursor:pointer}
@@ -3665,7 +3671,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .mgta{width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--text);
     font-family:var(--font); font-size:0.78rem; padding:8px 10px; outline:none; resize:vertical; min-height:64px; line-height:1.5}
 .vj .mgta:focus{border-color:var(--gold)}
-.vj .guidepanel{position:fixed; right:24px; bottom:24px; width:330px; max-width:calc(100vw - 40px); z-index:200;
+.vj .guidepanel{position:fixed; right:24px; bottom:88px; width:330px; max-width:calc(100vw - 40px); z-index:200;
     background:#11111b; border:1px solid var(--borderGold); border-radius:16px; padding:15px 17px; box-shadow:0 22px 60px rgba(0,0,0,0.6); display:none}
 .vj:not(.expert) .guidepanel{display:block}
 .vj .guidepanel.speaking{border-color:var(--goldBright); box-shadow:0 0 0 1px var(--goldBright), 0 22px 60px rgba(0,0,0,0.6)}
@@ -4186,10 +4192,12 @@ function CoachHero({ data }) {
 function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   useSectors((journaledTrades || []).map(t => t.ticker)); // theme fallback for tickers not in the curated map
+  const gradesV = useSavedGrades(); // re-render + re-run the freeze when grades save/sync
   // Freeze the symbol's CURRENT setup grade onto each closed trade once (grade_snapshot) —
   // later re-grades of the same ticker then never rewrite this trade's history.
   useEffect(() => {
     if (!session?.user?.id || !journaledTrades?.length) return;
+    if (!isGradesReady()) return; // don't freeze before the Supabase grade sync completes (stale/foreign-cache guard)
     const toFreeze = journaledTrades.filter(t => t.exit && !t.gradeSnapshot && getSavedGrade(t.ticker)).slice(0, 25);
     if (!toFreeze.length) return;
     (async () => {
@@ -4203,7 +4211,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
         } catch { return; }
       }
     })();
-  }, [journaledTrades.length, session?.user?.id]); // eslint-disable-line
+  }, [journaledTrades.length, session?.user?.id, gradesV]); // eslint-disable-line
   const [coachRead, setCoachRead] = useState(null);
   useEffect(() => {
     if (!isAdmin || !session?.user?.id) return;
@@ -6539,7 +6547,7 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .deployhead b{color:var(--white)}
 .vd .deploysub{font-size:0.74rem; color:var(--muted); margin-top:5px}
 .vd .deploysub b{color:var(--text); font-weight:700}
-.vd .guidepanel{position:fixed; right:24px; bottom:24px; width:330px; max-width:calc(100vw - 40px); z-index:200;
+.vd .guidepanel{position:fixed; right:24px; bottom:88px; width:330px; max-width:calc(100vw - 40px); z-index:200;
     background:#11111b; border:1px solid var(--borderGold); border-radius:16px; padding:15px 17px;
     box-shadow:0 22px 60px rgba(0,0,0,0.6); display:none}
 .vd:not(.expert) .guidepanel{display:block}
@@ -6579,6 +6587,9 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
     font-family:var(--font); font-size:0.74rem; font-weight:700; padding:7px 16px; border-radius:980px;
     letter-spacing:0.02em; transition:all .15s;}
 .vd .seg button.on{background:var(--goldDim); color:var(--goldBright)}
+.vd select{color-scheme:dark}
+.vd .btn{transition:border-color .15s,color .15s,background .15s}
+.vd .btn:hover{border-color:var(--borderGold); color:var(--white); background:rgba(255,255,255,0.05)}
 .vd .btn{border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text);
     font-family:var(--font); font-size:0.74rem; font-weight:700; padding:8px 16px;
     border-radius:980px; cursor:pointer;}
@@ -8059,7 +8070,7 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs .shell{max-width:1400px} }
 @media(min-width:2000px){
 .vs .shell{max-width:1680px} }
-.vs .card{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:20px;
+.vs .card{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:22px;
     backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%); padding:22px 24px; overflow:hidden; margin-top:18px}
 .vs .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)}
 .vs .cardtitle{font-size:1.02rem; font-weight:800; color:var(--white); letter-spacing:-0.02em}
@@ -8100,6 +8111,9 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.74rem;
     font-weight:700; padding:7px 16px; border-radius:980px; transition:all .15s}
 .vs .seg button.on{background:var(--goldDim); color:var(--goldBright)}
+.vs select{color-scheme:dark}
+.vs .btn{transition:border-color .15s,color .15s,background .15s}
+.vs .btn:hover{border-color:var(--borderGold); color:var(--white); background:rgba(255,255,255,0.05)}
 .vs .btn{border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text); font-family:var(--font);
     font-size:0.76rem; font-weight:700; padding:9px 16px; border-radius:980px; cursor:pointer; transition:all .15s}
 .vs .btn:hover{border-color:var(--borderGold)}
@@ -9122,18 +9136,19 @@ const mobileCSS = `
   /* Phone: hide the floating guide narrator panel (corner voiceover/explainer) — too distracting on small screens */
   .guidepanel { display: none !important; }
 
-  /* Large card paddings → compact */
-  [style*='padding: "32px 28px"'],
-  [style*='padding: "30px 32px"'],
-  [style*='padding: "28px 32px"'],
-  [style*='padding: "24px 32px"'],
-  [style*='padding: "24px 28px"'] { padding: 14px 14px !important; }
-  [style*='padding: "22px 28px"'],
-  [style*='padding: "20px 24px"'],
-  [style*='padding: "18px 24px"'],
-  [style*='padding: "18px 22px"'] { padding: 12px 14px !important; }
-  [style*='padding: "16px 18px"'],
-  [style*='padding: "14px 16px"'] { padding: 10px 12px !important; }
+  /* Large card paddings → compact (selectors MUST match React's serialized inline style:
+     kebab-case, no quotes — e.g. style="padding: 32px 28px") */
+  [style*='padding: 32px 28px'],
+  [style*='padding: 30px 32px'],
+  [style*='padding: 28px 32px'],
+  [style*='padding: 24px 32px'],
+  [style*='padding: 24px 28px'] { padding: 14px 14px !important; }
+  [style*='padding: 22px 28px'],
+  [style*='padding: 20px 24px'],
+  [style*='padding: 18px 24px'],
+  [style*='padding: 18px 22px'] { padding: 12px 14px !important; }
+  [style*='padding: 16px 18px'],
+  [style*='padding: 14px 16px'] { padding: 10px 12px !important; }
 
   /* Generous grid / flex gaps → tighter */
   [style*='gap: 24'] { gap: 10px !important; }
@@ -9144,32 +9159,32 @@ const mobileCSS = `
   [style*='gap: 14'] { gap: 8px !important; }
 
   /* Bottom margins between sections → tighter */
-  [style*='marginBottom: 28'],
-  [style*='marginBottom: 24'],
-  [style*='marginBottom: 22'],
-  [style*='marginBottom: 20'] { margin-bottom: 14px !important; }
+  [style*='margin-bottom: 28px'],
+  [style*='margin-bottom: 24px'],
+  [style*='margin-bottom: 22px'],
+  [style*='margin-bottom: 20px'] { margin-bottom: 14px !important; }
 
   /* Tables: compact rows + smaller font (most tables already scroll horizontally) */
   table th, table td { padding: 5px 4px !important; font-size: 0.62rem !important; }
 
   /* StatTile cluster — minmax 168px is too tight for phone; let them stack 2-up */
-  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(168px'],
-  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(150px'],
-  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(160px'] {
+  [style*='grid-template-columns: repeat(auto-fit, minmax(168px'],
+  [style*='grid-template-columns: repeat(auto-fit, minmax(150px'],
+  [style*='grid-template-columns: repeat(auto-fit, minmax(160px'] {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px !important;
   }
 
   /* Big hero numbers (1.5rem+, 2rem) → scale down */
-  [style*='fontSize: "2rem"'] { font-size: 1.4rem !important; }
-  [style*='fontSize: "1.8rem"'] { font-size: 1.3rem !important; }
-  [style*='fontSize: "1.5rem"'] { font-size: 1.15rem !important; }
+  [style*='font-size: 2rem'] { font-size: 1.4rem !important; }
+  [style*='font-size: 1.8rem'] { font-size: 1.3rem !important; }
+  [style*='font-size: 1.5rem'] { font-size: 1.15rem !important; }
 }
 @media (max-width: 420px) {
   /* Tiniest phones — make stat tiles single-column so labels and big numbers stay readable */
-  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(168px'],
-  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(150px'],
-  [style*='gridTemplateColumns: "repeat(auto-fit, minmax(160px'] {
+  [style*='grid-template-columns: repeat(auto-fit, minmax(168px'],
+  [style*='grid-template-columns: repeat(auto-fit, minmax(150px'],
+  [style*='grid-template-columns: repeat(auto-fit, minmax(160px'] {
     grid-template-columns: 1fr 1fr !important;
   }
 }

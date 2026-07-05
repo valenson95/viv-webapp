@@ -8,7 +8,10 @@ import { supabase } from "./supabaseClient";
 // Setup Grader, the Open Positions "Grade" column, and the Model Book.
 // ══════════════════════════════════════════════════════════════════
 const KEY = "viv-setup-grades-v1";
+const OWNER_KEY = "viv-setup-grades-uid-v1"; // which account this browser's cache belongs to
 let UID = null; // set by initGrades() after login; null = local-only mode
+let READY = false; // true once initGrades has completed (or been attempted) — gates grade_snapshot freezing
+export const isGradesReady = () => READY;
 
 export function loadGrades() {
   try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { return {}; }
@@ -21,30 +24,41 @@ function persist(obj) {
 // Local-only grades (made before this sync existed / while offline) are pushed up.
 export async function initGrades(uid) {
   UID = uid || null;
-  if (!UID) return;
+  if (!UID) { READY = true; return; }
   try {
+    // Cache hygiene: if this browser's cache belongs to a DIFFERENT account, wipe it —
+    // otherwise user B inherits user A's grades on a shared machine (and pushes them
+    // to their own account as "orphans").
+    try {
+      const owner = localStorage.getItem(OWNER_KEY);
+      if (owner && owner !== UID) localStorage.removeItem(KEY);
+      localStorage.setItem(OWNER_KEY, UID);
+    } catch {}
     const { data, error } = await supabase.from("setup_grades").select("*").eq("user_id", UID);
     if (error) return; // table not created yet → stay in local-only mode silently
     const local = loadGrades();
     const merged = { ...local };
+    const pushUp = []; // rows where LOCAL is newer (or server-missing) → push to server
     (data || []).forEach(r => {
       const sym = r.symbol;
       const localRow = local[sym];
       if (!localRow || new Date(r.updated_at) >= new Date(localRow.updatedAt || 0)) {
         merged[sym] = { sym, stars: r.stars, letter: r.letter, pct: +r.pct || 0, starHit: r.star_hit, starmakers: r.starmakers, ticked: r.ticked || [], updatedAt: r.updated_at };
+      } else {
+        pushUp.push(localRow); // local edit is newer than the server copy — sync it up
       }
     });
     persist(merged);
-    // push up anything the server doesn't have yet
     const serverSyms = new Set((data || []).map(r => r.symbol));
-    const orphans = Object.values(local).filter(g => g.sym && !serverSyms.has(g.sym));
-    if (orphans.length) {
-      await supabase.from("setup_grades").upsert(orphans.map(g => ({
+    Object.values(local).forEach(g => { if (g.sym && !serverSyms.has(g.sym)) pushUp.push(g); });
+    if (pushUp.length) {
+      await supabase.from("setup_grades").upsert(pushUp.map(g => ({
         user_id: UID, symbol: g.sym, stars: g.stars || 0, letter: g.letter || null, pct: g.pct ?? null,
         star_hit: g.starHit ?? null, starmakers: g.starmakers ?? null, ticked: g.ticked || [], updated_at: g.updatedAt || new Date().toISOString(),
       })));
     }
   } catch { /* offline / not set up — local cache still works */ }
+  finally { READY = true; try { window.dispatchEvent(new Event("viv-grades")); } catch {} }
 }
 
 export function getGrade(sym) {
@@ -79,12 +93,14 @@ export function letterFor(stars) {
 }
 
 // Re-render hook: bumps whenever any grade is saved/removed (this tab or another).
+// Returns the version counter so effects can depend on grade changes.
 export function useGrades() {
-  const [, setV] = useState(0);
+  const [v, setV] = useState(0);
   useEffect(() => {
     const h = () => setV(x => x + 1);
     window.addEventListener("viv-grades", h);
     window.addEventListener("storage", h);
     return () => { window.removeEventListener("viv-grades", h); window.removeEventListener("storage", h); };
   }, []);
+  return v;
 }

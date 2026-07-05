@@ -68,109 +68,11 @@ const Stars = ({ C, n, max = 7, size = "0.95rem" }) => (
   </span>
 );
 
-export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, guideLeave, gactive }) {
-  const uid = session?.user?.id;
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [fPattern, setFPattern] = useState("All");
-  const [fTier, setFTier] = useState("All"); // All | 7 | 6 | 5
-  const [fScope, setFScope] = useState("All"); // All | official (VIV published) | mine (my personal book)
-  const [detail, setDetail] = useState(null);
-  const [editing, setEditing] = useState(null); // null | {} (new) | row (edit)
-  const [busy, setBusy] = useState(false);
-  const [zoom, setZoom] = useState(null); // lightbox: { imgs: {before, after}, slot: "before"|"after" }
-
-  // Lightbox keyboard nav — ← → flips before/after, Esc closes
-  useEffect(() => {
-    if (!zoom) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") setZoom(null);
-      else if (e.key === "ArrowLeft") setZoom(z => (z && z.imgs.before ? { ...z, slot: "before" } : z));
-      else if (e.key === "ArrowRight") setZoom(z => (z && z.imgs.after ? { ...z, slot: "after" } : z));
-      else return;
-      e.preventDefault();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [zoom]);
-
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    const { data, error } = await supabase.from("model_book").select("*").order("created_at", { ascending: false });
-    if (error) setError(/relation|does not exist|schema cache|not find/i.test(String(error.message)) ? "setup" : String(error.message));
-    else setRows(data || []);
-    setLoading(false);
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  // A trade/position sent a prefill (📖 Add to Model Book) → open the editor immediately
-  useEffect(() => { try { if (sessionStorage.getItem("viv-mb-prefill")) setEditing({}); } catch {} }, []);
-
-  const visible = rows.filter(r => {
-    if (fScope === "official" && !r.is_published) return false;
-    if (fScope === "mine" && r.created_by !== uid) return false;
-    if (fPattern !== "All" && r.pattern !== fPattern) return false;
-    const eff = effectiveStars(r.stars, (r.elite || []).length).n;
-    if (fTier !== "All" && eff !== +fTier) return false;
-    return true;
-  });
-  const mineCount = rows.filter(r => r.created_by === uid && !r.is_published).length;
-
-  const uploadImg = async (file, slot, row, setRow) => {
-    if (!file) return;
-    setBusy(true);
-    try {
-      const path = `modelbook/${uid}/${Date.now()}-${slot}-${file.name}`.replace(/[^a-zA-Z0-9./_-]/g, "_");
-      const { error: upErr } = await supabase.storage.from("trade-charts").upload(path, file, { upsert: true });
-      if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from("trade-charts").getPublicUrl(path);
-      setRow(r => ({ ...r, [slot]: urlData?.publicUrl || "" }));
-    } catch (e) { setError(String(e.message || e)); }
-    setBusy(false);
-  };
-
-  const save = async (row) => {
-    setBusy(true); setError(null);
-    const body = {
-      created_by: uid, ticker: (row.ticker || "").toUpperCase().trim(), pattern: row.pattern || "Trendline Breakout",
-      stars: starsFromTicked(row.ticked).stars, // objective — derived from the grader ticks, never hand-set
-      outcome: row.outcome || outcomeFromR(row.r_mult, row.run_pct) || null, // blank → auto-classified from R
-      theme: row.theme || null, entry_date: row.entry_date || null, exit_date: row.exit_date || null,
-      before_img: row.before_img || null, after_img: row.after_img || null,
-      elite: row.elite || [], ticked: row.ticked || [],
-      metrics: row.metrics || {}, // chart-extracted deep data + the _auto (gold-dot) key list — must survive edits
-      run_pct: row.run_pct === "" || row.run_pct == null ? null : +row.run_pct,
-      run_up_pct: row.run_up_pct === "" || row.run_up_pct == null ? null : +row.run_up_pct,
-      angle: row.angle === "" || row.angle == null ? null : +row.angle,
-      characteristics: Array.isArray(row.characteristics) ? row.characteristics
-        : String(row.characteristics || "").split(/[;,]/).map(s => s.trim()).filter(Boolean),
-      days_held: row.days_held === "" || row.days_held == null ? null : +row.days_held,
-      r_mult: row.r_mult === "" || row.r_mult == null ? null : +row.r_mult,
-      thesis: row.thesis || null, lesson: row.lesson || null, is_published: !!row.is_published,
-    };
-    const q = row.id
-      ? supabase.from("model_book").update(body).eq("id", row.id)
-      : supabase.from("model_book").insert(body);
-    const { error } = await q;
-    setBusy(false);
-    if (error) { setError(String(error.message)); return; }
-    setEditing(null); load();
-  };
-  const remove = async (row) => {
-    const { error } = await supabase.from("model_book").delete().eq("id", row.id);
-    if (error) setError(String(error.message)); else { setDetail(null); load(); }
-  };
-
-  const chip = (active) => ({
-    fontSize: "0.72rem", fontWeight: 700, padding: "6px 14px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
-    border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? "#08080e" : C.muted,
-    background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
-  });
-  const inputS = { background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.84rem", padding: "9px 12px", outline: "none", width: "100%" };
-  const lbl = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" };
-
-  // ── Entry editor (admin) ──
-  const Editor = ({ initial }) => {
+// ── Entry editor — MODULE scope on purpose: defined inline it was recreated on every
+// parent render (new component type → React unmounts/remounts → typed form wiped, prefill
+// lost, uploads resolving against a dead instance). Do not move it back inside the page.
+function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload }) {
+  const chipBtn = { fontSize: "0.72rem", fontWeight: 700, padding: "6px 14px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "rgba(255,255,255,0.03)" };
     const [row, setRow] = useState(() => {
       let prefill = {};
       try { prefill = JSON.parse(sessionStorage.getItem("viv-mb-prefill") || "{}"); sessionStorage.removeItem("viv-mb-prefill"); } catch {}
@@ -190,7 +92,11 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     const setField = (key, val) => setRow(r => ({ ...r, [key]: val, metrics: clearAuto(r, key) }));
     const AutoDot = ({ k }) => auto.has(k) ? <span title="Auto-filled from your chart by VIV — edit to correct (the dot clears)" style={{ display: "inline-block", width: 7, height: 7, borderRadius: 99, background: C.goldBright, boxShadow: "0 0 7px rgba(240,192,80,0.85)", marginLeft: 6, verticalAlign: "middle", flexShrink: 0 }} /> : null;
     const toggleElite = (k) => setRow(r => ({ ...r, elite: r.elite.includes(k) ? r.elite.filter(x => x !== k) : [...r.elite, k], metrics: clearAuto(r, "elite:" + k) }));
-    const toggleTick = (key) => setRow(r => ({ ...r, ticked: r.ticked.includes(key) ? r.ticked.filter(x => x !== key) : [...r.ticked, key], metrics: clearAuto(r, "tick:" + key) }));
+    const toggleTick = (key) => setRow(r => {
+      const m2 = clearAuto(r, "tick:" + key);
+      return { ...r, ticked: r.ticked.includes(key) ? r.ticked.filter(x => x !== key) : [...r.ticked, key],
+        metrics: { ...m2, needs_eye: (m2.needs_eye || []).filter(x => x !== key) } }; // reviewing an item clears it from "needs your eye"
+    });
     const suggestedOutcome = outcomeFromR(row.r_mult, row.run_pct);
     const pullGrade = () => {
       const g = getGrade(row.ticker);
@@ -235,7 +141,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <span style={{ ...lbl, marginBottom: 0 }}>Setup Grader checklist — stars compute from these ticks</span>
           <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.goldBright }}>{graded.stars}★ · {graded.passed}/{MB_TOTAL} · {graded.starHit}/{MB_STARMAKERS} ★-makers</span>
-          <button onClick={pullGrade} title="Import this ticker's saved Setup Grader ticks" style={{ ...chip(false), whiteSpace: "nowrap", marginLeft: "auto" }}>Pull from grader</button>
+          <button onClick={pullGrade} title="Import this ticker's saved Setup Grader ticks" style={{ ...chipBtn, whiteSpace: "nowrap", marginLeft: "auto" }}>Pull from grader</button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 10, marginBottom: 14 }}>
           {SECTIONS.filter(s => !s.reminder).map((sec, si) => (
@@ -272,23 +178,23 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           })}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-          <div>
-            <span style={lbl}>Before chart (the setup)</span>
-            {row.before_img && <img src={row.before_img} alt="before" style={{ width: "100%", borderRadius: 10, marginBottom: 6, border: `1px solid ${C.border}` }} />}
-            <input type="file" accept="image/*" onChange={e => uploadImg(e.target.files?.[0], "before_img", row, setRow)} style={{ color: C.muted, fontSize: "0.74rem" }} />
-          </div>
-          <div>
-            <span style={lbl}>After chart (the outcome)</span>
-            {row.after_img && <img src={row.after_img} alt="after" style={{ width: "100%", borderRadius: 10, marginBottom: 6, border: `1px solid ${C.border}` }} />}
-            <input type="file" accept="image/*" onChange={e => uploadImg(e.target.files?.[0], "after_img", row, setRow)} style={{ color: C.muted, fontSize: "0.74rem" }} />
-          </div>
+          {[["before_img", "Before chart (the setup)", "⬆ Upload before chart"], ["after_img", "After chart (the outcome)", "⬆ Upload after chart"]].map(([slot, label, cta]) => (
+            <div key={slot}>
+              <span style={lbl}>{label}</span>
+              {row[slot] && <img src={row[slot]} alt={slot} style={{ width: "100%", borderRadius: 10, marginBottom: 8, border: `1px solid ${C.border}` }} />}
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 7, background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1 }}>
+                {busy ? "Uploading…" : row[slot] ? "↻ Replace chart" : cta}
+                <input type="file" accept="image/*" disabled={busy} onChange={e => onUpload(e.target.files?.[0], slot, setRow)} style={{ display: "none" }} />
+              </label>
+            </div>
+          ))}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           <div><span style={lbl}>The thesis (why it was A+ BEFORE the move)<AutoDot k="thesis" /></span><textarea rows={3} style={{ ...inputS, resize: "vertical" }} value={row.thesis || ""} onChange={e => setField("thesis", e.target.value)} /></div>
           <div><span style={lbl}>The lesson (what to internalize)<AutoDot k="lesson" /></span><textarea rows={3} style={{ ...inputS, resize: "vertical" }} value={row.lesson || ""} onChange={e => setField("lesson", e.target.value)} /></div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button disabled={busy || !row.ticker} onClick={() => save(row)} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.82rem", padding: "11px 24px", borderRadius: 99, cursor: "pointer", opacity: busy || !row.ticker ? 0.6 : 1 }}>{busy ? "Saving…" : row.id ? "Save changes" : "Add entry"}</button>
+          <button disabled={busy || !row.ticker} onClick={() => onSave(row)} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.82rem", padding: "11px 24px", borderRadius: 99, cursor: "pointer", opacity: busy || !row.ticker ? 0.6 : 1 }}>{busy ? "Saving…" : row.id ? "Save changes" : "Add entry"}</button>
           {isAdmin ? (
             <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.78rem", color: row.is_published ? C.green : C.muted, cursor: "pointer", fontFamily: font, fontWeight: 700 }}>
               <input type="checkbox" checked={!!row.is_published} onChange={e => setRow(r => ({ ...r, is_published: e.target.checked }))} /> Published to members
@@ -296,11 +202,113 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           ) : (
             <span style={{ fontSize: "0.72rem", color: C.muted, fontFamily: font }}>🔒 Saves to your personal model book — only you can see it.</span>
           )}
-          <button onClick={() => setEditing(null)} style={{ marginLeft: "auto", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 700, fontSize: "0.76rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onCancel} style={{ marginLeft: "auto", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 700, fontSize: "0.76rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
         </div>
       </div>
     );
+}
+
+export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, guideLeave, gactive }) {
+  const uid = session?.user?.id;
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [fPattern, setFPattern] = useState("All");
+  const [fTier, setFTier] = useState("All"); // All | 7 | 6 | 5
+  const [fScope, setFScope] = useState("All"); // All | official (VIV published) | mine (my personal book)
+  const [detail, setDetail] = useState(null);
+  const [editing, setEditing] = useState(null); // null | {} (new) | row (edit)
+  const [busy, setBusy] = useState(false);
+  const [zoom, setZoom] = useState(null); // lightbox: { imgs: {before, after}, slot: "before"|"after" }
+
+  // Lightbox keyboard nav — ← → flips before/after, Esc closes (Esc also closes the detail overlay)
+  useEffect(() => {
+    if (!zoom && !detail) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") { if (zoom) setZoom(null); else setDetail(null); }
+      else if (zoom && e.key === "ArrowLeft") setZoom(z => (z && z.imgs.before ? { ...z, slot: "before" } : z));
+      else if (zoom && e.key === "ArrowRight") setZoom(z => (z && z.imgs.after ? { ...z, slot: "after" } : z));
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoom, detail]);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    const { data, error } = await supabase.from("model_book").select("*").order("created_at", { ascending: false });
+    if (error) setError(/relation|does not exist|schema cache|not find/i.test(String(error.message)) ? "setup" : String(error.message));
+    else setRows(data || []);
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  // A trade/position sent a prefill (📖 Add to Model Book) → open the editor immediately
+  useEffect(() => { try { if (sessionStorage.getItem("viv-mb-prefill")) setEditing({}); } catch {} }, []);
+
+  const visible = rows.filter(r => {
+    if (fScope === "official" && !r.is_published) return false;
+    if (fScope === "mine" && r.created_by !== uid) return false;
+    if (fPattern !== "All" && r.pattern !== fPattern) return false;
+    const eff = effectiveStars(r.stars, (r.elite || []).length).n;
+    if (fTier !== "All" && eff !== +fTier) return false;
+    return true;
+  });
+  const mineCount = rows.filter(r => r.created_by === uid).length; // must match the fScope==='mine' predicate
+
+  const uploadImg = async (file, slot, setRow) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const path = `modelbook/${uid}/${Date.now()}-${slot}-${file.name}`.replace(/[^a-zA-Z0-9./_-]/g, "_");
+      const { error: upErr } = await supabase.storage.from("trade-charts").upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("trade-charts").getPublicUrl(path);
+      setRow(r => ({ ...r, [slot]: urlData?.publicUrl || "" }));
+    } catch (e) { setError(String(e.message || e)); }
+    setBusy(false);
   };
+
+  const save = async (row) => {
+    setBusy(true); setError(null);
+    const body = {
+      ticker: (row.ticker || "").toUpperCase().trim(), pattern: row.pattern || "Trendline Breakout",
+      stars: starsFromTicked(row.ticked).stars, // objective — derived from the grader ticks, never hand-set
+      outcome: row.outcome || outcomeFromR(row.r_mult, row.run_pct) || null, // blank → auto-classified from R
+      theme: row.theme || null, entry_date: row.entry_date || null, exit_date: row.exit_date || null,
+      before_img: row.before_img || null, after_img: row.after_img || null,
+      elite: row.elite || [], ticked: row.ticked || [],
+      metrics: row.metrics || {}, // chart-extracted deep data + the _auto (gold-dot) key list — must survive edits
+      run_pct: row.run_pct === "" || row.run_pct == null ? null : +row.run_pct,
+      run_up_pct: row.run_up_pct === "" || row.run_up_pct == null ? null : +row.run_up_pct,
+      angle: row.angle === "" || row.angle == null ? null : +row.angle,
+      characteristics: Array.isArray(row.characteristics) ? row.characteristics
+        : String(row.characteristics || "").split(/[;,]/).map(s => s.trim()).filter(Boolean),
+      days_held: row.days_held === "" || row.days_held == null ? null : +row.days_held,
+      r_mult: row.r_mult === "" || row.r_mult == null ? null : +row.r_mult,
+      thesis: row.thesis || null, lesson: row.lesson || null, is_published: !!row.is_published,
+    };
+    if (!row.id) body.created_by = uid; // ownership set once at insert — updating must never steal the row
+    const q = row.id
+      ? supabase.from("model_book").update(body).eq("id", row.id)
+      : supabase.from("model_book").insert(body);
+    const { error } = await q;
+    setBusy(false);
+    if (error) { setError(String(error.message)); return; }
+    setEditing(null); load();
+  };
+  const remove = async (row) => {
+    if (!window.confirm(`Delete ${row.ticker} from the Model Book? This cannot be undone.`)) return;
+    const { error } = await supabase.from("model_book").delete().eq("id", row.id);
+    if (error) setError(String(error.message)); else { setDetail(null); load(); }
+  };
+
+  const chip = (active) => ({
+    fontSize: "0.72rem", fontWeight: 700, padding: "6px 14px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
+    border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? "#08080e" : C.muted,
+    background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
+  });
+  const lbl = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" };
 
   return (
     <div style={{ fontFamily: font }}>
@@ -313,7 +321,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         {!editing && <button onClick={() => setEditing({})} style={{ marginLeft: "auto", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer" }}>{isAdmin ? "+ Add entry" : "+ Add to my book"}</button>}
       </div>
 
-      {editing !== null && <Editor initial={editing.id ? editing : null} />}
+      {editing !== null && <MBEditor C={C} font={font} busy={busy} isAdmin={isAdmin} initial={editing.id ? editing : null} onSave={save} onCancel={() => setEditing(null)} onUpload={uploadImg} />}
 
       {/* filters */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 18px", alignItems: "center" }}>
@@ -321,9 +329,15 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           <button key={k} onClick={() => setFScope(k)} style={chip(fScope === k)}>{label}</button>
         ))}
         <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
-        {["All", ...PATTERNS].map(p => <button key={p} onClick={() => setFPattern(p)} style={chip(fPattern === p)}>{p}</button>)}
+        {["All", ...PATTERNS].map(p => {
+          const n = p === "All" ? rows.length : rows.filter(r => r.pattern === p).length;
+          return <button key={p} onClick={() => setFPattern(p)} style={chip(fPattern === p)}>{p}{p !== "All" && n > 0 ? ` (${n})` : ""}</button>;
+        })}
         <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
-        {["All", "7", "6", "5"].map(t => <button key={t} onClick={() => setFTier(t)} style={chip(fTier === t)}>{t === "All" ? "Any grade" : `${t}★`}</button>)}
+        {["All", "7", "6", "5"].map(t => {
+          const n = t === "All" ? 0 : rows.filter(r => effectiveStars(r.stars, (r.elite || []).length).n === +t).length;
+          return <button key={t} onClick={() => setFTier(t)} style={chip(fTier === t)}>{t === "All" ? "Any grade" : `${t}★${n > 0 ? ` (${n})` : ""}`}</button>;
+        })}
       </div>
       {fScope === "mine" && !isAdmin && (
         <div style={{ fontSize: "0.72rem", color: C.muted, margin: "-8px 0 16px" }}>🔒 Your personal model book — entries here are visible only to you. The ⭐ VIV Official book is curated by the team and is read-only.</div>
@@ -384,8 +398,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               <div style={{ fontSize: "0.74rem", color: C.muted, marginBottom: 16 }}>
                 {r.entry_date || "—"} → {r.exit_date || "—"}{r.days_held != null ? ` · ${r.days_held}d` : ""}{r.run_pct != null ? ` · ${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : ""}{r.r_mult != null ? ` · ${r.r_mult}R` : ""}
               </div>
-              {/* BEFORE | AFTER — always left/right, clearly compared */}
-              <div style={{ display: "grid", gridTemplateColumns: window.innerWidth < 700 ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 16 }}>
+              {/* BEFORE | AFTER — always left/right, clearly compared (responsive, no innerWidth snapshot) */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 16 }}>
                 <div>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>◀ Before — the setup <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
                   {r.before_img ? <img src={r.before_img} alt="before" onClick={() => setZoom({ imgs: { before: r.before_img, after: r.after_img }, slot: "before" })} style={{ width: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>before chart pending</div>}
@@ -446,7 +460,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               )}
               {r.thesis && <div style={{ marginBottom: 12 }}><div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>The thesis</div><div style={{ fontSize: "0.88rem", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.thesis}</div></div>}
               {r.lesson && <div style={{ marginBottom: 14 }}><div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>The lesson</div><div style={{ fontSize: "0.88rem", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.lesson}</div></div>}
-              {(isAdmin || r.created_by === uid) && (
+              {(isAdmin || (r.created_by === uid && !r.is_published)) && (
                 <div style={{ display: "flex", gap: 10, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
                   <button onClick={() => { setEditing(r); setDetail(null); }} style={{ background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>Edit</button>
                   <button onClick={() => remove(r)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.red, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>Delete</button>
