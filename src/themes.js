@@ -61,7 +61,10 @@ export function consistentTop(date) { const w = new Set(top5("week", date)); ret
 
 const rankIn = (list, sector) => { const i = (list || []).findIndex(([n]) => n === sector); return i < 0 ? null : i + 1; };
 export function themeRanks(sector, date) {
-  const s = snapshotFor(date); if (!s || !sector) return null;
+  // TRADE context — a date is required. null/missing/unreadable entry = no judgement at all
+  // (snapshotFor's latest-snapshot fallback is ONLY for current-view widgets that pass no date).
+  if (!sector || date == null || date === "" || !dnorm(date)) return null;
+  const s = snapshotFor(date); if (!s) return null;
   return { day: rankIn(s.day, sector), week: rankIn(s.week, sector), month: rankIn(s.month, sector), date: s.date };
 }
 // 'in' if top-5 in week OR month at that date; 'off' otherwise; null if sector unknown
