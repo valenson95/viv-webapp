@@ -233,6 +233,7 @@ const WHATS_NEW = [
       "Gold-dot fields were auto-read off the chart for you (dates, %, slope, R) — cross-check and edit anything that looks off; editing clears the dot.",
       "Two books in one: the ⭐ VIV Official library (curated, read-only) and 🔒 My Book — add your own entries; they're private and only you can see them.",
       "Setup Grader rule update: the ADR% criterion is now > 3.5% (was ≥ 4–5%) — slightly wider net, same principle: the stock must move enough to pay multiple R.",
+      "Chart zoom upgrade: once zoomed, use your ← → arrow keys (or the on-screen arrows) to flip between the Before and After chart — Esc closes.",
       "Filter by book (VIV Official / My Book), by pattern (Trendline Breakout / Pullback Buy / Episodic Pivot / VCP) and by grade. New official entries are added on an ongoing basis — check back weekly.",
       "Also in this update: tickers outside our theme map now auto-detect their sector, plus accuracy fixes across metrics (break-even trades, risk %, hold times, calendar filtering).",
     ],

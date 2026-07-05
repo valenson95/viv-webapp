@@ -79,7 +79,21 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [detail, setDetail] = useState(null);
   const [editing, setEditing] = useState(null); // null | {} (new) | row (edit)
   const [busy, setBusy] = useState(false);
-  const [zoom, setZoom] = useState(null); // lightbox: full-screen chart URL
+  const [zoom, setZoom] = useState(null); // lightbox: { imgs: {before, after}, slot: "before"|"after" }
+
+  // Lightbox keyboard nav — ← → flips before/after, Esc closes
+  useEffect(() => {
+    if (!zoom) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setZoom(null);
+      else if (e.key === "ArrowLeft") setZoom(z => (z && z.imgs.before ? { ...z, slot: "before" } : z));
+      else if (e.key === "ArrowRight") setZoom(z => (z && z.imgs.after ? { ...z, slot: "after" } : z));
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoom]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -374,11 +388,11 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               <div style={{ display: "grid", gridTemplateColumns: window.innerWidth < 700 ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 16 }}>
                 <div>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>◀ Before — the setup <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
-                  {r.before_img ? <img src={r.before_img} alt="before" onClick={() => setZoom(r.before_img)} style={{ width: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>before chart pending</div>}
+                  {r.before_img ? <img src={r.before_img} alt="before" onClick={() => setZoom({ imgs: { before: r.before_img, after: r.after_img }, slot: "before" })} style={{ width: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>before chart pending</div>}
                 </div>
                 <div>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.green, marginBottom: 7 }}>After — the outcome ▶ <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
-                  {r.after_img ? <img src={r.after_img} alt="after" onClick={() => setZoom(r.after_img)} style={{ width: "100%", borderRadius: 12, border: "1px solid rgba(34,197,94,0.35)", cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>after chart pending</div>}
+                  {r.after_img ? <img src={r.after_img} alt="after" onClick={() => setZoom({ imgs: { before: r.before_img, after: r.after_img }, slot: "after" })} style={{ width: "100%", borderRadius: 12, border: "1px solid rgba(34,197,94,0.35)", cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>after chart pending</div>}
                 </div>
               </div>
               {/* Objective metric strip — gold dot = auto-read off the chart by VIV */}
@@ -442,13 +456,32 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           </div>
         );
       })()}
-      {/* LIGHTBOX — full-screen chart zoom */}
-      {zoom && (
-        <div onClick={() => setZoom(null)} style={{ position: "fixed", inset: 0, zIndex: 1500, background: "rgba(2,2,6,0.93)", display: "grid", placeItems: "center", cursor: "zoom-out", padding: 18 }}>
-          <img src={zoom} alt="chart zoom" style={{ maxWidth: "96vw", maxHeight: "94vh", borderRadius: 12, border: `1px solid ${C.borderGold}`, boxShadow: "0 30px 90px rgba(0,0,0,0.8)" }} />
-          <button onClick={() => setZoom(null)} aria-label="Close zoom" style={{ position: "fixed", top: 18, right: 20, background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 12, fontSize: "1.3rem", cursor: "pointer", lineHeight: 1 }}>&times;</button>
-        </div>
-      )}
+      {/* LIGHTBOX — full-screen chart zoom, ← → flips before/after */}
+      {zoom && (() => {
+        const url = zoom.imgs[zoom.slot];
+        const isBefore = zoom.slot === "before";
+        const hasBoth = !!(zoom.imgs.before && zoom.imgs.after);
+        const navBtn = (side, slot, enabled) => enabled && (
+          <button onClick={e => { e.stopPropagation(); setZoom(z => ({ ...z, slot })); }} aria-label={`Show ${slot} chart`}
+            style={{ position: "fixed", [side]: 20, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.07)", backdropFilter: "blur(4px)", border: `1px solid ${C.border}`, color: C.white, width: 46, height: 64, borderRadius: 14, fontSize: "1.5rem", cursor: "pointer", lineHeight: 1 }}>{side === "left" ? "‹" : "›"}</button>
+        );
+        return (
+          <div onClick={() => setZoom(null)} style={{ position: "fixed", inset: 0, zIndex: 1500, background: "rgba(2,2,6,0.93)", display: "grid", placeItems: "center", cursor: "zoom-out", padding: 18 }}>
+            <img key={zoom.slot} src={url} alt={`${zoom.slot} chart zoom`} style={{ maxWidth: "96vw", maxHeight: "90vh", borderRadius: 12, border: `1px solid ${isBefore ? C.borderGold : "rgba(34,197,94,0.45)"}`, boxShadow: "0 30px 90px rgba(0,0,0,0.8)" }} />
+            <span style={{ position: "fixed", top: 20, left: 20, fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: isBefore ? C.goldBright : "#7ef0a0", background: "rgba(8,8,14,0.8)", border: `1px solid ${isBefore ? C.borderGold : "rgba(34,197,94,0.4)"}`, padding: "7px 15px", borderRadius: 99 }}>
+              {isBefore ? "◀ Before — the setup" : "After — the outcome ▶"}
+            </span>
+            {navBtn("left", "before", hasBoth && !isBefore)}
+            {navBtn("right", "after", hasBoth && isBefore)}
+            {hasBoth && (
+              <span style={{ position: "fixed", bottom: 18, left: "50%", transform: "translateX(-50%)", fontSize: "0.68rem", fontWeight: 600, color: C.muted, background: "rgba(8,8,14,0.8)", border: `1px solid ${C.border}`, padding: "6px 14px", borderRadius: 99, whiteSpace: "nowrap" }}>
+                ← → flip before / after &nbsp;·&nbsp; Esc to close
+              </span>
+            )}
+            <button onClick={() => setZoom(null)} aria-label="Close zoom" style={{ position: "fixed", top: 18, right: 20, background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 12, fontSize: "1.3rem", cursor: "pointer", lineHeight: 1 }}>&times;</button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
