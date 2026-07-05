@@ -75,6 +75,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [error, setError] = useState(null);
   const [fPattern, setFPattern] = useState("All");
   const [fTier, setFTier] = useState("All"); // All | 7 | 6 | 5
+  const [fScope, setFScope] = useState("All"); // All | official (VIV published) | mine (my personal book)
   const [detail, setDetail] = useState(null);
   const [editing, setEditing] = useState(null); // null | {} (new) | row (edit)
   const [busy, setBusy] = useState(false);
@@ -92,11 +93,14 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   useEffect(() => { try { if (sessionStorage.getItem("viv-mb-prefill")) setEditing({}); } catch {} }, []);
 
   const visible = rows.filter(r => {
+    if (fScope === "official" && !r.is_published) return false;
+    if (fScope === "mine" && r.created_by !== uid) return false;
     if (fPattern !== "All" && r.pattern !== fPattern) return false;
     const eff = effectiveStars(r.stars, (r.elite || []).length).n;
     if (fTier !== "All" && eff !== +fTier) return false;
     return true;
   });
+  const mineCount = rows.filter(r => r.created_by === uid && !r.is_published).length;
 
   const uploadImg = async (file, slot, row, setRow) => {
     if (!file) return;
@@ -208,6 +212,12 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         </div>
 
         {/* SETUP GRADER CHECKLIST — the stars are COMPUTED from these ticks (objective, no bias) */}
+        {(row.metrics?.needs_eye || []).length > 0 && (
+          <div style={{ fontSize: "0.74rem", fontWeight: 600, color: "#f0b04f", background: "rgba(240,176,79,0.07)", border: "1px solid rgba(240,176,79,0.3)", borderRadius: 10, padding: "8px 13px", marginBottom: 10, lineHeight: 1.5 }}>
+            👁 <b>Needs your eye</b> — not provable from the chart alone, tick below if true:{" "}
+            {(row.metrics.needs_eye).map(k => { const [si, ii] = k.split("-").map(Number); return SECTIONS[si]?.items?.[ii]?.c; }).filter(Boolean).join(" · ")}
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <span style={{ ...lbl, marginBottom: 0 }}>Setup Grader checklist — stars compute from these ticks</span>
           <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.goldBright }}>{graded.stars}★ · {graded.passed}/{MB_TOTAL} · {graded.starHit}/{MB_STARMAKERS} ★-makers</span>
@@ -270,7 +280,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               <input type="checkbox" checked={!!row.is_published} onChange={e => setRow(r => ({ ...r, is_published: e.target.checked }))} /> Published to members
             </label>
           ) : (
-            <span style={{ fontSize: "0.72rem", color: C.muted, fontFamily: font }}>Submitted entries are reviewed by the team before publishing.</span>
+            <span style={{ fontSize: "0.72rem", color: C.muted, fontFamily: font }}>🔒 Saves to your personal model book — only you can see it.</span>
           )}
           <button onClick={() => setEditing(null)} style={{ marginLeft: "auto", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 700, fontSize: "0.76rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
         </div>
@@ -283,20 +293,27 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {/* header */}
       <div className="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h2 className={"sech guide" + (gactive ? gactive("modelbook") : "")}
-          onMouseEnter={guideEnter ? guideEnter("modelbook", "Model Book", "A curated library of the best real setups — study the before chart, the exact factors that made it elite, then the outcome. Stars are computed from the Setup Grader ticks (objective, no bias). Fields marked with a gold dot were auto-read off the chart by VIV — edit any that look off. Pattern recognition is built by reps: same patterns, hundreds of examples.", undefined) : undefined}
+          onMouseEnter={guideEnter ? guideEnter("modelbook", "Model Book", "Two books in one: the ⭐ VIV Official library — curated elite setups, read-only — and 🔒 My Book, your private collection only you can see. Study the before chart, the exact factors that made it elite, then the outcome. Stars are computed from the Setup Grader ticks (objective, no bias). Fields marked with a gold dot were auto-read off the chart by VIV — edit any that look off. Pattern recognition is built by reps: same patterns, hundreds of examples.", undefined) : undefined}
           onMouseLeave={guideLeave ? guideLeave("modelbook") : undefined}>Model Book</h2>
         <span style={{ fontSize: "0.74rem", color: C.muted }}>study the best — before → factors → after</span>
-        {!editing && <button onClick={() => setEditing({})} style={{ marginLeft: "auto", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer" }}>+ Add entry</button>}
+        {!editing && <button onClick={() => setEditing({})} style={{ marginLeft: "auto", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer" }}>{isAdmin ? "+ Add entry" : "+ Add to my book"}</button>}
       </div>
 
       {editing !== null && <Editor initial={editing.id ? editing : null} />}
 
       {/* filters */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 18px" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 18px", alignItems: "center" }}>
+        {[["All", "All"], ["official", "⭐ VIV Official"], ["mine", `🔒 My Book${mineCount ? ` (${mineCount})` : ""}`]].map(([k, label]) => (
+          <button key={k} onClick={() => setFScope(k)} style={chip(fScope === k)}>{label}</button>
+        ))}
+        <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
         {["All", ...PATTERNS].map(p => <button key={p} onClick={() => setFPattern(p)} style={chip(fPattern === p)}>{p}</button>)}
-        <span style={{ width: 1, background: C.border, margin: "0 4px" }} />
+        <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
         {["All", "7", "6", "5"].map(t => <button key={t} onClick={() => setFTier(t)} style={chip(fTier === t)}>{t === "All" ? "Any grade" : `${t}★`}</button>)}
       </div>
+      {fScope === "mine" && !isAdmin && (
+        <div style={{ fontSize: "0.72rem", color: C.muted, margin: "-8px 0 16px" }}>🔒 Your personal model book — entries here are visible only to you. The ⭐ VIV Official book is curated by the team and is read-only.</div>
+      )}
 
       {loading && <div style={{ color: C.muted, fontSize: "0.84rem", padding: "30px 0", textAlign: "center" }}>Loading the Model Book…</div>}
       {error === "setup" && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "30px 0", textAlign: "center" }}>📖 The Model Book is being set up — check back shortly.</div>}
@@ -320,7 +337,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                   <span style={{ fontWeight: 800, fontSize: "1.02rem", color: C.white }}>{r.ticker}</span>
                   <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.gold, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 9px", borderRadius: 99 }}>{r.pattern}</span>
-                  {!r.is_published && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: C.muted, border: `1px solid ${C.border}`, padding: "2px 8px", borderRadius: 99 }}>DRAFT</span>}
+                  {!r.is_published && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: isAdmin ? C.muted : "#8ab4f8", border: `1px solid ${isAdmin ? C.border : "rgba(138,180,248,0.35)"}`, padding: "2px 8px", borderRadius: 99 }}>{isAdmin ? "DRAFT" : "🔒 PERSONAL"}</span>}
+                  {r.is_published && <span title="Curated by the VIV team" style={{ fontSize: "0.58rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 8px", borderRadius: 99 }}>⭐ VIV</span>}
                   {r.outcome && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: r.outcome === "Huge Winner" ? "#7ef0a0" : r.outcome === "Winner" ? C.green : r.outcome === "Loser" ? C.red : C.muted, border: `1px solid ${C.border}`, padding: "2px 8px", borderRadius: 99 }}>{r.outcome}</span>}
                   <span style={{ marginLeft: "auto", fontSize: "0.8rem", fontWeight: 800, color: (r.run_pct || 0) >= 0 ? C.green : C.red }}>{r.run_pct != null ? `${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : ""}</span>
                 </div>
@@ -385,6 +403,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                     {dAuto.size > 0 && (
                       <div style={{ fontSize: "0.66rem", color: C.muted, marginBottom: 14 }}>
                         <span style={{ color: C.goldBright }}>●</span> auto-read from the chart by VIV — spot an error? hit Edit and correct it (the dot clears)
+                        {(r.metrics?.needs_eye || []).length > 0 && <span style={{ color: "#f0b04f" }}> · 👁 {(r.metrics.needs_eye).length} item{r.metrics.needs_eye.length > 1 ? "s" : ""} awaiting your eye (open Edit)</span>}
                       </div>
                     )}
                   </>
