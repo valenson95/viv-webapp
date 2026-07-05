@@ -12,6 +12,7 @@ import ThemeStrip from "./ThemeStrip.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
 import ModelBookPage, { outcomeFromR } from "./ModelBook.jsx";
 import MentorModePage from "./MentorMode.jsx";
+import TVChart from "./TVChart.jsx";
 import { getGrade as getSavedGrade, useGrades as useSavedGrades, initGrades, isGradesReady } from "./grades.js";
 import FeedbackWidget from "./Feedback.jsx";
 
@@ -2892,7 +2893,7 @@ return (
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a>}
+          {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
@@ -4319,7 +4320,8 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const [deletedTradeIds, setDeletedTradeIds] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [expandedTrade, setExpandedTrade] = useState(null); // full-page trade details overlay
-  const [tdTab, setTdTab] = useState("chart"); // trade-details right pane: chart | notes
+  const [tdTab, setTdTab] = useState("chart"); // trade-details right pane: chart | replay | notes
+  const [edgeOpen, setEdgeOpen] = useState(null); // Objective Edge: which group is expanded ("t:in", "t:off", "g:A+", …)
   const [tgts, setTgts] = useState(loadTargets); // TradeZella-style planning targets per trade id
   const tdTradeObj = expandedTrade ? (journaledTrades || []).find(x => x.id === expandedTrade) : null;
   const excursion = useTradeExcursion(tdTradeObj); // MAE/MFE/Best-Exit off real candles
@@ -5542,7 +5544,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-            {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a>}
+            {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -5827,14 +5829,53 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           const fitOf = (t) => { const th = sectorFor(t.ticker); return th ? themeFit(th, t.entry) : null; };
           const inT = agg(pop.filter(t => fitOf(t) === "in")), offT = agg(pop.filter(t => fitOf(t) === "off"));
           const cell = (v, good) => <b style={{ color: v == null ? "var(--muted)" : good ? "var(--green)" : "var(--red)" }}>{v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2) + "R"}</b>;
-          const Row = ({ label, s, accent }) => (
-            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 4px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "0.82rem" }}>
+          // click a group → expand the exact trades behind the number (with sector + the snapshot ranks used)
+          const groupTrades = (id) => {
+            if (id === "t:in") return pop.filter(t => fitOf(t) === "in");
+            if (id === "t:off") return pop.filter(t => fitOf(t) === "off");
+            if (id && id.startsWith("g:")) { const L = id.slice(2); return L === "un" ? pop.filter(t => !letterOf(t)) : pop.filter(t => letterOf(t) === L); }
+            return [];
+          };
+          const Row = ({ label, s, accent, id }) => (
+            <div onClick={id ? () => setEdgeOpen(edgeOpen === id ? null : id) : undefined}
+              title={id ? "Click to see the exact trades behind this number" : undefined}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 4px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "0.82rem", cursor: id ? "pointer" : "default", background: edgeOpen === id ? "rgba(240,192,80,0.05)" : "transparent", borderRadius: 8 }}>
               <span style={{ minWidth: 96, fontWeight: 800, color: accent || "var(--text)" }}>{label}</span>
               <span style={{ color: "var(--muted)", minWidth: 66 }}>{s.n} trade{s.n !== 1 ? "s" : ""}</span>
               <span style={{ minWidth: 84, color: s.winPct >= 50 ? "var(--green)" : "var(--red)", fontWeight: 700 }}>{s.winPct}% win</span>
               {cell(s.avgR, (s.avgR || 0) >= 0)}
+              {id && <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: "0.7rem" }}>{edgeOpen === id ? "▴" : "▾"}</span>}
             </div>
           );
+          const EdgeList = ({ id }) => {
+            const rows = groupTrades(id);
+            if (!rows.length) return null;
+            const isTheme = id.startsWith("t:");
+            return (
+              <div style={{ gridColumn: "1 / -1", background: "rgba(255,255,255,0.02)", border: "1px solid var(--borderGold)", borderRadius: 12, padding: "10px 14px", marginTop: 4 }}>
+                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>
+                  The {rows.length} trade{rows.length !== 1 ? "s" : ""} behind “{id === "t:in" ? "🟢 In-theme" : id === "t:off" ? "🔴 Off-theme" : id.slice(2) + " setups"}”
+                  {isTheme && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · judged against the theme snapshot at each trade's ENTRY date</span>}
+                </div>
+                {rows.map((t, i) => {
+                  const th = sectorFor(t.ticker);
+                  const rk = isTheme && th ? themeRanks(th, t.entry) : null;
+                  return (
+                    <div key={t.id || i} onClick={() => openReview(t)} title="Open trade details"
+                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 4px", borderTop: i ? "1px solid rgba(255,255,255,0.04)" : "none", fontSize: "0.78rem", cursor: "pointer", flexWrap: "wrap" }}>
+                      <b style={{ minWidth: 52, color: "var(--white)" }}>{t.ticker}</b>
+                      <span style={{ minWidth: 120, color: "var(--goldBright)", fontWeight: 600 }}>{th || "— no sector"}</span>
+                      <span style={{ minWidth: 78, color: "var(--muted)" }}>{tradeDateISO(t.entry) || "—"}</span>
+                      {rk && <span style={{ minWidth: 150, color: "var(--muted)", fontSize: "0.72rem" }}>wk #{rk.week ?? "–"} · mo #{rk.month ?? "–"} <span style={{ opacity: 0.7 }}>@ {rk.date}</span></span>}
+                      <span style={{ minWidth: 62, fontWeight: 700, color: (Number(t.plPct) || 0) > 0 ? "var(--green)" : "var(--red)" }}>{sgnPct(Number(t.plPct))}</span>
+                      <span style={{ color: "var(--muted)" }}>{t.rMult != null ? sgnR(Number(t.rMult)) : "—"}</span>
+                      <span style={{ marginLeft: "auto", color: "var(--goldBright)", fontSize: "0.7rem" }}>details ›</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          };
           if (!byGrade.length && !inT.n && !offT.n) return null;
           return (<>
             <div className="toolbar" style={{ marginTop: 26 }}><h2 className="sech guide" onMouseEnter={guideEnter("objedge", "Objective edge", "This connects your process to your results: win rate and average R grouped by the setup grade you gave each trade, and by whether the trade was in-theme at entry. If A-plus setups outperform, your grading has real edge.", undefined)} onMouseLeave={guideLeave("objedge")}>Objective edge</h2></div>
@@ -5842,17 +5883,18 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
                 <div>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By setup grade</div>
-                  {byGrade.map(g => <Row key={g.L} label={g.L + " setups"} s={g} accent={g.L === "A+" ? "var(--green)" : g.L === "A" ? "var(--goldBright)" : undefined} />)}
-                  {ungraded.n > 0 && <Row label="Ungraded" s={ungraded} accent="var(--muted)" />}
+                  {byGrade.map(g => <Row key={g.L} id={"g:" + g.L} label={g.L + " setups"} s={g} accent={g.L === "A+" ? "var(--green)" : g.L === "A" ? "var(--goldBright)" : undefined} />)}
+                  {ungraded.n > 0 && <Row id="g:un" label="Ungraded" s={ungraded} accent="var(--muted)" />}
                   {byGrade.length === 0 && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Grade setups in Premium Tools → Setup Grader; results correlate here automatically.</div>}
                 </div>
                 <div>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By theme fit (at entry)</div>
-                  {inT.n > 0 && <Row label="🟢 In-theme" s={inT} accent="var(--green)" />}
-                  {offT.n > 0 && <Row label="🔴 Off-theme" s={offT} accent="var(--red)" />}
+                  {inT.n > 0 && <Row id="t:in" label="🟢 In-theme" s={inT} accent="var(--green)" />}
+                  {offT.n > 0 && <Row id="t:off" label="🔴 Off-theme" s={offT} accent="var(--red)" />}
                   {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
                   {THEME_COVERAGE_START && <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>🧭 Theme metrics track from <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the date of the first theme snapshot. Trades entered earlier aren't theme-tagged: themes rotate constantly, so a later snapshot can't honestly judge an older trade. Grade metrics cover all trades.</div>}
                 </div>
+                {edgeOpen && <EdgeList id={edgeOpen} />}
               </div>
             </div>
           </>);
@@ -6086,7 +6128,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 <th className="pro-only"><span className="term" data-tip="Number of shares traded.">Shares</span></th>
                 <th><span className="term" data-tip="The date you opened the trade.">Entry date</span></th>
                 <th><span className="term" data-tip="The date you closed the trade.">Exit date</span></th>
-                <th><span className="term" data-tip="The pattern or reason you took the trade.">Setup</span></th>
+                {false && <th><span className="term" data-tip="The pattern or reason you took the trade.">Setup</span></th> /* Setup column hidden (Valen 2026-07-05) — data still lives in the preview/details */}
                 <th className="pro-only"><span className="term" data-tip="DeepVue sector, in/off-theme judged against the tracker at your entry date. Green = top-5 leader (with the trend); red = off-theme.">Theme</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="Your protective stop on this trade.">Stop</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="How many days you held the trade.">Hold</span></th>
@@ -6098,7 +6140,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             </thead>
             <tbody>
               {dateFiltered.length === 0 && (
-                <tr><td colSpan={15} className="nodata">No trades match this filter. Clear the filters to see your full track record.</td></tr>
+                <tr><td colSpan={14} className="nodata">No trades match this filter. Clear the filters to see your full track record.</td></tr>
               )}
               {dateFiltered.map(t => {
                 const up = (Number(t.plPct) || 0) > 0;
@@ -6115,7 +6157,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
                       <td data-l="Entry date">{tradeDateISO(t.entry) || t.entry || "—"}</td>
                       <td data-l="Exit date">{tradeDateISO(t.exit) || t.exit || "—"}</td>
-                      <td data-l="Setup">{t.setup ? <span className="tag">{t.setup}</span> : "—"}</td>
+                      {false && <td data-l="Setup">{t.setup ? <span className="tag">{t.setup}</span> : "—"}</td>}
                       <td className="pro-only" data-l="Theme">{(() => {
                         const th = sectorFor(t.ticker);
                         if (!th) return <span className="term" data-tip="No DeepVue sector mapped for this ticker yet.">—</span>;
@@ -6142,7 +6184,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       <td className="revcell" data-l=""><button className="revbtn" onClick={(e) => { e.stopPropagation(); setPreviewTrade(t); }}>View ›</button></td>
                     </tr>
                     {false && (
-                      <tr className="revrow"><td colSpan={15}>
+                      <tr className="revrow"><td colSpan={14}>
                         <div className={"revpanel" + (closingReview ? " closing" : "")}>
                           <div className="revhead">
                             <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
@@ -6369,11 +6411,19 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                         <div className="tdz-right">
                           <div className="tdz-tabs">
                             <button className={"tdz-tab" + (tdTab === "chart" ? " on" : "")} onClick={() => setTdTab("chart")}>Chart</button>
+                            <button className={"tdz-tab" + (tdTab === "replay" ? " on" : "")} onClick={() => setTdTab("replay")}>Replay</button>
                             <button className={"tdz-tab" + (tdTab === "notes" ? " on" : "")} onClick={() => setTdTab("notes")}>Notes</button>
                           </div>
-                          {tdTab === "chart" ? (
+                          {tdTab === "chart" && (
+                            <>
+                              <TVChart symbol={t.ticker} interval={tradeDateISO(t.entry) === (tradeDateISO(t.exit) || tradeDateISO(t.entry)) ? "5" : "D"} height={560} />
+                              <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8 }}>Full TradingView chart — indicators, drawing tools, timeframes. Your entry {entryP ? `$${entryP.toFixed(2)}` : ""}{exitP ? ` → exit $${exitP.toFixed(2)}` : ""}{t.stop ? ` · stop $${Number(t.stop).toFixed(2)}` : ""}. Fills plotted + candle-by-candle playback live on the Replay tab.</div>
+                            </>
+                          )}
+                          {tdTab === "replay" && (
                             <div className="revchart" style={{ marginBottom: 0 }}><TradeReplayChart trade={t} C={C} font={font} /></div>
-                          ) : (
+                          )}
+                          {tdTab === "notes" && (
                             <>
                               {isAdmin && (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>)}
                               <div className="revnotes">
@@ -7809,7 +7859,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a>}
+          {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -8612,7 +8662,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a>}
+          {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -9079,7 +9129,7 @@ function ModelBookShell({ setPage, onLogout, session, displayName, journaledTrad
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a className="on" style={{ cursor: "pointer" }}>Model Book</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a>}
+            {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip to relaunch */}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
           <div className="spacer"></div>
