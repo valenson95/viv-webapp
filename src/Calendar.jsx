@@ -38,8 +38,8 @@ function useDailyMap(trades) {
       const pl = t.plDollar == null ? (t.pl_dollar == null ? null : Number(t.pl_dollar)) : Number(t.plDollar);
       const iso = toISO(t.exit || t.exit_date);
       if (pl == null || isNaN(pl) || !iso) continue;
-      if (!m[iso]) m[iso] = { net: 0, n: 0, w: 0 };
-      m[iso].net += pl; m[iso].n += 1; if (pl > 0) m[iso].w += 1;
+      if (!m[iso]) m[iso] = { net: 0, n: 0, w: 0, trades: [] };
+      m[iso].net += pl; m[iso].n += 1; if (pl > 0) m[iso].w += 1; m[iso].trades.push(t);
     }
     return m;
   }, [trades]);
@@ -55,7 +55,8 @@ function dowStyle(C) {
 }
 
 // ─── Monthly view ───
-function Monthly({ daily, C, font, ym, setYm }) {
+function Monthly({ daily, C, font, ym, setYm, onOpenTrade }) {
+  const [selDay, setSelDay] = useState(null); // "YYYY-MM-DD" — clicked day expands its trade list
   const [y, m] = ym.split("-").map(Number);
   const first = new Date(Date.UTC(y, m - 1, 1));
   const startDow = first.getUTCDay();
@@ -77,6 +78,7 @@ function Monthly({ daily, C, font, ym, setYm }) {
   const nav = (delta) => {
     let ny = y, nm = m + delta;
     if (nm < 1) { nm = 12; ny--; } if (nm > 12) { nm = 1; ny++; }
+    setSelDay(null);
     setYm(`${ny}-${String(nm).padStart(2, "0")}`);
   };
 
@@ -113,12 +115,16 @@ function Monthly({ daily, C, font, ym, setYm }) {
             <React.Fragment key={wi}>
               {wk.map((c, ci) => {
                 if (!c) return <div key={ci} style={{ background: "rgba(255,255,255,0.012)", border: "1px solid rgba(255,255,255,0.03)", borderRadius: 12, minHeight: 96 }} />;
+                const key = `${y}-${String(m).padStart(2, "0")}-${String(c.d).padStart(2, "0")}`;
+                const sel = selDay === key;
                 return (
-                  <div key={ci} style={cellStyle(c.info)}>
+                  <div key={ci} onClick={c.info ? () => setSelDay(sel ? null : key) : undefined}
+                    title={c.info ? (sel ? "Hide the day's trades" : "Click to see the trades exited this day") : undefined}
+                    style={{ ...cellStyle(c.info), cursor: c.info ? "pointer" : "default", ...(sel ? { border: `1px solid ${C.goldBright}`, boxShadow: "0 0 0 1px " + C.goldBright + ", 0 6px 18px rgba(240,192,80,0.15)" } : {}), transition: "border-color .12s, box-shadow .12s" }}>
                     <div style={{ fontSize: "0.72rem", fontWeight: 700, color: c.info ? C.white : C.muted, textAlign: "right" }}>{c.d}</div>
                     {c.info && <div style={{ marginTop: "auto" }}>
                       <div style={{ fontWeight: 800, fontSize: "0.98rem", color: c.info.net > 0 ? C.green : c.info.net < 0 ? C.red : C.muted }}>{fmtK(c.info.net)}</div>
-                      <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 2 }}>{c.info.n} trade{c.info.n > 1 ? "s" : ""} · {Math.round(100 * c.info.w / c.info.n)}%</div>
+                      <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 2 }}>{c.info.n} trade{c.info.n > 1 ? "s" : ""} · {Math.round(100 * c.info.w / c.info.n)}% {sel ? "▴" : "▾"}</div>
                     </div>}
                   </div>
                 );
@@ -132,6 +138,39 @@ function Monthly({ daily, C, font, ym, setYm }) {
           );
         })}
       </div>
+      {/* DAY EXPANSION — the trades exited on the clicked day, each openable */}
+      {selDay && daily[selDay] && (() => {
+        const info = daily[selDay];
+        const dt = new Date(selDay + "T00:00:00Z");
+        const nice = `${DOW[dt.getUTCDay()]}, ${dt.getUTCDate()} ${MONTHS[dt.getUTCMonth()]} ${dt.getUTCFullYear()}`;
+        const plOf = (t) => t.plDollar == null ? Number(t.pl_dollar) : Number(t.plDollar);
+        return (
+          <div style={{ marginTop: 12, background: "rgba(255,255,255,0.02)", border: `1px solid ${C.borderGold}`, borderRadius: 14, padding: "14px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold }}>{nice}</span>
+              <span style={{ fontSize: "0.8rem", fontWeight: 800, color: info.net > 0 ? C.green : info.net < 0 ? C.red : C.muted }}>{fmtK(info.net)}</span>
+              <span style={{ fontSize: "0.68rem", color: C.muted }}>{info.n} trade{info.n > 1 ? "s" : ""} exited · {Math.round(100 * info.w / info.n)}% win</span>
+              <button onClick={() => setSelDay(null)} aria-label="Collapse" style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, width: 26, height: 26, cursor: "pointer", lineHeight: 1 }}>×</button>
+            </div>
+            {(info.trades || []).slice().sort((a, b) => plOf(b) - plOf(a)).map((t, k) => {
+              const pl = plOf(t), pct = t.plPct == null ? (t.pl_pct == null ? null : Number(t.pl_pct)) : Number(t.plPct);
+              const r = t.rMult == null ? (t.r_mult == null ? null : Number(t.r_mult)) : Number(t.rMult);
+              return (
+                <div key={t.id || k} style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 4px", borderTop: k ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.82rem", flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 800, color: C.white, minWidth: 58 }}>{t.ticker}</span>
+                  <span style={{ fontSize: "0.66rem", fontWeight: 700, color: C.muted, minWidth: 42 }}>{t.tradeType || t.trade_type || "Long"}</span>
+                  <span style={{ fontWeight: 800, minWidth: 76, color: pl > 0 ? C.green : pl < 0 ? C.red : C.muted }}>{(pl >= 0 ? "+" : "-") + "$" + Math.abs(pl).toFixed(0)}</span>
+                  <span style={{ minWidth: 62, color: (pct || 0) >= 0 ? C.green : C.red }}>{pct != null && !isNaN(pct) ? `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%` : "—"}</span>
+                  <span style={{ minWidth: 52, color: C.muted }}>{r != null && !isNaN(r) ? `${r >= 0 ? "+" : ""}${r.toFixed(2)}R` : "—"}</span>
+                  {onOpenTrade && (
+                    <button onClick={() => onOpenTrade(t)} style={{ marginLeft: "auto", background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.7rem", padding: "6px 14px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Go to trade details ›</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -225,7 +264,7 @@ function Yearly({ daily, C, font, onPickMonth }) {
 }
 
 // ─── Public component: month/year toggle wrapper ───
-export default function TradeCalendar({ trades, C, font }) {
+export default function TradeCalendar({ trades, C, font, onOpenTrade }) {
   const daily = useDailyMap(trades);
   const keys = useMemo(() => [...new Set(Object.keys(daily).map(d => d.slice(0, 7)))].sort(), [daily]);
   const latest = keys.length ? keys[keys.length - 1] : nowYM();
@@ -243,7 +282,7 @@ export default function TradeCalendar({ trades, C, font }) {
         </div>
       </div>
       {mode === "month"
-        ? <Monthly daily={daily} C={C} font={font} ym={ym} setYm={setYm} />
+        ? <div style={{ overflowX: "auto" }}><div style={{ minWidth: 760 }}><Monthly daily={daily} C={C} font={font} ym={ym} setYm={setYm} onOpenTrade={onOpenTrade} /></div></div>
         : <Yearly daily={daily} C={C} font={font} onPickMonth={(k) => { setYm(k); setMode("month"); }} />}
     </div>
   );

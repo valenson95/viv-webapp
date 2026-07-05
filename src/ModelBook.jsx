@@ -73,6 +73,8 @@ const Stars = ({ C, n, max = 7, size = "0.95rem" }) => (
 // lost, uploads resolving against a dead instance). Do not move it back inside the page.
 function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload }) {
   const chipBtn = { fontSize: "0.72rem", fontWeight: 700, padding: "6px 14px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "rgba(255,255,255,0.03)" };
+  const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.84rem", padding: "9px 12px", outline: "none", width: "100%", colorScheme: "dark" };
+  const lbl = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" };
     const [row, setRow] = useState(() => {
       let prefill = {};
       try { prefill = JSON.parse(sessionStorage.getItem("viv-mb-prefill") || "{}"); sessionStorage.removeItem("viv-mb-prefill"); } catch {}
@@ -308,7 +310,6 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? "#08080e" : C.muted,
     background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
   });
-  const lbl = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" };
 
   return (
     <div style={{ fontFamily: font }}>

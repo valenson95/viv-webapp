@@ -30,11 +30,18 @@ const dnorm = (d) => {
   const t = new Date(s);
   return isNaN(t) ? "" : t.toISOString().slice(0, 10);
 };
-// nearest snapshot on or before the given date (fallback: earliest)
+// The first dated DeepVue snapshot — theme metrics only exist from here forward.
+export const THEME_COVERAGE_START = Object.keys(THEME_SNAPSHOTS).sort()[0] || null;
+
+// nearest snapshot on or before the given date.
+// Dates BEFORE the first snapshot return null (untagged) — a later theme must never
+// judge an older trade; themes rotate constantly. Backfilling older dated snapshots
+// into THEME_SNAPSHOTS automatically extends coverage backwards.
 export function snapshotFor(date) {
   const keys = Object.keys(THEME_SNAPSHOTS).sort();
   if (!keys.length) return null;
   const d = dnorm(date) || keys[keys.length - 1];
+  if (d < keys[0]) return null;
   let pick = keys[0];
   for (const k of keys) { if (k <= d) pick = k; else break; }
   return { date: pick, ...THEME_SNAPSHOTS[pick] };

@@ -6,7 +6,7 @@ import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import TradeCalendar from "./Calendar.jsx";
 import TradeReplayChart from "./TradeReplayChart.jsx";
 import { sectorFor, useSectors } from "./sectors.js";
-import { themeFit, themeRanks, consistentTop, top5, latestSnapshot } from "./themes.js";
+import { themeFit, themeRanks, consistentTop, top5, latestSnapshot, THEME_COVERAGE_START } from "./themes.js";
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
@@ -235,6 +235,8 @@ const WHATS_NEW = [
       "Setup Grader rule update: the ADR% criterion is now > 3.5% (was ≥ 4–5%) — slightly wider net, same principle: the stock must move enough to pay multiple R.",
       "Chart zoom upgrade: once zoomed, use your ← → arrow keys (or the on-screen arrows) to flip between the Before and After chart — Esc closes.",
       "Quality-of-life: ticker search in the Journal filter bar (type NVDA → every trade you've taken in it), denser tables (~25% more trades per screen), the Premium Tools tour collapses to a one-click pill after your first visit, and a smoother mobile layout.",
+      "P&L calendar is now clickable — tap any day to expand the trades exited that day (P&L, %, R), then 'Go to trade details' jumps straight into the full trade.",
+      "Honest theme metrics: in/off-theme tagging and the Objective Edge theme split only track from the first theme snapshot (28 Jun 2026) forward — a later theme is never used to judge an older trade. Earlier trades simply show untagged.",
       "Filter by book (VIV Official / My Book), by pattern (Trendline Breakout / Pullback Buy / Episodic Pivot / VCP) and by grade. New official entries are added on an ongoing basis — check back weekly.",
       "Also in this update: tickers outside our theme map now auto-detect their sector, plus accuracy fixes across metrics (break-even trades, risk %, hold times, calendar filtering).",
     ],
@@ -5771,6 +5773,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   {inT.n > 0 && <Row label="🟢 In-theme" s={inT} accent="var(--green)" />}
                   {offT.n > 0 && <Row label="🔴 Off-theme" s={offT} accent="var(--red)" />}
                   {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
+                  {THEME_COVERAGE_START && <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>🧭 Theme metrics track from <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the date of the first theme snapshot. Trades entered earlier aren't theme-tagged: themes rotate constantly, so a later snapshot can't honestly judge an older trade. Grade metrics cover all trades.</div>}
                 </div>
               </div>
             </div>
@@ -5780,7 +5783,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
         {/* PERFORMANCE CALENDAR (monthly + yearly, TradeZella-style) */}
         <div className="toolbar"><h2 className="sech">Performance calendar</h2></div>
         <div className="card reveal" style={{ padding: "18px 20px", marginBottom: 18 }}>
-          <TradeCalendar trades={filtered} C={C} font={font} /> {/* setup/tag filters apply (calendar has its own month nav for dates) */}
+          <TradeCalendar trades={filtered} C={C} font={font} onOpenTrade={(t) => { setPreviewTrade && setPreviewTrade(null); openReview(t); }} /> {/* setup/tag filters apply; click a day → its trades → full details */}
         </div>
 
         {/* EQUITY CURVE + RETURN DISTRIBUTION */}
