@@ -67,6 +67,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [detail, setDetail] = useState(null);
   const [editing, setEditing] = useState(null); // null | {} (new) | row (edit)
   const [busy, setBusy] = useState(false);
+  const [zoom, setZoom] = useState(null); // lightbox: full-screen chart URL
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -329,12 +330,12 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               {/* BEFORE | AFTER — always left/right, clearly compared */}
               <div style={{ display: "grid", gridTemplateColumns: window.innerWidth < 700 ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>◀ Before — the setup</div>
-                  {r.before_img ? <img src={r.before_img} alt="before" style={{ width: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}` }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>before chart pending</div>}
+                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>◀ Before — the setup <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
+                  {r.before_img ? <img src={r.before_img} alt="before" onClick={() => setZoom(r.before_img)} style={{ width: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>before chart pending</div>}
                 </div>
                 <div>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.green, marginBottom: 7 }}>After — the outcome ▶</div>
-                  {r.after_img ? <img src={r.after_img} alt="after" style={{ width: "100%", borderRadius: 12, border: "1px solid rgba(34,197,94,0.35)" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>after chart pending</div>}
+                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.green, marginBottom: 7 }}>After — the outcome ▶ <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
+                  {r.after_img ? <img src={r.after_img} alt="after" onClick={() => setZoom(r.after_img)} style={{ width: "100%", borderRadius: 12, border: "1px solid rgba(34,197,94,0.35)", cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>after chart pending</div>}
                 </div>
               </div>
               {/* Objective metric strip */}
@@ -385,6 +386,13 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           </div>
         );
       })()}
+      {/* LIGHTBOX — full-screen chart zoom */}
+      {zoom && (
+        <div onClick={() => setZoom(null)} style={{ position: "fixed", inset: 0, zIndex: 1500, background: "rgba(2,2,6,0.93)", display: "grid", placeItems: "center", cursor: "zoom-out", padding: 18 }}>
+          <img src={zoom} alt="chart zoom" style={{ maxWidth: "96vw", maxHeight: "94vh", borderRadius: 12, border: `1px solid ${C.borderGold}`, boxShadow: "0 30px 90px rgba(0,0,0,0.8)" }} />
+          <button onClick={() => setZoom(null)} aria-label="Close zoom" style={{ position: "fixed", top: 18, right: 20, background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 12, fontSize: "1.3rem", cursor: "pointer", lineHeight: 1 }}>&times;</button>
+        </div>
+      )}
     </div>
   );
 }

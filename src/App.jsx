@@ -11,7 +11,7 @@ import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
 import ModelBookPage from "./ModelBook.jsx";
-import { getGrade as getSavedGrade, useGrades as useSavedGrades } from "./grades.js";
+import { getGrade as getSavedGrade, useGrades as useSavedGrades, initGrades } from "./grades.js";
 import FeedbackWidget from "./Feedback.jsx";
 
 // ─── Error Boundary — catches rendering crashes so the page doesn't go blank ───
@@ -4181,6 +4181,24 @@ function CoachHero({ data }) {
 function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   useSectors((journaledTrades || []).map(t => t.ticker)); // theme fallback for tickers not in the curated map
+  // Freeze the symbol's CURRENT setup grade onto each closed trade once (grade_snapshot) —
+  // later re-grades of the same ticker then never rewrite this trade's history.
+  useEffect(() => {
+    if (!session?.user?.id || !journaledTrades?.length) return;
+    const toFreeze = journaledTrades.filter(t => t.exit && !t.gradeSnapshot && getSavedGrade(t.ticker)).slice(0, 25);
+    if (!toFreeze.length) return;
+    (async () => {
+      for (const t of toFreeze) {
+        const g = getSavedGrade(t.ticker);
+        const snap = { stars: g.stars, letter: g.letter, pct: g.pct, ticked: g.ticked || [], frozen_at: new Date().toISOString() };
+        try {
+          const { error } = await supabase.from("trades").update({ grade_snapshot: snap }).eq("id", t.id);
+          if (error) return; // column not added yet (setup-grades.sql not run) — retry next session
+          setJournaledTrades(prev => prev.map(x => x.id === t.id ? { ...x, gradeSnapshot: snap } : x));
+        } catch { return; }
+      }
+    })();
+  }, [journaledTrades.length, session?.user?.id]); // eslint-disable-line
   const [coachRead, setCoachRead] = useState(null);
   useEffect(() => {
     if (!isAdmin || !session?.user?.id) return;
@@ -5678,6 +5696,53 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             });
           })()}
         </div>
+
+        {/* OBJECTIVE EDGE — grade-vs-outcome + in/off-theme splits (the "does my process predict results" card) */}
+        {(() => {
+          const pop = dateFiltered.filter(t => t.exit);
+          if (!pop.length) return null;
+          const agg = (rows) => {
+            const n = rows.length;
+            const wins = rows.filter(t => (Number(t.plPct) || 0) > 0).length;
+            const rRows = rows.filter(t => t.rMult != null);
+            const avgR = rRows.length ? rRows.reduce((s, t) => s + Number(t.rMult), 0) / rRows.length : null;
+            return { n, winPct: n ? Math.round(100 * wins / n) : 0, avgR };
+          };
+          const letterOf = (t) => (t.gradeSnapshot && t.gradeSnapshot.letter) || (getSavedGrade(t.ticker) || {}).letter || null;
+          const byGrade = ["A+", "A", "B", "C"].map(L => ({ L, ...agg(pop.filter(t => letterOf(t) === L)) })).filter(g => g.n > 0);
+          const ungraded = agg(pop.filter(t => !letterOf(t)));
+          const fitOf = (t) => { const th = sectorFor(t.ticker); return th ? themeFit(th, t.entry) : null; };
+          const inT = agg(pop.filter(t => fitOf(t) === "in")), offT = agg(pop.filter(t => fitOf(t) === "off"));
+          const cell = (v, good) => <b style={{ color: v == null ? "var(--muted)" : good ? "var(--green)" : "var(--red)" }}>{v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2) + "R"}</b>;
+          const Row = ({ label, s, accent }) => (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 4px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "0.82rem" }}>
+              <span style={{ minWidth: 96, fontWeight: 800, color: accent || "var(--text)" }}>{label}</span>
+              <span style={{ color: "var(--muted)", minWidth: 66 }}>{s.n} trade{s.n !== 1 ? "s" : ""}</span>
+              <span style={{ minWidth: 84, color: s.winPct >= 50 ? "var(--green)" : "var(--red)", fontWeight: 700 }}>{s.winPct}% win</span>
+              {cell(s.avgR, (s.avgR || 0) >= 0)}
+            </div>
+          );
+          if (!byGrade.length && !inT.n && !offT.n) return null;
+          return (<>
+            <div className="toolbar" style={{ marginTop: 26 }}><h2 className="sech guide" onMouseEnter={guideEnter("objedge", "Objective edge", "This connects your process to your results: win rate and average R grouped by the setup grade you gave each trade, and by whether the trade was in-theme at entry. If A-plus setups outperform, your grading has real edge.", undefined)} onMouseLeave={guideLeave("objedge")}>Objective edge</h2></div>
+            <div className="card reveal" style={{ padding: "16px 20px", marginBottom: 18 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
+                <div>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By setup grade</div>
+                  {byGrade.map(g => <Row key={g.L} label={g.L + " setups"} s={g} accent={g.L === "A+" ? "var(--green)" : g.L === "A" ? "var(--goldBright)" : undefined} />)}
+                  {ungraded.n > 0 && <Row label="Ungraded" s={ungraded} accent="var(--muted)" />}
+                  {byGrade.length === 0 && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Grade setups in Premium Tools → Setup Grader; results correlate here automatically.</div>}
+                </div>
+                <div>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By theme fit (at entry)</div>
+                  {inT.n > 0 && <Row label="🟢 In-theme" s={inT} accent="var(--green)" />}
+                  {offT.n > 0 && <Row label="🔴 Off-theme" s={offT} accent="var(--red)" />}
+                  {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
+                </div>
+              </div>
+            </div>
+          </>);
+        })()}
 
         {/* PERFORMANCE CALENDAR (monthly + yearly, TradeZella-style) */}
         <div className="toolbar"><h2 className="sech">Performance calendar</h2></div>
@@ -9191,6 +9256,7 @@ const NAV = [
 function AppInner() {
   // Inject the global mobile-responsive stylesheet once on mount. Lives in <head> for the lifetime of
   // the app (no cleanup — removing it would just bounce the UI for nothing).
+  // (grade sync: initGrades(session) is wired further down, after session state exists)
   useEffect(() => {
     if (typeof document === "undefined") return;
     if (document.getElementById("viv-mobile-css")) return;
@@ -9208,6 +9274,8 @@ function AppInner() {
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
+  // Pull the member's setup grades from Supabase (cross-device) once logged in; localStorage stays the offline cache.
+  useEffect(() => { if (session?.user?.id) initGrades(session.user.id); }, [session?.user?.id]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Always land at the top when switching tabs (Dashboard / Journal / Tools / Settings). The mobile and
   // desktop shells scroll at the window level, so a fresh page must reset the scroll position.
@@ -9402,7 +9470,7 @@ function AppInner() {
       else if (ins) {
         res.tInserted = ins.length;
         ins.forEach(t => { if (t.ib_exec_id) journaledExecIds.add(t.ib_exec_id); audit.tradesInserted.push(t.id); });
-        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null }));
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
     }
@@ -9474,7 +9542,7 @@ function AppInner() {
       else if (ins) {
         res.partialsInserted = ins.length;
         ins.forEach(t => audit.tradesInserted.push(t.id));
-        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null }));
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
     }
@@ -9642,7 +9710,7 @@ function AppInner() {
       ]);
       if (softDelsRes.data) setSoftDeletedExecIds(new Set(softDelsRes.data.map(r => r.ib_exec_id).filter(Boolean)));
       if (tradesRes.data) {
-        setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null }))));
+        setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null }))));
       }
       if (posRes.data) {
         const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
@@ -9977,7 +10045,7 @@ function AppInner() {
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       console.log(`[load] trades fetched: ${(trades || []).length}`);
       if (trades && trades.length > 0) {
-        setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null }))));
+        setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null }))));
         lastLoadedTradeCount.current = trades.length;
       }
       // Soft-deleted IBKR exec ids — small parallel query, just the column we need. Used by the matcher
