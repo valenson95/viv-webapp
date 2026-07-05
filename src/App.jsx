@@ -10,7 +10,7 @@ import { themeFit, themeRanks, consistentTop, top5, latestSnapshot } from "./the
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
-import ModelBookPage from "./ModelBook.jsx";
+import ModelBookPage, { outcomeFromR } from "./ModelBook.jsx";
 import { getGrade as getSavedGrade, useGrades as useSavedGrades, initGrades } from "./grades.js";
 import FeedbackWidget from "./Feedback.jsx";
 
@@ -228,8 +228,10 @@ const WHATS_NEW = [
     items: [
       "New Model Book page (top nav): a curated library of elite real-world setups. Every entry shows the BEFORE chart (the setup), the objective factors that made it elite, then the AFTER chart (the outcome) — side by side.",
       "Each entry is graded on the 5-star Setup Grader scale, plus an Elite-factor layer: the rare confluences that turn a maxed 5★ into a 6★ or 7★ 'on a 5-star scale' trade.",
-      "Objective metrics on every entry — rally %, prior run-up, slope angle, days held, R multiple, and measurable characteristics (tight days, ADR, volume dry-up) — so you build pattern recognition from numbers, not vibes.",
-      "Filter by pattern (Breakout / EP / Pullback / U&R / HTF / Parabolic) and by grade. New entries are added on an ongoing basis — check back weekly.",
+      "Objective metrics on every entry — captured %, peak run-up, slope angle, days held, R multiple, and measurable characteristics (tight days, ADR, volume dry-up) — so you build pattern recognition from numbers, not vibes.",
+      "Outcome tags are objective too: Huge Winner ≥5R · Winner 2–5R · Subpar under 2R · Loser. Days held runs entry → first daily close below the 9-EMA (the trail exit) — partial trims at 3–5R don't end the campaign.",
+      "Gold-dot fields were auto-read off the chart for you (dates, %, slope, R) — cross-check and edit anything that looks off; editing clears the dot.",
+      "Filter by pattern (Trendline Breakout / Pullback Buy / Episodic Pivot / VCP) and by grade. New entries are added on an ongoing basis — check back weekly.",
       "Also in this update: tickers outside our theme map now auto-detect their sector, plus accuracy fixes across metrics (break-even trades, risk %, hold times, calendar filtering).",
     ],
   },
@@ -6170,13 +6172,16 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   <div className="spacer"></div>
                   <button className="revbtn" title="Pre-fill a Model Book entry from this trade" onClick={() => {
                     const g = getSavedGrade(t.ticker);
-                    try { sessionStorage.setItem("viv-mb-prefill", JSON.stringify({
+                    try { const pf = {
                       ticker: t.ticker, entry_date: tradeDateISO(t.entry) || "", exit_date: tradeDateISO(t.exit) || "",
                       run_pct: t.plPct != null ? +Number(t.plPct).toFixed(1) : "", r_mult: t.rMult != null ? +Number(t.rMult).toFixed(2) : "",
                       days_held: (() => { const a = new Date(tradeDateISO(t.entry) || t.entry), b = new Date(tradeDateISO(t.exit) || t.exit); return (isNaN(a) || isNaN(b)) ? "" : Math.max(0, Math.round((b - a) / 86400000)); })(),
                       theme: sectorFor(t.ticker) || "", ticked: (g && g.ticked) || [],
-                      outcome: (Number(t.rMult) || 0) >= 3 ? "Huge Winner" : (Number(t.plPct) || 0) > 0 ? "Winner" : (Number(t.rMult) || 0) <= -1 ? "Loser" : "Subpar",
-                    })); } catch {}
+                      outcome: outcomeFromR(t.rMult, t.plPct) || "",
+                    };
+                    // gold-dot every field we pre-filled (ticked comes from HIS saved grader = human, no dot)
+                    pf.metrics = { _auto: ["ticker", "entry_date", "exit_date", "run_pct", "r_mult", "days_held", "theme", "outcome"].filter(k => pf[k] !== "" && pf[k] != null) };
+                    sessionStorage.setItem("viv-mb-prefill", JSON.stringify(pf)); } catch {}
                     closeReview(); setPage && setPage("modelbook");
                   }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)", fontWeight: 700 }}>📖 Add to Model Book</button>
                   <button className="revbtn" onClick={() => startEdit(t)} style={{ background: "var(--goldDim)", color: "var(--goldBright)", borderColor: "var(--borderGold)", fontWeight: 700 }}>Edit trade</button>
@@ -7942,10 +7947,12 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                             <button className={"btn mgsell" + (sellOpen ? " open" : "")} onClick={() => sellOpen ? setSellOpen(false) : openSell(p)}>Sell / Close position</button>
                             <button className="btn" title="Pre-fill a Model Book entry from this open position" onClick={() => {
                               const g = getSavedGrade(p.sym);
-                              try { sessionStorage.setItem("viv-mb-prefill", JSON.stringify({
+                              try { const pf = {
                                 ticker: p.sym, entry_date: tradeDateISO(p.entry) || "", theme: sectorFor(p.sym) || "",
                                 ticked: (g && g.ticked) || [],
-                              })); } catch {}
+                              };
+                              pf.metrics = { _auto: ["ticker", "entry_date", "theme"].filter(k => pf[k] !== "" && pf[k] != null) };
+                              sessionStorage.setItem("viv-mb-prefill", JSON.stringify(pf)); } catch {}
                               setPage && setPage("modelbook");
                             }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)" }}>📖 Add to Model Book</button>
                             <span className="mgfoot-hint">Logs a closed trade to your journal and reduces (or closes) this position.</span>

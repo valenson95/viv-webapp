@@ -49,6 +49,17 @@ export function effectiveStars(stars, eliteCount) {
   return { n: Math.max(0, Math.min(5, stars)), label: `${Math.max(0, Math.min(5, stars))}★` };
 }
 
+// ── Outcome — auto-classified so the tag is consistent (no vibes). R first, captured-% fallback.
+//    Huge Winner ≥5R · Winner 2–5R · Subpar −0.5R…2R (didn't pay for the risk taken) · Loser ≤−0.5R.
+//    Study charts with no R: managed-capture % ≥30 → Huge, ≥10 → Winner, ≥0 → Subpar, <0 → Loser.
+export function outcomeFromR(rMult, runPct) {
+  const r = rMult === "" || rMult == null ? null : +rMult;
+  if (r != null && !Number.isNaN(r)) return r >= 5 ? "Huge Winner" : r >= 2 ? "Winner" : r > -0.5 ? "Subpar" : "Loser";
+  const p = runPct === "" || runPct == null ? null : +runPct;
+  if (p != null && !Number.isNaN(p)) return p >= 30 ? "Huge Winner" : p >= 10 ? "Winner" : p >= 0 ? "Subpar" : "Loser";
+  return null;
+}
+
 const Stars = ({ C, n, max = 7, size = "0.95rem" }) => (
   <span style={{ letterSpacing: 1.5, fontSize: size, whiteSpace: "nowrap" }}>
     {Array.from({ length: max }, (_, k) => (
@@ -105,10 +116,11 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     const body = {
       created_by: uid, ticker: (row.ticker || "").toUpperCase().trim(), pattern: row.pattern || "Trendline Breakout",
       stars: starsFromTicked(row.ticked).stars, // objective — derived from the grader ticks, never hand-set
-      outcome: row.outcome || null,
+      outcome: row.outcome || outcomeFromR(row.r_mult, row.run_pct) || null, // blank → auto-classified from R
       theme: row.theme || null, entry_date: row.entry_date || null, exit_date: row.exit_date || null,
       before_img: row.before_img || null, after_img: row.after_img || null,
       elite: row.elite || [], ticked: row.ticked || [],
+      metrics: row.metrics || {}, // chart-extracted deep data + the _auto (gold-dot) key list — must survive edits
       run_pct: row.run_pct === "" || row.run_pct == null ? null : +row.run_pct,
       run_up_pct: row.run_up_pct === "" || row.run_up_pct == null ? null : +row.run_up_pct,
       angle: row.angle === "" || row.angle == null ? null : +row.angle,
@@ -147,14 +159,21 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       return {
         ticker: "", pattern: "Trendline Breakout", theme: "", entry_date: "", exit_date: "", before_img: "", after_img: "",
         elite: [], ticked: [], outcome: "", run_pct: "", run_up_pct: "", angle: "", characteristics: [],
-        days_held: "", r_mult: "", thesis: "", lesson: "", is_published: false,
+        days_held: "", r_mult: "", thesis: "", lesson: "", is_published: false, metrics: {},
         ...prefill, ...(initial || {}),
       };
     });
     const graded = starsFromTicked(row.ticked); // OBJECTIVE — same 16 ticks + formula as the Setup Grader
     const eff = effectiveStars(graded.stars, (row.elite || []).length);
-    const toggleElite = (k) => setRow(r => ({ ...r, elite: r.elite.includes(k) ? r.elite.filter(x => x !== k) : [...r.elite, k] }));
-    const toggleTick = (key) => setRow(r => ({ ...r, ticked: r.ticked.includes(key) ? r.ticked.filter(x => x !== key) : [...r.ticked, key] }));
+    // AUTO-FILL layer — metrics._auto lists every field/tick VIV pre-filled from the chart (shown as a
+    // gold dot). A human edit on that field clears its dot: the value becomes Valen-confirmed.
+    const auto = new Set((row.metrics && row.metrics._auto) || []);
+    const clearAuto = (r, key) => { const m = r.metrics || {}; return { ...m, _auto: (m._auto || []).filter(x => x !== key) }; };
+    const setField = (key, val) => setRow(r => ({ ...r, [key]: val, metrics: clearAuto(r, key) }));
+    const AutoDot = ({ k }) => auto.has(k) ? <span title="Auto-filled from your chart by VIV — edit to correct (the dot clears)" style={{ display: "inline-block", width: 7, height: 7, borderRadius: 99, background: C.goldBright, boxShadow: "0 0 7px rgba(240,192,80,0.85)", marginLeft: 6, verticalAlign: "middle", flexShrink: 0 }} /> : null;
+    const toggleElite = (k) => setRow(r => ({ ...r, elite: r.elite.includes(k) ? r.elite.filter(x => x !== k) : [...r.elite, k], metrics: clearAuto(r, "elite:" + k) }));
+    const toggleTick = (key) => setRow(r => ({ ...r, ticked: r.ticked.includes(key) ? r.ticked.filter(x => x !== key) : [...r.ticked, key], metrics: clearAuto(r, "tick:" + key) }));
+    const suggestedOutcome = outcomeFromR(row.r_mult, row.run_pct);
     const pullGrade = () => {
       const g = getGrade(row.ticker);
       if (g && g.ticked) setRow(r => ({ ...r, ticked: g.ticked }));
@@ -166,20 +185,26 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           <div style={{ marginLeft: "auto" }}><Stars C={C} n={eff.n} /></div>
           <span style={{ fontSize: "0.78rem", fontWeight: 800, color: eff.n >= 6 ? "#7ef0a0" : C.goldBright }}>{eff.label}</span>
         </div>
+        {auto.size > 0 && (
+          <div style={{ fontSize: "0.72rem", fontWeight: 600, color: C.goldBright, marginBottom: 12 }}>
+            <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 99, background: C.goldBright, boxShadow: "0 0 7px rgba(240,192,80,0.85)", marginRight: 7, verticalAlign: "middle" }} />
+            gold dot = auto-filled from your chart — cross-check and edit anything that's off (editing clears the dot)
+          </div>
+        )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
-          <div><span style={lbl}>Ticker</span><input style={inputS} value={row.ticker} onChange={e => setRow(r => ({ ...r, ticker: e.target.value.toUpperCase() }))} placeholder="NVDA" /></div>
-          <div><span style={lbl}>Pattern</span><select style={{ ...inputS, cursor: "pointer" }} value={row.pattern} onChange={e => setRow(r => ({ ...r, pattern: e.target.value }))}>{PATTERNS.map(p => <option key={p}>{p}</option>)}</select></div>
-          <div><span style={lbl}>Theme</span><input style={inputS} value={row.theme || ""} onChange={e => setRow(r => ({ ...r, theme: e.target.value }))} placeholder="Semiconductors" /></div>
-          <div><span style={lbl}>Entry date</span><input type="date" style={inputS} value={row.entry_date || ""} onChange={e => setRow(r => ({ ...r, entry_date: e.target.value }))} /></div>
-          <div><span style={lbl}>Exit date</span><input type="date" style={inputS} value={row.exit_date || ""} onChange={e => setRow(r => ({ ...r, exit_date: e.target.value }))} /></div>
+          <div><span style={lbl}>Ticker<AutoDot k="ticker" /></span><input style={inputS} value={row.ticker} onChange={e => setField("ticker", e.target.value.toUpperCase())} placeholder="NVDA" /></div>
+          <div><span style={lbl}>Pattern<AutoDot k="pattern" /></span><select style={{ ...inputS, cursor: "pointer" }} value={row.pattern} onChange={e => setField("pattern", e.target.value)}>{PATTERNS.map(p => <option key={p}>{p}</option>)}</select></div>
+          <div><span style={lbl}>Theme<AutoDot k="theme" /></span><input style={inputS} value={row.theme || ""} onChange={e => setField("theme", e.target.value)} placeholder="Semiconductors" /></div>
+          <div><span style={lbl}>Entry date<AutoDot k="entry_date" /></span><input type="date" style={inputS} value={row.entry_date || ""} onChange={e => setField("entry_date", e.target.value)} /></div>
+          <div><span style={lbl}>Exit date<AutoDot k="exit_date" /></span><input type="date" style={inputS} value={row.exit_date || ""} onChange={e => setField("exit_date", e.target.value)} /></div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
-          <div><span style={lbl}>Rally % (result)</span><input style={inputS} value={row.run_pct ?? ""} onChange={e => setRow(r => ({ ...r, run_pct: e.target.value }))} placeholder="+38" /></div>
-          <div><span style={lbl}>Run-up % (the pole)</span><input style={inputS} value={row.run_up_pct ?? ""} onChange={e => setRow(r => ({ ...r, run_up_pct: e.target.value }))} placeholder="+31" /></div>
-          <div><span style={lbl}>Slope ° (info-line)</span><input style={inputS} value={row.angle ?? ""} onChange={e => setRow(r => ({ ...r, angle: e.target.value }))} placeholder="62.5" /></div>
-          <div><span style={lbl}>Days held</span><input style={inputS} value={row.days_held ?? ""} onChange={e => setRow(r => ({ ...r, days_held: e.target.value }))} placeholder="12" /></div>
-          <div><span style={lbl}>R multiple</span><input style={inputS} value={row.r_mult ?? ""} onChange={e => setRow(r => ({ ...r, r_mult: e.target.value }))} placeholder="8.5" /></div>
-          <div><span style={lbl}>Outcome</span><select style={{ ...inputS, cursor: "pointer" }} value={row.outcome || ""} onChange={e => setRow(r => ({ ...r, outcome: e.target.value }))}><option value="">—</option>{OUTCOMES.map(o => <option key={o}>{o}</option>)}</select></div>
+          <div title="What the VIV management model captures: 50% trimmed at 3–5R, rest trailed to the EMA9-close exit (blended)."><span style={lbl}>Captured %<AutoDot k="run_pct" /></span><input style={inputS} value={row.run_pct ?? ""} onChange={e => setField("run_pct", e.target.value)} placeholder="+38" /></div>
+          <div title="Max run-up of the move (peak of the pole) — the ceiling, not what management banks."><span style={lbl}>Run-up % (peak)<AutoDot k="run_up_pct" /></span><input style={inputS} value={row.run_up_pct ?? ""} onChange={e => setField("run_up_pct", e.target.value)} placeholder="+90" /></div>
+          <div><span style={lbl}>Slope ° (info-line)<AutoDot k="angle" /></span><input style={inputS} value={row.angle ?? ""} onChange={e => setField("angle", e.target.value)} placeholder="62.5" /></div>
+          <div title="Campaign length: entry → first DAILY close below the 9-EMA (the trail exit). The 3–5R trim does NOT end the trade."><span style={lbl}>Days held → EMA9 close<AutoDot k="days_held" /></span><input style={inputS} value={row.days_held ?? ""} onChange={e => setField("days_held", e.target.value)} placeholder="12" /></div>
+          <div><span style={lbl}>R multiple<AutoDot k="r_mult" /></span><input style={inputS} value={row.r_mult ?? ""} onChange={e => setField("r_mult", e.target.value)} placeholder="8.5" /></div>
+          <div title="Objective tags — auto from R when blank: ≥5R Huge Winner · 2–5R Winner · −0.5R…2R Subpar · ≤−0.5R Loser (no-R studies use captured %: ≥30 / ≥10 / ≥0 / <0)."><span style={lbl}>Outcome<AutoDot k="outcome" /></span><select style={{ ...inputS, cursor: "pointer" }} value={row.outcome || ""} onChange={e => setField("outcome", e.target.value)}><option value="">{suggestedOutcome ? `— auto: ${suggestedOutcome}` : "—"}</option>{OUTCOMES.map(o => <option key={o}>{o}</option>)}</select></div>
         </div>
 
         {/* SETUP GRADER CHECKLIST — the stars are COMPUTED from these ticks (objective, no bias) */}
@@ -197,7 +222,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 return (
                   <div key={ii} onClick={() => toggleTick(key)} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 2px", cursor: "pointer" }}>
                     <span style={{ color: on ? C.goldBright : "rgba(255,255,255,0.22)", fontWeight: 800, lineHeight: 1.3 }}>{on ? "✓" : "○"}</span>
-                    <span style={{ fontSize: "0.76rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 }}>{it.c}{it.star && <span style={{ fontSize: "0.56rem", color: C.goldMid, marginLeft: 5 }}>★ maker</span>}</span>
+                    <span style={{ fontSize: "0.76rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 }}>{it.c}{it.star && <span style={{ fontSize: "0.56rem", color: C.goldMid, marginLeft: 5 }}>★ maker</span>}<AutoDot k={"tick:" + key} /></span>
                   </div>
                 );
               })}
@@ -205,9 +230,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           ))}
         </div>
         <div style={{ marginBottom: 14 }}>
-          <span style={lbl}>Objective characteristics (comma-separated — measurable traits only)</span>
+          <span style={lbl}>Objective characteristics (comma-separated — measurable traits only)<AutoDot k="characteristics" /></span>
           <input style={inputS} value={Array.isArray(row.characteristics) ? row.characteristics.join(", ") : (row.characteristics || "")}
-            onChange={e => setRow(r => ({ ...r, characteristics: e.target.value }))}
+            onChange={e => setField("characteristics", e.target.value)}
             placeholder="3 tight days, ADR 6.1%, vol dry-up −60%, EMA9>21>50, RS 96" />
         </div>
         <span style={lbl}>Elite factors — the 6★/7★ layer (tick what was TRUE at entry)</span>
@@ -217,7 +242,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
             return (
               <div key={f.k} onClick={() => toggleElite(f.k)} style={{ display: "flex", gap: 10, padding: "8px 11px", borderRadius: 10, cursor: "pointer", background: on ? "rgba(126,240,160,0.07)" : "rgba(255,255,255,0.02)", border: `1px solid ${on ? "rgba(126,240,160,0.35)" : C.border}` }}>
                 <span style={{ color: on ? "#7ef0a0" : "rgba(255,255,255,0.25)", fontWeight: 800 }}>{on ? "✓" : "○"}</span>
-                <div><div style={{ fontSize: "0.8rem", fontWeight: 700, color: on ? "#7ef0a0" : C.text }}>{f.c}</div><div style={{ fontSize: "0.7rem", color: C.muted }}>{f.s}</div></div>
+                <div><div style={{ fontSize: "0.8rem", fontWeight: 700, color: on ? "#7ef0a0" : C.text }}>{f.c}<AutoDot k={"elite:" + f.k} /></div><div style={{ fontSize: "0.7rem", color: C.muted }}>{f.s}</div></div>
               </div>
             );
           })}
@@ -235,8 +260,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-          <div><span style={lbl}>The thesis (why it was A+ BEFORE the move)</span><textarea rows={3} style={{ ...inputS, resize: "vertical" }} value={row.thesis || ""} onChange={e => setRow(r => ({ ...r, thesis: e.target.value }))} /></div>
-          <div><span style={lbl}>The lesson (what to internalize)</span><textarea rows={3} style={{ ...inputS, resize: "vertical" }} value={row.lesson || ""} onChange={e => setRow(r => ({ ...r, lesson: e.target.value }))} /></div>
+          <div><span style={lbl}>The thesis (why it was A+ BEFORE the move)<AutoDot k="thesis" /></span><textarea rows={3} style={{ ...inputS, resize: "vertical" }} value={row.thesis || ""} onChange={e => setField("thesis", e.target.value)} /></div>
+          <div><span style={lbl}>The lesson (what to internalize)<AutoDot k="lesson" /></span><textarea rows={3} style={{ ...inputS, resize: "vertical" }} value={row.lesson || ""} onChange={e => setField("lesson", e.target.value)} /></div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button disabled={busy || !row.ticker} onClick={() => save(row)} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.82rem", padding: "11px 24px", borderRadius: 99, cursor: "pointer", opacity: busy || !row.ticker ? 0.6 : 1 }}>{busy ? "Saving…" : row.id ? "Save changes" : "Add entry"}</button>
@@ -258,7 +283,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {/* header */}
       <div className="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h2 className={"sech guide" + (gactive ? gactive("modelbook") : "")}
-          onMouseEnter={guideEnter ? guideEnter("modelbook", "Model Book", "A curated library of the best real setups — study the before chart, the exact factors that made it elite, then the outcome. Pattern recognition is built by reps: same patterns, hundreds of examples.", undefined) : undefined}
+          onMouseEnter={guideEnter ? guideEnter("modelbook", "Model Book", "A curated library of the best real setups — study the before chart, the exact factors that made it elite, then the outcome. Stars are computed from the Setup Grader ticks (objective, no bias). Fields marked with a gold dot were auto-read off the chart by VIV — edit any that look off. Pattern recognition is built by reps: same patterns, hundreds of examples.", undefined) : undefined}
           onMouseLeave={guideLeave ? guideLeave("modelbook") : undefined}>Model Book</h2>
         <span style={{ fontSize: "0.74rem", color: C.muted }}>study the best — before → factors → after</span>
         {!editing && <button onClick={() => setEditing({})} style={{ marginLeft: "auto", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer" }}>+ Add entry</button>}
@@ -338,21 +363,33 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                   {r.after_img ? <img src={r.after_img} alt="after" onClick={() => setZoom(r.after_img)} style={{ width: "100%", borderRadius: 12, border: "1px solid rgba(34,197,94,0.35)", cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>after chart pending</div>}
                 </div>
               </div>
-              {/* Objective metric strip */}
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                {[["Rally", r.run_pct != null ? `${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : null, C.green],
-                  ["Run-up (pole)", r.run_up_pct != null ? `+${r.run_up_pct}%` : null, C.goldBright],
-                  ["Slope", r.angle != null ? `${r.angle}°` : null, C.goldBright],
-                  ["Held", r.days_held != null ? `${r.days_held}d` : null, C.text],
-                  ["R", r.r_mult != null ? `${r.r_mult}R` : null, C.green]]
-                  .filter(([, v]) => v != null)
-                  .map(([k, v, col]) => (
-                    <span key={k} style={{ display: "inline-flex", gap: 7, alignItems: "baseline", padding: "6px 13px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}` }}>
-                      <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>{k}</span>
-                      <span style={{ fontSize: "0.9rem", fontWeight: 800, color: col }}>{v}</span>
-                    </span>
-                  ))}
-              </div>
+              {/* Objective metric strip — gold dot = auto-read off the chart by VIV */}
+              {(() => {
+                const dAuto = new Set((r.metrics && r.metrics._auto) || []);
+                const strip = [["Captured", "run_pct", r.run_pct != null ? `${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : null, C.green, "What the management model banks: 50% at 3–5R + EMA9 trail"],
+                  ["Run-up (peak)", "run_up_pct", r.run_up_pct != null ? `+${r.run_up_pct}%` : null, C.goldBright, "Max run-up of the move"],
+                  ["Slope", "angle", r.angle != null ? `${r.angle}°` : null, C.goldBright, "Advance angle off the info-line"],
+                  ["Held", "days_held", r.days_held != null ? `${r.days_held}d` : null, C.text, "Entry → first daily close below EMA9 (the trail exit)"],
+                  ["R", "r_mult", r.r_mult != null ? `${r.r_mult}R` : null, C.green, "Reward vs the initial stop"]].filter(([, , v]) => v != null);
+                return (
+                  <>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: dAuto.size ? 7 : 14 }}>
+                      {strip.map(([k, fk, v, col, tip]) => (
+                        <span key={k} title={tip} style={{ display: "inline-flex", gap: 7, alignItems: "baseline", padding: "6px 13px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}` }}>
+                          <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>{k}</span>
+                          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: col }}>{v}</span>
+                          {dAuto.has(fk) && <span title="Auto-read from the chart by VIV" style={{ width: 6, height: 6, borderRadius: 99, background: C.goldBright, boxShadow: "0 0 6px rgba(240,192,80,0.85)", alignSelf: "center" }} />}
+                        </span>
+                      ))}
+                    </div>
+                    {dAuto.size > 0 && (
+                      <div style={{ fontSize: "0.66rem", color: C.muted, marginBottom: 14 }}>
+                        <span style={{ color: C.goldBright }}>●</span> auto-read from the chart by VIV — spot an error? hit Edit and correct it (the dot clears)
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               {(r.characteristics || []).length > 0 && (
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>Objective characteristics</div>
@@ -363,7 +400,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               )}
               {(r.elite || []).length > 0 && (
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7ef0a0", marginBottom: 8 }}>Elite factors present ({(r.elite || []).length}/10)</div>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7ef0a0", marginBottom: 8 }}>Elite factors present ({(r.elite || []).length}/{ELITE.length})</div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 6 }}>
                     {ELITE.filter(f => (r.elite || []).includes(f.k)).map(f => (
                       <div key={f.k} style={{ display: "flex", gap: 9, padding: "8px 11px", borderRadius: 10, background: "rgba(126,240,160,0.06)", border: "1px solid rgba(126,240,160,0.25)" }}>
