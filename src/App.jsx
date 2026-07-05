@@ -232,6 +232,7 @@ const WHATS_NEW = [
       "Outcome tags are objective too: Huge Winner ≥5R · Winner 2–5R · Subpar under 2R · Loser. Days held runs entry → first daily close below the 9-EMA (the trail exit) — partial trims at 3–5R don't end the campaign.",
       "Gold-dot fields were auto-read off the chart for you (dates, %, slope, R) — cross-check and edit anything that looks off; editing clears the dot.",
       "Two books in one: the ⭐ VIV Official library (curated, read-only) and 🔒 My Book — add your own entries; they're private and only you can see them.",
+      "Setup Grader rule update: the ADR% criterion is now > 3.5% (was ≥ 4–5%) — slightly wider net, same principle: the stock must move enough to pay multiple R.",
       "Filter by book (VIV Official / My Book), by pattern (Trendline Breakout / Pullback Buy / Episodic Pivot / VCP) and by grade. New official entries are added on an ongoing basis — check back weekly.",
       "Also in this update: tickers outside our theme map now auto-detect their sector, plus accuracy fixes across metrics (break-even trades, risk %, hold times, calendar filtering).",
     ],

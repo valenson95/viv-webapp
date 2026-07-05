@@ -14,8 +14,8 @@ export const SECTIONS = [
     items: [
       { c: "Relative strength — top-tier", star: true,
         s: "The stock is beating the market. Confirm it with an IBD RS Score (90+ is strong) or its price % change vs SPY/QQQ over 1/3/6 months — and its moving averages are rising faster (steeper) than the index's. Leaders go up more, and fall less, than the market." },
-      { c: "ADR% ≥ 4–5%",
-        s: "Average Daily Range of at least 4–5% — the stock moves enough each day that a few good days deliver multiple R." },
+      { c: "ADR% > 3.5%",
+        s: "Average Daily Range above 3.5% — the stock moves enough each day that a few good days deliver multiple R." },
       { c: "In-theme leader", star: true,
         s: "It sits in a sector or group that's currently leading the market — money is actively rotating into its theme, not out of it." },
       { c: "Liquid enough — ≥ $50M / 20 days",
