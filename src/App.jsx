@@ -236,6 +236,9 @@ const WHATS_NEW = [
       "Chart zoom upgrade: once zoomed, use your ← → arrow keys (or the on-screen arrows) to flip between the Before and After chart — Esc closes.",
       "Quality-of-life: ticker search in the Journal filter bar (type NVDA → every trade you've taken in it), denser tables (~25% more trades per screen), the Premium Tools tour collapses to a one-click pill after your first visit, and a smoother mobile layout.",
       "P&L calendar is now clickable — tap any day to expand the trades exited that day (P&L, %, R), then 'Go to trade details' jumps straight into the full trade.",
+      "Trade details, redesigned: stats panel on the left (Net P&L, ROI, Gross P&L, adjusted cost, MAE/MFE from real market data, best exit price & time) beside the chart, with Chart/Notes tabs on the right.",
+      "Plan your trades like a pro: set a Profit Target and Stop Loss price on any trade — Trade Risk, Planned R-Multiple and Realized R compute instantly. Planning inputs never touch your original stop.",
+      "Model Book: paste chart screenshots straight from your clipboard (⌘V / Ctrl+V) — first paste fills the Before chart, second fills After.",
       "Honest theme metrics: in/off-theme tagging and the Objective Edge theme split only track from the first theme snapshot (28 Jun 2026) forward — a later theme is never used to judge an older trade. Earlier trades simply show untagged.",
       "Filter by book (VIV Official / My Book), by pattern (Trendline Breakout / Pullback Buy / Episodic Pivot / VCP) and by grade. New official entries are added on an ongoing basis — check back weekly.",
       "Also in this update: tickers outside our theme map now auto-detect their sector, plus accuracy fixes across metrics (break-even trades, risk %, hold times, calendar filtering).",
@@ -3817,7 +3820,24 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .td-top .revtick{font-size:1.4rem; font-weight:800; color:var(--white)}
 .vj .td-grade{font-size:0.78rem; font-weight:800; padding:4px 10px; border:1px solid var(--border); border-radius:99px}
 .vj .td-top .spacer{flex:1}
-.vj .td-body .revgrid{margin-bottom:18px}`;
+.vj .td-body .revgrid{margin-bottom:18px}
+/* ── TradeZella-style trade-details layout: left stats panel · right chart/notes ── */
+.vj .tdz{display:grid; grid-template-columns:340px minmax(0,1fr); gap:18px; align-items:start; margin-bottom:18px}
+.vj .tdz-left{background:var(--glass); border:1px solid var(--border); border-radius:16px; padding:14px 18px 10px; position:sticky; top:14px; max-height:calc(100vh - 96px); overflow-y:auto}
+.vj .tz-npl{display:flex; flex-direction:column; gap:2px; padding:4px 0 10px 12px; border-left:3px solid var(--green); margin-bottom:6px}
+.vj .tz-npl span{font-size:0.66rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted)}
+.vj .tz-npl b{font-size:1.5rem; font-weight:800; letter-spacing:-0.02em}
+.vj .tz-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.8rem}
+.vj .tz-row:last-child{border-bottom:none}
+.vj .tz-row>span{color:var(--muted); font-weight:600}
+.vj .tz-row>b{font-weight:700; color:var(--text); text-align:right}
+.vj .tz-sect{font-size:0.6rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); margin:12px 0 2px}
+.vj .tz-in{width:120px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--white); padding:6px 10px; font-family:var(--font); font-size:0.8rem; font-weight:700; outline:none; text-align:right; color-scheme:dark}
+.vj .tz-in:focus{border-color:var(--borderGold)}
+.vj .tdz-tabs{display:flex; gap:6px; margin-bottom:12px}
+.vj .tdz-tab{background:rgba(255,255,255,0.03); border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-weight:700; font-size:0.76rem; padding:8px 20px; border-radius:99px; cursor:pointer; transition:all .14s}
+.vj .tdz-tab.on{background:linear-gradient(135deg,var(--goldBright),var(--goldMid)); color:#08080e; border-color:transparent}
+@media (max-width: 960px){ .vj .tdz{grid-template-columns:1fr} .vj .tdz-left{position:static; max-height:none} }`;
 
 // Admin-only AI deep-review block — renders the ai_review JSON Claude writes to Supabase
 // (score · process dimensions · narrative/regime/SL · the read). Members never see this.
@@ -4205,6 +4225,55 @@ function CoachHero({ data }) {
   );
 }
 
+// ── Trade planning targets (TradeZella-style Profit Target / Stop Loss inputs) ──
+// localStorage first; best-effort write-through to trades.profit_target / planned_stop
+// (optional columns — supabase/trade-targets.sql). NEVER touches the LOCKED stop_price.
+const TGT_KEY = "viv-trade-targets-v1";
+function loadTargets() { try { return JSON.parse(localStorage.getItem(TGT_KEY) || "{}"); } catch { return {}; } }
+function persistTarget(tradeId, patch) {
+  const all = loadTargets(); all[tradeId] = { ...(all[tradeId] || {}), ...patch };
+  try { localStorage.setItem(TGT_KEY, JSON.stringify(all)); } catch {}
+  try { supabase.from("trades").update({ profit_target: all[tradeId].target ?? null, planned_stop: all[tradeId].stop ?? null }).eq("id", tradeId).then(() => {}); } catch {} // columns optional
+  return all;
+}
+
+// ── Price MAE / MFE + Best Exit off REAL candles (Polygon via /api/candles) ──
+// Intraday round-trips use 5-minute bars; multi-day uses daily session bars.
+function useTradeExcursion(t) {
+  const [x, setX] = useState(null);
+  useEffect(() => {
+    setX(null);
+    if (!t || !t.ticker) return;
+    let dead = false;
+    const eISO = tradeDateISO(t.entry), xISO = tradeDateISO(t.exit) || eISO;
+    if (!eISO) { setX({ na: true }); return; }
+    const res = eISO === xISO ? "5min" : "1day";
+    fetch(`/api/candles?symbol=${encodeURIComponent(t.ticker)}&from=${eISO}&to=${xISO}&res=${res}`)
+      .then(r => r.json())
+      .then(j => {
+        if (dead) return;
+        const bars = j.candles || [];
+        if (!bars.length) { setX({ na: true }); return; }
+        const isLong = (t.tradeType || "Long") !== "Short";
+        let mae = null, mfe = null, bestT = null;
+        for (const b of bars) {
+          const adverse = isLong ? b.low : b.high, favorable = isLong ? b.high : b.low;
+          if (mae == null || (isLong ? adverse < mae : adverse > mae)) mae = adverse;
+          if (mfe == null || (isLong ? favorable > mfe : favorable < mfe)) { mfe = favorable; bestT = b.time; }
+        }
+        setX({ mae, mfe, bestT, res });
+      })
+      .catch(() => { if (!dead) setX({ na: true }); });
+    return () => { dead = true; };
+  }, [t && t.id]); // eslint-disable-line
+  return x;
+}
+const excTime = (bt, res) => {
+  if (bt == null) return "—";
+  if (typeof bt === "number") { const d = new Date(bt * 1000); return d.toLocaleString("en-US", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }); }
+  return String(bt);
+};
+
 function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   useSectors((journaledTrades || []).map(t => t.ticker)); // theme fallback for tickers not in the curated map
@@ -4247,6 +4316,10 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const [deletedTradeIds, setDeletedTradeIds] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [expandedTrade, setExpandedTrade] = useState(null); // full-page trade details overlay
+  const [tdTab, setTdTab] = useState("chart"); // trade-details right pane: chart | notes
+  const [tgts, setTgts] = useState(loadTargets); // TradeZella-style planning targets per trade id
+  const tdTradeObj = expandedTrade ? (journaledTrades || []).find(x => x.id === expandedTrade) : null;
+  const excursion = useTradeExcursion(tdTradeObj); // MAE/MFE/Best-Exit off real candles
   const [previewTrade, setPreviewTrade] = useState(null); // TradeZella-style slide-in overview preview
   const [highlightTradeId, setHighlightTradeId] = useState(null); // gold flash on a trade row jumped-to from VIV Analytics
   const [tradeSorts, setTradeSorts] = useState([]); // [{key, dir}] multi-sort for trades
@@ -4853,6 +4926,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     setReviewDraft({ right: n.right || "", wrong: n.wrong || "", lessons: n.lessons || n._plain || "" });
     setReviewSavedId(null);
     setDeleteStep(0);
+    setTdTab("chart");
     setClosingReview(false);
     setExpandedTrade(t.id);
   };
@@ -6221,41 +6295,88 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   <button className="revbtn" onClick={() => startEdit(t)} style={{ background: "var(--goldDim)", color: "var(--goldBright)", borderColor: "var(--borderGold)", fontWeight: 700 }}>Edit trade</button>
                 </div>
                 <div className="td-body">
-                  <div className="revgrid">
-                    <div className="revcol">
-                      <div className="revcoltitle">Trade stats</div>
-                      <div className="mgr"><span>Entry price</span><b>${(Number(t.entryP) || 0).toFixed(2)}</b></div>
-                      <div className="mgr"><span>Exit price</span><b>${(Number(t.exitP) || 0).toFixed(2)}</b></div>
-                      <div className="mgr"><span>Shares</span><b>{(Number(t.shares) || 0).toLocaleString()}</b></div>
-                      <div className="mgr"><span>Hold time</span><b>{holdLabel(t)}</b></div>
-                      <div className="mgr"><span>Stop</span><b>{t.stop ? "$" + Number(t.stop).toFixed(2) : "—"}</b></div>
-                      <div className="mgr"><span>Commission</span><b>{privacyMode ? "••••" : "$" + (parseFloat(t.commission) || 0).toFixed(2)}</b></div>
-                    </div>
-                    <div className="revcol">
-                      <div className="revcoltitle">Result</div>
-                      <div className="mgr"><span>Return</span><b className={up ? "green" : "red"}>{sgnPct(Number(t.plPct))}</b></div>
-                      <div className="mgr"><span>P/L</span><b className={(Number(t.plDollar) || 0) >= 0 ? "green" : "red"}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</b></div>
-                      <div className="mgr"><span>Realized R</span><b className={(Number(t.rMult) || 0) >= 0 ? "green" : "red"}>{t.rMult == null ? "—" : sgnR(Number(t.rMult))}</b></div>
-                      <div className="mgr"><span>Setup</span><b>{t.setup || "—"}</b></div>
-                      <div className="mgr"><span>Setup grade</span><b style={{ color: gcol }}>{gr ? `${gr.letter} · ${gr.stars}★ · ${Math.round((gr.pct || 0) * 100)}%` : "Not graded"}</b></div>
-                      <div className="mgr"><span>Exit reason</span><b>{t.reason || "—"}</b></div>
-                    </div>
-                  </div>
-                  <div className="revchart"><TradeReplayChart trade={t} C={C} font={font} /></div>
-                  {isAdmin ? (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>) : (
-                    <div className="revnotes">
-                      <div className="revchart-head" style={{ marginBottom: 0 }}>
-                        <span className="revcoltitle" style={{ margin: 0 }}>Trade review</span>
-                        <div className="spacer"></div>
-                        <button className="simbtn" onClick={() => saveReview(t.id)}>{reviewSavedId === t.id ? "Saved ✓" : "Save review"}</button>
+                  {(() => {
+                    // ── TradeZella-style two-column: LEFT stats/planning panel · RIGHT chart+notes tabs ──
+                    const isLong = (t.tradeType || "Long") !== "Short";
+                    const shares = Number(t.shares) || 0, entryP = Number(t.entryP) || 0, exitP = Number(t.exitP) || 0;
+                    const net = Number(t.plDollar) || 0, comm = parseFloat(t.commission) || 0, gross = net + comm;
+                    const tg = tgts[t.id] || {};
+                    const target = tg.target ?? t.profitTarget ?? "";
+                    const stopT = tg.stop ?? t.plannedStop ?? (t.stop != null && t.stop !== "" ? Number(t.stop) : "");
+                    const setTgt = (patch) => setTgts(persistTarget(t.id, patch));
+                    const riskPS = stopT !== "" && entryP ? (isLong ? entryP - Number(stopT) : Number(stopT) - entryP) : null; // per-share risk
+                    const tradeRisk = riskPS != null && riskPS > 0 ? riskPS * shares : null;
+                    const plannedR = riskPS != null && riskPS > 0 && target !== "" ? (isLong ? Number(target) - entryP : entryP - Number(target)) / riskPS : null;
+                    const realR = t.rMult != null ? Number(t.rMult) : (riskPS != null && riskPS > 0 ? (isLong ? exitP - entryP : entryP - exitP) / riskPS : null);
+                    const ex = excursion; // {mae, mfe, bestT, res} | {na} | null(loading)
+                    const money = (v) => privacyMode ? "••••" : (v < 0 ? "-" : "") + "$" + Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 2 });
+                    const Rw = ({ k, v, c, tip }) => (<div className="tz-row" title={tip || undefined}><span>{k}</span><b style={c ? { color: c } : undefined}>{v}</b></div>);
+                    return (
+                      <div className="tdz">
+                        <div className="tdz-left">
+                          <div className="tz-npl" style={{ borderLeftColor: up ? "var(--green)" : "var(--red)" }}>
+                            <span>Net P&L</span>
+                            <b className={up ? "green" : "red"}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(net)}</b>
+                          </div>
+                          <Rw k="Side" v={isLong ? "LONG" : "SHORT"} c={isLong ? "var(--green)" : "var(--red)"} />
+                          <Rw k="Commissions & Fees" v={privacyMode ? "••••" : "$" + comm.toFixed(2)} />
+                          <Rw k="Net ROI" v={sgnPct(Number(t.plPct))} c={up ? "var(--green)" : "var(--red)"} />
+                          <Rw k="Gross P&L" v={money(gross)} c={gross >= 0 ? "var(--green)" : "var(--red)"} />
+                          <Rw k="Adjusted Cost" v={money(entryP * shares)} />
+                          <div className="tz-row"><span className="term" data-tip="Max Adverse / Max Favorable Excursion — the worst price against you and the best price for you while the trade was open, from real market data.">Price MAE / MFE</span>
+                            <b>{ex == null ? "…" : ex.na ? "—" : (<><span style={{ color: "var(--red)" }}>${Number(ex.mae).toFixed(2)}</span><span style={{ color: "var(--muted)" }}> / </span><span style={{ color: "var(--green)" }}>${Number(ex.mfe).toFixed(2)}</span></>)}</b>
+                          </div>
+
+                          <div className="tz-sect">Profit Target <span className="term" data-tip="Your planned take-profit price. Planning inputs only — they never change your locked stop or your fills.">ⓘ</span></div>
+                          <div className="tz-row"><span>Target in Price</span><input className="tz-in" type="number" step="0.01" placeholder="—" value={target} onChange={e => setTgt({ target: e.target.value === "" ? null : +e.target.value })} /></div>
+                          <div className="tz-sect">Stop Loss <span className="term" data-tip="Your planned stop for R math. Defaults to the trade's locked original stop; editing this NEVER overwrites it.">ⓘ</span></div>
+                          <div className="tz-row"><span>Target in Price</span><input className="tz-in" type="number" step="0.01" placeholder="—" value={stopT} onChange={e => setTgt({ stop: e.target.value === "" ? null : +e.target.value })} /></div>
+
+                          <Rw k="Initial Target" v={target !== "" ? "$" + Number(target).toFixed(2) : "--"} />
+                          <Rw k="Trade Risk" v={tradeRisk != null ? money(tradeRisk) : "--"} tip="(entry − planned stop) × shares" />
+                          <Rw k="Planned R-Multiple" v={plannedR != null ? plannedR.toFixed(2) + "R" : "--"} c={plannedR != null ? (plannedR >= 2 ? "var(--green)" : "var(--goldBright)") : undefined} />
+                          <Rw k="Realized R-Multiple" v={realR != null ? sgnR(realR) : "--"} c={realR != null ? (realR >= 0 ? "var(--green)" : "var(--red)") : undefined} />
+                          <Rw k="Average Entry" v={"$" + entryP.toFixed(2)} />
+                          <Rw k="Average Exit" v={"$" + exitP.toFixed(2)} />
+                          <Rw k="Entry Time" v={(tradeDateISO(t.entry) || "—") + (t.entryTime ? " " + t.entryTime : "")} />
+                          <Rw k="Exit Time" v={(tradeDateISO(t.exit) || "—") + (t.exitTime ? " " + t.exitTime : "")} />
+                          <Rw k="Best Exit Price" v={ex && ex.mfe != null ? "$" + Number(ex.mfe).toFixed(2) : "--"} c="var(--green)" tip="The MFE price — the best the market offered while you were in" />
+                          <Rw k="Best Exit Time" v={ex && ex.bestT != null ? excTime(ex.bestT, ex.res) : "--"} />
+                          <Rw k="Hold Time" v={holdLabel(t)} />
+                          <Rw k="Shares" v={shares.toLocaleString()} />
+                          <Rw k="Locked Stop (original)" v={t.stop ? "$" + Number(t.stop).toFixed(2) : "—"} tip="Set at entry, drives official R — never overwritten" />
+                          <Rw k="Setup" v={t.setup || "—"} />
+                          <Rw k="Setup Grade" v={gr ? `${gr.letter} · ${gr.stars}★` : "Not graded"} c={gcol} />
+                          <Rw k="Exit Reason" v={t.reason || "—"} />
+                        </div>
+                        <div className="tdz-right">
+                          <div className="tdz-tabs">
+                            <button className={"tdz-tab" + (tdTab === "chart" ? " on" : "")} onClick={() => setTdTab("chart")}>Chart</button>
+                            <button className={"tdz-tab" + (tdTab === "notes" ? " on" : "")} onClick={() => setTdTab("notes")}>Notes</button>
+                          </div>
+                          {tdTab === "chart" ? (
+                            <div className="revchart" style={{ marginBottom: 0 }}><TradeReplayChart trade={t} C={C} font={font} /></div>
+                          ) : (
+                            <>
+                              {isAdmin && (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>)}
+                              <div className="revnotes">
+                                <div className="revchart-head" style={{ marginBottom: 0 }}>
+                                  <span className="revcoltitle" style={{ margin: 0 }}>Trade review</span>
+                                  <div className="spacer"></div>
+                                  <button className="simbtn" onClick={() => saveReview(t.id)}>{reviewSavedId === t.id ? "Saved ✓" : "Save review"}</button>
+                                </div>
+                                <div className="notesgrid">
+                                  <div><div className="nlabel r">What went right</div><textarea className="mgta" value={reviewDraft.right} onChange={e => setReviewDraft(r => ({ ...r, right: e.target.value }))} placeholder="What went right..." /></div>
+                                  <div><div className="nlabel w">What went wrong</div><textarea className="mgta" value={reviewDraft.wrong} onChange={e => setReviewDraft(r => ({ ...r, wrong: e.target.value }))} placeholder="What went wrong..." /></div>
+                                  <div><div className="nlabel l">Lesson learned</div><textarea className="mgta" value={reviewDraft.lessons} onChange={e => setReviewDraft(r => ({ ...r, lessons: e.target.value }))} placeholder="Lesson learned..." /></div>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="notesgrid">
-                        <div><div className="nlabel r">What went right</div><textarea className="mgta" value={reviewDraft.right} onChange={e => setReviewDraft(r => ({ ...r, right: e.target.value }))} placeholder="What went right..." /></div>
-                        <div><div className="nlabel w">What went wrong</div><textarea className="mgta" value={reviewDraft.wrong} onChange={e => setReviewDraft(r => ({ ...r, wrong: e.target.value }))} placeholder="What went wrong..." /></div>
-                        <div><div className="nlabel l">Lesson learned</div><textarea className="mgta" value={reviewDraft.lessons} onChange={e => setReviewDraft(r => ({ ...r, lessons: e.target.value }))} placeholder="Lesson learned..." /></div>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                   <div className="revfoot">
                     {deleteStep === 0 && (<button className="revdelbtn" onClick={() => setDeleteStep(1)} title="Delete this trade from your journal">Delete trade</button>)}
                     {deleteStep === 1 && (<div className="revdelconfirm"><span className="revdelmsg">Delete this trade? This cannot be undone.</span><button className="revdelbtn" onClick={() => setDeleteStep(2)}>Confirm</button><button className="revbtn" onClick={() => setDeleteStep(0)}>Cancel</button></div>)}
@@ -9518,7 +9639,7 @@ function AppInner() {
       else if (ins) {
         res.tInserted = ins.length;
         ins.forEach(t => { if (t.ib_exec_id) journaledExecIds.add(t.ib_exec_id); audit.tradesInserted.push(t.id); });
-        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null }));
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null, profitTarget: t.profit_target ?? null, plannedStop: t.planned_stop ?? null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
     }
@@ -9590,7 +9711,7 @@ function AppInner() {
       else if (ins) {
         res.partialsInserted = ins.length;
         ins.forEach(t => audit.tradesInserted.push(t.id));
-        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null }));
+        const mapped = ins.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "ibkr", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null, profitTarget: t.profit_target ?? null, plannedStop: t.planned_stop ?? null }));
         setJournaledTrades(prev => [...mapped, ...prev]);
       }
     }
@@ -9758,7 +9879,7 @@ function AppInner() {
       ]);
       if (softDelsRes.data) setSoftDeletedExecIds(new Set(softDelsRes.data.map(r => r.ib_exec_id).filter(Boolean)));
       if (tradesRes.data) {
-        setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null }))));
+        setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null, profitTarget: t.profit_target ?? null, plannedStop: t.planned_stop ?? null }))));
       }
       if (posRes.data) {
         const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
@@ -10093,7 +10214,7 @@ function AppInner() {
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       console.log(`[load] trades fetched: ${(trades || []).length}`);
       if (trades && trades.length > 0) {
-        setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null }))));
+        setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null, profitTarget: t.profit_target ?? null, plannedStop: t.planned_stop ?? null }))));
         lastLoadedTradeCount.current = trades.length;
       }
       // Soft-deleted IBKR exec ids — small parallel query, just the column we need. Used by the matcher

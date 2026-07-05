@@ -104,8 +104,19 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload 
       const g = getGrade(row.ticker);
       if (g && g.ticked) setRow(r => ({ ...r, ticked: g.ticked }));
     };
+    // 📋 Paste-to-upload: copy a chart screenshot, hit ⌘V/Ctrl+V anywhere in the editor —
+    // first paste fills the BEFORE slot, second fills AFTER (replace by clearing first).
+    const onPaste = (e) => {
+      const item = [...(e.clipboardData?.items || [])].find(i => i.type && i.type.startsWith("image/"));
+      if (!item) return;
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (!file) return;
+      const slot = !row.before_img ? "before_img" : "after_img";
+      onUpload(file, slot, setRow);
+    };
     return (
-      <div style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "20px 22px", marginBottom: 20 }}>
+      <div onPaste={onPaste} style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "20px 22px", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
           <div style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white }}>{row.id ? `Edit ${row.ticker}` : "Add to the Model Book"}</div>
           <div style={{ marginLeft: "auto" }}><Stars C={C} n={eff.n} /></div>
@@ -180,6 +191,7 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload 
           })}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+          <div style={{ gridColumn: "1 / -1", fontSize: "0.7rem", color: C.muted, marginBottom: -4 }}>📋 Tip: copy a chart screenshot and press <b style={{ color: C.goldBright }}>⌘V / Ctrl+V</b> right here — first paste fills Before, second fills After.</div>
           {[["before_img", "Before chart (the setup)", "⬆ Upload before chart"], ["after_img", "After chart (the outcome)", "⬆ Upload after chart"]].map(([slot, label, cta]) => (
             <div key={slot}>
               <span style={lbl}>{label}</span>
