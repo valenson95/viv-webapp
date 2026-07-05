@@ -105,7 +105,7 @@ export default function MentorModePage({ C, font, session }) {
 
       {/* ── ROSTER ── */}
       {members && !sel && (
-        <div style={{ ...card, padding: 0, overflow: "hidden" }}>
+        <div style={{ ...card, padding: 0, overflow: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
             <thead><tr style={{ textAlign: "left" }}>
               {["Member", "Trades", "Win rate", "Net P&L", "Avg R", "Streak", "Last trade", ""].map(h => <th key={h} style={{ padding: "12px 16px", fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, borderBottom: `1px solid ${C.border}` }}>{h}</th>)}

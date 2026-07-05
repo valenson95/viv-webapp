@@ -3815,7 +3815,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .tp-reason{border:1px solid var(--border); border-radius:12px; padding:13px 15px; margin-bottom:18px; background:rgba(255,255,255,0.02)}
 .vj .tp-reason-h{font-size:0.6rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:7px}
 .vj .tp-reason-b{font-size:0.82rem; color:var(--text); line-height:1.5}
-.vj .tp-foot{display:flex; gap:10px}
+.vj .tp-foot{display:flex; gap:10px; flex-wrap:wrap}
 .vj .tp-go{flex:1; background:linear-gradient(135deg,var(--goldBright),var(--goldMid)); color:#08080e; border:none; font-family:var(--font); font-weight:800; font-size:0.82rem; padding:12px 16px; border-radius:11px; cursor:pointer}
 /* ── Trade Details (full page) ── */
 .vj.td-back{position:fixed; inset:0; z-index:1300; background:var(--bg); overflow-y:auto; animation:tpFade .16s ease}
@@ -3827,7 +3827,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .td-body .revgrid{margin-bottom:18px}
 /* ── TradeZella-style trade-details layout: left stats panel · right chart/notes ── */
 .vj .tdz{display:grid; grid-template-columns:340px minmax(0,1fr); gap:18px; align-items:start; margin-bottom:18px}
-.vj .tdz-left{background:var(--glass); border:1px solid var(--border); border-radius:16px; padding:14px 18px 10px; position:sticky; top:14px; max-height:calc(100vh - 96px); overflow-y:auto}
+.vj .tdz-left{background:var(--glass); border:1px solid var(--border); border-radius:16px; padding:14px 18px 10px; position:sticky; top:70px; max-height:calc(100vh - 150px); overflow-y:auto} /* top clears the sticky td-top header */
 .vj .tz-npl{display:flex; flex-direction:column; gap:2px; padding:4px 0 10px 12px; border-left:3px solid var(--green); margin-bottom:6px}
 .vj .tz-npl span{font-size:0.66rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted)}
 .vj .tz-npl b{font-size:1.5rem; font-weight:800; letter-spacing:-0.02em}
@@ -6397,7 +6397,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                           <div className="tz-sect">Profit Target <span className="term" data-tip="Your planned take-profit price. Planning inputs only — they never change your locked stop or your fills.">ⓘ</span></div>
                           <div className="tz-row"><span>Target in Price</span><input className="tz-in" type="number" step="0.01" placeholder="—" value={target} onChange={e => setTgt({ target: e.target.value === "" ? null : +e.target.value })} /></div>
                           <div className="tz-sect">Stop Loss <span className="term" data-tip="Your planned stop for R math. Defaults to the trade's locked original stop; editing this NEVER overwrites it.">ⓘ</span></div>
-                          <div className="tz-row"><span>Target in Price</span><input className="tz-in" type="number" step="0.01" placeholder="—" value={stopT} onChange={e => setTgt({ stop: e.target.value === "" ? null : +e.target.value })} /></div>
+                          <div className="tz-row"><span>Stop in Price</span><input className="tz-in" type="number" step="0.01" placeholder="—" value={stopT} onChange={e => setTgt({ stop: e.target.value === "" ? null : +e.target.value })} /></div>
 
                           <Rw k="Initial Target" v={target !== "" ? "$" + Number(target).toFixed(2) : "--"} />
                           <Rw k="Trade Risk" v={tradeRisk != null ? money(tradeRisk) : "--"} tip="(entry − planned stop) × shares" />
