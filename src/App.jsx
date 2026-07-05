@@ -234,6 +234,7 @@ const WHATS_NEW = [
       "Two books in one: the ⭐ VIV Official library (curated, read-only) and 🔒 My Book — add your own entries; they're private and only you can see them.",
       "Setup Grader rule update: the ADR% criterion is now > 3.5% (was ≥ 4–5%) — slightly wider net, same principle: the stock must move enough to pay multiple R.",
       "Chart zoom upgrade: once zoomed, use your ← → arrow keys (or the on-screen arrows) to flip between the Before and After chart — Esc closes.",
+      "Quality-of-life: ticker search in the Journal filter bar (type NVDA → every trade you've taken in it), denser tables (~25% more trades per screen), the Premium Tools tour collapses to a one-click pill after your first visit, and a smoother mobile layout.",
       "Filter by book (VIV Official / My Book), by pattern (Trendline Breakout / Pullback Buy / Episodic Pivot / VCP) and by grade. New official entries are added on an ongoing basis — check back weekly.",
       "Also in this update: tickers outside our theme map now auto-detect their sector, plus accuracy fixes across metrics (break-even trades, risk %, hold times, calendar filtering).",
     ],
@@ -2735,6 +2736,10 @@ function PremiumTour({ onPlayStateChange }) {
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
   const [fill, setFill] = useState(0);
+  // First visit: full tour block. Every visit after: collapsed to a one-line pill so the
+  // tools aren't pushed below the fold — expanding is one click away.
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem("viv-tour-seen-v1") === "1"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("viv-tour-seen-v1", "1"); } catch {} }, []);
   const audioRef = useRef(null);
   const fbRef = useRef(null);
   const iRef = useRef(0);
@@ -2763,6 +2768,15 @@ function PremiumTour({ onPlayStateChange }) {
     else playChapter(iRef.current);
   };
   useEffect(() => () => clearFb(), []);
+  if (collapsed) return (
+    <div className="tourwrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <button className="btn" onClick={() => setCollapsed(false)} style={{ display: "inline-flex", alignItems: "center", gap: 9, fontWeight: 800 }}>
+        <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 13, height: 13, color: "var(--goldBright)" }}><path d="M8 5v14l11-7z" /></svg>
+        Watch the 1-minute tour
+      </button>
+      <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}>What this page is, and what each tool does</span>
+    </div>
+  );
   return (
     <div className="tourwrap">
       <audio ref={audioRef} preload="auto" onEnded={advance}
@@ -3586,7 +3600,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj thead th{font-size:0.6rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted);
     text-align:right; padding:12px 14px; border-bottom:1px solid var(--border)}
 .vj thead th:first-child,.vj thead th:nth-child(2){text-align:left}
-.vj tbody td{padding:14px 14px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.84rem}
+.vj tbody td{padding:10px 12px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.84rem}
 .vj tbody td:first-child,.vj tbody td:nth-child(2){text-align:left}
 .vj tbody tr.traderow:hover{background:rgba(255,255,255,0.025)}
 .vj .tick{font-weight:800; letter-spacing:-0.01em; font-size:0.92rem; display:flex; align-items:center; gap:9px}
@@ -4221,6 +4235,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     return () => { alive = false; };
   }, [isAdmin, session?.user?.id]);
   const [filterSetup, setFilterSetup] = useState("All");
+  const [filterTicker, setFilterTicker] = useState(""); // type-to-find a symbol across the whole journal
   const [filterTag, setFilterTag] = useState("All");
   const [editingId, setEditingId] = useState(null);
   const [editRow, setEditRow] = useState({});
@@ -4520,11 +4535,12 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
 
   const filtered = useMemo(() => {
     return allTrades.filter(t => {
+      if (filterTicker && !String(t.ticker || "").toUpperCase().includes(filterTicker)) return false;
       if (filterSetup !== "All" && t.setup !== filterSetup) return false;
       if (filterTag !== "All" && !(t.tags || []).includes(filterTag)) return false;
       return true;
     }).sort((a, b) => (Date.parse(tradeDateISO(b.entry)) || 0) - (Date.parse(tradeDateISO(a.entry)) || 0)); // default order: newest ENTRY date first (per Valen)
-  }, [allTrades, filterSetup, filterTag]);
+  }, [allTrades, filterSetup, filterTag, filterTicker]);
 
   const stats = useMemo(() => {
     const trades = filtered;
@@ -5207,7 +5223,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     });
   }, [filtered, dateRange, dateFrom, dateTo]);
 
-  const dfActive = filterSetup !== "All" || filterTag !== "All" || dateRange !== "all";
+  const dfActive = filterSetup !== "All" || filterTag !== "All" || dateRange !== "all" || filterTicker !== "";
 
   // ── NEW: edge / projection figures computed from `stats` over the date-filtered slice ──
   // stats is memoized off `filtered`; the hero/edge/metrics here use `dateFiltered` so the
@@ -5519,11 +5535,15 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
         )}
 
         {/* FILTER BAR */}
-        <div className={"filterbar guide" + gactive("filter")} style={{ marginTop: 20 }} onMouseEnter={guideEnter("filter", "Filter your performance", "Slice your whole track record by setup, tag or date. Every number, chart and the trade list update instantly.", "/audio/journal-filter.mp3")} onMouseLeave={guideLeave("filter")}>
+        <div className={"filterbar guide" + gactive("filter")} style={{ marginTop: 20 }} onMouseEnter={guideEnter("filter", "Filter your performance", "Slice your whole track record by ticker, setup, tag or date — type a symbol to pull up every trade you've taken in it. Every number, chart and the trade list update instantly.", "/audio/journal-filter.mp3")} onMouseLeave={guideLeave("filter")}>
           <span className="flabel">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
             Filter
           </span>
+          <label className="fctl">Ticker
+            <input className={"filtsel" + (filterTicker ? " active" : "")} value={filterTicker} placeholder="e.g. NVDA"
+              onChange={e => setFilterTicker(e.target.value.toUpperCase().trim())} style={{ width: 92, textTransform: "uppercase" }} />
+          </label>
           <label className="fctl">Setup
             <select className={"filtsel" + (filterSetup !== "All" ? " active" : "")} value={filterSetup} onChange={e => setFilterSetup(e.target.value)}>
               {["All", ...setupTypes].map(s => <option key={s} value={s}>{s}</option>)}
@@ -5552,7 +5572,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           )}
           <span className="spacer"></span>
           <span className="fcount">{dfActive ? `${dateFiltered.length} of ${allTrades.length} trades` : `All ${allTrades.length} trades`}</span>
-          {dfActive && <button className="btn" onClick={() => { setFilterSetup("All"); setFilterTag("All"); setDateRange("all"); setDateFrom(""); setDateTo(""); }}>Clear filters</button>}
+          {dfActive && <button className="btn" onClick={() => { setFilterTicker(""); setFilterSetup("All"); setFilterTag("All"); setDateRange("all"); setDateFrom(""); setDateTo(""); }}>Clear filters</button>}
         </div>
 
         {/* HERO */}
@@ -6603,7 +6623,7 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd thead th{font-size:0.6rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase;
     color:var(--muted); text-align:right; padding:12px 14px; border-bottom:1px solid var(--border);}
 .vd thead th:first-child,.vd thead th:nth-child(2){text-align:left}
-.vd tbody td{padding:15px 14px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.84rem}
+.vd tbody td{padding:10px 12px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.84rem}
 .vd tbody td:first-child,.vd tbody td:nth-child(2){text-align:left}
 .vd tbody tr:hover{background:rgba(255,255,255,0.025)}
 .vd .tick{font-weight:800; letter-spacing:-0.01em; font-size:0.92rem; display:flex; align-items:center; gap:9px}

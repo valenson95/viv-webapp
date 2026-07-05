@@ -343,7 +343,25 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         <div style={{ fontSize: "0.72rem", color: C.muted, margin: "-8px 0 16px" }}>🔒 Your personal model book — entries here are visible only to you. The ⭐ VIV Official book is curated by the team and is read-only.</div>
       )}
 
-      {loading && <div style={{ color: C.muted, fontSize: "0.84rem", padding: "30px 0", textAlign: "center" }}>Loading the Model Book…</div>}
+      {loading && (() => {
+        const sk = { background: "linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(240,192,80,0.08) 50%, rgba(255,255,255,0.03) 75%)", backgroundSize: "800px 100%", animation: "mbshimmer 1.4s linear infinite" };
+        return (
+          <>
+            <style>{"@keyframes mbshimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}"}</style>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }} aria-label="Loading the Model Book">
+              {Array.from({ length: 6 }, (_, k) => (
+                <div key={k} style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
+                  <div style={{ height: 160, borderBottom: `1px solid ${C.border}`, ...sk }} />
+                  <div style={{ padding: "13px 15px" }}>
+                    <div style={{ height: 14, width: "55%", borderRadius: 6, marginBottom: 10, ...sk }} />
+                    <div style={{ height: 10, width: "82%", borderRadius: 6, ...sk }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
       {error === "setup" && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "30px 0", textAlign: "center" }}>📖 The Model Book is being set up — check back shortly.</div>}
       {error && error !== "setup" && <div style={{ color: C.red, fontSize: "0.8rem", padding: "12px 0" }}>{error}</div>}
       {!loading && !error && visible.length === 0 && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "30px 0", textAlign: "center" }}>No entries match this filter yet.</div>}
