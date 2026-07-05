@@ -6383,7 +6383,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                         <div className="tdz-left">
                           <div className="tz-npl" style={{ borderLeftColor: up ? "var(--green)" : "var(--red)" }}>
                             <span>Net P&L</span>
-                            <b className={up ? "green" : "red"}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(net)}</b>
+                            <b style={{ color: up ? "var(--green)" : "var(--red)" }}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(net)}</b>
                           </div>
                           <Rw k="Side" v={isLong ? "LONG" : "SHORT"} c={isLong ? "var(--green)" : "var(--red)"} />
                           <Rw k="Commissions & Fees" v={privacyMode ? "••••" : "$" + comm.toFixed(2)} />
