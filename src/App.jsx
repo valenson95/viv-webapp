@@ -5828,23 +5828,27 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           const ungraded = agg(pop.filter(t => !letterOf(t)));
           const fitOf = (t) => { const th = sectorFor(t.ticker); return th ? themeFit(th, t.entry) : null; };
           const inT = agg(pop.filter(t => fitOf(t) === "in")), offT = agg(pop.filter(t => fitOf(t) === "off"));
-          const cell = (v, good) => <b style={{ color: v == null ? "var(--muted)" : good ? "var(--green)" : "var(--red)" }}>{v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2) + "R"}</b>;
+          const unT = agg(pop.filter(t => !fitOf(t))); // pre-coverage, missing entry date, or unknown sector — NEVER guessed
+          const cell = (v, good) => <b style={{ color: v == null ? "var(--muted)" : good ? "var(--green)" : "var(--red)", whiteSpace: "nowrap" }}>{v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2) + "R"}</b>;
           // click a group → expand the exact trades behind the number (with sector + the snapshot ranks used)
           const groupTrades = (id) => {
             if (id === "t:in") return pop.filter(t => fitOf(t) === "in");
             if (id === "t:off") return pop.filter(t => fitOf(t) === "off");
+            if (id === "t:un") return pop.filter(t => !fitOf(t));
             if (id && id.startsWith("g:")) { const L = id.slice(2); return L === "un" ? pop.filter(t => !letterOf(t)) : pop.filter(t => letterOf(t) === L); }
             return [];
           };
+          // NOTE: every cell must be shrink/wrap-safe — fixed minWidths inside a minmax(300px,1fr)
+          // grid track overflowed into the neighbouring column (member-reported UI bug).
           const Row = ({ label, s, accent, id }) => (
             <div onClick={id ? () => setEdgeOpen(edgeOpen === id ? null : id) : undefined}
               title={id ? "Click to see the exact trades behind this number" : undefined}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 4px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "0.82rem", cursor: id ? "pointer" : "default", background: edgeOpen === id ? "rgba(240,192,80,0.05)" : "transparent", borderRadius: 8 }}>
-              <span style={{ minWidth: 96, fontWeight: 800, color: accent || "var(--text)" }}>{label}</span>
-              <span style={{ color: "var(--muted)", minWidth: 66 }}>{s.n} trade{s.n !== 1 ? "s" : ""}</span>
-              <span style={{ minWidth: 84, color: s.winPct >= 50 ? "var(--green)" : "var(--red)", fontWeight: 700 }}>{s.winPct}% win</span>
+              style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 10px", padding: "8px 6px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "0.8rem", cursor: id ? "pointer" : "default", background: edgeOpen === id ? "rgba(240,192,80,0.05)" : "transparent", borderRadius: 8, minWidth: 0 }}>
+              <span style={{ flex: "1 1 84px", minWidth: 0, fontWeight: 800, color: accent || "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+              <span style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>{s.n} trade{s.n !== 1 ? "s" : ""}</span>
+              <span style={{ color: s.winPct >= 50 ? "var(--green)" : "var(--red)", fontWeight: 700, whiteSpace: "nowrap" }}>{s.winPct}% win</span>
               {cell(s.avgR, (s.avgR || 0) >= 0)}
-              {id && <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: "0.7rem" }}>{edgeOpen === id ? "▴" : "▾"}</span>}
+              {id && <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>{edgeOpen === id ? "▴" : "▾"}</span>}
             </div>
           );
           const EdgeList = ({ id }) => {
@@ -5854,8 +5858,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             return (
               <div style={{ gridColumn: "1 / -1", background: "rgba(255,255,255,0.02)", border: "1px solid var(--borderGold)", borderRadius: 12, padding: "10px 14px", marginTop: 4 }}>
                 <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>
-                  The {rows.length} trade{rows.length !== 1 ? "s" : ""} behind “{id === "t:in" ? "🟢 In-theme" : id === "t:off" ? "🔴 Off-theme" : id.slice(2) + " setups"}”
-                  {isTheme && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · judged against the theme snapshot at each trade's ENTRY date</span>}
+                  The {rows.length} trade{rows.length !== 1 ? "s" : ""} behind “{id === "t:in" ? "🟢 In-theme" : id === "t:off" ? "🔴 Off-theme" : id === "t:un" ? "◦ Untagged" : id.slice(2) + " setups"}”
+                  {isTheme && id !== "t:un" && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · judged against the theme snapshot at each trade's ENTRY date</span>}
+                  {id === "t:un" && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · entered before theme coverage, missing an entry date, or unknown sector — never guessed. Fix the entry date via Edit trade and it re-tags automatically.</span>}
                 </div>
                 {rows.map((t, i) => {
                   const th = sectorFor(t.ticker);
@@ -5866,7 +5871,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       <b style={{ minWidth: 52, color: "var(--white)" }}>{t.ticker}</b>
                       <span style={{ minWidth: 120, color: "var(--goldBright)", fontWeight: 600 }}>{th || "— no sector"}</span>
                       <span style={{ minWidth: 78, color: "var(--muted)" }}>{tradeDateISO(t.entry) || "—"}</span>
-                      {rk && <span style={{ minWidth: 150, color: "var(--muted)", fontSize: "0.72rem" }}>wk #{rk.week ?? "–"} · mo #{rk.month ?? "–"} <span style={{ opacity: 0.7 }}>@ {rk.date}</span></span>}
+                      {isTheme && (rk
+                        ? <span style={{ color: "var(--muted)", fontSize: "0.72rem", whiteSpace: "nowrap" }}>wk #{rk.week ?? "–"} · mo #{rk.month ?? "–"} <span style={{ opacity: 0.7 }}>@ {rk.date}</span></span>
+                        : <span style={{ color: "var(--muted)", fontSize: "0.72rem", fontStyle: "italic" }}>{!th ? "sector unknown" : !tradeDateISO(t.entry) ? "no entry date — not judged" : "before theme coverage"}</span>)}
                       <span style={{ minWidth: 62, fontWeight: 700, color: (Number(t.plPct) || 0) > 0 ? "var(--green)" : "var(--red)" }}>{sgnPct(Number(t.plPct))}</span>
                       <span style={{ color: "var(--muted)" }}>{t.rMult != null ? sgnR(Number(t.rMult)) : "—"}</span>
                       <span style={{ marginLeft: "auto", color: "var(--goldBright)", fontSize: "0.7rem" }}>details ›</span>
@@ -5881,16 +5888,17 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             <div className="toolbar" style={{ marginTop: 26 }}><h2 className="sech guide" onMouseEnter={guideEnter("objedge", "Objective edge", "This connects your process to your results: win rate and average R grouped by the setup grade you gave each trade, and by whether the trade was in-theme at entry. If A-plus setups outperform, your grading has real edge.", undefined)} onMouseLeave={guideLeave("objedge")}>Objective edge</h2></div>
             <div className="card reveal" style={{ padding: "16px 20px", marginBottom: 18 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By setup grade</div>
                   {byGrade.map(g => <Row key={g.L} id={"g:" + g.L} label={g.L + " setups"} s={g} accent={g.L === "A+" ? "var(--green)" : g.L === "A" ? "var(--goldBright)" : undefined} />)}
                   {ungraded.n > 0 && <Row id="g:un" label="Ungraded" s={ungraded} accent="var(--muted)" />}
                   {byGrade.length === 0 && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Grade setups in Premium Tools → Setup Grader; results correlate here automatically.</div>}
                 </div>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By theme fit (at entry)</div>
                   {inT.n > 0 && <Row id="t:in" label="🟢 In-theme" s={inT} accent="var(--green)" />}
                   {offT.n > 0 && <Row id="t:off" label="🔴 Off-theme" s={offT} accent="var(--red)" />}
+                  {unT.n > 0 && <Row id="t:un" label="◦ Untagged" s={unT} accent="var(--muted)" />}
                   {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
                   {THEME_COVERAGE_START && <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>🧭 Theme metrics track from <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the date of the first theme snapshot. Trades entered earlier aren't theme-tagged: themes rotate constantly, so a later snapshot can't honestly judge an older trade. Grade metrics cover all trades.</div>}
                 </div>

@@ -34,17 +34,24 @@ const dnorm = (d) => {
 export const THEME_COVERAGE_START = Object.keys(THEME_SNAPSHOTS).sort()[0] || null;
 
 // nearest snapshot on or before the given date.
-// Dates BEFORE the first snapshot return null (untagged) — a later theme must never
-// judge an older trade; themes rotate constantly. Backfilling older dated snapshots
-// into THEME_SNAPSHOTS automatically extends coverage backwards.
+// HONESTY RULES (Valen 2026-07-05):
+//  · date BEFORE the first snapshot → null (a later theme never judges an older trade)
+//  · date PROVIDED but unreadable/missing → null (never guess with the latest theme —
+//    the trade might be from before coverage; it shows as Untagged instead)
+//  · NO date argument at all (current-view widgets like the Theme Strip) → latest snapshot
+// Backfilling older dated snapshots into THEME_SNAPSHOTS auto-extends coverage backwards.
 export function snapshotFor(date) {
   const keys = Object.keys(THEME_SNAPSHOTS).sort();
   if (!keys.length) return null;
-  const d = dnorm(date) || keys[keys.length - 1];
-  if (d < keys[0]) return null;
-  let pick = keys[0];
-  for (const k of keys) { if (k <= d) pick = k; else break; }
-  return { date: pick, ...THEME_SNAPSHOTS[pick] };
+  if (date != null && date !== "") {
+    const d = dnorm(date);
+    if (!d || d < keys[0]) return null;
+    let pick = keys[0];
+    for (const k of keys) { if (k <= d) pick = k; else break; }
+    return { date: pick, ...THEME_SNAPSHOTS[pick] };
+  }
+  const k = keys[keys.length - 1];
+  return { date: k, ...THEME_SNAPSHOTS[k] };
 }
 export function latestSnapshot() { const keys = Object.keys(THEME_SNAPSHOTS).sort(); return keys.length ? { date: keys[keys.length - 1], ...THEME_SNAPSHOTS[keys[keys.length - 1]] } : null; }
 
