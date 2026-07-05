@@ -47,8 +47,60 @@ const SECTORS = {
   ...G("Technology","DELL","HPQ","HPE","ANET","WDC","STX","JBL","FLEX","CLS","APH","GLW","TEL"),
 };
 
+import { useEffect, useState } from "react";
+
+// ── Dynamic fallback layer ───────────────────────────────────
+// The curated map above is PRIMARY (mirrors Valen's DeepVue groupings).
+// Unknown tickers resolve once via /api/sector (Finnhub industry → theme),
+// then persist in localStorage so later renders are instant/offline.
+const DYN_KEY = "viv-sector-cache-v1";
+function loadDyn() {
+  try { return JSON.parse(localStorage.getItem(DYN_KEY) || "{}"); } catch { return {}; }
+}
+let DYN = typeof localStorage !== "undefined" ? loadDyn() : {};
+const MISSES = new Set();   // tickers the API couldn't resolve — don't refetch every render
+let pending = null;         // single in-flight batch
+
 export function sectorFor(ticker) {
   if (!ticker) return null;
-  return SECTORS[String(ticker).toUpperCase().trim()] || null;
+  const t = String(ticker).toUpperCase().trim();
+  return SECTORS[t] || DYN[t] || null;
 }
+
+// Queue unknown tickers, batch-resolve via /api/sector, persist + notify ("viv-sectors" event).
+export function resolveSectors(tickers) {
+  const unknown = (tickers || [])
+    .map(t => String(t || "").toUpperCase().trim())
+    .filter(t => t && !SECTORS[t] && !DYN[t] && !MISSES.has(t));
+  if (unknown.length === 0 || pending) return; // leftovers re-queue on the next render
+  const batch = [...new Set(unknown)].slice(0, 15);
+  pending = fetch(`/api/sector?symbols=${batch.join(",")}`)
+    .then(r => (r.ok ? r.json() : {}))
+    .then(map => {
+      let changed = false;
+      batch.forEach(t => {
+        if (map[t]) { DYN[t] = map[t]; changed = true; }
+        else MISSES.add(t);
+      });
+      if (changed) {
+        try { localStorage.setItem(DYN_KEY, JSON.stringify(DYN)); } catch {}
+        window.dispatchEvent(new Event("viv-sectors"));
+      }
+    })
+    .catch(() => { batch.forEach(t => MISSES.add(t)); })
+    .finally(() => { pending = null; });
+}
+
+// Hook: resolves unknown tickers in the background + re-renders when new sectors land.
+export function useSectors(tickers) {
+  const [, setV] = useState(0);
+  const key = (tickers || []).filter(Boolean).join(",");
+  useEffect(() => {
+    const h = () => setV(x => x + 1);
+    window.addEventListener("viv-sectors", h);
+    return () => window.removeEventListener("viv-sectors", h);
+  }, []);
+  useEffect(() => { if (key) resolveSectors(key.split(",")); }, [key]);
+}
+
 export default SECTORS;

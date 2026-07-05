@@ -5,7 +5,7 @@ import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import html2canvas from "html2canvas";
 import TradeCalendar from "./Calendar.jsx";
 import TradeReplayChart from "./TradeReplayChart.jsx";
-import { sectorFor } from "./sectors.js";
+import { sectorFor, useSectors } from "./sectors.js";
 import { themeFit, themeRanks, consistentTop, top5, latestSnapshot } from "./themes.js";
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
@@ -797,7 +797,7 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds, 
         const first = cycle[0], last = cycle[cycle.length - 1];
         const commission = cycle.reduce((s, c) => s + c.commission, 0);
         const realized = cycle.reduce((s, c) => s + c.realizedPnl, 0);
-        const plDollar = realized || ((exitP - entryP) * qty - commission);
+        const plDollar = realized != null ? realized : ((exitP - entryP) * qty - commission); // != null: a true $0 break-even must not fall through to −commission
         const plPct = entryP > 0 ? (plDollar / (entryP * qty)) * 100 : 0;
         // Gate on EXIT date, not entry date — a pre-floor open that closes post-floor is a post-floor
         // realized event (P/L hits this month's books) and belongs in the journal. Earlier this filter
@@ -4772,6 +4772,7 @@ function CoachHero({ data }) {
 
 function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  useSectors((journaledTrades || []).map(t => t.ticker)); // theme fallback for tickers not in the curated map
   const [coachRead, setCoachRead] = useState(null);
   useEffect(() => {
     if (!isAdmin || !session?.user?.id) return;
@@ -5102,7 +5103,8 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     // Holding duration (days) — uses time fields for fractional-day accuracy when available
     const holdDays = (t) => {
       if (!t.entry || !t.exit) return null;
-      const d1 = new Date(t.entry), d2 = new Date(t.exit);
+      // normalize to ISO first: raw "M/D/YY" parses as LOCAL midnight but ISO parses as UTC — mixing them skews the diff for UTC+8 users
+      const d1 = new Date(tradeDateISO(t.entry) || t.entry), d2 = new Date(tradeDateISO(t.exit) || t.exit);
       if (isNaN(d1) || isNaN(d2)) return null;
       if (t.entryTime && t.exitTime) {
         const [eh, em] = t.entryTime.split(":").map(Number);
@@ -5322,7 +5324,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const monthlyPerf = useMemo(() => {
     const holdDaysCalc = (t) => {
       if (!t.entry || !t.exit) return null;
-      const d1 = new Date(t.entry), d2 = new Date(t.exit);
+      const d1 = new Date(tradeDateISO(t.entry) || t.entry), d2 = new Date(tradeDateISO(t.exit) || t.exit); // ISO-normalize (UTC-consistent)
       if (isNaN(d1) || isNaN(d2)) return null;
       if (t.entryTime && t.exitTime) {
         const [eh, em] = t.entryTime.split(":").map(Number);
@@ -5347,7 +5349,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     return Object.keys(months).sort().map(k => {
       const trades = months[k];
       const wins = trades.filter(t => t.plPct > 0);
-      const losses = trades.filter(t => t.plPct <= 0);
+      const losses = trades.filter(t => t.plPct < 0); // strictly negative — a $0 break-even is NOT a loss (was double-counted in losses AND be)
       const be = trades.filter(t => t.plPct === 0);
       const count = trades.length;
       const dollar = trades.reduce((s, t) => s + t.plDollar, 0);
@@ -5790,7 +5792,8 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     // hold days (same formula as `stats`)
     const holdDays = (t) => {
       if (!t.entry || !t.exit) return null;
-      const d1 = new Date(t.entry), d2 = new Date(t.exit);
+      // normalize to ISO first: raw "M/D/YY" parses as LOCAL midnight but ISO parses as UTC — mixing them skews the diff for UTC+8 users
+      const d1 = new Date(tradeDateISO(t.entry) || t.entry), d2 = new Date(tradeDateISO(t.exit) || t.exit);
       if (isNaN(d1) || isNaN(d2)) return null;
       if (t.entryTime && t.exitTime) {
         const [eh, em] = String(t.entryTime).split(":").map(Number);
@@ -5985,7 +5988,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   // ── per-trade derived helpers for the table / review panel ──
   const holdLabel = (t) => {
     if (!t.entry || !t.exit) return "—";
-    const a = new Date(t.entry), b = new Date(t.exit);
+    const a = new Date(tradeDateISO(t.entry) || t.entry), b = new Date(tradeDateISO(t.exit) || t.exit); // ISO-normalize (UTC-consistent)
     if (isNaN(a) || isNaN(b)) return "—";
     return Math.max(0, Math.round((b - a) / 86400000)) + "d";
   };
@@ -6233,7 +6236,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
 
         {/* KEY METRICS */}
         <div className="toolbar" style={{ marginTop: 34 }}>
-          <h2 className="sech guide" onMouseEnter={guideEnter("metrics", "Key metrics", "These numbers tell you whether your trading works. Win rate is how often you win; expectancy is your average result per trade in units of risk.", "/audio/journal-metrics.mp3")} onMouseLeave={guideLeave("metrics")}>Key metrics</h2>
+          <h2 className="sech guide" onMouseEnter={guideEnter("metrics", "Key metrics", "These numbers tell you whether your trading works. Win rate is how often you win; Avg P/L per trade is your average dollar result; Avg R-multiple is that same edge measured in units of risk.", "/audio/journal-metrics.mp3")} onMouseLeave={guideLeave("metrics")}>Key metrics</h2>
         </div>
         <div className="metrics">
           {(() => {
@@ -6243,7 +6246,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
               { k: "avgGain", label: "Avg gain", val: m.wins ? sgnPct(m.avgGain) : "—", cls: "green", sub: "winners only", tip: "Average % return across your winning trades only." },
               { k: "avgLoss", label: "Avg loss", val: m.losses ? "−" + Math.abs(m.avgLoss).toFixed(2) + "%" : "—", cls: "red", sub: "losers only", tip: "Average % loss across your losing trades only." },
               { k: "wlr", label: "Win/Loss ratio", val: (m.wins && m.losses) ? m.wlr.toFixed(2) : "—", cls: "gold", sub: "winners vs losers", tip: "Average win ÷ average loss — how much bigger a typical winner is than a typical loser." },
-              { k: "exp", label: "Expectancy", val: m.n ? (privacyMode ? sgnR(m.expectancy) : sgnMoney(m.totalPL / m.n)) : "—", cls: m.expectancy >= 0 ? "green" : "red", sub: "avg $ per trade", tip: "Your average dollar result per trade — total realized P/L ÷ number of trades. Above zero = a positive edge. (Privacy shows it in R.)" },
+              { k: "exp", label: "Avg P/L per trade", val: m.n ? (privacyMode ? sgnR(m.expectancy) : sgnMoney(m.totalPL / m.n)) : "—", cls: m.expectancy >= 0 ? "green" : "red", sub: "expectancy in $", tip: "Your average dollar result per trade — total realized P/L ÷ number of trades. Above zero = a positive edge. (Privacy shows it in R; see Avg R-mult for the risk-unit version.)" },
               { k: "pf", label: "Profit factor", val: m.n ? (isFinite(m.pf) ? m.pf.toFixed(2) : (m.wins ? "∞" : "—")) : "—", cls: "gold", sub: "gross win ÷ loss", tip: "Total profit from winners ÷ total loss from losers. Above 1.0 means the system makes money." },
               { k: "lw", label: "Largest win", val: m.lw ? sgnPct(Number(m.lw.plPct)) : "—", cls: "green", sub: m.lw ? m.lw.ticker : "—", tip: "Your single biggest winning trade by % return." },
               { k: "ll", label: "Largest loss", val: m.ll ? "−" + Math.abs(Number(m.ll.plPct)).toFixed(2) + "%" : "—", cls: "red", sub: m.ll ? m.ll.ticker : "—", tip: "Your single biggest losing trade by % return." },
@@ -6269,7 +6272,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
         {/* PERFORMANCE CALENDAR (monthly + yearly, TradeZella-style) */}
         <div className="toolbar"><h2 className="sech">Performance calendar</h2></div>
         <div className="card reveal" style={{ padding: "18px 20px", marginBottom: 18 }}>
-          <TradeCalendar trades={journaledTrades} C={C} font={font} />
+          <TradeCalendar trades={filtered} C={C} font={font} /> {/* setup/tag filters apply (calendar has its own month nav for dates) */}
         </div>
 
         {/* EQUITY CURVE + RETURN DISTRIBUTION */}
@@ -7263,6 +7266,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
   // flag without rewriting every callsite. Reactive — flipping the Settings toggle re-renders the table.
   const INTRADAY_FEATURE_ENABLED = intradayFeatureEnabled;
   useSavedGrades(); // re-render the Grade column when a setup grade is saved/synced
+  useSectors((positions || []).map(p => p.sym)); // resolve unknown tickers' themes via /api/sector fallback
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [compactTable, setCompactTable] = useState(false);
   // Open Positions zoom — scales the whole table (5 steps each way, 70%–130%, 6% per step). Persisted as a UI-only pref.
@@ -7825,7 +7829,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
     const ps = +portfolioSize || 0;
     const roteD = initRiskD > 0 ? initRiskD : 0;
     const tier = autoTier(roteD, rSizer); // risk-first: tier by $-at-risk vs per-trade risk budget
-    const rotePct = ps > 0 ? (roteD / ps) * 100 : 0;
+    const rotePct = compEquity > 0 ? (roteD / compEquity) * 100 : 0; // same base as the aggregate/budget panel (was ÷ raw portfolioSize — rows didn't reconcile once realized P/L ≠ 0)
     const currentRiskPerShare = dir * (epN - activeStop); // >0 = still at risk, <=0 = risk-free / locked
     const currentRoteD = currentRiskPerShare <= 0 ? 0 : currentRiskPerShare * sharesN;
     const currentRotePct = compEquity > 0 ? (currentRoteD / compEquity) * 100 : 0;
