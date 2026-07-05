@@ -10,6 +10,7 @@ import { themeFit, themeRanks, consistentTop, top5, latestSnapshot } from "./the
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
+import ModelBookPage from "./ModelBook.jsx";
 import { getGrade as getSavedGrade, useGrades as useSavedGrades } from "./grades.js";
 import FeedbackWidget from "./Feedback.jsx";
 
@@ -220,6 +221,18 @@ function useDragReorder(length) {
 // ─── What's New — changelog the user can refer to (button in the top nav, modal of update notes).
 // Add new entries to the TOP of WHATS_NEW as features ship.
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "July 5, 2026",
+    title: "📖 The Model Book — study the best setups ever",
+    items: [
+      "New Model Book page (top nav): a curated library of elite real-world setups. Every entry shows the BEFORE chart (the setup), the objective factors that made it elite, then the AFTER chart (the outcome) — side by side.",
+      "Each entry is graded on the 5-star Setup Grader scale, plus an Elite-factor layer: the rare confluences that turn a maxed 5★ into a 6★ or 7★ 'on a 5-star scale' trade.",
+      "Objective metrics on every entry — rally %, prior run-up, slope angle, days held, R multiple, and measurable characteristics (tight days, ADR, volume dry-up) — so you build pattern recognition from numbers, not vibes.",
+      "Filter by pattern (Breakout / EP / Pullback / U&R / HTF / Parabolic) and by grade. New entries are added on an ongoing basis — check back weekly.",
+      "Also in this update: tickers outside our theme map now auto-detect their sector, plus accuracy fixes across metrics (break-even trades, risk %, hold times, calendar filtering).",
+    ],
+  },
   {
     tag: "New",
     date: "July 4, 2026",
@@ -2849,6 +2862,7 @@ return (
         <div className="tabs">
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
@@ -5401,6 +5415,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -7537,6 +7552,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
           <div className="tabs">
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -8325,6 +8341,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -8777,6 +8794,37 @@ const ADMIN_EMAIL = "vc-lv@live.com";
 // ─── AUTH PAGE (Login / Register / Forgot Password) ───
 // ═══════════════════════════════════════
 // ─── Smokey Particle Background for Login ───
+// ─── MODEL BOOK PAGE SHELL — reuses the journal CSS scope (.vj) for navbar/cards ───
+function ModelBookShell({ setPage, onLogout, session, displayName }) {
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  return (
+    <div className="vj">
+      <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
+      <div className="shell">
+        <div className="navbar">
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="tabs">
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a className="on" style={{ cursor: "pointer" }}>Model Book</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          </div>
+          <div className="spacer"></div>
+          <WhatsNew />
+          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
+        </div>
+        <div className="reveal in-view" style={{ marginBottom: 10 }}>
+          <div className="eyebrow">Model Book</div>
+          <div className="h1" style={{ marginTop: 6 }}>Study the <span className="goldname">best setups</span>, {(displayName && displayName.trim()) || "trader"}</div>
+          <div className="sub">Real winners, graded and dissected — the before chart, the exact factors that made it elite, then the outcome. Pattern recognition is built by reps.</div>
+        </div>
+        <ModelBookPage C={C} font={font} session={session} isAdmin={isAdmin} />
+      </div>
+    </div>
+  );
+}
+
 function SmokeBackground() {
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -8957,6 +9005,7 @@ function NavIcon({ name, size = 17, color = "currentColor" }) {
   if (name === "journal") return <svg {...p}><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>;
   if (name === "tools") return <svg {...p}><path d="M4 6h9M17 6h3M4 12h4M12 12h8M4 18h11M19 18h1" /><circle cx="14" cy="6" r="2.1" /><circle cx="10" cy="12" r="2.1" /><circle cx="16" cy="18" r="2.1" /></svg>;
   if (name === "settings") return <svg {...p}><circle cx="12" cy="12" r="3.4" /><path d="M12 2v3.2M12 18.8V22M2 12h3.2M18.8 12H22M4.9 4.9l2.3 2.3M16.8 16.8l2.3 2.3M19.1 4.9l-2.3 2.3M7.2 16.8l-2.3 2.3" /></svg>;
+  if (name === "modelbook") return <svg {...p}><path d="M12 5c-2-1.5-4.5-2-7-2v16c2.5 0 5 .5 7 2 2-1.5 4.5-2 7-2V3c-2.5 0-5 .5-7 2z" /><path d="M12 5v16" /><path d="M15.5 9l1-2 1 2 2 .3-1.5 1.4.4 2-1.9-1-1.9 1 .4-2L13.5 9.3z" strokeWidth="1.1" /></svg>;
   return null;
 }
 
@@ -9114,6 +9163,7 @@ function AppBackground({ intensity = "calm" }) {
 const NAV = [
   { id: "dashboard", label: "Dashboard" },
   { id: "journal", label: "Journal" },
+  { id: "modelbook", label: "Model Book" },
   { id: "tools", label: "Tools" },
   { id: "settings", label: "Settings" },
 ];
@@ -10285,6 +10335,7 @@ function AppInner() {
       {page === "dashboard" && <DashboardPage setPage={setPage} onLogout={handleLogout} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
       {page === "tools" && <PremiumToolsPage setPage={setPage} onLogout={handleLogout} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} positions={positions} displayName={displayName} />}
       {page === "journal" && <TradeJournalPage setPage={setPage} onLogout={handleLogout} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} />}
+      {page === "modelbook" && <ModelBookShell setPage={setPage} onLogout={handleLogout} session={session} displayName={displayName} />}
       {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
       <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />

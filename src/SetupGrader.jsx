@@ -8,7 +8,7 @@ import { loadGrades, getGrade, saveGrade, removeGrade, letterFor, useGrades } fr
 // Member-facing: no mentor/vendor brand names — VIV's own method.
 // ══════════════════════════════════════════════════════════════════
 
-const SECTIONS = [
+export const SECTIONS = [
   {
     title: "Leadership / Stock Selection",
     items: [
