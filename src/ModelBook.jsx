@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
+import { SECTIONS } from "./SetupGrader.jsx";
 
 // ══════════════════════════════════════════════════════════════════
 // VIV MODEL BOOK — curated database of the best winning setups, for
@@ -10,27 +11,41 @@ import { getGrade } from "./grades.js";
 // Admin curates; members study PUBLISHED entries. Run supabase/modelbook.sql.
 // ══════════════════════════════════════════════════════════════════
 
-export const PATTERNS = ["Breakout", "EP", "Pullback", "U&R", "HTF", "Parabolic"];
+export const PATTERNS = ["Trendline Breakout", "Pullback Buy", "Episodic Pivot", "VCP"];
+export const OUTCOMES = ["Huge Winner", "Winner", "Subpar", "Loser"];
 
-// The elite layer — confluences that upgrade a maxed 5★ into a 6★/7★.
-// Grounded in the VIV screening method (tightness, volume signature, leadership, R-math).
+// ── Objective star math — the EXACT Setup Grader checklist + formula (perfect mirror, zero bias).
+// The stars are COMPUTED from the same 16 ticks; nothing is hand-assigned.
+let MB_TOTAL = 0, MB_STARMAKERS = 0;
+SECTIONS.forEach(s => { if (s.reminder) return; s.items.forEach(i => { MB_TOTAL++; if (i.star) MB_STARMAKERS++; }); });
+export function starsFromTicked(ticked) {
+  const t = ticked || [];
+  let passed = 0, starHit = 0;
+  SECTIONS.forEach((sec, si) => {
+    if (sec.reminder) return;
+    sec.items.forEach((it, ii) => { if (t.includes(si + "-" + ii)) { passed++; if (it.star) starHit++; } });
+  });
+  const pct = MB_TOTAL ? passed / MB_TOTAL : 0;
+  let stars = Math.round(pct * 5);
+  if (stars >= 5 && starHit < MB_STARMAKERS) stars = 4; // A+ requires full ★-maker confluence — same gate as the grader
+  if (passed === 0) stars = 0;
+  return { stars, passed, starHit, pct };
+}
+
+// The elite layer — ONLY factors the Setup Grader checklist does NOT already score
+// (no double-counting: dead volume / inside days / EMA pinch / freshness are grader ★-makers).
 export const ELITE = [
-  { k: "dead-volume",  c: "Volume completely dead at the apex",      s: "Not just lower — flat-lined. Sellers are gone." },
-  { k: "inside-days",  c: "Extreme tightness — inside/NR days cluster", s: "Final days trade well under ½ the normal daily range." },
-  { k: "ema-pinch",    c: "9/21/50 EMAs converged under price",       s: "All the moving averages pinch into one coiled line." },
-  { k: "tiny-stop",    c: "Stop under ½ ADR → 15–20R math",           s: "The trigger bar structure allows an unusually tight stop." },
-  { k: "the-leader",   c: "THE leader of the #1 theme",               s: "Not a follower in a hot group — the name defining it." },
-  { k: "fresh-base",   c: "1st or 2nd base — fresh cycle",            s: "Early in its run, not a late-stage 4th base." },
-  { k: "catalyst",     c: "Real catalyst under the base (EP layer)",  s: "Earnings/news power confirms the technical setup." },
-  { k: "linear-move",  c: "Linear, clean prior advance",              s: "The run-up was orderly (30–45°+), not wild and overlapping." },
-  { k: "tennis-ball",  c: "Tennis-ball action on market dips",       s: "It fell least and snapped back first when the market pulled back." },
-  { k: "regime",       c: "Full regime tailwind",                     s: "Market trend up, breadth expanding, leaders working everywhere." },
+  { k: "tiny-stop",   c: "Stop under ½ ADR → 15–20R math",     s: "The trigger structure allows an unusually tight stop." },
+  { k: "the-leader",  c: "THE leader of the #1 theme",          s: "Not a follower in a hot group — the name defining it." },
+  { k: "catalyst",    c: "Real catalyst under the base",        s: "Earnings/news power confirms the technical setup (EP layer)." },
+  { k: "tennis-ball", c: "Tennis-ball action on market dips",   s: "Fell least and snapped back first when the market pulled back." },
+  { k: "regime",      c: "Full regime tailwind",                s: "Market trending up, breadth expanding, leaders working everywhere." },
 ];
 
-// base stars (0-5) + elite count → the "N★ on a 5★ scale" label
+// computed base stars (0-5) + elite count → the "N★ on a 5★ scale" label
 export function effectiveStars(stars, eliteCount) {
-  if (stars >= 5 && eliteCount >= 6) return { n: 7, label: "7★ · Generational" };
-  if (stars >= 5 && eliteCount >= 3) return { n: 6, label: "6★ · Elite" };
+  if (stars >= 5 && eliteCount >= 4) return { n: 7, label: "7★ · Generational" };
+  if (stars >= 5 && eliteCount >= 2) return { n: 6, label: "6★ · Elite" };
   return { n: Math.max(0, Math.min(5, stars)), label: `${Math.max(0, Math.min(5, stars))}★` };
 }
 
@@ -61,6 +76,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+  // A trade/position sent a prefill (📖 Add to Model Book) → open the editor immediately
+  useEffect(() => { try { if (sessionStorage.getItem("viv-mb-prefill")) setEditing({}); } catch {} }, []);
 
   const visible = rows.filter(r => {
     if (fPattern !== "All" && r.pattern !== fPattern) return false;
@@ -85,10 +102,12 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const save = async (row) => {
     setBusy(true); setError(null);
     const body = {
-      created_by: uid, ticker: (row.ticker || "").toUpperCase().trim(), pattern: row.pattern || "Breakout",
+      created_by: uid, ticker: (row.ticker || "").toUpperCase().trim(), pattern: row.pattern || "Trendline Breakout",
+      stars: starsFromTicked(row.ticked).stars, // objective — derived from the grader ticks, never hand-set
+      outcome: row.outcome || null,
       theme: row.theme || null, entry_date: row.entry_date || null, exit_date: row.exit_date || null,
       before_img: row.before_img || null, after_img: row.after_img || null,
-      stars: +row.stars || 0, elite: row.elite || [], ticked: row.ticked || [],
+      elite: row.elite || [], ticked: row.ticked || [],
       run_pct: row.run_pct === "" || row.run_pct == null ? null : +row.run_pct,
       run_up_pct: row.run_up_pct === "" || row.run_up_pct == null ? null : +row.run_up_pct,
       angle: row.angle === "" || row.angle == null ? null : +row.angle,
@@ -121,17 +140,23 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
   // ── Entry editor (admin) ──
   const Editor = ({ initial }) => {
-    const [row, setRow] = useState(() => ({
-      ticker: "", pattern: "Breakout", theme: "", entry_date: "", exit_date: "", before_img: "", after_img: "",
-      stars: 5, elite: [], ticked: [], run_pct: "", run_up_pct: "", angle: "", characteristics: [],
-      days_held: "", r_mult: "", thesis: "", lesson: "", is_published: false,
-      ...(initial || {}),
-    }));
-    const eff = effectiveStars(+row.stars || 0, (row.elite || []).length);
+    const [row, setRow] = useState(() => {
+      let prefill = {};
+      try { prefill = JSON.parse(sessionStorage.getItem("viv-mb-prefill") || "{}"); sessionStorage.removeItem("viv-mb-prefill"); } catch {}
+      return {
+        ticker: "", pattern: "Trendline Breakout", theme: "", entry_date: "", exit_date: "", before_img: "", after_img: "",
+        elite: [], ticked: [], outcome: "", run_pct: "", run_up_pct: "", angle: "", characteristics: [],
+        days_held: "", r_mult: "", thesis: "", lesson: "", is_published: false,
+        ...prefill, ...(initial || {}),
+      };
+    });
+    const graded = starsFromTicked(row.ticked); // OBJECTIVE — same 16 ticks + formula as the Setup Grader
+    const eff = effectiveStars(graded.stars, (row.elite || []).length);
     const toggleElite = (k) => setRow(r => ({ ...r, elite: r.elite.includes(k) ? r.elite.filter(x => x !== k) : [...r.elite, k] }));
+    const toggleTick = (key) => setRow(r => ({ ...r, ticked: r.ticked.includes(key) ? r.ticked.filter(x => x !== key) : [...r.ticked, key] }));
     const pullGrade = () => {
       const g = getGrade(row.ticker);
-      if (g) setRow(r => ({ ...r, stars: g.stars, ticked: g.ticked || [] }));
+      if (g && g.ticked) setRow(r => ({ ...r, ticked: g.ticked }));
     };
     return (
       <div style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "20px 22px", marginBottom: 20 }}>
@@ -153,12 +178,30 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           <div><span style={lbl}>Slope ° (info-line)</span><input style={inputS} value={row.angle ?? ""} onChange={e => setRow(r => ({ ...r, angle: e.target.value }))} placeholder="62.5" /></div>
           <div><span style={lbl}>Days held</span><input style={inputS} value={row.days_held ?? ""} onChange={e => setRow(r => ({ ...r, days_held: e.target.value }))} placeholder="12" /></div>
           <div><span style={lbl}>R multiple</span><input style={inputS} value={row.r_mult ?? ""} onChange={e => setRow(r => ({ ...r, r_mult: e.target.value }))} placeholder="8.5" /></div>
-          <div><span style={lbl}>Base grade (0–5★)</span>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <select style={{ ...inputS, cursor: "pointer" }} value={row.stars} onChange={e => setRow(r => ({ ...r, stars: +e.target.value }))}>{[5, 4, 3, 2, 1, 0].map(n => <option key={n} value={n}>{n}★</option>)}</select>
-              <button onClick={pullGrade} title="Pull this ticker's saved Setup Grader score" style={{ ...chip(false), whiteSpace: "nowrap" }}>Pull grade</button>
+          <div><span style={lbl}>Outcome</span><select style={{ ...inputS, cursor: "pointer" }} value={row.outcome || ""} onChange={e => setRow(r => ({ ...r, outcome: e.target.value }))}><option value="">—</option>{OUTCOMES.map(o => <option key={o}>{o}</option>)}</select></div>
+        </div>
+
+        {/* SETUP GRADER CHECKLIST — the stars are COMPUTED from these ticks (objective, no bias) */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <span style={{ ...lbl, marginBottom: 0 }}>Setup Grader checklist — stars compute from these ticks</span>
+          <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.goldBright }}>{graded.stars}★ · {graded.passed}/{MB_TOTAL} · {graded.starHit}/{MB_STARMAKERS} ★-makers</span>
+          <button onClick={pullGrade} title="Import this ticker's saved Setup Grader ticks" style={{ ...chip(false), whiteSpace: "nowrap", marginLeft: "auto" }}>Pull from grader</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 10, marginBottom: 14 }}>
+          {SECTIONS.filter(s => !s.reminder).map((sec, si) => (
+            <div key={si} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", background: "rgba(255,255,255,0.015)" }}>
+              <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>{sec.title}</div>
+              {sec.items.map((it, ii) => {
+                const key = si + "-" + ii, on = row.ticked.includes(key);
+                return (
+                  <div key={ii} onClick={() => toggleTick(key)} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 2px", cursor: "pointer" }}>
+                    <span style={{ color: on ? C.goldBright : "rgba(255,255,255,0.22)", fontWeight: 800, lineHeight: 1.3 }}>{on ? "✓" : "○"}</span>
+                    <span style={{ fontSize: "0.76rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 }}>{it.c}{it.star && <span style={{ fontSize: "0.56rem", color: C.goldMid, marginLeft: 5 }}>★ maker</span>}</span>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          ))}
         </div>
         <div style={{ marginBottom: 14 }}>
           <span style={lbl}>Objective characteristics (comma-separated — measurable traits only)</span>
@@ -196,9 +239,13 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button disabled={busy || !row.ticker} onClick={() => save(row)} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.82rem", padding: "11px 24px", borderRadius: 99, cursor: "pointer", opacity: busy || !row.ticker ? 0.6 : 1 }}>{busy ? "Saving…" : row.id ? "Save changes" : "Add entry"}</button>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.78rem", color: row.is_published ? C.green : C.muted, cursor: "pointer", fontFamily: font, fontWeight: 700 }}>
-            <input type="checkbox" checked={!!row.is_published} onChange={e => setRow(r => ({ ...r, is_published: e.target.checked }))} /> Published to members
-          </label>
+          {isAdmin ? (
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.78rem", color: row.is_published ? C.green : C.muted, cursor: "pointer", fontFamily: font, fontWeight: 700 }}>
+              <input type="checkbox" checked={!!row.is_published} onChange={e => setRow(r => ({ ...r, is_published: e.target.checked }))} /> Published to members
+            </label>
+          ) : (
+            <span style={{ fontSize: "0.72rem", color: C.muted, fontFamily: font }}>Submitted entries are reviewed by the team before publishing.</span>
+          )}
           <button onClick={() => setEditing(null)} style={{ marginLeft: "auto", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 700, fontSize: "0.76rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
         </div>
       </div>
@@ -213,10 +260,10 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           onMouseEnter={guideEnter ? guideEnter("modelbook", "Model Book", "A curated library of the best real setups — study the before chart, the exact factors that made it elite, then the outcome. Pattern recognition is built by reps: same patterns, hundreds of examples.", undefined) : undefined}
           onMouseLeave={guideLeave ? guideLeave("modelbook") : undefined}>Model Book</h2>
         <span style={{ fontSize: "0.74rem", color: C.muted }}>study the best — before → factors → after</span>
-        {isAdmin && !editing && <button onClick={() => setEditing({})} style={{ marginLeft: "auto", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer" }}>+ Add entry</button>}
+        {!editing && <button onClick={() => setEditing({})} style={{ marginLeft: "auto", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer" }}>+ Add entry</button>}
       </div>
 
-      {editing !== null && isAdmin && <Editor initial={editing.id ? editing : null} />}
+      {editing !== null && <Editor initial={editing.id ? editing : null} />}
 
       {/* filters */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 18px" }}>
@@ -247,7 +294,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                   <span style={{ fontWeight: 800, fontSize: "1.02rem", color: C.white }}>{r.ticker}</span>
                   <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.gold, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 9px", borderRadius: 99 }}>{r.pattern}</span>
-                  {!r.is_published && isAdmin && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: C.muted, border: `1px solid ${C.border}`, padding: "2px 8px", borderRadius: 99 }}>DRAFT</span>}
+                  {!r.is_published && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: C.muted, border: `1px solid ${C.border}`, padding: "2px 8px", borderRadius: 99 }}>DRAFT</span>}
+                  {r.outcome && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: r.outcome === "Huge Winner" ? "#7ef0a0" : r.outcome === "Winner" ? C.green : r.outcome === "Loser" ? C.red : C.muted, border: `1px solid ${C.border}`, padding: "2px 8px", borderRadius: 99 }}>{r.outcome}</span>}
                   <span style={{ marginLeft: "auto", fontSize: "0.8rem", fontWeight: 800, color: (r.run_pct || 0) >= 0 ? C.green : C.red }}>{r.run_pct != null ? `${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : ""}</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7 }}>
@@ -327,7 +375,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               )}
               {r.thesis && <div style={{ marginBottom: 12 }}><div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>The thesis</div><div style={{ fontSize: "0.88rem", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.thesis}</div></div>}
               {r.lesson && <div style={{ marginBottom: 14 }}><div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>The lesson</div><div style={{ fontSize: "0.88rem", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.lesson}</div></div>}
-              {isAdmin && (
+              {(isAdmin || r.created_by === uid) && (
                 <div style={{ display: "flex", gap: 10, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
                   <button onClick={() => { setEditing(r); setDetail(null); }} style={{ background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>Edit</button>
                   <button onClick={() => remove(r)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.red, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>Delete</button>

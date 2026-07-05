@@ -28,11 +28,12 @@ const after_img = await upload("celh-after.png");
 const { data, error } = await supa.from("model_book").insert({
   created_by: ADMIN_UID,
   ticker: "CELH",
-  pattern: "Breakout",
+  pattern: "Trendline Breakout",
   theme: "Growth Stocks",
   before_img, after_img,
-  stars: 5,
-  elite: ["dead-volume", "inside-days", "the-leader", "fresh-base", "linear-move", "regime"],
+  stars: 5, // objective: full checklist below is ticked
+  ticked: ["0-0","0-1","0-2","0-3","0-4","1-0","1-1","1-2","2-0","2-1","2-2","2-3","2-4","2-5","2-6","2-7"],
+  elite: ["the-leader", "tennis-ball", "regime"],
   characteristics: ["Tight 3-week base", "Volume dry-up into pivot", "Riding rising 10/20MA", "High-RS consumer leader"],
   run_pct: 45, run_up_pct: 60, angle: 40, days_held: 30, r_mult: 9,
   thesis: "SAMPLE ENTRY — the category leader in a fresh consumer-growth theme, tightening for weeks above rising moving averages while volume dried up. Breakout on a clear range-expansion day with a tight stop under the pivot.",

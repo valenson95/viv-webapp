@@ -6103,6 +6103,17 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
                   {gr && <span className="td-grade" style={{ color: gcol }} title={`Setup grade ${gr.letter} · ${gr.stars}/5★`}>{gr.letter} · {gr.stars}★</span>}
                   <div className="spacer"></div>
+                  <button className="revbtn" title="Pre-fill a Model Book entry from this trade" onClick={() => {
+                    const g = getSavedGrade(t.ticker);
+                    try { sessionStorage.setItem("viv-mb-prefill", JSON.stringify({
+                      ticker: t.ticker, entry_date: tradeDateISO(t.entry) || "", exit_date: tradeDateISO(t.exit) || "",
+                      run_pct: t.plPct != null ? +Number(t.plPct).toFixed(1) : "", r_mult: t.rMult != null ? +Number(t.rMult).toFixed(2) : "",
+                      days_held: (() => { const a = new Date(tradeDateISO(t.entry) || t.entry), b = new Date(tradeDateISO(t.exit) || t.exit); return (isNaN(a) || isNaN(b)) ? "" : Math.max(0, Math.round((b - a) / 86400000)); })(),
+                      theme: sectorFor(t.ticker) || "", ticked: (g && g.ticked) || [],
+                      outcome: (Number(t.rMult) || 0) >= 3 ? "Huge Winner" : (Number(t.plPct) || 0) > 0 ? "Winner" : (Number(t.rMult) || 0) <= -1 ? "Loser" : "Subpar",
+                    })); } catch {}
+                    closeReview(); setPage && setPage("modelbook");
+                  }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)", fontWeight: 700 }}>📖 Add to Model Book</button>
                   <button className="revbtn" onClick={() => startEdit(t)} style={{ background: "var(--goldDim)", color: "var(--goldBright)", borderColor: "var(--borderGold)", fontWeight: 700 }}>Edit trade</button>
                 </div>
                 <div className="td-body">
@@ -7864,6 +7875,14 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
 
                           <div className="mgfoot">
                             <button className={"btn mgsell" + (sellOpen ? " open" : "")} onClick={() => sellOpen ? setSellOpen(false) : openSell(p)}>Sell / Close position</button>
+                            <button className="btn" title="Pre-fill a Model Book entry from this open position" onClick={() => {
+                              const g = getSavedGrade(p.sym);
+                              try { sessionStorage.setItem("viv-mb-prefill", JSON.stringify({
+                                ticker: p.sym, entry_date: tradeDateISO(p.entry) || "", theme: sectorFor(p.sym) || "",
+                                ticked: (g && g.ticked) || [],
+                              })); } catch {}
+                              setPage && setPage("modelbook");
+                            }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)" }}>📖 Add to Model Book</button>
                             <span className="mgfoot-hint">Logs a closed trade to your journal and reduces (or closes) this position.</span>
                             <div className="spacer"></div>
                             <button className="btn" style={{ color: "var(--red)", borderColor: "rgba(239,68,68,0.4)" }} title="Delete this position entirely (no journal entry). Use for entries keyed in by mistake." onClick={() => { if (removeRow(p.id)) { setManageId(null); setSellOpen(false); setTimeout(() => onManualSaveRef.current && onManualSaveRef.current(), 50); } }}>Delete position</button>
