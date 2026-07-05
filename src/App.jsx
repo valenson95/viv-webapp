@@ -11,6 +11,7 @@ import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
 import ModelBookPage, { outcomeFromR } from "./ModelBook.jsx";
+import MentorModePage from "./MentorMode.jsx";
 import { getGrade as getSavedGrade, useGrades as useSavedGrades, initGrades, isGradesReady } from "./grades.js";
 import FeedbackWidget from "./Feedback.jsx";
 
@@ -239,6 +240,7 @@ const WHATS_NEW = [
       "Trade details, redesigned: stats panel on the left (Net P&L, ROI, Gross P&L, adjusted cost, MAE/MFE from real market data, best exit price & time) beside the chart, with Chart/Notes tabs on the right.",
       "Plan your trades like a pro: set a Profit Target and Stop Loss price on any trade — Trade Risk, Planned R-Multiple and Realized R compute instantly. Planning inputs never touch your original stop.",
       "Model Book: paste chart screenshots straight from your clipboard (⌘V / Ctrl+V) — first paste fills the Before chart, second fills After.",
+      "Shadow-fill: type a ticker you've traded into a new Model Book entry and it finds that trade in your journal — one click imports the dates, %, R, days held, theme and outcome. Plus a 📖 Model Book button right on the trade preview.",
       "Honest theme metrics: in/off-theme tagging and the Objective Edge theme split only track from the first theme snapshot (28 Jun 2026) forward — a later theme is never used to judge an older trade. Earlier trades simply show untagged.",
       "Filter by book (VIV Official / My Book), by pattern (Trendline Breakout / Pullback Buy / Episodic Pivot / VCP) and by grade. New official entries are added on an ongoing basis — check back weekly.",
       "Also in this update: tickers outside our theme map now auto-detect their sector, plus accuracy fixes across metrics (break-even trades, risk %, hold times, calendar filtering).",
@@ -2890,6 +2892,7 @@ return (
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a>}
           <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
@@ -5539,6 +5542,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+            {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -6255,6 +6259,19 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 {t.reason && <div className="tp-reason"><div className="tp-reason-h">Exit reason</div><div className="tp-reason-b">{t.reason}</div></div>}
                 <div className="tp-foot">
                   <button className="tp-go" onClick={() => { setPreviewTrade(null); openReview(t); }}>Go to trade details ›</button>
+                  <button className="revbtn" title="Import this trade into the Model Book — everything already known is pre-filled" onClick={() => {
+                    const g = getSavedGrade(t.ticker);
+                    try { const pf = {
+                      ticker: t.ticker, entry_date: tradeDateISO(t.entry) || "", exit_date: tradeDateISO(t.exit) || "",
+                      run_pct: t.plPct != null ? +Number(t.plPct).toFixed(1) : "", r_mult: t.rMult != null ? +Number(t.rMult).toFixed(2) : "",
+                      days_held: (() => { const a = new Date(tradeDateISO(t.entry) || t.entry), b = new Date(tradeDateISO(t.exit) || t.exit); return (isNaN(a) || isNaN(b)) ? "" : Math.max(0, Math.round((b - a) / 86400000)); })(),
+                      theme: sectorFor(t.ticker) || "", ticked: (g && g.ticked) || [],
+                      outcome: outcomeFromR(t.rMult, t.plPct) || "",
+                    };
+                    pf.metrics = { _auto: ["ticker", "entry_date", "exit_date", "run_pct", "r_mult", "days_held", "theme", "outcome"].filter(k => pf[k] !== "" && pf[k] != null) };
+                    sessionStorage.setItem("viv-mb-prefill", JSON.stringify(pf)); } catch {}
+                    setPreviewTrade(null); setPage && setPage("modelbook");
+                  }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)", fontWeight: 700 }}>📖 Model Book</button>
                   <button className="revbtn" onClick={() => { setPreviewTrade(null); startEdit(t); }}>Edit</button>
                 </div>
               </div>
@@ -7792,6 +7809,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -8594,6 +8612,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -9047,7 +9066,7 @@ const ADMIN_EMAIL = "vc-lv@live.com";
 // ═══════════════════════════════════════
 // ─── Smokey Particle Background for Login ───
 // ─── MODEL BOOK PAGE SHELL — reuses the journal CSS scope (.vj) for navbar/cards ───
-function ModelBookShell({ setPage, onLogout, session, displayName }) {
+function ModelBookShell({ setPage, onLogout, session, displayName, journaledTrades }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   return (
     <div className="vj">
@@ -9060,6 +9079,7 @@ function ModelBookShell({ setPage, onLogout, session, displayName }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a className="on" style={{ cursor: "pointer" }}>Model Book</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
           <div className="spacer"></div>
@@ -9071,7 +9091,40 @@ function ModelBookShell({ setPage, onLogout, session, displayName }) {
           <div className="h1" style={{ marginTop: 6 }}>Study the <span className="goldname">best setups</span>, {(displayName && displayName.trim()) || "trader"}</div>
           <div className="sub">Real winners, graded and dissected — the before chart, the exact factors that made it elite, then the outcome. Pattern recognition is built by reps.</div>
         </div>
-        <ModelBookPage C={C} font={font} session={session} isAdmin={isAdmin} />
+        <ModelBookPage C={C} font={font} session={session} isAdmin={isAdmin} journaledTrades={journaledTrades} />
+      </div>
+    </div>
+  );
+}
+
+// ── MENTOR MODE shell — ADMIN-ONLY (renders nothing for members) ──
+function MentorShell({ setPage, onLogout, session }) {
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  if (!isAdmin) return null;
+  return (
+    <div className="vj">
+      <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
+      <div className="shell">
+        <div className="navbar">
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="tabs">
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            <a className="on" style={{ cursor: "pointer" }}>Mentor</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          </div>
+          <div className="spacer"></div>
+          <WhatsNew />
+          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
+        </div>
+        <div className="reveal in-view" style={{ marginBottom: 10 }}>
+          <div className="eyebrow">Mentorship</div>
+          <div className="h1" style={{ marginTop: 6 }}>Coach your <span className="goldname">members</span></div>
+          <div className="sub">Roster performance at a glance, drill into any member's trades, replay them candle-by-candle, and leave coaching notes — private until you flip them member-visible.</div>
+        </div>
+        <MentorModePage C={C} font={font} session={session} />
       </div>
     </div>
   );
@@ -10591,7 +10644,8 @@ function AppInner() {
       {page === "dashboard" && <DashboardPage setPage={setPage} onLogout={handleLogout} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
       {page === "tools" && <PremiumToolsPage setPage={setPage} onLogout={handleLogout} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} positions={positions} displayName={displayName} />}
       {page === "journal" && <TradeJournalPage setPage={setPage} onLogout={handleLogout} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} />}
-      {page === "modelbook" && <ModelBookShell setPage={setPage} onLogout={handleLogout} session={session} displayName={displayName} />}
+      {page === "modelbook" && <ModelBookShell setPage={setPage} onLogout={handleLogout} session={session} displayName={displayName} journaledTrades={journaledTrades} />}
+      {page === "mentor" && <MentorShell setPage={setPage} onLogout={handleLogout} session={session} />}
       {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
       <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />

@@ -2,6 +2,17 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
 import { SECTIONS } from "./SetupGrader.jsx";
+import { sectorFor } from "./sectors.js";
+
+// tolerant date → ISO (journal trades carry ISO or M/D/YY)
+const mbISO = (d) => {
+  if (!d) return "";
+  const s = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const m = s.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})/);
+  if (m) return `${m[3].length === 2 ? "20" + m[3] : m[3]}-${String(m[1]).padStart(2, "0")}-${String(m[2]).padStart(2, "0")}`;
+  return "";
+};
 
 // ══════════════════════════════════════════════════════════════════
 // VIV MODEL BOOK — curated database of the best winning setups, for
@@ -71,7 +82,7 @@ const Stars = ({ C, n, max = 7, size = "0.95rem" }) => (
 // ── Entry editor — MODULE scope on purpose: defined inline it was recreated on every
 // parent render (new component type → React unmounts/remounts → typed form wiped, prefill
 // lost, uploads resolving against a dead instance). Do not move it back inside the page.
-function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload }) {
+function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload, journaledTrades }) {
   const chipBtn = { fontSize: "0.72rem", fontWeight: 700, padding: "6px 14px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "rgba(255,255,255,0.03)" };
   const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.84rem", padding: "9px 12px", outline: "none", width: "100%", colorScheme: "dark" };
   const lbl = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" };
@@ -104,6 +115,32 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload 
       const g = getGrade(row.ticker);
       if (g && g.ticked) setRow(r => ({ ...r, ticked: g.ticked }));
     };
+    // ⚡ SHADOW-FILL — type a ticker you've actually traded and the editor offers that
+    // journal trade: one click imports dates/%/R/days/theme/outcome (gold-dotted).
+    const shadow = (() => {
+      if (row.id || !row.ticker || row.ticker.length < 2 || !journaledTrades?.length) return null;
+      if (row.entry_date || row.exit_date || row.run_pct !== "" || row.r_mult !== "") return null; // already filled
+      return journaledTrades
+        .filter(t => t.exit && String(t.ticker).toUpperCase().trim() === row.ticker)
+        .sort((a, b) => mbISO(b.exit).localeCompare(mbISO(a.exit)))[0] || null;
+    })();
+    const applyShadow = () => {
+      if (!shadow) return;
+      const eI = mbISO(shadow.entry), xI = mbISO(shadow.exit);
+      const days = eI && xI ? Math.max(0, Math.round((new Date(xI) - new Date(eI)) / 86400000)) : "";
+      const g = getGrade(row.ticker);
+      const fills = {
+        entry_date: eI, exit_date: xI,
+        run_pct: shadow.plPct != null ? +Number(shadow.plPct).toFixed(1) : "",
+        r_mult: shadow.rMult != null ? +Number(shadow.rMult).toFixed(2) : "",
+        days_held: days, theme: sectorFor(row.ticker) || "",
+        outcome: outcomeFromR(shadow.rMult, shadow.plPct) || "",
+      };
+      setRow(r => ({
+        ...r, ...fills, ticked: (g && g.ticked && !r.ticked.length) ? g.ticked : r.ticked,
+        metrics: { ...(r.metrics || {}), _auto: [...new Set([...((r.metrics || {})._auto || []), ...Object.keys(fills).filter(k => fills[k] !== "" && fills[k] != null)])].sort() },
+      }));
+    };
     // 📋 Paste-to-upload: copy a chart screenshot, hit ⌘V/Ctrl+V anywhere in the editor —
     // first paste fills the BEFORE slot, second fills AFTER (replace by clearing first).
     const onPaste = (e) => {
@@ -126,6 +163,12 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload 
           <div style={{ fontSize: "0.72rem", fontWeight: 600, color: C.goldBright, marginBottom: 12 }}>
             <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 99, background: C.goldBright, boxShadow: "0 0 7px rgba(240,192,80,0.85)", marginRight: 7, verticalAlign: "middle" }} />
             gold dot = auto-filled from your chart — cross-check and edit anything that's off (editing clears the dot)
+          </div>
+        )}
+        {shadow && (
+          <div onClick={applyShadow} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.78rem", fontWeight: 700, color: C.goldBright, background: C.goldDim, border: `1px dashed ${C.borderGold}`, borderRadius: 12, padding: "10px 14px", marginBottom: 12, cursor: "pointer" }}>
+            ⚡ Found your {row.ticker} trade ({mbISO(shadow.exit)}) in the journal — click to shadow-fill dates, %, R, days, theme &amp; outcome.
+            <span style={{ marginLeft: "auto", fontSize: "0.68rem", color: C.muted, fontWeight: 600 }}>fills only what's empty</span>
           </div>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
@@ -222,7 +265,7 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload 
     );
 }
 
-export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, guideLeave, gactive }) {
+export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, guideLeave, gactive, journaledTrades }) {
   const uid = session?.user?.id;
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -334,7 +377,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         {!editing && <button onClick={() => setEditing({})} style={{ marginLeft: "auto", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer" }}>{isAdmin ? "+ Add entry" : "+ Add to my book"}</button>}
       </div>
 
-      {editing !== null && <MBEditor C={C} font={font} busy={busy} isAdmin={isAdmin} initial={editing.id ? editing : null} onSave={save} onCancel={() => setEditing(null)} onUpload={uploadImg} />}
+      {editing !== null && <MBEditor C={C} font={font} busy={busy} isAdmin={isAdmin} initial={editing.id ? editing : null} onSave={save} onCancel={() => setEditing(null)} onUpload={uploadImg} journaledTrades={journaledTrades} />}
 
       {/* filters */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 18px", alignItems: "center" }}>
