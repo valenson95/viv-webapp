@@ -119,6 +119,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const [chartImg, setChartImg] = useState(""); // chart for the daily post / share card
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sel, setSel] = useState(() => new Set()); // bulk-selected watchlist symbols
   const loadSeq = useRef(""); // last loadTicker target — guards async prefill against ticker switches
   const [editDate, setEditDate] = useState(null); // set when editing an existing post — republish keeps its date
 
@@ -230,6 +231,58 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     flashMsg(`Synced to ${sym} — shows on its Open Positions row & is kept if it closes`);
   };
 
+  // ── watchlist bulk actions: select rows → copy text summary / download share cards ──
+  const toggleSel = (sym) => setSel(prev => { const n = new Set(prev); n.has(sym) ? n.delete(sym) : n.add(sym); return n; });
+  const copySummary = async () => {
+    const rows = loadRowsSel();
+    if (!rows.length) return;
+    const date = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const text = `VIV Screening Watchlist — ${date}\n` + rows.map(g =>
+      `${(g.letter || "—").padEnd(2)} ${"★".repeat(g.stars || 0)}${"☆".repeat(5 - (g.stars || 0))}  ${g.sym}  ${Math.round((g.pct || 0) * 100)}%`).join("\n");
+    try { await navigator.clipboard.writeText(text); flashMsg(`Copied ${rows.length} name${rows.length > 1 ? "s" : ""} as text 📋`); }
+    catch { flashMsg("Clipboard blocked by the browser"); }
+  };
+  const loadRowsSel = () => Object.values(loadGrades()).filter(g => sel.has(g.sym)).sort((a, b) => (b.stars - a.stars) || (a.sym < b.sym ? -1 : 1));
+  const downloadCards = async () => {
+    const rows = loadRowsSel();
+    if (!rows.length) return;
+    setBusy(true);
+    flashMsg(`Rendering ${rows.length} card${rows.length > 1 ? "s" : ""}… allow multiple downloads if the browser asks`);
+    // one query: latest post per selected ticker → chart/note/sector for the cards
+    const posts = {};
+    if (uid) {
+      try {
+        const { data } = await supabase.from("daily_setups").select("ticker,chart_img,sector,trade_date")
+          .in("ticker", rows.map(g => g.sym)).eq("created_by", uid)
+          .order("trade_date", { ascending: false }).order("created_at", { ascending: false });
+        (data || []).forEach(r => { if (!posts[r.ticker]) posts[r.ticker] = r; });
+      } catch {}
+    }
+    const today = localISO();
+    for (const g of rows) {
+      const post = posts[g.sym] || {};
+      const tset = new Set(g.ticked || []);
+      const items = [];
+      SECTIONS.forEach((sec, si) => { if (sec.reminder) return; sec.items.forEach((it, ii) => items.push({ label: it.c, on: tset.has(si + "-" + ii), star: !!it.star })); });
+      const sector = post.sector || sectorFor(g.sym);
+      const cv = await renderShareCard({
+        ticker: g.sym, sector, themeStatus: themeFit(sector, today),
+        dateLabel: new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }),
+        stars: g.stars || 0, letter: g.letter || "—", label: (GRADES[g.stars || 0] || GRADES[0])[0],
+        passed: (g.ticked || []).length, total: TOTAL, starHit: g.starHit ?? 0, starmakers: STARMAKERS,
+        items, chartUrl: post.chart_img || null,
+      });
+      await new Promise(res => cv.toBlob(b => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(b); a.download = `VIV-${g.sym}-${today}.png`; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000); res();
+      }, "image/png"));
+      await new Promise(r => setTimeout(r, 350)); // spread the downloads so the browser keeps them all
+    }
+    setBusy(false);
+    flashMsg(`Downloaded ${rows.length} share card${rows.length > 1 ? "s" : ""} 📥`);
+  };
+
   // ── daily-post kit: chart attach (paste/file) + publish + share card ──
   const uploadChart = async (file) => {
     if (!file || !String(file.type || "").startsWith("image/")) return;
@@ -332,6 +385,14 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
             <button onClick={startTicker} style={{ background: C.goldDim, color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 800, fontSize: "0.74rem", padding: "8px 14px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>Grade this ↓</button>
           </div>
         </div>
+        {isAdmin && sel.size > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "4px 2px 12px" }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 800, color: C.gold }}>{sel.size} selected</span>
+            <button disabled={busy} onClick={copySummary} style={{ background: "rgba(255,255,255,0.06)", color: C.text, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>📋 Copy summary</button>
+            <button disabled={busy} onClick={downloadCards} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>🖼 Download {sel.size} card{sel.size > 1 ? "s" : ""}</button>
+            <button onClick={() => setSel(new Set())} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer" }}>Clear</button>
+          </div>
+        )}
         {savedRows.length === 0 ? (
           <div style={{ fontSize: "0.8rem", color: C.muted, padding: "6px 2px 12px" }}>No graded names yet — type a ticker, tick the criteria below, then <b style={{ color: C.gold }}>Save grade</b>. It'll appear here.</div>
         ) : (
@@ -339,6 +400,12 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460 }}>
               <thead>
                 <tr style={{ textAlign: "left" }}>
+                  {isAdmin && <th style={{ padding: "6px 4px 6px 8px", borderBottom: `1px solid ${C.border}`, width: 30 }}>
+                    <input type="checkbox" title="Select all"
+                      checked={savedRows.length > 0 && savedRows.every(g => sel.has(g.sym))}
+                      onChange={e => setSel(e.target.checked ? new Set(savedRows.map(g => g.sym)) : new Set())}
+                      style={{ accentColor: "#c9982a", cursor: "pointer" }} />
+                  </th>}
                   {["Ticker", "Grade", "Stars", "%", "", ""].map((h, i) => (
                     <th key={i} style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, padding: "6px 8px", borderBottom: `1px solid ${C.border}`, textAlign: i >= 3 ? "right" : "left" }}>{h}</th>
                   ))}
@@ -351,6 +418,9 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                     <tr key={g.sym} onClick={() => loadTicker(g.sym)} style={{ cursor: "pointer", background: active ? "rgba(201,152,42,0.07)" : "transparent" }}
                       onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
                       onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(201,152,42,0.07)" : "transparent"; }}>
+                      {isAdmin && <td onClick={e => e.stopPropagation()} style={{ padding: "9px 4px 9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)`, width: 30 }}>
+                        <input type="checkbox" checked={sel.has(g.sym)} onChange={() => toggleSel(g.sym)} style={{ accentColor: "#c9982a", cursor: "pointer" }} />
+                      </td>}
                       <td style={{ padding: "9px 8px", fontWeight: 800, fontSize: "0.86rem", color: C.white, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
                         {g.sym}
                         {posSet.has(g.sym) && <span title="Open position" style={{ marginLeft: 7, fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.06em", color: C.green, background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)", padding: "2px 6px", borderRadius: 99, verticalAlign: "middle" }}>OPEN</span>}
