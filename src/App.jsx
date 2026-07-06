@@ -242,6 +242,7 @@ const WHATS_NEW = [
       "Plan your trades like a pro: set a Profit Target and Stop Loss price on any trade — Trade Risk, Planned R-Multiple and Realized R compute instantly. Planning inputs never touch your original stop.",
       "Model Book: paste chart screenshots straight from your clipboard (⌘V / Ctrl+V) — first paste fills the Before chart, second fills After.",
       "Shadow-fill: type a ticker you've traded into a new Model Book entry and it finds that trade in your journal — one click imports the dates, %, R, days held, theme and outcome. Plus a 📖 Model Book button right on the trade preview.",
+      "IBKR sync fixes: a new Sync now button (Settings) pulls your trades instantly, the nightly auto-sync is live after each US close, turning sync on backfills your last 30 days, and the sample starter positions are removed automatically the moment you connect — you only ever see YOUR book.",
       "Honest theme metrics: in/off-theme tagging and the Objective Edge theme split only track from the first theme snapshot (28 Jun 2026) forward — a later theme is never used to judge an older trade. Earlier trades simply show untagged.",
       "Filter by book (VIV Official / My Book), by pattern (Trendline Breakout / Pullback Buy / Episodic Pivot / VCP) and by grade. New official entries are added on an ongoing basis — check back weekly.",
       "Also in this update: tickers outside our theme map now auto-detect their sector, plus accuracy fixes across metrics (break-even trades, risk %, hold times, calendar filtering).",
@@ -8777,15 +8778,18 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
                   </div>
                   <div className="hint" style={{ marginTop: 4, maxWidth: 460 }}>
                     {isIbkrMode
-                      ? <>Closed trades from <b>{ibkrSyncInfo?.cutover_date || "your cutover date"}</b> forward are logged automatically, a few minutes after they close. {ibkrSyncInfo?.last_synced_at ? <>Last synced <b>{new Date(ibkrSyncInfo.last_synced_at).toLocaleString()}</b>.</> : "Waiting for your first closed trade."} R-multiple stays blank until you add your stop. Read-only; your existing history is never touched.</>
+                      ? <>Closed trades from <b>{ibkrSyncInfo?.cutover_date || "your cutover date"}</b> forward are logged on the nightly sync after each US close — or instantly with <b>Sync now</b>. {ibkrSyncInfo?.last_synced_at ? <>Last synced <b>{new Date(ibkrSyncInfo.last_synced_at).toLocaleString()}</b>.</> : <>No sync has run yet — hit <b>Sync now</b> to pull your trades.</>} R-multiple stays blank until you add your stop. Read-only; your existing history is never touched.</>
                       : ibkrConnected
-                        ? <>Turn this on to auto-log your closed trades from <b>today</b> forward. You stop hand-entering trades; everything already in your journal stays exactly as it is.</>
+                        ? <>Turn this on to auto-log your closed trades (we backfill the last 30 days). Any sample positions are removed so you see only YOUR book. Everything already in your journal stays exactly as it is.</>
                         : <>Connect your IBKR account above first, then turn this on.</>}
                   </div>
                 </div>
                 {isIbkrMode
-                  ? <button className="btn" disabled={syncModeBusy} onClick={() => toggleSyncMode("manual")} title="Stop auto-sync and return to manual entry">{syncModeBusy ? "…" : "Pause auto-sync"}</button>
-                  : <button className="btn gold" disabled={syncModeBusy || !ibkrConnected} onClick={() => toggleSyncMode("ibkr")} title={ibkrConnected ? "Start auto-sync from today" : "Connect your IBKR account first"}>{syncModeBusy ? "…" : "Turn on auto-sync"}</button>}
+                  ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {onIbkrSync && <button className="btn gold" disabled={syncModeBusy} onClick={() => onIbkrSync()} title="Pull your latest IBKR statement right now">Sync now</button>}
+                      <button className="btn" disabled={syncModeBusy} onClick={() => toggleSyncMode("manual")} title="Stop auto-sync and return to manual entry">{syncModeBusy ? "…" : "Pause auto-sync"}</button>
+                    </div>
+                  : <button className="btn gold" disabled={syncModeBusy || !ibkrConnected} onClick={() => toggleSyncMode("ibkr")} title={ibkrConnected ? "Start auto-sync (backfills the last 30 days)" : "Connect your IBKR account first"}>{syncModeBusy ? "…" : "Turn on auto-sync"}</button>}
               </div>
             </div>
           )}
@@ -10227,6 +10231,14 @@ function AppInner() {
           // because the server is the cross-device truth — but unique device-only keys are preserved.
           if (s.setting_key === "trade_links" && s.setting_value && typeof s.setting_value === "object") {
             try {
+              // Cache hygiene (grades.js owner-wipe pattern): if this browser's link/target caches
+              // belong to a DIFFERENT account, wipe them — otherwise the merge-back below would
+              // push user A's links INTO user B's account on a shared browser.
+              try {
+                const owner = localStorage.getItem("viv-cache-owner-uid-v1");
+                if (owner && owner !== uid) { localStorage.removeItem(TRADE_LINKS_KEY); localStorage.removeItem("viv-trade-targets-v1"); }
+                localStorage.setItem("viv-cache-owner-uid-v1", uid);
+              } catch {}
               const local = JSON.parse(localStorage.getItem(TRADE_LINKS_KEY) || "{}") || {};
               const merged = { ...local, ...s.setting_value }; // server wins per-key
               localStorage.setItem(TRADE_LINKS_KEY, JSON.stringify(merged));
@@ -10300,6 +10312,7 @@ function AppInner() {
             entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
             stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
             commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, trade_type: p.tradeType || "Long",
+            source: "demo", // labeled — auto-removed the moment the member connects IBKR (member-reported bug: unlabeled seeds read as "someone else's trades")
           })));
           if (!seedErr) {
             // Re-load from DB so positions have real DB ids
@@ -10620,16 +10633,30 @@ function AppInner() {
   }, [session, journaledTrades]);
 
   // ─── Turn IBKR auto-sync on / off ─────────────────────────────────────────────────────────
-  // 'ibkr' → opt in with cutover = today (only fills from today forward; existing history untouched).
+  // 'ibkr' → opt in; first-time cutover = 30 DAYS BACK (Flex reports reach ~30d — backfill the
+  // recent month instead of only-from-today, which silently orphaned members' prior weeks).
+  // Opting in also removes the demo-seed sample positions (labeled or legacy-unlabeled) so a
+  // member's first synced view is THEIR book, not the sample one (member-reported).
   // 'manual' → pause auto-sync and go back to manual entry. Idempotent upsert on ibkr_sync_state.
   const handleSetSyncMode = useCallback(async (mode) => {
     if (!session) return false;
     const uid = session.user.id;
-    const today = new Date().toISOString().slice(0, 10);
-    const cutover = ibkrSyncInfo?.cutover_date || today; // keep existing cutover; first time = today
+    const backfill = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const cutover = ibkrSyncInfo?.cutover_date || backfill; // keep existing cutover; first time = 30d back
     const row = { user_id: uid, sync_mode: mode, cutover_date: cutover, updated_at: new Date().toISOString() };
     const { error } = await supabase.from("ibkr_sync_state").upsert(row, { onConflict: "user_id" });
     if (error) { console.error("Set sync mode failed:", error.message); return false; }
+    if (mode === "ibkr") {
+      try {
+        const { data: cand } = await supabase.from("positions").select("id,symbol,shares,entry_price,source,ib_conid").eq("user_id", uid).eq("is_closed", false);
+        const sigs = new Set(INIT_POSITIONS.map(p => `${p.sym}|${p.shares}|${p.ep}`));
+        const ids = (cand || []).filter(p => !p.ib_conid && (p.source === "demo" || sigs.has(`${p.symbol}|${p.shares}|${p.entry_price}`))).map(p => p.id);
+        if (ids.length) {
+          await supabase.from("positions").delete().in("id", ids);
+          setPositions(prev => prev.filter(p => !ids.includes(p.id)));
+        }
+      } catch {}
+    }
     setIbkrSyncInfo(prev => ({ ...(prev || {}), sync_mode: mode, cutover_date: cutover }));
     setIsIbkrMode(mode === "ibkr");
     return true;
