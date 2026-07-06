@@ -236,6 +236,7 @@ const WHATS_NEW = [
       "Your starting capital is now easier to edit: click the big equity number (or the Start value) on the Dashboard's Live Risk Budget card — it's your sizing base, so set it to YOUR account.",
       "Nav reordered: Premium tools now sits before Model Book, with Daily Setups next to it.",
       "These posts are educational market study, not trade signals — the entry, the stop, and the decision are always yours.",
+      "Fixed: the Edit trade button inside the full trade-details page now opens the editor properly (it was opening behind the page — thanks Vincentius for the report).",
     ],
   },
   {
@@ -3756,7 +3757,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
     font-size:0.8rem; color:var(--text); font-weight:600}
 .vj .metricopt:hover{background:rgba(255,255,255,0.05)}
 .vj .metricopt input{accent-color:var(--gold); width:14px; height:14px; cursor:pointer; flex:none}
-.vj .modal{display:none; position:fixed; inset:0; z-index:300; background:rgba(8,8,14,0.72); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:24px}
+.vj .modal{display:none; position:fixed; inset:0; z-index:1400; background:rgba(8,8,14,0.72); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:24px}
 .vj .modal.open{display:flex}
 .vj .modalcard{background:#0c0c14; border:1px solid var(--borderGold); border-radius:20px; width:100%; max-width:780px; max-height:86vh; overflow:auto; padding:24px 26px}
 .vj .modalhead{display:flex; align-items:flex-start; gap:16px; margin-bottom:18px}
