@@ -27,7 +27,7 @@ function dateLabel(iso) {
   return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
 }
 
-export default function DailySetupsTab({ C, font, session, isAdmin }) {
+export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   const [rows, setRows] = useState(null); // null = loading
   const [tableMissing, setTableMissing] = useState(false);
   const [openId, setOpenId] = useState(null);   // expanded scorecard
@@ -131,7 +131,22 @@ export default function DailySetupsTab({ C, font, session, isAdmin }) {
                       <Stars C={C} n={r.stars} />
                       <span style={{ fontSize: "0.92rem", fontWeight: 800, color: letterColor(C, r.letter) }}>{r.letter}</span>
                       {r._local && <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: C.gold, background: "rgba(201,152,42,0.12)", border: `1px solid ${C.borderGold}`, padding: "3px 8px", borderRadius: 99 }}>LOCAL</span>}
-                      {isAdmin && <button onClick={() => remove(r)} title="Remove post" style={{ marginLeft: "auto", background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>×</button>}
+                      {isAdmin && (
+                        <span style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
+                          <button title="Edit in the Setup Grader — republish replaces this post"
+                            onClick={() => {
+                              try {
+                                sessionStorage.setItem("viv-ds-edit", JSON.stringify({
+                                  ticker: r.ticker, trade_date: r.trade_date, ticked: r.ticked || [],
+                                  auto: r.auto || [], note: r.note || "", chart_img: r.chart_img || "",
+                                }));
+                              } catch {}
+                              setPage && setPage("tools");
+                            }}
+                            style={{ background: "rgba(201,152,42,0.1)", border: `1px solid ${C.borderGold}`, color: C.gold, fontFamily: font, fontSize: "0.66rem", fontWeight: 800, padding: "4px 11px", borderRadius: 99, cursor: "pointer" }}>✎ Edit</button>
+                          <button onClick={() => remove(r)} title="Remove post" style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>×</button>
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: "0.74rem", color: C.muted, marginTop: 5 }}>
                       {r.pct != null ? `${Math.round(r.pct * 100)}% of criteria` : ""}{r.star_hit != null ? ` · ${r.star_hit}/${r.starmakers} ★-makers` : ""}

@@ -9208,7 +9208,7 @@ function DailySetupsShell({ setPage, onLogout, session, displayName }) {
           <div className="h1" style={{ marginTop: 6 }}>Today's setups on <span className="goldname">the radar</span>, {(displayName && displayName.trim()) || "trader"}</div>
           <div className="sub">Fresh each day — the chart, the read, and the full graded scorecard behind every star. Educational, not trade signals.</div>
         </div>
-        <DailySetupsTab C={C} font={font} session={session} isAdmin={isAdmin} />
+        <DailySetupsTab C={C} font={font} session={session} isAdmin={isAdmin} setPage={setPage} />
       </div>
     </div>
   );

@@ -120,6 +120,27 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const loadSeq = useRef(""); // last loadTicker target — guards async prefill against ticker switches
+  const [editDate, setEditDate] = useState(null); // set when editing an existing post — republish keeps its date
+
+  // ✎ Edit from the Daily Setups feed → the full post loads here; republish REPLACES it (same ticker+date)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("viv-ds-edit");
+      if (!raw) return;
+      sessionStorage.removeItem("viv-ds-edit"); // consume once — never re-trigger on later visits
+      const e = JSON.parse(raw);
+      if (!e || !e.ticker) return;
+      loadSeq.current = e.ticker; // block any in-flight prefill from overwriting this payload
+      setTicker(e.ticker);
+      setOn(new Set(e.ticked || []));
+      setAuto(new Set(e.auto || []));
+      setNote(e.note || "");
+      setChartImg(e.chart_img || "");
+      setEditDate(e.trade_date || null);
+      flashMsg(`Editing the ${e.ticker} post (${e.trade_date}) — Publish replaces it`);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const toggle = (key) => {
     // any human touch clears the gold dot — same convention as the Model Book
     setAuto(prev => { if (!prev.has(key)) return prev; const n = new Set(prev); n.delete(key); return n; });
@@ -155,7 +176,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const loadTicker = (sym) => {
     const g = getGrade(sym);
     setTicker(sym); setOn(new Set(g && g.ticked ? g.ticked : [])); setAuto(new Set(g && g.auto ? g.auto : []));
-    setChartImg(""); setNote("");
+    setChartImg(""); setNote(""); setEditDate(null); // switching tickers leaves post-edit mode
     loadSeq.current = sym; // stamp: only the LATEST loadTicker may prefill (kills the cross-ticker race)
     // If I already have a post for this ticker (e.g. published via "pull my daily ideas"),
     // pull its chart + annotation back into the kit so republish/share-card keeps them.
@@ -228,7 +249,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     setBusy(true);
     saveGrade(s, grade); // publishing also keeps the grade in the watchlist
     const res = await publishSetup({
-      created_by: uid, ticker: s, trade_date: localISO(),
+      created_by: uid, ticker: s, trade_date: editDate || localISO(),
       sector: sectorFor(s), stars, letter, pct, star_hit: starHit, starmakers: STARMAKERS,
       ticked: [...on], auto: autoLive, note: note.trim(), chart_img: chartImg,
     });
