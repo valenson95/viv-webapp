@@ -242,7 +242,8 @@ const WHATS_NEW = [
       "Plan your trades like a pro: set a Profit Target and Stop Loss price on any trade — Trade Risk, Planned R-Multiple and Realized R compute instantly. Planning inputs never touch your original stop.",
       "Model Book: paste chart screenshots straight from your clipboard (⌘V / Ctrl+V) — first paste fills the Before chart, second fills After.",
       "Shadow-fill: type a ticker you've traded into a new Model Book entry and it finds that trade in your journal — one click imports the dates, %, R, days held, theme and outcome. Plus a 📖 Model Book button right on the trade preview.",
-      "IBKR sync fixes: a new Sync now button (Settings) pulls your trades instantly, the nightly auto-sync is live after each US close, turning sync on backfills your last 30 days, and the sample starter positions are removed automatically the moment you connect — you only ever see YOUR book.",
+      "IBKR sync fixes: a new Sync now button (Settings) pulls your trades instantly, the nightly auto-sync runs after each US close, and turning sync on backfills your last 30 days.",
+      "Sample data is gone for good: the starter demo positions are no longer added to new accounts, and any untouched sample rows have been cleared from existing accounts — your dashboard only ever shows YOUR book.",
       "Honest theme metrics: in/off-theme tagging and the Objective Edge theme split only track from the first theme snapshot (28 Jun 2026) forward — a later theme is never used to judge an older trade. Earlier trades simply show untagged.",
       "Filter by book (VIV Official / My Book), by pattern (Trendline Breakout / Pullback Buy / Episodic Pivot / VCP) and by grade. New official entries are added on an ongoing basis — check back weekly.",
       "Also in this update: tickers outside our theme map now auto-detect their sector, plus accuracy fixes across metrics (break-even trades, risk %, hold times, calendar filtering).",
@@ -10306,22 +10307,11 @@ function AppInner() {
         // Query succeeded but returned empty — check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
         if (!initFlag) {
-          // Very first login — seed demo positions, save to DB, then load back with DB ids
-          const { error: seedErr } = await supabase.from("positions").insert(INIT_POSITIONS.map(p => ({
-            user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", entry_time: p.entryTime || "", shares: p.shares || "",
-            entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
-            stop_price_2: p.stop2 || "", trailing_stop: p.trailStop || "", setup: p.setup || "VCP", tags: p.tags || [],
-            commission: p.comm != null && p.comm !== "" ? Number(p.comm) : null, trade_type: p.tradeType || "Long",
-            source: "demo", // labeled — auto-removed the moment the member connects IBKR (member-reported bug: unlabeled seeds read as "someone else's trades")
-          })));
-          if (!seedErr) {
-            // Re-load from DB so positions have real DB ids
-            const { data: seeded } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).order("created_at");
-            if (seeded && seeded.length > 0) {
-              lastLoadedCount.current = seeded.length;
-              setPositions(seeded.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) })));
-            }
-          }
+          // Very first login — start with an EMPTY book. (We used to seed 6 demo positions here;
+          // members read them as "someone else's trades" — removed 2026-07-06 per Valen. New users
+          // see the empty state and either add manually or connect IBKR. INIT_POSITIONS is kept
+          // only as the signature list for cleaning legacy seeds out of old accounts.)
+          lastLoadedCount.current = 0;
           await saveSettingNow(uid, "initialized", true);
         } else {
           // User deleted all positions intentionally — keep empty
