@@ -50,3 +50,7 @@ alter table public.setup_grades add column if not exists auto jsonb not null def
 
 -- 2026-07-06: setup segmentation (Breakout / Pullback — mirrors the Daily Trade Ideas folders)
 alter table public.daily_setups add column if not exists setup_type text;
+
+-- 2026-07-06 (workflow): a gameplan post marked as EXECUTED — drives the Friday weekly-review
+-- query and the Model Book before/after chain. The feed is a permanent database (Reset removed).
+alter table public.daily_setups add column if not exists taken_at timestamptz;

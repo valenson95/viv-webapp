@@ -237,6 +237,8 @@ const WHATS_NEW = [
       "Nav reordered: Premium tools now sits before Model Book, with Daily Setups next to it.",
       "These posts are educational market study, not trade signals — the entry, the stop, and the decision are always yours.",
       "Fixed: the Edit trade button inside the full trade-details page now opens the editor properly (it was opening behind the page — thanks Vincentius for the report).",
+      "Daily Setups upgrades: sort the feed by Newest or Top graded, and filter to ✔ Taken — the setups that became live trades. The feed is a permanent library: scroll back to any day's gameplan.",
+      "When a graded setup turns into a trade, its pre-entry chart and thesis now follow it automatically into the Model Book when you import that trade — the before picture is the original gameplan.",
     ],
   },
   {
@@ -6330,7 +6332,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 {t.reason && <div className="tp-reason"><div className="tp-reason-h">Exit reason</div><div className="tp-reason-b">{t.reason}</div></div>}
                 <div className="tp-foot">
                   <button className="tp-go" onClick={() => { setPreviewTrade(null); openReview(t); }}>Go to trade details ›</button>
-                  <button className="revbtn" title="Import this trade into the Model Book — everything already known is pre-filled" onClick={() => {
+                  <button className="revbtn" title="Import this trade into the Model Book — everything already known is pre-filled" onClick={async () => {
                     const g = getSavedGrade(t.ticker);
                     try { const pf = {
                       ticker: t.ticker, entry_date: tradeDateISO(t.entry) || "", exit_date: tradeDateISO(t.exit) || "",
@@ -6339,7 +6341,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       theme: sectorFor(t.ticker) || "", ticked: (g && g.ticked) || [],
                       outcome: outcomeFromR(t.rMult, t.plPct) || "",
                     };
-                    pf.metrics = { _auto: ["ticker", "entry_date", "exit_date", "run_pct", "r_mult", "days_held", "theme", "outcome"].filter(k => pf[k] !== "" && pf[k] != null) };
+                    const ds = await fetchSetupPost(t.ticker); // pre-entry gameplan post = the BEFORE evidence
+                    if (ds) { if (ds.chart_img) pf.before_img = ds.chart_img; if (ds.note) pf.thesis = ds.note; }
+                    pf.metrics = { _auto: ["ticker", "entry_date", "exit_date", "run_pct", "r_mult", "days_held", "theme", "outcome", "before_img", "thesis"].filter(k => pf[k] !== "" && pf[k] != null) };
                     sessionStorage.setItem("viv-mb-prefill", JSON.stringify(pf)); } catch {}
                     setPreviewTrade(null); setPage && setPage("modelbook");
                   }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)", fontWeight: 700 }}>📖 Model Book</button>
@@ -6366,7 +6370,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
                   {gr && <span className="td-grade" style={{ color: gcol }} title={`Setup grade ${gr.letter} · ${gr.stars}/5★`}>{gr.letter} · {gr.stars}★</span>}
                   <div className="spacer"></div>
-                  <button className="revbtn" title="Pre-fill a Model Book entry from this trade" onClick={() => {
+                  <button className="revbtn" title="Pre-fill a Model Book entry from this trade" onClick={async () => {
                     const g = getSavedGrade(t.ticker);
                     try { const pf = {
                       ticker: t.ticker, entry_date: tradeDateISO(t.entry) || "", exit_date: tradeDateISO(t.exit) || "",
@@ -6375,8 +6379,10 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       theme: sectorFor(t.ticker) || "", ticked: (g && g.ticked) || [],
                       outcome: outcomeFromR(t.rMult, t.plPct) || "",
                     };
+                    const ds = await fetchSetupPost(t.ticker); // pre-entry gameplan post = the BEFORE evidence
+                    if (ds) { if (ds.chart_img) pf.before_img = ds.chart_img; if (ds.note) pf.thesis = ds.note; }
                     // gold-dot every field we pre-filled (ticked comes from HIS saved grader = human, no dot)
-                    pf.metrics = { _auto: ["ticker", "entry_date", "exit_date", "run_pct", "r_mult", "days_held", "theme", "outcome"].filter(k => pf[k] !== "" && pf[k] != null) };
+                    pf.metrics = { _auto: ["ticker", "entry_date", "exit_date", "run_pct", "r_mult", "days_held", "theme", "outcome", "before_img", "thesis"].filter(k => pf[k] !== "" && pf[k] != null) };
                     sessionStorage.setItem("viv-mb-prefill", JSON.stringify(pf)); } catch {}
                     closeReview(); setPage && setPage("modelbook");
                   }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)", fontWeight: 700 }}>📖 Add to Model Book</button>
@@ -8201,13 +8207,15 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
 
                           <div className="mgfoot">
                             <button className={"btn mgsell" + (sellOpen ? " open" : "")} onClick={() => sellOpen ? setSellOpen(false) : openSell(p)}>Sell / Close position</button>
-                            <button className="btn" title="Pre-fill a Model Book entry from this open position" onClick={() => {
+                            <button className="btn" title="Pre-fill a Model Book entry from this open position" onClick={async () => {
                               const g = getSavedGrade(p.sym);
                               try { const pf = {
                                 ticker: p.sym, entry_date: tradeDateISO(p.entry) || "", theme: sectorFor(p.sym) || "",
                                 ticked: (g && g.ticked) || [],
                               };
-                              pf.metrics = { _auto: ["ticker", "entry_date", "theme"].filter(k => pf[k] !== "" && pf[k] != null) };
+                              const ds = await fetchSetupPost(p.sym);
+                              if (ds) { if (ds.chart_img) pf.before_img = ds.chart_img; if (ds.note) pf.thesis = ds.note; }
+                              pf.metrics = { _auto: ["ticker", "entry_date", "theme", "before_img", "thesis"].filter(k => pf[k] !== "" && pf[k] != null) };
                               sessionStorage.setItem("viv-mb-prefill", JSON.stringify(pf)); } catch {}
                               setPage && setPage("modelbook");
                             }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)" }}>📖 Add to Model Book</button>
@@ -9143,6 +9151,16 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
 // ═══════════════════════════════════════
 // ─── LOGIN PAGE ───
 // ═══════════════════════════════════════
+// Latest Daily Setups post for a ticker (RLS-visible) — the pre-entry "before" chart + thesis,
+// inherited by Model Book prefills so gameplan → trade → study stays one chain.
+async function fetchSetupPost(tk) {
+  try {
+    const { data } = await supabase.from("daily_setups").select("chart_img,note").eq("ticker", tk)
+      .order("trade_date", { ascending: false }).order("created_at", { ascending: false }).limit(1);
+    return (data && data[0]) || null;
+  } catch { return null; }
+}
+
 const ADMIN_EMAIL = "vc-lv@live.com";
 
 // ═══════════════════════════════════════

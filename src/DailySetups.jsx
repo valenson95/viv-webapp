@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { listSetups, deleteSetup, resetSetups } from "./dailySetups.js";
+import { listSetups, deleteSetup, markTaken } from "./dailySetups.js";
 import { SECTIONS } from "./SetupGrader.jsx";
 import { themeFit } from "./themes.js";
 
@@ -33,6 +33,8 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   const [tableMissing, setTableMissing] = useState(false);
   const [openId, setOpenId] = useState(null);   // expanded scorecard
   const [lightbox, setLightbox] = useState(null); // chart url
+  const [sortBy, setSortBy] = useState("date");   // "date" | "grade"
+  const [view, setView] = useState("all");        // "all" | "taken"
 
   const load = useCallback(async () => {
     const { rows: r, tableMissing: tm } = await listSetups();
@@ -49,20 +51,26 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
     if (!window.confirm(`Remove ${r.ticker} (${r.trade_date}) from the feed?`)) return;
     await deleteSetup(r.id); load();
   };
-  const resetAll = async () => {
-    if (!window.confirm("Reset the Daily Setups feed?\n\nThis deletes ALL posts (members see an empty feed) so the next day starts fresh. Saved grades in the Setup Grader are NOT touched.")) return;
-    const res = await resetSetups();
-    if (!res.ok) window.alert("Reset failed: " + res.error);
+  const takenToggle = async (r) => {
+    const res = await markTaken(r.id, !r.taken_at);
+    if (!res.ok) window.alert(res.error);
     load();
   };
 
-  // group by trade_date (rows already newest-first)
+  // filter (All / Taken) then group: by date (default) or one ranked list (Top graded)
+  const visRows = (rows || []).filter(r => view !== "taken" || r.taken_at);
   const groups = [];
-  (rows || []).forEach(r => {
-    const g = groups[groups.length - 1];
-    if (g && g.date === r.trade_date) g.items.push(r);
-    else groups.push({ date: r.trade_date, items: [r] });
-  });
+  if (sortBy === "grade") {
+    const ranked = [...visRows].sort((a, b) => (b.stars - a.stars) || ((b.pct || 0) - (a.pct || 0)) ||
+      String(b.trade_date || "").localeCompare(String(a.trade_date || "")));
+    if (ranked.length) groups.push({ date: "__ranked__", label: "Ranked by grade", items: ranked });
+  } else {
+    visRows.forEach(r => {
+      const g = groups[groups.length - 1];
+      if (g && g.date === r.trade_date) g.items.push(r);
+      else groups.push({ date: r.trade_date, label: dateLabel(r.trade_date), items: [r] });
+    });
+  }
 
   return (
     <div id="panel-daily" style={{ fontFamily: font }}>
@@ -77,12 +85,17 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         </div>
       </div>
 
-      {isAdmin && rows && rows.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-          <button onClick={resetAll}
-            style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)", fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "7px 14px", borderRadius: 99, cursor: "pointer" }}>
-            ⟲ Reset feed…
-          </button>
+      {rows && rows.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+          {[["date", "Newest"], ["grade", "Top graded"]].map(([k, lbl]) => (
+            <button key={k} onClick={() => setSortBy(k)}
+              style={{ background: sortBy === k ? "rgba(201,152,42,0.14)" : "rgba(255,255,255,0.04)", color: sortBy === k ? C.goldBright : C.muted, border: `1px solid ${sortBy === k ? C.borderGold : C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, cursor: "pointer" }}>{lbl}</button>
+          ))}
+          <span style={{ width: 1, height: 18, background: C.border }} />
+          {[["all", "All"], ["taken", "✔ Taken"]].map(([k, lbl]) => (
+            <button key={k} onClick={() => setView(k)}
+              style={{ background: view === k ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.04)", color: view === k ? "#22c55e" : C.muted, border: `1px solid ${view === k ? "rgba(34,197,94,0.35)" : C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, cursor: "pointer" }}>{lbl}</button>
+          ))}
         </div>
       )}
 
@@ -98,9 +111,13 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "34px 20px", textAlign: "center", color: C.muted, fontSize: "0.86rem" }}>
           No setups published yet — the first daily post lands here.
         </div>
+      ) : groups.length === 0 ? (
+        <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "30px 20px", textAlign: "center", color: C.muted, fontSize: "0.85rem" }}>
+          No taken setups yet — ✔ Mark taken on a post when the trade is executed.
+        </div>
       ) : groups.map((g, gi) => (
         <div key={g.date + "-" + gi} style={{ marginBottom: 26 }}>
-          <div style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, margin: "0 2px 10px" }}>{dateLabel(g.date)}</div>
+          <div style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, margin: "0 2px 10px" }}>{g.label}</div>
           {g.items.map(r => {
             const expanded = openId === r.id;
             const autoSet = new Set(r.auto || []);
@@ -131,9 +148,14 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                       )}
                       <Stars C={C} n={r.stars} />
                       <span style={{ fontSize: "0.92rem", fontWeight: 800, color: letterColor(C, r.letter) }}>{r.letter}</span>
+                      {r.taken_at && <span title={"Executed " + String(r.taken_at).slice(0, 10) + " — this gameplan became a live trade"} style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: "#22c55e", background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.4)", padding: "3px 8px", borderRadius: 99 }}>✔ TAKEN</span>}
                       {r._local && <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: C.gold, background: "rgba(201,152,42,0.12)", border: `1px solid ${C.borderGold}`, padding: "3px 8px", borderRadius: 99 }}>LOCAL</span>}
                       {isAdmin && (
                         <span style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
+                          <button title={r.taken_at ? "Unmark — removes the executed flag" : "Mark as executed — syncs the gameplan to your live trade for the Friday review"}
+                            onClick={() => takenToggle(r)}
+                            style={{ background: r.taken_at ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.05)", border: `1px solid ${r.taken_at ? "rgba(34,197,94,0.4)" : C.border}`, color: r.taken_at ? "#22c55e" : C.muted, fontFamily: font, fontSize: "0.66rem", fontWeight: 800, padding: "4px 11px", borderRadius: 99, cursor: "pointer" }}>
+                            {r.taken_at ? "✔ Taken" : "Mark taken"}</button>
                           <button title="Edit in the Setup Grader — republish replaces this post"
                             onClick={() => {
                               try {

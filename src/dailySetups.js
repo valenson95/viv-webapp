@@ -65,15 +65,27 @@ export async function publishSetup(row) {
   return { ok: true, local: true };
 }
 
-// Admin "start fresh" — wipes the WHOLE feed (server rows + local parked). Daily-ideas
-// board, not an archive: the grades themselves stay in setup_grades untouched.
+// ⚠️ RESET REMOVED FROM THE UI (Valen, 2026-07-06): the feed is a permanent DATABASE of
+// pre-market gameplans he scrolls back through — never bulk-wiped. Function kept for
+// emergency console use only.
 export async function resetSetups() {
   try {
     const { error } = await supabase.from("daily_setups").delete().not("id", "is", null);
-    if (error && !isTableMissing(error)) return { ok: false, error: error.message }; // keep local rows on real failure
+    if (error && !isTableMissing(error)) return { ok: false, error: error.message };
   } catch (e) { return { ok: false, error: String(e?.message || e) }; }
-  persistLocal([]); // server cleared (or table missing = nothing there) → now clear local
+  persistLocal([]);
   return { ok: true };
+}
+
+// ✔ Taken — marks a gameplan post as EXECUTED (badge for everyone, drives the Friday
+// weekly-review query + the Model Book before/after chain). Toggle with on=false.
+export async function markTaken(id, on) {
+  if (String(id).startsWith("local-")) return { ok: false, error: "local-only post — publish it first" };
+  const { error } = await supabase.from("daily_setups")
+    .update({ taken_at: on ? new Date().toISOString() : null }).eq("id", id);
+  if (error && /taken_at|schema cache/i.test(error.message || ""))
+    return { ok: false, error: "Run the taken_at line in supabase/daily-setups.sql first" };
+  return { ok: !error, error: error?.message };
 }
 
 export async function deleteSetup(id) {
