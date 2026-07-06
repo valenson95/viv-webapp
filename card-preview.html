@@ -1,0 +1,46 @@
+<!doctype html>
+<!-- DEV-ONLY preview of the daily share card (not part of the build — root files aren't shipped to dist).
+     Open http://localhost:5174/card-preview.html while `npm run dev` is running. -->
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Share card preview — AGL</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body { margin: 0; background: #04040a; min-height: 100vh; display: grid; place-items: center; font-family: 'Plus Jakarta Sans', sans-serif; padding: 24px; box-sizing: border-box; }
+    canvas { max-width: 96vw; height: auto; border-radius: 10px; box-shadow: 0 30px 90px rgba(0,0,0,0.8); }
+    .bar { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; z-index: 5; }
+    button { background: linear-gradient(135deg,#f0c050,#c9982a); border: none; color: #08080e; font: 800 13px 'Plus Jakarta Sans'; padding: 9px 18px; border-radius: 99px; cursor: pointer; }
+    .msg { color: #22c55e; font: 700 13px 'Plus Jakarta Sans'; }
+  </style>
+</head>
+<body>
+  <div class="bar"><button id="copy">📋 Copy card</button><span class="msg" id="msg"></span></div>
+  <script type="module">
+    import { renderShareCard, copyCard } from "/src/shareCard.js?v=3"; // ?v busts the module cache on layout iterations
+
+    const TICKED = new Set(["0-0","0-2","0-4","1-0","1-1","1-2","2-0","2-1","2-2","2-3","2-4","2-7"]);
+    const LABELS = [
+      ["0-0","Relative strength — top-tier",true],["0-1","ADR% > 3.5%",false],["0-2","In-theme leader",true],
+      ["0-3","Liquid enough — ≥ $50M / 20 days",false],["0-4","Above rising 10 & 20-day MA",false],
+      ["1-0","Big prior thrust",true],["1-1","Sharp, high-volume advance",false],["1-2","Fresh, not extended",true],
+      ["2-0","Higher lows",false],["2-1","Tightening range (contraction)",false],["2-2","Volume drying up into the apex",true],
+      ["2-3","Inside bars / tight days at the pivot",true],["2-4","Surfing the rising 10/20 (or 9/21 EMA)",false],
+      ["2-5","EMAs 9 / 21 / 50 converging",true],["2-6","Orderly — no wild wicks / gaps against",false],
+      ["2-7","Duration 2 weeks – 2 months",false],
+    ];
+    const cv = await renderShareCard({
+      ticker: "AGL", sector: "HealthCare", themeStatus: "in",
+      dateLabel: "Mon, Jul 6, 2026",
+      stars: 4, letter: "A", label: "A · Strong", passed: 12, total: 16, starHit: 6, starmakers: 7,
+      items: LABELS.map(([k, label, star]) => ({ label, star, on: TICKED.has(k) })),
+      chartUrl: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/daily-setups/0e32b092-029a-436d-8cb5-67621e1467b0/AGL-2026-07-06.png",
+    });
+    document.body.appendChild(cv);
+    document.getElementById("copy").onclick = async () => {
+      const how = await copyCard(cv, "VIV-AGL-setup.png");
+      document.getElementById("msg").textContent = how === "copied" ? "✓ copied — paste into Skool" : "✓ downloaded";
+    };
+  </script>
+</body>
+</html>

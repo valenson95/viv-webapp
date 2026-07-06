@@ -43,7 +43,7 @@ export async function initGrades(uid) {
       const sym = r.symbol;
       const localRow = local[sym];
       if (!localRow || new Date(r.updated_at) >= new Date(localRow.updatedAt || 0)) {
-        merged[sym] = { sym, stars: r.stars, letter: r.letter, pct: +r.pct || 0, starHit: r.star_hit, starmakers: r.starmakers, ticked: r.ticked || [], updatedAt: r.updated_at };
+        merged[sym] = { sym, stars: r.stars, letter: r.letter, pct: +r.pct || 0, starHit: r.star_hit, starmakers: r.starmakers, ticked: r.ticked || [], auto: r.auto || [], updatedAt: r.updated_at };
       } else {
         pushUp.push(localRow); // local edit is newer than the server copy — sync it up
       }
@@ -55,6 +55,9 @@ export async function initGrades(uid) {
       await supabase.from("setup_grades").upsert(pushUp.map(g => ({
         user_id: UID, symbol: g.sym, stars: g.stars || 0, letter: g.letter || null, pct: g.pct ?? null,
         star_hit: g.starHit ?? null, starmakers: g.starmakers ?? null, ticked: g.ticked || [], updated_at: g.updatedAt || new Date().toISOString(),
+        // `auto` (gold-dot keys) only when present — keeps the upsert working on projects
+        // that haven't run daily-setups.sql (which adds the column) yet
+        ...(g.auto && g.auto.length ? { auto: g.auto } : {}),
       })));
     }
   } catch { /* offline / not set up — local cache still works */ }
@@ -76,6 +79,7 @@ export function saveGrade(sym, grade) {
     supabase.from("setup_grades").upsert({
       user_id: UID, symbol: s, stars: row.stars || 0, letter: row.letter || null, pct: row.pct ?? null,
       star_hit: row.starHit ?? null, starmakers: row.starmakers ?? null, ticked: row.ticked || [], updated_at: row.updatedAt,
+      ...(row.auto && row.auto.length ? { auto: row.auto } : {}), // column exists after daily-setups.sql
     }).then(({ error }) => { if (error) console.error("grade sync:", error.message); });
   }
 }

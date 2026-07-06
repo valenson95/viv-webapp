@@ -16,7 +16,7 @@ const SECTORS = {
   ...G("Biotechnology","MRNA","BNTX","VRTX","REGN","GILD","BIIB","AMGN","PTCT","SRPT","RARE","BMRN","IONS","ARWR","ALNY","INCY","EXEL","HALO","CYTK","KRYS","MDGL","VKTX","ADPT","TVTX","KOD","HROW","CPRX","RYTM","INSM","AXSM","IMVT","ARDX","BBIO","ACAD","NBIX","JAZZ","APLS","IOVA","RXRX","VERV","DVAX","CORT","SMMT","PCVX","RVMD"),
   ...G("Genomics","CRSP","NTLA","BEAM","EDIT","GH","TXG","PACB","NVTA","EXAS","VCYT","DNA","TWST","FLGT","NTRA"),
   ...G("Medical","ISRG","DXCM","PODD","TMDX","GKOS","PEN","INSP","TNDM","IRTC","NARI","SILK","BSX","MDT","SYK","EW","ALGN","RMD","GEHC","IDXX","DGX","SOLV","LNTH","AXNX","PRCT"),
-  ...G("HealthCare","UNH","HIMS","OSCR","CI","ELV","HCA","MOH","HUM","ALHC","DOCS","MCK","COR","CNC","THC","UHS","TDOC","PGNY"),
+  ...G("HealthCare","UNH","HIMS","OSCR","CI","ELV","HCA","MOH","HUM","ALHC","AGL","DOCS","MCK","COR","CNC","THC","UHS","TDOC","PGNY"),
   ...G("Bitcoin","MSTR","COIN","IBIT","BITO","BITX","FBTC"),
   ...G("Bitcoin Miners","MARA","RIOT","CLSK","WULF","IREN","CIFR","BTDR","HUT","BITF","BTBT","HIVE","SDIG"),
   ...G("Quantum","IONQ","QUBT","RGTI","QBTS","ARQQ","QMCO"),

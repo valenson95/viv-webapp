@@ -10,6 +10,7 @@ import { themeFit, themeRanks, consistentTop, top5, latestSnapshot, THEME_COVERA
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
+import DailySetupsTab from "./DailySetups.jsx";
 import ModelBookPage, { outcomeFromR } from "./ModelBook.jsx";
 import MentorModePage from "./MentorMode.jsx";
 import TVChart from "./TVChart.jsx";
@@ -223,6 +224,20 @@ function useDragReorder(length) {
 // ─── What's New — changelog the user can refer to (button in the top nav, modal of update notes).
 // Add new entries to the TOP of WHATS_NEW as features ship.
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "July 6, 2026",
+    title: "⚡ Daily Setups — today's charts, graded and auditable",
+    items: [
+      "New Daily Setups section (top nav): the setups on VIV's radar, posted fresh each day — the annotated chart, the read, and the full Setup-Grader scorecard behind every star.",
+      "Every post is fully auditable: hit 'See the scorecard' to see exactly which of the 16 criteria passed (✓) and which didn't (✗) — nothing is hand-waved. A gold dot ● marks a tick auto-read off the chart.",
+      "Each post is theme-checked automatically: the sector chip shows in theme (green) or off theme (red), judged against the weekly theme tracker at the post's date — the same rule that tags your own positions.",
+      "Setup Grader upgrade: paste a chart screenshot (⌘V) straight onto the grader, annotate it, and copy a branded share card of your grade — great for posting your own setups in the community.",
+      "Your starting capital is now easier to edit: click the big equity number (or the Start value) on the Dashboard's Live Risk Budget card — it's your sizing base, so set it to YOUR account.",
+      "Nav reordered: Premium tools now sits before Model Book, with Daily Setups next to it.",
+      "These posts are educational market study, not trade signals — the entry, the stop, and the decision are always yours.",
+    ],
+  },
   {
     tag: "New",
     date: "July 5, 2026",
@@ -2822,6 +2837,7 @@ function PremiumTour({ onPlayStateChange }) {
 }
 function PremiumToolsPage({ setPage, onLogout, session, demo, portfolioSize, journaledTrades, positions, displayName }) {
   const[tab,setTab]=useState(0);const tabs=["Setup Grader","Return Simulator","Risk","Expectancy","Risk Finance"];
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const realizedPL = useMemo(() => (journaledTrades || []).reduce((s, t) => s + (t.plDollar || 0), 0), [journaledTrades]);
   const currentCapital = (+portfolioSize || 0) + realizedPL;
 // ════════════════════════════════════════════════════════════════════════
@@ -2894,9 +2910,10 @@ return (
         <div className="tabs">
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+          <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
         <div className="spacer"></div>
@@ -2935,7 +2952,7 @@ return (
       </div>
 
       {/* ACTIVE PANEL */}
-      {tab === 0 && <SetupGraderTab C={C} font={font} positions={positions} {...guideProps} />}
+      {tab === 0 && <SetupGraderTab C={C} font={font} positions={positions} session={session} isAdmin={isAdmin} {...guideProps} />}
       {tab === 1 && <ReturnSimulatorTab portfolioSize={portfolioSize} currentCapital={currentCapital} {...guideProps} />}
       {tab === 2 && <RiskTab demo={demo} {...guideProps} />}
       {tab === 3 && <ExpectancyTab demo={demo} {...guideProps} />}
@@ -5545,9 +5562,10 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
           <div className="spacer"></div>
@@ -7868,9 +7886,10 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
           <div className="tabs">
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
           <div className="spacer"></div>
@@ -7923,13 +7942,13 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
               {/* LEFT: compounding equity */}
               <div className="eq-left">
                 <div className="label"><span className="term" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">Compounding equity <span className="plain">(ROTE base)</span></span></div>
-                <div className="val gold">{usd0(compEquity)}</div>
+                <div className="val gold" title="Click to edit your starting capital" style={{ cursor: "pointer" }} onClick={() => { setCapDraft(String(+portfolioSize || 0)); setCapEditing(true); }}>{usd0(compEquity)}</div>
                 <div className="breakdown">
                   Start{" "}
                   {capEditing ? (
                     <input className="capinput" autoFocus value={capDraft} onChange={e => setCapDraft(e.target.value)} onBlur={() => { const v = parseFloat(capDraft.replace(/[^0-9.]/g, "")) || 0; setPortfolioSize(v); setCapEditing(false); }} onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }} />
                   ) : (
-                    <span className="editcap" onClick={() => { setCapDraft(String(+portfolioSize || 0)); setCapEditing(true); }}>
+                    <span className="editcap" title="Click to edit your starting capital" onClick={() => { setCapDraft(String(+portfolioSize || 0)); setCapEditing(true); }}>
                       <span className="capval">{usd0(+portfolioSize || 0)}</span><span className="pencil">&#9998;</span>
                     </span>
                   )}
@@ -8671,9 +8690,10 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
           <div className="spacer"></div>
@@ -9140,8 +9160,9 @@ function ModelBookShell({ setPage, onLogout, session, displayName, journaledTrad
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
-            <a className="on" style={{ cursor: "pointer" }}>Model Book</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a className="on" style={{ cursor: "pointer" }}>Model Book</a>
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip to relaunch */}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -9160,6 +9181,38 @@ function ModelBookShell({ setPage, onLogout, session, displayName, journaledTrad
   );
 }
 
+// ── DAILY SETUPS shell — its own nav section (promoted out of Premium tools 2026-07-06) ──
+function DailySetupsShell({ setPage, onLogout, session, displayName }) {
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  return (
+    <div className="vj">
+      <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
+      <div className="shell">
+        <div className="navbar">
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="tabs">
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            <a className="on" style={{ cursor: "pointer" }}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          </div>
+          <div className="spacer"></div>
+          <WhatsNew />
+          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
+        </div>
+        <div className="reveal in-view" style={{ marginBottom: 10 }}>
+          <div className="eyebrow">Daily Setups</div>
+          <div className="h1" style={{ marginTop: 6 }}>Today's setups on <span className="goldname">the radar</span>, {(displayName && displayName.trim()) || "trader"}</div>
+          <div className="sub">Fresh each day — the chart, the read, and the full graded scorecard behind every star. Educational, not trade signals.</div>
+        </div>
+        <DailySetupsTab C={C} font={font} session={session} isAdmin={isAdmin} />
+      </div>
+    </div>
+  );
+}
+
 // ── MENTOR MODE shell — ADMIN-ONLY (renders nothing for members) ──
 function MentorShell({ setPage, onLogout, session }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
@@ -9173,8 +9226,9 @@ function MentorShell({ setPage, onLogout, session }) {
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a className="on" style={{ cursor: "pointer" }}>Mentor</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -9572,7 +9626,7 @@ function AppInner() {
   const [exitReasons, setExitReasons] = useState(DEFAULT_EXIT_REASONS);
   const [journaledTrades, setJournaledTrades] = useState([]);
   const [positions, setPositions] = useState([]);
-  const [portfolioSize, setPortfolioSize] = useState("500000");
+  const [portfolioSize, setPortfolioSize] = useState("10000");
 
   // ─── IBKR sync (read-only preview — Phase 1) ───
   const [ibkrOpen, setIbkrOpen] = useState(false);
@@ -10676,7 +10730,7 @@ function AppInner() {
     setSetupTypes(DEFAULT_SETUP_TYPES);
     setTags(DEFAULT_TAGS);
     setExitReasons(DEFAULT_EXIT_REASONS);
-    setPortfolioSize("500000");
+    setPortfolioSize("10000");
     setFontSize("standard");
     setTargetRote("2");
     lastLoadedCount.current = 0;
@@ -10719,6 +10773,7 @@ function AppInner() {
       {page === "dashboard" && <DashboardPage setPage={setPage} onLogout={handleLogout} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
       {page === "tools" && <PremiumToolsPage setPage={setPage} onLogout={handleLogout} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} positions={positions} displayName={displayName} />}
       {page === "journal" && <TradeJournalPage setPage={setPage} onLogout={handleLogout} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} />}
+      {page === "daily" && <DailySetupsShell setPage={setPage} onLogout={handleLogout} session={session} displayName={displayName} />}
       {page === "modelbook" && <ModelBookShell setPage={setPage} onLogout={handleLogout} session={session} displayName={displayName} journaledTrades={journaledTrades} />}
       {page === "mentor" && <MentorShell setPage={setPage} onLogout={handleLogout} session={session} />}
       {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}

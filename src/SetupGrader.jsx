@@ -1,5 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { loadGrades, getGrade, saveGrade, removeGrade, letterFor, useGrades } from "./grades.js";
+import { supabase } from "./supabaseClient";
+import { publishSetup } from "./dailySetups.js";
+import { renderShareCard, copyCard } from "./shareCard.js";
+import { sectorFor } from "./sectors.js";
+import { themeFit } from "./themes.js";
 
 // ══════════════════════════════════════════════════════════════════
 // SETUP GRADER — Premium Tools sub-tab. 5-star A+ breakout/continuation
@@ -100,14 +105,23 @@ const MiniStars = ({ C, n, size = 0.72 }) => (
   </span>
 );
 
-export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactive, expert, positions = [] }) {
+export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactive, expert, positions = [], session, isAdmin }) {
   useGrades(); // re-render when a grade is saved/removed
+  const uid = session?.user?.id || null;
   const [on, setOn] = useState(() => new Set());
+  const [auto, setAuto] = useState(() => new Set()); // gold-dot: ticks auto-read by VIV, pending a human eye
   const [ticker, setTicker] = useState("");
   const [showSync, setShowSync] = useState(false);
   const [flash, setFlash] = useState("");
-  const toggle = (key) => setOn(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
-  const reset = () => setOn(new Set());
+  const [chartImg, setChartImg] = useState(""); // chart for the daily post / share card
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const toggle = (key) => {
+    // any human touch clears the gold dot — same convention as the Model Book
+    setAuto(prev => { if (!prev.has(key)) return prev; const n = new Set(prev); n.delete(key); return n; });
+    setOn(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  };
+  const reset = () => { setOn(new Set()); setAuto(new Set()); };
 
   let passed = 0, starHit = 0;
   const secCounts = SECTIONS.map((sec, si) => {
@@ -126,14 +140,32 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const letter = letterFor(stars);
 
   // ── grade object + persistence ──
-  const grade = { stars, pct, passed, total: TOTAL, starHit, starmakers: STARMAKERS, letter, label: gLabel, ticked: [...on] };
+  const autoLive = [...auto].filter(k => on.has(k)); // dots only count while their tick is still on
+  const grade = { stars, pct, passed, total: TOTAL, starHit, starmakers: STARMAKERS, letter, label: gLabel, ticked: [...on], auto: autoLive };
   const posSyms = Array.from(new Set((positions || []).map(p => String(p.sym || p.symbol || "").toUpperCase().trim()).filter(Boolean)));
   const posSet = new Set(posSyms);
   const saved = loadGrades();
   const savedRows = Object.values(saved).sort((a, b) => (b.stars - a.stars) || (a.sym < b.sym ? -1 : 1));
 
-  const flashMsg = (m) => { setFlash(m); setTimeout(() => setFlash(""), 2600); };
-  const loadTicker = (sym) => { const g = getGrade(sym); setTicker(sym); setOn(new Set(g && g.ticked ? g.ticked : [])); };
+  const flashMsg = (m) => { setFlash(m); setTimeout(() => setFlash(""), 3400); };
+  const loadTicker = (sym) => {
+    const g = getGrade(sym);
+    setTicker(sym); setOn(new Set(g && g.ticked ? g.ticked : [])); setAuto(new Set(g && g.auto ? g.auto : []));
+    setChartImg(""); setNote("");
+    // If I already have a post for this ticker (e.g. published via "pull my daily ideas"),
+    // pull its chart + annotation back into the kit so republish/share-card keeps them.
+    if (uid) {
+      supabase.from("daily_setups").select("chart_img,note,created_by")
+        .eq("ticker", sym).eq("created_by", uid)
+        .order("trade_date", { ascending: false }).order("created_at", { ascending: false }).limit(1)
+        .then(({ data }) => {
+          const row = data && data[0];
+          if (!row) return;
+          setChartImg(c => c || row.chart_img || "");
+          setNote(n => n || row.note || "");
+        });
+    }
+  };
   const startTicker = () => { const s = ticker.toUpperCase().trim(); if (!s) return; loadTicker(s); };
   const doSave = (symArg) => {
     const s = (symArg || ticker || "").toUpperCase().trim();
@@ -146,6 +178,81 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     if (passed === 0) { flashMsg("Tick some criteria first, then sync"); return; }
     saveGrade(sym, grade); setTicker(sym); setShowSync(false);
     flashMsg(`Synced to ${sym} — shows on its Open Positions row & is kept if it closes`);
+  };
+
+  // ── daily-post kit: chart attach (paste/file) + publish + share card ──
+  const uploadChart = async (file) => {
+    if (!file || !String(file.type || "").startsWith("image/")) return;
+    setBusy(true);
+    try {
+      const path = `daily-setups/${uid || "anon"}/${Date.now()}-${file.name || "chart.png"}`.replace(/[^a-zA-Z0-9./_-]/g, "_");
+      const { error } = await supabase.storage.from("trade-charts").upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data } = supabase.storage.from("trade-charts").getPublicUrl(path);
+      setChartImg(data?.publicUrl || "");
+      flashMsg("Chart attached ✓ — it goes on the share card & the member post");
+    } catch {
+      // storage unreachable → keep a local data-URL so the share card still renders
+      try {
+        const r = new FileReader();
+        r.onload = () => setChartImg(String(r.result));
+        r.readAsDataURL(file);
+        flashMsg("Chart attached (local only — storage unreachable)");
+      } catch {}
+    }
+    setBusy(false);
+  };
+  const uploadRef = useRef(uploadChart);
+  uploadRef.current = uploadChart;
+  useEffect(() => { // paste a screenshot anywhere on this tab → it attaches
+    const h = (e) => {
+      const items = e.clipboardData?.items || [];
+      for (const it of items) {
+        if (String(it.type || "").startsWith("image/")) { e.preventDefault(); uploadRef.current(it.getAsFile()); return; }
+      }
+    };
+    window.addEventListener("paste", h);
+    return () => window.removeEventListener("paste", h);
+  }, []);
+
+  const doPublish = async () => {
+    const s = (ticker || "").toUpperCase().trim();
+    if (!s) { flashMsg("Enter a ticker first ↑"); return; }
+    if (passed === 0) { flashMsg("Tick the criteria first"); return; }
+    setBusy(true);
+    saveGrade(s, grade); // publishing also keeps the grade in the watchlist
+    const res = await publishSetup({
+      created_by: uid, ticker: s, trade_date: new Date().toISOString().slice(0, 10),
+      sector: sectorFor(s), stars, letter, pct, star_hit: starHit, starmakers: STARMAKERS,
+      ticked: [...on], auto: autoLive, note: note.trim(), chart_img: chartImg,
+    });
+    setBusy(false);
+    flashMsg(res.local
+      ? "Parked in this browser — run supabase/daily-setups.sql once, then publish again"
+      : `Published ${s} to the members' Daily Setups feed`);
+  };
+
+  const doCard = async () => {
+    const s = (ticker || "").toUpperCase().trim();
+    if (!s) { flashMsg("Enter a ticker first ↑"); return; }
+    setBusy(true);
+    try {
+      const items = []; // ALL 16 scored criteria, flat, in checklist order
+      SECTIONS.forEach((sec, si) => {
+        if (sec.reminder) return;
+        sec.items.forEach((it, ii) => items.push({ label: it.c, on: on.has(si + "-" + ii), star: !!it.star }));
+      });
+      const today = new Date().toISOString().slice(0, 10);
+      const cv = await renderShareCard({
+        ticker: s, sector: sectorFor(s), themeStatus: themeFit(sectorFor(s), today),
+        dateLabel: new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }),
+        stars, letter, label: gLabel, passed, total: TOTAL, starHit, starmakers: STARMAKERS,
+        items, chartUrl: chartImg || null,
+      });
+      const how = await copyCard(cv, `VIV-${s}-setup.png`);
+      flashMsg(how === "copied" ? "Share card copied 📋 — paste it straight into Skool" : "Share card downloaded (clipboard blocked by the browser)");
+    } catch (e) { flashMsg("Card failed: " + (e?.message || e)); }
+    setBusy(false);
   };
 
   return (
@@ -261,7 +368,51 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
             </div>
           )}
         </div>
+        {autoLive.length > 0 && (
+          <button onClick={() => { setAuto(new Set()); flashMsg("Auto-ticks confirmed — hit Save grade to keep it"); }}
+            title="These ticks were auto-read off the chart by VIV (gold dot ●). Cross-check them, then confirm."
+            style={{ background: "rgba(201,152,42,0.12)", color: C.goldBright, border: `1px solid ${C.borderGold}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 800, padding: "9px 14px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>
+            ● Confirm {autoLive.length} auto-tick{autoLive.length > 1 ? "s" : ""}
+          </button>
+        )}
         {flash && <div style={{ flexBasis: "100%", fontSize: "0.74rem", color: C.green, fontWeight: 700, marginTop: 2 }}>✓ {flash}</div>}
+      </div>
+
+      {/* DAILY POST KIT — attach the chart, annotate, publish to members / copy the Skool card */}
+      <div style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "14px 16px", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Daily post kit</span>
+          <span style={{ fontSize: "0.72rem", color: C.muted }}>paste a chart screenshot (⌘V) anywhere on this tab — it attaches here</span>
+        </div>
+        <div style={{ display: "flex", gap: 14, alignItems: "stretch", flexWrap: "wrap" }}>
+          {/* chart slot */}
+          <label style={{ flex: "0 0 200px", minHeight: 96, borderRadius: 12, border: `1px dashed ${chartImg ? C.borderGold : C.border}`, background: "rgba(255,255,255,0.02)", display: "grid", placeItems: "center", cursor: "pointer", overflow: "hidden", position: "relative" }}>
+            <input type="file" accept="image/*" disabled={busy} onChange={e => uploadChart(e.target.files?.[0])} style={{ display: "none" }} />
+            {chartImg
+              ? <img src={chartImg} alt="chart" style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }} />
+              : <span style={{ fontSize: "0.7rem", color: C.muted, textAlign: "center", padding: "0 12px" }}>{busy ? "Uploading…" : "📈 Paste or click to attach the chart"}</span>}
+          </label>
+          {chartImg && (
+            <button onClick={() => setChartImg("")} title="Remove chart" style={{ alignSelf: "flex-start", background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.66rem", fontWeight: 700, padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>×</button>
+          )}
+          {/* annotation */}
+          <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} maxLength={400}
+            placeholder="Annotation for the post — the read, the level that matters, what you're waiting for…"
+            style={{ flex: "1 1 260px", minWidth: 0, resize: "vertical", background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, fontFamily: font, fontSize: "0.82rem", lineHeight: 1.5, padding: "10px 12px", outline: "none" }} />
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
+          {isAdmin && (
+            <button disabled={busy} onClick={doPublish}
+              style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontSize: "0.74rem", fontWeight: 800, padding: "9px 16px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
+              📣 Publish to members{ticker ? ` · ${ticker.toUpperCase().trim()}` : ""}
+            </button>
+          )}
+          <button disabled={busy} onClick={doCard}
+            style={{ background: "rgba(255,255,255,0.06)", color: C.text, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.74rem", fontWeight: 800, padding: "9px 16px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
+            🖼 Copy share card
+          </button>
+          <span style={{ fontSize: "0.7rem", color: C.muted }}>{isAdmin ? "Publish → members' Daily Setups feed · card → clipboard for Skool" : "The card is a branded image of this grade — share your setup in the community"}</span>
+        </div>
       </div>
 
       {/* SECTIONS */}
@@ -309,7 +460,13 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                     display: "grid", placeItems: "center", transition: ".18s",
                   }}>{isOn && CHECK}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "0.94rem", fontWeight: 600, lineHeight: 1.3, color: isOn ? C.goldBright : C.text }}>{it.c}</div>
+                    <div style={{ fontSize: "0.94rem", fontWeight: 600, lineHeight: 1.3, color: isOn ? C.goldBright : C.text }}>
+                      {it.c}
+                      {isOn && auto.has(key) && (
+                        <span title="Auto-read from the chart by VIV — cross-check it; any click clears the dot"
+                          style={{ marginLeft: 8, fontSize: "0.62rem", color: C.goldBright, verticalAlign: "middle", textShadow: "0 0 8px rgba(240,192,80,0.7)" }}>●</span>
+                      )}
+                    </div>
                     <div style={{ fontSize: "0.79rem", color: C.muted, marginTop: 3, lineHeight: 1.45 }}>{it.s}</div>
                   </div>
                   {it.star && (
