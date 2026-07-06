@@ -116,9 +116,11 @@ export default async function handler(req, res) {
   // position no longer reported by IBKR — but ONLY on a FULL snapshot, so a transient/partial
   // update can never wrongly close your book.
   let posUpserted = 0, posClosed = 0;
+  const splits = []; // split events detected this sync (symbol + ratio + rows adjusted)
   if (Array.isArray(positions) && positions.length) {
     const { data: openPos, error: opErr } = await sb.from("positions")
-      .select("id, symbol, ib_conid").eq("user_id", user_id).eq("is_closed", false);
+      .select("id, symbol, ib_conid, shares, entry_price, stop_price, stop_price_2, trailing_stop")
+      .eq("user_id", user_id).eq("is_closed", false);
     if (opErr) return res.status(500).json({ ok: false, error: opErr.message });
     const byConid = new Map(), bySym = new Map();
     (openPos || []).forEach(p => {
@@ -135,6 +137,45 @@ export default async function handler(req, res) {
       const patch = { shares: pos.shares, ib_conid: conid, source: "ibkr", ib_synced_at: nowIso, is_closed: false };
       if (pos.market_price != null) patch.current_price = pos.market_price;
       if (existing) {
+        // ── SPLIT DETECTION (sync-mistake #18, CRWD 4:1 2026-07-06): IBKR reports post-split
+        // shares/avg while the stored position + campaign fills are pre-split → stops and trim%
+        // silently go wrong by the ratio. Detect: share count scaled by a CLEAN ratio AND avg
+        // cost inverse-scaled by the same ratio. Then convert UNITS everywhere (economics
+        // unchanged: stop ÷ r is the SAME stop — this is the one sanctioned "edit" of locked
+        // stops/entry, because it's a unit conversion, not a value change).
+        const oldSh = parseFloat(existing.shares), newSh = Number(pos.shares);
+        const oldAvg = parseFloat(existing.entry_price), newAvg = Number(pos.avg_cost);
+        if (oldSh > 0 && newSh > 0 && oldAvg > 0 && newAvg > 0 && Math.abs(newSh - oldSh) > 0.001) {
+          const r = newSh / oldSh;
+          const CLEAN = [2, 3, 4, 5, 6, 7, 8, 10, 20, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 10];
+          const clean = CLEAN.find(c => Math.abs(r - c) / c < 0.01);
+          if (clean && Math.abs((oldAvg / newAvg) - clean) / clean < 0.02) {
+            const scale = (v) => { const n = parseFloat(v); return isFinite(n) && n > 0 ? String(+(n / clean).toFixed(4)) : v; };
+            patch.entry_price = scale(existing.entry_price);
+            if (existing.stop_price) patch.stop_price = scale(existing.stop_price);
+            if (existing.stop_price_2) patch.stop_price_2 = scale(existing.stop_price_2);
+            if (existing.trailing_stop) patch.trailing_stop = scale(existing.trailing_stop);
+            // Campaign fills carrying the pre-split basis (entry ≈ old avg) → post-split units.
+            // P&L untouched (shares × r, prices ÷ r cancel). Older campaigns (entry+exit both
+            // pre-split, different basis) stay internally consistent and are left alone.
+            let adjusted = 0;
+            const { data: tRows } = await sb.from("trades").select("id, shares, entry_price, exit_price")
+              .eq("user_id", user_id).eq("ticker", sym);
+            for (const t of (tRows || [])) {
+              const e = Number(t.entry_price);
+              if (e > 0 && Math.abs(e - oldAvg) / oldAvg < 0.10) {
+                const { error: tErr } = await sb.from("trades").update({
+                  shares: Math.round(Number(t.shares) * clean),
+                  entry_price: +(e / clean).toFixed(4),
+                  exit_price: t.exit_price != null && t.exit_price !== "" ? +(Number(t.exit_price) / clean).toFixed(4) : t.exit_price,
+                  ib_synced_at: nowIso,
+                }).eq("id", t.id);
+                if (!tErr) adjusted++;
+              }
+            }
+            splits.push({ symbol: sym, ratio: clean, tradesAdjusted: adjusted });
+          }
+        }
         const { error } = await sb.from("positions").update(patch).eq("id", existing.id);
         if (!error) posUpserted++;
       } else {
@@ -157,5 +198,5 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ ok: true, ingested, refreshed, posUpserted, posClosed, fetchedAt: nowIso });
+  return res.status(200).json({ ok: true, ingested, refreshed, posUpserted, posClosed, splits, fetchedAt: nowIso });
 }
