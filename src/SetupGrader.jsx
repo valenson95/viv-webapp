@@ -194,12 +194,35 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     }
   };
   const startTicker = () => { const s = ticker.toUpperCase().trim(); if (!s) return; loadTicker(s); };
-  const doSave = (symArg) => {
+  // Admin: mirror the current scorecard straight onto the published Daily Setups post (if one
+  // exists for this ticker) so a grade edit shows to members IMMEDIATELY on Save — no republish.
+  const syncPostScore = async (s) => {
+    if (!isAdmin || !uid) return false;
+    try {
+      let q = supabase.from("daily_setups").select("id").eq("created_by", uid).eq("ticker", s);
+      q = editDate
+        ? q.eq("trade_date", editDate)
+        : q.order("trade_date", { ascending: false }).order("created_at", { ascending: false }).limit(1);
+      const { data } = await q;
+      const row = data && data[0];
+      if (!row) return false;
+      const patch = { stars, letter, pct, star_hit: starHit, starmakers: STARMAKERS, ticked: [...on], auto: autoLive };
+      if (note.trim()) patch.note = note.trim();       // never blank an existing note/chart
+      if (chartImg) patch.chart_img = chartImg;         // with an empty kit
+      const { error } = await supabase.from("daily_setups").update(patch).eq("id", row.id);
+      return !error;
+    } catch { return false; }
+  };
+
+  const doSave = async (symArg) => {
     const s = (symArg || ticker || "").toUpperCase().trim();
     if (!s) { flashMsg("Enter a ticker first ↑"); return; }
     if (passed === 0) { flashMsg("Tick some criteria first"); return; }
     saveGrade(s, grade); setTicker(s);
-    flashMsg(posSet.has(s) ? `Saved ${s} — synced to its Open Position row` : `Saved grade for ${s}`);
+    const postSynced = await syncPostScore(s);
+    flashMsg(postSynced
+      ? `Saved ${s} — the live Daily Setups post updated instantly`
+      : posSet.has(s) ? `Saved ${s} — synced to its Open Position row` : `Saved grade for ${s}`);
   };
   const syncTo = (sym) => {
     if (passed === 0) { flashMsg("Tick some criteria first, then sync"); return; }
