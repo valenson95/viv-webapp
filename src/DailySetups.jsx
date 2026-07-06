@@ -21,10 +21,10 @@ const Stars = ({ C, n, size = "1.05rem" }) => (
 const letterColor = (C, l) => l === "A+" ? C.green : l === "A" ? C.goldBright : l === "B" ? C.muted : C.red;
 
 function dateLabel(iso) {
-  try {
-    const d = new Date(iso + "T00:00:00");
-    return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
-  } catch { return iso; }
+  if (!iso) return "Undated";
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d)) return String(iso); // new Date() doesn't throw — it yields Invalid Date
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
 }
 
 export default function DailySetupsTab({ C, font, session, isAdmin }) {
@@ -97,8 +97,8 @@ export default function DailySetupsTab({ C, font, session, isAdmin }) {
         <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "34px 20px", textAlign: "center", color: C.muted, fontSize: "0.86rem" }}>
           No setups published yet — the first daily post lands here.
         </div>
-      ) : groups.map(g => (
-        <div key={g.date} style={{ marginBottom: 26 }}>
+      ) : groups.map((g, gi) => (
+        <div key={g.date + "-" + gi} style={{ marginBottom: 26 }}>
           <div style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, margin: "0 2px 10px" }}>{dateLabel(g.date)}</div>
           {g.items.map(r => {
             const expanded = openId === r.id;

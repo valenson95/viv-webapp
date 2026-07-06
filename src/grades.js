@@ -52,13 +52,16 @@ export async function initGrades(uid) {
     const serverSyms = new Set((data || []).map(r => r.symbol));
     Object.values(local).forEach(g => { if (g.sym && !serverSyms.has(g.sym)) pushUp.push(g); });
     if (pushUp.length) {
-      await supabase.from("setup_grades").upsert(pushUp.map(g => ({
+      // PostgREST bulk upserts require UNIFORM keys across all rows — a mixed batch
+      // (some rows with `auto`, some without) 400s the whole request. So: include `auto`
+      // on EVERY row iff any row has it (the column exists once gold-dot grades exist).
+      const withAuto = pushUp.some(g => g.auto && g.auto.length);
+      const { error: upErr } = await supabase.from("setup_grades").upsert(pushUp.map(g => ({
         user_id: UID, symbol: g.sym, stars: g.stars || 0, letter: g.letter || null, pct: g.pct ?? null,
         star_hit: g.starHit ?? null, starmakers: g.starmakers ?? null, ticked: g.ticked || [], updated_at: g.updatedAt || new Date().toISOString(),
-        // `auto` (gold-dot keys) only when present — keeps the upsert working on projects
-        // that haven't run daily-setups.sql (which adds the column) yet
-        ...(g.auto && g.auto.length ? { auto: g.auto } : {}),
+        ...(withAuto ? { auto: g.auto || [] } : {}),
       })));
+      if (upErr) console.error("grade push-up:", upErr.message);
     }
   } catch { /* offline / not set up — local cache still works */ }
   finally { READY = true; try { window.dispatchEvent(new Event("viv-grades")); } catch {} }

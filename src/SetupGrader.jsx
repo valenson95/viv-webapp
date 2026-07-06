@@ -99,6 +99,9 @@ const GRADES = {
 };
 
 const letterColor = (C, l) => l === "A+" ? C.green : l === "A" ? C.goldBright : l === "B" ? C.muted : (l === "—" ? C.muted : C.red);
+// Device-LOCAL calendar date (Valen = MYT). toISOString() alone is UTC and stamps
+// yesterday before 8am MYT — wrong feed grouping + wrong theme snapshot.
+const localISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const MiniStars = ({ C, n, size = 0.72 }) => (
   <span style={{ letterSpacing: 1, fontSize: `${size}rem`, whiteSpace: "nowrap" }}>
     {[0, 1, 2, 3, 4].map(k => <span key={k} style={{ color: k < n ? C.goldBright : "rgba(255,255,255,0.16)" }}>★</span>)}
@@ -116,6 +119,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const [chartImg, setChartImg] = useState(""); // chart for the daily post / share card
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const loadSeq = useRef(""); // last loadTicker target — guards async prefill against ticker switches
   const toggle = (key) => {
     // any human touch clears the gold dot — same convention as the Model Book
     setAuto(prev => { if (!prev.has(key)) return prev; const n = new Set(prev); n.delete(key); return n; });
@@ -152,6 +156,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     const g = getGrade(sym);
     setTicker(sym); setOn(new Set(g && g.ticked ? g.ticked : [])); setAuto(new Set(g && g.auto ? g.auto : []));
     setChartImg(""); setNote("");
+    loadSeq.current = sym; // stamp: only the LATEST loadTicker may prefill (kills the cross-ticker race)
     // If I already have a post for this ticker (e.g. published via "pull my daily ideas"),
     // pull its chart + annotation back into the kit so republish/share-card keeps them.
     if (uid) {
@@ -159,6 +164,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
         .eq("ticker", sym).eq("created_by", uid)
         .order("trade_date", { ascending: false }).order("created_at", { ascending: false }).limit(1)
         .then(({ data }) => {
+          if (loadSeq.current !== sym) return; // user moved to another ticker while this was in flight
           const row = data && data[0];
           if (!row) return;
           setChartImg(c => c || row.chart_img || "");
@@ -222,14 +228,16 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     setBusy(true);
     saveGrade(s, grade); // publishing also keeps the grade in the watchlist
     const res = await publishSetup({
-      created_by: uid, ticker: s, trade_date: new Date().toISOString().slice(0, 10),
+      created_by: uid, ticker: s, trade_date: localISO(),
       sector: sectorFor(s), stars, letter, pct, star_hit: starHit, starmakers: STARMAKERS,
       ticked: [...on], auto: autoLive, note: note.trim(), chart_img: chartImg,
     });
     setBusy(false);
-    flashMsg(res.local
-      ? "Parked in this browser — run supabase/daily-setups.sql once, then publish again"
-      : `Published ${s} to the members' Daily Setups feed`);
+    flashMsg(!res.ok
+      ? `Publish failed — ${res.error || "unknown error"}. Nothing was posted; try again.`
+      : res.local
+        ? "Parked in this browser — run supabase/daily-setups.sql once, then publish again"
+        : `Published ${s} to the members' Daily Setups feed (replaces today's ${s} post if one existed)`);
   };
 
   const doCard = async () => {
@@ -242,7 +250,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
         if (sec.reminder) return;
         sec.items.forEach((it, ii) => items.push({ label: it.c, on: on.has(si + "-" + ii), star: !!it.star }));
       });
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localISO(); // same calendar day as the printed dateLabel + the published trade_date
       const cv = await renderShareCard({
         ticker: s, sector: sectorFor(s), themeStatus: themeFit(sectorFor(s), today),
         dateLabel: new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }),

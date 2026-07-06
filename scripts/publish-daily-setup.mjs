@@ -18,18 +18,25 @@ const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "applic
 const UID = "0e32b092-029a-436d-8cb5-67621e1467b0"; // vc-lv@live.com (admin — this feed is his)
 
 // ── Setup-Grader formula mirror (SetupGrader.jsx SECTIONS — keep in lockstep) ──
-const TOTAL = 16;
+// Only the 16 SCORED keys count (sections 0–2). Trigger & Stop ("3-x") is a live-execution
+// reminder in the webapp and is NEVER scored — manifest entries are whitelisted + deduped
+// so a stray key can't inflate the grade past 100%.
+const SCORED = ["0-0","0-1","0-2","0-3","0-4","1-0","1-1","1-2","2-0","2-1","2-2","2-3","2-4","2-5","2-6","2-7"];
+const SCORED_SET = new Set(SCORED);
+const TOTAL = SCORED.length; // 16
 const STAR_KEYS = new Set(["0-0", "0-2", "1-0", "1-2", "2-2", "2-3", "2-5"]);
 const STARMAKERS = STAR_KEYS.size;
 const letterFor = (s) => ({ 5: "A+", 4: "A", 3: "B", 2: "C", 1: "C", 0: "—" })[s] || "—";
-function gradeFrom(ticked) {
+function gradeFrom(rawTicked) {
+  const ticked = [...new Set(rawTicked)].filter(k => SCORED_SET.has(k));
+  const dropped = [...new Set(rawTicked)].filter(k => !SCORED_SET.has(k));
   const passed = ticked.length;
   const starHit = ticked.filter(k => STAR_KEYS.has(k)).length;
   const pct = passed / TOTAL;
   let stars = Math.round(pct * 5);
   if (stars >= 5 && starHit < STARMAKERS) stars = 4;
   if (passed === 0) stars = 0;
-  return { passed, starHit, pct, stars, letter: letterFor(stars) };
+  return { ticked, dropped, passed, starHit, pct, stars, letter: letterFor(stars) };
 }
 
 const manifestPath = process.argv[2];
@@ -41,8 +48,9 @@ for (const e of entries) {
   const ticker = String(e.ticker || "").toUpperCase().trim();
   if (!ticker || !Array.isArray(e.ticked)) { console.error(`SKIP bad entry: ${JSON.stringify(e).slice(0, 80)}`); continue; }
   const date = e.trade_date || todayMYT;
-  const auto = e.auto || e.ticked;
-  const g = gradeFrom(e.ticked);
+  const g = gradeFrom(e.ticked); // g.ticked = whitelisted + deduped — use IT everywhere below
+  const auto = [...new Set(e.auto || e.ticked)].filter(k => SCORED_SET.has(k));
+  if (g.dropped.length) console.warn(`${ticker}: dropped non-scored/unknown keys from manifest: ${g.dropped.join(", ")}`);
 
   // 1) chart → storage
   let chartUrl = null;
@@ -64,7 +72,7 @@ for (const e of entries) {
     body: JSON.stringify([{
       created_by: UID, ticker, trade_date: date, sector: e.sector || null,
       stars: g.stars, letter: g.letter, pct: g.pct, star_hit: g.starHit, starmakers: STARMAKERS,
-      ticked: e.ticked, auto, note: e.note || null, chart_img: chartUrl, is_published: true,
+      ticked: g.ticked, auto, note: e.note || null, chart_img: chartUrl, is_published: true,
       // Breakout | Pullback — from the Daily Trade Ideas subfolder (needs the setup_type ALTER run)
       ...(e.setup_type ? { setup_type: e.setup_type } : {}),
     }]),
@@ -75,7 +83,7 @@ for (const e of entries) {
     method: "POST", headers: { ...H, Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify([{
       user_id: UID, symbol: ticker, stars: g.stars, letter: g.letter, pct: g.pct,
-      star_hit: g.starHit, starmakers: STARMAKERS, ticked: e.ticked, auto,
+      star_hit: g.starHit, starmakers: STARMAKERS, ticked: g.ticked, auto,
       updated_at: new Date().toISOString(),
     }]),
   });

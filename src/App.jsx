@@ -9427,6 +9427,7 @@ function NavIcon({ name, size = 17, color = "currentColor" }) {
   if (name === "journal") return <svg {...p}><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>;
   if (name === "tools") return <svg {...p}><path d="M4 6h9M17 6h3M4 12h4M12 12h8M4 18h11M19 18h1" /><circle cx="14" cy="6" r="2.1" /><circle cx="10" cy="12" r="2.1" /><circle cx="16" cy="18" r="2.1" /></svg>;
   if (name === "settings") return <svg {...p}><circle cx="12" cy="12" r="3.4" /><path d="M12 2v3.2M12 18.8V22M2 12h3.2M18.8 12H22M4.9 4.9l2.3 2.3M16.8 16.8l2.3 2.3M19.1 4.9l-2.3 2.3M7.2 16.8l-2.3 2.3" /></svg>;
+  if (name === "daily") return <svg {...p}><path d="M13 2L4.5 13.5h6L11 22l8.5-11.5h-6L13 2z" /></svg>;
   if (name === "modelbook") return <svg {...p}><path d="M12 5c-2-1.5-4.5-2-7-2v16c2.5 0 5 .5 7 2 2-1.5 4.5-2 7-2V3c-2.5 0-5 .5-7 2z" /><path d="M12 5v16" /><path d="M15.5 9l1-2 1 2 2 .3-1.5 1.4.4 2-1.9-1-1.9 1 .4-2L13.5 9.3z" strokeWidth="1.1" /></svg>;
   return null;
 }
@@ -9586,8 +9587,9 @@ function AppBackground({ intensity = "calm" }) {
 const NAV = [
   { id: "dashboard", label: "Dashboard" },
   { id: "journal", label: "Journal" },
-  { id: "modelbook", label: "Model Book" },
   { id: "tools", label: "Tools" },
+  { id: "daily", label: "Setups" },
+  { id: "modelbook", label: "Model Book" },
   { id: "settings", label: "Settings" },
 ];
 

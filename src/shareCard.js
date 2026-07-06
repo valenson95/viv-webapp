@@ -83,7 +83,13 @@ export async function renderShareCard(data) {
   if (chart) {
     ctx.save();
     roundRect(ctx, M, topH, chartW, chartH, 14); ctx.clip();
-    ctx.drawImage(chart, M, topH, chartW, chartH);
+    // cover-crop from the source (center) instead of stretching, so a height-capped
+    // (portrait-ish) chart never squashes — for normal DeepVue landscapes this is a no-op
+    const tr = chartW / chartH;
+    let sw = chart.width, sh = chart.height, sx = 0, sy = 0;
+    if (chart.width / chart.height > tr) { sw = chart.height * tr; sx = (chart.width - sw) / 2; }
+    else { sh = chart.width / tr; sy = (chart.height - sh) / 2; }
+    ctx.drawImage(chart, sx, sy, sw, sh, M, topH, chartW, chartH);
     ctx.restore();
     ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.lineWidth = 1;
     roundRect(ctx, M, topH, chartW, chartH, 14); ctx.stroke();
