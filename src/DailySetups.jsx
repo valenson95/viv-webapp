@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { listSetups, deleteSetup, resetSetups } from "./dailySetups.js";
 import { SECTIONS } from "./SetupGrader.jsx";
 import { themeFit } from "./themes.js";
@@ -183,13 +184,16 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         </div>
       ))}
 
-      {/* lightbox */}
-      {lightbox && (
+      {/* lightbox — PORTALED to body: an ancestor with transform/filter/backdrop-filter re-anchors
+          position:fixed and crops the chart (member-seen on RKLB). Body-level = true fullscreen. */}
+      {lightbox && createPortal(
         <div onClick={() => setLightbox(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(4,4,8,0.92)", display: "grid", placeItems: "center", cursor: "zoom-out", padding: 24 }}>
-          <img src={lightbox} alt="chart" style={{ maxWidth: "94vw", maxHeight: "92vh", borderRadius: 14, border: `1px solid ${C.borderGold}`, boxShadow: "0 30px 80px rgba(0,0,0,0.7)" }} />
+          style={{ position: "fixed", inset: 0, zIndex: 1500, background: "rgba(4,4,8,0.94)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out", padding: 24 }}>
+          <img src={lightbox} alt="chart"
+            style={{ maxWidth: "min(96vw, 1900px)", maxHeight: "92vh", width: "auto", height: "auto", objectFit: "contain", display: "block", borderRadius: 14, border: `1px solid ${C.borderGold}`, boxShadow: "0 30px 80px rgba(0,0,0,0.7)" }} />
           <div style={{ position: "fixed", top: 18, right: 26, color: "rgba(255,255,255,0.7)", fontSize: "0.8rem", fontFamily: font }}>Esc / click to close</div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
