@@ -225,17 +225,6 @@ function useDragReorder(length) {
 // Add new entries to the TOP of WHATS_NEW as features ship.
 const WHATS_NEW = [
   {
-    tag: "New",
-    date: "July 8, 2026",
-    title: "📏 Extension metric — how stretched was it when you entered and exited?",
-    items: [
-      "New metric on your trades: ATR% multiple from the 50-day MA — the same 'how extended is this stock' number pro scanners print. Under 4× = fresh; ~5× = stretched (2σ); 7.5–8× = statistically rare (3σ); 10×+ = extreme.",
-      "Where to see it: a small badge beside the ticker in Recent trades (extension AT YOUR EXIT — green ≥7× means you sold into strength), the same badge on Open Positions (live reading), the full entry → exit pair inside Trade details, and two new cards in Your Edge: average exit extension + % of exits taken ≥7×.",
-      "Why it matters: 25 years of Nasdaq-100 data shows stocks crossing extreme extension pause ~5 days, then OUTPERFORM for months — so extension is a 'trim into strength' signal, never a shorting signal, and chasing entries above 4× is where losses cluster.",
-      "Insight layer only — it changes nothing about your stops, R math, or saved data. Badges appear as the data populates.",
-    ],
-  },
-  {
     tag: "Fix",
     date: "July 8, 2026",
     title: "📅 Calendar now books every partial exit on its own day",
@@ -5820,7 +5809,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
               <div className="edgestat"><div className={"edgeval " + (edgePos ? "green" : "red")}>{dstats.n ? sgnR(dstats.expectancy) : "—"}</div><div className="edgek">Expectancy / trade</div></div>
               <div className="edgestat"><div className="edgeval gold">{dstats.n ? (isFinite(dstats.pf) ? dstats.pf.toFixed(2) : (dstats.wins ? "∞" : "—")) : "—"}</div><div className="edgek">Profit factor</div></div>
             </div>
-            {dstats.extN > 0 && (
+            {isAdmin && dstats.extN > 0 && (
               <div className="edgerow">
                 <div className="edgestat"><div className="edgeval" style={{ color: dstats.avgExtExit >= 5 ? "var(--green)" : "var(--text)" }}>{dstats.avgExtExit.toFixed(1)}×</div><div className="edgek"><span className="term" data-tip="Average ATR% multiple from the 50-day MA at your exits. Higher = you're consistently selling while the stock is stretched, not after it comes in.">Avg exit extension</span></div></div>
                 <div className="edgestat"><div className="edgeval" style={{ color: dstats.strongExitPct >= 15 ? "var(--green)" : "var(--goldBright)" }}>{Math.round(dstats.strongExitPct)}%</div><div className="edgek"><span className="term" data-tip="Share of exits taken at ≥7× ATR from the 50-day MA — statistically rare (3-sigma) territory. These are your sell-into-strength exits; historically your highest win-rate bucket.">Exits into strength (≥7×)</span></div></div>
@@ -6257,7 +6246,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   <React.Fragment key={t.id}>
                     <tr id={"jtrade-" + t.id} className={"traderow clickrow" + (isOpen ? " rev-open" : "") + (highlightTradeId === t.id ? " jumphl" : "")} onClick={() => setPreviewTrade(t)}>
                       <td data-l="Result"><span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span></td>
-                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}{t.extExit != null ? <span className="term" data-tip={`Extension at exit: ${Number(t.extExit).toFixed(1)}× ATR from the 50-day MA${t.extEntry != null ? ` (entry was ${Number(t.extEntry).toFixed(1)}×)` : ""}. ≥7× = sold into strength (rare, 3-sigma territory) · <2× = a stop/management exit near the mean.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--goldBright)" : t.extExit < 2 ? "var(--red)" : "var(--muted)", border: `1px solid ${t.extExit >= 7 ? "rgba(34,197,94,0.35)" : t.extExit >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(t.extExit).toFixed(1)}×</span> : null}</span></td>
+                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}{isAdmin && t.extExit != null ? <span className="term" data-tip={`Extension at exit: ${Number(t.extExit).toFixed(1)}× ATR from the 50-day MA${t.extEntry != null ? ` (entry was ${Number(t.extEntry).toFixed(1)}×)` : ""}. ≥7× = sold into strength (rare, 3-sigma territory) · <2× = a stop/management exit near the mean.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--goldBright)" : t.extExit < 2 ? "var(--red)" : "var(--muted)", border: `1px solid ${t.extExit >= 7 ? "rgba(34,197,94,0.35)" : t.extExit >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(t.extExit).toFixed(1)}×</span> : null}</span></td>
                       <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Exit $">${(Number(t.exitP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
@@ -6506,7 +6495,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                           <Rw k="Trade Risk" v={tradeRisk != null ? money(tradeRisk) : "--"} tip="(entry − planned stop) × shares" />
                           <Rw k="Planned R-Multiple" v={plannedR != null ? plannedR.toFixed(2) + "R" : "--"} c={plannedR != null ? (plannedR >= 2 ? "var(--green)" : "var(--goldBright)") : undefined} />
                           <Rw k="Realized R-Multiple" v={realR != null ? sgnR(realR) : "--"} c={realR != null ? (realR >= 0 ? "var(--green)" : "var(--red)") : undefined} />
-                          {(t.extEntry != null || t.extExit != null) && (
+                          {isAdmin && (t.extEntry != null || t.extExit != null) && (
                             <div className="tz-row"><span className="term" data-tip="ATR% Multiple from the 50-day MA at your entry → at your exit (same metric your charts print). Under 4× = fresh entry zone; 5× = statistically stretched; 7.5–8× = rare (3-sigma); 10×+ = extreme — the trim-into-strength zone. Insight only — it never changes your stops or fills.">Ext (×ATR from 50MA)</span>
                               <b>
                                 <span style={{ color: t.extEntry == null ? "var(--faint)" : t.extEntry <= 4 ? "var(--green)" : t.extEntry < 7 ? "var(--goldBright)" : "var(--red)" }}>{t.extEntry != null ? Number(t.extEntry).toFixed(1) + "×" : "—"}</span>
@@ -8172,7 +8161,6 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                 <th className="pro-only"><span className="term" data-tip="How many shares you currently hold.">Shares</span></th>
                 <th className="pro-only"><span className="term" data-tip="Your average entry price per share.">Avg Cost</span></th>
                 <th className="pro-only"><span className="term" data-tip="Total broker fees paid on this position so far.">Commission</span></th>
-                <th className="pro-only"><span className="term" data-tip="The pattern or reason you took the trade.">Setup</span></th>
                 <th className="pro-only"><span className="term" data-tip="DeepVue-style sector, auto-recognized from the ticker — no AI needed. Unknown tickers show a dash.">Theme</span></th>
                 <th className="pro-only"><span className="term" data-tip="The Setup Grader score for this position (★ / letter / %). Grade a name in Premium Tools → Setup Grader, then Sync to Open Position.">Grade</span></th>
                 <th onClick={() => togglePosSort("posValue")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "posValue" ? C.gold : undefined }} title="Sort by position size"><span className="term" data-tip="Total dollars in this position — shares × average cost.">Position size</span>{posSort && posSort.key === "posValue" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
@@ -8181,6 +8169,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                 <th><span className="term tipright" data-tip="Dollars you'd lose if price falls to your stop from here.">Risk to stop</span></th>
                 <th className="pro-only" onClick={() => togglePosSort("rMult")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "rMult" ? C.gold : undefined }} title="Sort by R-multiple"><span className="term tipright" data-tip="R-multiple — profit/loss in units of your initial risk.">R</span>{posSort && posSort.key === "rMult" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th><span className="term tipright" data-tip="Open profit or loss on this position right now.">P/L</span>{" "}<span onClick={(e) => { e.stopPropagation(); togglePosSort("plD"); }} title="Sort by P/L ($)" style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "plD" ? C.gold : C.muted }}>${posSort && posSort.key === "plD" ? (posSort.dir === "asc" ? "▲" : "▼") : ""}</span>{" "}<span onClick={(e) => { e.stopPropagation(); togglePosSort("plPct"); }} title="Sort by P/L (%)" style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "plPct" ? C.gold : C.muted }}>%{posSort && posSort.key === "plPct" ? (posSort.dir === "asc" ? "▲" : "▼") : ""}</span></th>
+                <th className="pro-only"><span className="term tipright" data-tip="The setup you traded — Breakout, Pullback Buy or Episodic Pivot.">Setup</span></th>
                 <th></th>
               </tr>
             </thead>
@@ -8200,11 +8189,10 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                   <React.Fragment key={p.id}>
                     <tr className={"posrow" + (isOpen ? " mg-open" : "")}>
                       <td data-l="Status"><span className={"status " + sc}><span className="d"></span>{p.riskStatus === "—" ? "Risk-Free" : p.riskStatus}</span></td>
-                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{p.sym}{p.extMult != null ? <span className="term" data-tip={`Extension: ${Number(p.extMult).toFixed(1)}× ATR from the 50-day MA (as of ${p.extAsof || "last sync"}). <4× = fresh · ~5× = stretched (2σ) · 7.5–8× = rare (3σ) · ≥10× = extreme, the trim-into-strength zone. Insight only — your stops and plan stay the plan.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: p.extMult >= 10 ? "var(--red)" : p.extMult >= 7.5 ? "#fb923c" : p.extMult >= 5 ? "var(--goldBright)" : "var(--muted)", border: `1px solid ${p.extMult >= 10 ? "rgba(239,68,68,0.4)" : p.extMult >= 7.5 ? "rgba(251,146,60,0.4)" : p.extMult >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(p.extMult).toFixed(1)}×</span> : null}</span></td>
+                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{p.sym}{isAdmin && p.extMult != null ? <span className="term" data-tip={`Extension: ${Number(p.extMult).toFixed(1)}× ATR from the 50-day MA (as of ${p.extAsof || "last sync"}). <4× = fresh · ~5× = stretched (2σ) · 7.5–8× = rare (3σ) · ≥10× = extreme, the trim-into-strength zone. Insight only — your stops and plan stay the plan.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: p.extMult >= 10 ? "var(--red)" : p.extMult >= 7.5 ? "#fb923c" : p.extMult >= 5 ? "var(--goldBright)" : "var(--muted)", border: `1px solid ${p.extMult >= 10 ? "rgba(239,68,68,0.4)" : p.extMult >= 7.5 ? "rgba(251,146,60,0.4)" : p.extMult >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(p.extMult).toFixed(1)}×</span> : null}</span></td>
                       <td className="pro-only" data-l="Shares">{p.sharesN}</td>
                       <td className="pro-only" data-l="Avg Cost">${(p.epN || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Commission">${(p.commN || 0).toFixed(2)}</td>
-                      <td className="pro-only" data-l="Setup"><select value={p.setup || ""} onChange={e => updateField(p.id, "setup", e.target.value)} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 7, color: p.setup ? "var(--text)" : "var(--faint)", fontFamily: font, fontSize: "0.68rem", fontWeight: 600, padding: "4px 8px", outline: "none", cursor: "pointer", maxWidth: 130 }}><option value="">— Setup —</option>{(setupTypes || []).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
                       <td className="pro-only" data-l="Theme">{(() => {
                         const th = sectorFor(p.sym);
                         if (!th) return <span className="term" data-tip="No DeepVue sector mapped for this ticker yet — it'll tag automatically once added to the theme map.">—</span>;
@@ -8240,6 +8228,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                       <td data-l="Risk to stop"><span className={"pl " + (p.rtsD > 0 ? "dn" : "up")}>{rtsTxt}</span></td>
                       <td className="pro-only" data-l="R"><span className={"pl " + (p.rMult >= 0 ? "up" : "dn")}>{(p.rMult >= 0 ? "+" : "") + p.rMult.toFixed(1)}R</span></td>
                       <td data-l="P/L"><span className={"pl " + (p.plD >= 0 ? "up" : "dn")}>{usdSigned(p.plD)}<span className="pct">{pctSigned(p.plPct)}</span></span></td>
+                      <td className="pro-only" data-l="Setup"><select value={p.setup || ""} onChange={e => updateField(p.id, "setup", e.target.value)} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 7, color: p.setup ? "var(--text)" : "var(--faint)", fontFamily: font, fontSize: "0.68rem", fontWeight: 600, padding: "4px 8px", outline: "none", cursor: "pointer", maxWidth: 130 }}><option value="">— Setup —</option>{(setupTypes || []).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
                       <td className="mgcell" data-l="">
                         <button className="mgbtn" onClick={() => openManage(p)}>Manage</button>
                         <button className="mgbtn sell" title="Sell or close this position" onClick={() => openSell(p)}>Sell</button>
