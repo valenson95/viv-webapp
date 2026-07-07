@@ -225,6 +225,17 @@ function useDragReorder(length) {
 // Add new entries to the TOP of WHATS_NEW as features ship.
 const WHATS_NEW = [
   {
+    tag: "New",
+    date: "July 8, 2026",
+    title: "📏 Extension metric — how stretched was it when you entered and exited?",
+    items: [
+      "New metric on your trades: ATR% multiple from the 50-day MA — the same 'how extended is this stock' number pro scanners print. Under 4× = fresh; ~5× = stretched (2σ); 7.5–8× = statistically rare (3σ); 10×+ = extreme.",
+      "Where to see it: a small badge beside the ticker in Recent trades (extension AT YOUR EXIT — green ≥7× means you sold into strength), the same badge on Open Positions (live reading), the full entry → exit pair inside Trade details, and two new cards in Your Edge: average exit extension + % of exits taken ≥7×.",
+      "Why it matters: 25 years of Nasdaq-100 data shows stocks crossing extreme extension pause ~5 days, then OUTPERFORM for months — so extension is a 'trim into strength' signal, never a shorting signal, and chasing entries above 4× is where losses cluster.",
+      "Insight layer only — it changes nothing about your stops, R math, or saved data. Badges appear as the data populates.",
+    ],
+  },
+  {
     tag: "Fix",
     date: "July 8, 2026",
     title: "📅 Calendar now books every partial exit on its own day",
@@ -828,6 +839,9 @@ function groupPositionFills(rows) {
       setup: firstOf("setup"), reason: firstOf("reason"), notes: firstOf("notes"),
       tags: [...new Set(fills.flatMap(f => f.tags || []))],
       aiReview: firstOf("aiReview"), rationale: firstOf("rationale"), thesisId: firstOf("thesisId"),
+      // extension: campaign entry ext = earliest fill's, exit ext = final fill's (chronological, not cluster order)
+      extEntry: (() => { const xs = fills.filter(f => f.extEntry != null).sort((a, b) => String(tradeDateISO(a.entry) || "").localeCompare(String(tradeDateISO(b.entry) || ""))); return xs.length ? xs[0].extEntry : null; })(),
+      extExit: (() => { const xs = fills.filter(f => f.extExit != null).sort((a, b) => String(tradeDateISO(a.exit) || "").localeCompare(String(tradeDateISO(b.exit) || ""))); return xs.length ? xs[xs.length - 1].extExit : null; })(),
       _fills: fills, _fillCount: fills.length,
     };
   };
@@ -5390,6 +5404,13 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     const grossLoss = Math.abs(losses.reduce((a, t) => a + (Number(t.plDollar) || 0), 0));
     const rTrades = tr.filter(t => t.rMult != null);
     const expectancy = rTrades.length ? rTrades.reduce((a, t) => a + Number(t.rMult), 0) / rTrades.length : 0;
+    // Extension metric (ATR% multiple from 50-MA) — fill-level so campaign rollups don't hide per-exit values
+    const extFills = tr.flatMap(t => (t._fills && t._fills.length > 1 ? t._fills : [t])).filter(f => f.extExit != null && !isNaN(Number(f.extExit)));
+    const extN = extFills.length;
+    const avgExtExit = extN ? extFills.reduce((a, f) => a + Number(f.extExit), 0) / extN : 0;
+    const strongExitPct = extN ? (100 * extFills.filter(f => Number(f.extExit) >= 7).length / extN) : 0;
+    const entFills = tr.flatMap(t => (t._fills && t._fills.length > 1 ? t._fills : [t])).filter(f => f.extEntry != null && !isNaN(Number(f.extEntry)));
+    const avgExtEntry = entFills.length ? entFills.reduce((a, f) => a + Number(f.extEntry), 0) / entFills.length : 0;
     let lw = null, ll = null;
     wins.forEach(t => { if (!lw || (Number(t.plPct) || 0) > (Number(lw.plPct) || 0)) lw = t; });
     losses.forEach(t => { if (!ll || (Number(t.plPct) || 0) < (Number(ll.plPct) || 0)) ll = t; });
@@ -5431,6 +5452,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
       wlr: avgLoss ? Math.abs(avgGain / avgLoss) : 0, expectancy,
       pf: grossLoss ? grossWin / grossLoss : (grossWin > 0 ? Infinity : 0),
       lw, ll, streakN, streakWin, adjWL, avgHoldWin, avgHoldLoss, holdRatio, totalComm: tr.reduce((a, t) => a + (parseFloat(t.commission) || 0), 0),
+      extN, avgExtExit, avgExtEntry, strongExitPct,
     };
   }, [dateFiltered, startCap]);
 
@@ -5798,6 +5820,12 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
               <div className="edgestat"><div className={"edgeval " + (edgePos ? "green" : "red")}>{dstats.n ? sgnR(dstats.expectancy) : "—"}</div><div className="edgek">Expectancy / trade</div></div>
               <div className="edgestat"><div className="edgeval gold">{dstats.n ? (isFinite(dstats.pf) ? dstats.pf.toFixed(2) : (dstats.wins ? "∞" : "—")) : "—"}</div><div className="edgek">Profit factor</div></div>
             </div>
+            {dstats.extN > 0 && (
+              <div className="edgerow">
+                <div className="edgestat"><div className="edgeval" style={{ color: dstats.avgExtExit >= 5 ? "var(--green)" : "var(--text)" }}>{dstats.avgExtExit.toFixed(1)}×</div><div className="edgek"><span className="term" data-tip="Average ATR% multiple from the 50-day MA at your exits. Higher = you're consistently selling while the stock is stretched, not after it comes in.">Avg exit extension</span></div></div>
+                <div className="edgestat"><div className="edgeval" style={{ color: dstats.strongExitPct >= 15 ? "var(--green)" : "var(--goldBright)" }}>{Math.round(dstats.strongExitPct)}%</div><div className="edgek"><span className="term" data-tip="Share of exits taken at ≥7× ATR from the 50-day MA — statistically rare (3-sigma) territory. These are your sell-into-strength exits; historically your highest win-rate bucket.">Exits into strength (≥7×)</span></div></div>
+              </div>
+            )}
             {dstats.n > 0 && <div style={{ marginTop: 14 }}><span className="streak" style={{ color: dstats.streakWin ? "#86efac" : "#fca5a5" }}>{(dstats.streakWin ? "▲ " : "▼ ") + dstats.streakN + "-trade " + (dstats.streakWin ? "win streak" : "losing streak")}</span></div>}
             {dstats.n > 0 && (
               <div className="edgeproj">
@@ -6229,7 +6257,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   <React.Fragment key={t.id}>
                     <tr id={"jtrade-" + t.id} className={"traderow clickrow" + (isOpen ? " rev-open" : "") + (highlightTradeId === t.id ? " jumphl" : "")} onClick={() => setPreviewTrade(t)}>
                       <td data-l="Result"><span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span></td>
-                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}</span></td>
+                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}{t.extExit != null ? <span className="term" data-tip={`Extension at exit: ${Number(t.extExit).toFixed(1)}× ATR from the 50-day MA${t.extEntry != null ? ` (entry was ${Number(t.extEntry).toFixed(1)}×)` : ""}. ≥7× = sold into strength (rare, 3-sigma territory) · <2× = a stop/management exit near the mean.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--goldBright)" : t.extExit < 2 ? "var(--red)" : "var(--muted)", border: `1px solid ${t.extExit >= 7 ? "rgba(34,197,94,0.35)" : t.extExit >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(t.extExit).toFixed(1)}×</span> : null}</span></td>
                       <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Exit $">${(Number(t.exitP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
@@ -8172,7 +8200,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                   <React.Fragment key={p.id}>
                     <tr className={"posrow" + (isOpen ? " mg-open" : "")}>
                       <td data-l="Status"><span className={"status " + sc}><span className="d"></span>{p.riskStatus === "—" ? "Risk-Free" : p.riskStatus}</span></td>
-                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{p.sym}</span></td>
+                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{p.sym}{p.extMult != null ? <span className="term" data-tip={`Extension: ${Number(p.extMult).toFixed(1)}× ATR from the 50-day MA (as of ${p.extAsof || "last sync"}). <4× = fresh · ~5× = stretched (2σ) · 7.5–8× = rare (3σ) · ≥10× = extreme, the trim-into-strength zone. Insight only — your stops and plan stay the plan.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: p.extMult >= 10 ? "var(--red)" : p.extMult >= 7.5 ? "#fb923c" : p.extMult >= 5 ? "var(--goldBright)" : "var(--muted)", border: `1px solid ${p.extMult >= 10 ? "rgba(239,68,68,0.4)" : p.extMult >= 7.5 ? "rgba(251,146,60,0.4)" : p.extMult >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(p.extMult).toFixed(1)}×</span> : null}</span></td>
                       <td className="pro-only" data-l="Shares">{p.sharesN}</td>
                       <td className="pro-only" data-l="Avg Cost">${(p.epN || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Commission">${(p.commN || 0).toFixed(2)}</td>
@@ -9919,7 +9947,7 @@ function AppInner() {
       else if (ins) {
         res.pInserted = ins.length;
         ins.forEach(p => audit.positionsInserted.push(p.id));
-        const mapped = ins.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "ibkr", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
+        const mapped = ins.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "ibkr", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, extMult: p.ext_mult ?? null, extAsof: p.ext_asof || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
         setPositions(prev => [...prev, ...mapped]);
         lastLoadedCount.current = (lastLoadedCount.current || 0) + mapped.length;
       }
@@ -10133,7 +10161,7 @@ function AppInner() {
         setJournaledTrades(applyTradeLinks(tradesRes.data.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null, profitTarget: t.profit_target ?? null, plannedStop: t.planned_stop ?? null, extEntry: t.ext_entry ?? null, extExit: t.ext_exit ?? null }))));
       }
       if (posRes.data) {
-        const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
+        const mapped = posRes.data.map(p => ({ id: p.id, _lid: 1e9 + (p.id || 0), sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, extMult: p.ext_mult ?? null, extAsof: p.ext_asof || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
         setPositions(mapped);
         positionsRef.current = mapped;
         lastLoadedCount.current = mapped.length;
@@ -10437,7 +10465,7 @@ function AppInner() {
         const snap = new Map();
         clean.forEach(p => { if (p.symbol) snap.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
         loadedSnapshot.current = snap;
-        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) })));
+        setPositions(clean.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", source: p.source || "manual", ibConid: p.ib_conid || null, ibSyncedAt: p.ib_synced_at || null, rationale: p.rationale || null, extMult: p.ext_mult ?? null, extAsof: p.ext_asof || null, intradayLog: normalizeIntradayLog(p.intraday_log) })));
       } else if (!posErr) {
         // Query succeeded but returned empty — check if user has been initialized before
         const { data: initFlag } = await supabase.from("user_settings").select("setting_value").eq("user_id", uid).eq("setting_key", "initialized").single();
@@ -10513,7 +10541,7 @@ function AppInner() {
                 const snap2 = new Map();
                 refreshed.forEach(p => { if (p.symbol) snap2.set(p.id, { sym: p.symbol, ep: p.entry_price || "", shares: p.shares || "" }); });
                 loadedSnapshot.current = snap2;
-                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", rationale: p.rationale || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
+                const next = refreshed.map(p => ({ id: p.id, _lid: _lid++, sym: p.symbol, entry: p.entry_date, entryTime: p.entry_time || "", shares: p.shares, ep: p.entry_price, cp: p.current_price, stop: p.stop_price, stop2: p.stop_price_2, trailStop: p.trailing_stop || "", setup: p.setup, tags: p.tags || [], comm: p.commission != null ? String(p.commission) : "", notes: p.notes || "", chartUrl: p.chart_url || "", chartImage: p.chart_image || "", tradeType: p.trade_type || "Long", rationale: p.rationale || null, extMult: p.ext_mult ?? null, extAsof: p.ext_asof || null, intradayLog: normalizeIntradayLog(p.intraday_log) }));
                 positionsRef.current = next;
                 setPositions(next);
               }
