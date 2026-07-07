@@ -7,6 +7,15 @@
 // ─────────────────────────────────────────────────────────────
 
 export const THEME_SNAPSHOTS = {
+  // 2026-06-26 = the 06-28 snapshot BACKDATED 2 trading days by VALEN'S MANUAL JUDGMENT
+  // (2026-07-07): his 6/26 entries (CRWD/FTNT cyber, MRNA biotech) predate the first logged
+  // snapshot but the leaders were the same — Cyber 1W #1, Biotech top-5. Auditable here + in
+  // trading/context/deepvue-themes.md.
+  "2026-06-26": {
+    month: [["Genomics",26.5],["Airlines",19.3],["Biotechnology",16.84],["HealthCare",12.04],["Home Construction",11.29],["Banks",10.55],["Aerospace",10.36],["Medical",6.9],["Industrials",5.67],["Retail",5.63],["Transports",5.3],["Utilities",4.69],["Cybersecurity",4.66],["Real Estate",2.69],["Materials",0.74],["Growth Stocks",-2.75],["Social Media",-4.4],["Bitcoin",-5.76],["Software",-6.62],["Robotics",-7.15],["Semiconductors",-7.15],["Quantum",-7.6],["Gold Miners",-7.73],["China Internet",-8.19],["Silver Miners",-8.33],["Telecom",-9.27],["AI",-10.57],["Steel",-12.53],["Oil & Gas",-16.61],["Solar",-19.87],["Bitcoin Miners",-24.78]],
+    week:  [["Cybersecurity",11.4],["Genomics",11.22],["Software",8.59],["Biotechnology",7.81],["HealthCare",6.82],["Social Media",6.62],["Silver Miners",6.13],["Gold Miners",5.15],["Aerospace",5.08],["Medical",4.55],["Transports",3.15],["Bitcoin",2.95],["China Internet",2.84],["Airlines",2.22],["Robotics",2.21],["Industrials",2.05],["Banks",1.67],["Materials",1.66],["Utilities",0.48],["Telecom",0.39],["Real Estate",0.38],["Retail",-0.18],["Home Construction",-0.41],["Steel",-1.99],["AI",-2.43],["Growth Stocks",-2.82],["Quantum",-3.05],["Oil & Gas",-3.14],["Solar",-3.16],["Semiconductors",-4.3],["Bitcoin Miners",-20.33]],
+    day:   [],
+  },
   "2026-06-28": {
     month: [["Genomics",26.5],["Airlines",19.3],["Biotechnology",16.84],["HealthCare",12.04],["Home Construction",11.29],["Banks",10.55],["Aerospace",10.36],["Medical",6.9],["Industrials",5.67],["Retail",5.63],["Transports",5.3],["Utilities",4.69],["Cybersecurity",4.66],["Real Estate",2.69],["Materials",0.74],["Growth Stocks",-2.75],["Social Media",-4.4],["Bitcoin",-5.76],["Software",-6.62],["Robotics",-7.15],["Semiconductors",-7.15],["Quantum",-7.6],["Gold Miners",-7.73],["China Internet",-8.19],["Silver Miners",-8.33],["Telecom",-9.27],["AI",-10.57],["Steel",-12.53],["Oil & Gas",-16.61],["Solar",-19.87],["Bitcoin Miners",-24.78]],
     week:  [["Cybersecurity",11.4],["Genomics",11.22],["Software",8.59],["Biotechnology",7.81],["HealthCare",6.82],["Social Media",6.62],["Silver Miners",6.13],["Gold Miners",5.15],["Aerospace",5.08],["Medical",4.55],["Transports",3.15],["Bitcoin",2.95],["China Internet",2.84],["Airlines",2.22],["Robotics",2.21],["Industrials",2.05],["Banks",1.67],["Materials",1.66],["Utilities",0.48],["Telecom",0.39],["Real Estate",0.38],["Retail",-0.18],["Home Construction",-0.41],["Steel",-1.99],["AI",-2.43],["Growth Stocks",-2.82],["Quantum",-3.05],["Oil & Gas",-3.14],["Solar",-3.16],["Semiconductors",-4.3],["Bitcoin Miners",-20.33]],
