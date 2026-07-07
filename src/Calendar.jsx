@@ -31,15 +31,28 @@ function toISO(s) {
 }
 
 // Aggregate closed trades → { "YYYY-MM-DD": {net, n, w} } by EXIT date.
+// IMPORTANT: campaign rows arrive MERGED (partial trims rolled up, stamped with the LAST exit date —
+// right for the trades list, wrong for daily booking: a Jul-1 trim must not book on Jul-6).
+// So explode campaigns back to their fills (._fills), book each fill on its own exit day, then
+// re-group same ticker+side+day so the day panel still reads one line per position.
 function useDailyMap(trades) {
   return useMemo(() => {
-    const m = {};
-    for (const t of (trades || [])) {
-      const pl = t.plDollar == null ? (t.pl_dollar == null ? null : Number(t.pl_dollar)) : Number(t.plDollar);
-      const iso = toISO(t.exit || t.exit_date);
+    const fills = (trades || []).flatMap(t => (t._fills && t._fills.length > 1 ? t._fills : [t]));
+    const byDayTicker = {};
+    for (const f of fills) {
+      const pl = f.plDollar == null ? (f.pl_dollar == null ? null : Number(f.pl_dollar)) : Number(f.plDollar);
+      const iso = toISO(f.exit || f.exit_date);
       if (pl == null || isNaN(pl) || !iso) continue;
+      const k = iso + "|" + (f.ticker || "") + "|" + (f.tradeType || f.trade_type || "Long");
+      (byDayTicker[k] = byDayTicker[k] || { iso, rows: [] }).rows.push(f);
+    }
+    const m = {};
+    for (const { iso, rows } of Object.values(byDayTicker)) {
+      const pl = rows.reduce((s, f) => s + (Number(f.plDollar ?? f.pl_dollar) || 0), 0);
+      const cost = rows.reduce((s, f) => s + (Number(f.entryP ?? f.entry_price) || 0) * (Number(f.shares) || 0), 0);
+      const rep = { ...rows[0], plDollar: +pl.toFixed(2), plPct: cost ? +((pl / cost) * 100).toFixed(2) : (rows[0].plPct ?? rows[0].pl_pct ?? null), _dayFills: rows.length };
       if (!m[iso]) m[iso] = { net: 0, n: 0, w: 0, trades: [] };
-      m[iso].net += pl; m[iso].n += 1; if (pl > 0) m[iso].w += 1; m[iso].trades.push(t);
+      m[iso].net += pl; m[iso].n += 1; if (pl > 0) m[iso].w += 1; m[iso].trades.push(rep);
     }
     return m;
   }, [trades]);

@@ -225,6 +225,16 @@ function useDragReorder(length) {
 // Add new entries to the TOP of WHATS_NEW as features ship.
 const WHATS_NEW = [
   {
+    tag: "Fix",
+    date: "July 8, 2026",
+    title: "📅 Calendar now books every partial exit on its own day",
+    items: [
+      "Partial trims used to roll up into the campaign's FINAL exit day, inflating that day's P&L (e.g. a July-1 trim showing under July 6). Each day now shows exactly what was realized that day — totals match your broker statement day by day.",
+      "The day panel still shows one clean line per position; multiple same-day fills of the same stock are combined with a cost-weighted %.",
+      "Your trades list is unchanged — campaigns still show as one whole position there, as designed.",
+    ],
+  },
+  {
     tag: "New",
     date: "July 8, 2026",
     title: "🧭 Theme tracker — full rankings + audit-proof tagging",
