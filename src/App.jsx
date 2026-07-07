@@ -227,6 +227,16 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 8, 2026",
+    title: "⏱ Days column on Open Positions",
+    items: [
+      "Open Positions now shows a Days column — how many calendar days you've held each position since entry, at one glance.",
+      "Click the header to sort by it: your freshest entries or your longest holds float to the top.",
+      "Positions without an entry date show a dash — add the date in Manage to start the clock.",
+    ],
+  },
+  {
+    tag: "New",
+    date: "July 8, 2026",
     title: "🔍 You review, you decide — flagged trade cleanup",
     items: [
       "If any of your synced trades match the foreign-currency import bug (non-USD trades booked at raw local prices), the journal now shows a review banner — you see exactly which rows, tick or untick each one, and nothing is removed unless YOU confirm.",
@@ -7817,8 +7827,13 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
     const intradayLiveCount = _liveEvents.length;
     const intradayAllReconciled = _log.length > 0 && _liveEvents.length === 0;
 
-    return { ...p, epN, cpN, commN, stop1, stop2, stop2N: stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR, sumTrimsLogged, sumAddsLogged, sharesNProj, realizedProjAdd, trimProjPct, todayTrimPct, remainingProjPct, intradayEventCount, intradayLiveCount, intradayAllReconciled };
-  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, realizedShares:0, origShares:0, trimPct:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0, sumTrimsLogged:0, sumAddsLogged:0, sharesNProj:0, realizedProjAdd:0, trimProjPct:0, todayTrimPct:0, remainingProjPct:0, intradayEventCount:0, intradayLiveCount:0, intradayAllReconciled:false }; }
+    // Duration — calendar days held since entry. null when the entry date is missing/unreadable.
+    const _entryIso = tradeDateISO(p.entry);
+    const _entryD = _entryIso ? new Date(_entryIso + "T00:00:00") : null;
+    const holdDays = _entryD && !isNaN(_entryD) ? Math.max(0, Math.round((new Date().setHours(0, 0, 0, 0) - _entryD) / 86400000)) : null;
+
+    return { ...p, holdDays, epN, cpN, commN, stop1, stop2, stop2N: stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR, sumTrimsLogged, sumAddsLogged, sharesNProj, realizedProjAdd, trimProjPct, todayTrimPct, remainingProjPct, intradayEventCount, intradayLiveCount, intradayAllReconciled };
+  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, holdDays:null, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, realizedShares:0, origShares:0, trimPct:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0, sumTrimsLogged:0, sumAddsLogged:0, sharesNProj:0, realizedProjAdd:0, trimProjPct:0, todayTrimPct:0, remainingProjPct:0, intradayEventCount:0, intradayLiveCount:0, intradayAllReconciled:false }; }
   }), [positions, rSizer, portfolioSize, compEquity, realizedByPosition]);
 
   const totals = useMemo(() => {
@@ -8235,6 +8250,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
               <tr>
                 <th><span className="term" data-tip="Where this position sits on risk.&#10;At Risk = stop below entry.&#10;Risk-Free = stop at entry.&#10;Profit Locked = stop above entry.">Status</span></th>
                 <th onClick={() => togglePosSort("sym")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "sym" ? C.gold : undefined }} title="Sort by ticker"><span className="term" data-tip="The ticker symbol. The dot shows the source: gold = auto-synced from IBKR, grey = entered manually.">Symbol</span>{posSort && posSort.key === "sym" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
+                <th onClick={() => togglePosSort("holdDays")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "holdDays" ? C.gold : undefined }} title="Sort by days held"><span className="term" data-tip="How many calendar days you've held this position since your entry date.">Days</span>{posSort && posSort.key === "holdDays" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th className="pro-only"><span className="term" data-tip="How many shares you currently hold.">Shares</span></th>
                 <th className="pro-only"><span className="term" data-tip="Your average entry price per share.">Avg Cost</span></th>
                 <th className="pro-only"><span className="term" data-tip="Total broker fees paid on this position so far.">Commission</span></th>
@@ -8267,6 +8283,9 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                     <tr className={"posrow" + (isOpen ? " mg-open" : "")}>
                       <td data-l="Status"><span className={"status " + sc}><span className="d"></span>{p.riskStatus === "—" ? "Risk-Free" : p.riskStatus}</span></td>
                       <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{p.sym}{isAdmin && p.extMult != null ? <span className="term" data-tip={`Extension: ${Number(p.extMult).toFixed(1)}× ATR from the 50-day MA (as of ${p.extAsof || "last sync"}). <4× = fresh · ~5× = stretched (2σ) · 7.5–8× = rare (3σ) · ≥10× = extreme, the trim-into-strength zone. Insight only — your stops and plan stay the plan.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: p.extMult >= 10 ? "var(--red)" : p.extMult >= 7.5 ? "#fb923c" : p.extMult >= 5 ? "var(--goldBright)" : "var(--muted)", border: `1px solid ${p.extMult >= 10 ? "rgba(239,68,68,0.4)" : p.extMult >= 7.5 ? "rgba(251,146,60,0.4)" : p.extMult >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(p.extMult).toFixed(1)}×</span> : null}</span></td>
+                      <td data-l="Days">{p.holdDays == null
+                        ? <span className="term" data-tip="No entry date on this position — add one in Manage to track how long you've held it." style={{ color: "var(--faint)" }}>—</span>
+                        : <span className="term" data-tip={`Held ${p.holdDays} calendar day${p.holdDays === 1 ? "" : "s"} since entry (${p.entry}).`} style={{ whiteSpace: "nowrap", cursor: "help", fontVariantNumeric: "tabular-nums", color: "var(--text)" }}>{p.holdDays}d</span>}</td>
                       <td className="pro-only" data-l="Shares">{p.sharesN}</td>
                       <td className="pro-only" data-l="Avg Cost">${(p.epN || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Commission">${(p.commN || 0).toFixed(2)}</td>
@@ -8312,7 +8331,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                       </td>
                     </tr>
                     {isOpen && (
-                      <tr className="mgrow"><td colSpan={15}>
+                      <tr className="mgrow"><td colSpan={16}>
                         <div className="mgpanel">
                           <div className="mghead">
                             <span className={"status " + sc}><span className="d"></span>{p.riskStatus === "—" ? "Risk-Free" : p.riskStatus}</span>
@@ -8427,7 +8446,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                 );
               })}
               {enriched.filter(p => p.sym).length === 0 && (
-                <tr><td colSpan={15} style={{ padding: "32px 14px", textAlign: "center", color: "var(--muted)" }}>No open positions yet. Click <b style={{ color: "var(--goldBright)" }}>+ Add Position</b> to start.</td></tr>
+                <tr><td colSpan={16} style={{ padding: "32px 14px", textAlign: "center", color: "var(--muted)" }}>No open positions yet. Click <b style={{ color: "var(--goldBright)" }}>+ Add Position</b> to start.</td></tr>
               )}
             </tbody>
           </table>
