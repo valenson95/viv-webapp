@@ -100,18 +100,31 @@ export default async function handler(req, res) {
     const positions = parseElements(stmtXml, "OpenPosition")
       .map((a) => {
         const dt = parseDateTime(a.openDateTime || a.holdingPeriodDateTime || "");
-        return { conid: a.conid || "", symbol: a.symbol || "", shares: a.position || "0", avgCost: a.costBasisPrice || a.openPrice || "0", markPrice: a.markPrice || "", openDate: dt.date, openTime: dt.time, assetCategory: a.assetCategory || "" };
+        const fx = Number(a.fxRateToBase) || 0;
+        const cur = (a.currency || "USD").toUpperCase();
+        const conv = (v) => { const n = Number(v) || 0; return cur !== "USD" && fx > 0 ? n * fx : n; };
+        return { conid: a.conid || "", symbol: a.symbol || "", shares: a.position || "0", avgCost: String(conv(a.costBasisPrice || a.openPrice || "0")), markPrice: a.markPrice !== undefined && a.markPrice !== "" ? String(conv(a.markPrice)) : "", openDate: dt.date, openTime: dt.time, assetCategory: a.assetCategory || "", currency: cur, fxOk: cur === "USD" || fx > 0 };
       })
-      .filter((p) => p.symbol && Number(p.shares) !== 0);
+      .filter((p) => p.symbol && Number(p.shares) !== 0)
+      .filter((p) => !p.assetCategory || p.assetCategory.toUpperCase() === "STK")
+      .filter((p) => p.fxOk);
 
-    const trades = parseElements(stmtXml, "Trade")
+    let trades = parseElements(stmtXml, "Trade")
       .map((a) => {
         const dt = parseDateTime(a.dateTime || (a.tradeDate ? a.tradeDate + (a.tradeTime ? ";" + a.tradeTime : "") : ""));
-        return { tradeID: a.tradeID || "", execID: a.ibExecID || a.tradeID || "", conid: a.conid || "", symbol: a.symbol || "", date: dt.date, time: dt.time, buySell: a.buySell || "", quantity: Math.abs(Number(a.quantity) || 0), signedQty: Number(a.quantity) || 0, price: Number(a.tradePrice) || 0, commission: Math.abs(Number(a.ibCommission) || 0), realizedPnl: Number(a.fifoPnlRealized) || 0, openClose: a.openCloseIndicator || "", assetCategory: a.assetCategory || "" };
+        const fx = Number(a.fxRateToBase) || 0;
+        const cur = (a.currency || "USD").toUpperCase();
+        const conv = (v) => { const n = Number(v) || 0; return cur !== "USD" && fx > 0 ? n * fx : n; };
+        return { tradeID: a.tradeID || "", execID: a.ibExecID || a.tradeID || "", conid: a.conid || "", symbol: a.symbol || "", date: dt.date, time: dt.time, buySell: a.buySell || "", quantity: Math.abs(Number(a.quantity) || 0), signedQty: Number(a.quantity) || 0, price: conv(a.tradePrice), commission: Math.abs(conv(a.ibCommission)), realizedPnl: conv(a.fifoPnlRealized), openClose: a.openCloseIndicator || "", assetCategory: (a.assetCategory || "").toUpperCase(), currency: cur, fxOk: cur === "USD" || fx > 0 };
       })
       .filter((t) => t.symbol && t.execID);
+    const skippedNonStock = trades.filter((t) => t.assetCategory && t.assetCategory !== "STK").length;
+    const skippedNoFx = trades.filter((t) => (!t.assetCategory || t.assetCategory === "STK") && !t.fxOk).length;
+    trades = trades
+      .filter((t) => !t.assetCategory || t.assetCategory === "STK")
+      .filter((t) => t.fxOk);
 
-    return res.status(200).json({ ok: true, account: accountId, fetchedAt: new Date().toISOString(), positions, trades });
+    return res.status(200).json({ ok: true, account: accountId, fetchedAt: new Date().toISOString(), positions, trades, skipped: { nonStock: skippedNonStock, foreignNoFxRate: skippedNoFx, note: skippedNoFx > 0 ? "Some non-USD trades were skipped because your Flex template doesn't include fxRateToBase — add it under Trades in your Flex Query to sync them converted to USD." : undefined } });
   } catch (err) {
     return res.status(500).json({ ok: false, error: `Sync failed: ${err.message || err}` });
   }
