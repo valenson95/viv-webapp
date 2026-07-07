@@ -226,6 +226,19 @@ function useDragReorder(length) {
 const WHATS_NEW = [
   {
     tag: "New",
+    date: "July 7, 2026",
+    title: "🎯 Setup Grader — sharper checklist guidance (scoring unchanged)",
+    items: [
+      "The checklist explanations now carry exact numbers. 'Fresh, not extended' shows you how to MEASURE extended: price's distance above the 50-day MA in units of the stock's own ATR% — under ~4× is launchpad territory, above it you're statistically buying someone else's exit.",
+      "'Range-expansion breakout on volume' now explains volume PACE: compare today's volume so far vs what the stock normally does by the same time of day. 40%+ of a full normal day inside the first 30 minutes = real demand; a breakout without that pace is the one that fades.",
+      "The key tick — 'Tight stop under 1 ADR' — now includes the sizing formula to run BEFORE every order: shares = risk budget ÷ (entry − stop). Your share count comes from the math, never from a round number you liked.",
+      "Two new live-market reminders: the 30-minute rule (the open hunts tight stops — if the setup is real it's still valid at 10:00), and the event/session check (no fresh entries into economic data or earnings you can't cushion; max ~3 new positions per session).",
+      "New idea on the invalidation tick: staggered stops — three stops of a third each at ⅓, ⅔ and the full distance to your level. A straight-line failure then costs ~0.67R instead of the full 1R, without ever moving your 'I'm wrong' price.",
+      "Nothing about scoring changed: same 16 criteria, same stars, same grades. Every published Daily Setup stays exactly as graded — this update is about executing them better.",
+    ],
+  },
+  {
+    tag: "New",
     date: "July 6, 2026",
     title: "⚡ Daily Setups — today's charts, graded and auditable",
     items: [
