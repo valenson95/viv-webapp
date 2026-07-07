@@ -230,8 +230,9 @@ const WHATS_NEW = [
     title: "⏱ Days column on Open Positions",
     items: [
       "Open Positions now shows a Days column — how many calendar days you've held each position since entry, at one glance.",
-      "Click the header to sort by it: your freshest entries or your longest holds float to the top.",
+      "More sortable columns: click Days, Theme or Position size (plus the existing Symbol, R and P/L) to sort the table; click again to flip the order.",
       "Positions without an entry date show a dash — add the date in Manage to start the clock.",
+      "Removing a ticker from the Setup Grader watchlist now asks for confirmation first — the × also deletes its saved grade, which is why a grade can vanish from Open Positions.",
     ],
   },
   {
@@ -7832,7 +7833,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
     const _entryD = _entryIso ? new Date(_entryIso + "T00:00:00") : null;
     const holdDays = _entryD && !isNaN(_entryD) ? Math.max(0, Math.round((new Date().setHours(0, 0, 0, 0) - _entryD) / 86400000)) : null;
 
-    return { ...p, holdDays, epN, cpN, commN, stop1, stop2, stop2N: stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR, sumTrimsLogged, sumAddsLogged, sharesNProj, realizedProjAdd, trimProjPct, todayTrimPct, remainingProjPct, intradayEventCount, intradayLiveCount, intradayAllReconciled };
+    return { ...p, holdDays, themeName: sectorFor(p.sym) || "", epN, cpN, commN, stop1, stop2, stop2N: stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR, sumTrimsLogged, sumAddsLogged, sharesNProj, realizedProjAdd, trimProjPct, todayTrimPct, remainingProjPct, intradayEventCount, intradayLiveCount, intradayAllReconciled };
   } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, holdDays:null, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, realizedShares:0, origShares:0, trimPct:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0, sumTrimsLogged:0, sumAddsLogged:0, sharesNProj:0, realizedProjAdd:0, trimProjPct:0, todayTrimPct:0, remainingProjPct:0, intradayEventCount:0, intradayLiveCount:0, intradayAllReconciled:false }; }
   }), [positions, rSizer, portfolioSize, compEquity, realizedByPosition]);
 
@@ -8254,7 +8255,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                 <th className="pro-only"><span className="term" data-tip="How many shares you currently hold.">Shares</span></th>
                 <th className="pro-only"><span className="term" data-tip="Your average entry price per share.">Avg Cost</span></th>
                 <th className="pro-only"><span className="term" data-tip="Total broker fees paid on this position so far.">Commission</span></th>
-                <th className="pro-only"><span className="term" data-tip="DeepVue-style sector, auto-recognized from the ticker — no AI needed. Unknown tickers show a dash.">Theme</span></th>
+                <th className="pro-only" onClick={() => togglePosSort("themeName")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "themeName" ? C.gold : undefined }} title="Sort by theme"><span className="term" data-tip="DeepVue-style sector, auto-recognized from the ticker — no AI needed. Unknown tickers show a dash. Click to sort by theme.">Theme</span>{posSort && posSort.key === "themeName" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th className="pro-only"><span className="term" data-tip="The Setup Grader score for this position (★ / letter / %). Grade a name in Premium Tools → Setup Grader, then Sync to Open Position.">Grade</span></th>
                 <th onClick={() => togglePosSort("posValue")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "posValue" ? C.gold : undefined }} title="Sort by position size"><span className="term" data-tip="Total dollars in this position — shares × average cost.">Position size</span>{posSort && posSort.key === "posValue" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th><span className="term" data-tip="Profit banked from partial sells of this position. The bar fills to the percentage of your original shares you've sold (trimmed).">Realized</span></th>
