@@ -225,6 +225,17 @@ function useDragReorder(length) {
 // Add new entries to the TOP of WHATS_NEW as features ship.
 const WHATS_NEW = [
   {
+    tag: "New",
+    date: "July 8, 2026",
+    title: "🧭 Theme tracker — full rankings + audit-proof tagging",
+    items: [
+      "Theme Leaders now has a 'Full tracker ▾' button — see the complete DeepVue theme ranking (all themes, 1-week and 1-month), not just the top 5. The 'updated' date shows exactly how fresh the data is.",
+      "Every 🟢 in-theme / 🔴 off-theme tag now tells you WHICH dated tracker snapshot judged it (hover the badge) — always the snapshot nearest your entry date, so the call never shifts as themes rotate later.",
+      "Trades from before theme tracking began (or with no readable entry date) now show ⚪ Untagged instead of being unfairly marked off-theme.",
+      "Latest snapshot: July 7 — Cybersecurity took the 1-week #1 seat; Genomics & Biotechnology still lead both timeframes.",
+    ],
+  },
+  {
     tag: "Fix",
     date: "July 8, 2026",
     title: "🛡️ Clearer stops + foreign-currency trades handled",
@@ -6219,9 +6230,10 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                         const th = sectorFor(t.ticker);
                         if (!th) return <span className="term" data-tip="No DeepVue sector mapped for this ticker yet.">—</span>;
                         const fit = themeFit(th, t.entry), r = themeRanks(th, t.entry) || {}, rk = (x) => x ? "#" + x : "—";
+                        if (!fit) return <span className="term" data-tip={`⚪ Untagged — entry date is before the first DeepVue tracker snapshot${THEME_COVERAGE_START ? ` (${THEME_COVERAGE_START})` : ""} or unreadable. A later theme snapshot never judges an older trade.`} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: "0.62rem", fontWeight: 700, background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap", cursor: "help" }}>⚪ {th}</span>;
                         const tip = fit === "in"
-                          ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend.`
-                          : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. Leaders that week: ${top5("week", t.entry).slice(0,3).join(", ")}.`;
+                          ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend. Judged vs the ${r.date} tracker snapshot (nearest at/before entry).`
+                          : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. Leaders that week: ${top5("week", t.entry).slice(0,3).join(", ")}. Judged vs the ${r.date} tracker snapshot (nearest at/before entry).`;
                         const g = fit === "in";
                         return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: "0.62rem", fontWeight: 700, background: g ? "var(--greenDim)" : "var(--redDim)", border: `1px solid ${g ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)"}`, color: g ? "var(--green)" : "var(--red)", whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
                       })()}</td>
@@ -8151,9 +8163,10 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                         if (!th) return <span className="term" data-tip="No DeepVue sector mapped for this ticker yet — it'll tag automatically once added to the theme map.">—</span>;
                         const fit = themeFit(th, p.entry), r = themeRanks(th, p.entry) || {};
                         const rk = (x) => x ? "#" + x : "—";
+                        if (!fit) return <span className="term" data-tip={`⚪ Untagged — entry date is before the first DeepVue tracker snapshot${THEME_COVERAGE_START ? ` (${THEME_COVERAGE_START})` : ""} or unreadable. A later theme snapshot never judges an older trade.`} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.66rem", fontWeight: 700, background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap", cursor: "help" }}>⚪ {th}</span>;
                         const tip = fit === "in"
-                          ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend — where the money was rotating.`
-                          : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. The leaders that week were ${top5("week", p.entry).slice(0,3).join(", ")}.`;
+                          ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend — where the money was rotating. Judged vs the ${r.date} tracker snapshot (nearest at/before your entry).`
+                          : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. The leaders that week were ${top5("week", p.entry).slice(0,3).join(", ")}. Judged vs the ${r.date} tracker snapshot (nearest at/before your entry).`;
                         const g = fit === "in", bg = g ? "var(--greenDim)" : "var(--redDim)", bd = g ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)", cl = g ? "var(--green)" : "var(--red)";
                         return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.66rem", fontWeight: 700, background: bg, border: `1px solid ${bd}`, color: cl, whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
                       })()}</td>

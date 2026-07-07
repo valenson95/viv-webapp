@@ -6,11 +6,12 @@ import { latestSnapshot, consistentTop } from "./themes.js";
 // Consistent leaders (top-5 in BOTH) highlighted green. VIV glass + gold.
 // ─────────────────────────────────────────────────────────────
 export default function ThemeStrip({ C, font }) {
+  const [full, setFull] = React.useState(false);
   const snap = latestSnapshot();
   if (!snap) return null;
   const both = new Set(consistentTop());
-  const week = (snap.week || []).slice(0, 5);
-  const month = (snap.month || []).slice(0, 5);
+  const week = full ? (snap.week || []) : (snap.week || []).slice(0, 5);
+  const month = full ? (snap.month || []) : (snap.month || []).slice(0, 5);
 
   const Table = ({ title, rows }) => (
     <div style={{ background: "rgba(255,255,255,0.025)", border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
@@ -46,10 +47,13 @@ export default function ThemeStrip({ C, font }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
           <span style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>Theme Leaders</span>
           <span style={{ height: 3, width: 3, borderRadius: "50%", background: C.muted, opacity: 0.5 }} />
-          <span style={{ fontSize: "0.68rem", color: C.muted }}>updated {snap.date}</span>
+          <span style={{ fontSize: "0.68rem", color: C.goldBright || C.gold, fontWeight: 700 }}>updated {snap.date}</span>
           <span style={{ marginLeft: "auto", fontSize: "0.66rem", color: C.muted, display: "inline-flex", alignItems: "center", gap: 6 }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.green }} /> leads BOTH 1W &amp; 1M
           </span>
+          <button onClick={() => setFull(f => !f)} style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.muted, fontFamily: font, fontSize: "0.64rem", fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
+            {full ? "Top 5 only ▴" : "Full tracker ▾"}
+          </button>
         </div>
         {/* two tables, same row */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
