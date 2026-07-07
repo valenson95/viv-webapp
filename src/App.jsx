@@ -225,6 +225,16 @@ function useDragReorder(length) {
 // Add new entries to the TOP of WHATS_NEW as features ship.
 const WHATS_NEW = [
   {
+    tag: "New",
+    date: "July 8, 2026",
+    title: "🔍 You review, you decide — flagged trade cleanup",
+    items: [
+      "If any of your synced trades match the foreign-currency import bug (non-USD trades booked at raw local prices), the journal now shows a review banner — you see exactly which rows, tick or untick each one, and nothing is removed unless YOU confirm.",
+      "After removing bad imports, run Sync now and those trades come back correctly converted to USD (make sure your Flex query includes the fxRateToBase field — Settings guide, step 3).",
+      "If they're all actually correct, one click dismisses the banner for good.",
+    ],
+  },
+  {
     tag: "Fix",
     date: "July 8, 2026",
     title: "📅 Calendar now books every partial exit on its own day",
@@ -5446,6 +5456,39 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   }, [dateFiltered, startCap]);
 
   const edgePos = dstats.expectancy >= 0;
+
+  // ── Foreign-currency flag review (member self-service; Valen 2026-07-07) ──
+  // Old syncs booked non-USD fills at RAW local-currency prices (yen/won as dollars). Detect the
+  // signature, let the MEMBER review row-by-row and confirm — nothing deletes without their click.
+  const [fxReviewOpen, setFxReviewOpen] = useState(false);
+  const [fxSel, setFxSel] = useState(() => new Set());
+  const [fxBusy, setFxBusy] = useState(false);
+  const [fxDismissed, setFxDismissed] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem("viv-fxflag-dismissed") || "[]")); } catch { return new Set(); } });
+  const fxFlagged = useMemo(() => (journaledTrades || []).filter(t =>
+    !fxDismissed.has(t.id) &&
+    (t.source === "ibkr" || t.source === "ibkr-sync") &&
+    (/\.[A-Za-z]{1,3}$/.test(String(t.ticker || "")) || Math.abs(Number(t.plPct) || 0) > 300 || (Number(t.entryP) || 0) > 50000)
+  ), [journaledTrades, fxDismissed]);
+  useEffect(() => { setFxSel(new Set(fxFlagged.map(t => t.id))); }, [fxFlagged.length]); // default: all checked
+  const fxDismiss = () => { const next = new Set([...fxDismissed, ...fxFlagged.map(t => t.id)]); setFxDismissed(next); try { localStorage.setItem("viv-fxflag-dismissed", JSON.stringify([...next])); } catch {} setFxReviewOpen(false); };
+  const fxDeleteSelected = async () => {
+    if (!fxSel.size || fxBusy) return;
+    setFxBusy(true);
+    const ids = [...fxSel];
+    let failed = 0;
+    for (const id of ids) {
+      // soft-delete + FREE the exec id so the fixed sync can re-import this fill converted to USD
+      const { error } = await supabase.from("trades").update({ is_deleted: true, ib_exec_id: null }).eq("id", id).eq("user_id", session.user.id);
+      if (error) failed++;
+    }
+    if (!failed) {
+      setJournaledTrades(prev => prev.filter(t => !fxSel.has(t.id)));
+      setFxReviewOpen(false);
+    }
+    setFxBusy(false);
+    if (failed) alert(`${failed} of ${ids.length} rows could not be removed — try again.`);
+  };
+
   const per$ = dstats.n ? dstats.totalPL / dstats.n : 0;
   const proj100R = dstats.expectancy * 100;
   const proj100$ = per$ * 100;
@@ -6201,6 +6244,40 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           </div>
         </div>
 
+        {fxFlagged.length > 0 && (
+          <div style={{ margin: "14px 0", padding: "13px 16px", borderRadius: 14, background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.35)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: "1.05rem" }}>⚠️</span>
+            <div style={{ flex: 1, minWidth: 260, fontSize: "0.8rem", lineHeight: 1.5 }}>
+              <b style={{ color: "#fdba74" }}>{fxFlagged.length} synced trade{fxFlagged.length > 1 ? "s" : ""} look mis-priced.</b>{" "}
+              They match a known bug where non-USD trades (e.g. Tokyo/Korea listings) were imported at raw local-currency prices — a ¥190,000 loss could show as −$190,000. <b>Nothing is changed unless you confirm.</b>
+            </div>
+            <button className="btn" onClick={() => setFxReviewOpen(true)} style={{ background: "rgba(251,146,60,0.15)", borderColor: "rgba(251,146,60,0.45)", color: "#fdba74", fontWeight: 700 }}>Review them</button>
+          </div>
+        )}
+        {fxReviewOpen && (
+          <div style={{ margin: "0 0 16px", padding: "16px", borderRadius: 14, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(251,146,60,0.35)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+              <b style={{ fontSize: "0.86rem" }}>Review flagged trades</b>
+              <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>Untick any row that's actually correct. Deleting only removes the bad import — after that, run <b>Sync now</b> (Settings → IBKR) and these trades re-import correctly converted to USD.</span>
+              <button onClick={() => setFxReviewOpen(false)} style={{ marginLeft: "auto", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", borderRadius: 8, width: 26, height: 26, cursor: "pointer" }}>×</button>
+            </div>
+            <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 10 }}>
+              {fxFlagged.map((t, i) => (
+                <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderTop: i ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.76rem", cursor: "pointer" }}>
+                  <input type="checkbox" checked={fxSel.has(t.id)} onChange={() => setFxSel(prev => { const n = new Set(prev); n.has(t.id) ? n.delete(t.id) : n.add(t.id); return n; })} />
+                  <b style={{ minWidth: 76 }}>{t.ticker}</b>
+                  <span style={{ color: "var(--muted)", minWidth: 130 }}>{tradeDateISO(t.entry) || t.entry} → {tradeDateISO(t.exit) || t.exit}</span>
+                  <span style={{ minWidth: 130 }}>${Number(t.entryP || 0).toLocaleString()} → ${Number(t.exitP || 0).toLocaleString()}</span>
+                  <span style={{ fontWeight: 700, color: (Number(t.plDollar) || 0) >= 0 ? "var(--green)" : "var(--red)" }}>{(Number(t.plDollar) || 0) >= 0 ? "+" : "−"}${Math.abs(Number(t.plDollar) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+              <button className="btn" onClick={fxDeleteSelected} disabled={!fxSel.size || fxBusy} style={{ background: "rgba(239,68,68,0.14)", borderColor: "rgba(239,68,68,0.4)", color: "#fca5a5", fontWeight: 700 }}>{fxBusy ? "Removing…" : `Yes, these are wrong — remove ${fxSel.size} selected`}</button>
+              <button className="btn" onClick={fxDismiss} style={{ fontWeight: 700 }}>They're all correct — don't ask again</button>
+            </div>
+          </div>
+        )}
         {/* RECENT / CLOSED TRADES */}
         <div className="toolbar">
           <h2 className="sech guide" onMouseEnter={guideEnter("trades", "Recent trades", "Every closed trade. Click any trade for a quick overview, then open Trade Details for its chart, key stats, and your review — what went right, what went wrong, and the lesson learned.", "/audio/journal-trades.mp3")} onMouseLeave={guideLeave("trades")}>Recent trades</h2>
