@@ -56,6 +56,7 @@ const SAMPLE = [
 export default function MarketContext({ C, font }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
+  const [showInfo, setShowInfo] = useState(false);
   useEffect(() => {
     let dead = false;
     (async () => {
@@ -88,11 +89,20 @@ export default function MarketContext({ C, font }) {
     <div className="card" style={{ padding: "12px 16px", marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Market Context</span>
-        <span className="term" data-tip={"Is the market a tailwind or a headwind right now?\nGreen/red arrows: is the index above or below each moving average.\nThe badge is the ATR% Multiple from the 50-day MA — how far the index has stretched above its 50-day line, measured in units of its average daily range. Low = room to run. High = stretched, go easy on new buys."} style={{ fontSize: "0.6rem", color: C.muted, cursor: "help" }}>what is this?</span>
+        <button onClick={() => setShowInfo(v => !v)} style={{ background: "transparent", border: "none", padding: 0, fontFamily: font, fontSize: "0.6rem", color: C.muted, cursor: "pointer", borderBottom: "1px dotted var(--borderGold, rgba(201,152,42,0.4))" }}>{showInfo ? "hide ✕" : "what is this?"}</button>
         <span style={{ marginLeft: "auto", fontSize: "0.58rem", color: C.faint || C.muted }}>
           {rows ? (err === "sample" ? "sample data (dev)" : `as of ${rows[0].asof} close`) : "loading…"}
         </span>
       </div>
+      {showInfo && (
+        <div style={{ fontSize: "0.68rem", color: "var(--text, #eee)", lineHeight: 1.6, background: "rgba(201,152,42,0.06)", border: "1px solid var(--borderGold, rgba(201,152,42,0.3))", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
+          This card tells you one thing: <b>are you buying stocks while the market is stretched, or at a good spot?</b><br />
+          The arrows show whether SPY and QQQ are above (🟢) or below (🔴) each of their key moving averages.
+          The badge shows how far the index has run above its 50-day line, measured in daily ranges — the <b>ATR% Multiple from the 50-MA</b>, the same number as the extension badges on your positions.
+          A low number means the market has room. A high number (4×+) means it's stretched — historically pullbacks start around 5×, so go easy on new buys there.<br />
+          <span style={{ color: C.muted }}>Tip: toggle on <b>Guided</b> mode (top of the page) and hover anything on the dashboard for more plain-English explanations.</span>
+        </div>
+      )}
       {!rows ? (
         <div style={{ fontSize: "0.68rem", color: C.muted, padding: "6px 0" }}>Loading index data…</div>
       ) : (
@@ -100,14 +110,16 @@ export default function MarketContext({ C, font }) {
           {rows.map(r => {
             const b = bandFor(r.ext);
             return (
-              <div key={r.sym} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: "1px solid rgba(255,255,255,0.05)", flexWrap: "wrap" }}>
-                <b style={{ fontSize: "0.82rem", color: "var(--text, #fff)", width: 42 }}>{r.sym}</b>
-                <span style={{ fontSize: "0.74rem", color: "var(--text, #fff)", fontVariantNumeric: "tabular-nums", width: 64 }}>{r.price.toFixed(2)}</span>
-                <span style={{ display: "inline-flex", gap: 5, flexWrap: "wrap" }}>{r.mas.map(chip)}</span>
-                <span className="term tipright" data-tip={b.tip} style={{ marginLeft: "auto", display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 1, padding: "4px 10px", borderRadius: 9, cursor: "help", background: b.dim, border: `1px solid ${b.border}`, color: b.color }}>
-                  <span style={{ fontSize: "0.68rem", fontWeight: 800, whiteSpace: "nowrap" }}>{(r.ext >= 0 ? "" : "−") + Math.abs(r.ext).toFixed(1)}× · {b.label}</span>
-                  <span style={{ fontSize: "0.5rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", opacity: 0.75, whiteSpace: "nowrap" }}>ATR% Mult from 50-MA</span>
-                </span>
+              <div key={r.sym} style={{ padding: "8px 0", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <b style={{ fontSize: "0.84rem", color: "var(--text, #fff)" }}>{r.sym}</b>
+                  <span style={{ fontSize: "0.76rem", color: "var(--text, #fff)", fontVariantNumeric: "tabular-nums" }}>{r.price.toFixed(2)}</span>
+                  <span className="term tipright" data-tip={b.tip} style={{ marginLeft: "auto", display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 1, padding: "4px 10px", borderRadius: 9, cursor: "help", background: b.dim, border: `1px solid ${b.border}`, color: b.color }}>
+                    <span style={{ fontSize: "0.68rem", fontWeight: 800, whiteSpace: "nowrap" }}>{(r.ext >= 0 ? "" : "−") + Math.abs(r.ext).toFixed(1)}× · {b.label}</span>
+                    <span style={{ fontSize: "0.5rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", opacity: 0.75, whiteSpace: "nowrap" }}>ATR% Mult from 50-MA</span>
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>{r.mas.map(chip)}</div>
               </div>
             );
           })}
