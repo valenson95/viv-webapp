@@ -9,6 +9,7 @@ import { sectorFor, useSectors } from "./sectors.js";
 import { themeFit, themeRanks, consistentTop, top5, latestSnapshot, THEME_COVERAGE_START } from "./themes.js";
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
+import MarketContext from "./MarketContext.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
 import DailySetupsTab from "./DailySetups.jsx";
 import ModelBookPage, { outcomeFromR } from "./ModelBook.jsx";
@@ -224,6 +225,16 @@ function useDragReorder(length) {
 // ─── What's New — changelog the user can refer to (button in the top nav, modal of update notes).
 // Add new entries to the TOP of WHATS_NEW as features ship.
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "July 8, 2026",
+    title: "🎚 Market Context — how extended is the tape?",
+    items: [
+      "New card under the theme strip: where SPY and QQQ trade vs their 10/20/50/200-day MAs, each with an extension badge — the same ATR%-Multiple-from-50MA metric as your position badges, now applied to the indexes.",
+      "Reading the badge: under 2× = fresh, room to work · 2–4× = stretched, be selective · 4×+ = extension is a headwind for new entries (index pullbacks historically start near 5×) · at/below the 50-MA = repair zone.",
+      "Data is live (updates through the session) — the card shows exactly when it was last refreshed.",
+    ],
+  },
   {
     tag: "New",
     date: "July 8, 2026",
@@ -8223,6 +8234,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
 
         {/* THEME LEADERS STRIP (this week's DeepVue leaders) */}
         <ThemeStrip C={C} font={font} />
+        <MarketContext C={C} font={font} />
 
         {/* TABLE */}
         <div className="toolbar">
