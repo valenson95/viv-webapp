@@ -167,7 +167,7 @@ export default function EdgeLedger({ C, font, session, setPage }) {
           sub={v.n >= 30 ? "MC meaningful at 50" : `${v.nTarget30} more to judge outcome`} />
         <Stat C={C} label="Open book" value={`${ob.riskFree}/${ob.positions} risk-free`} color={ob.riskFree >= ob.positions * 0.6 ? G : GOLD}
           info={<Info C={C}>Positions whose stop/trail sits at or above cost — the derisk system's live state. "Naked" = a position with no stop recorded: fix immediately.</Info>}
-          sub={`${fmt$(ob.openRiskUsd)} still at risk${ob.naked ? ` · ${ob.naked} NAKED ⚠️` : ""}`} />
+          sub={`${fmt$(ob.openRiskUsd)} still at risk${ob.naked ? ` · ${ob.naked} naked` : ""}`} />
       </div>
 
       {open && (
@@ -250,7 +250,7 @@ export default function EdgeLedger({ C, font, session, setPage }) {
                   <tbody>
                     {(data.campaigns || []).map((c, i) => (
                       <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                        <td style={{ padding: "4px 8px", fontWeight: 700 }}>{c.ticker}{c.rescued ? " 🛟" : ""}</td>
+                        <td style={{ padding: "4px 8px", fontWeight: 700 }}>{c.ticker}{c.rescued ? " ·R" : ""}</td>
                         <td style={{ padding: "4px 8px", color: c.pl > 0 ? G : R_, fontWeight: 700 }}>{fmt$(c.pl)}</td>
                         <td style={{ padding: "4px 8px" }}>{num(c.blendedR ?? c.rSum)}</td>
                         <td style={{ padding: "4px 8px" }}>{num(c.mfeR)}</td>
@@ -264,7 +264,7 @@ export default function EdgeLedger({ C, font, session, setPage }) {
                   </tbody>
                 </table>
                 <div style={{ fontSize: "0.58rem", color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
-                  R = banked P&L vs initial risk (entry − first stop) · MFE R = best the trade ever offered · Shadow R = what NEVER trimming would have made (bracket = shadow − actual: green = trim saved, gold = trim cost) · 🛟 = rescue. Bars: EOD.
+                  R = banked P&L vs initial risk (entry − first stop) · MFE R = best the trade ever offered · Shadow R = what NEVER trimming would have made (bracket = shadow − actual: green = trim saved, gold = trim cost) · "·R" = rescue. Bars: EOD.
                 </div>
               </div>
             )}
