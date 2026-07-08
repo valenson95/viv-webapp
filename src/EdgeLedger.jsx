@@ -94,7 +94,7 @@ function Hist({ C, hist }) {
   );
 }
 
-export default function EdgeLedger({ C, font, session }) {
+export default function EdgeLedger({ C, font, session, setPage }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL;
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(() => { try { return localStorage.getItem("viv-edge-open") === "1"; } catch { return false; } });
@@ -138,6 +138,7 @@ export default function EdgeLedger({ C, font, session }) {
         <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Edge Ledger · admin</span>
         <span title={st.tip} style={{ fontSize: "0.62rem", fontWeight: 800, padding: "3px 10px", borderRadius: 8, color: st.color, background: `${st.color}1a`, border: `1px solid ${st.color}55`, cursor: "help" }}>{st.label}</span>
         <button onClick={() => setShowInfo(x => !x)} style={{ background: "transparent", border: "none", padding: 0, fontFamily: font, fontSize: "0.6rem", color: C.muted, cursor: "pointer", borderBottom: "1px dotted rgba(201,152,42,0.4)" }}>{showInfo ? "hide ✕" : "what is this?"}</button>
+        {setPage && <button onClick={() => setPage("quant")} style={{ background: "rgba(201,152,42,0.1)", border: "1px solid rgba(201,152,42,0.35)", borderRadius: 8, padding: "3px 12px", fontFamily: font, fontSize: "0.62rem", fontWeight: 700, color: C.gold, cursor: "pointer" }}>Open Quantitative Analysis →</button>}
         <span style={{ marginLeft: "auto", fontSize: "0.58rem", color: C.muted }}>as of {String(data.asof).slice(0, 16).replace("T", " ")} · <button onClick={() => { setOpen(x => { try { localStorage.setItem("viv-edge-open", x ? "0" : "1"); } catch {} return !x; }); }} style={{ background: "transparent", border: "none", color: C.gold, cursor: "pointer", fontSize: "0.6rem", fontWeight: 700 }}>{open ? "collapse ▲" : "expand ▼"}</button></span>
       </div>
 

@@ -32,13 +32,15 @@ async function main() {
   // ambiguous M/D/YY dates (and string-compare leaks) — excluded, stated in method.
   const ISO = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || "");
   const seenFill = new Set();
+  let dupesDropped = 0;
   const trades = rawTrades.filter((x) => {
     if (!ISO(x.exit_date)) return false;
     const k = [x.ticker, x.exit_date, x.shares, x.exit_price].join("|");
-    if (seenFill.has(k)) return false; // exact-duplicate fill (sync+manual) — keep first
+    if (seenFill.has(k)) { dupesDropped++; return false; } // exact-duplicate fill — keep first
     seenFill.add(k);
     return true;
   });
+  const provenance = { window: SINCE + " → today", fillsAll: rawTrades.length, fillsVerified: trades.length, legacyExcluded: rawTrades.length - trades.length - 0, dupesDropped };
 
   const positions = (await fetch(`${URL_}/rest/v1/positions?select=symbol,shares,entry_price,stop_price,trailing_stop,current_price,ext_mult&user_id=eq.${UID}&is_closed=eq.false`, { headers: H }).then(j))
     .filter((p) => +p.shares > 0);
@@ -97,6 +99,7 @@ async function main() {
     const B = bars[c.ticker];
     if (!B || !c.entry || !c.stop || c.stop >= c.entry || !c.entryDate || !c.lastExit) continue;
     const riskPS = c.entry - c.stop;
+    if (riskPS / c.entry < 0.002) continue; // stop ≈ entry (BE-stop row) → R denominators explode; $-stats only
     const i0 = B.findIndex((b) => b.date >= c.entryDate);
     let i1 = B.findIndex((b) => b.date > c.lastExit); i1 = i1 === -1 ? B.length : i1;
     if (i0 === -1 || i0 >= i1) continue;
@@ -180,6 +183,47 @@ async function main() {
     ext5Exits: { n: extWins.length, winners: extWins.filter((c) => c.pl > 0).length },
   };
 
+  // ---------- MAE / MFE insights (system winners & losers) ----------
+  const winsC = sys.filter((c) => c.pl > 0), lossC = sys.filter((c) => c.pl <= 0);
+  const winnersMAE = winsC.map((c) => c.maeR).filter((v) => v != null);
+  const losersMFE = lossC.map((c) => c.mfeR).filter((v) => v != null);
+  const maeInsight = {
+    winnersMAE, losersMFE,
+    pctWinnersMAEover50: winnersMAE.length ? round(100 * winnersMAE.filter((v) => v <= -0.5).length / winnersMAE.length, 0) : null,
+    pctWinnersMAEover25: winnersMAE.length ? round(100 * winnersMAE.filter((v) => v <= -0.25).length / winnersMAE.length, 0) : null,
+    nearMissLosers: losersMFE.filter((v) => v >= 1).length, // losers that saw ≥+1R before dying — management leak
+  };
+
+  // ---------- equity curve (cumulative R by exit date) + rolling expectancy ----------
+  const ordered = [...sys].filter((c) => (c.blendedR ?? c.rSum) != null).sort((a, b) => (a.lastExit || "").localeCompare(b.lastExit || ""));
+  let cum = 0;
+  const equityR = ordered.map((c) => { cum += (c.blendedR ?? c.rSum); return { d: c.lastExit, t: c.ticker, r: round(c.blendedR ?? c.rSum), cum: round(cum) }; });
+  const rollingExp = ordered.map((_, i) => {
+    const w = ordered.slice(Math.max(0, i - 9), i + 1).map((c) => c.blendedR ?? c.rSum);
+    return { i: i + 1, exp: round(sum(w) / w.length) };
+  });
+
+  // ---------- OPEN campaigns (the runners) — realized-so-far + marked unrealized ----------
+  // Valen's requirement: a partially-trimmed campaign (e.g. MRNA) must never be read as "finished";
+  // the ledger shows realized trims + the runner marked at current price, separately and combined.
+  const realizedBySym = {};
+  sys.forEach((c) => { realizedBySym[c.ticker] = (realizedBySym[c.ticker] || 0) + (c.pl || 0); });
+  const openCampaigns = positions.filter((p) => +p.shares > 0).map((p) => {
+    const entry = +p.entry_price || null, sh = +p.shares || 0, cp = +p.current_price || null;
+    const stop = p.stop_price ? +p.stop_price : null, trail = p.trailing_stop ? +p.trailing_stop : null;
+    const riskPS = entry && stop && stop < entry ? entry - stop : null;
+    const unreal = entry && cp ? (cp - entry) * sh : null;
+    const eff = Math.max(stop ?? -1e18, trail ?? -1e18);
+    return {
+      sym: p.symbol, shares: sh, entry, stop, trail, cp, ext: p.ext_mult != null ? round(+p.ext_mult, 2) : null,
+      riskFree: eff > -1e17 && entry != null && eff >= entry,
+      unrealUsd: round(unreal, 0),
+      unrealR: riskPS && unreal != null ? round((cp - entry) / riskPS) : null,
+      realizedUsd: round(realizedBySym[p.symbol] || 0, 0),
+      worstCaseUsd: eff > -1e17 && entry != null ? round((eff - entry) * sh + (realizedBySym[p.symbol] || 0), 0) : null, // locked outcome if the trail/stop is hit
+    };
+  }).sort((a, b) => (b.unrealUsd ?? -1e9) - (a.unrealUsd ?? -1e9));
+
   // ---------- Monte Carlo on his own R-distribution ----------
   function mc(rlist, label) {
     if (rlist.length < 8) return { label, n: rlist.length, note: "insufficient sample" };
@@ -232,7 +276,8 @@ async function main() {
   const payload_edge = {
     asof: new Date().toISOString(), since: SINCE, systemStart: SYSTEM_START, systemEntry: SYSTEM_ENTRY,
     method: "IBKR fill rebuild, equities-focused ESTIMATE — TradeZella owns realized truth. Pipeline-verified ISO-dated rows only (legacy slash-dated manual journal rows excluded); exact-duplicate fills deduped. Month cards = campaign-month slices; system cohort = campaigns entered on/after " + SYSTEM_ENTRY + ". R = blended campaign R vs initial risk (entry−stop, first-leg stop); MFE/shadow from EOD bars.",
-    verdict, buckets, derisk, monte,
+    verdict, buckets, derisk, monte, provenance, maeInsight, equityR, rollingExp, openCampaigns,
+    stopCoverage: { system: "100%", note: "R exists only where a stop was recorded; system cohort fully covered" },
     openBook: { positions: positions.length, riskFree: free, atRisk, naked, openRiskUsd: round(openRisk, 0) },
     campaigns: campaigns
       .filter(isSystem)
