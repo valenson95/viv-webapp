@@ -40,7 +40,7 @@ async function main() {
     seenFill.add(k);
     return true;
   });
-  const provenance = { window: SINCE + " → today", fillsAll: rawTrades.length, fillsVerified: trades.length, legacyExcluded: rawTrades.length - trades.length - 0, dupesDropped };
+  const provenance = { window: SINCE + " → today", fillsAll: rawTrades.length, fillsVerified: trades.length, legacyExcluded: rawTrades.length - trades.length - 0, dupesDropped, noStopExcluded: 0 };
 
   const positions = (await fetch(`${URL_}/rest/v1/positions?select=symbol,shares,entry_price,stop_price,trailing_stop,current_price,ext_mult&user_id=eq.${UID}&is_closed=eq.false`, { headers: H }).then(j))
     .filter((p) => +p.shares > 0);
@@ -57,8 +57,13 @@ async function main() {
     const first = legs[0];
     const pl = sum(legs.map((x) => +x.pl_dollar || 0));
     const rLegs = legs.map((x) => x.r_mult).filter((v) => v != null);
-    const stop = legs.map((x) => x.stop_price).find((v) => v != null && +v > 0);
     const entry = +first.entry_price || null;
+    // Risk unit = the WIDEST valid stop across the campaign's legs (= the original thesis stop,
+    // per the locked-stop rule). A tightened trail or an accidental/mid-setting stop is NARROWER
+    // and must never define R — that's what blew up NBIS (a 0.34% placeholder). Only stops below
+    // entry by ≥0.8% of price qualify as a real thesis stop for these high-ADR names.
+    const validStops = legs.map((x) => x.stop_price).filter((v) => v != null && +v > 0 && entry && (entry - +v) / entry >= 0.008).map(Number);
+    const stop = validStops.length ? Math.min(...validStops) : null; // min price = widest risk
     const initShares = sum(legs.map((x) => +x.shares || 0));
     const trims = legs.filter((x) => /partial|trim|strength/i.test(x.exit_reason || ""));
     return {
@@ -75,6 +80,8 @@ async function main() {
       reasons: [...new Set(legs.map((x) => x.exit_reason).filter(Boolean))].join(" / "),
     };
   });
+
+  provenance.noStopExcluded = campaigns.filter((c) => c.entryDate && c.entryDate >= "2026-06-26" && c.stop == null).length;
 
   // ---------- EOD bars for derived metrics ----------
   const symOK = (t) => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(t) && !isOption(t);
@@ -206,21 +213,37 @@ async function main() {
   // ---------- OPEN campaigns (the runners) — realized-so-far + marked unrealized ----------
   // Valen's requirement: a partially-trimmed campaign (e.g. MRNA) must never be read as "finished";
   // the ledger shows realized trims + the runner marked at current price, separately and combined.
-  const realizedBySym = {};
-  sys.forEach((c) => { realizedBySym[c.ticker] = (realizedBySym[c.ticker] || 0) + (c.pl || 0); });
+  // Realized attribution PER CAMPAIGN, not per ticker: match closed trims to THIS open position by
+  // symbol + entry date + entry price. A ticker can hold several distinct lots (e.g. OSCR: a 6/29
+  // failed-breakout −$4,018 AND the 7/1 runner's +$1,852 trim) — summing by ticker cross-contaminates
+  // them. This keeps the open table in lockstep with the position it describes.
+  const isoRe = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || "");
+  const realizedForPos = (p) => {
+    const pe = +p.entry_price; if (!isFinite(pe)) return 0;
+    const tol = Math.max(0.05, pe * 0.0015);
+    return trades.filter((x) => {
+      if (x.ticker !== p.symbol || x.pl_dollar == null) return false;
+      const priceOk = x.entry_price != null && Math.abs(+x.entry_price - pe) < tol;
+      // Prefer exact date match (separates same-name lots on different days); fall back to price-only
+      // (tighter) when either side lacks a clean ISO date.
+      if (isoRe(p.entry_date) && isoRe(x.entry_date)) return x.entry_date === p.entry_date && priceOk;
+      return x.entry_price != null && Math.abs(+x.entry_price - pe) < Math.min(tol, 0.02);
+    }).reduce((sm, x) => sm + (+x.pl_dollar || 0), 0);
+  };
   const openCampaigns = positions.filter((p) => +p.shares > 0).map((p) => {
     const entry = +p.entry_price || null, sh = +p.shares || 0, cp = +p.current_price || null;
     const stop = p.stop_price ? +p.stop_price : null, trail = p.trailing_stop ? +p.trailing_stop : null;
     const riskPS = entry && stop && stop < entry ? entry - stop : null;
     const unreal = entry && cp ? (cp - entry) * sh : null;
     const eff = Math.max(stop ?? -1e18, trail ?? -1e18);
+    const realized = round(realizedForPos(p), 0);
     return {
       sym: p.symbol, shares: sh, entry, stop, trail, cp, ext: p.ext_mult != null ? round(+p.ext_mult, 2) : null,
       riskFree: eff > -1e17 && entry != null && eff >= entry,
       unrealUsd: round(unreal, 0),
       unrealR: riskPS && unreal != null ? round((cp - entry) / riskPS) : null,
-      realizedUsd: round(realizedBySym[p.symbol] || 0, 0),
-      worstCaseUsd: eff > -1e17 && entry != null ? round((eff - entry) * sh + (realizedBySym[p.symbol] || 0), 0) : null, // locked outcome if the trail/stop is hit
+      realizedUsd: realized,
+      worstCaseUsd: eff > -1e17 && entry != null ? round((eff - entry) * sh + realized, 0) : null, // realized + what the runner locks in at its stop/trail
     };
   }).sort((a, b) => (b.unrealUsd ?? -1e9) - (a.unrealUsd ?? -1e9));
 
@@ -273,10 +296,21 @@ async function main() {
   }
   const verdict = { status, pf: b.pf, wr: b.wr, payoff: b.payoff, wBE: round(wBE), edgeRatio, expR: b.expR, sqn: b.sqn, n: b.n, nTarget30: Math.max(0, 30 - b.n), nTarget50: Math.max(0, 50 - b.n) };
 
+  // R-basis aggregates (risk-adjusted view) — computed, never hardcoded in the UI.
+  const rVals = sys.map((c) => c.blendedR ?? c.rSum).filter((x) => x != null && isFinite(x));
+  const rW = rVals.filter((x) => x > 0), rL = rVals.filter((x) => x <= 0);
+  const rGW = sum(rW), rGL = sum(rL);
+  const rBasis = {
+    n: rVals.length, wr: rVals.length ? round(100 * rW.length / rVals.length, 1) : null,
+    avgWin: rW.length ? round(rGW / rW.length) : null, avgLoss: rL.length ? round(rGL / rL.length) : null,
+    payoff: rW.length && rL.length && rGL < 0 ? round((rGW / rW.length) / (-rGL / rL.length)) : null,
+    pf: rGL < 0 ? round(rGW / -rGL) : null,
+  };
+
   const payload_edge = {
     asof: new Date().toISOString(), since: SINCE, systemStart: SYSTEM_START, systemEntry: SYSTEM_ENTRY,
     method: "IBKR fill rebuild, equities-focused ESTIMATE — TradeZella owns realized truth. Pipeline-verified ISO-dated rows only (legacy slash-dated manual journal rows excluded); exact-duplicate fills deduped. Month cards = campaign-month slices; system cohort = campaigns entered on/after " + SYSTEM_ENTRY + ". R = blended campaign R vs initial risk (entry−stop, first-leg stop); MFE/shadow from EOD bars.",
-    verdict, buckets, derisk, monte, provenance, maeInsight, equityR, rollingExp, openCampaigns,
+    verdict, buckets, derisk, monte, provenance, maeInsight, equityR, rollingExp, openCampaigns, rBasis,
     stopCoverage: { system: "100%", note: "R exists only where a stop was recorded; system cohort fully covered" },
     openBook: { positions: positions.length, riskFree: free, atRisk, naked, openRiskUsd: round(openRisk, 0) },
     campaigns: campaigns

@@ -167,7 +167,7 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: "14px 18px" }}>
           <Kpi label="Expectancy / trade" value={(v.expR > 0 ? "+" : "") + num(v.expR) + "R"} tone={v.expR > 0 ? T.green : T.red} sub="mean R per closed campaign" />
           <Kpi label="Profit factor · $" value={num(v.pf)} tone={v.pf >= 1.3 ? T.green : v.pf >= 1 ? T.gold : T.red} sub="gross won ÷ gross lost" />
-          <Kpi label="Profit factor · R" value="2.20" tone={T.green} sub="risk-adjusted — the sizing gap" />
+          <Kpi label="Profit factor · R" value={num((data.rBasis || {}).pf)} tone={T.green} sub="risk-adjusted — the sizing gap" />
           <Kpi label="Win rate" value={num(v.wr, 0) + "%"} sub={`breakeven payoff ${num(v.wBE)}`} />
           <Kpi label="Payoff" value={num(v.payoff)} tone={v.edgeRatio >= 1.2 ? T.green : v.edgeRatio >= 1 ? T.gold : T.red} sub={`edge ratio ${num(v.edgeRatio)}×`} />
           <Kpi label="SQN" value={num(v.sqn)} tone={v.sqn >= 2 ? T.green : v.sqn >= 1.6 ? T.gold : T.blue} sub="Tharp scale · 2+ good" />
@@ -211,13 +211,13 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
 
       {/* map */}
       <Panel title="Profitability Map — Win Rate × Payoff" meta="breakeven: W = (1−p) / p"
-        footnote="Positions above the dashed curve are structurally profitable regardless of stock selection. The distance between SYSTEM ($) and SYSTEM (R) is the position-sizing inconsistency — in risk units the book already clears breakeven by 2×; in dollars it does not. Convergence of these two marks is the primary objective of the next 25 trades.">
+        footnote={`Positions above the dashed curve are structurally profitable regardless of stock selection. The distance between SYSTEM ($) and SYSTEM (R) is the position-sizing inconsistency — in risk units the book clears breakeven by ${num(((data.rBasis || {}).payoff || 0) / (v.wBE || 1), 1)}× (payoff ${num((data.rBasis || {}).payoff)} vs ${num(v.wBE)} required); in dollars it does not (${num(v.payoff)}). Convergence of these two marks is the primary objective of the next ${v.nTarget50 ?? 25} trades.`}>
         <BreakevenMap pts={[
           { label: "May", wr: b.may?.wr, payoff: payoffOf(b.may), color: T.grey },
           { label: "Jun", wr: b.june?.wr, payoff: payoffOf(b.june), color: T.grey },
           { label: "Jul ($)", wr: b.july?.wr, payoff: payoffOf(b.july), color: T.blue },
           { label: "SYSTEM ($)", wr: v.wr, payoff: v.payoff, color: T.gold, big: true },
-          { label: "SYSTEM (R)", wr: 41.7, payoff: 2.85, color: T.green, big: true },
+          { label: "SYSTEM (R)", wr: (data.rBasis || {}).wr, payoff: (data.rBasis || {}).payoff, color: T.green, big: true },
         ]} />
       </Panel>
 
