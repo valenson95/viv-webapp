@@ -9,10 +9,10 @@ import React, { useEffect, useState } from "react";
 // generated deterministically from the numbers so it can never drift from them.
 
 const BANDS = [
-  { min: 4, label: "No new risk", color: "#ef4444", dim: "rgba(239,68,68,0.14)", border: "rgba(239,68,68,0.38)", tip: "The index is 4× or more of its daily ATR above the 50-day MA. Historically pullbacks start around 5× — extension here is a headwind for fresh entries." },
-  { min: 2, label: "Selective", color: "#f0c050", dim: "rgba(240,192,80,0.12)", border: "rgba(240,192,80,0.35)", tip: "2–4× ATR above the 50-day MA — stretched but workable. Size new risk down and demand A+ setups." },
-  { min: 0, label: "Fresh", color: "#22c55e", dim: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.32)", tip: "Under 2× ATR from the 50-day MA — the index has room. Normal risk deployment per your plan." },
-  { min: -Infinity, label: "On/below 50-MA", color: "#60a5fa", dim: "rgba(96,165,250,0.12)", border: "rgba(96,165,250,0.35)", tip: "Trading at or below the 50-day MA — repair/base zone. The strongest entry days historically come on a bounce off a RISING 50-day MA." },
+  { min: 4, label: "No new risk", color: "#ef4444", dim: "rgba(239,68,68,0.14)", border: "rgba(239,68,68,0.38)", tip: "Very stretched — 4+ daily ranges above the 50-day line. Markets usually snap back from around 5×. Not the time to open new positions." },
+  { min: 2, label: "Selective", color: "#f0c050", dim: "rgba(240,192,80,0.12)", border: "rgba(240,192,80,0.35)", tip: "Stretched. New buys need extra-strong setups and smaller size." },
+  { min: 0, label: "Fresh", color: "#22c55e", dim: "rgba(34,197,94,0.12)", border: "rgba(34,197,94,0.32)", tip: "A healthy distance above the 50-day line — normal conditions for new buys." },
+  { min: -Infinity, label: "Repair zone", color: "#60a5fa", dim: "rgba(96,165,250,0.12)", border: "rgba(96,165,250,0.35)", tip: "At or under the 50-day line. The strongest buy days often come when the index bounces off a rising 50-day line." },
 ];
 const bandFor = (ext) => BANDS.find(b => ext >= b.min) || BANDS[BANDS.length - 1];
 
@@ -41,10 +41,10 @@ function readFor(r) {
     : `above the ${above.join("/")} MA${above.length > 1 ? "s" : ""}, below the ${below.join("/")}`;
   const b = bandFor(r.ext);
   const extTxt = `${r.ext >= 0 ? "" : "−"}${Math.abs(r.ext).toFixed(1)}× ATR from the 50-day`;
-  const tail = b.label === "No new risk" ? " — extension is a headwind, not a tailwind for new entries."
-    : b.label === "Selective" ? " — stretched; be selective with fresh risk."
+  const tail = b.label === "No new risk" ? " — very stretched; go easy on new buys."
+    : b.label === "Selective" ? " — stretched; be picky with fresh buys."
     : b.label === "Fresh" ? " — room to work."
-    : " — repair zone; the tell is a reclaim of the short MAs on volume.";
+    : " — recovery zone; watch for it to climb back above its short-term averages.";
   return `${r.sym} trades ${stack} at ${extTxt}${tail}`;
 }
 
@@ -80,7 +80,7 @@ export default function MarketContext({ C, font }) {
 
   if (err && err !== "sample" && !rows) return null; // quiet fail — never break the dashboard
   const chip = (m) => (
-    <span key={m.k} className="term" data-tip={`${m.k}-day MA ${m.v.toFixed(2)} — price is ${m.above ? "above" : "below"} it.`} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 7px", borderRadius: 7, fontSize: "0.62rem", fontWeight: 700, whiteSpace: "nowrap", cursor: "help", background: m.above ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)", border: `1px solid ${m.above ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)"}`, color: m.above ? "var(--green, #22c55e)" : "var(--red, #ef4444)" }}>
+    <span key={m.k} className="term" data-tip={`${m.k}-day moving average: ${m.v.toFixed(2)}. Price is ${m.above ? "above" : "below"} it.`} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 7px", borderRadius: 7, fontSize: "0.62rem", fontWeight: 700, whiteSpace: "nowrap", cursor: "help", background: m.above ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)", border: `1px solid ${m.above ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)"}`, color: m.above ? "var(--green, #22c55e)" : "var(--red, #ef4444)" }}>
       {m.k}d {m.above ? "▲" : "▼"}
     </span>
   );
@@ -88,7 +88,7 @@ export default function MarketContext({ C, font }) {
     <div className="card" style={{ padding: "12px 16px", marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Market Context</span>
-        <span className="term" data-tip="Where the index ETFs trade vs their key daily moving averages, plus how EXTENDED each is — the ATR% Multiple from the 50-day MA (same metric as the extension badges on your positions). It frames whether the tape is a tailwind or a headwind for new entries." style={{ fontSize: "0.6rem", color: C.muted, cursor: "help" }}>what is this?</span>
+        <span className="term" data-tip={"Is the market a tailwind or a headwind right now?\nGreen/red arrows: is the index above or below each moving average.\nThe badge is the ATR% Multiple from the 50-day MA — how far the index has stretched above its 50-day line, measured in units of its average daily range. Low = room to run. High = stretched, go easy on new buys."} style={{ fontSize: "0.6rem", color: C.muted, cursor: "help" }}>what is this?</span>
         <span style={{ marginLeft: "auto", fontSize: "0.58rem", color: C.faint || C.muted }}>
           {rows ? (err === "sample" ? "sample data (dev)" : `as of ${rows[0].asof} close`) : "loading…"}
         </span>
@@ -104,8 +104,9 @@ export default function MarketContext({ C, font }) {
                 <b style={{ fontSize: "0.82rem", color: "var(--text, #fff)", width: 42 }}>{r.sym}</b>
                 <span style={{ fontSize: "0.74rem", color: "var(--text, #fff)", fontVariantNumeric: "tabular-nums", width: 64 }}>{r.price.toFixed(2)}</span>
                 <span style={{ display: "inline-flex", gap: 5, flexWrap: "wrap" }}>{r.mas.map(chip)}</span>
-                <span className="term" data-tip={b.tip} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 9, fontSize: "0.66rem", fontWeight: 800, whiteSpace: "nowrap", cursor: "help", background: b.dim, border: `1px solid ${b.border}`, color: b.color }}>
-                  {(r.ext >= 0 ? "" : "−") + Math.abs(r.ext).toFixed(1)}× · {b.label}
+                <span className="term tipright" data-tip={b.tip} style={{ marginLeft: "auto", display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 1, padding: "4px 10px", borderRadius: 9, cursor: "help", background: b.dim, border: `1px solid ${b.border}`, color: b.color }}>
+                  <span style={{ fontSize: "0.68rem", fontWeight: 800, whiteSpace: "nowrap" }}>{(r.ext >= 0 ? "" : "−") + Math.abs(r.ext).toFixed(1)}× · {b.label}</span>
+                  <span style={{ fontSize: "0.5rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", opacity: 0.75, whiteSpace: "nowrap" }}>ATR% Mult from 50-MA</span>
                 </span>
               </div>
             );
