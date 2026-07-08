@@ -133,6 +133,18 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
     });
     return rows;
   }, [data, sortKey, sortDir]);
+  // Sample constituents, oldest-entry first — the top row's entry date IS the day the calc starts.
+  const sample = useMemo(() => {
+    const rows = (data?.campaigns || []).filter(c => c.ticker);
+    return rows.sort((a, b) =>
+      (a.entryDate || "9999").localeCompare(b.entryDate || "9999") ||
+      (a.lastExit || "").localeCompare(b.lastExit || ""));
+  }, [data]);
+  const span = useMemo(() => {
+    const ins = (data?.campaigns || []).map(c => c.entryDate).filter(Boolean).sort();
+    const outs = (data?.campaigns || []).map(c => c.lastExit).filter(Boolean).sort();
+    return { first: ins[0] || null, last: outs[outs.length - 1] || null };
+  }, [data]);
 
   if (!isAdmin) return null;
   if (!data) return <div style={{ fontFamily: font, color: T.muted, padding: 48, fontSize: 13 }}>Loading… (if empty, run <code style={{ fontFamily: T.mono }}>node --env-file=.env.local scripts/edge-ledger.mjs</code>)</div>;
@@ -171,9 +183,50 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
           <Kpi label="Win rate" value={num(v.wr, 0) + "%"} sub={`breakeven payoff ${num(v.wBE)}`} />
           <Kpi label="Payoff" value={num(v.payoff)} tone={v.edgeRatio >= 1.2 ? T.green : v.edgeRatio >= 1 ? T.gold : T.red} sub={`edge ratio ${num(v.edgeRatio)}×`} />
           <Kpi label="SQN" value={num(v.sqn)} tone={v.sqn >= 2 ? T.green : v.sqn >= 1.6 ? T.gold : T.blue} sub="Tharp scale · 2+ good" />
-          <Kpi label="Sample" value={`${v.n} / 50`} tone={T.blue} sub={v.n >= 30 ? "outcome readable · MC at 50" : "judge adherence until 30"} />
+          <Kpi label="Sample" value={`${v.n} / 50`} tone={T.blue} sub={span.first ? `since ${span.first} · ${v.n >= 30 ? "outcome readable" : "building to 30"}` : (v.n >= 30 ? "outcome readable · MC at 50" : "judge adherence until 30")} />
         </div>
       </section>
+
+      {/* sample & provenance — what exactly is in the N, and from which day */}
+      <Panel title="Sample & Provenance — What's Counted" meta={span.first ? `${v.n} campaigns · ${span.first} → ${span.last}` : `${v.n} campaigns`} collapsed
+        footnote={`Data starts ${span.first || "—"} — the entry date of the oldest campaign in the cohort (first row below). Every metric on this page is computed from exactly these ${sample.length} campaigns (system cohort = entered ≥ ${data.systemEntry}). Baseline for the month cards reaches back to ${pv.window || "May"}. From ${pv.fillsVerified ?? "—"} pipeline-verified fills; ${pv.legacyExcluded ?? 0} legacy ambiguous-date rows and ${pv.dupesDropped ?? 0} exact-duplicate fills excluded.`}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 26px", marginBottom: 14 }}>
+          {[
+            ["Data starts", span.first || "—"],
+            ["Last exit", span.last || "—"],
+            ["Campaigns in N", sample.length],
+            ["Fills verified", pv.fillsVerified ?? "—"],
+            ["Legacy excluded", pv.legacyExcluded ?? 0],
+            ["Dupes dropped", pv.dupesDropped ?? 0],
+          ].map(([k, val]) => (
+            <div key={k}>
+              <div style={{ fontFamily: T.mono, fontSize: 9, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: T.faint }}>{k}</div>
+              <div style={{ fontFamily: T.mono, fontSize: 14, color: T.text, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{val}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr>
+              {th("#")}{th("Ticker")}{th("Entry date", null, 1)}{th("Last exit", null, 1)}{th("Legs", null, 1)}{th("P&L", null, 1)}{th("R", null, 1)}{th("Exit reasons")}
+            </tr></thead>
+            <tbody>
+              {sample.map((c, i) => (
+                <tr key={i} style={i === 0 ? { background: "rgba(201,152,42,0.05)" } : undefined}>
+                  <td style={{ ...tdBase, color: T.faint }}>{i + 1}</td>
+                  <td style={{ ...tdBase, fontWeight: 600 }}>{c.ticker}{i === 0 && <span style={{ color: T.gold, fontFamily: T.mono, fontSize: 9, marginLeft: 6 }}>◂ start</span>}</td>
+                  <td style={{ ...tdBase, textAlign: "right", color: c.entryDate ? T.muted : T.faint }}>{c.entryDate || "no date"}</td>
+                  <td style={{ ...tdBase, textAlign: "right", color: T.muted }}>{c.lastExit || "—"}</td>
+                  <td style={{ ...tdBase, textAlign: "right", color: T.muted }}>{c.legs}</td>
+                  <td style={{ ...tdBase, textAlign: "right", color: c.pl > 0 ? T.green : T.red }}>{fmt$(c.pl)}</td>
+                  <td style={{ ...tdBase, textAlign: "right", color: T.muted }}>{num(c.blendedR ?? c.rSum)}</td>
+                  <td style={{ ...tdBase, color: T.faint, maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis" }} title={c.reasons}>{c.reasons}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
       {/* equity */}
       <Panel title="Equity Curve — Cumulative R" meta="closed campaigns, exit order"
