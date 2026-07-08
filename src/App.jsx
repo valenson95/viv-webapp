@@ -10,6 +10,7 @@ import { themeFit, themeRanks, consistentTop, top5, latestSnapshot, THEME_COVERA
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import MarketContext from "./MarketContext.jsx";
+import EdgeLedger from "./EdgeLedger.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
 import DailySetupsTab from "./DailySetups.jsx";
 import ModelBookPage, { outcomeFromR } from "./ModelBook.jsx";
@@ -8235,6 +8236,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
         {/* THEME LEADERS STRIP (this week's DeepVue leaders) */}
         <ThemeStrip C={C} font={font} />
         <MarketContext C={C} font={font} />
+        <EdgeLedger C={C} font={font} session={session} />  {/* admin-only: renders null for members */}
 
         {/* TABLE */}
         <div className="toolbar">
