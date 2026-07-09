@@ -48,6 +48,9 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
   res.setHeader("Access-Control-Allow-Headers", "authorization, content-type");
+  // CORS preflight — the client calls this DIRECTLY on the canonical host to dodge the apex→www redirect
+  // (a cross-origin redirect strips the Authorization header). A direct cross-origin call needs OPTIONS to 204.
+  if (req.method === "OPTIONS") { return res.status(204).end(); }
 
   if (!SB_URL || !SB_ANON) {
     return res.status(500).json({ ok: false, error: "Server not configured: missing SUPABASE_URL / SUPABASE_ANON_KEY env vars in Vercel." });

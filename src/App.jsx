@@ -9947,7 +9947,12 @@ function AppInner() {
           String(ig.setting_value).split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean).forEach(t => ignoreTickers.add(t));
         }
       }
-      const res = await fetch("/api/ibkr-sync", { headers: { Authorization: `Bearer ${session?.access_token || ""}` } });
+      // Call the API DIRECTLY on the canonical host. If the app is loaded on the apex (valensontrades.com),
+      // a relative /api call 307-redirects to www — and a cross-origin redirect STRIPS the Authorization
+      // header, so sync silently fails while public endpoints work. Going direct to www avoids the redirect.
+      const onVst = typeof window !== "undefined" && /(^|\.)valensontrades\.com$/i.test(window.location.hostname);
+      const syncUrl = onVst ? "https://www.valensontrades.com/api/ibkr-sync" : "/api/ibkr-sync";
+      const res = await fetch(syncUrl, { headers: { Authorization: `Bearer ${session?.access_token || ""}` } });
       const json = await res.json();
       if (!json.ok) { setIbkrStatus("error"); setIbkrError(json.error || "Sync failed."); return; }
       setIbkrData(buildIbkrPreview(json, positions, journaledTrades, softDeletedExecIds, ignoreTickers));
