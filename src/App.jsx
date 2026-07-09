@@ -7847,9 +7847,20 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
     const _entryIso = tradeDateISO(p.entry);
     const _entryD = _entryIso ? new Date(_entryIso + "T00:00:00") : null;
     const holdDays = _entryD && !isNaN(_entryD) ? Math.max(0, Math.round((new Date().setHours(0, 0, 0, 0) - _entryD) / 86400000)) : null;
+    // T+3 trim reminder — trading-days held (weekday count, entry = T+0) and whether a partial has been taken.
+    // Jeff's mandatory T+3 shave: at T+3 with no partial trimmed, prompt the 30–33% shave + stops→breakeven.
+    const tradingDaysHeld = (() => {
+      if (!_entryD || isNaN(_entryD)) return null;
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      let n = 0; const cur = new Date(_entryD);
+      while (cur < today) { cur.setDate(cur.getDate() + 1); const d = cur.getDay(); if (d !== 0 && d !== 6) n++; }
+      return n;
+    })();
+    const trimmedYet = (realizedShares > 0) || (sumTrimsLogged > 0);
+    const t3Due = tradingDaysHeld != null && tradingDaysHeld >= 3 && sharesN > 0 && !trimmedYet;
 
-    return { ...p, holdDays, themeName: sectorFor(p.sym) || "", epN, cpN, commN, stop1, stop2, stop2N: stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR, sumTrimsLogged, sumAddsLogged, sharesNProj, realizedProjAdd, trimProjPct, todayTrimPct, remainingProjPct, intradayEventCount, intradayLiveCount, intradayAllReconciled };
-  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, holdDays:null, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, realizedShares:0, origShares:0, trimPct:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0, sumTrimsLogged:0, sumAddsLogged:0, sharesNProj:0, realizedProjAdd:0, trimProjPct:0, todayTrimPct:0, remainingProjPct:0, intradayEventCount:0, intradayLiveCount:0, intradayAllReconciled:false }; }
+    return { ...p, holdDays, tradingDaysHeld, t3Due, themeName: sectorFor(p.sym) || "", epN, cpN, commN, stop1, stop2, stop2N: stop2, tsN, hasTS, sharesN, h1, h2, posValue, expPct, realizedPL, realizedShares, origShares, trimPct, costFinanced, tier, isDual, activeStop, dtsD, dtsPct, dtsTotalD, rtsD, sbe, sbePct, plPct, plD, rMult, riskStatus, roteD, rotePct, currentRoteD, currentRotePct, riskFreePct, riskExposurePct, rPerShare, currentRLevel, rAchieved, rSuggestedStop, rLockedProfit, rNextTarget, dtsR, rtsR, sumTrimsLogged, sumAddsLogged, sharesNProj, realizedProjAdd, trimProjPct, todayTrimPct, remainingProjPct, intradayEventCount, intradayLiveCount, intradayAllReconciled };
+  } catch (err) { console.error("Enrichment error for position:", p.id, err); return { ...p, holdDays:null, tradingDaysHeld:null, t3Due:false, epN:0, cpN:0, commN:0, stop1:0, stop2:0, tsN:0, hasTS:false, sharesN:0, h1:0, h2:0, posValue:0, expPct:0, realizedPL:0, realizedShares:0, origShares:0, trimPct:0, costFinanced:false, tier:"Pilot", isDual:false, activeStop:0, dtsD:0, dtsPct:0, dtsTotalD:0, rtsD:0, sbe:0, sbePct:0, plPct:0, plD:0, rMult:0, riskStatus:"—", roteD:0, rotePct:0, currentRoteD:0, currentRotePct:0, riskFreePct:0, riskExposurePct:0, rPerShare:0, currentRLevel:0, rAchieved:0, rSuggestedStop:0, rLockedProfit:0, rNextTarget:0, dtsR:0, rtsR:0, sumTrimsLogged:0, sumAddsLogged:0, sharesNProj:0, realizedProjAdd:0, trimProjPct:0, todayTrimPct:0, remainingProjPct:0, intradayEventCount:0, intradayLiveCount:0, intradayAllReconciled:false }; }
   }), [positions, rSizer, portfolioSize, compEquity, realizedByPosition]);
 
   const totals = useMemo(() => {
@@ -8302,9 +8313,14 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                     <tr className={"posrow" + (isOpen ? " mg-open" : "")}>
                       <td data-l="Status"><span className={"status " + sc}><span className="d"></span>{p.riskStatus === "—" ? "Risk-Free" : p.riskStatus}</span></td>
                       <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{p.sym}{isAdmin && p.extMult != null ? <span className="term" data-tip={`Extension: ${Number(p.extMult).toFixed(1)}× ATR from the 50-day MA (as of ${p.extAsof || "last sync"}). <4× = fresh · ~5× = stretched (2σ) · 7.5–8× = rare (3σ) · ≥10× = extreme, the trim-into-strength zone. Insight only — your stops and plan stay the plan.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: p.extMult >= 10 ? "var(--red)" : p.extMult >= 7.5 ? "#fb923c" : p.extMult >= 5 ? "var(--goldBright)" : "var(--muted)", border: `1px solid ${p.extMult >= 10 ? "rgba(239,68,68,0.4)" : p.extMult >= 7.5 ? "rgba(251,146,60,0.4)" : p.extMult >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(p.extMult).toFixed(1)}×</span> : null}</span></td>
-                      <td data-l="Days">{p.holdDays == null
+                      <td data-l="Days" style={p.t3Due ? { background: "rgba(251,146,60,0.10)" } : undefined}>{p.holdDays == null
                         ? <span className="term" data-tip="No entry date on this position — add one in Manage to track how long you've held it." style={{ color: "var(--faint)" }}>—</span>
-                        : <span className="term" data-tip={`Held ${p.holdDays} calendar day${p.holdDays === 1 ? "" : "s"} since entry (${p.entry}).`} style={{ whiteSpace: "nowrap", cursor: "help", fontVariantNumeric: "tabular-nums", color: "var(--text)" }}>{p.holdDays}d</span>}</td>
+                        : <span className="term" data-tip={p.t3Due
+                            ? `T+${p.tradingDaysHeld}: ${p.tradingDaysHeld} trading days held and no partial trimmed yet. T+3 mandatory shave is due — trim 30–33% and move stops to breakeven (derisk regardless of R:R). Held ${p.holdDays} calendar days since entry (${p.entry}).`
+                            : `Held ${p.holdDays} calendar day${p.holdDays === 1 ? "" : "s"} since entry (${p.entry}).`}
+                            style={{ whiteSpace: "nowrap", cursor: "help", fontVariantNumeric: "tabular-nums", color: p.t3Due ? "#fb923c" : "var(--text)", fontWeight: p.t3Due ? 700 : 400 }}>{p.holdDays}d{p.t3Due
+                            ? <span style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "#fb923c", border: "1px solid rgba(251,146,60,0.5)", background: "rgba(251,146,60,0.14)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>T+{p.tradingDaysHeld} · TRIM</span>
+                            : null}</span>}</td>
                       <td className="pro-only" data-l="Shares">{p.sharesN}</td>
                       <td className="pro-only" data-l="Avg Cost">${(p.epN || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Commission">${(p.commN || 0).toFixed(2)}</td>
