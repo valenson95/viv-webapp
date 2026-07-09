@@ -92,6 +92,7 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
   const [data, setData] = useState(null);
   const [sortKey, setSortKey] = useState("pl");
   const [sortDir, setSortDir] = useState(-1);
+  const [eqMaP, setEqMaP] = useState(10);
 
   useEffect(() => {
     if (!isAdmin || !session?.user?.id) return;
@@ -102,6 +103,22 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
   }, [isAdmin, session?.user?.id]);
 
   const eq = useMemo(() => (data?.equityR || []).map((p, i) => ({ ...p, i: i + 1 })), [data]);
+  // Equity-curve MA (Jeff Sun risk-throttle): trade the system's own equity like a stock —
+  // trailing SMA of cumulative R; cum below its MA = system in drawdown → derisk.
+  const eqMA = useMemo(() => eq.map((p, i) => {
+    const win = eq.slice(Math.max(0, i - eqMaP + 1), i + 1);
+    const ma = win.reduce((s, x) => s + x.cum, 0) / win.length;
+    return { ...p, ma: +ma.toFixed(2), below: p.cum < ma };
+  }), [eq, eqMaP]);
+  const eqState = useMemo(() => {
+    if (eqMA.length < 2) return null;
+    const on = (x) => x.cum >= x.ma;
+    const last = eqMA[eqMA.length - 1], above = on(last);
+    let streak = 0; for (let i = eqMA.length - 1; i >= 0; i--) { if (on(eqMA[i]) === above) streak++; else break; }
+    let crosses = 0; for (let i = 1; i < eqMA.length; i++) if (on(eqMA[i]) !== on(eqMA[i - 1])) crosses++;
+    const belowN = eqMA.filter(p => !on(p)).length;
+    return { above, gap: +(last.cum - last.ma).toFixed(2), cum: last.cum, ma: last.ma, streak, crosses, belowPct: Math.round(100 * belowN / eqMA.length) };
+  }, [eqMA]);
   const roll = useMemo(() => (data?.rollingExp || []).map(p => ({ ...p })), [data]);
   const hist = useMemo(() => {
     const h = data?.buckets?.system?.hist || {};
@@ -230,9 +247,24 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
 
       {/* equity */}
       <Panel title="Equity Curve — Cumulative R" meta="closed campaigns, exit order"
-        footnote="Runners are excluded until they close. The lower panel is the rolling 10-trade expectancy — the system's pulse; sustained readings below zero warrant investigation before the month forces it.">
+        footnote={`The gold curve is cumulative R in exit order; the blue dashed line is its ${eqMaP}-trade moving average — you trade your OWN equity like a stock. Rule (Jeff Sun): while equity holds ABOVE its MA the system is in gear → press at full unit risk. When equity closes BELOW its MA the system is in a real drawdown, not noise → halve new-position risk (or paper-trade) until it reclaims the line, then step size back up. It is a mechanical throttle that forces you smallest exactly when you're cold and largest when you're hot — the opposite of the revenge-sizing instinct. Red dots mark trades taken while below the MA. Runners are excluded until they close. Lower panel = rolling-10 expectancy (the pulse); sustained sub-zero warrants investigation before the month forces it.`}>
+        {eqState && (
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "10px 16px", marginBottom: 14 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", fontFamily: T.mono, fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", color: eqState.above ? T.green : T.red, border: `1px solid ${(eqState.above ? T.green : T.red)}44`, borderRadius: 99, padding: "4px 13px" }}>
+              <Dot c={eqState.above ? T.green : T.red} />{eqState.above ? "IN GEAR · FULL RISK" : "BELOW EQUITY-MA · HALF RISK"}
+            </span>
+            <span style={{ fontSize: 11.5, color: T.muted }}>
+              Equity <b style={{ color: T.text }}>{eqState.cum}R</b> is <b style={{ color: eqState.above ? T.green : T.red }}>{eqState.gap > 0 ? "+" : ""}{eqState.gap}R</b> {eqState.above ? "above" : "below"} its {eqMaP}-MA (<b style={{ color: T.text }}>{eqState.ma}R</b>) · {eqState.streak} trades on this side · {eqState.crosses} crossings · {eqState.belowPct}% of trades below-line
+            </span>
+            <span style={{ marginLeft: "auto", display: "inline-flex", gap: 4 }}>
+              {[5, 10, 20].map(p => (
+                <button key={p} onClick={() => setEqMaP(p)} style={{ background: p === eqMaP ? `${T.blue}22` : "transparent", border: `1px solid ${p === eqMaP ? T.blue : T.border}`, color: p === eqMaP ? T.blue : T.faint, borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontFamily: T.mono, fontSize: 10 }}>{p}-MA</button>
+              ))}
+            </span>
+          </div>
+        )}
         <ResponsiveContainer width="100%" height={230}>
-          <ComposedChart data={eq} margin={{ left: 0, right: 8, top: 6 }}>
+          <ComposedChart data={eqMA} margin={{ left: 0, right: 8, top: 6 }}>
             <defs>
               <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={T.gold} stopOpacity={0.22} />
@@ -244,10 +276,13 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
             <YAxis {...axis} width={38} tickFormatter={(t) => t + "R"} />
             <Tooltip cursor={{ stroke: T.border }} content={<TT render={(p) => {
               const d = p[0]?.payload; if (!d) return null;
-              return <><div style={{ color: T.muted }}>{d.d} · trade #{d.i}</div><div><b>{d.t}</b> {d.r > 0 ? "+" : ""}{d.r}R</div><div>cumulative <b>{d.cum}R</b></div></>;
+              return <><div style={{ color: T.muted }}>{d.d} · trade #{d.i}</div><div><b>{d.t}</b> {d.r > 0 ? "+" : ""}{d.r}R</div><div>cumulative <b>{d.cum}R</b> · {eqMaP}-MA <b>{d.ma}R</b></div><div style={{ color: d.below ? T.red : T.green }}>{d.below ? "below MA — derisk" : "above MA — full size"}</div></>;
             }} />} />
             <ReferenceLine y={0} stroke={T.border} />
-            <Area type="monotone" dataKey="cum" stroke={T.gold} strokeWidth={1.6} fill="url(#eqFill)" dot={{ r: 2, fill: T.gold, strokeWidth: 0 }} activeDot={{ r: 4, fill: T.gold }} />
+            <Area type="monotone" dataKey="cum" stroke={T.gold} strokeWidth={1.6} fill="url(#eqFill)"
+              dot={(pr) => <circle key={pr.index} cx={pr.cx} cy={pr.cy} r={2.2} fill={pr.payload?.below ? T.red : T.gold} />}
+              activeDot={{ r: 4, fill: T.gold }} />
+            <Line type="monotone" dataKey="ma" stroke={T.blue} strokeWidth={1.3} strokeDasharray="5 4" dot={false} activeDot={{ r: 3, fill: T.blue }} />
           </ComposedChart>
         </ResponsiveContainer>
         <ResponsiveContainer width="100%" height={110}>
