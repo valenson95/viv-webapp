@@ -74,6 +74,8 @@ export const SECTIONS = [
         s: "You're buying right at the breakout pivot, not chasing 5–10% above it. A close entry keeps the stop tight and the reward-to-risk high." },
       { c: "Tight stop — under 1 ADR (ideally < ½)", key: true,
         s: "(entry − stop) ÷ ATR < 0.5. Then size from the math, before the order: shares = risk $ ÷ (entry − stop). Tight stop = explosive R:R; a stop a full ADR away means the day's fuel is already spent." },
+      { c: "Tight candle at trigger — DCR ≤ ½ ATR", key: true,
+        s: "Daily Candle Range (today's high − low) ÷ ATR(14). Under 50% means you're entering while the range is still coiled, not after it already expanded — the candle-level version of a tight stop. A wide range at trigger = the day's fuel is half-spent before you're even in." },
       { c: "Invalidation defined before entry",
         s: "Know your exact 'I'm wrong' price BEFORE you buy. Pro upgrade: three stops of ⅓ each at ⅓ / ⅔ / full distance — a straight-line failure costs ~0.67R instead of 1R, without moving the level." },
       { c: "Not the first 30 minutes (unless volume is extreme)",
