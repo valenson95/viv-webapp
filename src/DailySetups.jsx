@@ -54,6 +54,8 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   const [view, setView] = useState("all");        // "all" | "taken"
   const [q, setQ] = useState("");                 // ticker search — cross-reference all posts of one name
   const [statusF, setStatusF] = useState(null);   // funnel chip filter — "pivot" | "coiling" | "fresh" | "triggered" | "faded"
+  const [boardSort, setBoardSort] = useState({ k: "stage", d: 1 }); // board column sort — key + direction
+  const [boardOpen, setBoardOpen] = useState(false); // collapsed by default: top rows only
 
   const load = useCallback(async () => {
     const { rows: r, tableMissing: tm } = await listSetups();
@@ -111,11 +113,24 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
     faded:     { label: "💤 Faded",        col: C.muted,      bg: "rgba(255,255,255,0.04)", bd: C.border,                 tip: "Idea aged out — over 5 days without triggering" },
   };
   // Board = the LATEST post per ticker (index/market-context posts excluded — they live in the strip)
+  const STAGE_ORDER = ["pivot", "coiling", "fresh", "triggered", "faded"];
   const latestByTicker = Object.values(tickerHistory).map(list => list[list.length - 1]).filter(r => r.sector !== "Index");
-  const boardRows = latestByTicker.map(r => ({ r, s: statusOf(r) }))
-    .sort((a, b) => ["pivot", "coiling", "fresh", "triggered", "faded"].indexOf(a.s) - ["pivot", "coiling", "fresh", "triggered", "faded"].indexOf(b.s)
-      || (b.r.stars - a.r.stars) || String(b.r.trade_date || "").localeCompare(String(a.r.trade_date || "")));
+  const boardRows = latestByTicker.map(r => ({ r, s: statusOf(r), mi: mentionInfo(r) }));
   const statusCounts = boardRows.reduce((m, x) => { m[x.s] = (m[x.s] || 0) + 1; return m; }, {});
+  // sortable headers — click cycles asc/desc; default = funnel order, best checklist first
+  const cmp = {
+    stage: (a, b) => STAGE_ORDER.indexOf(a.s) - STAGE_ORDER.indexOf(b.s) || (b.r.pct || 0) - (a.r.pct || 0),
+    ticker: (a, b) => String(a.r.ticker).localeCompare(String(b.r.ticker)),
+    grade: (a, b) => (b.r.stars - a.r.stars) || ((b.r.pct || 0) - (a.r.pct || 0)),
+    checks: (a, b) => (b.r.pct || 0) - (a.r.pct || 0),
+    first: (a, b) => String(b.mi.first?.trade_date || "").localeCompare(String(a.mi.first?.trade_date || "")),
+    times: (a, b) => b.mi.total - a.mi.total,
+    theme: (a, b) => String(a.r.sector || "~").localeCompare(String(b.r.sector || "~")),
+  };
+  const sortedBoard = [...boardRows].sort((a, b) => {
+    const base = (cmp[boardSort.k] || cmp.stage)(a, b);
+    return boardSort.d < 0 ? -base : base;
+  });
   // Today's index post (SPY) = the regime strip
   const ctxPost = (rows || []).find(r => r.sector === "Index" && daysAgo(r.trade_date) === 0);
 
@@ -177,32 +192,63 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
             {statusF && <button onClick={() => setStatusF(null)} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "0.8rem", cursor: "pointer" }}>× clear</button>}
             <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.muted }}>status is read off each post's scorecard — nothing is hand-picked</span>
           </div>
-          {/* the board: latest post per ticker, funnel order — tap a row to pull that name's history */}
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.76rem" }}>
-              <thead>
-                <tr style={{ color: C.muted, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                  {["Ticker", "Grade", "Stage", "On radar", "Theme"].map(h => <th key={h} style={{ textAlign: "left", padding: "4px 10px 6px", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {boardRows.filter(x => !statusF || x.s === statusF).map(({ r, s }) => {
-                  const m = STATUS_META[s], mi = mentionInfo(r);
-                  const fit = themeFit(r.sector, r.trade_date);
-                  return (
-                    <tr key={r.id} onClick={() => { setQ(r.ticker); setStatusF(null); }} title={`Show ${r.ticker}'s full history below`}
-                      style={{ cursor: "pointer", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
-                      <td style={{ padding: "7px 10px", fontWeight: 800, color: C.white, whiteSpace: "nowrap" }}>{r.ticker}</td>
-                      <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}><span style={{ fontWeight: 800, color: letterColor(C, r.letter) }}>{r.letter}</span> <span style={{ color: C.goldBright, fontSize: "0.68rem" }}>{"★".repeat(r.stars)}</span></td>
-                      <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}><span title={m.tip} style={{ fontSize: "0.64rem", fontWeight: 800, color: m.col, background: m.bg, border: `1px solid ${m.bd}`, padding: "2px 9px", borderRadius: 99 }}>{m.label}</span></td>
-                      <td style={{ padding: "7px 10px", color: C.muted, whiteSpace: "nowrap" }}>{mi.total > 1 ? `day ${mi.total} · since ${shortDate(mi.first.trade_date)}` : shortDate(r.trade_date)}</td>
-                      <td style={{ padding: "7px 10px", whiteSpace: "nowrap", color: fit === "in" ? "#22c55e" : fit === "off" ? "#ef4444" : C.muted }}>{r.sector || "—"}{fit === "in" ? " ✓" : ""}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {/* the board: latest post per ticker — sortable columns, collapsed to the top rows by default */}
+          {(() => {
+            const filteredBoard = sortedBoard.filter(x => !statusF || x.s === statusF);
+            const LIMIT = 8;
+            const shown = boardOpen ? filteredBoard : filteredBoard.slice(0, LIMIT);
+            const th = (key, label, tip, right) => (
+              <th key={key} onClick={() => setBoardSort(s => ({ k: key, d: s.k === key ? -s.d : 1 }))} title={tip || `Sort by ${label}`}
+                style={{ textAlign: right ? "right" : "left", padding: "4px 8px 6px", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap", cursor: "pointer", userSelect: "none", color: boardSort.k === key ? C.goldBright : C.muted }}>
+                {label}{boardSort.k === key ? (boardSort.d > 0 ? " ▾" : " ▴") : ""}
+              </th>
+            );
+            return (
+              <>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ borderCollapse: "collapse", fontSize: "0.76rem", minWidth: 520 }}>
+                    <thead>
+                      <tr style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                        {th("ticker", "Ticker")}
+                        {th("grade", "Grade")}
+                        {th("checks", "Checklist", "Criteria passed out of 16 — sort by score")}
+                        {th("first", "First seen", "The date the ticker first entered the focus list")}
+                        {th("times", "×", "How many times it has appeared in the feed", true)}
+                        {th("theme", "Theme")}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shown.map(({ r, s, mi }) => {
+                        const m = STATUS_META[s];
+                        const fit = themeFit(r.sector, r.trade_date);
+                        const passed = (r.ticked || []).length;
+                        return (
+                          <tr key={r.id} onClick={() => { setQ(r.ticker); setStatusF(null); }} title={`${m.label} — ${m.tip}. Click to show ${r.ticker}'s full history below.`}
+                            style={{ cursor: "pointer", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                            <td style={{ padding: "7px 8px", fontWeight: 800, color: C.white, whiteSpace: "nowrap" }}>{r.ticker}</td>
+                            <td style={{ padding: "7px 8px", whiteSpace: "nowrap" }}><span style={{ fontWeight: 800, color: letterColor(C, r.letter) }}>{r.letter}</span> <span style={{ color: C.goldBright, fontSize: "0.66rem" }}>{"★".repeat(r.stars)}</span></td>
+                            <td style={{ padding: "7px 8px", whiteSpace: "nowrap" }}>
+                              <span style={{ fontWeight: 800, color: m.col }}>{m.label.slice(0, 2)} {passed}/16</span>
+                              <span style={{ color: C.muted, marginLeft: 6 }}>{r.pct != null ? `${Math.round(r.pct * 100)}%` : ""}</span>
+                            </td>
+                            <td style={{ padding: "7px 8px", color: C.text, whiteSpace: "nowrap" }}>{shortDate(mi.first?.trade_date || r.trade_date)}</td>
+                            <td style={{ padding: "7px 8px", whiteSpace: "nowrap", textAlign: "right", fontWeight: mi.total > 1 ? 800 : 400, color: mi.total > 1 ? C.goldBright : C.muted }}>{mi.total}×</td>
+                            <td style={{ padding: "7px 8px", whiteSpace: "nowrap", color: fit === "in" ? "#22c55e" : fit === "off" ? "#ef4444" : C.muted }}>{r.sector || "—"}{fit === "in" ? " ✓" : ""}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {filteredBoard.length > LIMIT && (
+                  <button onClick={() => setBoardOpen(o => !o)}
+                    style={{ marginTop: 8, width: "100%", background: "rgba(255,255,255,0.03)", border: `1px dashed ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "7px 0", borderRadius: 10, cursor: "pointer" }}>
+                    {boardOpen ? "Collapse ▴" : `Show all ${filteredBoard.length} ▾`}
+                  </button>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
