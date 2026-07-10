@@ -85,7 +85,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
     const list = tickerHistory[r.ticker] || [];
     const idx = list.findIndex(x => x.id === r.id);
     const prev = idx > 0 ? list[idx - 1] : null;
-    return { nth: idx + 1, total: list.length, prev };
+    return { nth: idx + 1, total: list.length, prev, first: list[0] || null };
   };
 
   // filter (ticker search → All/Taken) then group: by date (default) or one ranked list (Top graded)
@@ -201,9 +201,9 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                           style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: C.goldBright, background: "rgba(240,192,80,0.1)", border: `1px solid ${C.borderGold}`, padding: "3px 8px", borderRadius: 99 }}>NEW</span>
                       )}
                       {mi.nth > 1 && (
-                        <span title={`Mention ${mi.nth} of ${mi.total} — previous: ${shortDate(mi.prev.trade_date)} (${mi.prev.letter})${gradeUp ? " · setup improving" : gradeDown ? " · setup weakening" : ""}`}
+                        <span title={`On the focus list since ${dateLabel(mi.first.trade_date)} (first call: ${mi.first.letter}) — mention ${mi.nth} of ${mi.total} · previous: ${shortDate(mi.prev.trade_date)} (${mi.prev.letter})${gradeUp ? " · setup improving" : gradeDown ? " · setup weakening" : ""}`}
                           style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: gradeUp ? "#22c55e" : gradeDown ? "#ef4444" : C.muted, background: gradeUp ? "rgba(34,197,94,0.1)" : gradeDown ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)", border: `1px solid ${gradeUp ? "rgba(34,197,94,0.35)" : gradeDown ? "rgba(239,68,68,0.35)" : C.border}`, padding: "3px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>
-                          DAY {mi.nth}{mi.prev ? ` · ${mi.prev.letter}→${r.letter}${gradeUp ? " ↑" : gradeDown ? " ↓" : ""}` : ""}
+                          DAY {mi.nth} · since {shortDate(mi.first.trade_date)}{mi.prev ? ` · ${mi.prev.letter}→${r.letter}${gradeUp ? " ↑" : gradeDown ? " ↓" : ""}` : ""}
                         </span>
                       )}
                       {r.setup_type && (
