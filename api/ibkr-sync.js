@@ -44,6 +44,28 @@ async function fetchText(url) {
   return await r.text();
 }
 
+// ── Human-readable, ACTIONABLE messages for IBKR Flex error codes ──
+// Members see these verbatim in the sync modal, so each one says exactly what to do next.
+// Codes from IBKR's Flex Web Service reference (1001–1021).
+function friendlyFlexError(code, rawMsg) {
+  const c = String(code || "");
+  const map = {
+    "1012": "Your Flex token has EXPIRED. In IBKR: Performance & Reports → Flex Queries → Flex Web Service Configuration → generate a new token (set expiry up to 1 year), then paste the new token in Settings → IBKR and Save.",
+    "1015": "Your Flex TOKEN is invalid. Re-copy it from IBKR (Performance & Reports → Flex Queries → Flex Web Service Configuration — it's the long number, ~15–25 digits) and paste it again in Settings → IBKR. Make sure there are no spaces.",
+    "1014": "Your Flex QUERY ID is invalid. It must be the short number shown next to your query in Performance & Reports → Flex Queries (e.g. 1519726) — not your username or email. Fix it in Settings → IBKR.",
+    "1013": "IBKR blocked the request due to an IP restriction on your Flex token. In Flex Web Service Configuration, remove the IP restriction (leave the IP field empty) and try again.",
+    "1011": "Flex Web Service is not enabled on your IBKR account yet. In IBKR: Performance & Reports → Flex Queries → Flex Web Service Configuration → set Status to ON, then try again.",
+    "1016": "The account in your Flex query doesn't match this token. Re-create the Flex Query under the SAME IBKR user that generated the token.",
+    "1018": "Too many sync requests in a short time — IBKR rate-limited the token. Wait 1–2 minutes and hit Sync again.",
+    "1009": "IBKR's statement servers are busy right now. Wait a minute and hit Sync again.",
+    "1019": "IBKR is still generating your statement. Wait ~30 seconds and hit Sync again.",
+    "1021": "IBKR couldn't retrieve the statement this time. Wait a minute and hit Sync again.",
+    "1010": "This Flex query uses IBKR's legacy format. Re-create it as a new Flex Query (Performance & Reports → Flex Queries → Trades) and use the new Query ID.",
+    "1020": "IBKR couldn't validate the request — this almost always means the Query ID or token isn't what IBKR expects. Check in Settings → IBKR that: (1) Flex Query ID is the short NUMBER from your Flex Queries list (e.g. 1519726) — not an email or username; (2) the token is the long number from Flex Web Service Configuration, pasted with no spaces.",
+  };
+  return map[c] || `IBKR rejected the request: ${rawMsg || "unknown error"} (code ${c || "?"})`;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
@@ -72,12 +94,23 @@ export default async function handler(req, res) {
     if (!TOKEN || !QUERY_ID) {
       return res.status(400).json({ ok: false, error: "Connect your IBKR account in Settings first — enter your own Flex Query ID and Token." });
     }
+    // ── Validate BEFORE calling IBKR — catches the classic mistakes (email/username in the Query ID
+    // field, token with spaces, swapped fields) with a message that says exactly what to fix.
+    if (/^\d{1,9}$/.test(TOKEN) && /^\d{13,}$/.test(QUERY_ID)) {
+      return res.status(400).json({ ok: false, error: "It looks like your Query ID and token are SWAPPED — the token is the LONG number (~15–25 digits), the Query ID is the SHORT one (e.g. 1519726). Swap them in Settings → IBKR and Save." });
+    }
+    if (!/^\d{1,12}$/.test(QUERY_ID)) {
+      return res.status(400).json({ ok: false, error: `Your Flex Query ID ("${QUERY_ID.slice(0, 40)}") isn't valid — it must be the short NUMBER shown next to your query in IBKR under Performance & Reports → Flex Queries (e.g. 1519726), not your email or username. Fix it in Settings → IBKR and Save.` });
+    }
+    if (!/^[A-Za-z0-9]{8,64}$/.test(TOKEN)) {
+      return res.status(400).json({ ok: false, error: "Your Flex token doesn't look right — it should be one long number/code (~15–25 characters) with no spaces, copied from IBKR's Flex Web Service Configuration. Re-paste it in Settings → IBKR and Save." });
+    }
 
     // ── Step 1: request statement generation ──
     const sendXml = await fetchText(`${SEND_URL}?t=${encodeURIComponent(TOKEN)}&q=${encodeURIComponent(QUERY_ID)}&v=3`);
     const status = tag(sendXml, "Status");
     if (status !== "Success") {
-      return res.status(502).json({ ok: false, error: `IBKR rejected the request: ${tag(sendXml, "ErrorMessage") || status || "unknown"} (code ${tag(sendXml, "ErrorCode") || "?"})` });
+      return res.status(502).json({ ok: false, error: friendlyFlexError(tag(sendXml, "ErrorCode"), tag(sendXml, "ErrorMessage") || status) });
     }
     const ref = tag(sendXml, "ReferenceCode");
     const baseUrl = tag(sendXml, "Url") || "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/GetStatement";
@@ -91,7 +124,10 @@ export default async function handler(req, res) {
       if (stmtXml.includes("<FlexQueryResponse")) break;
       const s = tag(stmtXml, "Status");
       if (s && s !== "Warn" && s !== "Success") {
-        return res.status(502).json({ ok: false, error: `IBKR statement error: ${tag(stmtXml, "ErrorMessage") || s} (code ${tag(stmtXml, "ErrorCode") || "?"})` });
+        const code = tag(stmtXml, "ErrorCode");
+        // 1019 = still generating — keep polling instead of failing the sync.
+        if (code === "1019") continue;
+        return res.status(502).json({ ok: false, error: friendlyFlexError(code, tag(stmtXml, "ErrorMessage") || s) });
       }
     }
     if (!stmtXml.includes("<FlexQueryResponse")) {

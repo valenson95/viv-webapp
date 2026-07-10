@@ -19,6 +19,7 @@ import MentorModePage from "./MentorMode.jsx";
 import TVChart from "./TVChart.jsx";
 import { getGrade as getSavedGrade, useGrades as useSavedGrades, initGrades, isGradesReady } from "./grades.js";
 import FeedbackWidget from "./Feedback.jsx";
+import { looksLikeIbkrCSV, parseIbkrCSV } from "./ibkrCsv.js";
 
 // ─── Error Boundary — catches rendering crashes so the page doesn't go blank ───
 class ErrorBoundary extends React.Component {
@@ -4681,6 +4682,21 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target.result;
+      // ── IBKR statement? (Activity Statement CSV or Flex Query CSV) — parse executions into
+      // closed round-trips instead of expecting our own journal columns. Members download these
+      // straight from IBKR, so this must Just Work.
+      if (looksLikeIbkrCSV(text)) {
+        const r = parseIbkrCSV(text);
+        if (r && r.trades.length > 0) {
+          setJournaledTrades(prev => [...prev, ...r.trades]);
+          setImportResult({ success: true, count: r.trades.length, ibkr: true, openLots: r.openLots.length, skippedNonStock: r.skipped.nonStock, skippedNonUsd: r.skipped.nonUsd });
+          setTimeout(() => onManualSaveRef.current && onManualSaveRef.current(), 80);
+        } else {
+          setImportResult({ success: false, count: 0, ibkr: true, openLots: r ? r.openLots.length : 0, execCount: r ? r.execCount : 0 });
+        }
+        setTimeout(() => setImportResult(null), 12000);
+        return;
+      }
       // Detect master export format (has section markers)
       const master = parseMasterCSV(text);
       if (master) {
@@ -5750,18 +5766,25 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           <div className="welcome" style={{ borderColor: importResult.success ? "var(--borderGold)" : "rgba(239,68,68,0.4)" }}>
             <span className="wd" style={{ background: importResult.success ? "var(--goldBright)" : "var(--red)" }}></span>
             <div>{importResult.success
-              ? importResult.master
-                ? `Master import: ${importResult.posCount} position${importResult.posCount !== 1 ? "s" : ""} + ${importResult.tradeCount} trade${importResult.tradeCount !== 1 ? "s" : ""} imported. Remember to Save on both Dashboard and Journal.`
-                : `Successfully imported ${importResult.count} trade${importResult.count > 1 ? "s" : ""}. They now appear in your closed trades below.`
-              : "Import failed — could not parse any trades. Check that your CSV has a header row with recognizable column names."}</div>
+              ? importResult.ibkr
+                ? `IBKR statement detected — imported ${importResult.count} closed trade${importResult.count !== 1 ? "s" : ""} (buys & sells paired automatically).${importResult.openLots ? ` ${importResult.openLots} still-open position${importResult.openLots !== 1 ? "s were" : " was"} skipped — add those on your Dashboard.` : ""}${importResult.skippedNonStock ? ` ${importResult.skippedNonStock} non-stock row${importResult.skippedNonStock !== 1 ? "s" : ""} (options/forex) skipped.` : ""}${importResult.skippedNonUsd ? ` ${importResult.skippedNonUsd} non-USD row${importResult.skippedNonUsd !== 1 ? "s" : ""} skipped.` : ""}`
+                : importResult.master
+                  ? `Master import: ${importResult.posCount} position${importResult.posCount !== 1 ? "s" : ""} + ${importResult.tradeCount} trade${importResult.tradeCount !== 1 ? "s" : ""} imported. Remember to Save on both Dashboard and Journal.`
+                  : `Successfully imported ${importResult.count} trade${importResult.count > 1 ? "s" : ""}. They now appear in your closed trades below.`
+              : importResult.ibkr
+                ? (importResult.execCount > 0
+                  ? `We read your IBKR file (${importResult.execCount} execution${importResult.execCount !== 1 ? "s" : ""}) but found no COMPLETED round-trips${importResult.openLots ? ` — ${importResult.openLots} position${importResult.openLots !== 1 ? "s are" : " is"} still open` : ""}. Make sure the statement's date range covers both your BUYS and your SELLS.`
+                  : "We recognized an IBKR file but it contains no trade rows. In IBKR use Performance & Reports → Statements → Activity, pick a date range that includes your trades, and download as CSV — or see the Import guide.")
+                : "Import failed — could not parse any trades. Check that your CSV has a header row with recognizable column names."}</div>
           </div>
         )}
         {showImportGuide && (
           <div className="card" style={{ marginTop: 14, padding: "20px 24px" }}>
             <div className="sech" style={{ marginBottom: 10 }}>How to Import Your Trades</div>
             <div style={{ fontSize: "0.78rem", color: "var(--text)", lineHeight: 1.7 }}>
-              <p style={{ marginBottom: 8 }}>Export your trades as a CSV with a <b style={{ color: "var(--white)" }}>header row</b>. Recognized columns: Symbol/Ticker, Entry/Exit Date &amp; Time, Entry/Exit Price, Shares, Stop, Setup, Tags (semicolon-separated), P/L %, P/L $, R-Multiple, Exit Reason, Notes.</p>
-              <p style={{ color: "var(--muted)" }}>P/L %, P/L $ and R-Multiple are auto-calculated from entry/exit/shares/stop if missing. Unrecognized columns are ignored.</p>
+              <p style={{ marginBottom: 8 }}><b style={{ color: "var(--gold)" }}>Straight from IBKR (easiest):</b> log in to IBKR → <b style={{ color: "var(--white)" }}>Performance &amp; Reports → Statements → Activity</b> → set the date range that covers your trades → download as <b style={{ color: "var(--white)" }}>CSV</b> → drop that file here. We detect IBKR's format automatically, pair your buys and sells into round-trip trades (weighted-average cost, longs and shorts), and skip anything still open. A Flex Query CSV (with a Trades section) works too.</p>
+              <p style={{ marginBottom: 8 }}><b style={{ color: "var(--white)" }}>Or your own CSV</b> with a <b style={{ color: "var(--white)" }}>header row</b>. Recognized columns: Symbol/Ticker, Entry/Exit Date &amp; Time, Entry/Exit Price, Shares, Stop, Setup, Tags (semicolon-separated), P/L %, P/L $, R-Multiple, Exit Reason, Notes.</p>
+              <p style={{ color: "var(--muted)" }}>P/L %, P/L $ and R-Multiple are auto-calculated from entry/exit/shares/stop if missing. Unrecognized columns are ignored. Importing the same file twice creates duplicates — delete the extras if that happens.</p>
             </div>
           </div>
         )}
@@ -8720,6 +8743,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
   const [ibkrQueryId, setIbkrQueryId] = useState("");
   const [ibkrToken, setIbkrToken] = useState("");
   const [ibkrConnStatus, setIbkrConnStatus] = useState("");
+  const [ibkrConnError, setIbkrConnError] = useState("");
   const [ibkrLoaded, setIbkrLoaded] = useState(false);
   const [ibkrIgnoreText, setIbkrIgnoreText] = useState("");
   const [ibkrIgnoreStatus, setIbkrIgnoreStatus] = useState("");
@@ -8750,12 +8774,32 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
   const saveIbkrConn = async () => {
     const uid = session?.user?.id;
     if (!uid) return;
+    // ── Sanitize + validate BEFORE saving — bad credentials here are the #1 cause of "sync doesn't work".
+    // Strip ALL whitespace (tokens get copied with stray spaces/newlines) and quotes.
+    let qid = ibkrQueryId.replace(/["'\s]/g, "");
+    let tok = ibkrToken.replace(/["'\s]/g, "");
+    // Classic mistake: fields swapped (token = LONG number, query id = SHORT number) → auto-fix.
+    if (/^\d{1,9}$/.test(tok) && /^\d{13,}$/.test(qid)) { const t = qid; qid = tok; tok = t; }
+    setIbkrQueryId(qid); setIbkrToken(tok);
+    if (qid || tok) { // allow clearing both to disconnect
+      if (!qid || !tok) { setIbkrConnError("Fill in BOTH fields — the Query ID (short number) and the token (long number)."); setIbkrConnStatus("error"); setTimeout(() => setIbkrConnStatus(""), 2500); return; }
+      if (qid.includes("@") || !/^\d{1,12}$/.test(qid)) {
+        setIbkrConnError(`"${qid.slice(0, 40)}" isn't a Flex Query ID. It's the short NUMBER next to your query in IBKR under Performance & Reports → Flex Queries (e.g. 1519726) — not your email or username.`);
+        setIbkrConnStatus("error"); setTimeout(() => setIbkrConnStatus(""), 2500); return;
+      }
+      if (!/^[A-Za-z0-9]{8,64}$/.test(tok)) {
+        setIbkrConnError("That token doesn't look right — it should be one long number (~15–25 digits, no spaces) from IBKR's Flex Web Service Configuration page.");
+        setIbkrConnStatus("error"); setTimeout(() => setIbkrConnStatus(""), 2500); return;
+      }
+    }
+    setIbkrConnError("");
     setIbkrConnStatus("saving");
     const { error } = await supabase.from("user_settings").upsert([
-      { user_id: uid, setting_key: "ibkr_query_id", setting_value: ibkrQueryId.trim(), updated_at: new Date().toISOString() },
-      { user_id: uid, setting_key: "ibkr_token", setting_value: ibkrToken.trim(), updated_at: new Date().toISOString() },
+      { user_id: uid, setting_key: "ibkr_query_id", setting_value: qid, updated_at: new Date().toISOString() },
+      { user_id: uid, setting_key: "ibkr_token", setting_value: tok, updated_at: new Date().toISOString() },
     ], { onConflict: "user_id,setting_key" });
     setIbkrConnStatus(error ? "error" : "saved");
+    if (error) setIbkrConnError("Couldn't save — check your connection and try again.");
     setTimeout(() => setIbkrConnStatus(""), 2500);
   };
   const ibkrConnected = ibkrToken.trim() && ibkrQueryId.trim();
@@ -8997,13 +9041,17 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <div className="row" style={{ marginTop: 20 }}><span className="label">Your IBKR connection</span>
             {ibkrLoaded && <span className={"conn " + (ibkrConnected ? "yes" : "no")}><span className="d"></span>{ibkrConnected ? "Connected ✓" : "Not connected"}</span>}</div>
           <div className="grid2" style={{ marginTop: 12 }}>
-            <div className="field"><label><span className="term" data-tip="A number that identifies the report (Flex Query) you created in IBKR. You'll copy it from the Flex Queries list.">Flex Query ID</span></label><input className="in" value={ibkrQueryId} onChange={e => setIbkrQueryId(e.target.value)} placeholder="e.g. 1519726" /><div className="hint">From your IBKR Flex Queries list.</div></div>
-            <div className="field"><label><span className="term" data-tip="A long read-only key that lets the app fetch your statements. Treat it like a password. It cannot trade or move money.">Flex Web Service token</span></label><input className="in" type="password" autoComplete="off" value={ibkrToken} onChange={e => setIbkrToken(e.target.value)} placeholder="paste your token" /><div className="hint">Read-only — like a password.</div></div>
+            <div className="field"><label><span className="term" data-tip="A number that identifies the report (Flex Query) you created in IBKR. You'll copy it from the Flex Queries list.">Flex Query ID</span></label><input className="in" value={ibkrQueryId} onChange={e => { setIbkrQueryId(e.target.value); setIbkrConnError(""); }} placeholder="e.g. 1519726" />
+              {ibkrQueryId.trim() && !/^\d{1,12}$/.test(ibkrQueryId.replace(/["'\s]/g, ""))
+                ? <div className="hint" style={{ color: "#ff8f8f" }}>⚠ This should be a short NUMBER (e.g. 1519726) — not your email or username.</div>
+                : <div className="hint">The short number from your IBKR Flex Queries list — NOT your email/username.</div>}</div>
+            <div className="field"><label><span className="term" data-tip="A long read-only key that lets the app fetch your statements. Treat it like a password. It cannot trade or move money.">Flex Web Service token</span></label><input className="in" type="password" autoComplete="off" value={ibkrToken} onChange={e => { setIbkrToken(e.target.value); setIbkrConnError(""); }} placeholder="paste your token" /><div className="hint">The LONG number (~15–25 digits) from Flex Web Service Configuration. Read-only — like a password.</div></div>
           </div>
           <div className="row" style={{ marginTop: 14 }}>
             <button className={"btn gold" + (ibkrConnStatus === "saved" ? " ok" : "")} onClick={saveIbkrConn} disabled={ibkrConnStatus === "saving"}>{ibkrConnStatus === "saving" ? "Saving…" : ibkrConnStatus === "saved" ? "Saved ✓" : ibkrConnStatus === "error" ? "Failed" : "Save connection"}</button>
             <span className="hint" style={{ maxWidth: 420 }}>Stored privately on your own account. The token is read-only — it can pull statements but can't trade or move money.</span>
           </div>
+          {ibkrConnError && <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,107,107,0.35)", background: "rgba(255,107,107,0.08)", color: "#ff9f9f", fontSize: 13, lineHeight: 1.5, maxWidth: 640 }}>⚠ {ibkrConnError}</div>}
 
           {/* auto-sync control — replaces the old manual "preview & reconcile" flow.
               ON  → trades flow in automatically from your cutover date forward (existing history untouched).
