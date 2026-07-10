@@ -230,6 +230,16 @@ function useDragReorder(length) {
 const WHATS_NEW = [
   {
     tag: "New",
+    date: "July 10, 2026",
+    title: "📅 Daily Setups — dates, NEW/DAY-N badges & ticker search",
+    items: [
+      "Every card now shows its release date, and repeat tickers carry a DAY-N badge with the grade change vs the previous mention (B→A ↑ = the setup is maturing; ↓ = weakening). First calls posted today are marked NEW.",
+      "TODAY / YESTERDAY day dividers are now bold with an idea count, and posts older than 5 days fade slightly so the fresh board stands out.",
+      "New 🔍 ticker search in the toolbar — type a symbol to pull up its entire feed history and read how the thesis developed post by post. Thanks Vincentius for the ask.",
+    ],
+  },
+  {
+    tag: "New",
     date: "July 8, 2026",
     title: "🎚 Market Context — how extended is the tape?",
     items: [

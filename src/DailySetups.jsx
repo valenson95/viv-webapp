@@ -28,6 +28,23 @@ function dateLabel(iso) {
   return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" });
 }
 
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+// "Jul 10" — the always-visible per-card date chip (member ask: repeat tickers were undatable)
+function shortDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  return isNaN(d) ? String(iso) : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+function daysAgo(iso) {
+  if (!iso) return null;
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d)) return null;
+  return Math.round((new Date(todayISO() + "T00:00:00") - d) / 86400e3);
+}
+
 export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   const [rows, setRows] = useState(null); // null = loading
   const [tableMissing, setTableMissing] = useState(false);
@@ -35,6 +52,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   const [lightbox, setLightbox] = useState(null); // chart url
   const [sortBy, setSortBy] = useState("date");   // "date" | "grade"
   const [view, setView] = useState("all");        // "all" | "taken"
+  const [q, setQ] = useState("");                 // ticker search — cross-reference all posts of one name
 
   const load = useCallback(async () => {
     const { rows: r, tableMissing: tm } = await listSetups();
@@ -57,8 +75,23 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
     load();
   };
 
-  // filter (All / Taken) then group: by date (default) or one ranked list (Top graded)
-  const visRows = (rows || []).filter(r => view !== "taken" || r.taken_at);
+  // ── Repeat-ticker context (member ask, 2026-07-10): one ticker can appear across many days,
+  // so every card carries its own date + a NEW / DAY-N badge + the grade change vs its previous
+  // mention. History is computed over ALL posts (not the filtered view) so the count is honest.
+  const tickerHistory = {};
+  (rows || []).forEach(r => { (tickerHistory[r.ticker] = tickerHistory[r.ticker] || []).push(r); });
+  Object.values(tickerHistory).forEach(list => list.sort((a, b) => String(a.trade_date || "").localeCompare(String(b.trade_date || ""))));
+  const mentionInfo = (r) => {
+    const list = tickerHistory[r.ticker] || [];
+    const idx = list.findIndex(x => x.id === r.id);
+    const prev = idx > 0 ? list[idx - 1] : null;
+    return { nth: idx + 1, total: list.length, prev };
+  };
+
+  // filter (ticker search → All/Taken) then group: by date (default) or one ranked list (Top graded)
+  const visRows = (rows || [])
+    .filter(r => !q.trim() || String(r.ticker || "").toUpperCase().includes(q.trim().toUpperCase()))
+    .filter(r => view !== "taken" || r.taken_at);
   const groups = [];
   if (sortBy === "grade") {
     const ranked = [...visRows].sort((a, b) => (b.stars - a.stars) || ((b.pct || 0) - (a.pct || 0)) ||
@@ -96,6 +129,13 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
             <button key={k} onClick={() => setView(k)}
               style={{ background: view === k ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.04)", color: view === k ? "#22c55e" : C.muted, border: `1px solid ${view === k ? "rgba(34,197,94,0.35)" : C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, cursor: "pointer" }}>{lbl}</button>
           ))}
+          <span style={{ width: 1, height: 18, background: C.border }} />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 ticker…" spellCheck={false}
+            title="Type a ticker to see its full history in the feed — every post, oldest thesis to latest"
+            style={{ background: "rgba(255,255,255,0.04)", color: C.white, border: `1px solid ${q.trim() ? C.borderGold : C.border}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "6px 12px", borderRadius: 99, width: 110, outline: "none", textTransform: "uppercase" }} />
+          {q.trim() && (
+            <button onClick={() => setQ("")} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "0.85rem", cursor: "pointer", padding: 0 }}>×</button>
+          )}
         </div>
       )}
 
@@ -115,10 +155,24 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "30px 20px", textAlign: "center", color: C.muted, fontSize: "0.85rem" }}>
           No taken setups yet — ✔ Mark taken on a post when the trade is executed.
         </div>
-      ) : groups.map((g, gi) => (
+      ) : groups.map((g, gi) => {
+        // Emphasized day dividers — TODAY in gold, YESTERDAY named, older dates plain (member ask)
+        const dAgo = g.date === "__ranked__" ? null : daysAgo(g.date);
+        const rel = dAgo === 0 ? "TODAY" : dAgo === 1 ? "YESTERDAY" : null;
+        return (
         <div key={g.date + "-" + gi} style={{ marginBottom: 26 }}>
-          <div style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold, margin: "0 2px 10px" }}>{g.label}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 2px 10px" }}>
+            <div style={{ fontSize: rel === "TODAY" ? "0.78rem" : "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: rel === "TODAY" ? C.goldBright : C.gold, whiteSpace: "nowrap" }}>
+              {rel ? <>{rel} <span style={{ color: C.muted, fontWeight: 700 }}>· {g.label}</span></> : g.label}
+            </div>
+            <div style={{ flex: 1, height: 1, background: rel === "TODAY" ? "rgba(240,192,80,0.35)" : C.border }} />
+            {g.date !== "__ranked__" && <span style={{ fontSize: "0.62rem", color: C.muted, fontWeight: 700, whiteSpace: "nowrap" }}>{g.items.length} idea{g.items.length !== 1 ? "s" : ""}</span>}
+          </div>
           {g.items.map(r => {
+            const mi = mentionInfo(r);
+            const gradeUp = mi.prev && r.stars > mi.prev.stars;
+            const gradeDown = mi.prev && r.stars < mi.prev.stars;
+            const isStale = (daysAgo(r.trade_date) ?? 0) > 5 && !r.taken_at;
             const expanded = openId === r.id;
             const autoSet = new Set(r.auto || []);
             const tickedSet = new Set(r.ticked || []);
@@ -126,7 +180,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
             const fit = themeFit(r.sector, r.trade_date);
             const fitCol = fit === "in" ? "#22c55e" : fit === "off" ? "#ef4444" : null;
             return (
-              <div key={r.id} style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, marginBottom: 14 }}>
+              <div key={r.id} style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, marginBottom: 14, opacity: isStale ? 0.78 : 1 }}>
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                   {/* chart thumb */}
                   {r.chart_img && (
@@ -137,6 +191,21 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                   <div style={{ flex: "1 1 260px", minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                       <span style={{ fontSize: "1.3rem", fontWeight: 800, color: C.white }}>{r.ticker}</span>
+                      {/* release date — always on the card, so repeats are datable even in ranked view */}
+                      <span title={`Posted ${dateLabel(r.trade_date)}`} style={{ fontSize: "0.66rem", fontWeight: 800, color: C.text, background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`, padding: "3px 9px", borderRadius: 99, whiteSpace: "nowrap" }}>
+                        📅 {shortDate(r.trade_date)}
+                      </span>
+                      {/* mention badge: today's first-ever calls get NEW; any repeat shows DAY N + grade direction */}
+                      {mi.nth === 1 && daysAgo(r.trade_date) === 0 && (
+                        <span title={mi.total > 1 ? `First call — updated ${mi.total - 1}× since` : "First time on the radar"}
+                          style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: C.goldBright, background: "rgba(240,192,80,0.1)", border: `1px solid ${C.borderGold}`, padding: "3px 8px", borderRadius: 99 }}>NEW</span>
+                      )}
+                      {mi.nth > 1 && (
+                        <span title={`Mention ${mi.nth} of ${mi.total} — previous: ${shortDate(mi.prev.trade_date)} (${mi.prev.letter})${gradeUp ? " · setup improving" : gradeDown ? " · setup weakening" : ""}`}
+                          style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: gradeUp ? "#22c55e" : gradeDown ? "#ef4444" : C.muted, background: gradeUp ? "rgba(34,197,94,0.1)" : gradeDown ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)", border: `1px solid ${gradeUp ? "rgba(34,197,94,0.35)" : gradeDown ? "rgba(239,68,68,0.35)" : C.border}`, padding: "3px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>
+                          DAY {mi.nth}{mi.prev ? ` · ${mi.prev.letter}→${r.letter}${gradeUp ? " ↑" : gradeDown ? " ↓" : ""}` : ""}
+                        </span>
+                      )}
                       {r.setup_type && (
                         <span style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#3b82f6", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.35)", padding: "3px 10px", borderRadius: 99 }}>{r.setup_type}</span>
                       )}
@@ -204,7 +273,8 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
             );
           })}
         </div>
-      ))}
+        );
+      })}
 
       {/* lightbox — PORTALED to body: an ancestor with transform/filter/backdrop-filter re-anchors
           position:fixed and crops the chart (member-seen on RKLB). Body-level = true fullscreen. */}
