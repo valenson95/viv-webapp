@@ -214,7 +214,6 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                 : { txt: `#${rank}`, col: C.muted, bold: false };
             return (
               <>
-                {toggle("top")}
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse", fontSize: "0.76rem", minWidth: 640 }}>
                     <colgroup>
