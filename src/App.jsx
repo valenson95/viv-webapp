@@ -236,6 +236,8 @@ const WHATS_NEW = [
       "Every card now shows its release date, and repeat tickers carry a DAY-N badge with the grade change vs the previous mention (B→A ↑ = the setup is maturing; ↓ = weakening). First calls posted today are marked NEW.",
       "TODAY / YESTERDAY day dividers are now bold with an idea count, and posts older than 5 days fade slightly so the fresh board stands out.",
       "New 🔍 ticker search in the toolbar — type a symbol to pull up its entire feed history and read how the thesis developed post by post. Thanks Vincentius for the ask.",
+      "THE FUNNEL: every idea now carries a stage — 👀 Fresh → 🌀 Coiling → 🔥 At the pivot → ✔ Triggered → 💤 Faded — derived straight from its scorecard (nothing hand-picked). Stage chips filter the feed, and a new at-a-glance board on top shows the latest call per ticker in funnel order. Tap a row to pull that name's history.",
+      "Today's market-context post (SPY) is pinned as a one-line regime strip above the board.",
     ],
   },
   {

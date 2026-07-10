@@ -53,6 +53,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   const [sortBy, setSortBy] = useState("date");   // "date" | "grade"
   const [view, setView] = useState("all");        // "all" | "taken"
   const [q, setQ] = useState("");                 // ticker search — cross-reference all posts of one name
+  const [statusF, setStatusF] = useState(null);   // funnel chip filter — "pivot" | "coiling" | "fresh" | "triggered" | "faded"
 
   const load = useCallback(async () => {
     const { rows: r, tableMissing: tm } = await listSetups();
@@ -88,8 +89,39 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
     return { nth: idx + 1, total: list.length, prev, first: list[0] || null };
   };
 
-  // filter (ticker search → All/Taken) then group: by date (default) or one ranked list (Top graded)
+  // ── THE FUNNEL — status is DERIVED from the scorecard, never hand-curated (honest by design).
+  // Mirrors the method members are taught: fresh idea → coiling base → tight at the pivot → triggered.
+  //   pivot    = tight days at the pivot ticked (2-3), or tightening + volume dry-up together (2-1 & 2-2)
+  //   coiling  = base is developing (any contraction evidence, or a repeat mention)
+  //   fresh    = first look, no contraction evidence yet
+  //   triggered= Valen marked it taken · faded = >5 days old and never triggered
+  const statusOf = (r) => {
+    const t = new Set(r.ticked || []);
+    if (r.taken_at) return "triggered";
+    if ((daysAgo(r.trade_date) ?? 0) > 5) return "faded";
+    if (t.has("2-3") || (t.has("2-1") && t.has("2-2"))) return "pivot";
+    if (t.has("2-1") || t.has("2-2") || mentionInfo(r).nth > 1) return "coiling";
+    return "fresh";
+  };
+  const STATUS_META = {
+    pivot:     { label: "🔥 At the pivot", col: C.goldBright, bg: "rgba(240,192,80,0.1)",  bd: C.borderGold,             tip: "Tight and coiled right at the buy point — the watch-closely list" },
+    coiling:   { label: "🌀 Coiling",      col: "#3b82f6",    bg: "rgba(59,130,246,0.1)",  bd: "rgba(59,130,246,0.35)",  tip: "Base is developing — contraction started but not pivot-tight yet" },
+    fresh:     { label: "👀 Fresh",        col: C.text,       bg: "rgba(255,255,255,0.05)", bd: C.border,                 tip: "First look — on the radar, base not built yet" },
+    triggered: { label: "✔ Triggered",     col: "#22c55e",    bg: "rgba(34,197,94,0.1)",   bd: "rgba(34,197,94,0.35)",   tip: "The gameplan became a live trade" },
+    faded:     { label: "💤 Faded",        col: C.muted,      bg: "rgba(255,255,255,0.04)", bd: C.border,                 tip: "Idea aged out — over 5 days without triggering" },
+  };
+  // Board = the LATEST post per ticker (index/market-context posts excluded — they live in the strip)
+  const latestByTicker = Object.values(tickerHistory).map(list => list[list.length - 1]).filter(r => r.sector !== "Index");
+  const boardRows = latestByTicker.map(r => ({ r, s: statusOf(r) }))
+    .sort((a, b) => ["pivot", "coiling", "fresh", "triggered", "faded"].indexOf(a.s) - ["pivot", "coiling", "fresh", "triggered", "faded"].indexOf(b.s)
+      || (b.r.stars - a.r.stars) || String(b.r.trade_date || "").localeCompare(String(a.r.trade_date || "")));
+  const statusCounts = boardRows.reduce((m, x) => { m[x.s] = (m[x.s] || 0) + 1; return m; }, {});
+  // Today's index post (SPY) = the regime strip
+  const ctxPost = (rows || []).find(r => r.sector === "Index" && daysAgo(r.trade_date) === 0);
+
+  // filter (funnel status → ticker search → All/Taken) then group: by date (default) or one ranked list (Top graded)
   const visRows = (rows || [])
+    .filter(r => !statusF || (r.sector !== "Index" && statusOf(r) === statusF))
     .filter(r => !q.trim() || String(r.ticker || "").toUpperCase().includes(q.trim().toUpperCase()))
     .filter(r => view !== "taken" || r.taken_at);
   const groups = [];
@@ -117,6 +149,62 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
           <p style={{ margin: 0, fontSize: "0.82rem", color: C.muted, lineHeight: 1.55 }}>The setups on VIV's radar, posted fresh each day — the chart, the read, and the <b style={{ color: C.text }}>full Setup-Grader scorecard</b> behind the stars. Click <b style={{ color: C.gold }}>See the scorecard</b> on any post to see exactly which criteria passed — every grade is auditable, nothing is hand-waved. A gold dot <span style={{ color: C.goldBright }}>●</span> marks a tick that was auto-read off the chart. <b style={{ color: C.text }}>Educational, not trade signals</b> — the entry, the stop, and the decision are always yours.</p>
         </div>
       </div>
+
+      {/* ① REGIME STRIP — today's market-context post (index), pinned as one line above everything */}
+      {ctxPost && (
+        <div onClick={() => setQ(ctxPost.ticker)} title="Today's market read — click to open the full post"
+          style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(240,192,80,0.05)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "9px 14px", marginBottom: 12, cursor: "pointer" }}>
+          <span style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", color: C.goldBright, whiteSpace: "nowrap" }}>MARKET · {ctxPost.ticker}</span>
+          <span style={{ fontSize: "0.62rem", fontWeight: 800, color: letterColor(C, ctxPost.letter), whiteSpace: "nowrap" }}>{ctxPost.letter}</span>
+          <span style={{ fontSize: "0.76rem", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{ctxPost.note}</span>
+        </div>
+      )}
+
+      {/* ② THE FUNNEL — status chips (derived from each post's own scorecard) + the at-a-glance board */}
+      {rows && rows.length > 0 && boardRows.length > 0 && (
+        <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "14px 16px", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            {["pivot", "coiling", "fresh", "triggered", "faded"].map(s => {
+              const m = STATUS_META[s], n = statusCounts[s] || 0, on = statusF === s;
+              if (!n) return null;
+              return (
+                <button key={s} onClick={() => setStatusF(on ? null : s)} title={m.tip}
+                  style={{ background: on ? m.bg : "rgba(255,255,255,0.03)", color: on ? m.col : C.muted, border: `1px solid ${on ? m.bd : C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer" }}>
+                  {m.label} ({n})
+                </button>
+              );
+            })}
+            {statusF && <button onClick={() => setStatusF(null)} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "0.8rem", cursor: "pointer" }}>× clear</button>}
+            <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.muted }}>status is read off each post's scorecard — nothing is hand-picked</span>
+          </div>
+          {/* the board: latest post per ticker, funnel order — tap a row to pull that name's history */}
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.76rem" }}>
+              <thead>
+                <tr style={{ color: C.muted, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                  {["Ticker", "Grade", "Stage", "On radar", "Theme"].map(h => <th key={h} style={{ textAlign: "left", padding: "4px 10px 6px", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {boardRows.filter(x => !statusF || x.s === statusF).map(({ r, s }) => {
+                  const m = STATUS_META[s], mi = mentionInfo(r);
+                  const fit = themeFit(r.sector, r.trade_date);
+                  return (
+                    <tr key={r.id} onClick={() => { setQ(r.ticker); setStatusF(null); }} title={`Show ${r.ticker}'s full history below`}
+                      style={{ cursor: "pointer", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                      <td style={{ padding: "7px 10px", fontWeight: 800, color: C.white, whiteSpace: "nowrap" }}>{r.ticker}</td>
+                      <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}><span style={{ fontWeight: 800, color: letterColor(C, r.letter) }}>{r.letter}</span> <span style={{ color: C.goldBright, fontSize: "0.68rem" }}>{"★".repeat(r.stars)}</span></td>
+                      <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}><span title={m.tip} style={{ fontSize: "0.64rem", fontWeight: 800, color: m.col, background: m.bg, border: `1px solid ${m.bd}`, padding: "2px 9px", borderRadius: 99 }}>{m.label}</span></td>
+                      <td style={{ padding: "7px 10px", color: C.muted, whiteSpace: "nowrap" }}>{mi.total > 1 ? `day ${mi.total} · since ${shortDate(mi.first.trade_date)}` : shortDate(r.trade_date)}</td>
+                      <td style={{ padding: "7px 10px", whiteSpace: "nowrap", color: fit === "in" ? "#22c55e" : fit === "off" ? "#ef4444" : C.muted }}>{r.sector || "—"}{fit === "in" ? " ✓" : ""}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {rows && rows.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -173,6 +261,8 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
             const gradeUp = mi.prev && r.stars > mi.prev.stars;
             const gradeDown = mi.prev && r.stars < mi.prev.stars;
             const isStale = (daysAgo(r.trade_date) ?? 0) > 5 && !r.taken_at;
+            const st = r.sector !== "Index" ? statusOf(r) : null;
+            const stM = st ? STATUS_META[st] : null;
             const expanded = openId === r.id;
             const autoSet = new Set(r.auto || []);
             const tickedSet = new Set(r.ticked || []);
@@ -199,6 +289,9 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                       {mi.nth === 1 && daysAgo(r.trade_date) === 0 && (
                         <span title={mi.total > 1 ? `First call — updated ${mi.total - 1}× since` : "First time on the radar"}
                           style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: C.goldBright, background: "rgba(240,192,80,0.1)", border: `1px solid ${C.borderGold}`, padding: "3px 8px", borderRadius: 99 }}>NEW</span>
+                      )}
+                      {stM && (
+                        <span title={stM.tip} style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.04em", color: stM.col, background: stM.bg, border: `1px solid ${stM.bd}`, padding: "3px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>{stM.label}</span>
                       )}
                       {mi.nth > 1 && (
                         <span title={`On the focus list since ${dateLabel(mi.first.trade_date)} (first call: ${mi.first.letter}) — mention ${mi.nth} of ${mi.total} · previous: ${shortDate(mi.prev.trade_date)} (${mi.prev.letter})${gradeUp ? " · setup improving" : gradeDown ? " · setup weakening" : ""}`}
