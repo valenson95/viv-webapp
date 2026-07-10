@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { listSetups, deleteSetup, markTaken } from "./dailySetups.js";
 import { SECTIONS } from "./SetupGrader.jsx";
-import { themeFit } from "./themes.js";
+import { themeFit, themeRanks } from "./themes.js";
 
 // ══════════════════════════════════════════════════════════════════
 // DAILY SETUPS — the members' daily-idea feed. Valen grades a chart in the
@@ -106,33 +106,38 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
     return "fresh";
   };
   const STATUS_META = {
-    pivot:     { label: "🔥 At the pivot", col: C.goldBright, bg: "rgba(240,192,80,0.1)",  bd: C.borderGold,             tip: "Tight and coiled right at the buy point — the watch-closely list" },
-    coiling:   { label: "🌀 Coiling",      col: "#3b82f6",    bg: "rgba(59,130,246,0.1)",  bd: "rgba(59,130,246,0.35)",  tip: "Base is developing — contraction started but not pivot-tight yet" },
-    fresh:     { label: "👀 Fresh",        col: C.text,       bg: "rgba(255,255,255,0.05)", bd: C.border,                 tip: "First look — on the radar, base not built yet" },
-    triggered: { label: "✔ Triggered",     col: "#22c55e",    bg: "rgba(34,197,94,0.1)",   bd: "rgba(34,197,94,0.35)",   tip: "The gameplan became a live trade" },
-    faded:     { label: "💤 Faded",        col: C.muted,      bg: "rgba(255,255,255,0.04)", bd: C.border,                 tip: "Idea aged out — over 5 days without triggering" },
+    pivot:     { label: "At the pivot", col: C.goldBright, bg: "rgba(240,192,80,0.1)",  bd: C.borderGold,             tip: "Tight and coiled right at the buy point — the watch-closely list" },
+    coiling:   { label: "Coiling",      col: "#3b82f6",    bg: "rgba(59,130,246,0.1)",  bd: "rgba(59,130,246,0.35)",  tip: "Base is developing — contraction started but not pivot-tight yet" },
+    fresh:     { label: "Fresh",        col: C.text,       bg: "rgba(255,255,255,0.05)", bd: C.border,                 tip: "First look — on the radar, base not built yet" },
+    triggered: { label: "✔ Triggered",  col: "#22c55e",    bg: "rgba(34,197,94,0.1)",   bd: "rgba(34,197,94,0.35)",   tip: "The gameplan became a live trade" },
+    faded:     { label: "Faded",        col: C.muted,      bg: "rgba(255,255,255,0.04)", bd: C.border,                 tip: "Idea aged out — over 5 days without triggering" },
   };
-  // Board = the LATEST post per ticker (index/market-context posts excluded — they live in the strip)
-  const STAGE_ORDER = ["pivot", "coiling", "fresh", "triggered", "faded"];
+  // Board = the LATEST post per ticker (index/market-context posts excluded).
+  // A ticker whose ANY post is ✔ taken counts as TRIGGERED on the board — the taken mark may live on an
+  // earlier mention (AXSM taken Jul 6, re-posted Jul 10) and must NEVER look deleted. Data is never touched.
+  const STAGE_ORDER = ["pivot", "coiling", "fresh", "triggered", "faded"]; // actionable first
   const latestByTicker = Object.values(tickerHistory).map(list => list[list.length - 1]).filter(r => r.sector !== "Index");
-  const boardRows = latestByTicker.map(r => ({ r, s: statusOf(r), mi: mentionInfo(r) }));
+  const boardRows = latestByTicker.map(r => {
+    const anyTaken = (tickerHistory[r.ticker] || []).some(x => x.taken_at);
+    return { r, s: anyTaken ? "triggered" : statusOf(r), mi: mentionInfo(r) };
+  });
   const statusCounts = boardRows.reduce((m, x) => { m[x.s] = (m[x.s] || 0) + 1; return m; }, {});
   // sortable headers — click cycles asc/desc; default = funnel order, best checklist first
+  const rankOf = (r, k) => { const tr = themeRanks(r.sector, r.trade_date); return tr && tr[k] ? tr[k] : 999; }; // 999 = unranked, sorts last
   const cmp = {
     stage: (a, b) => STAGE_ORDER.indexOf(a.s) - STAGE_ORDER.indexOf(b.s) || (b.r.pct || 0) - (a.r.pct || 0),
     ticker: (a, b) => String(a.r.ticker).localeCompare(String(b.r.ticker)),
     grade: (a, b) => (b.r.stars - a.r.stars) || ((b.r.pct || 0) - (a.r.pct || 0)),
     checks: (a, b) => (b.r.pct || 0) - (a.r.pct || 0),
     first: (a, b) => String(b.mi.first?.trade_date || "").localeCompare(String(a.mi.first?.trade_date || "")),
-    times: (a, b) => b.mi.total - a.mi.total,
+    wk: (a, b) => rankOf(a.r, "week") - rankOf(b.r, "week"),
+    mo: (a, b) => rankOf(a.r, "month") - rankOf(b.r, "month"),
     theme: (a, b) => String(a.r.sector || "~").localeCompare(String(b.r.sector || "~")),
   };
   const sortedBoard = [...boardRows].sort((a, b) => {
     const base = (cmp[boardSort.k] || cmp.stage)(a, b);
     return boardSort.d < 0 ? -base : base;
   });
-  // Today's index post (SPY) = the regime strip
-  const ctxPost = (rows || []).find(r => r.sector === "Index" && daysAgo(r.trade_date) === 0);
 
   // filter (funnel status → ticker search → All/Taken) then group: by date (default) or one ranked list (Top graded)
   const visRows = (rows || [])
@@ -165,17 +170,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         </div>
       </div>
 
-      {/* ① REGIME STRIP — today's market-context post (index), pinned as one line above everything */}
-      {ctxPost && (
-        <div onClick={() => setQ(ctxPost.ticker)} title="Today's market read — click to open the full post"
-          style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(240,192,80,0.05)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "9px 14px", marginBottom: 12, cursor: "pointer" }}>
-          <span style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", color: C.goldBright, whiteSpace: "nowrap" }}>MARKET · {ctxPost.ticker}</span>
-          <span style={{ fontSize: "0.62rem", fontWeight: 800, color: letterColor(C, ctxPost.letter), whiteSpace: "nowrap" }}>{ctxPost.letter}</span>
-          <span style={{ fontSize: "0.76rem", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{ctxPost.note}</span>
-        </div>
-      )}
-
-      {/* ② THE FUNNEL — status chips (derived from each post's own scorecard) + the at-a-glance board */}
+      {/* THE FUNNEL — status chips (derived from each post's own scorecard) + the at-a-glance board */}
       {rows && rows.length > 0 && boardRows.length > 0 && (
         <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "14px 16px", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
@@ -192,28 +187,53 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
             {statusF && <button onClick={() => setStatusF(null)} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "0.8rem", cursor: "pointer" }}>× clear</button>}
             <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.muted }}>status is read off each post's scorecard — nothing is hand-picked</span>
           </div>
-          {/* the board: latest post per ticker — sortable columns, collapsed to the top rows by default */}
+          {/* the board: latest post per ticker — sortable, table-layout FIXED (headers can never drift
+              from their cells), collapsed to the top rows with a toggle at BOTH top and bottom.
+              Color discipline (Valen): only A+ or a 16/16 sweep earns green/gold — the rest stay dark. */}
           {(() => {
             const filteredBoard = sortedBoard.filter(x => !statusF || x.s === statusF);
             const LIMIT = 8;
             const shown = boardOpen ? filteredBoard : filteredBoard.slice(0, LIMIT);
-            const th = (key, label, tip, right) => (
+            const toggle = (pos) => filteredBoard.length > LIMIT && (
+              <button key={pos} onClick={() => setBoardOpen(o => !o)}
+                style={{ margin: pos === "top" ? "0 0 8px" : "8px 0 0", width: "100%", background: "rgba(255,255,255,0.03)", border: `1px dashed ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "6px 0", borderRadius: 10, cursor: "pointer" }}>
+                {boardOpen ? "Collapse ▴" : `Show all ${filteredBoard.length} ▾`}
+              </button>
+            );
+            const th = (key, label, tip) => (
               <th key={key} onClick={() => setBoardSort(s => ({ k: key, d: s.k === key ? -s.d : 1 }))} title={tip || `Sort by ${label}`}
-                style={{ textAlign: right ? "right" : "left", padding: "4px 8px 6px", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap", cursor: "pointer", userSelect: "none", color: boardSort.k === key ? C.goldBright : C.muted }}>
+                style={{ textAlign: "left", padding: "4px 8px 6px", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap", overflow: "hidden", cursor: "pointer", userSelect: "none", color: boardSort.k === key ? C.goldBright : C.muted, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 {label}{boardSort.k === key ? (boardSort.d > 0 ? " ▾" : " ▴") : ""}
               </th>
             );
+            const td = (children, extra) => ({ children, style: { padding: "7px 8px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "left", ...extra } });
+            const rankCell = (rank) => rank == null
+              ? { txt: "—", col: "rgba(255,255,255,0.25)", bold: false }
+              : rank <= 5
+                ? { txt: `Top ${rank}`, col: "#22c55e", bold: true }
+                : { txt: `#${rank}`, col: C.muted, bold: false };
             return (
               <>
+                {toggle("top")}
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ borderCollapse: "collapse", fontSize: "0.76rem", minWidth: 520 }}>
+                  <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse", fontSize: "0.76rem", minWidth: 640 }}>
+                    <colgroup>
+                      <col style={{ width: "10%" }} />{/* ticker  */}
+                      <col style={{ width: "13%" }} />{/* grade   */}
+                      <col style={{ width: "13%" }} />{/* checks  */}
+                      <col style={{ width: "11%" }} />{/* first   */}
+                      <col style={{ width: "10%" }} />{/* top 1W  */}
+                      <col style={{ width: "10%" }} />{/* top 1M  */}
+                      <col style={{ width: "33%" }} />{/* theme   */}
+                    </colgroup>
                     <thead>
-                      <tr style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                      <tr>
                         {th("ticker", "Ticker")}
                         {th("grade", "Grade")}
                         {th("checks", "Checklist", "Criteria passed out of 16 — sort by score")}
                         {th("first", "First seen", "The date the ticker first entered the focus list")}
-                        {th("times", "×", "How many times it has appeared in the feed", true)}
+                        {th("wk", "Top (1W)", "The sector's rank on the weekly theme tracker at the post's date")}
+                        {th("mo", "Top (1M)", "The sector's rank on the monthly theme tracker at the post's date")}
                         {th("theme", "Theme")}
                       </tr>
                     </thead>
@@ -221,31 +241,31 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                       {shown.map(({ r, s, mi }) => {
                         const m = STATUS_META[s];
                         const fit = themeFit(r.sector, r.trade_date);
+                        const tr = themeRanks(r.sector, r.trade_date);
+                        const wk = rankCell(tr && tr.week ? tr.week : null);
+                        const mo = rankCell(tr && tr.month ? tr.month : null);
                         const passed = (r.ticked || []).length;
+                        const hot = r.letter === "A+" || passed === 16; // ONLY these earn the highlight
+                        const cells = [
+                          td(<><span style={{ fontWeight: 800, color: C.white }}>{r.ticker}</span>{s === "triggered" && <span title="Marked taken — this gameplan became a live trade" style={{ color: "#22c55e", marginLeft: 5, fontWeight: 800 }}>✔</span>}</>),
+                          td(<><span style={{ fontWeight: 800, color: hot ? C.green : C.text }}>{r.letter}</span> <span style={{ color: hot ? C.goldBright : "rgba(255,255,255,0.3)", fontSize: "0.66rem" }}>{"★".repeat(r.stars)}</span></>),
+                          td(<><span style={{ fontWeight: 800, color: hot ? C.goldBright : C.text }}>{passed}/16</span><span style={{ color: C.muted, marginLeft: 6, fontSize: "0.68rem" }}>{r.pct != null ? `${Math.round(r.pct * 100)}%` : ""}</span></>),
+                          td(<span style={{ color: C.text }}>{shortDate(mi.first?.trade_date || r.trade_date)}</span>),
+                          td(<span style={{ color: wk.col, fontWeight: wk.bold ? 800 : 400 }}>{wk.txt}</span>),
+                          td(<span style={{ color: mo.col, fontWeight: mo.bold ? 800 : 400 }}>{mo.txt}</span>),
+                          td(<span style={{ color: fit === "in" ? "#22c55e" : fit === "off" ? "#ef4444" : C.muted }}>{r.sector || "—"}{fit === "in" ? " ✓" : ""}</span>),
+                        ];
                         return (
                           <tr key={r.id} onClick={() => { setQ(r.ticker); setStatusF(null); }} title={`${m.label} — ${m.tip}. Click to show ${r.ticker}'s full history below.`}
                             style={{ cursor: "pointer", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
-                            <td style={{ padding: "7px 8px", fontWeight: 800, color: C.white, whiteSpace: "nowrap" }}>{r.ticker}</td>
-                            <td style={{ padding: "7px 8px", whiteSpace: "nowrap" }}><span style={{ fontWeight: 800, color: letterColor(C, r.letter) }}>{r.letter}</span> <span style={{ color: C.goldBright, fontSize: "0.66rem" }}>{"★".repeat(r.stars)}</span></td>
-                            <td style={{ padding: "7px 8px", whiteSpace: "nowrap" }}>
-                              <span style={{ fontWeight: 800, color: m.col }}>{m.label.slice(0, 2)} {passed}/16</span>
-                              <span style={{ color: C.muted, marginLeft: 6 }}>{r.pct != null ? `${Math.round(r.pct * 100)}%` : ""}</span>
-                            </td>
-                            <td style={{ padding: "7px 8px", color: C.text, whiteSpace: "nowrap" }}>{shortDate(mi.first?.trade_date || r.trade_date)}</td>
-                            <td style={{ padding: "7px 8px", whiteSpace: "nowrap", textAlign: "right", fontWeight: mi.total > 1 ? 800 : 400, color: mi.total > 1 ? C.goldBright : C.muted }}>{mi.total}×</td>
-                            <td style={{ padding: "7px 8px", whiteSpace: "nowrap", color: fit === "in" ? "#22c55e" : fit === "off" ? "#ef4444" : C.muted }}>{r.sector || "—"}{fit === "in" ? " ✓" : ""}</td>
+                            {cells.map((c, i) => <td key={i} style={c.style}>{c.children}</td>)}
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
-                {filteredBoard.length > LIMIT && (
-                  <button onClick={() => setBoardOpen(o => !o)}
-                    style={{ marginTop: 8, width: "100%", background: "rgba(255,255,255,0.03)", border: `1px dashed ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "7px 0", borderRadius: 10, cursor: "pointer" }}>
-                    {boardOpen ? "Collapse ▴" : `Show all ${filteredBoard.length} ▾`}
-                  </button>
-                )}
+                {toggle("bottom")}
               </>
             );
           })()}
@@ -329,7 +349,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                       <span style={{ fontSize: "1.3rem", fontWeight: 800, color: C.white }}>{r.ticker}</span>
                       {/* release date — always on the card, so repeats are datable even in ranked view */}
                       <span title={`Posted ${dateLabel(r.trade_date)}`} style={{ fontSize: "0.66rem", fontWeight: 800, color: C.text, background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`, padding: "3px 9px", borderRadius: 99, whiteSpace: "nowrap" }}>
-                        📅 {shortDate(r.trade_date)}
+                        {shortDate(r.trade_date)}
                       </span>
                       {/* mention badge: today's first-ever calls get NEW; any repeat shows DAY N + grade direction */}
                       {mi.nth === 1 && daysAgo(r.trade_date) === 0 && (
