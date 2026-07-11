@@ -4909,7 +4909,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const [tdTab, setTdTab] = useState("chart"); // trade-details right pane: chart | replay | notes
   const [edgeOpen, setEdgeOpen] = useState(null); // Objective Edge: which group is expanded ("t:in", "t:off", "g:A+", …)
   const [edgeNotes, setEdgeNotes] = useState({}); // Objective Edge definition blocks — collapsed by default, per-key expand
-  const [edgeMatrixView, setEdgeMatrixView] = useState("heatmap"); // 3-D edge matrix presentation: "heatmap" (default) | "table"
+  const [edgeMatrixView, setEdgeMatrixView] = useState("table"); // 3-D edge matrix presentation: "table" (DEFAULT — Valen) | "heatmap"
   const [tgts, setTgts] = useState(loadTargets); // TradeZella-style planning targets per trade id
   const tdTradeObj = expandedTrade ? (journaledTrades || []).find(x => x.id === expandedTrade) : null;
   const excursion = useTradeExcursion(tdTradeObj); // MAE/MFE/Best-Exit off real candles

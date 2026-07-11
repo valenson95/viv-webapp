@@ -131,8 +131,17 @@ async function main() {
       const r5 = d5?.chart?.result?.[0]; if (!r5?.timestamp) continue;
       const q5 = r5.indicators.quote[0];
       const entryTs = Math.floor(new Date(c.entryDate + "T" + c.entryTime + "-04:00").getTime() / 1000);
-      const lows = r5.timestamp.map((ts, i) => ({ ts, l: q5.low[i] })).filter((b) => b.l != null && b.ts >= entryTs - 300); // include the bar the entry printed in
-      if (lows.length) c.day0PostLow = Math.min(...lows.map((b) => b.l));
+      const closeTs = Math.floor(new Date(c.entryDate + "T16:00:00-04:00").getTime() / 1000);
+      // session bars only — Yahoo's 16:00 auction row can carry garbage prints (MRVL printed a
+      // fake 235.81 low=high at 16:00 vs a real 288.09 daily low; caught 2026-07-11)
+      const lows = r5.timestamp.map((ts, i) => ({ ts, l: q5.low[i] })).filter((b) => b.l != null && b.ts >= entryTs - 300 && b.ts < closeTs);
+      if (lows.length) {
+        let lo5 = Math.min(...lows.map((b) => b.l));
+        // the DAILY bar is the authority: a 5m low below the day's true low is a bad print
+        const dBar = (bars[c.ticker] || []).find((b) => b.date === c.entryDate);
+        if (dBar && lo5 < dBar.l) lo5 = dBar.l;
+        c.day0PostLow = lo5;
+      }
       await new Promise((r) => setTimeout(r, 150));
     } catch { /* skip */ }
   }
@@ -216,6 +225,24 @@ async function main() {
       };
       c.sim3stop = simStops([c.entry - riskPS / 3, c.entry - 2 * riskPS / 3, c.entry - riskPS], [1 / 3, 1 / 3, 1 / 3]);
       c.sim1stop = simStops([c.entry - riskPS], [1]);
+    }
+    // SYSTEM-MAX R (Valen's spec, 2026-07-11): the best HIS T+3–5 system could have delivered —
+    // trim 25% or 33% at the day-3, day-4 or day-5 close (whichever combination is best), runner
+    // sold at its post-trim PEAK high. A raw sold-the-top ceiling assumes a system he doesn't
+    // trade, so capture is now measured against THIS attainable ceiling instead.
+    {
+      let best = null;
+      for (const d of [3, 4, 5]) {
+        if (win.length <= d) break; // campaign ended before this trim day
+        const trimPx = win[d].c;
+        const after = win.slice(d + 1);
+        const runnerPx = after.length ? Math.max(...after.map((b) => b.h)) : win[win.length - 1].c;
+        for (const f of [0.25, 1 / 3]) {
+          const r = (f * (trimPx - c.entry) + (1 - f) * (runnerPx - c.entry)) / riskPS;
+          if (best == null || r > best) best = r;
+        }
+      }
+      c.sysMaxR = best != null ? round(best) : c.mfeR; // ended before day 3 → best possible = sell the peak
     }
     c.dayMFE = iMax; // trading days after entry
     if (c.initShares > 0) c.blendedR = round(c.pl / (riskPS * c.initShares));
@@ -402,21 +429,46 @@ async function main() {
       const waitPx = q5.open[idx];
       if (!(waitPx > 0)) continue;
       c.waitEntryPx = round(waitPx, 4);
-      if (waitPx <= c.stop) { c.waitShadowR = null; c.waitSkipped = "gapped below stop by 10:00"; continue; }
+      if (waitPx <= c.stop) { c.waitShadowR = null; c.waitSkipped = "price was at/below the stop by 10:00 — the waited entry never triggers"; continue; }
+      // STOP-AWARE on BOTH arms (Valen caught the distortion: a 10:00 entry near the stop shrinks
+      // the risk unit, and ignoring stop-outs then inflates the waited arm — MRVL read +13.2R).
+      // Each arm: if the post-entry low (5m day 0, then daily lows) touches the stop → that arm
+      // exits AT the stop (−1R). Otherwise both ride to the same final day's close.
       const B = bars[c.ticker];
       const iEnd = (() => { let i = B.findIndex((b) => b.date > c.lastExit); return (i === -1 ? B.length : i) - 1; })();
       if (iEnd < 0) continue;
-      c.waitShadowR = round((B[iEnd].c - waitPx) / (waitPx - c.stop));
+      const i0b = B.findIndex((b) => b.date >= c.entryDate);
+      const laterLow = i0b >= 0 && i0b + 1 <= iEnd ? Math.min(...B.slice(i0b + 1, iEnd + 1).map((b) => b.l)) : Infinity;
+      const close0 = Math.floor(new Date(c.entryDate + "T16:00:00-04:00").getTime() / 1000);
+      const dBar0 = B.find((b) => b.date === c.entryDate);
+      const low5After = (fromTs) => {
+        const ls = r5.timestamp.map((ts2, i2) => ({ ts: ts2, l: q5.low[i2] })).filter((b) => b.l != null && b.ts >= fromTs && b.ts < close0); // session only — 16:00 auction prints can be garbage
+        if (!ls.length) return Infinity;
+        let lo = Math.min(...ls.map((b) => b.l));
+        if (dBar0 && lo < dBar0.l) lo = dBar0.l; // daily bar is the authority
+        return lo;
+      };
+      const entryTs2 = Math.floor(new Date(c.entryDate + "T" + (c.entryTime || "09:30:00") + "-04:00").getTime() / 1000);
+      const armR = (px, fromTs) => {
+        const d0Low = low5After(fromTs);
+        const swept = Math.min(d0Low, laterLow) <= c.stop;
+        const D = px - c.stop;
+        return round(((swept ? c.stop : B[iEnd].c) - px) / D);
+      };
+      c.actGateR = armR(c.entry, entryTs2);      // as traded, stop-aware, same basis
+      c.waitShadowR = armR(waitPx, tenET);       // waited to 10:00, stop-aware
       await new Promise((r) => setTimeout(r, 200));
     } catch { /* skip ticker/day */ }
   }
-  const wgPairs = campaigns.filter((c) => c.waitShadowR != null && c.shadowR != null);
+  const wgPairs = campaigns.filter((c) => c.waitShadowR != null && c.actGateR != null);
   const waitGate = {
     eligible: eligible.length, simmed: wgPairs.length,
     noTime: campaigns.filter((c) => !c.entryTime).length,
-    actMeanR: wgPairs.length ? round(sum(wgPairs.map((c) => c.shadowR)) / wgPairs.length) : null,
+    skipped: eligible.filter((c) => c.waitSkipped).map((c) => ({ t: c.ticker, d: c.entryDate, why: c.waitSkipped })),
+    actMeanR: wgPairs.length ? round(sum(wgPairs.map((c) => c.actGateR)) / wgPairs.length) : null,
     waitMeanR: wgPairs.length ? round(sum(wgPairs.map((c) => c.waitShadowR)) / wgPairs.length) : null,
-    pairs: wgPairs.map((c) => ({ t: c.ticker, d: c.entryDate, act: c.shadowR, wait: c.waitShadowR })),
+    pairs: wgPairs.map((c) => ({ t: c.ticker, d: c.entryDate, act: c.actGateR, wait: c.waitShadowR })),
+    method: "both arms stop-aware: post-entry lows (5m day 0, daily after) at/below the stop exit AT the stop; survivors ride to the final day's close",
   };
 
   // ---------- open book ----------
