@@ -86,6 +86,11 @@ export default async function handler(req, res) {
     const { data: { user } = {}, error: uErr } = await sb.auth.getUser();
     if (uErr || !user) return res.status(401).json({ ok: false, error: "Your session expired — refresh the page and sign in again." });
 
+    // ADMIN GUARD: the admin journal is AI-OS-curated (single-writer). The 2026-07-09 self-sync
+    // dumped 334 raw fills on top of the curated rows — this account must never self-import.
+    if ((user.email || "").toLowerCase() === "vc-lv@live.com")
+      return res.status(403).json({ ok: false, error: "This account's journal is AI-OS-curated — IBKR self-sync is disabled here to protect the curated data. Ask Claude to pull trades instead." });
+
     const { data: settings } = await sb.from("user_settings").select("setting_key,setting_value").eq("user_id", user.id).in("setting_key", ["ibkr_token", "ibkr_query_id"]);
     const m = {};
     (settings || []).forEach(s => { m[s.setting_key] = (s.setting_value == null) ? "" : String(s.setting_value).trim(); });

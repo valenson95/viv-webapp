@@ -6,7 +6,7 @@ const env=Object.fromEntries(readFileSync('.env.local','utf8').split('\n').filte
 const sb=createClient(env.SUPABASE_URL||env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}});
 const UID='0e32b092-029a-436d-8cb5-67621e1467b0';
 // Paste live IBKR truth here each pull: symbol -> {shares, avg, realized90d}
-const IBKR={ALAB:{shares:295,avg:356.75},MRVL:{shares:500,avg:305.96},NBIS:{shares:459,avg:268.14},BE:{shares:200,avg:256.34},LITE:{shares:100,avg:879.05},ON:{shares:781,avg:128.655}};
+const IBKR={DDOG:{shares:190,avg:248.555},NTAP:{shares:525,avg:160.305},OSCR:{shares:2250,avg:30.255},RBRK:{shares:642,avg:74.745},TWLO:{shares:325,avg:197.985}}; // 2026-07-10 ~10:00 ET pull (MRNA closed +2.77R · SOFI intraday RT −0.67R · IBKR ticker = broker-paid interest, ignored)
 const {data:pos}=await sb.from('positions').select('*').eq('user_id',UID).eq('is_closed',false);
 const {data:tr}=await sb.from('trades').select('ticker,exit_date,shares,pl_dollar,exit_reason,position_id').eq('user_id',UID);
 let red=0;

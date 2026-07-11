@@ -4697,6 +4697,13 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
       // closed round-trips instead of expecting our own journal columns. Members download these
       // straight from IBKR, so this must Just Work.
       if (looksLikeIbkrCSV(text)) {
+        // ADMIN GUARD: curated journal is single-writer — a raw IBKR file import would
+        // duplicate the curated rows (the 2026-07-09 incident).
+        if (isAdmin) {
+          setImportResult({ success: false, count: 0, ibkr: true, adminBlocked: true });
+          setTimeout(() => setImportResult(null), 12000);
+          return;
+        }
         const r = parseIbkrCSV(text);
         if (r && r.trades.length > 0) {
           setJournaledTrades(prev => [...prev, ...r.trades]);
@@ -5783,7 +5790,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   ? `Master import: ${importResult.posCount} position${importResult.posCount !== 1 ? "s" : ""} + ${importResult.tradeCount} trade${importResult.tradeCount !== 1 ? "s" : ""} imported. Remember to Save on both Dashboard and Journal.`
                   : `Successfully imported ${importResult.count} trade${importResult.count > 1 ? "s" : ""}. They now appear in your closed trades below.`
               : importResult.ibkr
-                ? (importResult.execCount > 0
+                ? importResult.adminBlocked
+                  ? "This account's journal is AI-OS-curated — IBKR file import is disabled here to protect the curated data. Ask Claude to pull trades instead."
+                  : (importResult.execCount > 0
                   ? `We read your IBKR file (${importResult.execCount} execution${importResult.execCount !== 1 ? "s" : ""}) but found no COMPLETED round-trips${importResult.openLots ? ` — ${importResult.openLots} position${importResult.openLots !== 1 ? "s are" : " is"} still open` : ""}. Make sure the statement's date range covers both your BUYS and your SELLS.`
                   : "We recognized an IBKR file but it contains no trade rows. In IBKR use Performance & Reports → Statements → Activity, pick a date range that includes your trades, and download as CSV — or see the Import guide.")
                 : "Import failed — could not parse any trades. Check that your CSV has a header row with recognizable column names."}</div>
@@ -9995,6 +10004,13 @@ function AppInner() {
     catch { /* quota — drop silently rather than break the sync */ }
   }, [undoStorageKey]);
   const runIbkrSync = useCallback(async () => {
+    // ADMIN GUARD: the admin journal is AI-OS-curated (single-writer) — self-sync would
+    // duplicate the curated rows (the 2026-07-09 incident). Server enforces this too (403).
+    if ((session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+      setIbkrOpen(true); setIbkrStatus("error"); setIbkrData(null); setIbkrResult(null);
+      setIbkrError("This account's journal is AI-OS-curated — IBKR self-sync is disabled here to protect the curated data. Ask Claude to pull trades instead.");
+      return;
+    }
     setIbkrOpen(true); setIbkrStatus("loading"); setIbkrError(null); setIbkrData(null); setIbkrResult(null);
     try {
       const uid = session?.user?.id;
