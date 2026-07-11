@@ -153,6 +153,12 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       .then(({ data: d }) => { if (alive && d?.payload?.edge_ledger) setData(d.payload.edge_ledger); });
     return () => { alive = false; };
   }, [isAdmin, session?.user?.id]);
+  // No cursor glow on the research bench (Valen) — body class scopes the CSS kill-switch.
+  useEffect(() => {
+    document.body.classList.add("qa-open");
+    return () => document.body.classList.remove("qa-open");
+  }, []);
+  const [ovl, setOvl] = useState(false); // overlay the $-equity curve on system health
 
   // ── cohort selection: same list, two populations — the toggle IS the reconciliation
   const allCamps = useMemo(() => data?.campaigns || [], [data]);
@@ -180,8 +186,8 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
   // ── equity curve + rolling expectancy for the selected cohort
   const eq = useMemo(() => {
     const ordered = rows.filter(c => (c.blendedR ?? c.rSum) != null).sort((a, b) => (a.lastExit || "").localeCompare(b.lastExit || ""));
-    let cum = 0;
-    return ordered.map((c, i) => { cum += (c.blendedR ?? c.rSum); return { i: i + 1, d: c.lastExit, t: c.ticker, r: +(c.blendedR ?? c.rSum).toFixed(2), cum: +cum.toFixed(2) }; });
+    let cum = 0, cumUsd = 0;
+    return ordered.map((c, i) => { cum += (c.blendedR ?? c.rSum); cumUsd += (c.pl || 0); return { i: i + 1, d: c.lastExit, t: c.ticker, r: +(c.blendedR ?? c.rSum).toFixed(2), cum: +cum.toFixed(2), cumUsd: Math.round(cumUsd) }; });
   }, [rows]);
   const eqMA = useMemo(() => eq.map((p, i) => {
     const win = eq.slice(Math.max(0, i - eqMaP + 1), i + 1);
@@ -212,8 +218,15 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
   const THREE_STOP_START = "2026-07-10";
   const lab = useMemo(() => {
     const W = rows.filter(c => c.pl > 0), L = rows.filter(c => c.pl <= 0);
-    const wMAE = W.map(c => c.maeR).filter(v => v != null);
+    // Rungs measured from the day AFTER entry (maeR1) — day-0 lows mostly print BEFORE an ORB
+    // entry and the stop IS that LoD, so including them made "63% of winners through full stop"
+    // (impossible for a real post-entry sweep — Valen caught it, 2026-07-11).
+    const wMAE = W.map(c => c.maeR1).filter(v => v != null);
     const rung = (lvl) => wMAE.length ? Math.round(100 * wMAE.filter(v => v <= lvl).length / wMAE.length) : null;
+    // 3-stop vs 1-stop counterfactual, aggregated — the money answer to "would the 3-stop
+    // structure hurt me?"
+    const simPairs = rows.filter(c => c.sim3stop != null && c.sim1stop != null);
+    const sim3 = mean(simPairs.map(c => c.sim3stop)), sim1 = mean(simPairs.map(c => c.sim1stop));
     const lR = L.map(c => c.blendedR ?? c.rSum).filter(v => v != null && isFinite(v));
     const is3s = (c) => c.entryDate && c.entryDate >= THREE_STOP_START;
     // breach = loss beyond THAT trade's design cap + slippage allowance:
@@ -257,6 +270,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       return { n: have.length, pass: aggOf(p), fail: aggOf(f) };
     };
     return {
+      sim3, sim1, simN: simPairs.length, simDelta: sim3 != null && sim1 != null ? sim3 - sim1 : null,
       wMAEn: wMAE.length, rung33: rung(-0.33), rung67: rung(-0.67), rung100: rung(-1.0),
       avgLossR: mean(lR), worstR: lR.length ? Math.min(...lR) : null,
       n3sLosers: L3.length, avgLoss3s: mean(l3R), // 3-stop era only (entered ≥ 2026-07-10)
@@ -340,18 +354,24 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       {label}{key && sortKey === key ? (sortDir < 0 ? " ↓" : " ↑") : ""}
     </th>
   );
+  // Two-line slice row — CANNOT overflow a narrow card (the 5-column grid version bled columns
+  // into each other inside the rule cards, Valen screenshot 2026-07-11).
   const sliceRow = (label, s, tip) => (
-    <div key={label} style={{ display: "grid", gridTemplateColumns: "minmax(150px,1.4fr) 70px 90px 110px 110px", gap: "2px 10px", alignItems: "center", padding: "7px 4px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.74rem", minWidth: 0 }}>
-      <span className="term" data-tip={tip} style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
-      <span style={{ color: T.muted, fontVariantNumeric: "tabular-nums" }}>{s.n} trade{s.n === 1 ? "" : "s"}</span>
-      <span style={{ fontVariantNumeric: "tabular-nums" }}>{s.wr == null ? "—" : Math.round(s.wr) + "% win"}</span>
-      <span style={{ fontVariantNumeric: "tabular-nums" }}>PF {s.pf == null ? "—" : s.pf === Infinity ? "∞" : num(s.pf)}</span>
-      <b style={{ fontVariantNumeric: "tabular-nums", color: s.expR == null ? T.muted : s.expR >= 0 ? T.green : T.red }}>{sgnR(s.expR)}</b>
+    <div key={label} style={{ padding: "8px 4px", borderTop: `1px solid ${T.borderSoft}`, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+        <span className="term" data-tip={tip} style={{ fontWeight: 700, fontSize: "0.76rem" }}>{label}</span>
+        <b style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums", fontSize: "0.8rem", color: s.expR == null ? T.muted : s.expR >= 0 ? T.green : T.red }}>{sgnR(s.expR)}</b>
+      </div>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: "0.66rem", color: T.muted, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
+        <span>{s.n} trade{s.n === 1 ? "" : "s"}</span>
+        <span>{s.wr == null ? "—" : Math.round(s.wr) + "% win"}</span>
+        <span>PF {s.pf == null ? "—" : s.pf === Infinity ? "∞" : num(s.pf)}</span>
+      </div>
     </div>
   );
 
   return (
-    <div className="qa" style={{ fontFamily: font, maxWidth: 1120, margin: "0 auto", color: T.text }}>
+    <div className="qa" style={{ fontFamily: font, maxWidth: 1440, margin: "0 auto", color: T.text }}>
       {/* .term tooltips are scoped to .vj/.vp in App.jsx — this page needs its own scope or every
           data-tip is silently dead (Valen found the definitions never showed, 2026-07-11). */}
       <style>{`
@@ -361,6 +381,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           font-size:0.68rem; line-height:1.65; color:#E7E9EE; z-index:60; white-space:normal; font-weight:500;
           text-transform:none; letter-spacing:0; box-shadow:0 10px 30px rgba(0,0,0,0.6)}
         .qa .term.tipright:hover::after{left:auto; right:0}
+        body.qa-open .viv-cursor-glow{display:none !important}
       `}</style>
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "4px 0 18px", flexWrap: "wrap" }}>
@@ -469,15 +490,22 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           {lab.breaches.length > 0 && <><b style={{ color: T.red }}>{lab.breaches.length} loser{lab.breaches.length === 1 ? "" : "s"}</b> exceeded their own era's cap (chips below). </>}
           {lab.extOK.n >= 3 && lab.extHot.n >= 3 ? <>Entries taken fresh (≤4× extended) run <b>{sgnR(lab.extOK.expR)}</b>/trade vs <b>{sgnR(lab.extHot.expR)}</b> when chased — that difference is what the extension gate is worth in your own money.</> : <>Not enough campaigns on both sides of the extension gate yet to price it — keep logging.</>}
         </Say>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 14, alignItems: "start" }}>
           {/* ── RULE CARD: 3-stop structure ── */}
           <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
             <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Rule · 3-stop structure — how deep do winners dip?</div>
-            <div style={{ fontSize: "0.62rem", color: T.faint, lineHeight: 1.5, marginBottom: 4 }}>Winners from BEFORE 2026-07-10 backtest where the rungs would have sat; winners after it validate the live rule. Same question either way: does normal winner heat survive each rung?</div>
+            {/* VERDICT — the money answer: every campaign replayed with the 3 rungs vs one full stop */}
+            {lab.simN >= 5 && lab.simDelta != null && (
+              <div style={{ padding: "8px 12px", borderRadius: 10, marginBottom: 8, background: lab.simDelta >= 0 ? "rgba(34,197,94,0.07)" : "rgba(239,68,68,0.07)", border: `1px solid ${lab.simDelta >= 0 ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`, fontSize: "0.72rem", lineHeight: 1.6 }}>
+                <Chip ok={lab.simDelta >= 0}>{lab.simDelta >= 0 ? "3-STOP WOULD HAVE HELPED" : "3-STOP WOULD HAVE COST YOU"}</Chip>
+                <div style={{ marginTop: 3, color: T.muted }}>Replaying your {lab.simN} campaigns: 3-stop <b style={{ color: T.text, fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.sim3)}</b>/trade vs one full stop <b style={{ color: T.text, fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.sim1)}</b>/trade → difference <b style={{ color: lab.simDelta >= 0 ? T.green : T.red, fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.simDelta)}</b> per trade. EOD replay from the day after entry; both arms share the same assumptions, so the DIFFERENCE is the honest read.</div>
+              </div>
+            )}
+            <div style={{ fontSize: "0.62rem", color: T.faint, lineHeight: 1.5, marginBottom: 4 }}>Dips measured from the day AFTER entry (entry-day noise removed — that low usually prints before an ORB entry). True depth sits between this and the raw daily number.</div>
             {[
               { lvl: "through rung 1 (−0.33R)", v: lab.rung33, note: "expected to be common — that's why only ⅓ of size sits there", warnAt: null },
               { lvl: "through rung 2 (−0.67R)", v: lab.rung67, note: "should be rare — high = loose entries vs LoD or early triggers", warnAt: 25 },
-              { lvl: "through full stop (−1.00R)", v: lab.rung100, note: "mostly the entry-day low printing BEFORE the entry (daily bars can't see the clock) — a real post-entry sweep would have stopped the trade", warnAt: null },
+              { lvl: "through full stop (−1.00R)", v: lab.rung100, note: "a winner surviving a REAL post-entry sweep is near-impossible — residual % here is gap noise in the daily bars", warnAt: 10 },
             ].map(r => (
               <div key={r.lvl} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "7px 2px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.74rem" }}>
                 <span style={{ flex: "0 0 190px", fontWeight: 700 }}>{r.lvl}</span>
@@ -506,6 +534,9 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           {/* ── RULE CARD: extension gate ── */}
           <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
             <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Rule · Extension ≤ 4× from the 50MA</div>
+            <div style={{ marginBottom: 4 }}>{lab.extOK.n >= 5 && lab.extHot.n >= 4
+              ? <Chip ok={(lab.extOK.expR ?? -9) > (lab.extHot.expR ?? -9)}>{(lab.extOK.expR ?? -9) > (lab.extHot.expR ?? -9) ? "GATE EARNS ITS KEEP — fresh entries make more" : "NOT SEPARATING — chased entries did as well; keep watching"}</Chip>
+              : <Chip ok={null}>BUILDING SAMPLE</Chip>}</div>
             {sliceRow("Extension ≤ 4× at entry", lab.extOK, "Campaigns entered with ATR%-multiple from the 50MA at or under 4× — the freshness gate. Uses your recorded value when present, else computed from daily bars (SMA50 + ATR14 as of entry). Expectancy here vs the hot side IS the gate's proof.")}
             {sliceRow("Extension > 4× at entry", lab.extHot, "Chased entries — extension above 4× when the trigger fired. If this side's expectancy is negative, every violation has a known price.")}
             {lab.extUnknown > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, padding: "5px 4px" }}>{lab.extUnknown} campaigns lack bar history for the calc — excluded, not guessed.</div>}
@@ -513,6 +544,9 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           {/* ── RULE CARD: LoD-distance gate ── */}
           <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
             <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Rule · LoD-distance ≤ 60% of ATR</div>
+            <div style={{ marginBottom: 4 }}>{lab.lodOK.n >= 5 && lab.lodHot.n >= 5
+              ? <Chip ok={(lab.lodOK.expR ?? -9) > (lab.lodHot.expR ?? -9)}>{(lab.lodOK.expR ?? -9) > (lab.lodHot.expR ?? -9) ? "GATE EARNS ITS KEEP — tight entries make more" : "NOT SEPARATING — loose entries did as well; keep watching"}</Chip>
+              : <Chip ok={null}>BUILDING SAMPLE</Chip>}</div>
             {sliceRow("LoD-dist ≤ 0.6 ATR", lab.lodOK, "Entries where the low-of-day sat within 60% of one ATR of the entry price — the tight-stop gate. Until the trade-log's live capture builds up, this uses the ENTRY DAY's final low from EOD bars — an upper bound of the true at-entry distance (the low can print after you entered).")}
             {sliceRow("LoD-dist > 0.6 ATR", lab.lodHot, "Gate violations — the stop anchor sat too far below the entry, making D wide and the R math expensive.")}
             {lab.lodUnknown > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, padding: "5px 4px" }}>{lab.lodUnknown} campaigns lack an entry-day bar match — excluded, not guessed.</div>}
@@ -547,6 +581,9 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           {/* ── RULE CARD: setup grade ── */}
           <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
             <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Context · setup grade at entry</div>
+            <div style={{ marginBottom: 4 }}>{lab.gA.n >= 5
+              ? <Chip ok={(lab.gA.expR ?? -9) > (lab.gU.expR ?? -9)}>{(lab.gA.expR ?? -9) > (lab.gU.expR ?? -9) ? "A-GRADES OUTPERFORM — the grader is predictive" : "A-GRADES UNDERPERFORMING — grading and outcomes disagree; review what the grader rewards"}</Chip>
+              : <Chip ok={null}>BUILDING SAMPLE</Chip>}</div>
             {sliceRow("A-grade setups", lab.gA, "Campaigns whose ticker carried an A/A+ setup grade (frozen at entry).")}
             {sliceRow("B-grade setups", lab.gB, "Campaigns graded B at entry.")}
             {sliceRow("Ungraded", lab.gU, "No grade recorded at entry — the pre-grader era or skipped grading.")}
@@ -654,7 +691,12 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18 }}>
           {[{ d: mfeDots, t: "DAY OF MAX PROFIT" }, { d: trimDots, t: "DAY OF FIRST TRIM" }].map((cfg, k) => (
             <div key={k}>
-              <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 4 }}>{cfg.t}</div>
+              <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 2 }}>{cfg.t}</div>
+              <div style={{ marginBottom: 4 }}>
+                {k === 0
+                  ? (dk.medDayMFE != null ? <Chip ok={dk.medDayMFE >= 3 && dk.medDayMFE <= 5}>{dk.medDayMFE >= 3 && dk.medDayMFE <= 5 ? `MEDIAN DAY ${dk.medDayMFE} — RULE AIMED RIGHT` : `MEDIAN DAY ${dk.medDayMFE} — OUTSIDE THE WINDOW, RE-AIM`}</Chip> : <Chip ok={null}>NO DATA</Chip>)
+                  : (dk.adherencePct != null ? <Chip ok={dk.adherencePct >= 80}>{dk.adherencePct >= 80 ? `${num(dk.adherencePct, 0)}% IN WINDOW — EXECUTING` : `${num(dk.adherencePct, 0)}% IN WINDOW — EXECUTION GAP (target 80%)`}</Chip> : <Chip ok={null}>NO DATA</Chip>)}
+              </div>
               <ResponsiveContainer width="100%" height={150}>
                 <ScatterChart margin={{ left: 0, right: 8, top: 8 }}>
                   <XAxis type="number" dataKey="x" {...axis} domain={[0, 9]} tickCount={10} />
@@ -675,26 +717,33 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
                 .map(c => ({ t: c.ticker, v: +(-c.deriskCostR).toFixed(2), shadowR: c.shadowR, actual: c.blendedR }))
                 .sort((a, b) => b.v - a.v);
               const helped = tv.filter(x => x.v >= 0).length;
+              const excluded = rows.filter(c => c.deriskCostR == null);
               return (<>
-                <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 4 }}>
-                  TRIM VALUE ADDED VS NEVER-TRIM (R) <span style={{ color: T.muted, letterSpacing: 0, textTransform: "none", fontWeight: 600 }}>· helped on {helped} of {tv.length} · one bar per trade, sorted</span>
+                <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 2 }}>
+                  TRIM VALUE ADDED VS NEVER-TRIM (R) <span style={{ color: T.muted, letterSpacing: 0, textTransform: "none", fontWeight: 600 }}>· one bar per trade, sorted</span>
                 </div>
-                <ResponsiveContainer width="100%" height={150}>
-                  <BarChart data={tv} margin={{ left: 0, right: 8, top: 8 }}>
-                    {tv.length > 20
-                      ? <XAxis dataKey="t" {...axis} tick={false} height={6} />
-                      : <XAxis dataKey="t" {...axis} interval={0} angle={-38} textAnchor="end" height={40} tick={{ ...axis.tick, fontSize: 8.5 }} />}
-                    <YAxis {...axis} width={30} tickFormatter={(t) => t + "R"} />
-                    <ReferenceLine y={0} stroke={T.border} />
-                    <Tooltip cursor={{ fill: "rgba(255,255,255,0.03)" }} content={<TT render={(p) => {
-                      const d = p[0]?.payload; if (!d) return null;
-                      return <><b>{d.t}</b><div>never-trim: {num(d.shadowR)}R · actual: {num(d.actual)}R</div><div>trim {d.v >= 0 ? "added" : "cost"} <b>{num(Math.abs(d.v))}R</b></div></>;
-                    }} />} />
-                    <Bar dataKey="v" radius={[2, 2, 0, 0]} maxBarSize={18}>
-                      {tv.map((d, i) => <Cell key={i} fill={d.v >= 0 ? T.green : T.red} fillOpacity={0.7} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div style={{ marginBottom: 4 }}><Chip ok={(-dk.deriskCostR ?? 0) >= 0}>{`HELPED ON ${helped} OF ${tv.length} · NET ${sgnR(-dk.deriskCostR, 1)}`}</Chip></div>
+                {/* every bar keeps its ticker — scroll sideways when the sample grows (AMD went
+                    "missing" when labels were hidden; named bars are non-negotiable for audit) */}
+                <div style={{ overflowX: "auto" }}>
+                  <div style={{ minWidth: Math.max(280, tv.length * 34) }}>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <BarChart data={tv} margin={{ left: 0, right: 8, top: 8 }}>
+                        <XAxis dataKey="t" {...axis} interval={0} angle={-38} textAnchor="end" height={42} tick={{ ...axis.tick, fontSize: 8.5 }} />
+                        <YAxis {...axis} width={30} tickFormatter={(t) => t + "R"} />
+                        <ReferenceLine y={0} stroke={T.border} />
+                        <Tooltip cursor={{ fill: "rgba(255,255,255,0.03)" }} content={<TT render={(p) => {
+                          const d = p[0]?.payload; if (!d) return null;
+                          return <><b>{d.t}</b><div>never-trim: {num(d.shadowR)}R · actual: {num(d.actual)}R</div><div>trim {d.v >= 0 ? "added" : "cost"} <b>{num(Math.abs(d.v))}R</b></div></>;
+                        }} />} />
+                        <Bar dataKey="v" radius={[2, 2, 0, 0]} maxBarSize={18}>
+                          {tv.map((d, i) => <Cell key={i} fill={d.v >= 0 ? T.green : T.red} fillOpacity={0.7} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                {excluded.length > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 4, lineHeight: 1.5 }}>Not shown ({excluded.length}, no original stop → no R math): {excluded.map(c => c.ticker).join(" · ")}.</div>}
               </>);
             })()}
           </div>
@@ -766,6 +815,8 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
               Equity <b style={{ color: T.text }}>{eqState.cum}R</b> is <b style={{ color: eqState.above ? T.green : T.red }}>{eqState.gap > 0 ? "+" : ""}{eqState.gap}R</b> {eqState.above ? "above" : "below"} its {eqMaP}-MA (<b style={{ color: T.text }}>{eqState.ma}R</b>) · {eqState.streak} trades this side
             </span>
             <span style={{ marginLeft: "auto", display: "inline-flex", gap: 4 }}>
+              <button onClick={() => setOvl(o => !o)} title="Overlay the same trades' cumulative $ P&L (right axis). Where the two lines diverge, position sizing — not the edge — did the work."
+                style={{ background: ovl ? "rgba(122,162,247,0.12)" : "transparent", border: `1px solid ${ovl ? T.blue : T.border}`, color: ovl ? T.blue : T.faint, borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontSize: "0.64rem", fontFamily: font }}>$ overlay</button>
               {[5, 10, 20].map(p => (
                 <button key={p} onClick={() => setEqMaP(p)} style={{ background: p === eqMaP ? "rgba(201,152,42,0.12)" : "transparent", border: `1px solid ${p === eqMaP ? T.gold : T.border}`, color: p === eqMaP ? T.goldBright : T.faint, borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontSize: "0.64rem", fontFamily: font }}>{p}-MA</button>
               ))}
@@ -782,18 +833,22 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
             </defs>
             <CartesianGrid vertical={false} stroke={T.grid} strokeDasharray="3 5" />
             <XAxis dataKey="i" {...axis} tickMargin={8} />
-            <YAxis {...axis} width={38} tickFormatter={(t) => t + "R"} />
+            <YAxis yAxisId="r" {...axis} width={38} tickFormatter={(t) => t + "R"} />
+            {ovl && <YAxis yAxisId="usd" orientation="right" {...axis} width={52} tickFormatter={(t) => "$" + (Math.abs(t) >= 1000 ? (t / 1000).toFixed(0) + "k" : t)} />}
             <Tooltip cursor={{ stroke: T.border }} content={<TT render={(p) => {
               const d = p[0]?.payload; if (!d) return null;
-              return <><div style={{ color: T.muted }}>{d.d} · trade #{d.i}</div><div><b>{d.t}</b> {d.r > 0 ? "+" : ""}{d.r}R</div><div>cumulative <b>{d.cum}R</b> · {eqMaP}-MA <b>{d.ma}R</b></div><div style={{ color: d.below ? T.red : T.green }}>{d.below ? "below MA — derisk" : "above MA — full size"}</div></>;
+              return <><div style={{ color: T.muted }}>{d.d} · trade #{d.i}</div><div><b>{d.t}</b> {d.r > 0 ? "+" : ""}{d.r}R</div><div>cumulative <b>{d.cum}R</b> · {eqMaP}-MA <b>{d.ma}R</b></div>{ovl && <div style={{ color: T.blue }}>cumulative $ {d.cumUsd?.toLocaleString()}</div>}<div style={{ color: d.below ? T.red : T.green }}>{d.below ? "below MA — derisk" : "above MA — full size"}</div></>;
             }} />} />
-            <ReferenceLine y={0} stroke={T.border} />
-            <Area type="monotone" dataKey="cum" stroke={T.gold} strokeWidth={1.6} fill="url(#eqFill)"
+            <ReferenceLine yAxisId="r" y={0} stroke={T.border} />
+            <Area yAxisId="r" type="monotone" dataKey="cum" stroke={T.gold} strokeWidth={1.6} fill="url(#eqFill)"
               dot={(pr) => <circle key={pr.index} cx={pr.cx} cy={pr.cy} r={2.2} fill={pr.payload?.below ? T.red : T.gold} />}
               activeDot={{ r: 4, fill: T.gold }} />
-            <Line type="monotone" dataKey="ma" stroke="rgba(255,255,255,0.55)" strokeWidth={1.3} strokeDasharray="5 4" dot={false} activeDot={{ r: 3, fill: "#fff" }} />
+            <Line yAxisId="r" type="monotone" dataKey="ma" stroke="rgba(255,255,255,0.55)" strokeWidth={1.3} strokeDasharray="5 4" dot={false} activeDot={{ r: 3, fill: "#fff" }} />
+            {ovl && <Line yAxisId="usd" type="monotone" dataKey="cumUsd" stroke={T.blue} strokeWidth={1.4} dot={false} activeDot={{ r: 3, fill: T.blue }} />}
           </ComposedChart>
         </ResponsiveContainer>
+        {ovl && <div style={{ fontSize: "0.64rem", color: T.muted, margin: "2px 0 6px" }}><i style={{ display: "inline-block", width: 12, height: 2, background: T.blue, verticalAlign: "middle", marginRight: 5 }} />same trades in DOLLARS (right axis) — where blue and gold diverge, position sizing did the work, not the edge.</div>}
+        <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.faint, margin: "10px 0 2px" }}>Rolling 10-trade expectancy — the pulse (white line, vs the +0.25R target)</div>
         <ResponsiveContainer width="100%" height={110}>
           <LineChart data={roll} margin={{ left: 0, right: 8, top: 10 }}>
             <XAxis dataKey="i" {...axis} hide />
@@ -836,14 +891,15 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       {/* Monte Carlo */}
       <Panel title="What can the next 100 trades look like?" meta={`10,000 simulated paths · resampled from ${mode === "sys" ? "system" : "full-journal"} R · ${mc.riskPct}% risk · n=${mc.n}`}
         howto={[
-          "The computer replays YOUR real trade results 10,000 times in random order, 100 trades per run, and reports the spread.",
-          "The bell curve below is all 10,000 endings: tall = common outcome, thin edges = rare luck (good or bad).",
-          "Median = the realistic base case. 5th percentile = unlucky ordering of the SAME skill.",
+          "Think of a marble bag: each of your real trade results is a marble. Draw 100 marbles (with replacement), write down where the account ends, put them back. Do that 10,000 times.",
+          "The curve counts the endings: the taller the curve at a number, the more of the 10,000 futures ended there. Thin edges = rare luck, good or bad.",
+          "The shaded band holds 9 out of 10 futures — anything inside it is NORMAL for your system. Only results outside it mean something actually changed.",
+          "Median = the realistic base case. The left line = an unlucky ordering of the SAME skill — if even that is positive, the edge survives bad luck.",
           "The 95th-percentile drawdown is your circuit-breaker: a real drawdown deeper than that is NOT normal variance — halt and diagnose.",
           "Directional until n ≥ 50 closed campaigns.",
         ]}>
         <Say>
-          {mc.retP50 != null ? <>Same trading, shuffled 10,000 ways: the middle path makes <b>{(mc.retP50 >= 0 ? "+" : "") + num(mc.retP50, 1)}%</b> per 100 trades, and even the unlucky 5% start at <b>{(mc.retP5 >= 0 ? "+" : "") + num(mc.retP5, 1)}%</b>. Your circuit-breaker: a drawdown beyond <b style={{ color: T.red }}>{num(mc.ddP95, 1)}%</b> means something CHANGED — stop and diagnose, don't push through.</> : <>Not enough scored trades to simulate yet.</>}
+          {mc.retP50 != null ? <>Same trading, shuffled 10,000 ways: the middle path makes <b>{(mc.retP50 >= 0 ? "+" : "") + num(mc.retP50, 1)}%</b> per 100 trades, and <b>9 in 10 futures land between {(mc.retP5 >= 0 ? "+" : "") + num(mc.retP5, 1)}% and {(mc.retP95 >= 0 ? "+" : "") + num(mc.retP95, 1)}%</b> (the shaded band below). Your circuit-breaker: a drawdown beyond <b style={{ color: T.red }}>{num(mc.ddP95, 1)}%</b> means something CHANGED — stop and diagnose, don't push through.</> : <>Not enough scored trades to simulate yet.</>}
         </Say>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "14px 18px" }}>
           <Kpi label="Median path" value={(mc.retP50 >= 0 ? "+" : "") + num(mc.retP50, 1) + "%"} tone={(mc.retP50 ?? 0) >= 0 ? T.green : T.red} sub="realistic base case"
@@ -878,7 +934,8 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
                   <XAxis dataKey="x" {...axis} tickFormatter={(t) => t + "%"} />
                   <YAxis hide />
                   <Tooltip content={<TT render={(p) => <>{p[0]?.payload?.n} of 10,000 futures end near <b>{p[0]?.payload?.x}%</b></>} />} />
-                  <ReferenceLine x={mc.retP5} stroke={T.red} strokeDasharray="4 4" label={{ value: "P5", position: "top", fill: T.red, fontSize: 9 }} ifOverflow="hidden" />
+                  <ReferenceArea x1={mc.retP5} x2={mc.retP95} fill={T.gold} fillOpacity={0.05} ifOverflow="hidden" />
+                  <ReferenceLine x={mc.retP5} stroke={T.red} strokeDasharray="4 4" label={{ value: "unlucky 5%", position: "top", fill: T.red, fontSize: 9 }} ifOverflow="hidden" />
                   <ReferenceLine x={mc.retP50} stroke={T.goldBright} strokeDasharray="4 4" label={{ value: "median", position: "top", fill: T.goldBright, fontSize: 9 }} ifOverflow="hidden" />
                   <ReferenceLine x={mc.retP95} stroke={T.muted} strokeDasharray="4 4" label={{ value: "P95", position: "top", fill: T.muted, fontSize: 9 }} ifOverflow="hidden" />
                   <Area type="monotone" dataKey="n" stroke={T.gold} strokeWidth={1.6} fill="url(#mcFill)" dot={false} />

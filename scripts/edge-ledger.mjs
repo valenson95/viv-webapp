@@ -110,7 +110,7 @@ async function main() {
       const q = r0.indicators.quote[0];
       bars[t] = r0.timestamp.map((ts, i) => ({
         date: new Date(ts * 1000).toISOString().slice(0, 10),
-        h: q.high[i], l: q.low[i], c: q.close[i],
+        o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i],
       })).filter((b) => b.h != null);
       await new Promise((r) => setTimeout(r, 120));
     } catch { /* skip ticker */ }
@@ -158,6 +158,29 @@ async function main() {
     win.forEach((b, i) => { if (b.h > maxH) { maxH = b.h; iMax = i; } if (b.l < minL) minL = b.l; });
     c.mfeR = round((maxH - c.entry) / riskPS);
     c.maeR = round((minL - c.entry) / riskPS);
+    // MAE from the day AFTER entry — the entry-day low usually prints BEFORE an ORB entry (and
+    // the stop IS that LoD), so day-0 lows poison rung analysis. True adverse depth sits between
+    // maeR1 (this, a lower bound) and maeR (upper bound).
+    c.maeR1 = win.length > 1 ? round((Math.min(...win.slice(1).map((b) => b.l)) - c.entry) / riskPS) : null;
+    // ── 3-STOP vs 1-STOP counterfactual (EOD, day AFTER entry onward; gap-through exits at open).
+    // Same walk, same window for both — so the COMPARISON is fair even where absolutes are approximate.
+    {
+      const simStops = (levels, weights) => {
+        const rem = weights.slice(); let r = 0;
+        for (let k = 1; k < win.length; k++) {
+          const b = win[k];
+          levels.forEach((lv, ix) => {
+            if (rem[ix] > 0 && b.l <= lv) { const px = (b.o != null && b.o < lv) ? b.o : lv; r += rem[ix] * (px - c.entry) / riskPS; rem[ix] = 0; }
+          });
+          if (!rem.some((w) => w > 0)) break;
+        }
+        const fin = win[win.length - 1].c;
+        levels.forEach((lv, ix) => { if (rem[ix] > 0) r += rem[ix] * (fin - c.entry) / riskPS; });
+        return round(r);
+      };
+      c.sim3stop = simStops([c.entry - riskPS / 3, c.entry - 2 * riskPS / 3, c.entry - riskPS], [1 / 3, 1 / 3, 1 / 3]);
+      c.sim1stop = simStops([c.entry - riskPS], [1]);
+    }
     c.dayMFE = iMax; // trading days after entry
     if (c.initShares > 0) c.blendedR = round(c.pl / (riskPS * c.initShares));
     c.shadowR = round((win[win.length - 1].c - c.entry) / riskPS);
