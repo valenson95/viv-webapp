@@ -28,9 +28,34 @@ function computeCtx(sym, candles) {
   const s50 = sma(50);
   const ext = ((P - s50) / s50) / (atr / P);
   const mas = [10, 20, 50, 200].map(k => ({ k, v: sma(k), above: P > sma(k) }));
+  // Market condition vs the 21-day EMA (Valen's definition, 2026-07-10):
+  //   TRENDING  = closed ABOVE the EMA21 for 10+ straight sessions
+  //   DOWNTREND = closed BELOW the EMA21 for 10+ straight sessions
+  //   CHOPPY    = neither — price crossing the EMA21 within the last 10 sessions
+  const k21 = 2 / 22; let e21 = null; const above21 = [];
+  for (let i = 0; i < n; i++) {
+    if (i < 20) continue;
+    e21 = i === 20 ? c.slice(0, 21).reduce((s, x) => s + x, 0) / 21 : c[i] * k21 + e21 * (1 - k21);
+    above21.push(c[i] > e21);
+  }
+  let streak = 0; const side = above21[above21.length - 1];
+  for (let i = above21.length - 1; i >= 0 && above21[i] === side; i--) streak++;
+  const regime = streak >= 10 ? (side ? "trend" : "down") : "chop";
   const asof = new Date(candles[n - 1].time * 1000).toISOString().slice(0, 10);
-  return { sym, price: P, mas, ext, asof };
+  return { sym, price: P, mas, ext, asof, regime, streak, side, ema21: e21 };
 }
+
+const REGIME_META = {
+  trend: { icon: "📈", label: "Trending", color: "#22c55e", dim: "rgba(34,197,94,0.10)", border: "rgba(34,197,94,0.3)" },
+  chop: { icon: "🌊", label: "Choppy", color: "#f0c050", dim: "rgba(240,192,80,0.10)", border: "rgba(240,192,80,0.3)" },
+  down: { icon: "📉", label: "Downtrend", color: "#ef4444", dim: "rgba(239,68,68,0.10)", border: "rgba(239,68,68,0.28)" },
+};
+const regimeTip = (r) => {
+  const now = r.regime === "chop"
+    ? `Right now: price has crossed the EMA21 within the last 10 sessions (current streak: ${r.streak} ${r.side ? "above" : "below"}).`
+    : `Right now: ${r.streak} straight sessions ${r.side ? "ABOVE" : "BELOW"} the EMA21${r.ema21 ? ` (${r.ema21.toFixed(2)})` : ""}.`;
+  return `Market condition, anchored to the 21-day EMA over the past 10 trading sessions — Trending: closed above the EMA21 for 10+ straight sessions. Downtrend: closed below it for 10+ straight sessions. Choppy: neither — hovering up and down through the line. ${now} Breakouts carry the best odds in a Trending tape; a Choppy tape fades them; a Downtrend is swimming upstream.`;
+};
 
 // Plain-English one-liner per index, built from the numbers only.
 function readFor(r) {
@@ -100,6 +125,7 @@ export default function MarketContext({ C, font }) {
           The arrows show whether SPY and QQQ are above (🟢) or below (🔴) each of their key moving averages.
           The badge shows how far the index has run above its 50-day line, measured in daily ranges — the <b>ATR% Multiple from the 50-MA</b>, the same number as the extension badges on your positions.
           A low number means the market has room. A high number (4×+) means it's stretched — historically pullbacks start around 5×, so go easy on new buys there.<br />
+          The <b>condition badge</b> anchors to the <b>21-day EMA over the past 10 trading sessions</b>: <b style={{ color: "#22c55e" }}>Trending</b> = closed above the EMA21 for 10+ straight sessions · <b style={{ color: "#ef4444" }}>Downtrend</b> = below it for 10+ straight sessions · <b style={{ color: "#f0c050" }}>Choppy</b> = neither, price hovering through the line. It's the same definition your Objective Edge "market context" dimension uses — so the dashboard read and your stats speak one language.<br />
           <span style={{ color: C.muted }}>Tip: toggle on <b>Guided</b> mode (top of the page) and hover anything on the dashboard for more plain-English explanations.</span>
         </div>
       )}
@@ -114,6 +140,11 @@ export default function MarketContext({ C, font }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <b style={{ fontSize: "0.84rem", color: "var(--text, #fff)" }}>{r.sym}</b>
                   <span style={{ fontSize: "0.76rem", color: "var(--text, #fff)", fontVariantNumeric: "tabular-nums" }}>{r.price.toFixed(2)}</span>
+                  {r.regime && (() => { const g = REGIME_META[r.regime]; return (
+                    <span className="term" data-tip={regimeTip(r)} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 9, fontSize: "0.66rem", fontWeight: 800, cursor: "help", background: g.dim, border: `1px solid ${g.border}`, color: g.color, whiteSpace: "nowrap" }}>
+                      {g.icon} {g.label} <span style={{ fontWeight: 700, opacity: 0.75, fontSize: "0.58rem" }}>· {r.streak} sess {r.side ? "above" : "below"} EMA21</span>
+                    </span>
+                  ); })()}
                   <span className="term tipright" data-tip={b.tip} style={{ marginLeft: "auto", display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 1, padding: "4px 10px", borderRadius: 9, cursor: "help", background: b.dim, border: `1px solid ${b.border}`, color: b.color }}>
                     <span style={{ fontSize: "0.68rem", fontWeight: 800, whiteSpace: "nowrap" }}>{(r.ext >= 0 ? "" : "−") + Math.abs(r.ext).toFixed(1)}× · {b.label}</span>
                     <span style={{ fontSize: "0.5rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", opacity: 0.75, whiteSpace: "nowrap" }}>ATR% Mult from 50-MA</span>

@@ -255,8 +255,20 @@ function PlaybookTracker({ trades, uid }) {
     const topN = Math.max(1, Math.ceil(wins.length * 0.1));
     const top = wins.slice().sort((a, b) => (Number(b.plDollar) || 0) - (Number(a.plDollar) || 0)).slice(0, topN);
     const homerunShare = gross > 0 ? top.reduce((s, t) => s + Math.max(0, Number(t.plDollar) || 0), 0) / gross * 100 : null;
-    return { n: closed.length, avgLoss, worstLoss, payoff, winRate, homerunShare, topN: wins.length ? topN : 0 };
+    return { n: closed.length, avgLoss, worstLoss, payoff, winRate, homerunShare, topN: wins.length ? topN : 0, avgWin };
   }, [trades]);
+  const [more, setMore] = useState(false);
+  // Feedback loop: the playbook AS DESIGNED (targets) vs the book AS TRADED (actuals), each
+  // projected forward — expectancy per trade compounded over the next 100 trades at simSize% risk deployed.
+  const proj = useMemo(() => {
+    const t = pb.targets;
+    const size = Number(pb.simSize) > 0 ? Number(pb.simSize) : 15;
+    const evOf = (wr, avgWin, avgLoss) => (wr == null || avgWin == null || avgLoss == null) ? null : (wr / 100) * avgWin - (1 - wr / 100) * avgLoss;
+    const evSim = evOf(Number(t.winRate), Number(t.payoff) * Number(t.avgLoss), Number(t.avgLoss));
+    const evAct = evOf(m.winRate, m.avgWin, m.avgLoss);
+    const mult = (ev) => ev == null ? null : Math.pow(1 + (size / 100) * (ev / 100), 100);
+    return { size, evSim, evAct, multSim: mult(evSim), multAct: mult(evAct) };
+  }, [pb, m]);
   const ROWS = [
     { k: "avgLoss", label: "Average loss", dir: "lte", unit: "%", v: m.avgLoss, def: "Mean size of your losing trades. The playbook's core: derisk fast so the average loss stays tiny — this number IS your worst-case discipline." },
     { k: "worstLoss", label: "Worst single loss", dir: "lte", unit: "%", v: m.worstLoss, def: "Your biggest single loser. One blowout undoes twenty good stops — it must stay capped." },
@@ -290,7 +302,41 @@ function PlaybookTracker({ trades, uid }) {
           </div>
         );
       })}
-      <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>The playbook thesis: keep every loss near-nothing (derisk fast), so a handful of homerun winners carry the whole book. Verdicts recompute from the same trades this page shows — use the date filter to score just a specific period.</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+        <div style={{ fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, flex: 1 }}>The playbook thesis: keep every loss near-nothing (derisk fast), so a handful of homerun winners carry the whole book. Verdicts recompute from the same trades this page shows — use the date filter to score just a specific period.</div>
+        <button className="distbtn" onClick={() => setMore(o => !o)}>{more ? "Hide details ▴" : "More details ▾"}</button>
+      </div>
+      {more && (
+        <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
+            <div style={{ border: "1px solid var(--borderGold)", borderRadius: 12, padding: "12px 14px", background: "rgba(201,152,42,0.05)" }}>
+              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--goldBright)", marginBottom: 8 }}>The playbook — as designed (simulation)</div>
+              <div style={{ fontSize: "0.72rem", lineHeight: 1.8 }}>
+                <div><span className="term" data-tip="Expectancy: the average % you'd make per trade if you hit your targets exactly — win-rate × avg win − loss-rate × avg loss.">Expectancy / trade</span>: <b style={{ color: (proj.evSim || 0) >= 0 ? "var(--green)" : "var(--red)" }}>{proj.evSim == null ? "—" : (proj.evSim >= 0 ? "+" : "") + proj.evSim.toFixed(2) + "%"}</b></div>
+                <div>Next 100 trades at {proj.size}% size: <b style={{ color: "var(--goldBright)" }}>{proj.multSim == null ? "—" : "×" + proj.multSim.toFixed(2) + " equity"}</b></div>
+              </div>
+            </div>
+            <div style={{ border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.02)" }}>
+              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 8 }}>Your actuals — projected if nothing changes</div>
+              <div style={{ fontSize: "0.72rem", lineHeight: 1.8 }}>
+                <div>Expectancy / trade: <b style={{ color: (proj.evAct || 0) >= 0 ? "var(--green)" : "var(--red)" }}>{proj.evAct == null ? "—" : (proj.evAct >= 0 ? "+" : "") + proj.evAct.toFixed(2) + "%"}</b></div>
+                <div>Next 100 trades at {proj.size}% size: <b style={{ color: (proj.multAct || 1) >= 1 ? "var(--green)" : "var(--red)" }}>{proj.multAct == null ? "—" : "×" + proj.multAct.toFixed(2) + " equity"}</b></div>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap", fontSize: "0.66rem", color: "var(--muted)" }}>
+            <span>Position size for the projection:</span>
+            <input type="number" min="1" max="100" step="1" value={pb.simSize ?? 15} onChange={e => setPb(p => ({ ...p, simSize: e.target.value === "" ? "" : Number(e.target.value) }))}
+              style={{ width: 56, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: "var(--text)", padding: "3px 8px", fontSize: "0.7rem" }} />% of equity
+            {proj.evSim != null && proj.evAct != null && (
+              <b style={{ marginLeft: "auto", color: proj.evAct >= proj.evSim ? "var(--green)" : "var(--red)" }}>
+                {proj.evAct >= proj.evSim ? "🟢 Trading AHEAD of the playbook design" : `🔴 Actuals lag the design by ${(proj.evSim - proj.evAct).toFixed(2)}%/trade — the DEVIATING rows above show where`}
+              </b>
+            )}
+          </div>
+          <div style={{ fontSize: "0.64rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Want the full scenario builder (winner-size tiers, saved scenarios, projected curve)? That's the <b>Return simulator</b> card on this page — feed it these numbers and compare shapes.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -301,6 +347,9 @@ const WHATS_NEW = [
     date: "July 10, 2026",
     title: "🧭 Market context, 3-D edge matrix, equity SMAs & the Playbook tracker",
     items: [
+      "Daily Setups now opens as a clean row of dates — click a day to unfold its charts (search and funnel filters auto-expand). Recent trades: partial trims of a position you still hold show live with an OPEN · partials badge and fold into one row when the position closes; the equity curve now books every partial on its real exit day, exactly like the calendar.",
+      "The dashboard Market Context card carries the same condition badge — Trending / Choppy / Downtrend vs the 21-day EMA over the past 10 sessions — with full hover explanations, and the 3-D edge matrix starts from the first theme snapshot so no cell is built on untagged history.",
+      "Playbook tracker → More details: your playbook as designed vs your actuals projected over the next 100 trades — a live feedback loop between the system you planned and the one you're actually trading.",
       "Objective Edge gains a third dimension — MARKET CONTEXT at entry: Trending (SPY above its 21-day EMA for 10+ straight sessions), Choppy (crossing back and forth), or Downtrend (below for 10+ sessions). Every group now also shows its Profit Factor next to win rate and average R.",
       "NEW 3-D edge matrix: grade × theme × market context crossed in one table, so you can see exactly which combination your edge lives in — every row clicks open to its exact trades.",
       "Equity curve now carries its own 5 / 10 / 20-SMA overlay with a live risk pill: below the 5-SMA = derisk mode, below the 10-SMA = hard brake (no new risk, review trades).",
@@ -4849,7 +4898,13 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
       if (filterSetup !== "All" && t.setup !== filterSetup) return false;
       if (filterTag !== "All" && !(t.tags || []).includes(filterTag)) return false;
       return true;
-    }).sort((a, b) => (Date.parse(tradeDateISO(b.entry)) || 0) - (Date.parse(tradeDateISO(a.entry)) || 0)); // default order: newest ENTRY date first (per Valen)
+    }).sort((a, b) => {
+      // newest ENTRY first (per Valen) — but partial-trim rows synced without an entry date
+      // fall back to their EXIT date, otherwise Date.parse(null)=0 buried every trim at the
+      // very bottom of the list ("my partials don't show up" — they were just sorted to page 9).
+      const key = (t) => Date.parse(tradeDateISO(t.entry) || tradeDateISO(t.exit) || "") || 0;
+      return key(b) - key(a);
+    });
   }, [allTrades, filterSetup, filterTag, filterTicker]);
 
   const stats = useMemo(() => {
@@ -5661,7 +5716,12 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   // ── equity-curve SVG (green-above / red-below split, $/% Y-axis, by trade / by month X) ──
   const eqMode = (privacyMode ? "%" : eqYAxis);          // "$" | "%" (privacy forces %)
   const eqSvg = useMemo(() => {
-    const sorted = dateFiltered.slice().sort((a, b) => Date.parse(tradeDateISO(a.exit) || 0) - Date.parse(tradeDateISO(b.exit) || 0));
+    // FILL-LEVEL booking (sync-rule #19: every DAILY aggregate consumes fills, not merged campaigns).
+    // A campaign's partial trims hit the curve on THEIR exit days — real-time equity while the position
+    // is still open — instead of the whole campaign landing on the final exit date. This matches the
+    // performance calendar exactly; win-rate/trade-count stats stay campaign-level on purpose.
+    const fillRows = dateFiltered.flatMap(t => (t._fills && t._fills.length > 1) ? t._fills : [t]);
+    const sorted = fillRows.slice().sort((a, b) => Date.parse(tradeDateISO(a.exit) || 0) - Date.parse(tradeDateISO(b.exit) || 0));
     // Cumulative equity series — one node per calendar DAY (By Date) or per month (By Month).
     // Trades that fall on the same date/month are summed into a single node, so the X axis shows
     // dates (never times) and same-day trades total together rather than each getting its own point.
@@ -5708,7 +5768,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
       if (ds.length <= 8) xs = ds;
       else { const step = (ds.length - 1) / 7; xs = Array.from({ length: 8 }, (_, k) => ds[Math.round(k * step)]); }
     }
-    const totalPL = eq[eq.length - 1] - startCap, totalRet = startCap > 0 ? totalPL / startCap * 100 : 0, n = sorted.length;
+    const totalPL = eq[eq.length - 1] - startCap, totalRet = startCap > 0 ? totalPL / startCap * 100 : 0, n = dateFiltered.length; // n = campaigns (trades), not fills
     // ── Equity SMAs (5/10/20 equity nodes) — the derisk/brake overlay. SMA runs over the
     // equity NODES (one per trading day in By-Date mode). Rule: equity below its 5-SMA =
     // START DERISKING; below the 10-SMA = HARD BRAKE (no new risk, review open trades);
@@ -6188,17 +6248,21 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             if (id === "t:un") return pop.filter(t => !fitOf(t));
             if (id && id.startsWith("g:")) { const L = id.slice(2); return L === "un" ? pop.filter(t => !letterOf(t)) : pop.filter(t => letterOf(t) === L); }
             if (id && id.startsWith("m:")) { const c = id.slice(2); return c === "un" ? pop.filter(t => !ctxOf(t)) : pop.filter(t => ctxOf(t) === c); }
-            if (id && id.startsWith("x:")) { // 3-D combo: grade|theme|context
+            if (id && id.startsWith("x:")) { // 3-D combo: grade|theme|context — SAME population as the matrix (entries ≥ theme coverage)
               const [G, T, X] = id.slice(2).split("|");
-              return pop.filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
+              return pop.filter(t => { const iso = tradeDateISO(t.entry); return iso && THEME_COVERAGE_START && iso >= THEME_COVERAGE_START; })
+                .filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
             }
             return [];
           };
-          // 3-D matrix: Grade × Theme × Context — every combo with trades, biggest first
+          // 3-D matrix: Grade × Theme × Context — ONLY trades entered from THEME_COVERAGE_START
+          // (2026-06-26, the first theme snapshot). Earlier trades have no honest theme tag, so a
+          // 3-D cell built on them would be fake precision. The 1-D columns above still cover all trades.
+          const pop3d = pop.filter(t => { const iso = tradeDateISO(t.entry); return iso && THEME_COVERAGE_START && iso >= THEME_COVERAGE_START; });
           const combos = [];
           const gKeys = [...byGrade.map(g => g.L), ...(ungraded.n ? ["un"] : [])];
           for (const G of gKeys) for (const T of ["in", "off", "un"]) for (const X of ["trend", "chop", "down", "un"]) {
-            const rows = pop.filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
+            const rows = pop3d.filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
             if (rows.length) combos.push({ id: `x:${G}|${T}|${X}`, G, T, X, ...agg(rows) });
           }
           combos.sort((a, b) => b.n - a.n);
@@ -6272,10 +6336,10 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By market context (at entry)</div>
-                  {mTrend.n > 0 && <Row id="m:trend" label="📈 Trending" s={mTrend} accent="var(--green)" />}
-                  {mChop.n > 0 && <Row id="m:chop" label="🌊 Choppy" s={mChop} accent="var(--goldBright)" />}
-                  {mDown.n > 0 && <Row id="m:down" label="📉 Downtrend" s={mDown} accent="var(--red)" />}
-                  {mUn.n > 0 && <Row id="m:un" label="◦ No data" s={mUn} accent="var(--muted)" />}
+                  {mTrend.n > 0 && <Row id="m:trend" label={<span className="term" data-tip="Trending market: SPY closed ABOVE its 21-day EMA for 10 or more straight sessions, as of the last completed session before your entry. The tape had a persistent uptrend under your trade.">📈 Trending</span>} s={mTrend} accent="var(--green)" />}
+                  {mChop.n > 0 && <Row id="m:chop" label={<span className="term" data-tip="Choppy market: within the last 10 sessions before your entry, SPY crossed back and forth around its 21-day EMA — neither side held 10 straight closes. Whipsaw conditions: breakouts get faded.">🌊 Choppy</span>} s={mChop} accent="var(--goldBright)" />}
+                  {mDown.n > 0 && <Row id="m:down" label={<span className="term" data-tip="Downtrend market: SPY closed BELOW its 21-day EMA for 10 or more straight sessions before your entry. Persistent downside tape — fresh long breakout risk is swimming upstream.">📉 Downtrend</span>} s={mDown} accent="var(--red)" />}
+                  {mUn.n > 0 && <Row id="m:un" label={<span className="term" data-tip="No verdict: the entry date predates the SPY history loaded, the date is missing, or the price feed didn't answer. Never guessed.">◦ No data</span>} s={mUn} accent="var(--muted)" />}
                   {!spyCtxDays && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Loading SPY history… (needs the deployed /api — shows “No data” in local dev.)</div>}
                   <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>📐 <b style={{ color: "var(--goldBright)" }}>Definition:</b> the market's state at ENTRY, from SPY vs its 21-day EMA as of the last completed session BEFORE your entry day (the entry day's close isn't known when you enter — no lookahead) — <b>Trending</b> = SPY closed above the EMA21 for 10+ straight sessions · <b>Downtrend</b> = below it for 10+ straight sessions · <b>Choppy</b> = neither (price crossing back and forth inside the last 10 sessions). Context, theme and grade together give the multi-dimensional read BEFORE the trade-level detail.</div>
                 </div>
@@ -6286,8 +6350,12 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
               {combos.length > 0 && (
                 <div style={{ marginTop: 18 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>3-D edge matrix — grade × theme × market context</div>
+                  <div style={{ background: "rgba(201,152,42,0.06)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "8px 12px", fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, marginBottom: 8 }}>
+                    🧭 This matrix starts at <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the first theme snapshot. Trades entered before that have no theme tracking, so crossing them here would be inaccurate; they're excluded from the matrix (the single-dimension columns above still cover every trade).
+                  </div>
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem", tableLayout: "fixed" }}>
+                      <colgroup><col style={{ width: "13%" }} /><col style={{ width: "15%" }} /><col style={{ width: "18%" }} /><col style={{ width: "11%" }} /><col style={{ width: "12%" }} /><col style={{ width: "12%" }} /><col style={{ width: "13%" }} /><col style={{ width: "6%" }} /></colgroup>
                       <thead><tr style={{ color: "var(--muted)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                         <th style={{ textAlign: "left", padding: "4px 8px" }}>Grade</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Theme</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Market</th>
                         <th style={{ textAlign: "right", padding: "4px 8px" }}>Trades</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Win %</th><th style={{ textAlign: "right", padding: "4px 8px" }}>PF</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Avg R</th><th></th>
@@ -6651,7 +6719,15 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   <React.Fragment key={t.id}>
                     <tr id={"jtrade-" + t.id} className={"traderow clickrow" + (isOpen ? " rev-open" : "") + (highlightTradeId === t.id ? " jumphl" : "")} onClick={() => setPreviewTrade(t)}>
                       <td data-l="Result"><span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span></td>
-                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}{isAdmin && t.extExit != null ? <span className="term" data-tip={`Extension at exit: ${Number(t.extExit).toFixed(1)}× ATR from the 50-day MA${t.extEntry != null ? ` (entry was ${Number(t.extEntry).toFixed(1)}×)` : ""}. ≥7× = sold into strength (rare, 3-sigma territory) · <2× = a stop/management exit near the mean.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--goldBright)" : t.extExit < 2 ? "var(--red)" : "var(--muted)", border: `1px solid ${t.extExit >= 7 ? "rgba(34,197,94,0.35)" : t.extExit >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(t.extExit).toFixed(1)}×</span> : null}</span></td>
+                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}{(() => {
+                        // OPEN-CAMPAIGN badge: this row is realized-so-far from partial trims of a position
+                        // you STILL HOLD — it updates in real time as you trim, and folds into the single
+                        // final campaign row when the position fully closes (same rows, so no double-count).
+                        const sym = String(t.ticker || "").toUpperCase();
+                        const isTrimOnly = (t._fills || [t]).every(f => (f.reason || "") === "Partial Trim");
+                        const stillOpen = isTrimOnly && (positions || []).some(p => String(p.sym || "").toUpperCase() === sym);
+                        return stillOpen ? <span className="term" data-tip="Realized-so-far: partial trims of a position you still hold. This row moves your equity curve in real time and merges into one final row when the position closes — never double-counted." style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, color: "var(--goldBright)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>OPEN · partials</span> : null;
+                      })()}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}{isAdmin && t.extExit != null ? <span className="term" data-tip={`Extension at exit: ${Number(t.extExit).toFixed(1)}× ATR from the 50-day MA${t.extEntry != null ? ` (entry was ${Number(t.extEntry).toFixed(1)}×)` : ""}. ≥7× = sold into strength (rare, 3-sigma territory) · <2× = a stop/management exit near the mean.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--goldBright)" : t.extExit < 2 ? "var(--red)" : "var(--muted)", border: `1px solid ${t.extExit >= 7 ? "rgba(34,197,94,0.35)" : t.extExit >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(t.extExit).toFixed(1)}×</span> : null}</span></td>
                       <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Exit $">${(Number(t.exitP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
@@ -6924,7 +7000,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                         </div>
                         <div className="tdz-right">
                           <div className="tdz-tabs">
-                            <button className={"tdz-tab" + (tdTab === "chart" ? " on" : "")} onClick={() => setTdTab("chart")}>Chart & Replay</button>
+                            <button className={"tdz-tab" + (tdTab === "chart" ? " on" : "")} onClick={() => setTdTab("chart")}>Chart</button>
                             <button className={"tdz-tab" + (tdTab === "replay" ? " on" : "")} onClick={() => setTdTab("replay")}>TradingView</button>
                             <button className={"tdz-tab" + (tdTab === "notes" ? " on" : "")} onClick={() => setTdTab("notes")}>Notes</button>
                           </div>

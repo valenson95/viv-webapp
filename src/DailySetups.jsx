@@ -56,6 +56,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   const [statusF, setStatusF] = useState(null);   // funnel chip filter — "pivot" | "coiling" | "fresh" | "triggered" | "faded"
   const [boardSort, setBoardSort] = useState({ k: "stage", d: 1 }); // board column sort — key + direction
   const [boardOpen, setBoardOpen] = useState(false); // collapsed by default: top rows only
+  const [openDays, setOpenDays] = useState(() => new Set()); // date groups the user expanded — ALL collapsed by default (member ask 2026-07-10)
 
   const load = useCallback(async () => {
     const { rows: r, tableMissing: tm } = await listSetups();
@@ -312,16 +313,31 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         // Emphasized day dividers — TODAY in gold, YESTERDAY named, older dates plain (member ask)
         const dAgo = g.date === "__ranked__" ? null : daysAgo(g.date);
         const rel = dAgo === 0 ? "TODAY" : dAgo === 1 ? "YESTERDAY" : null;
+        // COLLAPSED BY DEFAULT (member ask): the feed is a row of dates — click a date to open its
+        // charts. Search / Top-graded / funnel-chip views auto-expand (a filtered feed must show hits).
+        const forceOpen = g.date === "__ranked__" || !!q.trim() || !!statusF || view === "taken";
+        const dayOpen = forceOpen || openDays.has(g.date);
+        const toggleDay = () => { if (forceOpen) return; setOpenDays(prev => { const n = new Set(prev); n.has(g.date) ? n.delete(g.date) : n.add(g.date); return n; }); };
         return (
-        <div key={g.date + "-" + gi} style={{ marginBottom: 26 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 2px 10px" }}>
+        <div key={g.date + "-" + gi} style={{ marginBottom: dayOpen ? 26 : 10 }}>
+          <div onClick={toggleDay} title={forceOpen ? undefined : dayOpen ? "Collapse this day" : "Show this day's charts"}
+            style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 2px 10px", cursor: forceOpen ? "default" : "pointer", padding: dayOpen ? 0 : "10px 12px", borderRadius: 12, border: dayOpen ? "none" : `1px solid ${rel === "TODAY" ? C.borderGold : C.border}`, background: dayOpen ? "transparent" : "rgba(255,255,255,0.02)" }}>
             <div style={{ fontSize: rel === "TODAY" ? "0.78rem" : "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: rel === "TODAY" ? C.goldBright : C.gold, whiteSpace: "nowrap" }}>
               {rel ? <>{rel} <span style={{ color: C.muted, fontWeight: 700 }}>· {g.label}</span></> : g.label}
             </div>
+            {!dayOpen && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0, overflow: "hidden" }}>
+                {g.items.slice(0, 8).map(r => (
+                  <span key={r.id} style={{ fontSize: "0.6rem", fontWeight: 800, color: r.taken_at ? C.green : C.text, border: `1px solid ${r.taken_at ? "rgba(34,197,94,0.35)" : C.border}`, borderRadius: 8, padding: "2px 7px", whiteSpace: "nowrap" }}>{r.ticker}{r.letter ? <span style={{ color: C.muted, fontWeight: 700 }}> {r.letter}</span> : null}</span>
+                ))}
+                {g.items.length > 8 && <span style={{ fontSize: "0.6rem", color: C.muted }}>+{g.items.length - 8} more</span>}
+              </div>
+            )}
             <div style={{ flex: 1, height: 1, background: rel === "TODAY" ? "rgba(240,192,80,0.35)" : C.border }} />
             {g.date !== "__ranked__" && <span style={{ fontSize: "0.62rem", color: C.muted, fontWeight: 700, whiteSpace: "nowrap" }}>{g.items.length} idea{g.items.length !== 1 ? "s" : ""}</span>}
+            {!forceOpen && <span style={{ fontSize: "0.7rem", color: dayOpen ? C.muted : C.goldBright }}>{dayOpen ? "▴" : "▾"}</span>}
           </div>
-          {g.items.map(r => {
+          {dayOpen && g.items.map(r => {
             const mi = mentionInfo(r);
             const gradeUp = mi.prev && r.stars > mi.prev.stars;
             const gradeDown = mi.prev && r.stars < mi.prev.stars;
