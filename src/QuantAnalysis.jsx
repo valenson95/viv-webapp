@@ -469,11 +469,11 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         <button onClick={() => setPage && setPage("dashboard")} style={{ background: "transparent", border: `1px solid ${T.border}`, color: T.muted, borderRadius: 8, padding: "5px 13px", cursor: "pointer", fontFamily: font, fontSize: "0.72rem" }}>← Dashboard</button>
         <div>
           <div style={{ fontSize: "1.05rem", fontWeight: 800, letterSpacing: "-0.01em" }}>Quant Analysis</div>
-          <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 1 }}>{mode === "sys" ? `SYSTEM COHORT · ENTERED ≥ ${data.systemEntry}` : `FULL JOURNAL · SINCE ${data.since || "2026-05-01"}`} · N={A.n} CLOSED CAMPAIGNS</div>
+          <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 1 }}>{mode === "sys" ? `SYSTEM COHORT · ENTERED ≥ ${data.systemEntry} · LIVE RECORD` : `STRESS-TEST OVERLAY · FULL HISTORY SINCE ${data.since || "2026-05-01"}`} · N={A.n} CLOSED CAMPAIGNS</div>
         </div>
         <span style={{ display: "inline-flex", gap: 4, marginLeft: 6 }}>
-          {[["sys", "System cohort"], ["all", "Full journal"]].map(([k, lab2]) => (
-            <button key={k} onClick={() => setMode(k)} title={k === "sys" ? `Campaigns entered on/after ${data.systemEntry} — the 3-stop / derisk-trim book` : `Every verified campaign since ${data.since || "May"} — the same population the journal page shows, campaign-merged`}
+          {[["sys", "System cohort"], ["all", "Stress-test (full)"]].map(([k, lab2]) => (
+            <button key={k} onClick={() => setMode(k)} title={k === "sys" ? `Campaigns entered on/after ${data.systemEntry} — the 3-stop / derisk-trim book, tracked in real time. Small n by design: it grows with every new trade.` : `Your FULL history since ${data.since || "May"} (incl. the recovered pre-system book) replayed through the new entry criteria — a stress test of the rules, NOT the system's live record`}
               style={{ background: mode === k ? "rgba(201,152,42,0.12)" : "transparent", border: `1px solid ${mode === k ? T.gold : T.border}`, color: mode === k ? T.goldBright : T.faint, borderRadius: 8, padding: "4px 11px", cursor: "pointer", fontFamily: font, fontSize: "0.68rem", fontWeight: 700 }}>{lab2}</button>
           ))}
         </span>
@@ -505,16 +505,23 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       <Panel title="What's counted here (vs the journal)" meta={`${rec.fillsVerified ?? "—"} fills → ${rec.campaignsAll ?? allCamps.length} campaigns → ${rec.campaignsSystem ?? "—"} system`}
         howto={[
           "The journal page counts campaign rows across its date filter; this page counts the SAME campaigns, chosen by the toggle above.",
-          "Full journal here ≈ the journal page with no date filter, minus the exclusions listed.",
+          "Stress-test (full) = your ENTIRE verified history, incl. the recovered pre-system book (May–Jun manual rows, dates census-proven, zero overlap with pipeline rows) — old trades replayed through the new entry criteria.",
+          "System cohort = the LIVE record — only trades entered under the system. Recovered history can never enter it (the build asserts this and dies if violated).",
           "Every number on this page is computed from exactly the cohort named in the header — nothing is inherited from a different population.",
+          "R sanity: every recovered row's recorded R is recomputed from its own entry/stop/exit — mismatches would be listed here by name.",
         ]}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 26px" }}>
           {[
             ["Fills since " + (rec.since || "May"), rec.fillsAll],
             ["Pipeline-verified", rec.fillsVerified],
-            ["Legacy excluded", rec.legacyExcluded],
-            ["Dupes dropped", rec.dupesDropped],
-            ["→ Campaigns (full journal)", rec.campaignsAll ?? allCamps.length],
+            ["Recovered legacy (dates normalized)", rec.recoveredLegacy],
+            ["Unrecoverable / failed sanity", rec.legacyExcluded],
+            ["Dupes dropped (by broker exec id)", rec.dupesDropped],
+            ["Exit-only fills attached by stop match", rec.exitOnlyAttached],
+            ["Exit-only orphans ($-stats only)", rec.exitOnlyOrphans],
+            ["Impossible clock times dropped", rec.impossibleTimesDropped],
+            ["R cross-check (recovered rows)", rec.rCrossCheck ? `${rec.rCrossCheck.checked - rec.rCrossCheck.mismatched}/${rec.rCrossCheck.checked} match` : "—"],
+            ["→ Campaigns (stress-test full)", rec.campaignsAll ?? allCamps.length],
             ["→ System cohort (≥ " + (rec.systemEntry || data.systemEntry) + ")", rec.campaignsSystem],
             ["Option campaigns", rec.optionCampaigns ?? 0],
             ["Open runners (not counted)", rec.openRunners],
@@ -525,6 +532,12 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
             </div>
           ))}
         </div>
+        {rec.rCrossCheck?.mismatched > 0 && (
+          <div style={{ fontSize: "0.68rem", color: T.red, marginTop: 10 }}>R mismatches (recorded vs recomputed — treat these rows' R as unverified): {(rec.rCrossCheck.rows || []).join(" · ")}</div>
+        )}
+        {(rec.unparseableRows || []).length > 0 && (
+          <div style={{ fontSize: "0.68rem", color: T.red, marginTop: 6 }}>Unrecoverable rows (by name): {rec.unparseableRows.join(" · ")}</div>
+        )}
       </Panel>
 
       {/* DATA COVERAGE — every exclusion NAMED. An unnamed exclusion is how "is AMD missing?"
@@ -780,6 +793,9 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
                     ))}
                     {/* avoided losers render inside pairs with the "avoided" tag */}
                   </div>
+                  {(wg.skips || []).length > 0 && (
+                    <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 6, lineHeight: 1.5 }}>Eligible but not simulated (named, never guessed): {wg.skips.map((s) => `${s.t} ${s.d} — ${s.why}`).join(" · ")}. Rerun the ledger to retry price-feed gaps.</div>
+                  )}
                   <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 6, lineHeight: 1.5 }}>{wg.noTime} campaigns have no recorded entry time — excluded, not guessed. Verdict from YOUR data only; treat as direction until n ≥ 15.</div>
                 </div>
               );
@@ -1220,7 +1236,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem" }}>
           <tbody>
             {[
-              ["Populations", `Full journal = every pipeline-verified campaign since ${data.since || "2026-05-01"} (the journal page's population, campaign-merged). System cohort = campaigns entered ≥ ${data.systemEntry} — the 3-stop / derisk-trim book. The toggle recomputes every panel client-side from the same list.`],
+              ["Populations", `Stress-test (full) = every verified campaign since ${data.since || "2026-05-01"}, incl. the recovered pre-system book (M/D/YY dates normalized after a census proved the format; every recovered R recomputed from its own entry/stop/exit; zero overlap with pipeline rows). Purpose: replay old trades through the new entry criteria. System cohort = campaigns entered ≥ ${data.systemEntry} — the LIVE record of the 3-stop / derisk-trim book; recovered history is asserted out of it at build time. The toggle recomputes every panel client-side from the same list.`],
               ["Campaign", "position_id when present, else ticker + entry date. Partially-trimmed positions appear in Open Campaigns until the runner closes — never treated as finished."],
               ["R", "Banked P&L ÷ (entry − locked original stop) × initial shares. No stop → excluded from R metrics. Near-zero denominators excluded."],
               ["MFE / MAE / Shadow", "From daily EOD bars, entry → final exit. Shadow = never-trimmed full position to final exit close. MAE is an upper bound (a bar's low can predate an intraday entry) — rung percentages are lower bounds."],

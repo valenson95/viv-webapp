@@ -27,25 +27,55 @@ async function main() {
   if (!UID) throw new Error("could not resolve admin user_id");
 
   // entry_gates is a late migration (supabase/entry-gates.sql) — fall back gracefully until it exists.
-  const SEL = "ticker,entry_date,entry_time,exit_date,entry_price,exit_price,shares,stop_price,pl_dollar,r_mult,exit_reason,position_id,ext_entry,ext_exit,trade_type,source,is_sample,is_deleted,grade_snapshot";
+  const SEL = "ticker,entry_date,entry_time,exit_date,entry_price,exit_price,shares,stop_price,pl_dollar,r_mult,exit_reason,position_id,ext_entry,ext_exit,trade_type,source,is_sample,is_deleted,grade_snapshot,ib_exec_id";
   const getTrades = (sel) => fetch(`${URL_}/rest/v1/trades?select=${sel}&user_id=eq.${UID}&exit_date=gte.${SINCE}&order=exit_date.asc&limit=2000`, { headers: H }).then(j);
   let rawFetched = await getTrades(SEL + ",entry_gates");
   if (!Array.isArray(rawFetched)) rawFetched = await getTrades(SEL);
   if (!Array.isArray(rawFetched)) throw new Error("trades fetch failed: " + JSON.stringify(rawFetched).slice(0, 200));
   const rawTrades = rawFetched.filter((x) => !x.is_sample && !x.is_deleted && x.ticker);
-  // TRUST FILTER: only pipeline-verified ISO-dated rows. Legacy manual journal rows carry
-  // ambiguous M/D/YY dates (and string-compare leaks) — excluded, stated in method.
+  // DATE RECOVERY (2026-07-11, replaces the old blanket "trust filter"): the manual-era book
+  // (May 7 → Jun 12) carries US M/D/YY dates. A DB census PROVED the format — 42 exit dates with
+  // day>12 fix month-first order, 0 unparseable, 0 ticker+date+shares+price overlap with ISO
+  // rows (no double-count) — so these rows are NORMALIZED, not excluded. They form the
+  // STRESS-TEST OVERLAY: all predate SYSTEM_ENTRY (asserted below the campaign fold), so they
+  // enrich the full-journal cohort only and can never pollute the live system record.
+  // Anything that fails a sanity gate is EXCLUDED BY NAME — never guessed, never silent.
   const ISO = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || "");
+  const mdy = (s) => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/.exec(s || ""); if (!m) return null; const M = +m[1], D = +m[2]; return M >= 1 && M <= 12 && D >= 1 && D <= 31 ? `20${m[3]}-${String(M).padStart(2, "0")}-${String(D).padStart(2, "0")}` : null; };
+  const normDate = (s) => (s ? (ISO(s) ? s : mdy(s)) : null);
+  const today = new Date().toISOString().slice(0, 10);
+  let recovered = 0, unparseable = 0, badTimes = 0, outOfWindow = 0, rChecked = 0;
+  const unparseableRows = [], rSuspects = [];
+  const normed = [];
+  for (const x of rawTrades) {
+    const xd = normDate(x.exit_date), ed = normDate(x.entry_date);
+    if (!xd) { unparseable++; unparseableRows.push(`${x.ticker}:${x.exit_date}`); continue; }
+    if (ed && ed > xd) { unparseable++; unparseableRows.push(`${x.ticker}:entry ${ed} after exit ${xd}`); continue; }
+    if (xd < SINCE || xd > today) { outOfWindow++; continue; }
+    const wasLegacy = !ISO(x.exit_date);
+    if (wasLegacy) recovered++;
+    // impossible ET wall-clock (16:00–23:59 = market closed, MYT residue) → drop the TIME, keep the fill
+    let t = x.entry_time || null;
+    if (t && String(t).slice(0, 2) >= "16") { badTimes++; t = null; }
+    // recovered rows: cross-check the recorded r_mult against its own entry/stop/exit — flag, never trust blind
+    if (wasLegacy && x.r_mult != null && +x.entry_price > +x.stop_price && +x.stop_price > 0 && +x.exit_price > 0) {
+      rChecked++;
+      const rc = (+x.exit_price - +x.entry_price) / (+x.entry_price - +x.stop_price);
+      if (Math.abs(rc - +x.r_mult) > Math.max(0.25, Math.abs(+x.r_mult) * 0.15)) rSuspects.push(`${x.ticker} ${xd} recorded ${round(+x.r_mult)}R vs recomputed ${round(rc)}R`);
+    }
+    normed.push({ ...x, entry_date: ed, exit_date: xd, entry_time: t, _recovered: wasLegacy });
+  }
+  // dedup by broker exec id when present — equal-size same-price twin fills are REAL partial fills
+  // (TWLO 06-01 / FTNT 07-07 were wrongly collapsed by the old composite key)
   const seenFill = new Set();
   let dupesDropped = 0;
-  const trades = rawTrades.filter((x) => {
-    if (!ISO(x.exit_date)) return false;
-    const k = [x.ticker, x.exit_date, x.shares, x.exit_price].join("|");
-    if (seenFill.has(k)) { dupesDropped++; return false; } // exact-duplicate fill — keep first
+  const trades = normed.filter((x) => {
+    const k = x.ib_exec_id ? "x:" + x.ib_exec_id : [x.ticker, x.exit_date, x.shares, x.exit_price, x.entry_date || ""].join("|");
+    if (seenFill.has(k)) { dupesDropped++; return false; }
     seenFill.add(k);
     return true;
   });
-  const provenance = { window: SINCE + " → today", fillsAll: rawTrades.length, fillsVerified: trades.length, legacyExcluded: rawTrades.length - trades.length - 0, dupesDropped, noStopExcluded: 0 };
+  const provenance = { window: SINCE + " → today", fillsAll: rawTrades.length, fillsVerified: trades.length, recoveredLegacy: recovered, legacyExcluded: unparseable, unparseableRows, outOfWindow, dupesDropped, impossibleTimesDropped: badTimes, rCrossCheck: { checked: rChecked, mismatched: rSuspects.length, rows: rSuspects.slice(0, 12) }, noStopExcluded: 0 };
 
   const positions = (await fetch(`${URL_}/rest/v1/positions?select=symbol,shares,entry_price,stop_price,trailing_stop,current_price,ext_mult&user_id=eq.${UID}&is_closed=eq.false`, { headers: H }).then(j))
     .filter((p) => +p.shares > 0);
@@ -53,10 +83,26 @@ async function main() {
   // ---------- campaigns ----------
   const isOption = (t) => /\s/.test(t.trim()) || /\d{6}[CP]\d/.test(t);
   const camps = {};
+  const undatedLegs = [];
   for (const x of trades) {
-    const k = x.position_id || `${x.ticker}#${x.entry_date || "?"}`;
-    (camps[k] = camps[k] || []).push(x);
+    const k = x.position_id || (x.entry_date ? `${x.ticker}#${x.entry_date}` : null);
+    if (k) (camps[k] = camps[k] || []).push(x); else undatedLegs.push(x);
   }
+  // Exit-only legs (no entry date, mostly the recovered manual book): attach to the same-ticker
+  // dated campaign whose LOCKED STOP matches the leg's stop EXACTLY (the broker-level fingerprint
+  // of one thesis) and whose entry precedes the exit. UNIQUE match only — anything ambiguous stays
+  // its own "TICKER#?" campaign, which the metrics loop excludes BY NAME ($-stats only, no bar sims).
+  let exitOnlyAttached = 0;
+  for (const x of undatedLegs) {
+    const cand = Object.values(camps).filter((legs) =>
+      legs[0].ticker === x.ticker && x.stop_price != null && +x.stop_price > 0 &&
+      legs.some((l) => l.stop_price != null && +l.stop_price === +x.stop_price) &&
+      (legs.map((l) => l.entry_date).filter(Boolean).sort()[0] || "9999") <= x.exit_date);
+    if (cand.length === 1) { cand[0].push(x); exitOnlyAttached++; }
+    else (camps[`${x.ticker}#?`] = camps[`${x.ticker}#?`] || []).push(x);
+  }
+  provenance.exitOnlyAttached = exitOnlyAttached;
+  provenance.exitOnlyOrphans = undatedLegs.length - exitOnlyAttached;
   const campaigns = Object.entries(camps).map(([k, legs]) => {
     legs.sort((a, b) => (a.exit_date || "").localeCompare(b.exit_date || ""));
     const first = legs[0];
@@ -73,6 +119,7 @@ async function main() {
     const trims = legs.filter((x) => /partial|trim|strength/i.test(x.exit_reason || ""));
     return {
       key: k, ticker: first.ticker, option: isOption(first.ticker),
+      recovered: legs.some((x) => x._recovered) || undefined, // stress-test overlay row (pre-system book)
       legs: legs.length, pl: round(pl, 0),
       rSum: rLegs.length ? round(sum(rLegs)) : null,
       entryDate: legs.map((x) => x.entry_date).filter(Boolean).sort()[0] || null,
@@ -129,19 +176,28 @@ async function main() {
     if (fiveMinCache[ck] !== undefined) return fiveMinCache[ck];
     // RETRY: a transient proxy failure must never cache as a permanent null — that silently
     // shrank the wait-gate sample between runs (caught 2026-07-11).
-    for (let attempt = 0; attempt < 3; attempt++) {
+    const LAST = 7;
+    for (let attempt = 0; attempt <= LAST; attempt++) {
       try {
         const d = await fetch(`${CANDLES_API}?symbol=${encodeURIComponent(tk)}&from=${date}&to=${date}&res=5min`).then(j);
         if (d?.ok && Array.isArray(d.candles) && d.candles.length) {
           const open = Math.floor(new Date(date + "T09:30:00-04:00").getTime() / 1000);
           const close = Math.floor(new Date(date + "T16:00:00-04:00").getTime() / 1000);
           const out = d.candles.filter((b) => b.time >= open && b.time < close).map((b) => ({ ts: b.time, o: b.open, h: b.high, l: b.low }));
-          await new Promise((r) => setTimeout(r, 120));
+          await new Promise((r) => setTimeout(r, 250));
           return (fiveMinCache[ck] = out.length ? out : null);
         }
         if (d?.ok && Array.isArray(d.candles) && !d.candles.length) return (fiveMinCache[ck] = null); // genuinely no data (halted/holiday)
-      } catch (e) { if (attempt === 2) console.error("fiveMin FAIL after retries:", tk, date, e.message); }
-      await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+        // ok:false must never fail silently — the "samples shrink between runs" bug was Polygon's
+        // per-minute rate limit cached as permanent null. Wait out the full window and retry.
+        if (/per minute/i.test(d?.error || "")) {
+          console.log("  fiveMin rate-limited — waiting 61s:", tk, date);
+          await new Promise((r) => setTimeout(r, 61000));
+          continue;
+        }
+        if (attempt === LAST) console.error("fiveMin gave up (ok:false):", tk, date, JSON.stringify(d).slice(0, 120));
+      } catch (e) { if (attempt === LAST) console.error("fiveMin FAIL after retries:", tk, date, e.message); }
+      await new Promise((r) => setTimeout(r, 1200 * (attempt + 1) + Math.random() * 500));
     }
     return (fiveMinCache[ck] = null);
   };
@@ -178,6 +234,14 @@ async function main() {
     const i0 = B.findIndex((b) => b.date >= c.entryDate);
     let i1 = B.findIndex((b) => b.date > c.lastExit); i1 = i1 === -1 ? B.length : i1;
     if (i0 === -1 || i0 >= i1) { c.skipReason = "entry/exit dates outside bar history"; continue; }
+    // PRICE-BASIS TRUTH GATE (2026-07-11, the CRWD split lesson): Yahoo bars are split-ADJUSTED;
+    // fills are RAW. If the recorded entry doesn't sit inside its own entry-day bar (±3%), the two
+    // are on different bases (split between then and now, or a bad row) — bar counterfactuals
+    // would be FICTION. Excluded BY NAME; $-stats and recorded R still count.
+    if (B[i0].date === c.entryDate && (c.entry > B[i0].h * 1.03 || c.entry < B[i0].l * 0.97)) {
+      c.skipReason = `entry ${c.entry} outside entry-day bar ${round(B[i0].l)}–${round(B[i0].h)} (split-adjusted bars vs raw fill) — bar sims skipped`;
+      continue;
+    }
     const win = B.slice(i0, i1);
     // ---- entry-context backfill from bars (approximations, labelled as such in the UI) ----
     // ATR14 = mean true range of the 14 bars BEFORE entry · SMA50 = mean close of the 50 before.
@@ -308,6 +372,10 @@ async function main() {
   }
   const slices = Object.values(sliceCamps).map((legs) => ({ pl: sum(legs.map((x) => +x.pl_dollar || 0)), rSum: null, blendedR: null, month: legs[0].exit_date.slice(0, 7), lastExit: legs.map((x) => x.exit_date).sort().slice(-1)[0] })); // month cards are $-only: legacy per-fill r_mult sums are not campaign-R comparable
   const isSystem = (c) => c.entryDate && c.entryDate >= SYSTEM_ENTRY;
+  // HARD GUARANTEE: recovered legacy rows are a stress-test overlay for the full-journal cohort
+  // ONLY — if one ever dates into the system cohort, the run must die, not publish.
+  const leaked = campaigns.filter((c) => c.recovered && isSystem(c));
+  if (leaked.length) throw new Error("recovered legacy campaign leaked into SYSTEM cohort: " + leaked.map((c) => c.ticker + "@" + c.entryDate).join(", "));
   function agg(list) {
     const W = list.filter((c) => c.pl > 0), L = list.filter((c) => c.pl <= 0);
     const gw = sum(W.map((c) => c.pl)), gl = sum(L.map((c) => c.pl));
@@ -463,17 +531,18 @@ async function main() {
     && c.entry && c.stop && c.stop < c.entry && c.shadowR != null && symOK(c.ticker));
   for (const c of eligible) {
     try {
+      c.wgSkip = null; // named-skip manifest — silent exclusions are banned (coverage law)
       const bars5 = await fiveMin(c.ticker, c.entryDate);
-      if (!bars5) continue;
+      if (!bars5) { c.wgSkip = "no 5m bars from proxy"; continue; }
       const tenET = Math.floor(new Date(c.entryDate + "T10:00:00-04:00").getTime() / 1000);
       const first10 = bars5.find((b) => b.ts >= tenET && b.o != null);
-      if (!first10) continue;
+      if (!first10) { c.wgSkip = "no 10:00 ET bar in session"; continue; }
       const waitPx = first10.o;
-      if (!(waitPx > 0)) continue;
+      if (!(waitPx > 0)) { c.wgSkip = "bad 10:00 bar price"; continue; }
       c.waitEntryPx = round(waitPx, 4);
       const B = bars[c.ticker];
       const iEnd = (() => { let i = B.findIndex((b) => b.date > c.lastExit); return (i === -1 ? B.length : i) - 1; })();
-      if (iEnd < 0) continue;
+      if (iEnd < 0) { c.wgSkip = "exit date outside daily bars"; continue; }
       const i0b = B.findIndex((b) => b.date >= c.entryDate);
       const laterLow = i0b >= 0 && i0b + 1 <= iEnd ? Math.min(...B.slice(i0b + 1, iEnd + 1).map((b) => b.l)) : Infinity;
       const dBar0 = B.find((b) => b.date === c.entryDate);
@@ -503,7 +572,7 @@ async function main() {
       };
       c.actGateR = armR(c.entry, entryTs2);      // as traded, stop-aware, same basis
       c.waitShadowR = armR(waitPx, tenET);       // waited to 10:00, stop-aware
-    } catch { /* skip ticker/day */ }
+    } catch (e) { c.wgSkip = "sim error: " + e.message; }
   }
   const wgPairs = campaigns.filter((c) => c.waitShadowR != null && c.actGateR != null);
   const waitGate = {
@@ -513,6 +582,7 @@ async function main() {
     actMeanR: wgPairs.length ? round(sum(wgPairs.map((c) => c.actGateR)) / wgPairs.length) : null,
     waitMeanR: wgPairs.length ? round(sum(wgPairs.map((c) => c.waitShadowR)) / wgPairs.length) : null,
     pairs: wgPairs.map((c) => ({ t: c.ticker, d: c.entryDate, act: c.actGateR, wait: c.waitShadowR, avoided: !!c.waitAvoided })),
+    skips: eligible.filter((c) => c.wgSkip).map((c) => ({ t: c.ticker, d: c.entryDate, why: c.wgSkip })),
     method: "both arms stop-aware: post-entry lows (5m day 0, daily after) at/below the stop exit AT the stop; survivors ride to the final day's close",
   };
 
@@ -552,7 +622,7 @@ async function main() {
 
   const payload_edge = {
     asof: new Date().toISOString(), since: SINCE, systemStart: SYSTEM_START, systemEntry: SYSTEM_ENTRY,
-    method: "IBKR fill rebuild, equities-focused ESTIMATE — TradeZella owns realized truth. Pipeline-verified ISO-dated rows only (legacy slash-dated manual journal rows excluded); exact-duplicate fills deduped. Month cards = campaign-month slices; system cohort = campaigns entered on/after " + SYSTEM_ENTRY + ". R = blended campaign R vs initial risk (entry−stop, first-leg stop); MFE/shadow from EOD bars.",
+    method: "IBKR fill rebuild, equities-focused ESTIMATE — TradeZella owns realized truth. Legacy M/D/YY manual rows are date-normalized and included as the STRESS-TEST OVERLAY (full-journal cohort only — census-proven format, zero overlap with pipeline rows; failures excluded by name). Dedup by broker exec id. System cohort = campaigns entered on/after " + SYSTEM_ENTRY + " — the live record; overlay rows can never enter it (asserted). R = blended campaign R vs initial risk (entry−stop, first-leg stop); MFE/shadow from EOD bars.",
     verdict, buckets, derisk, monte, waitGate, provenance, maeInsight, equityR, rollingExp, openCampaigns, rBasis,
     stopCoverage: { system: "100%", note: "R exists only where a stop was recorded; system cohort fully covered" },
     openBook: { positions: positions.length, riskFree: free, atRisk, naked, openRiskUsd: round(openRisk, 0) },
@@ -560,8 +630,13 @@ async function main() {
     // This is the answer to "why is the sample size different from the webapp", kept in-product.
     reconcile: {
       fillsAll: provenance.fillsAll, fillsVerified: provenance.fillsVerified,
-      legacyExcluded: provenance.legacyExcluded, dupesDropped: provenance.dupesDropped,
+      recoveredLegacy: provenance.recoveredLegacy, legacyExcluded: provenance.legacyExcluded,
+      unparseableRows: provenance.unparseableRows, dupesDropped: provenance.dupesDropped,
+      impossibleTimesDropped: provenance.impossibleTimesDropped,
+      exitOnlyAttached: provenance.exitOnlyAttached, exitOnlyOrphans: provenance.exitOnlyOrphans,
+      rCrossCheck: provenance.rCrossCheck,
       campaignsAll: campaigns.length, campaignsSystem: sys.length,
+      campaignsRecovered: campaigns.filter((c) => c.recovered).length,
       optionCampaigns: campaigns.filter((c) => c.option).length,
       openRunners: positions.length, systemEntry: SYSTEM_ENTRY, since: SINCE,
       // integrity check: every verified fill must be inside exactly one campaign

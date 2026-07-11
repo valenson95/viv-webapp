@@ -103,7 +103,10 @@ export default async function handler(req, res) {
     for (const r of toRefresh) {
       const { error: upErr } = await sb.from("trades")
         .update({ commission: r.commission, pl_dollar: r.pl_dollar, pl_pct: r.pl_pct,
-                  exit_price: r.exit_price, exit_date: r.exit_date, exit_time: r.exit_time, ib_synced_at: nowIso })
+                  exit_price: r.exit_price, exit_date: r.exit_date, exit_time: r.exit_time, ib_synced_at: nowIso,
+                  // self-heal factual fill times: a later statement can carry the opening leg a
+                  // prior sync couldn't see (times feed the quant bench's intraday sims)
+                  ...(r.entry_time ? { entry_time: r.entry_time } : {}) })
         .eq("user_id", user_id).eq("ib_exec_id", r.ib_exec_id);
       if (!upErr) refreshed++;
     }
