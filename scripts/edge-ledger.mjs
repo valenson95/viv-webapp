@@ -26,8 +26,13 @@ async function main() {
   const UID = own?.[0]?.user_id;
   if (!UID) throw new Error("could not resolve admin user_id");
 
-  const rawTrades = (await fetch(`${URL_}/rest/v1/trades?select=ticker,entry_date,exit_date,entry_price,exit_price,shares,stop_price,pl_dollar,r_mult,exit_reason,position_id,ext_entry,ext_exit,trade_type,source,is_sample,is_deleted&user_id=eq.${UID}&exit_date=gte.${SINCE}&order=exit_date.asc&limit=2000`, { headers: H }).then(j))
-    .filter((x) => !x.is_sample && !x.is_deleted && x.ticker);
+  // entry_gates is a late migration (supabase/entry-gates.sql) — fall back gracefully until it exists.
+  const SEL = "ticker,entry_date,exit_date,entry_price,exit_price,shares,stop_price,pl_dollar,r_mult,exit_reason,position_id,ext_entry,ext_exit,trade_type,source,is_sample,is_deleted,grade_snapshot";
+  const getTrades = (sel) => fetch(`${URL_}/rest/v1/trades?select=${sel}&user_id=eq.${UID}&exit_date=gte.${SINCE}&order=exit_date.asc&limit=2000`, { headers: H }).then(j);
+  let rawFetched = await getTrades(SEL + ",entry_gates");
+  if (!Array.isArray(rawFetched)) rawFetched = await getTrades(SEL);
+  if (!Array.isArray(rawFetched)) throw new Error("trades fetch failed: " + JSON.stringify(rawFetched).slice(0, 200));
+  const rawTrades = rawFetched.filter((x) => !x.is_sample && !x.is_deleted && x.ticker);
   // TRUST FILTER: only pipeline-verified ISO-dated rows. Legacy manual journal rows carry
   // ambiguous M/D/YY dates (and string-compare leaks) — excluded, stated in method.
   const ISO = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || "");
@@ -77,6 +82,11 @@ async function main() {
       finalExitPx: +legs[legs.length - 1].exit_price || null,
       entry, stop: stop != null ? +stop : null, initShares,
       extExits: legs.map((x) => x.ext_exit).filter((v) => v != null).map(Number),
+      // Entry-side context for the refinement lab: extension at entry (worst leg), frozen grade,
+      // and the entry_gates JSON when the trade-log captured it (LoD-dist %ATR, RVOL, ORB wait…).
+      extEntry: (() => { const e = legs.map((x) => x.ext_entry).filter((v) => v != null).map(Number); return e.length ? round(Math.max(...e)) : null; })(),
+      grade: legs.map((x) => x.grade_snapshot).find(Boolean) || null,
+      gates: legs.map((x) => x.entry_gates).find((g) => g && typeof g === "object") || null,
       reasons: [...new Set(legs.map((x) => x.exit_reason).filter(Boolean))].join(" / "),
     };
   });
@@ -313,11 +323,21 @@ async function main() {
     verdict, buckets, derisk, monte, provenance, maeInsight, equityR, rollingExp, openCampaigns, rBasis,
     stopCoverage: { system: "100%", note: "R exists only where a stop was recorded; system cohort fully covered" },
     openBook: { positions: positions.length, riskFree: free, atRisk, naked, openRiskUsd: round(openRisk, 0) },
+    // Reconciliation bridge — the exact ladder from "what the journal shows" to "what N is here".
+    // This is the answer to "why is the sample size different from the webapp", kept in-product.
+    reconcile: {
+      fillsAll: provenance.fillsAll, fillsVerified: provenance.fillsVerified,
+      legacyExcluded: provenance.legacyExcluded, dupesDropped: provenance.dupesDropped,
+      campaignsAll: campaigns.length, campaignsSystem: sys.length,
+      optionCampaigns: campaigns.filter((c) => c.option).length,
+      openRunners: positions.length, systemEntry: SYSTEM_ENTRY, since: SINCE,
+    },
+    // ALL campaigns since May (sys flag marks the system cohort) — the page computes either
+    // population client-side from the same list, so the journal and the quant page reconcile.
     campaigns: campaigns
-      .filter(isSystem)
       .sort((a, b2) => Math.abs(b2.pl) - Math.abs(a.pl))
-      .slice(0, 60)
-      .map(({ key, ...c }) => c),
+      .slice(0, 250)
+      .map(({ key, ...c }) => ({ ...c, sys: isSystem(c) })),
   };
 
   // ---------- merge-write into claude_insights (NEVER clobber Jarvis keys) ----------

@@ -254,7 +254,16 @@ function PlaybookTracker({ trades, uid, setPage }) {
     const topN = Math.max(1, Math.ceil(wins.length * 0.1));
     const top = wins.slice().sort((a, b) => (Number(b.plDollar) || 0) - (Number(a.plDollar) || 0)).slice(0, topN);
     const homerunShare = gross > 0 ? top.reduce((s, t) => s + Math.max(0, Number(t.plDollar) || 0), 0) / gross * 100 : null;
-    return { n: closed.length, avgLoss, worstLoss, payoff, winRate, homerunShare, topN: wins.length ? topN : 0, avgWin, winPcts: wins.map(t => Number(t.plPct) || 0) };
+    // R-based variants — used when the design was built in R-multiples (members size by R).
+    // Trades with no recorded R (no stop) are EXCLUDED from R rows and counted, never guessed.
+    const rOf = (t) => { const v = Number(t.rMult); return t.rMult != null && isFinite(v) ? v : null; };
+    const winRs = wins.map(rOf).filter(v => v != null);
+    const lossRs = losses.map(rOf).filter(v => v != null).map(Math.abs);
+    const avgLossR = lossRs.length ? mean(lossRs) : null;
+    const avgWinR = winRs.length ? mean(winRs) : null;
+    const noR = closed.filter(t => rOf(t) == null).length;
+    return { n: closed.length, avgLoss, worstLoss, payoff, winRate, homerunShare, topN: wins.length ? topN : 0, avgWin,
+      winPcts: wins.map(t => Number(t.plPct) || 0), winRs, avgLossR, avgWinR, payoffR: avgWinR != null && avgLossR ? avgWinR / avgLossR : null, noR };
   }, [trades]);
   // ── DESIGN PROGRESS — pace vs the design's structure (trade count + winner tiers). This is what
   // catches "all ratios green but the homeruns aren't happening": each tier shows how many winners
@@ -263,13 +272,20 @@ function PlaybookTracker({ trades, uid, setPage }) {
     const d = pb.design;
     if (!d || !d.total || !Array.isArray(d.tiers) || !d.tiers.length) return null;
     const frac = Math.min(1, m.n / d.total);
+    // Winner sizes measured in the design's OWN unit: R-multiple designs band on each win's R,
+    // % designs band on plPct — never mixed.
+    const unitR = d.unit === "r";
+    const winSizes = unitR ? m.winRs : m.winPcts;
     const tiers = d.tiers.slice().sort((a, b) => b.gain - a.gain).map((t, i, arr) => {
       const hi = i === 0 ? Infinity : arr[i - 1].gain;              // tier band: [gain, next-bigger tier)
-      const actual = m.winPcts.filter(p => p >= t.gain && p < hi).length;
+      const actual = winSizes.filter(p => p >= t.gain && p < hi).length;
       const expectedNow = t.count * frac;
-      return { gain: t.gain, planned: t.count, actual, expectedNow, ok: actual >= Math.floor(expectedNow) };
+      // Compare against the UNROUNDED expectation (Valen 2026-07-11): flooring let a 1-planned
+      // homerun tier read "0 due → ON PACE" for half the cycle with nothing landed. 0 landed vs
+      // 0.5 due is behind — the ladder must say so.
+      return { gain: t.gain, planned: t.count, actual, expectedNow, ok: actual >= expectedNow };
     });
-    return { total: d.total, taken: m.n, remaining: Math.max(0, d.total - m.n), frac, tiers };
+    return { total: d.total, taken: m.n, remaining: Math.max(0, d.total - m.n), frac, tiers, suffix: unitR ? "R" : "%" };
   }, [pb.design, m]);
   const [more, setMore] = useState(false);
   const [hov, setHov] = useState(null); // hovered trade index on the projection chart (0..100)
@@ -287,12 +303,14 @@ function PlaybookTracker({ trades, uid, setPage }) {
   // projected forward — expectancy per trade compounded over the next 100 trades at simSize% risk deployed.
   const proj = useMemo(() => {
     const t = pb.targets;
-    const size = Number(pb.simSize) > 0 ? Number(pb.simSize) : 15;
+    const unitR = pb.design?.unit === "r"; // R design: expectancy in R, size = % of equity risked/trade
+    const size = Number(pb.simSize) > 0 ? Number(pb.simSize) : (unitR ? 0.5 : 15);
     const evOf = (wr, avgWin, avgLoss) => (wr == null || avgWin == null || avgLoss == null) ? null : (wr / 100) * avgWin - (1 - wr / 100) * avgLoss;
     const evSim = evOf(Number(t.winRate), Number(t.payoff) * Number(t.avgLoss), Number(t.avgLoss));
-    const evAct = evOf(m.winRate, m.avgWin, m.avgLoss);
-    const mult = (ev) => ev == null ? null : Math.pow(1 + (size / 100) * (ev / 100), 100);
-    return { size, evSim, evAct, multSim: mult(evSim), multAct: mult(evAct) };
+    const evAct = unitR ? evOf(m.winRate, m.avgWinR, m.avgLossR) : evOf(m.winRate, m.avgWin, m.avgLoss);
+    // Per-trade growth: % design → size% × ev%; R design → risk% × evR (ev already in R units)
+    const mult = (ev) => ev == null ? null : Math.pow(1 + (size / 100) * (unitR ? ev : ev / 100), 100);
+    return { size, unitR, suffix: unitR ? "R" : "%", sizeLabel: unitR ? "% risk per trade" : "% position size", evSim, evAct, multSim: mult(evSim), multAct: mult(evAct) };
   }, [pb, m]);
   // ── Scoreboard: YOUR DESIGN vs LIVE, one row per metric. Pass/fail compares with half a
   // display-unit of tolerance so a live value that ROUNDS to the target (44.36% shown as 44.4%
@@ -301,16 +319,21 @@ function PlaybookTracker({ trades, uid, setPage }) {
   const desWinRate = pb.design && pb.design.total ? (pb.design.winners / pb.design.total) * 100 : Number(pb.targets.winRate);
   const pass = (v, dir, tgt, tol = 0.05) => (v == null || !Number.isFinite(tgt)) ? null : (dir === "lte" ? v <= tgt + tol : v >= tgt - tol);
   const tg = pb.targets;
+  // Score in the design's OWN unit: an R-multiple design compares R-based live stats (trades
+  // without a recorded R are excluded and counted); a % design compares plPct-based stats.
+  const uR = pb.design?.unit === "r";
+  const liveAvgLoss = uR ? m.avgLossR : m.avgLoss;
+  const livePayoff = uR ? m.payoffR : m.payoff;
   const ROWS = [
     { k: "winRate", label: "Winners · win rate", tip: "How many of your closed trades finished positive, against the share the design plans for. A homerun playbook survives a modest win rate — but not below the one you designed the math on.", design: pb.design && pb.design.total ? `${pb.design.winners} of ${pb.design.total} · ${desWinRate.toFixed(1)}%` : `≥ ${tg.winRate}%`, live: m.n ? `${winsN} of ${m.n} · ${m.winRate.toFixed(1)}%` : null, ok: pass(m.winRate, "gte", desWinRate) },
-    { k: "avgLoss", label: "Average loss", tip: "Mean size of your losing trades. The playbook's core discipline: derisk fast so the average loss stays tiny.", design: `≤ ${tg.avgLoss}%`, live: m.avgLoss == null ? null : m.avgLoss.toFixed(1) + "%", ok: pass(m.avgLoss, "lte", Number(tg.avgLoss)) },
-    { k: "payoff", label: "Avg win ÷ avg loss", tip: "How much bigger the average win is than the average loss. A low-win-rate homerun system needs this comfortably above 2.", design: `≥ ${tg.payoff}×`, live: m.payoff == null ? null : m.payoff.toFixed(2) + "×", ok: pass(m.payoff, "gte", Number(tg.payoff), 0.005) },
+    { k: "avgLoss", label: "Average loss", tip: uR ? "Mean size of your losing trades in R — how much of one risk unit the typical loser actually costs. 1R = a full stop-out; a 3-stop structure designs for 0.67R." : "Mean size of your losing trades. The playbook's core discipline: derisk fast so the average loss stays tiny.", design: `≤ ${tg.avgLoss}${uR ? "R" : "%"}`, live: liveAvgLoss == null ? null : liveAvgLoss.toFixed(2) + (uR ? "R" : "%"), ok: pass(liveAvgLoss, "lte", Number(tg.avgLoss), uR ? 0.005 : 0.05) },
+    { k: "payoff", label: "Avg win ÷ avg loss", tip: "How much bigger the average win is than the average loss" + (uR ? ", measured in R" : "") + ". A low-win-rate homerun system needs this comfortably above 2.", design: `≥ ${tg.payoff}×`, live: livePayoff == null ? null : livePayoff.toFixed(2) + "×", ok: pass(livePayoff, "gte", Number(tg.payoff), 0.005) },
     { k: "homerunShare", label: `Homerun share (top ${m.topN || 1} win${m.topN === 1 ? "" : "s"})`, tip: "Share of total gross profit that came from your biggest ~10% of winners. High = a few big trades carry the book, exactly as designed.", design: `≥ ${tg.homerunShare}%`, live: m.homerunShare == null ? null : m.homerunShare.toFixed(1) + "%", ok: pass(m.homerunShare, "gte", Number(tg.homerunShare)) },
   ];
   // ── ONE verdict for the whole card — every failing check named in plain English.
   const failList = ROWS.filter(r => r.ok === false).map(r => r.label.split(" (")[0].toLowerCase());
   const tiersBehind = pace ? pace.tiers.filter(x => !x.ok) : [];
-  tiersBehind.forEach(x => failList.push(`+${x.gain}%+ winners behind pace`));
+  tiersBehind.forEach(x => failList.push(`+${x.gain}${pace.suffix}+ winners behind pace`));
   const checksN = ROWS.filter(r => r.ok != null).length + (pace ? pace.tiers.length : 0);
   const verdict = failList.length === 0
     ? { word: "ON TRACK", col: "var(--green)", bd: "rgba(34,197,94,0.35)", bg: "rgba(34,197,94,0.07)", why: `all ${checksN} checks passing` }
@@ -372,16 +395,17 @@ function PlaybookTracker({ trades, uid, setPage }) {
         <div style={{ marginTop: 12, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px 14px", background: "rgba(255,255,255,0.015)" }}>
           <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 2 }}>Winner ladder — are the big ones landing on schedule?</div>
           {pace.tiers.map((tr, i) => {
-            const due = Math.floor(tr.expectedNow);
+            const due = tr.expectedNow; // unrounded — "0.5 due" is real information, never floored to 0
             return (
               <div key={i} style={{ display: "grid", gridTemplateColumns: GRID, gap: "2px 10px", alignItems: "center", padding: "8px 0", borderTop: i ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.76rem", minWidth: 0 }}>
-                <span className="term" data-tip={`The design plans ${tr.planned} winners of +${tr.gain}% or larger across the full ${pace.total.toLocaleString()}-trade cycle. "Due by now" pro-rates that to your ${pace.taken.toLocaleString()} trades so far — a playbook dies silently when the big tiers stop landing while every ratio still looks fine.`} style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>+{tr.gain}%+ winners</span>
-                <span style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{tr.planned} planned · {due} due by now</span>
+                <span className="term" data-tip={`The design plans ${tr.planned} winners of +${tr.gain}${pace.suffix} or larger across the full ${pace.total.toLocaleString()}-trade cycle. "Due by now" pro-rates that to your ${pace.taken.toLocaleString()} trades so far — a playbook dies silently when the big tiers stop landing while every ratio still looks fine.`} style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>+{tr.gain}{pace.suffix}+ winners</span>
+                <span style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{tr.planned} planned · {due < 10 ? due.toFixed(1) : Math.round(due)} due by now</span>
                 <b style={{ fontVariantNumeric: "tabular-nums" }}>{tr.actual} landed</b>
-                <span style={{ textAlign: "right", fontWeight: 800, fontSize: "0.62rem", whiteSpace: "nowrap", color: tr.ok ? "var(--green)" : "var(--red)" }}>{tr.ok ? "✓ ON PACE" : `✕ NEED ${Math.max(0, due - tr.actual)} MORE`}</span>
+                <span style={{ textAlign: "right", fontWeight: 800, fontSize: "0.62rem", whiteSpace: "nowrap", color: tr.ok ? "var(--green)" : "var(--red)" }}>{tr.ok ? "✓ ON PACE" : `✕ NEED ${Math.max(1, Math.ceil(due - tr.actual))} MORE`}</span>
               </div>
             );
           })}
+          {uR && m.noR > 0 && <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 6 }}>{m.noR} trade{m.noR === 1 ? "" : "s"} without a recorded R (no original stop) excluded from R-based rows — never guessed.</div>}
           <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Every ratio above can pass while the design still fails — if the big winners aren't landing at pace, the expectancy math never materializes. This ladder is the honest check.</div>
         </div>
       )}
@@ -393,16 +417,16 @@ function PlaybookTracker({ trades, uid, setPage }) {
       {more && (
         <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px 18px", fontSize: "0.74rem" }}>
-            <span className="term" data-tip="Expectancy: the average % you'd make per trade — win-rate × avg win − loss-rate × avg loss." style={{ color: "var(--muted)" }}>Expectancy / trade</span>
-            <span style={{ whiteSpace: "nowrap" }}>design <b style={{ fontVariantNumeric: "tabular-nums" }}>{proj.evSim == null ? "—" : (proj.evSim >= 0 ? "+" : "") + proj.evSim.toFixed(2) + "%"}</b></span>
-            <span style={{ whiteSpace: "nowrap" }}>you <b style={{ fontVariantNumeric: "tabular-nums" }}>{proj.evAct == null ? "—" : (proj.evAct >= 0 ? "+" : "") + proj.evAct.toFixed(2) + "%"}</b></span>
+            <span className="term" data-tip={proj.unitR ? "Expectancy in R: the average R you'd make per trade — win-rate × avg win(R) − loss-rate × avg loss(R)." : "Expectancy: the average % you'd make per trade — win-rate × avg win − loss-rate × avg loss."} style={{ color: "var(--muted)" }}>Expectancy / trade</span>
+            <span style={{ whiteSpace: "nowrap" }}>design <b style={{ fontVariantNumeric: "tabular-nums" }}>{proj.evSim == null ? "—" : (proj.evSim >= 0 ? "+" : "") + proj.evSim.toFixed(2) + proj.suffix}</b></span>
+            <span style={{ whiteSpace: "nowrap" }}>you <b style={{ fontVariantNumeric: "tabular-nums" }}>{proj.evAct == null ? "—" : (proj.evAct >= 0 ? "+" : "") + proj.evAct.toFixed(2) + proj.suffix}</b></span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: "0.68rem", whiteSpace: "nowrap" }}>
-              at <input type="number" min="1" max="100" step="1" value={pb.simSize ?? 15} onChange={e => setPb(p => ({ ...p, simSize: e.target.value === "" ? "" : Number(e.target.value) }))}
-                style={{ width: 52, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: "var(--text)", padding: "3px 8px", fontSize: "0.7rem" }} /> % position size
+              at <input type="number" min={proj.unitR ? 0.1 : 1} max="100" step={proj.unitR ? 0.1 : 1} value={pb.simSize ?? (proj.unitR ? 0.5 : 15)} onChange={e => setPb(p => ({ ...p, simSize: e.target.value === "" ? "" : Number(e.target.value) }))}
+                style={{ width: 56, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: "var(--text)", padding: "3px 8px", fontSize: "0.7rem" }} /> {proj.sizeLabel}
             </span>
             {proj.evSim != null && proj.evAct != null && (
               <b style={{ marginLeft: "auto", fontSize: "0.7rem", color: proj.evAct >= proj.evSim ? "var(--green)" : "var(--red)" }}>
-                {proj.evAct >= proj.evSim ? "trading ahead of the design" : `lagging the design by ${(proj.evSim - proj.evAct).toFixed(2)}%/trade`}
+                {proj.evAct >= proj.evSim ? "trading ahead of the design" : `lagging the design by ${(proj.evSim - proj.evAct).toFixed(2)}${proj.suffix}/trade`}
               </b>
             )}
           </div>
@@ -410,7 +434,8 @@ function PlaybookTracker({ trades, uid, setPage }) {
               glide/drag across the chart to read both curves at any trade (pointer events cover touch). */}
           {proj.evSim != null && proj.evAct != null && (() => {
             const N = 100, sz = proj.size / 100;
-            const curveOf = (ev) => Array.from({ length: N + 1 }, (_, i) => Math.pow(1 + sz * (ev / 100), i));
+            // % design: growth = size% × ev% per trade · R design: growth = risk% × evR per trade
+            const curveOf = (ev) => Array.from({ length: N + 1 }, (_, i) => Math.pow(1 + sz * (proj.unitR ? ev : ev / 100), i));
             const simC = curveOf(proj.evSim), actC = curveOf(proj.evAct);
             const all = [...simC, ...actC]; const lo = Math.min(...all); const hiR = Math.max(...all); const hi = hiR === lo ? lo + 1 : hiR;
             const X = (i) => (i / N) * 600, Y = (v) => 10 + (1 - (v - lo) / (hi - lo)) * 158;
@@ -462,6 +487,9 @@ const WHATS_NEW = [
       "The winner ladder checks the part ratios can't see: is each SIZE of winner landing on schedule? Planned · due by now · landed, per tier — because a playbook dies silently when the big winners stop happening while every average still looks fine.",
       "The projected equity curve is now interactive: glide across it to inspect any of the next 100 trades — the design's equity, yours if nothing changes, and the gap between them.",
       "A calmer read across the analytics: numbers stay neutral by default and colour now means something — green/red is reserved for outcomes (Avg R, P&L) and verdicts, category labels carry a small dot instead of coloured text, and the emoji badges are gone. Based on published dashboard-design research, so the number that matters is the one that pops.",
+      "Key metrics follow the same rule: rates, ratios and hold times now render in clean white — only actual P&L and R numbers carry green/red, so a 44% win rate no longer screams alarm-red when it's exactly what a homerun playbook expects.",
+      "Return Simulator now designs in R-MULTIPLES by default — risk per trade (your 1R as % of equity), losers in R, winner tiers in R (2R / 5R / 10R) — because that's how positions are actually sized. A toggle keeps the classic % mode; the Playbook tracker scores your live trades in whichever unit you designed in (trades without a recorded R are excluded and counted, never guessed).",
+      "Winner-ladder pacing is now exact: 'due by now' shows the true pro-rated number (0.5 due, never rounded to 0), so a planned homerun that hasn't landed reads BEHIND — not a false ON PACE.",
     ],
   },
   {
@@ -2645,16 +2673,26 @@ function ReturnSimulatorTab({ guideEnter, guideLeave, gactive, expert, portfolio
   const [simWinRate, setSimWinRate] = useState("40");
   const [simAvgLoss, setSimAvgLoss] = useState("5");
   const [simTiers, setSimTiers] = useState([{ count: "80", gain: "5" }, { count: "10", gain: "50" }, { count: "10", gain: "100" }]);
+  // R-MULTIPLE design mode (DEFAULT — members size by R, Valen 2026-07-11). Same compounding
+  // engine, different unit: each trade moves equity by (risk% of equity) × (trade's R). Separate
+  // state per mode so toggling never reinterprets what the member typed.
+  const [simUnit, setSimUnit] = useState("r"); // "r" = R-multiple · "pct" = % of position
+  const [simRisk, setSimRisk] = useState("0.5"); // % of equity risked per trade = 1R
+  const [simAvgLossR, setSimAvgLossR] = useState("1"); // loser size in R (0.67 if 3-stop structure)
+  const [simTiersR, setSimTiersR] = useState([{ count: "60", gain: "2" }, { count: "30", gain: "5" }, { count: "10", gain: "10" }]);
   const [pbSaved, setPbSaved] = useState(false); // "design saved ✓" flash after Save playbook design
   const [simScenarios, setSimScenarios] = useState([]);
 
   const sim = useMemo(() => {
     const startCap = (+simStart > 0) ? +simStart : baseStart;
     const base = (+simCurrent > 0) ? +simCurrent : (baseCurrent > 0 ? baseCurrent : startCap); // projection compounds from current capital
-    const ps = (+simPosSize || 0) / 100;
-    const avgLoss = (+simAvgLoss || 0) / 100;
-    const tiers = simTiers
-      .map(t => ({ count: Math.max(0, Math.floor(+t.count || 0)), gain: (+t.gain || 0) / 100 }))
+    // Unit mapping: in % mode a trade moves equity by size% × return%; in R mode by risk% × R.
+    // Same engine — ps carries risk%/100 and "gain" carries the raw R multiple.
+    const unit = simUnit;
+    const ps = unit === "r" ? (+simRisk || 0) / 100 : (+simPosSize || 0) / 100;
+    const avgLoss = unit === "r" ? (+simAvgLossR || 0) : (+simAvgLoss || 0) / 100;
+    const tiers = (unit === "r" ? simTiersR : simTiers)
+      .map(t => ({ count: Math.max(0, Math.floor(+t.count || 0)), gain: unit === "r" ? (+t.gain || 0) : (+t.gain || 0) / 100 }))
       .filter(t => t.count > 0);
     const winners = tiers.reduce((s, t) => s + t.count, 0);
     let losers;
@@ -2695,10 +2733,10 @@ function ReturnSimulatorTab({ guideEnter, guideLeave, gactive, expert, portfolio
       eq *= (1 + ps * rr);
       if ((idx + 1) % step === 0 || idx === seq.length - 1) curve.push({ trade: idx + 1, equity: Math.round(eq) });
     });
-    return { startCap, base, ps, losers, avgLoss, winners, total, winRate, lossDrag, winMult, endEq, totalReturn, fromStartReturn, tierStats, curve };
-  }, [simStart, simCurrent, simPosSize, simLossMode, simLosers, simWinRate, simAvgLoss, simTiers, baseStart, baseCurrent]);
+    return { startCap, base, ps, losers, avgLoss, winners, total, winRate, lossDrag, winMult, endEq, totalReturn, fromStartReturn, tierStats, curve, unit };
+  }, [simStart, simCurrent, simPosSize, simLossMode, simLosers, simWinRate, simAvgLoss, simTiers, simUnit, simRisk, simAvgLossR, simTiersR, baseStart, baseCurrent]);
 
-  const winnersCount = simTiers.reduce((s, t) => s + Math.max(0, Math.floor(+t.count || 0)), 0);
+  const winnersCount = (simUnit === "r" ? simTiersR : simTiers).reduce((s, t) => s + Math.max(0, Math.floor(+t.count || 0)), 0);
 
 // ════════════════════════════════════════════════════════════════════════
 // RETURN SIMULATOR — new render block for ReturnSimulatorTab
@@ -2767,8 +2805,19 @@ return (
           <div className="iogrid">
             <div className="field"><label><span className="term" data-tip="The money you started the account with. Your total return is measured against this.">Starting capital</span></label><input className="in" value={simStart} onChange={e => setSimStart(e.target.value)} placeholder={baseStart ? Math.round(baseStart).toString() : "100000"} /><div className="hint">What you began with.{baseStart > 0 && <button onClick={() => setSimStart(String(Math.round(baseStart)))} style={{ background: "transparent", border: "none", color: "var(--goldBright)", cursor: "pointer", fontSize: "0.62rem", fontWeight: 700, padding: "0 0 0 6px" }}>↙ auto-fill</button>}</div></div>
             <div className="field"><label><span className="term" data-tip="The money you have now. Compounding starts from here.">Current capital</span></label><input className="in" value={simCurrent} onChange={e => setSimCurrent(e.target.value)} placeholder={baseCurrent ? Math.round(baseCurrent).toString() : "100000"} /><div className="hint">What you have today.{baseCurrent > 0 && <button onClick={() => setSimCurrent(String(Math.round(baseCurrent)))} style={{ background: "transparent", border: "none", color: "var(--goldBright)", cursor: "pointer", fontSize: "0.62rem", fontWeight: 700, padding: "0 0 0 6px" }}>↙ auto-fill</button>}</div></div>
-            <div className="field"><label><span className="term" data-tip="How much of your account goes into each trade, as a percent. Bigger size compounds faster but loses faster too.">Position size %</span></label><input className="in" value={simPosSize} onChange={e => setSimPosSize(e.target.value)} placeholder="12" /><div className="hint">% of account per trade.</div></div>
-            <div className="field"><label><span className="term" data-tip="The typical percent you lose on a losing trade (a positive number, e.g. 5 means −5%).">Avg loss %</span></label><input className="in" value={simAvgLoss} onChange={e => setSimAvgLoss(e.target.value)} placeholder="5" /><div className="hint">Typical losing trade.</div></div>
+            <div className="field"><label><span className="term" data-tip="Design in R-multiples (each trade measured in units of risk — how most of us size) or in raw % moves of the position. Same compounding math, different unit.">Design unit</span></label>
+              <div className="miniseg">
+                <button className={simUnit === "r" ? "on" : ""} onClick={() => setSimUnit("r")}>R-multiple</button>
+                <button className={simUnit === "pct" ? "on" : ""} onClick={() => setSimUnit("pct")}>% of position</button>
+              </div>
+            </div>
+            {simUnit === "r" ? (<>
+              <div className="field"><label><span className="term" data-tip="Your 1R as a percent of the account — how much of your equity a full stop-out costs. 0.5 means every loser at −1R dents the account about half a percent.">Risk per trade %</span></label><input className="in" value={simRisk} onChange={e => setSimRisk(e.target.value)} placeholder="0.5" /><div className="hint">1R, as % of equity.</div></div>
+              <div className="field"><label><span className="term" data-tip="Typical loser in R. 1 = a full stop-out; 0.67 if you run a staggered 3-stop structure; smaller if you derisk before the stop.">Avg loss (R)</span></label><input className="in" value={simAvgLossR} onChange={e => setSimAvgLossR(e.target.value)} placeholder="1" /><div className="hint">Typical losing trade, in R.</div></div>
+            </>) : (<>
+              <div className="field"><label><span className="term" data-tip="How much of your account goes into each trade, as a percent. Bigger size compounds faster but loses faster too.">Position size %</span></label><input className="in" value={simPosSize} onChange={e => setSimPosSize(e.target.value)} placeholder="12" /><div className="hint">% of account per trade.</div></div>
+              <div className="field"><label><span className="term" data-tip="The typical percent you lose on a losing trade (a positive number, e.g. 5 means −5%).">Avg loss %</span></label><input className="in" value={simAvgLoss} onChange={e => setSimAvgLoss(e.target.value)} placeholder="5" /><div className="hint">Typical losing trade.</div></div>
+            </>)}
             <div className="field"><label><span className="term" data-tip="How you describe your losers: enter a raw count of losing trades, or a win rate % and we work out the losers for you.">Losers</span></label>
               <div className="miniseg">
                 <button className={simLossMode === "count" ? "on" : ""} onClick={() => setSimLossMode("count")}>By count</button>
@@ -2781,27 +2830,33 @@ return (
           </div>
           <div className="panelhead" style={{ marginTop: 18 }}>Your winners <span style={{ color: "var(--faint)", textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>— group them by size</span></div>
           <div className="tbl-scroll">
-          <table className="rtable" style={{ marginTop: 6 }}>
-            <thead><tr><th>Winner size %</th><th>How many</th></tr></thead>
-            <tbody>
-              {simTiers.map((row, i) => (
-                <tr key={i}>
-                  <td style={{ textAlign: "left" }}><input className="in" style={{ maxWidth: 120 }} value={row.gain} onChange={e => setSimTiers(t => t.map((r, idx) => idx === i ? { ...r, gain: e.target.value } : r))} /></td>
-                  <td style={{ position: "relative" }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "flex-end", width: "100%" }}>
-                      <input className="in" style={{ maxWidth: 120 }} value={row.count} onChange={e => setSimTiers(t => t.map((r, idx) => idx === i ? { ...r, count: e.target.value } : r))} />
-                      <button title="Remove this winner tier" disabled={simTiers.length <= 1} onClick={() => setSimTiers(t => t.filter((_, idx) => idx !== i))}
-                        style={{ background: "transparent", border: "none", color: simTiers.length <= 1 ? "var(--faint)" : "var(--muted)", cursor: simTiers.length <= 1 ? "default" : "pointer", fontSize: "0.85rem", padding: "0 2px" }}>✕</button>
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {(() => {
+            const tiersNow = simUnit === "r" ? simTiersR : simTiers;
+            const setTiersNow = simUnit === "r" ? setSimTiersR : setSimTiers;
+            return (
+              <table className="rtable" style={{ marginTop: 6 }}>
+                <thead><tr><th>{simUnit === "r" ? "Winner size (R)" : "Winner size %"}</th><th>How many</th></tr></thead>
+                <tbody>
+                  {tiersNow.map((row, i) => (
+                    <tr key={i}>
+                      <td style={{ textAlign: "left" }}><input className="in" style={{ maxWidth: 120 }} value={row.gain} onChange={e => setTiersNow(t => t.map((r, idx) => idx === i ? { ...r, gain: e.target.value } : r))} /></td>
+                      <td style={{ position: "relative" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "flex-end", width: "100%" }}>
+                          <input className="in" style={{ maxWidth: 120 }} value={row.count} onChange={e => setTiersNow(t => t.map((r, idx) => idx === i ? { ...r, count: e.target.value } : r))} />
+                          <button title="Remove this winner tier" disabled={tiersNow.length <= 1} onClick={() => setTiersNow(t => t.filter((_, idx) => idx !== i))}
+                            style={{ background: "transparent", border: "none", color: tiersNow.length <= 1 ? "var(--faint)" : "var(--muted)", cursor: tiersNow.length <= 1 ? "default" : "pointer", fontSize: "0.85rem", padding: "0 2px" }}>✕</button>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          })()}
           </div>
-          <button className="btn" style={{ marginTop: 8, fontSize: "0.72rem", padding: "6px 12px" }} onClick={() => setSimTiers(t => [...t, { gain: "", count: "" }])}>＋ Add winner tier</button>
+          <button className="btn" style={{ marginTop: 8, fontSize: "0.72rem", padding: "6px 12px" }} onClick={() => (simUnit === "r" ? setSimTiersR : setSimTiers)(t => [...t, { gain: "", count: "" }])}>＋ Add winner tier</button>
           <div className="hint" style={{ marginTop: 8 }}>Most wins are small; a few are huge. That mix is what drives compounding.</div>
-          <button className="btn" style={{ marginTop: 14 }} onClick={() => sim && setSimScenarios(s => [...s, { id: Date.now(), posSize: +simPosSize || 0, avgLoss: +simAvgLoss || 0, winRate: sim.winRate, totalReturn: sim.totalReturn, endEq: sim.endEq, total: sim.total }].slice(-3))}>＋ Save as scenario to compare</button>
+          <button className="btn" style={{ marginTop: 14 }} onClick={() => sim && setSimScenarios(s => [...s, { id: Date.now(), posSize: simUnit === "r" ? (+simRisk || 0) : (+simPosSize || 0), avgLoss: simUnit === "r" ? (+simAvgLossR || 0) : (+simAvgLoss || 0), winRate: sim.winRate, totalReturn: sim.totalReturn, endEq: sim.endEq, total: sim.total }].slice(-3))}>＋ Save as scenario to compare</button>
           {/* ── Simulator → Playbook loop: this design becomes the tracker's BENCHMARK; live journal
                 stats fill in automatically and the tracker compares + projects both. ── */}
           {(() => {
@@ -2809,22 +2864,23 @@ return (
               if (!sim) return;
               const uid = session?.user?.id || "anon";
               const KEY = `viv-playbook-${uid}-v1`;
-              const tiers = simTiers.map(r => ({ gain: +r.gain || 0, count: +r.count || 0 })).filter(r => r.gain > 0 && r.count > 0);
+              const unit = simUnit; // "r" designs benchmark in R-multiples; "pct" in % moves
+              const tiers = (unit === "r" ? simTiersR : simTiers).map(r => ({ gain: +r.gain || 0, count: +r.count || 0 })).filter(r => r.gain > 0 && r.count > 0);
               const wN = tiers.reduce((s, r) => s + r.count, 0);
               const wSum = tiers.reduce((s, r) => s + r.gain * r.count, 0);
               const avgWin = wN ? wSum / wN : 0;
-              const avgLoss = +simAvgLoss || 0;
+              const avgLoss = unit === "r" ? (+simAvgLossR || 0) : (+simAvgLoss || 0);
               let topLeft = Math.max(1, Math.ceil(wN * 0.1)), topSum = 0; // top ~10% of winners by size
               for (const r of tiers.slice().sort((a, b) => b.gain - a.gain)) { const take = Math.min(topLeft, r.count); topSum += take * r.gain; topLeft -= take; if (!topLeft) break; }
               let cur = {}; try { cur = JSON.parse(localStorage.getItem(KEY) || "null") || {}; } catch { /* fresh */ }
-              const next = { ...cur, name: cur.designed && cur.name ? cur.name : "Playbook design", designed: true, simSize: +simPosSize || 15,
+              const next = { ...cur, name: cur.designed && cur.name ? cur.name : "Playbook design", designed: true,
+                simSize: unit === "r" ? (+simRisk || 0.5) : (+simPosSize || 15), // R mode: % of equity risked per trade
                 targets: { ...(cur.targets || {}), avgLoss, winRate: +sim.winRate.toFixed(1),
                   payoff: avgLoss > 0 ? +(avgWin / avgLoss).toFixed(2) : 0,
                   homerunShare: wSum > 0 ? +((topSum / wSum) * 100).toFixed(0) : 0 },
-                // The design's STRUCTURE — total trade count + winner tiers — so the tracker can show
-                // pace: trades taken vs planned, and per-tier expected-by-now vs actual (a member can
-                // pass every ratio target while still missing the homeruns the design depends on).
-                design: { total: sim.total, winners: sim.winners, losers: sim.losers, tiers } };
+                // The design's STRUCTURE — unit + total trade count + winner tiers — so the tracker
+                // scores live trades in the SAME unit the member designed in (R bands vs % bands).
+                design: { unit, total: sim.total, winners: sim.winners, losers: sim.losers, tiers } };
               try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* quota */ }
               if (goCompare && setPage) { try { sessionStorage.setItem("viv-goto-playbook", "1"); } catch {} setPage("journal"); }
             };
@@ -6365,20 +6421,24 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
         <div className="metrics">
           {(() => {
             const m = dstats;
+            // Value colour follows the TradeZella convention (Valen, 2026-07-11): rates, ratios and
+            // hold times render NEUTRAL white — only actual P&L/R numbers carry green/red. A 44%
+            // win rate in alarm-red reads like a failure when it's exactly what a homerun playbook
+            // expects; colour is reserved for money.
             const tiles = [
-              { k: "winRate", label: "Win rate", val: m.n ? Math.round(m.winRate) + "%" : "—", cls: m.winRate >= 50 ? "green" : "red", sub: `${m.wins} of ${m.n} trades`, tip: "Percentage of your closed trades that finished profitable." },
+              { k: "winRate", label: "Win rate", val: m.n ? Math.round(m.winRate) + "%" : "—", cls: "", sub: `${m.wins} of ${m.n} trades`, tip: "Percentage of your closed trades that finished profitable." },
               { k: "avgGain", label: "Avg gain", val: m.wins ? sgnPct(m.avgGain) : "—", cls: "green", sub: "winners only", tip: "Average % return across your winning trades only." },
               { k: "avgLoss", label: "Avg loss", val: m.losses ? "−" + Math.abs(m.avgLoss).toFixed(2) + "%" : "—", cls: "red", sub: "losers only", tip: "Average % loss across your losing trades only." },
-              { k: "wlr", label: "Win/Loss ratio", val: (m.wins && m.losses) ? m.wlr.toFixed(2) : "—", cls: "gold", sub: "winners vs losers", tip: "Average win ÷ average loss — how much bigger a typical winner is than a typical loser." },
+              { k: "wlr", label: "Win/Loss ratio", val: (m.wins && m.losses) ? m.wlr.toFixed(2) : "—", cls: "", sub: "winners vs losers", tip: "Average win ÷ average loss — how much bigger a typical winner is than a typical loser." },
               { k: "exp", label: "Avg P/L per trade", val: m.n ? (privacyMode ? sgnR(m.expectancy) : sgnMoney(m.totalPL / m.n)) : "—", cls: m.expectancy >= 0 ? "green" : "red", sub: "expectancy in $", tip: "Your average dollar result per trade — total realized P/L ÷ number of trades. Above zero = a positive edge. (Privacy shows it in R; see Avg R-mult for the risk-unit version.)" },
-              { k: "pf", label: "Profit factor", val: m.n ? (isFinite(m.pf) ? m.pf.toFixed(2) : (m.wins ? "∞" : "—")) : "—", cls: "gold", sub: "gross win ÷ loss", tip: "Total profit from winners ÷ total loss from losers. Above 1.0 means the system makes money." },
+              { k: "pf", label: "Profit factor", val: m.n ? (isFinite(m.pf) ? m.pf.toFixed(2) : (m.wins ? "∞" : "—")) : "—", cls: "", sub: "gross win ÷ loss", tip: "Total profit from winners ÷ total loss from losers. Above 1.0 means the system makes money." },
               { k: "lw", label: "Largest win", val: m.lw ? sgnPct(Number(m.lw.plPct)) : "—", cls: "green", sub: m.lw ? m.lw.ticker : "—", tip: "Your single biggest winning trade by % return." },
               { k: "ll", label: "Largest loss", val: m.ll ? "−" + Math.abs(Number(m.ll.plPct)).toFixed(2) + "%" : "—", cls: "red", sub: m.ll ? m.ll.ticker : "—", tip: "Your single biggest losing trade by % return." },
-              { k: "adjwl", label: "Adj. W/L ratio", val: (m.wins && m.losses) ? m.adjWL.toFixed(2) : "—", cls: "gold", sub: "frequency-adjusted", tip: "Payoff ratio adjusted for how often you win: (avg gain × win rate) ÷ (avg loss × loss rate). Above 1.0 means your wins outweigh your losses." },
+              { k: "adjwl", label: "Adj. W/L ratio", val: (m.wins && m.losses) ? m.adjWL.toFixed(2) : "—", cls: "", sub: "frequency-adjusted", tip: "Payoff ratio adjusted for how often you win: (avg gain × win rate) ÷ (avg loss × loss rate). Above 1.0 means your wins outweigh your losses." },
               { k: "avgr", label: "Avg R-mult", val: m.n ? sgnR(m.expectancy) : "—", cls: m.expectancy >= 0 ? "green" : "red", sub: "all trades", tip: "Average R-multiple — your mean result measured in units of risk. Above 0 is a positive edge." },
-              { k: "holdwin", label: "Avg hold (win)", val: m.wins ? Math.round(m.avgHoldWin) + "d" : "—", cls: "green", sub: "winners only", tip: "Average number of days you hold winning trades." },
-              { k: "holdlose", label: "Avg hold (lose)", val: m.losses ? Math.round(m.avgHoldLoss) + "d" : "—", cls: "red", sub: "losers only", tip: "Average number of days you hold losing trades." },
-              { k: "holdratio", label: "Hold ratio (W/L)", val: (m.wins && m.losses) ? m.holdRatio.toFixed(2) : "—", cls: (m.wins && m.losses) ? (m.holdRatio >= 1 ? "green" : "red") : "gold", sub: "winners vs losers", tip: "Avg hold of winners ÷ avg hold of losers. Above 1.0 means you let winners run longer than you sit in losers." },
+              { k: "holdwin", label: "Avg hold (win)", val: m.wins ? Math.round(m.avgHoldWin) + "d" : "—", cls: "", sub: "winners only", tip: "Average number of days you hold winning trades." },
+              { k: "holdlose", label: "Avg hold (lose)", val: m.losses ? Math.round(m.avgHoldLoss) + "d" : "—", cls: "", sub: "losers only", tip: "Average number of days you hold losing trades." },
+              { k: "holdratio", label: "Hold ratio (W/L)", val: (m.wins && m.losses) ? m.holdRatio.toFixed(2) : "—", cls: "", sub: "winners vs losers", tip: "Avg hold of winners ÷ avg hold of losers. Above 1.0 means you let winners run longer than you sit in losers." },
             ];
             return statDrag.order.map((ti, vi) => {
               const t = tiles[ti];
