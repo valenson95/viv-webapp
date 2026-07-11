@@ -490,6 +490,8 @@ const WHATS_NEW = [
       "Key metrics follow the same rule: rates, ratios and hold times now render in clean white — only actual P&L and R numbers carry green/red, so a 44% win rate no longer screams alarm-red when it's exactly what a homerun playbook expects.",
       "Return Simulator now designs in R-MULTIPLES by default — risk per trade (your 1R as % of equity), losers in R, winner tiers in R (2R / 5R / 10R) — because that's how positions are actually sized. A toggle keeps the classic % mode; the Playbook tracker scores your live trades in whichever unit you designed in (trades without a recorded R are excluded and counted, never guessed).",
       "Winner-ladder pacing is now exact: 'due by now' shows the true pro-rated number (0.5 due, never rounded to 0), so a planned homerun that hasn't landed reads BEHIND — not a false ON PACE.",
+      "NEW: Plan backwards from a target — type the total % return you want and the simulator tells you how many trades it takes at your win rate, risk and winner mix (e.g. 162 trades to double at 0.5% risk), with a one-click 'Use this plan' that fills your design. You can't plan a trade count — you CAN plan a target.",
+      "Your saved playbook design is now the simulator's DEFAULT: 'Edit playbook design' opens on exactly what you saved — unit, risk, tiers, losers — never factory numbers. Save once, and it sticks until you save again.",
     ],
   },
   {
@@ -2680,6 +2682,32 @@ function ReturnSimulatorTab({ guideEnter, guideLeave, gactive, expert, portfolio
   const [simRisk, setSimRisk] = useState("0.5"); // % of equity risked per trade = 1R
   const [simAvgLossR, setSimAvgLossR] = useState("1"); // loser size in R (0.67 if 3-stop structure)
   const [simTiersR, setSimTiersR] = useState([{ count: "60", gain: "2" }, { count: "30", gain: "5" }, { count: "10", gain: "10" }]);
+  // ── SAVED DESIGN = THE DEFAULT (Valen 2026-07-11): opening the simulator loads the member's
+  // saved playbook design into every field. Factory numbers appear only before the FIRST save;
+  // after that, "Edit playbook design" always lands on what they saved — never resets.
+  useEffect(() => {
+    try {
+      const uid = session?.user?.id || "anon";
+      const s = JSON.parse(localStorage.getItem(`viv-playbook-${uid}-v1`) || "null");
+      const d = s?.designed && s.design;
+      if (!d || !Array.isArray(d.tiers) || !d.tiers.length) return;
+      const unit = d.unit === "r" ? "r" : "pct";
+      setSimUnit(unit);
+      const tiers = d.tiers.map(t => ({ gain: String(t.gain), count: String(t.count) }));
+      if (unit === "r") {
+        setSimTiersR(tiers);
+        if (s.targets?.avgLoss != null) setSimAvgLossR(String(s.targets.avgLoss));
+        if (s.simSize != null) setSimRisk(String(s.simSize));
+      } else {
+        setSimTiers(tiers);
+        if (s.targets?.avgLoss != null) setSimAvgLoss(String(s.targets.avgLoss));
+        if (s.simSize != null) setSimPosSize(String(s.simSize));
+      }
+      if (d.losers != null) { setSimLossMode("count"); setSimLosers(String(d.losers)); }
+      setExampleMode(false);
+    } catch { /* fresh browser / private mode */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [pbSaved, setPbSaved] = useState(false); // "design saved ✓" flash after Save playbook design
   const [simScenarios, setSimScenarios] = useState([]);
 
@@ -2737,6 +2765,51 @@ function ReturnSimulatorTab({ guideEnter, guideLeave, gactive, expert, portfolio
   }, [simStart, simCurrent, simPosSize, simLossMode, simLosers, simWinRate, simAvgLoss, simTiers, simUnit, simRisk, simAvgLossR, simTiersR, baseStart, baseCurrent]);
 
   const winnersCount = (simUnit === "r" ? simTiersR : simTiers).reduce((s, t) => s + Math.max(0, Math.floor(+t.count || 0)), 0);
+
+  // ── PLAN BACKWARDS FROM A TARGET (Valen 2026-07-11): members can't predict a trade count —
+  // they know the RETURN they want, their win rate, and the winner sizes they trade. Solve N:
+  //   g = WR · Σ shareᵢ·ln(1 + k·gainᵢ)  +  (1−WR) · ln(1 − k·loss)      (k = risk%/size% ÷ 100)
+  //   N = ln(1 + target) / g   — the EXPECTED path; variance makes it a range, not a promise.
+  // Tier counts act as the MIX (60:30:10), win rate from the toggle (or implied by counts).
+  const [planTarget, setPlanTarget] = useState("100");
+  const plan = useMemo(() => {
+    const t = (+planTarget || 0) / 100;
+    if (!(t > 0)) return null;
+    const unit = simUnit;
+    const k = unit === "r" ? (+simRisk || 0) / 100 : (+simPosSize || 0) / 100;
+    const loss = unit === "r" ? (+simAvgLossR || 0) : (+simAvgLoss || 0) / 100;
+    const raw = (unit === "r" ? simTiersR : simTiers)
+      .map(x => ({ g: +x.gain || 0, c: Math.max(0, +x.count || 0) }))
+      .filter(x => x.g > 0 && x.c > 0);
+    const wSum = raw.reduce((s, x) => s + x.c, 0);
+    if (!(k > 0) || !wSum || !(loss > 0)) return null;
+    let wr;
+    if (simLossMode === "rate") wr = (+simWinRate || 0) / 100;
+    else { const l = Math.max(0, +simLosers || 0); wr = wSum / Math.max(1, wSum + l); }
+    if (!(wr > 0 && wr < 1)) return null;
+    const frac = (g) => unit === "r" ? g : g / 100;
+    const gWin = raw.reduce((s, x) => s + (x.c / wSum) * Math.log(1 + k * frac(x.g)), 0);
+    const gLoss = Math.log(Math.max(1e-9, 1 - k * loss));
+    const g = wr * gWin + (1 - wr) * gLoss;
+    if (g <= 0) return { impossible: true, wr: wr * 100 };
+    const N = Math.ceil(Math.log(1 + t) / g);
+    let W = Math.max(1, Math.round(N * wr));
+    const L = Math.max(0, N - W);
+    // integer winners per tier, mix preserved (round, then fix the drift on the biggest tier)
+    const alloc = raw.map(x => ({ g: x.g, n: Math.round(W * x.c / wSum) }));
+    const drift = W - alloc.reduce((s, a) => s + a.n, 0);
+    if (drift !== 0) { const big = alloc.reduce((m, a) => a.n >= m.n ? a : m, alloc[0]); big.n = Math.max(0, big.n + drift); }
+    // what the ROUNDED plan actually lands at
+    const logSum = alloc.reduce((s, a) => s + a.n * Math.log(1 + k * frac(a.g)), 0) + L * gLoss;
+    const achieved = (Math.exp(logSum) - 1) * 100;
+    return { N, W, L, alloc, achieved, wr: wr * 100, suffix: unit === "r" ? "R" : "%" };
+  }, [planTarget, simUnit, simRisk, simPosSize, simAvgLossR, simAvgLoss, simTiersR, simTiers, simLossMode, simWinRate, simLosers]);
+  const applyPlan = () => {
+    if (!plan || plan.impossible) return;
+    (simUnit === "r" ? setSimTiersR : setSimTiers)(plan.alloc.map(a => ({ gain: String(a.g), count: String(a.n) })));
+    setSimLossMode("count");
+    setSimLosers(String(plan.L));
+  };
 
 // ════════════════════════════════════════════════════════════════════════
 // RETURN SIMULATOR — new render block for ReturnSimulatorTab
@@ -2856,6 +2929,31 @@ return (
           </div>
           <button className="btn" style={{ marginTop: 8, fontSize: "0.72rem", padding: "6px 12px" }} onClick={() => (simUnit === "r" ? setSimTiersR : setSimTiers)(t => [...t, { gain: "", count: "" }])}>＋ Add winner tier</button>
           <div className="hint" style={{ marginTop: 8 }}>Most wins are small; a few are huge. That mix is what drives compounding.</div>
+          {/* ── GOAL-SEEK: set the RETURN you want; the system tells you the trades you need.
+                Members can't plan a trade count — they can plan a target and a winner mix. ── */}
+          <div style={{ marginTop: 18, border: "1px solid var(--borderGold)", borderRadius: 12, padding: "12px 14px", background: "rgba(201,152,42,0.04)" }}>
+            <div className="panelhead" style={{ marginBottom: 8 }}>Plan backwards from a target</div>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, fontSize: "0.76rem" }}>
+              <span className="term" data-tip="The total account growth you're planning for, in % of current capital. The solver uses your risk per trade, win rate and winner mix above to work out how many trades that takes.">Target total return</span>
+              <input className="in" style={{ maxWidth: 90 }} value={planTarget} onChange={e => setPlanTarget(e.target.value)} placeholder="100" />
+              <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>%</span>
+            </div>
+            {plan?.impossible ? (
+              <div style={{ marginTop: 10, fontSize: "0.74rem", color: "var(--red)", lineHeight: 1.6 }}>
+                This mix never reaches the target — expected growth per trade is zero or negative at a {plan.wr.toFixed(0)}% win rate. Raise the winner sizes, the win rate, or cut the average loss.
+              </div>
+            ) : plan ? (
+              <div style={{ marginTop: 10, fontSize: "0.76rem", lineHeight: 1.8 }}>
+                You need about <b style={{ color: "var(--goldBright)", fontSize: "0.95rem", fontVariantNumeric: "tabular-nums" }}>{plan.N.toLocaleString()} trades</b> at your {plan.wr.toFixed(0)}% win rate — <b style={{ fontVariantNumeric: "tabular-nums" }}>{plan.W} winners</b> ({plan.alloc.map((a, i) => `${a.n}× ${a.g}${plan.suffix === "R" ? "R" : "%"}`).join(" · ")}) and <b style={{ fontVariantNumeric: "tabular-nums" }}>{plan.L} losers</b>. That exact plan lands ≈ <b style={{ fontVariantNumeric: "tabular-nums" }}>{(plan.achieved >= 0 ? "+" : "") + plan.achieved.toFixed(1)}%</b>.
+                <div style={{ marginTop: 6 }}>
+                  <button className="btn" style={{ fontSize: "0.72rem", padding: "6px 12px" }} onClick={applyPlan} title="Writes these counts into the winner tiers and losers above — then hit Save playbook design to make it your benchmark">Use this plan → fill my design</button>
+                </div>
+                <div className="hint" style={{ marginTop: 8 }}>This is the EXPECTED path — real sequences land in a range around it. It's also very sensitive to risk per trade: half the risk ≈ double the trades. Adjust the mix above and watch this number move.</div>
+              </div>
+            ) : (
+              <div className="hint" style={{ marginTop: 8 }}>Enter a target % — the winner mix, win rate and risk above feed the solver.</div>
+            )}
+          </div>
           <button className="btn" style={{ marginTop: 14 }} onClick={() => sim && setSimScenarios(s => [...s, { id: Date.now(), posSize: simUnit === "r" ? (+simRisk || 0) : (+simPosSize || 0), avgLoss: simUnit === "r" ? (+simAvgLossR || 0) : (+simAvgLoss || 0), winRate: sim.winRate, totalReturn: sim.totalReturn, endEq: sim.endEq, total: sim.total }].slice(-3))}>＋ Save as scenario to compare</button>
           {/* ── Simulator → Playbook loop: this design becomes the tracker's BENCHMARK; live journal
                 stats fill in automatically and the tracker compares + projects both. ── */}
