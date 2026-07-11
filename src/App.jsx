@@ -6447,16 +6447,21 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       </tr></thead>
                       <tbody>
                         {combos.map(c => (
+                          /* NOTE: .vj tbody td right-aligns everything past column 2 — the first three
+                             (text) columns need EXPLICIT textAlign:left or headers and cells drift apart
+                             (the Market-column misalignment Valen caught, 2026-07-11). */
                           <tr key={c.id} onClick={() => setEdgeOpen(edgeOpen === c.id ? null : c.id)} title="Click to see the exact trades behind this combination"
+                            onMouseEnter={e => { if (edgeOpen !== c.id) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent"; }}
                             style={{ cursor: "pointer", background: edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                            <td style={{ padding: "6px 8px", fontWeight: 800, color: c.G === "A+" ? "var(--green)" : c.G === "A" ? "var(--goldBright)" : c.G === "un" ? "var(--muted)" : "var(--text)" }}>{c.G === "un" ? "Ungraded" : c.G}</td>
-                            <td style={{ padding: "6px 8px", color: c.T === "in" ? "var(--green)" : c.T === "off" ? "var(--red)" : "var(--muted)" }}>{c.T === "in" ? "🟢 In" : c.T === "off" ? "🔴 Off" : "◦ Untagged"}</td>
-                            <td style={{ padding: "6px 8px", color: c.X === "trend" ? "var(--green)" : c.X === "down" ? "var(--red)" : c.X === "chop" ? "var(--goldBright)" : "var(--muted)" }}>{c.X === "un" ? "◦ No data" : CTX_LABEL[c.X]}</td>
-                            <td style={{ padding: "6px 8px", textAlign: "right", color: "var(--muted)" }}>{c.n}</td>
-                            <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 700, color: c.winPct >= 50 ? "var(--green)" : "var(--red)" }}>{c.winPct}%</td>
-                            <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 700, color: c.pf == null ? "var(--muted)" : c.pf >= 1 ? "var(--green)" : "var(--red)" }}>{c.pf == null ? "—" : c.pf === Infinity ? "∞" : c.pf.toFixed(2)}</td>
-                            <td style={{ padding: "6px 8px", textAlign: "right" }}>{c.avgR == null ? <span style={{ color: "var(--muted)" }}>—</span> : <b style={{ color: c.avgR >= 0 ? "var(--green)" : "var(--red)" }}>{(c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2)}R</b>}</td>
-                            <td style={{ padding: "6px 4px", color: "var(--muted)", fontSize: "0.66rem" }}>{edgeOpen === c.id ? "▴" : "▾"}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 800, color: c.G === "A+" ? "var(--green)" : c.G === "A" ? "var(--goldBright)" : c.G === "un" ? "var(--muted)" : "var(--text)" }}>{c.G === "un" ? "Ungraded" : c.G}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.T === "in" ? "var(--green)" : c.T === "off" ? "var(--red)" : "var(--muted)" }}>{c.T === "in" ? "🟢 In" : c.T === "off" ? "🔴 Off" : "◦ Untagged"}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.X === "trend" ? "var(--green)" : c.X === "down" ? "var(--red)" : c.X === "chop" ? "var(--goldBright)" : "var(--muted)" }}>{c.X === "un" ? "◦ No data" : CTX_LABEL[c.X]}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{c.n}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: c.winPct >= 50 ? "var(--green)" : "var(--red)" }}>{c.winPct}%</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: c.pf == null ? "var(--muted)" : c.pf >= 1 ? "var(--green)" : "var(--red)" }}>{c.pf == null ? "—" : c.pf === Infinity ? "∞" : c.pf.toFixed(2)}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums" }}>{c.avgR == null ? <span style={{ color: "var(--muted)" }}>—</span> : <b style={{ color: c.avgR >= 0 ? "var(--green)" : "var(--red)" }}>{(c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2)}R</b>}</td>
+                            <td style={{ padding: "8px 4px", textAlign: "right", color: "var(--muted)", fontSize: "0.66rem" }}>{edgeOpen === c.id ? "▴" : "▾"}</td>
                           </tr>
                         ))}
                       </tbody>
