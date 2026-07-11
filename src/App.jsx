@@ -272,6 +272,7 @@ function PlaybookTracker({ trades, uid, setPage }) {
     return { total: d.total, taken: m.n, remaining: Math.max(0, d.total - m.n), frac, tiers };
   }, [pb.design, m]);
   const [more, setMore] = useState(false);
+  const [hov, setHov] = useState(null); // hovered trade index on the projection chart (0..100)
   // Arrived via the simulator's "Compare stats" button → scroll here and open the comparison.
   useEffect(() => {
     try {
@@ -293,134 +294,157 @@ function PlaybookTracker({ trades, uid, setPage }) {
     const mult = (ev) => ev == null ? null : Math.pow(1 + (size / 100) * (ev / 100), 100);
     return { size, evSim, evAct, multSim: mult(evSim), multAct: mult(evAct) };
   }, [pb, m]);
+  // ── Scoreboard: YOUR DESIGN vs LIVE, one row per metric. Pass/fail compares with half a
+  // display-unit of tolerance so a live value that ROUNDS to the target (44.36% shown as 44.4%
+  // against a 44.4% target) can't print a phantom MISS.
+  const winsN = m.winPcts.length;
+  const desWinRate = pb.design && pb.design.total ? (pb.design.winners / pb.design.total) * 100 : Number(pb.targets.winRate);
+  const pass = (v, dir, tgt, tol = 0.05) => (v == null || !Number.isFinite(tgt)) ? null : (dir === "lte" ? v <= tgt + tol : v >= tgt - tol);
+  const tg = pb.targets;
   const ROWS = [
-    { k: "avgLoss", label: "Average loss", dir: "lte", unit: "%", v: m.avgLoss, def: "Mean size of your losing trades. The playbook's core: derisk fast so the average loss stays tiny — this number IS your worst-case discipline." },
-    { k: "payoff", label: "Avg win ÷ avg loss", dir: "gte", unit: "×", v: m.payoff, def: "How much bigger the average win is than the average loss. Homerun systems need this well above 2 because the win rate runs low." },
-    { k: "homerunShare", label: `Homerun share (top ${m.topN || 1} win${m.topN === 1 ? "" : "s"})`, dir: "gte", unit: "%", v: m.homerunShare, def: "Share of total gross profit that came from your biggest ~10% of winners. High = the homerun engine is working: a few big trades carry the book." },
-    { k: "winRate", label: "Win rate floor", dir: "gte", unit: "%", v: m.winRate, def: "The minimum hit rate for the math to hold. A homerun playbook survives a modest win rate — but not below the floor you set here." },
+    { k: "winRate", label: "Winners · win rate", tip: "How many of your closed trades finished positive, against the share the design plans for. A homerun playbook survives a modest win rate — but not below the one you designed the math on.", design: pb.design && pb.design.total ? `${pb.design.winners} of ${pb.design.total} · ${desWinRate.toFixed(1)}%` : `≥ ${tg.winRate}%`, live: m.n ? `${winsN} of ${m.n} · ${m.winRate.toFixed(1)}%` : null, ok: pass(m.winRate, "gte", desWinRate) },
+    { k: "avgLoss", label: "Average loss", tip: "Mean size of your losing trades. The playbook's core discipline: derisk fast so the average loss stays tiny.", design: `≤ ${tg.avgLoss}%`, live: m.avgLoss == null ? null : m.avgLoss.toFixed(1) + "%", ok: pass(m.avgLoss, "lte", Number(tg.avgLoss)) },
+    { k: "payoff", label: "Avg win ÷ avg loss", tip: "How much bigger the average win is than the average loss. A low-win-rate homerun system needs this comfortably above 2.", design: `≥ ${tg.payoff}×`, live: m.payoff == null ? null : m.payoff.toFixed(2) + "×", ok: pass(m.payoff, "gte", Number(tg.payoff), 0.005) },
+    { k: "homerunShare", label: `Homerun share (top ${m.topN || 1} win${m.topN === 1 ? "" : "s"})`, tip: "Share of total gross profit that came from your biggest ~10% of winners. High = a few big trades carry the book, exactly as designed.", design: `≥ ${tg.homerunShare}%`, live: m.homerunShare == null ? null : m.homerunShare.toFixed(1) + "%", ok: pass(m.homerunShare, "gte", Number(tg.homerunShare)) },
   ];
-  const fmt = (v, unit) => v == null ? "—" : (unit === "×" ? v.toFixed(2) + "×" : v.toFixed(1) + "%");
+  // ── ONE verdict for the whole card — every failing check named in plain English.
+  const failList = ROWS.filter(r => r.ok === false).map(r => r.label.split(" (")[0].toLowerCase());
+  const tiersBehind = pace ? pace.tiers.filter(x => !x.ok) : [];
+  tiersBehind.forEach(x => failList.push(`+${x.gain}%+ winners behind pace`));
+  const checksN = ROWS.filter(r => r.ok != null).length + (pace ? pace.tiers.length : 0);
+  const verdict = failList.length === 0
+    ? { word: "ON TRACK", col: "var(--green)", bd: "rgba(34,197,94,0.35)", bg: "rgba(34,197,94,0.07)", why: `all ${checksN} checks passing` }
+    : (tiersBehind.length === 0 && failList.length === 1)
+      ? { word: "DRIFTING", col: "var(--goldBright)", bd: "rgba(240,192,80,0.35)", bg: "rgba(201,152,42,0.07)", why: "1 check failing: " + failList[0] }
+      : { word: "OFF TRACK", col: "var(--red)", bd: "rgba(239,68,68,0.35)", bg: "rgba(239,68,68,0.07)", why: `${failList.length} of ${checksN} checks failing — ` + failList.join(" · ") };
+  const GRID = "minmax(150px,1.5fr) minmax(120px,1fr) minmax(110px,1fr) 90px";
   const goDesign = () => { try { sessionStorage.setItem("viv-goto-sim", "1"); } catch { /* private mode */ } setPage && setPage("tools"); };
   // No design yet → the invitation, not an empty preset (member ask 2026-07-11)
   if (!pb.designed) return (
     <div className="card reveal" style={{ padding: "26px 24px", marginBottom: 18, textAlign: "center" }}>
       <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--goldBright)", marginBottom: 8 }}>Design your playbook to track your performance live</div>
       <div style={{ fontSize: "0.76rem", color: "var(--muted)", lineHeight: 1.7, maxWidth: 620, margin: "0 auto 14px" }}>
-        Build your system in the Return Simulator — your win rate, average loss, winner sizes — then hit <b style={{ color: "var(--goldBright)" }}>🎯 Sync to Playbook</b>.
-        It becomes your benchmark here: your real trades score against it live, ON TRACK or DEVIATING, with your projected curve vs the design. The best feedback loop a trader can have.
+        Build your system in the Return Simulator — your win rate, average loss, winner sizes — then hit <b style={{ color: "var(--goldBright)" }}>💾 Save playbook design</b>.
+        It becomes your benchmark here: one verdict, a design-vs-live scoreboard, and a winner ladder that checks the big winners are landing on schedule. The best feedback loop a trader can have.
       </div>
       <button className="distbtn on" onClick={goDesign}>✎ Design my playbook → Return Simulator</button>
     </div>
   );
   return (
     <div className="card reveal" style={{ padding: "16px 20px", marginBottom: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
         <input value={pb.name} onChange={e => setPb(p => ({ ...p, name: e.target.value }))} title="Name your playbook"
           style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "var(--goldBright)", fontWeight: 800, fontSize: "0.86rem", padding: "5px 10px", minWidth: 200 }} />
-        <span style={{ fontSize: "0.64rem", color: "var(--muted)" }}>{m.n} closed trade{m.n === 1 ? "" : "s"} in this slice · every change saves automatically and stays until YOU change it</span>
-        <button className="distbtn" style={{ marginLeft: "auto" }} onClick={goDesign} title="Rework the design in the Return Simulator, then re-sync — nothing here changes until you sync">✎ Edit playbook design</button>
+        <button className="distbtn" style={{ marginLeft: "auto" }} onClick={goDesign} title="Rework the design in the Return Simulator, then save — nothing here changes until you do">✎ Edit playbook design</button>
       </div>
-      {ROWS.map((r, i) => {
-        const tgt = Number(pb.targets[r.k]);
-        const ok = r.v == null || !Number.isFinite(tgt) ? null : (r.dir === "lte" ? r.v <= tgt : r.v >= tgt);
-        return (
-          <div key={r.k} style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 12px", padding: "8px 6px", borderBottom: i < ROWS.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.78rem", minWidth: 0 }}>
-            <span className="term" data-tip={r.def} style={{ flex: "1 1 150px", minWidth: 0, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.label}</span>
-            <b style={{ minWidth: 62, textAlign: "right", fontVariantNumeric: "tabular-nums", color: ok == null ? "var(--muted)" : ok ? "var(--green)" : "var(--red)" }}>{fmt(r.v, r.unit)}</b>
-            <span style={{ color: "var(--muted)", fontSize: "0.66rem" }}>{r.dir === "lte" ? "target ≤" : "target ≥"}</span>
-            <input type="number" step="0.5" value={pb.targets[r.k]} onChange={e => { const v = e.target.value; setPb(p => ({ ...p, targets: { ...p.targets, [r.k]: v === "" ? "" : Number(v) } })); }}
-              style={{ width: 64, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: "var(--text)", padding: "4px 8px", fontSize: "0.74rem", fontVariantNumeric: "tabular-nums" }} />
-            <span style={{ fontSize: "0.62rem", color: "var(--muted)", width: 12 }}>{r.unit}</span>
-            <span style={{ marginLeft: "auto", fontWeight: 800, fontSize: "0.62rem", padding: "3px 10px", borderRadius: 20, whiteSpace: "nowrap",
-              background: ok == null ? "rgba(255,255,255,0.05)" : ok ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.14)",
-              color: ok == null ? "var(--muted)" : ok ? "var(--green)" : "var(--red)" }}>{ok == null ? "— no data" : ok ? "🟢 ON TRACK" : "🔴 DEVIATING"}</span>
-          </div>
-        );
-      })}
-      {/* ── DESIGN PROGRESS — trades taken vs the design's total + per-tier homerun pacing ── */}
+      {/* ── ONE verdict — the whole card answered in a glance. The only loud colour on this card. ── */}
+      <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "4px 12px", padding: "12px 16px", borderRadius: 12, background: verdict.bg, border: `1px solid ${verdict.bd}`, marginBottom: 12 }}>
+        <b style={{ color: verdict.col, fontSize: "0.95rem", fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{verdict.word}</b>
+        <span style={{ fontSize: "0.7rem", color: "var(--muted)", lineHeight: 1.5, flex: "1 1 220px", minWidth: 0 }}>{verdict.why}</span>
+        <span style={{ fontSize: "0.64rem", color: "var(--muted)", whiteSpace: "nowrap" }}>{m.n} closed trade{m.n === 1 ? "" : "s"} in this view</span>
+      </div>
+      {/* Progress through the design's trade count */}
       {pace && (
-        <div style={{ marginTop: 12, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
-          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
-            <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)" }}>Design progress</span>
-            <span className="term" data-tip="Your playbook's math is defined over a total number of trades — the expectancy only realizes across the full count. This tracks how far through the design you are and how many trades remain." style={{ fontSize: "0.7rem", fontWeight: 800, color: "var(--goldBright)" }}>
-              {pace.taken.toLocaleString()} of {pace.total.toLocaleString()} trades · {pace.remaining.toLocaleString()} to go
-            </span>
-            <div style={{ flex: "1 1 160px", minWidth: 120, height: 6, borderRadius: 4, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
-              <div style={{ width: (pace.frac * 100).toFixed(1) + "%", height: "100%", background: "var(--goldBright)" }} />
-            </div>
-            <span style={{ fontSize: "0.62rem", color: "var(--muted)" }}>{(pace.frac * 100).toFixed(0)}% through the design</span>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, margin: "0 2px 10px" }}>
+          <span className="term" data-tip="Your playbook's math is defined over a total number of trades — the expectancy only shows up across the full count. This is how far through the design you are." style={{ fontSize: "0.74rem", fontWeight: 700 }}>
+            Trades taken <b style={{ fontVariantNumeric: "tabular-nums" }}>{pace.taken.toLocaleString()} of {pace.total.toLocaleString()}</b>
+          </span>
+          <div style={{ flex: "1 1 140px", minWidth: 100, height: 5, borderRadius: 4, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+            <div style={{ width: (pace.frac * 100).toFixed(1) + "%", height: "100%", background: "var(--gold)" }} />
           </div>
-          {pace.tiers.map((t, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 12px", padding: "6px 4px", borderTop: "1px solid rgba(255,255,255,0.05)", fontSize: "0.72rem" }}>
-              <span className="term" data-tip={`The design plans ${t.planned} winners of +${t.gain}% or larger over the full ${pace.total.toLocaleString()}-trade cycle. "Expected by now" pro-rates that to how far through the cycle you are — falling behind on the BIG tiers is how a playbook silently dies while every ratio still looks fine.`} style={{ fontWeight: 700, minWidth: 110 }}>+{t.gain}%+ winners</span>
-              <span style={{ color: "var(--muted)" }}>planned {t.planned}</span>
-              <span style={{ color: "var(--muted)" }}>expected by now ≈ {t.expectedNow.toFixed(1)}</span>
-              <b style={{ color: t.ok ? "var(--green)" : "var(--red)", fontVariantNumeric: "tabular-nums" }}>actual {t.actual}</b>
-              <span style={{ marginLeft: "auto", fontWeight: 800, fontSize: "0.6rem", padding: "2px 9px", borderRadius: 20,
-                background: t.ok ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.14)", color: t.ok ? "var(--green)" : "var(--red)" }}>
-                {t.ok ? "🟢 ON PACE" : `🔴 BEHIND — need ${Math.max(0, Math.ceil(t.expectedNow) - t.actual)} more by this point`}</span>
-            </div>
-          ))}
-          <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>The ratio targets above can all be green while the design still fails — if the big-tier winners aren't landing at pace, the expectancy math never materializes. This block is the honest check.</div>
+          <span style={{ fontSize: "0.68rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{pace.remaining.toLocaleString()} to go · {(pace.frac * 100).toFixed(0)}%</span>
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-        <div style={{ fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, flex: 1 }}>The playbook thesis: keep every loss near-nothing (derisk fast), so a handful of homerun winners carry the whole book. Verdicts recompute from the same trades this page shows — use the date filter to score just a specific period.</div>
-        <button className="distbtn" onClick={() => setMore(o => !o)}>{more ? "Hide details ▴" : "More details ▾"}</button>
+      {/* ── Scoreboard: design vs live. Numbers stay neutral — colour marks only the verdict. ── */}
+      <div style={{ display: "grid", gridTemplateColumns: GRID, gap: "0 10px", alignItems: "center", padding: "2px 6px 6px", fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)" }}>
+        <span>Metric</span><span>Your design</span><span>Live</span><span style={{ textAlign: "right" }}>Verdict</span>
+      </div>
+      {ROWS.map(r => (
+        <div key={r.k} style={{ display: "grid", gridTemplateColumns: GRID, gap: "2px 10px", alignItems: "center", padding: "9px 6px", borderTop: "1px solid rgba(255,255,255,0.05)", fontSize: "0.78rem", minWidth: 0 }}>
+          <span className="term" data-tip={r.tip} style={{ fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</span>
+          <span style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.design}</span>
+          <b style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.live ?? "—"}</b>
+          <span style={{ textAlign: "right", fontWeight: 800, fontSize: "0.62rem", whiteSpace: "nowrap", color: r.ok == null ? "var(--muted)" : r.ok ? "var(--green)" : "var(--red)" }}>{r.ok == null ? "—" : r.ok ? "✓ PASS" : "✕ MISS"}</span>
+        </div>
+      ))}
+      {/* ── Winner ladder — are the BIG winners landing on schedule? ── */}
+      {pace && (
+        <div style={{ marginTop: 12, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px 14px", background: "rgba(255,255,255,0.015)" }}>
+          <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 2 }}>Winner ladder — are the big ones landing on schedule?</div>
+          {pace.tiers.map((tr, i) => {
+            const due = Math.floor(tr.expectedNow);
+            return (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: GRID, gap: "2px 10px", alignItems: "center", padding: "8px 0", borderTop: i ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.76rem", minWidth: 0 }}>
+                <span className="term" data-tip={`The design plans ${tr.planned} winners of +${tr.gain}% or larger across the full ${pace.total.toLocaleString()}-trade cycle. "Due by now" pro-rates that to your ${pace.taken.toLocaleString()} trades so far — a playbook dies silently when the big tiers stop landing while every ratio still looks fine.`} style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>+{tr.gain}%+ winners</span>
+                <span style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{tr.planned} planned · {due} due by now</span>
+                <b style={{ fontVariantNumeric: "tabular-nums" }}>{tr.actual} landed</b>
+                <span style={{ textAlign: "right", fontWeight: 800, fontSize: "0.62rem", whiteSpace: "nowrap", color: tr.ok ? "var(--green)" : "var(--red)" }}>{tr.ok ? "✓ ON PACE" : `✕ NEED ${Math.max(0, due - tr.actual)} MORE`}</span>
+              </div>
+            );
+          })}
+          <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Every ratio above can pass while the design still fails — if the big winners aren't landing at pace, the expectancy math never materializes. This ladder is the honest check.</div>
+        </div>
+      )}
+      {!pace && <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 10, lineHeight: 1.5 }}>Re-save your design in the Return Simulator to unlock trade-count and winner-ladder pacing — older saves stored only the ratio targets.</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+        <div style={{ fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, flex: 1 }}>Verdicts recompute from the same trades this page shows — use the date filter to score a specific period. Targets come from your saved design; change them in the Return Simulator.</div>
+        <button className="distbtn" onClick={() => setMore(o => !o)}>{more ? "Hide projection ▴" : "Projection ▾"}</button>
       </div>
       {more && (
         <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 }}>
-            <div style={{ border: "1px solid var(--borderGold)", borderRadius: 12, padding: "12px 14px", background: "rgba(201,152,42,0.05)" }}>
-              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--goldBright)", marginBottom: 8 }}>The playbook — as designed (simulation)</div>
-              <div style={{ fontSize: "0.72rem", lineHeight: 1.8 }}>
-                <div><span className="term" data-tip="Expectancy: the average % you'd make per trade if you hit your targets exactly — win-rate × avg win − loss-rate × avg loss.">Expectancy / trade</span>: <b style={{ color: (proj.evSim || 0) >= 0 ? "var(--green)" : "var(--red)" }}>{proj.evSim == null ? "—" : (proj.evSim >= 0 ? "+" : "") + proj.evSim.toFixed(2) + "%"}</b></div>
-                <div>Next 100 trades at {proj.size}% size: <b style={{ color: "var(--goldBright)" }}>{proj.multSim == null ? "—" : "×" + proj.multSim.toFixed(2) + " equity"}</b></div>
-              </div>
-            </div>
-            <div style={{ border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.02)" }}>
-              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 8 }}>Your actuals — projected if nothing changes</div>
-              <div style={{ fontSize: "0.72rem", lineHeight: 1.8 }}>
-                <div>Expectancy / trade: <b style={{ color: (proj.evAct || 0) >= 0 ? "var(--green)" : "var(--red)" }}>{proj.evAct == null ? "—" : (proj.evAct >= 0 ? "+" : "") + proj.evAct.toFixed(2) + "%"}</b></div>
-                <div>Next 100 trades at {proj.size}% size: <b style={{ color: (proj.multAct || 1) >= 1 ? "var(--green)" : "var(--red)" }}>{proj.multAct == null ? "—" : "×" + proj.multAct.toFixed(2) + " equity"}</b></div>
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap", fontSize: "0.66rem", color: "var(--muted)" }}>
-            <span>Position size for the projection:</span>
-            <input type="number" min="1" max="100" step="1" value={pb.simSize ?? 15} onChange={e => setPb(p => ({ ...p, simSize: e.target.value === "" ? "" : Number(e.target.value) }))}
-              style={{ width: 56, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: "var(--text)", padding: "3px 8px", fontSize: "0.7rem" }} />% of equity
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px 18px", fontSize: "0.74rem" }}>
+            <span className="term" data-tip="Expectancy: the average % you'd make per trade — win-rate × avg win − loss-rate × avg loss." style={{ color: "var(--muted)" }}>Expectancy / trade</span>
+            <span style={{ whiteSpace: "nowrap" }}>design <b style={{ fontVariantNumeric: "tabular-nums" }}>{proj.evSim == null ? "—" : (proj.evSim >= 0 ? "+" : "") + proj.evSim.toFixed(2) + "%"}</b></span>
+            <span style={{ whiteSpace: "nowrap" }}>you <b style={{ fontVariantNumeric: "tabular-nums" }}>{proj.evAct == null ? "—" : (proj.evAct >= 0 ? "+" : "") + proj.evAct.toFixed(2) + "%"}</b></span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: "0.68rem", whiteSpace: "nowrap" }}>
+              at <input type="number" min="1" max="100" step="1" value={pb.simSize ?? 15} onChange={e => setPb(p => ({ ...p, simSize: e.target.value === "" ? "" : Number(e.target.value) }))}
+                style={{ width: 52, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: "var(--text)", padding: "3px 8px", fontSize: "0.7rem" }} /> % position size
+            </span>
             {proj.evSim != null && proj.evAct != null && (
-              <b style={{ marginLeft: "auto", color: proj.evAct >= proj.evSim ? "var(--green)" : "var(--red)" }}>
-                {proj.evAct >= proj.evSim ? "🟢 Trading AHEAD of the playbook design" : `🔴 Actuals lag the design by ${(proj.evSim - proj.evAct).toFixed(2)}%/trade — the DEVIATING rows above show where`}
+              <b style={{ marginLeft: "auto", fontSize: "0.7rem", color: proj.evAct >= proj.evSim ? "var(--green)" : "var(--red)" }}>
+                {proj.evAct >= proj.evSim ? "trading ahead of the design" : `lagging the design by ${(proj.evSim - proj.evAct).toFixed(2)}%/trade`}
               </b>
             )}
           </div>
-          {/* Projected equity — the designed system vs your actuals, compounded over the next 100 trades */}
+          {/* Projected equity — designed vs actual, compounded over the next 100 trades. INTERACTIVE:
+              glide/drag across the chart to read both curves at any trade (pointer events cover touch). */}
           {proj.evSim != null && proj.evAct != null && (() => {
             const N = 100, sz = proj.size / 100;
-            const curve = (ev) => Array.from({ length: N + 1 }, (_, i) => Math.pow(1 + sz * (ev / 100), i));
-            const simC = curve(proj.evSim), actC = curve(proj.evAct);
+            const curveOf = (ev) => Array.from({ length: N + 1 }, (_, i) => Math.pow(1 + sz * (ev / 100), i));
+            const simC = curveOf(proj.evSim), actC = curveOf(proj.evAct);
             const all = [...simC, ...actC]; const lo = Math.min(...all); const hiR = Math.max(...all); const hi = hiR === lo ? lo + 1 : hiR;
-            const path = (arr) => "M" + arr.map((v, i) => `${((i / N) * 600).toFixed(1)},${(8 + (1 - (v - lo) / (hi - lo)) * 164).toFixed(1)}`).join(" L");
+            const X = (i) => (i / N) * 600, Y = (v) => 10 + (1 - (v - lo) / (hi - lo)) * 158;
+            const path = (arr) => "M" + arr.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" L");
+            const h = hov == null ? null : Math.min(N, Math.max(0, hov));
             return (
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 6 }}>Projected equity curve — designed vs actual (next 100 trades)</div>
-                <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 10px", background: "rgba(255,255,255,0.015)" }}>
-                  <svg viewBox="0 0 600 180" style={{ width: "100%", height: 150, display: "block" }} preserveAspectRatio="none" role="img" aria-label="Designed vs actual projected equity">
-                    <line x1="0" y1="90" x2="600" y2="90" stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
+              <div style={{ marginTop: 12 }}>
+                <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "2px 12px", marginBottom: 6 }}>
+                  <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)" }}>Projected equity — next 100 trades</span>
+                  <span style={{ fontSize: "0.7rem", color: h == null ? "var(--muted)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+                    {h == null ? "glide across the chart to inspect any trade" : <>trade {h} · design <b style={{ color: "var(--goldBright)" }}>×{simC[h].toFixed(3)}</b> · you <b>×{actC[h].toFixed(3)}</b> · gap <b style={{ color: actC[h] >= simC[h] ? "var(--green)" : "var(--red)" }}>{(actC[h] - simC[h] >= 0 ? "+" : "") + (actC[h] - simC[h]).toFixed(3)}</b></>}
+                  </span>
+                </div>
+                <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 10px", background: "rgba(255,255,255,0.015)", touchAction: "none", cursor: "crosshair" }}
+                  onPointerMove={e => { const r = e.currentTarget.getBoundingClientRect(); const f = Math.min(1, Math.max(0, (e.clientX - r.left - 10) / Math.max(1, r.width - 20))); setHov(Math.round(f * N)); }}
+                  onPointerLeave={() => setHov(null)}>
+                  <svg viewBox="0 0 600 180" style={{ width: "100%", height: 160, display: "block" }} preserveAspectRatio="none" role="img" aria-label="Designed vs actual projected equity">
+                    <line x1="0" y1={Y(1).toFixed(1)} x2="600" y2={Y(1).toFixed(1)} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
                     <path d={path(simC)} fill="none" stroke="var(--goldBright)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                    <path d={path(actC)} fill="none" stroke={proj.evAct >= 0 ? "var(--green)" : "var(--red)"} strokeWidth="2" strokeDasharray="5 3" vectorEffect="non-scaling-stroke" />
+                    <path d={path(actC)} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeDasharray="5 3" vectorEffect="non-scaling-stroke" />
+                    {h != null && (<>
+                      <line x1={X(h).toFixed(1)} y1="0" x2={X(h).toFixed(1)} y2="180" stroke="rgba(255,255,255,0.22)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                      <circle cx={X(h).toFixed(1)} cy={Y(simC[h]).toFixed(1)} r="3.5" fill="var(--goldBright)" />
+                      <circle cx={X(h).toFixed(1)} cy={Y(actC[h]).toFixed(1)} r="3.5" fill="#ffffff" />
+                    </>)}
                   </svg>
                 </div>
-                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "0.62rem", color: "var(--muted)", marginTop: 6 }}>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "0.64rem", color: "var(--muted)", marginTop: 6 }}>
                   <span><i style={{ display: "inline-block", width: 12, height: 2, background: "var(--goldBright)", verticalAlign: "middle", marginRight: 5 }} />the system as designed → <b style={{ color: "var(--goldBright)" }}>×{proj.multSim?.toFixed(2)}</b></span>
-                  <span><i style={{ display: "inline-block", width: 12, height: 2, background: proj.evAct >= 0 ? "var(--green)" : "var(--red)", verticalAlign: "middle", marginRight: 5 }} />your actuals if nothing changes → <b style={{ color: proj.evAct >= 0 ? "var(--green)" : "var(--red)" }}>×{proj.multAct?.toFixed(2)}</b></span>
+                  <span><i style={{ display: "inline-block", width: 12, height: 2, background: "rgba(255,255,255,0.55)", verticalAlign: "middle", marginRight: 5 }} />your actuals if nothing changes → <b>×{proj.multAct?.toFixed(2)}</b></span>
                 </div>
               </div>
             );
           })()}
-          <div style={{ fontSize: "0.64rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Design your system in the <b>Return Simulator</b> (Premium Tools) and hit <b>🎯 Sync to Playbook</b> — it becomes the benchmark here, and this card turns into your live feedback loop.</div>
         </div>
       )}
     </div>
@@ -428,6 +452,18 @@ function PlaybookTracker({ trades, uid, setPage }) {
 }
 
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "July 11, 2026",
+    title: "🎯 Playbook tracker redesigned — one verdict, a cleaner read everywhere",
+    items: [
+      "The Playbook tracker now answers in ONE line: ON TRACK, DRIFTING or OFF TRACK — with every failing check named in plain English right in the banner.",
+      "Below it, a simple scoreboard — YOUR DESIGN vs LIVE, side by side: trades taken (and how many remain), winners & win rate, average loss, payoff, homerun share. Each row is a clear ✓ PASS / ✕ MISS.",
+      "The winner ladder checks the part ratios can't see: is each SIZE of winner landing on schedule? Planned · due by now · landed, per tier — because a playbook dies silently when the big winners stop happening while every average still looks fine.",
+      "The projected equity curve is now interactive: glide across it to inspect any of the next 100 trades — the design's equity, yours if nothing changes, and the gap between them.",
+      "A calmer read across the analytics: numbers stay neutral by default and colour now means something — green/red is reserved for outcomes (Avg R, P&L) and verdicts, category labels carry a small dot instead of coloured text, and the emoji badges are gone. Based on published dashboard-design research, so the number that matters is the one that pops.",
+    ],
+  },
   {
     tag: "New",
     date: "July 10, 2026",
@@ -6381,9 +6417,15 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           const ctxOf = (t) => spyCtxOf(t.entry);
           const mTrend = agg(pop.filter(t => ctxOf(t) === "trend")), mChop = agg(pop.filter(t => ctxOf(t) === "chop"));
           const mDown = agg(pop.filter(t => ctxOf(t) === "down")), mUn = agg(pop.filter(t => !ctxOf(t)));
-          const cell = (v, good) => <b style={{ color: v == null ? "var(--muted)" : good ? "var(--green)" : "var(--red)", whiteSpace: "nowrap" }}>{v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2) + "R"}</b>;
-          const pfCell = (pf) => <span className="term" data-tip="Profit factor = gross $ won ÷ gross $ lost in this group. Above 1 = the group makes money; 2+ = every dollar lost buys two back." style={{ color: pf == null ? "var(--muted)" : pf >= 1 ? "var(--green)" : "var(--red)", fontWeight: 700, whiteSpace: "nowrap" }}>PF {pf == null ? "—" : pf === Infinity ? "∞" : pf.toFixed(2)}</span>;
-          const CTX_LABEL = { trend: "📈 Trending", chop: "🌊 Choppy", down: "📉 Downtrend" };
+          // Colour doctrine (design-research pass, 2026-07-11): numbers stay NEUTRAL; green/red is
+          // reserved for the outcome column (Avg R) so the one number that means money is the one
+          // that pops. Category identity (theme/market) = a small controlled dot, never coloured text
+          // or emoji (uncontrollable saturated blobs on a dark theme).
+          const cell = (v, good) => <b style={{ color: v == null ? "var(--muted)" : good ? "var(--green)" : "var(--red)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2) + "R"}</b>;
+          const pfCell = (pf) => <span className="term" data-tip="Profit factor = gross $ won ÷ gross $ lost in this group. Above 1 = the group makes money; 2+ = every dollar lost buys two back." style={{ color: pf == null ? "var(--muted)" : "var(--text)", fontWeight: 600, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>PF {pf == null ? "—" : pf === Infinity ? "∞" : pf.toFixed(2)}</span>;
+          const dot = (c) => <i style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: c, marginRight: 7, verticalAlign: "middle", flex: "none" }} />;
+          const CTX_LABEL = { trend: "Trending", chop: "Choppy", down: "Downtrend" };
+          const CTX_DOT = { trend: "var(--green)", chop: "var(--gold)", down: "var(--red)" };
           // click a group → expand the exact trades behind the number (with sector + the snapshot ranks used)
           const groupTrades = (id) => {
             if (id === "t:in") return pop.filter(t => fitOf(t) === "in");
@@ -6416,8 +6458,8 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
               title={id ? "Click to see the exact trades behind this number" : undefined}
               style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 10px", padding: "8px 6px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "0.8rem", cursor: id ? "pointer" : "default", background: edgeOpen === id ? "rgba(240,192,80,0.05)" : "transparent", borderRadius: 8, minWidth: 0 }}>
               <span style={{ flex: "1 1 84px", minWidth: 0, fontWeight: 800, color: accent || "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
-              <span style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>{s.n} trade{s.n !== 1 ? "s" : ""}</span>
-              <span style={{ color: s.winPct >= 50 ? "var(--green)" : "var(--red)", fontWeight: 700, whiteSpace: "nowrap" }}>{s.winPct}% win</span>
+              <span style={{ color: "var(--muted)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{s.n} trade{s.n !== 1 ? "s" : ""}</span>
+              <span style={{ color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{s.winPct}% win</span>
               {pfCell(s.pf)}
               {cell(s.avgR, (s.avgR || 0) >= 0)}
               {id && <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>{edgeOpen === id ? "▴" : "▾"}</span>}
@@ -6430,8 +6472,8 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             return (
               <div style={{ gridColumn: "1 / -1", background: "rgba(255,255,255,0.02)", border: "1px solid var(--borderGold)", borderRadius: 12, padding: "10px 14px", marginTop: 4 }}>
                 <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>
-                  The {rows.length} trade{rows.length !== 1 ? "s" : ""} behind “{id === "t:in" ? "🟢 In-theme" : id === "t:off" ? "🔴 Off-theme" : id === "t:un" ? "◦ Untagged"
-                    : id === "m:trend" ? "📈 Trending tape" : id === "m:chop" ? "🌊 Choppy tape" : id === "m:down" ? "📉 Downtrend tape" : id === "m:un" ? "◦ No market data"
+                  The {rows.length} trade{rows.length !== 1 ? "s" : ""} behind “{id === "t:in" ? "In-theme" : id === "t:off" ? "Off-theme" : id === "t:un" ? "Untagged"
+                    : id === "m:trend" ? "Trending tape" : id === "m:chop" ? "Choppy tape" : id === "m:down" ? "Downtrend tape" : id === "m:un" ? "No market data"
                     : id.startsWith("x:") ? (() => { const [G, T, X] = id.slice(2).split("|"); return `${G === "un" ? "Ungraded" : G} · ${T === "in" ? "In-theme" : T === "off" ? "Off-theme" : "Untagged"} · ${X === "un" ? "No mkt data" : ({ trend: "Trending", chop: "Choppy", down: "Downtrend" })[X]}`; })()
                     : id.slice(2) + " setups"}”
                   {isTheme && id !== "t:un" && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · judged against the theme snapshot at each trade's ENTRY date</span>}
@@ -6465,36 +6507,36 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By setup grade</div>
-                  {byGrade.map(g => <Row key={g.L} id={"g:" + g.L} label={g.L + " setups"} s={g} accent={g.L === "A+" ? "var(--green)" : g.L === "A" ? "var(--goldBright)" : undefined} />)}
+                  {byGrade.map(g => <Row key={g.L} id={"g:" + g.L} label={g.L + " setups"} s={g} />)}
                   {ungraded.n > 0 && <Row id="g:un" label="Ungraded" s={ungraded} accent="var(--muted)" />}
                   {byGrade.length === 0 && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Grade setups in Premium Tools → Setup Grader; results correlate here automatically.</div>}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By theme fit (at entry)</div>
-                  {inT.n > 0 && <Row id="t:in" label="🟢 In-theme" s={inT} accent="var(--green)" />}
-                  {offT.n > 0 && <Row id="t:off" label="🔴 Off-theme" s={offT} accent="var(--red)" />}
-                  {unT.n > 0 && <Row id="t:un" label="◦ Untagged" s={unT} accent="var(--muted)" />}
+                  {inT.n > 0 && <Row id="t:in" label={<>{dot("var(--green)")}In-theme</>} s={inT} />}
+                  {offT.n > 0 && <Row id="t:off" label={<>{dot("var(--red)")}Off-theme</>} s={offT} />}
+                  {unT.n > 0 && <Row id="t:un" label={<>{dot("rgba(255,255,255,0.25)")}Untagged</>} s={unT} accent="var(--muted)" />}
                   {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
                   {THEME_COVERAGE_START && <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
-                    🧭 Tracked from <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b>
+                    Tracked from <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b>
                     <span onClick={() => setEdgeNotes(n => ({ ...n, theme: !n.theme }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.theme ? "hide ▴" : "why? ▾"}</span>
                     {edgeNotes.theme && <div style={{ marginTop: 4 }}>The date of the first theme snapshot. Trades entered earlier aren't theme-tagged: themes rotate constantly, so a later snapshot can't honestly judge an older trade. Grade metrics cover all trades.</div>}
                   </div>}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By market context (at entry)</div>
-                  {mTrend.n > 0 && <Row id="m:trend" label={<span className="term" data-tip="Trending market: SPY closed ABOVE its 21-day EMA for 10 or more straight sessions, as of the last completed session before your entry. The tape had a persistent uptrend under your trade.">📈 Trending</span>} s={mTrend} accent="var(--green)" />}
-                  {mChop.n > 0 && <Row id="m:chop" label={<span className="term" data-tip="Choppy market: within the last 10 sessions before your entry, SPY crossed back and forth around its 21-day EMA — neither side held 10 straight closes. Whipsaw conditions: breakouts get faded.">🌊 Choppy</span>} s={mChop} accent="var(--goldBright)" />}
-                  {mDown.n > 0 && <Row id="m:down" label={<span className="term" data-tip="Downtrend market: SPY closed BELOW its 21-day EMA for 10 or more straight sessions before your entry. Persistent downside tape — fresh long breakout risk is swimming upstream.">📉 Downtrend</span>} s={mDown} accent="var(--red)" />}
-                  {mUn.n > 0 && <Row id="m:un" label={<span className="term" data-tip="No verdict: the entry date predates the SPY history loaded, the date is missing, or the price feed didn't answer. Never guessed.">◦ No data</span>} s={mUn} accent="var(--muted)" />}
+                  {mTrend.n > 0 && <Row id="m:trend" label={<span className="term" data-tip="Trending market: SPY closed ABOVE its 21-day EMA for 10 or more straight sessions, as of the last completed session before your entry. The tape had a persistent uptrend under your trade.">{dot(CTX_DOT.trend)}Trending</span>} s={mTrend} />}
+                  {mChop.n > 0 && <Row id="m:chop" label={<span className="term" data-tip="Choppy market: within the last 10 sessions before your entry, SPY crossed back and forth around its 21-day EMA — neither side held 10 straight closes. Whipsaw conditions: breakouts get faded.">{dot(CTX_DOT.chop)}Choppy</span>} s={mChop} />}
+                  {mDown.n > 0 && <Row id="m:down" label={<span className="term" data-tip="Downtrend market: SPY closed BELOW its 21-day EMA for 10 or more straight sessions before your entry. Persistent downside tape — fresh long breakout risk is swimming upstream.">{dot(CTX_DOT.down)}Downtrend</span>} s={mDown} />}
+                  {mUn.n > 0 && <Row id="m:un" label={<span className="term" data-tip="No verdict: the entry date predates the SPY history loaded, the date is missing, or the price feed didn't answer. Never guessed.">{dot("rgba(255,255,255,0.25)")}No data</span>} s={mUn} accent="var(--muted)" />}
                   {!spyCtxDays && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Loading SPY history… (needs the deployed /api — shows “No data” in local dev.)</div>}
                   <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
-                    📐 SPY vs its 21-day EMA, past 10 sessions, judged at entry
+                    SPY vs its 21-day EMA, past 10 sessions, judged at entry
                     <span onClick={() => setEdgeNotes(n => ({ ...n, market: !n.market }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.market ? "hide ▴" : "full definition ▾"}</span>
                     {edgeNotes.market && <div style={{ marginTop: 6, display: "grid", gap: 5 }}>
-                      <div><b style={{ color: "var(--green)" }}>📈 Trending</b> — SPY closed above its 21-day EMA for 10 or more straight sessions.</div>
-                      <div><b style={{ color: "var(--goldBright)" }}>🌊 Choppy</b> — price crossed back and forth through the EMA21 within the last 10 sessions.</div>
-                      <div><b style={{ color: "var(--red)" }}>📉 Downtrend</b> — SPY closed below its 21-day EMA for 10 or more straight sessions.</div>
+                      <div><b style={{ color: "var(--text)" }}>{dot(CTX_DOT.trend)}Trending</b> — SPY closed above its 21-day EMA for 10 or more straight sessions.</div>
+                      <div><b style={{ color: "var(--text)" }}>{dot(CTX_DOT.chop)}Choppy</b> — price crossed back and forth through the EMA21 within the last 10 sessions.</div>
+                      <div><b style={{ color: "var(--text)" }}>{dot(CTX_DOT.down)}Downtrend</b> — SPY closed below its 21-day EMA for 10 or more straight sessions.</div>
                       <div style={{ opacity: 0.8 }}>Judged on the last completed session before your entry — the entry day's close isn't known when you enter (no lookahead).</div>
                     </div>}
                   </div>
@@ -6507,7 +6549,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 <div style={{ marginTop: 18 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>3-D edge matrix — grade × theme × market context</div>
                   <div style={{ background: "rgba(201,152,42,0.06)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "8px 12px", fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, marginBottom: 8 }}>
-                    🧭 Starts at <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the first theme snapshot
+                    Starts at <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the first theme snapshot
                     <span onClick={() => setEdgeNotes(n => ({ ...n, matrix: !n.matrix }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.matrix ? "hide ▴" : "why? ▾"}</span>
                     {edgeNotes.matrix && <div style={{ marginTop: 4 }}>Trades entered before that have no theme tracking, so crossing them here would be inaccurate; they're excluded from the matrix (the single-dimension columns above still cover every trade).</div>}
                   </div>
@@ -6527,12 +6569,12 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                             onMouseEnter={e => { if (edgeOpen !== c.id) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
                             onMouseLeave={e => { e.currentTarget.style.background = edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent"; }}
                             style={{ cursor: "pointer", background: edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 800, color: c.G === "A+" ? "var(--green)" : c.G === "A" ? "var(--goldBright)" : c.G === "un" ? "var(--muted)" : "var(--text)" }}>{c.G === "un" ? "Ungraded" : c.G}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.T === "in" ? "var(--green)" : c.T === "off" ? "var(--red)" : "var(--muted)" }}>{c.T === "in" ? "🟢 In" : c.T === "off" ? "🔴 Off" : "◦ Untagged"}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.X === "trend" ? "var(--green)" : c.X === "down" ? "var(--red)" : c.X === "chop" ? "var(--goldBright)" : "var(--muted)" }}>{c.X === "un" ? "◦ No data" : CTX_LABEL[c.X]}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 800, color: c.G === "un" ? "var(--muted)" : "var(--text)" }}>{c.G === "un" ? "Ungraded" : c.G}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.T === "un" ? "var(--muted)" : "var(--text)" }}>{c.T === "in" ? <>{dot("var(--green)")}In</> : c.T === "off" ? <>{dot("var(--red)")}Off</> : <>{dot("rgba(255,255,255,0.25)")}Untagged</>}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.X === "un" ? "var(--muted)" : "var(--text)" }}>{c.X === "un" ? <>{dot("rgba(255,255,255,0.25)")}No data</> : <>{dot(CTX_DOT[c.X])}{CTX_LABEL[c.X]}</>}</td>
                             <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{c.n}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: c.winPct >= 50 ? "var(--green)" : "var(--red)" }}>{c.winPct}%</td>
-                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: c.pf == null ? "var(--muted)" : c.pf >= 1 ? "var(--green)" : "var(--red)" }}>{c.pf == null ? "—" : c.pf === Infinity ? "∞" : c.pf.toFixed(2)}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: "var(--text)" }}>{c.winPct}%</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: c.pf == null ? "var(--muted)" : "var(--text)" }}>{c.pf == null ? "—" : c.pf === Infinity ? "∞" : c.pf.toFixed(2)}</td>
                             <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums" }}>{c.avgR == null ? <span style={{ color: "var(--muted)" }}>—</span> : <b style={{ color: c.avgR >= 0 ? "var(--green)" : "var(--red)" }}>{(c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2)}R</b>}</td>
                             <td style={{ padding: "8px 4px", textAlign: "right", color: "var(--muted)", fontSize: "0.66rem" }}>{edgeOpen === c.id ? "▴" : "▾"}</td>
                           </tr>
@@ -6550,7 +6592,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
 
         {/* PLAYBOOK TRACKER — model-playbook targets vs live journal adherence.
             Reached via "Compare stats" in the Return Simulator (sessionStorage flag → scroll). */}
-        <div className="toolbar" id="playbook-tracker"><h2 className="sech guide" onMouseEnter={guideEnter("playbook", "Playbook tracker", "Define your model playbook as measurable targets — average loss, worst loss, payoff ratio, homerun share, win-rate floor — and this card scores your actual trades against them live. Green means on track; red means you're deviating from the system you designed. Design a system in the Return Simulator and hit Sync to Playbook to make it your benchmark.", undefined)} onMouseLeave={guideLeave("playbook")}>Playbook tracker</h2></div>
+        <div className="toolbar" id="playbook-tracker"><h2 className="sech guide" onMouseEnter={guideEnter("playbook", "Playbook tracker", "Design your system in the Return Simulator, save it, and this card becomes your live feedback loop: one verdict up top — on track, drifting, or off track, with every failing check named — then a scoreboard of your design versus your live trading: trades taken, winners and win rate, average loss, payoff and homerun share. The winner ladder below checks the big winners are landing on schedule, because every ratio can pass while the homeruns quietly stop happening.", undefined)} onMouseLeave={guideLeave("playbook")}>Playbook tracker</h2></div>
         <PlaybookTracker trades={dateFiltered} uid={session?.user?.id} setPage={setPage} />
 
         {/* PERFORMANCE CALENDAR (monthly + yearly, TradeZella-style) */}
