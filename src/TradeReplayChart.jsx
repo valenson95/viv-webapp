@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 
 // ─────────────────────────────────────────────────────────────
-// TradeReplayChart — the alab-replay.html experience, in-app.
-// Clean layout: stat pills → big chart → Play/Reset/scrub/speed → legend.
-// TradingView's Lightweight-Charts engine + candle-by-candle replay +
-// your executions plotted + a subtle drawing-tools strip (H-line/ray/trend).
+// TradeReviewChart (formerly TradeReplayChart) — the static TradingView-style
+// review chart: TradingView Lightweight-Charts engine, the trade's REAL fills
+// as ▲ entry / ▼ exit arrows at the exact bars, the locked stop as a level
+// line, EMA9/21, timeframes, and drawing tools whose annotations AUTO-SAVE
+// per trade (localStorage, keyed by trade id) — drawings are never lost.
+// Replay/scrub was removed 2026-07-11 (Valen: static chart for trade review).
 // Candles from /api/candles (Polygon, unadjusted). Sample fallback in local dev.
 // ─────────────────────────────────────────────────────────────
 
@@ -26,18 +28,25 @@ function genSample(trade, tf) {
 
 export default function TradeReplayChart({ trade, C, font }) {
   const wrapRef = useRef(null), chartRef = useRef(null), seriesRef = useRef(null), canvasRef = useRef(null);
-  const barsRef = useRef([]), drawingsRef = useRef([]), draftRef = useRef(null), toolRef = useRef("cursor"), scrubRef = useRef(1), timerRef = useRef(null);
+  const barsRef = useRef([]), drawingsRef = useRef([]), draftRef = useRef(null), toolRef = useRef("cursor");
   const [tf, setTf] = useState(() => pickRes(trade.entry, trade.exit));
   const [tool, setTool] = useState("cursor");
   const [status, setStatus] = useState("loading");
   const [sample, setSample] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const [scrub, setScrub] = useState(1);
-  const [speed, setSpeed] = useState(180);
-  const [curDate, setCurDate] = useState("");
+  const [savedTick, setSavedTick] = useState(0); // bumps when annotations persist → "saved ✓" flash
   useEffect(() => { toolRef.current = tool; }, [tool]);
 
   const GOLD = C.goldBright, GRN = "#22c55e", RED = "#ef4444", BLUE = "#6aa8ff";
+
+  // ── annotation persistence: load per trade, save on every change, never lost ──
+  const drawKey = `viv-chart-draw-${trade.id ?? (trade.ticker + "|" + iso(trade.entry))}-v1`;
+  useEffect(() => {
+    try { drawingsRef.current = JSON.parse(localStorage.getItem(drawKey) || "[]"); } catch { drawingsRef.current = []; }
+    draftRef.current = null;
+  }, [drawKey]);
+  const persistDrawings = useCallback(() => {
+    try { localStorage.setItem(drawKey, JSON.stringify(drawingsRef.current)); setSavedTick(t => t + 1); } catch { /* quota — drawing stays on screen this session */ }
+  }, [drawKey]);
 
   const redraw = useCallback(() => {
     const cv = canvasRef.current, chart = chartRef.current, s = seriesRef.current; if (!cv || !chart || !s) return;
@@ -57,9 +66,9 @@ export default function TradeReplayChart({ trade, C, font }) {
     const start = new Date(iso(trade.entry)); start.setDate(start.getDate() - (tf === "1day" ? 40 : 6));
     const end = new Date(iso(trade.exit) || iso(trade.entry)); end.setDate(end.getDate() + (tf === "1day" ? 12 : 3));
     const f = start.toISOString().slice(0, 10), t = end.toISOString().slice(0, 10);
-    const useSample = () => { const c = genSample(trade, tf); if (!c.length) { setStatus("empty"); return; } barsRef.current = c; setScrub(c.length); scrubRef.current = c.length; setSample(true); setStatus("ok"); };
+    const useSample = () => { const c = genSample(trade, tf); if (!c.length) { setStatus("empty"); return; } barsRef.current = c; setSample(true); setStatus("ok"); };
     fetch(`/api/candles?symbol=${encodeURIComponent(trade.ticker)}&from=${f}&to=${t}&res=${tf}`)
-      .then(r => r.json()).then(j => { if (dead) return; const candles = (j.candles || []).map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })); if (!candles.length) { useSample(); return; } barsRef.current = candles; setSample(false); setScrub(candles.length); scrubRef.current = candles.length; setStatus("ok"); })
+      .then(r => r.json()).then(j => { if (dead) return; const candles = (j.candles || []).map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })); if (!candles.length) { useSample(); return; } barsRef.current = candles; setSample(false); setStatus("ok"); })
       .catch(() => { if (!dead) useSample(); });
     return () => { dead = true; };
   }, [trade.ticker, trade.entry, trade.exit, tf]);
@@ -70,47 +79,28 @@ export default function TradeReplayChart({ trade, C, font }) {
     const chart = LWC.createChart(wrapRef.current, { layout: { background: { color: "#0e0e16" }, textColor: "rgba(255,255,255,0.62)", fontFamily: font }, grid: { vertLines: { color: "rgba(255,255,255,0.05)" }, horzLines: { color: "rgba(255,255,255,0.05)" } }, rightPriceScale: { borderColor: "rgba(255,255,255,0.12)" }, timeScale: { borderColor: "rgba(255,255,255,0.12)", timeVisible: tf !== "1day", secondsVisible: false }, crosshair: { mode: 0 }, height: wrapRef.current.clientHeight || 440 });
     chartRef.current = chart;
     const s = chart.addCandlestickSeries({ upColor: GRN, downColor: RED, wickUpColor: GRN, wickDownColor: RED, borderVisible: false }); seriesRef.current = s;
-    const bars = barsRef.current; s.setData(bars.slice(0, scrubRef.current));
+    const bars = barsRef.current; s.setData(bars);
     const closes = bars.map(b => b.close), e9 = ema(closes, 9), e21 = ema(closes, 21);
     const l9 = chart.addLineSeries({ color: GOLD, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
     const l21 = chart.addLineSeries({ color: BLUE, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-    l9.setData(bars.map((b, i) => ({ time: b.time, value: e9[i] })).slice(0, scrubRef.current));
-    l21.setData(bars.map((b, i) => ({ time: b.time, value: e21[i] })).slice(0, scrubRef.current));
-    chart._l9 = l9; chart._l21 = l21; chart._e9 = e9; chart._e21 = e21;
+    l9.setData(bars.map((b, i) => ({ time: b.time, value: e9[i] })));
+    l21.setData(bars.map((b, i) => ({ time: b.time, value: e21[i] })));
     const isLong = (trade.tradeType || "Long") !== "Short";
     const entryP = Number(trade.entryP) || 0, exitP = Number(trade.exitP) || 0, stopP = Number(trade.stop) || 0, up = (Number(trade.plDollar) || 0) >= 0;
-    // Events vs levels: entry/exit are point-in-time EVENTS → arrow markers at the fill bar ONLY.
-    // Drawing them ALSO as full-width pricelines doubled every fill visually (member-reported —
-    // a breakeven trade looked like "two entries and two exits"). Only the STOP is a standing
-    // LEVEL, so only the stop keeps a horizontal line.
+    // Events vs levels: entry/exit = arrow markers at the exact fill bars ONLY; the locked
+    // stop is a standing LEVEL, so only the stop draws a horizontal line.
     if (stopP) s.createPriceLine({ price: stopP, color: RED, lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: "stop " + stopP });
     const nearest = (dstr) => { const target = new Date(iso(dstr)).getTime() / 1000; let b = bars[0], best = 1e18; for (const c of bars) { const d = Math.abs(c.time - target); if (d < best) { best = d; b = c; } } return b; };
     const marks = [];
     if (trade.entry) marks.push({ time: nearest(trade.entry).time, position: isLong ? "belowBar" : "aboveBar", color: GOLD, shape: isLong ? "arrowUp" : "arrowDown", text: "ENTRY " + entryP.toFixed(2) });
     if (trade.exit) marks.push({ time: nearest(trade.exit).time, position: isLong ? "aboveBar" : "belowBar", color: up ? GRN : RED, shape: isLong ? "arrowDown" : "arrowUp", text: "EXIT " + exitP.toFixed(2) });
-    marks.sort((a, b) => a.time - b.time); s._marks = marks;
-    s.setMarkers(scrubRef.current >= bars.length ? marks : marks.filter(m => bars.findIndex(b => b.time === m.time) < scrubRef.current));
+    marks.sort((a, b) => a.time - b.time);
+    s.setMarkers(marks);
     chart.timeScale().fitContent();
     const onRange = () => redraw(); chart.timeScale().subscribeVisibleTimeRangeChange(onRange);
     const ro = new ResizeObserver(() => { chart.applyOptions({ height: wrapRef.current.clientHeight }); redraw(); }); ro.observe(wrapRef.current); redraw();
     return () => { try { ro.disconnect(); chart.remove(); } catch (e) {} chartRef.current = null; seriesRef.current = null; };
   }, [status, tf, font, redraw, trade, GOLD, BLUE]);
-
-  useEffect(() => {
-    const s = seriesRef.current, chart = chartRef.current; if (!s || !chart) return; const bars = barsRef.current, n = scrub;
-    s.setData(bars.slice(0, n));
-    if (chart._l9) chart._l9.setData(bars.map((b, i) => ({ time: b.time, value: chart._e9[i] })).slice(0, n));
-    if (chart._l21) chart._l21.setData(bars.map((b, i) => ({ time: b.time, value: chart._e21[i] })).slice(0, n));
-    if (s._marks) { const upto = bars[n - 1] ? bars[n - 1].time : 0; s.setMarkers(s._marks.filter(m => m.time <= upto)); }
-    const lb = bars[n - 1]; if (lb) { const dt = new Date(lb.time * 1000); setCurDate(tf === "1day" ? dt.toISOString().slice(0, 10) : dt.toISOString().slice(0, 16).replace("T", " ")); }
-    redraw();
-  }, [scrub, redraw, tf]);
-
-  useEffect(() => {
-    if (!playing) { if (timerRef.current) clearInterval(timerRef.current); timerRef.current = null; return; }
-    timerRef.current = setInterval(() => { setScrub(prev => { const n = prev + 1; scrubRef.current = n; if (n >= barsRef.current.length) { setPlaying(false); return barsRef.current.length; } return n; }); }, speed);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [playing, speed]);
 
   const onCanvasClick = (e) => {
     const chart = chartRef.current, s = seriesRef.current; if (!chart || !s) return; const T = toolRef.current; if (T === "cursor") return;
@@ -119,6 +109,7 @@ export default function TradeReplayChart({ trade, C, font }) {
     if (T === "hline") drawingsRef.current.push({ type: "hline", p1: { price } });
     else if (T === "hray") drawingsRef.current.push({ type: "hray", p1: { t, price } });
     else if (T === "trend") { if (!draftRef.current) { draftRef.current = { t, price }; return; } drawingsRef.current.push({ type: "trend", p1: draftRef.current, p2: { t, price } }); draftRef.current = null; }
+    persistDrawings();
     redraw();
   };
 
@@ -130,7 +121,7 @@ export default function TradeReplayChart({ trade, C, font }) {
 
   return (
     <div style={{ fontFamily: font }}>
-      {/* stat pills (alab-replay style) */}
+      {/* stat pills */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         <Pill label="Entry">{b("$" + entryP.toFixed(2))} · {sh.toLocaleString()} sh</Pill>
         {stopP ? <Pill label="Stop">{b("$" + stopP.toFixed(2), RED)}</Pill> : null}
@@ -146,27 +137,16 @@ export default function TradeReplayChart({ trade, C, font }) {
         </div>
         <div style={{ display: "flex", gap: 2, marginLeft: 4 }}>
           {tBtn("cursor", "✛", "Cursor")}{tBtn("hline", "─ Line", "Horizontal line")}{tBtn("hray", "→ Ray", "Horizontal ray")}{tBtn("trend", "╱ Trend", "Trend line")}
-          <button onClick={() => { drawingsRef.current = []; draftRef.current = null; redraw(); }} title="Clear drawings" style={{ background: "transparent", color: C.muted, border: "none", borderRadius: 7, padding: "5px 8px", fontFamily: font, fontSize: "0.7rem", fontWeight: 700, cursor: "pointer" }}>✕ Clear</button>
+          <button onClick={() => { drawingsRef.current = []; draftRef.current = null; persistDrawings(); redraw(); }} title="Clear drawings (also clears the saved annotations for this trade)" style={{ background: "transparent", color: C.muted, border: "none", borderRadius: 7, padding: "5px 8px", fontFamily: font, fontSize: "0.7rem", fontWeight: 700, cursor: "pointer" }}>✕ Clear</button>
         </div>
+        {savedTick > 0 && <span style={{ fontSize: "0.62rem", color: GRN, fontWeight: 700 }}>annotations saved ✓</span>}
       </div>
       {/* chart */}
-      <div style={{ position: "relative", height: 440, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.border}`, background: "#0e0e16" }}>
+      <div style={{ position: "relative", height: 500, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.border}`, background: "#0e0e16" }}>
         <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
         <canvas ref={canvasRef} onClick={onCanvasClick} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: tool === "cursor" ? "none" : "auto", cursor: tool === "cursor" ? "default" : "crosshair" }} />
         {status !== "ok" && <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.82rem" }}>{status === "loading" ? "Loading candles…" : status === "empty" ? `No candle data for ${trade.ticker}` : status === "nolib" ? "Chart engine not loaded" : "Couldn't load candles (check POLYGON_API_KEY)"}</div>}
         {status === "ok" && sample && <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(201,152,42,0.18)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.05em", padding: "3px 8px", borderRadius: 6, pointerEvents: "none" }}>SAMPLE · live candles on deploy</div>}
-      </div>
-      {/* control bar (alab-replay style) */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 14px", flexWrap: "wrap" }}>
-        <button onClick={() => { if (scrub >= barsRef.current.length) { setScrub(1); scrubRef.current = 1; } setPlaying(p => !p); }} style={{ background: C.gold, color: "#1a1206", border: "none", borderRadius: 9, padding: "9px 18px", fontFamily: font, fontWeight: 800, fontSize: "0.86rem", cursor: "pointer" }}>{playing ? "⏸ Pause" : "▶ Play"}</button>
-        <button onClick={() => { setPlaying(false); setScrub(1); scrubRef.current = 1; }} style={{ background: "rgba(255,255,255,0.06)", color: "#eee", border: "none", borderRadius: 9, padding: "9px 14px", fontFamily: font, fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>⟲ Reset</button>
-        <span style={{ fontWeight: 800, color: C.goldBright, minWidth: 118, fontSize: "0.82rem" }}>{curDate || "—"}</span>
-        <input type="range" min={1} max={Math.max(1, barsRef.current.length)} value={scrub} onChange={e => { const n = +e.target.value; scrubRef.current = n; setScrub(n); }} style={{ flex: 1, minWidth: 160, accentColor: C.gold }} />
-        <span style={{ display: "flex", alignItems: "center", gap: 6, color: C.muted, fontSize: "0.76rem" }}>speed
-          <select value={speed} onChange={e => setSpeed(+e.target.value)} style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: "#eee", borderRadius: 7, padding: "5px 8px", fontFamily: font, fontWeight: 700, fontSize: "0.74rem" }}>
-            <option value={360}>1×</option><option value={180}>2×</option><option value={80}>4×</option>
-          </select>
-        </span>
       </div>
       {/* legend */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 10, color: C.muted, fontSize: "0.72rem" }}>
@@ -174,7 +154,7 @@ export default function TradeReplayChart({ trade, C, font }) {
         <span><i style={{ display: "inline-block", width: 10, height: 2, background: BLUE, verticalAlign: "middle", marginRight: 5 }} />EMA21</span>
         <span style={{ color: C.goldBright, fontWeight: 700 }}>▲ entry</span>
         <span style={{ color: up ? GRN : RED, fontWeight: 700 }}>▼ exit</span>
-        <span style={{ marginLeft: "auto", fontStyle: "italic" }}>TradingView Lightweight-Charts · your fills plotted · ▶ replays candle-by-candle</span>
+        <span style={{ marginLeft: "auto", fontStyle: "italic" }}>TradingView Lightweight-Charts · your fills at the exact bars · drawings auto-save per trade</span>
       </div>
     </div>
   );

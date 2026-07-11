@@ -142,7 +142,7 @@ export default function MarketContext({ C, font }) {
                   <span style={{ fontSize: "0.76rem", color: "var(--text, #fff)", fontVariantNumeric: "tabular-nums" }}>{r.price.toFixed(2)}</span>
                   {r.regime && (() => { const g = REGIME_META[r.regime]; return (
                     <span className="term" data-tip={regimeTip(r)} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 9, fontSize: "0.66rem", fontWeight: 800, cursor: "help", background: g.dim, border: `1px solid ${g.border}`, color: g.color, whiteSpace: "nowrap" }}>
-                      {g.icon} {g.label} <span style={{ fontWeight: 700, opacity: 0.75, fontSize: "0.58rem" }}>· {r.streak} sess {r.side ? "above" : "below"} EMA21</span>
+                      {g.icon} {g.label} Market <span style={{ fontWeight: 700, opacity: 0.75, fontSize: "0.58rem" }}>· {r.streak} trading session{r.streak === 1 ? "" : "s"} {r.side ? "above" : "below"} EMA21{r.regime === "chop" ? " (needs 10 to trend)" : ""}</span>
                     </span>
                   ); })()}
                   <span className="term tipright" data-tip={b.tip} style={{ marginLeft: "auto", display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 1, padding: "4px 10px", borderRadius: 9, cursor: "help", background: b.dim, border: `1px solid ${b.border}`, color: b.color }}>
