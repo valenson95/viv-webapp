@@ -227,7 +227,86 @@ function useDragReorder(length) {
 
 // ─── What's New — changelog the user can refer to (button in the top nav, modal of update notes).
 // Add new entries to the TOP of WHATS_NEW as features ship.
+// ── PLAYBOOK TRACKER ─────────────────────────────────────────────────────────
+// Define a model playbook as measurable TARGETS, then track live adherence from the
+// journal: each metric shows its live value vs your target with an ON TRACK / DEVIATING
+// verdict. v1 ships the "Derisk fast · hunt homeruns" preset: cut losers to near-nothing
+// quickly, accept a modest win rate, and let a handful of huge winners carry the P&L.
+// Targets persist per-user in localStorage; metrics recompute live from closed trades.
+const PLAYBOOK_PRESET = {
+  name: "Derisk fast · hunt homeruns",
+  targets: { avgLoss: 5, worstLoss: 8, payoff: 2, homerunShare: 50, winRate: 30 },
+};
+function PlaybookTracker({ trades, uid }) {
+  const KEY = `viv-playbook-${uid || "anon"}-v1`;
+  const [pb, setPb] = useState(() => { try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); return s && s.targets ? { ...PLAYBOOK_PRESET, ...s, targets: { ...PLAYBOOK_PRESET.targets, ...s.targets } } : PLAYBOOK_PRESET; } catch { return PLAYBOOK_PRESET; } });
+  useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(pb)); } catch { /* quota */ } }, [pb, KEY]);
+  const m = useMemo(() => {
+    const closed = trades.filter(t => t.exit);
+    const wins = closed.filter(t => (Number(t.plPct) || 0) > 0);
+    const losses = closed.filter(t => (Number(t.plPct) || 0) <= 0);
+    const mean = (a) => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+    const avgLoss = losses.length ? Math.abs(mean(losses.map(t => Number(t.plPct) || 0))) : null;
+    const worstLoss = losses.length ? Math.max(...losses.map(t => Math.abs(Number(t.plPct) || 0))) : null;
+    const avgWin = wins.length ? mean(wins.map(t => Number(t.plPct) || 0)) : null;
+    const payoff = avgWin != null && avgLoss ? avgWin / avgLoss : null;
+    const winRate = closed.length ? wins.length / closed.length * 100 : null;
+    const gross = wins.reduce((s, t) => s + Math.max(0, Number(t.plDollar) || 0), 0);
+    const topN = Math.max(1, Math.ceil(wins.length * 0.1));
+    const top = wins.slice().sort((a, b) => (Number(b.plDollar) || 0) - (Number(a.plDollar) || 0)).slice(0, topN);
+    const homerunShare = gross > 0 ? top.reduce((s, t) => s + Math.max(0, Number(t.plDollar) || 0), 0) / gross * 100 : null;
+    return { n: closed.length, avgLoss, worstLoss, payoff, winRate, homerunShare, topN: wins.length ? topN : 0 };
+  }, [trades]);
+  const ROWS = [
+    { k: "avgLoss", label: "Average loss", dir: "lte", unit: "%", v: m.avgLoss, def: "Mean size of your losing trades. The playbook's core: derisk fast so the average loss stays tiny — this number IS your worst-case discipline." },
+    { k: "worstLoss", label: "Worst single loss", dir: "lte", unit: "%", v: m.worstLoss, def: "Your biggest single loser. One blowout undoes twenty good stops — it must stay capped." },
+    { k: "payoff", label: "Avg win ÷ avg loss", dir: "gte", unit: "×", v: m.payoff, def: "How much bigger the average win is than the average loss. Homerun systems need this well above 2 because the win rate runs low." },
+    { k: "homerunShare", label: `Homerun share (top ${m.topN || 1} win${m.topN === 1 ? "" : "s"})`, dir: "gte", unit: "%", v: m.homerunShare, def: "Share of total gross profit that came from your biggest ~10% of winners. High = the homerun engine is working: a few big trades carry the book." },
+    { k: "winRate", label: "Win rate floor", dir: "gte", unit: "%", v: m.winRate, def: "The minimum hit rate for the math to hold. A homerun playbook survives a modest win rate — but not below the floor you set here." },
+  ];
+  const fmt = (v, unit) => v == null ? "—" : (unit === "×" ? v.toFixed(2) + "×" : v.toFixed(1) + "%");
+  return (
+    <div className="card reveal" style={{ padding: "16px 20px", marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+        <input value={pb.name} onChange={e => setPb(p => ({ ...p, name: e.target.value }))} title="Name your playbook"
+          style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "var(--goldBright)", fontWeight: 800, fontSize: "0.86rem", padding: "5px 10px", minWidth: 200 }} />
+        <span style={{ fontSize: "0.64rem", color: "var(--muted)" }}>{m.n} closed trade{m.n === 1 ? "" : "s"} in this slice · targets are yours to edit — the verdicts update live</span>
+        <button className="distbtn" style={{ marginLeft: "auto" }} onClick={() => setPb(PLAYBOOK_PRESET)} title="Restore the default derisk-fast/homerun targets">↺ Reset preset</button>
+      </div>
+      {ROWS.map((r, i) => {
+        const tgt = Number(pb.targets[r.k]);
+        const ok = r.v == null || !Number.isFinite(tgt) ? null : (r.dir === "lte" ? r.v <= tgt : r.v >= tgt);
+        return (
+          <div key={r.k} style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 12px", padding: "8px 6px", borderBottom: i < ROWS.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.78rem", minWidth: 0 }}>
+            <span className="term" data-tip={r.def} style={{ flex: "1 1 150px", minWidth: 0, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.label}</span>
+            <b style={{ minWidth: 62, textAlign: "right", fontVariantNumeric: "tabular-nums", color: ok == null ? "var(--muted)" : ok ? "var(--green)" : "var(--red)" }}>{fmt(r.v, r.unit)}</b>
+            <span style={{ color: "var(--muted)", fontSize: "0.66rem" }}>{r.dir === "lte" ? "target ≤" : "target ≥"}</span>
+            <input type="number" step="0.5" value={pb.targets[r.k]} onChange={e => { const v = e.target.value; setPb(p => ({ ...p, targets: { ...p.targets, [r.k]: v === "" ? "" : Number(v) } })); }}
+              style={{ width: 64, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: "var(--text)", padding: "4px 8px", fontSize: "0.74rem", fontVariantNumeric: "tabular-nums" }} />
+            <span style={{ fontSize: "0.62rem", color: "var(--muted)", width: 12 }}>{r.unit}</span>
+            <span style={{ marginLeft: "auto", fontWeight: 800, fontSize: "0.62rem", padding: "3px 10px", borderRadius: 20, whiteSpace: "nowrap",
+              background: ok == null ? "rgba(255,255,255,0.05)" : ok ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.14)",
+              color: ok == null ? "var(--muted)" : ok ? "var(--green)" : "var(--red)" }}>{ok == null ? "— no data" : ok ? "🟢 ON TRACK" : "🔴 DEVIATING"}</span>
+          </div>
+        );
+      })}
+      <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>The playbook thesis: keep every loss near-nothing (derisk fast), so a handful of homerun winners carry the whole book. Verdicts recompute from the same trades this page shows — use the date filter to score just a specific period.</div>
+    </div>
+  );
+}
+
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "July 10, 2026",
+    title: "🧭 Market context, 3-D edge matrix, equity SMAs & the Playbook tracker",
+    items: [
+      "Objective Edge gains a third dimension — MARKET CONTEXT at entry: Trending (SPY above its 21-day EMA for 10+ straight sessions), Choppy (crossing back and forth), or Downtrend (below for 10+ sessions). Every group now also shows its Profit Factor next to win rate and average R.",
+      "NEW 3-D edge matrix: grade × theme × market context crossed in one table, so you can see exactly which combination your edge lives in — every row clicks open to its exact trades.",
+      "Equity curve now carries its own 5 / 10 / 20-SMA overlay with a live risk pill: below the 5-SMA = derisk mode, below the 10-SMA = hard brake (no new risk, review trades).",
+      "NEW Playbook tracker: define your model playbook as measurable targets (average loss, worst loss, payoff, homerun share, win-rate floor) and watch live ON TRACK / DEVIATING verdicts computed from your actual journal.",
+    ],
+  },
   {
     tag: "New",
     date: "July 10, 2026",
@@ -5630,8 +5709,18 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
       else { const step = (ds.length - 1) / 7; xs = Array.from({ length: 8 }, (_, k) => ds[Math.round(k * step)]); }
     }
     const totalPL = eq[eq.length - 1] - startCap, totalRet = startCap > 0 ? totalPL / startCap * 100 : 0, n = sorted.length;
+    // ── Equity SMAs (5/10/20 equity nodes) — the derisk/brake overlay. SMA runs over the
+    // equity NODES (one per trading day in By-Date mode). Rule: equity below its 5-SMA =
+    // START DERISKING; below the 10-SMA = HARD BRAKE (no new risk, review open trades);
+    // the 20-SMA is the long guardrail for regime context.
+    const smaOf = (p) => eq.map((_, i) => i + 1 >= p ? eq.slice(i + 1 - p, i + 1).reduce((s, v) => s + v, 0) / p : null);
+    const smaPath = (arr) => { let out = "", pen = false; arr.forEach((v, i) => { if (v == null) { pen = false; return; } out += (pen ? " L" : " M") + X(i).toFixed(1) + "," + Y(v).toFixed(1); pen = true; }); return out.trim(); };
+    const sma5 = smaOf(5), sma10 = smaOf(10), sma20 = smaOf(20);
+    const lastV = eq[eq.length - 1], l5 = sma5[sma5.length - 1], l10 = sma10[sma10.length - 1];
+    const riskStatus = l10 != null && lastV < l10 ? "brake" : l5 != null && lastV < l5 ? "derisk" : l5 != null ? "full" : null;
     return { yb, linePos: linePath(posSegs), lineNeg: linePath(negSegs), areaPos: areaPath(posSegs), areaNeg: areaPath(negSegs), yLabels, xs, totalPL, totalRet, n, pct,
-      pts: eq.map((v, i) => ({ x: X(i), y: Y(v), v, key: i === 0 ? "Start" : groupKeys[i - 1], delta: i === 0 ? 0 : (eq[i] - eq[i - 1]) })), startCap, W, H };
+      pts: eq.map((v, i) => ({ x: X(i), y: Y(v), v, key: i === 0 ? "Start" : groupKeys[i - 1], delta: i === 0 ? 0 : (eq[i] - eq[i - 1]) })), startCap, W, H,
+      smaPaths: { s5: smaPath(sma5), s10: smaPath(sma10), s20: smaPath(sma20) }, riskStatus, lastV, l5, l10 };
   }, [dateFiltered, startCap, eqMode, eqXAxis]);
 
   // ── NEW: return-distribution buckets (mockup's fixed 10 buckets, editable what-if) ──
@@ -5664,6 +5753,46 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const distLosses = distTotal - distWins;
   const distRpt = distTotal ? distCounts.reduce((a, c, i) => a + c * DIST_BUCKETS[i].mid, 0) / distTotal : 0;
   const distFmtPct = (v) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
+
+  // ── Market context: SPY vs its 21-day EMA — the third Objective-Edge dimension ──
+  // Definition (Valen, 2026-07-10):
+  //   TRENDING  = SPY closed ABOVE the EMA21 (daily) for ≥10 consecutive sessions as of entry
+  //   DOWNTREND = SPY closed BELOW the EMA21 (daily) for ≥10 consecutive sessions
+  //   CHOPPY    = neither — price hovering around the EMA21 within the last 10 sessions
+  // Judged at the trade's ENTRY date (same convention as theme fit). No data = never guessed.
+  const [spyCtxDays, setSpyCtxDays] = useState(null); // [{d:"YYYY-MM-DD", ctx:"trend"|"down"|"chop"}]
+  useEffect(() => {
+    let alive = true;
+    const to = new Date().toISOString().slice(0, 10);
+    fetch(`/api/candles?symbol=SPY&from=2026-01-02&to=${to}&res=1day`).then(r => r.json()).then(j => {
+      if (!alive || !j || !Array.isArray(j.candles) || j.candles.length < 40) return;
+      const closes = j.candles.map(c => c.close);
+      const k = 2 / 22, ema = []; let seed = 0;
+      for (let i = 0; i < closes.length; i++) {
+        if (i < 20) { seed += closes[i]; ema.push(null); }
+        else if (i === 20) { seed += closes[i]; ema.push(seed / 21); }
+        else ema.push(closes[i] * k + ema[i - 1] * (1 - k));
+      }
+      let up = 0, dn = 0;
+      const days = [];
+      j.candles.forEach((c, i) => {
+        if (ema[i] == null) return;
+        if (c.close > ema[i]) { up++; dn = 0; } else { dn++; up = 0; }
+        if (i >= 30) days.push({ d: new Date(c.time * 1000).toISOString().slice(0, 10), ctx: up >= 10 ? "trend" : dn >= 10 ? "down" : "chop" }); // 10 EMA-tracked sessions before the first verdict
+      });
+      setSpyCtxDays(days);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const spyCtxOf = (entryDate) => {
+    if (!spyCtxDays || !spyCtxDays.length) return null;
+    const iso = tradeDateISO(entryDate); if (!iso) return null;
+    // STRICTLY BEFORE the entry date: the entry day's own close isn't known at entry time —
+    // using it would be lookahead (the exact bias class the entry-model study retracted).
+    let last = null;
+    for (const d of spyCtxDays) { if (d.d < iso) last = d; else break; }
+    return last ? last.ctx : null;
+  };
 
   // ── NEW: VIV Analytics — scoped by ALL / MONTH / WEEK / DAY (off dateFiltered) ──
   const [vaPeriod, setVaPeriod] = useState("all");
@@ -6034,7 +6163,10 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             const wins = rows.filter(t => (Number(t.plPct) || 0) > 0).length;
             const rRows = rows.filter(t => t.rMult != null);
             const avgR = rRows.length ? rRows.reduce((s, t) => s + Number(t.rMult), 0) / rRows.length : null;
-            return { n, winPct: n ? Math.round(100 * wins / n) : 0, avgR };
+            const gw = rows.reduce((s, t) => s + Math.max(0, Number(t.plDollar) || 0), 0);
+            const gl = rows.reduce((s, t) => s + Math.max(0, -(Number(t.plDollar) || 0)), 0);
+            const pf = gl > 0 ? gw / gl : (gw > 0 ? Infinity : null); // profit factor: gross wins ÷ gross losses
+            return { n, winPct: n ? Math.round(100 * wins / n) : 0, avgR, pf };
           };
           const letterOf = (t) => (t.gradeSnapshot && t.gradeSnapshot.letter) || (getSavedGrade(t.ticker) || {}).letter || null;
           const byGrade = ["A+", "A", "B", "C"].map(L => ({ L, ...agg(pop.filter(t => letterOf(t) === L)) })).filter(g => g.n > 0);
@@ -6042,15 +6174,34 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           const fitOf = (t) => { const th = sectorFor(t.ticker); return th ? themeFit(th, t.entry) : null; };
           const inT = agg(pop.filter(t => fitOf(t) === "in")), offT = agg(pop.filter(t => fitOf(t) === "off"));
           const unT = agg(pop.filter(t => !fitOf(t))); // pre-coverage, missing entry date, or unknown sector — NEVER guessed
+          // Market context at ENTRY (SPY vs EMA21 — trending / choppy / downtrend, see spyCtxOf)
+          const ctxOf = (t) => spyCtxOf(t.entry);
+          const mTrend = agg(pop.filter(t => ctxOf(t) === "trend")), mChop = agg(pop.filter(t => ctxOf(t) === "chop"));
+          const mDown = agg(pop.filter(t => ctxOf(t) === "down")), mUn = agg(pop.filter(t => !ctxOf(t)));
           const cell = (v, good) => <b style={{ color: v == null ? "var(--muted)" : good ? "var(--green)" : "var(--red)", whiteSpace: "nowrap" }}>{v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2) + "R"}</b>;
+          const pfCell = (pf) => <span className="term" data-tip="Profit factor = gross $ won ÷ gross $ lost in this group. Above 1 = the group makes money; 2+ = every dollar lost buys two back." style={{ color: pf == null ? "var(--muted)" : pf >= 1 ? "var(--green)" : "var(--red)", fontWeight: 700, whiteSpace: "nowrap" }}>PF {pf == null ? "—" : pf === Infinity ? "∞" : pf.toFixed(2)}</span>;
+          const CTX_LABEL = { trend: "📈 Trending", chop: "🌊 Choppy", down: "📉 Downtrend" };
           // click a group → expand the exact trades behind the number (with sector + the snapshot ranks used)
           const groupTrades = (id) => {
             if (id === "t:in") return pop.filter(t => fitOf(t) === "in");
             if (id === "t:off") return pop.filter(t => fitOf(t) === "off");
             if (id === "t:un") return pop.filter(t => !fitOf(t));
             if (id && id.startsWith("g:")) { const L = id.slice(2); return L === "un" ? pop.filter(t => !letterOf(t)) : pop.filter(t => letterOf(t) === L); }
+            if (id && id.startsWith("m:")) { const c = id.slice(2); return c === "un" ? pop.filter(t => !ctxOf(t)) : pop.filter(t => ctxOf(t) === c); }
+            if (id && id.startsWith("x:")) { // 3-D combo: grade|theme|context
+              const [G, T, X] = id.slice(2).split("|");
+              return pop.filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
+            }
             return [];
           };
+          // 3-D matrix: Grade × Theme × Context — every combo with trades, biggest first
+          const combos = [];
+          const gKeys = [...byGrade.map(g => g.L), ...(ungraded.n ? ["un"] : [])];
+          for (const G of gKeys) for (const T of ["in", "off", "un"]) for (const X of ["trend", "chop", "down", "un"]) {
+            const rows = pop.filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
+            if (rows.length) combos.push({ id: `x:${G}|${T}|${X}`, G, T, X, ...agg(rows) });
+          }
+          combos.sort((a, b) => b.n - a.n);
           // NOTE: every cell must be shrink/wrap-safe — fixed minWidths inside a minmax(300px,1fr)
           // grid track overflowed into the neighbouring column (member-reported UI bug).
           const Row = ({ label, s, accent, id }) => (
@@ -6060,6 +6211,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
               <span style={{ flex: "1 1 84px", minWidth: 0, fontWeight: 800, color: accent || "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
               <span style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>{s.n} trade{s.n !== 1 ? "s" : ""}</span>
               <span style={{ color: s.winPct >= 50 ? "var(--green)" : "var(--red)", fontWeight: 700, whiteSpace: "nowrap" }}>{s.winPct}% win</span>
+              {pfCell(s.pf)}
               {cell(s.avgR, (s.avgR || 0) >= 0)}
               {id && <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>{edgeOpen === id ? "▴" : "▾"}</span>}
             </div>
@@ -6071,7 +6223,10 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             return (
               <div style={{ gridColumn: "1 / -1", background: "rgba(255,255,255,0.02)", border: "1px solid var(--borderGold)", borderRadius: 12, padding: "10px 14px", marginTop: 4 }}>
                 <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>
-                  The {rows.length} trade{rows.length !== 1 ? "s" : ""} behind “{id === "t:in" ? "🟢 In-theme" : id === "t:off" ? "🔴 Off-theme" : id === "t:un" ? "◦ Untagged" : id.slice(2) + " setups"}”
+                  The {rows.length} trade{rows.length !== 1 ? "s" : ""} behind “{id === "t:in" ? "🟢 In-theme" : id === "t:off" ? "🔴 Off-theme" : id === "t:un" ? "◦ Untagged"
+                    : id === "m:trend" ? "📈 Trending tape" : id === "m:chop" ? "🌊 Choppy tape" : id === "m:down" ? "📉 Downtrend tape" : id === "m:un" ? "◦ No market data"
+                    : id.startsWith("x:") ? (() => { const [G, T, X] = id.slice(2).split("|"); return `${G === "un" ? "Ungraded" : G} · ${T === "in" ? "In-theme" : T === "off" ? "Off-theme" : "Untagged"} · ${X === "un" ? "No mkt data" : ({ trend: "Trending", chop: "Choppy", down: "Downtrend" })[X]}`; })()
+                    : id.slice(2) + " setups"}”
                   {isTheme && id !== "t:un" && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · judged against the theme snapshot at each trade's ENTRY date</span>}
                   {id === "t:un" && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · entered before theme coverage, missing an entry date, or unknown sector — never guessed. Fix the entry date via Edit trade and it re-tags automatically.</span>}
                 </div>
@@ -6098,7 +6253,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           };
           if (!byGrade.length && !inT.n && !offT.n) return null;
           return (<>
-            <div className="toolbar" style={{ marginTop: 26 }}><h2 className="sech guide" onMouseEnter={guideEnter("objedge", "Objective edge", "This connects your process to your results: win rate and average R grouped by the setup grade you gave each trade, and by whether the trade was in-theme at entry. If A-plus setups outperform, your grading has real edge.", undefined)} onMouseLeave={guideLeave("objedge")}>Objective edge</h2></div>
+            <div className="toolbar" style={{ marginTop: 26 }}><h2 className="sech guide" onMouseEnter={guideEnter("objedge", "Objective edge", "This connects your process to your results across three dimensions judged at entry: the setup grade you gave the trade, whether its sector was in-theme, and the market context — was SPY trending, choppy or in a downtrend versus its 21-day EMA. The 3-D matrix crosses all three so you see exactly which combination your edge lives in.", undefined)} onMouseLeave={guideLeave("objedge")}>Objective edge</h2></div>
             <div className="card reveal" style={{ padding: "16px 20px", marginBottom: 18 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
                 <div style={{ minWidth: 0 }}>
@@ -6115,11 +6270,56 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
                   {THEME_COVERAGE_START && <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>🧭 Theme metrics track from <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the date of the first theme snapshot. Trades entered earlier aren't theme-tagged: themes rotate constantly, so a later snapshot can't honestly judge an older trade. Grade metrics cover all trades.</div>}
                 </div>
-                {edgeOpen && <EdgeList id={edgeOpen} />}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By market context (at entry)</div>
+                  {mTrend.n > 0 && <Row id="m:trend" label="📈 Trending" s={mTrend} accent="var(--green)" />}
+                  {mChop.n > 0 && <Row id="m:chop" label="🌊 Choppy" s={mChop} accent="var(--goldBright)" />}
+                  {mDown.n > 0 && <Row id="m:down" label="📉 Downtrend" s={mDown} accent="var(--red)" />}
+                  {mUn.n > 0 && <Row id="m:un" label="◦ No data" s={mUn} accent="var(--muted)" />}
+                  {!spyCtxDays && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Loading SPY history… (needs the deployed /api — shows “No data” in local dev.)</div>}
+                  <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>📐 <b style={{ color: "var(--goldBright)" }}>Definition:</b> the market's state at ENTRY, from SPY vs its 21-day EMA as of the last completed session BEFORE your entry day (the entry day's close isn't known when you enter — no lookahead) — <b>Trending</b> = SPY closed above the EMA21 for 10+ straight sessions · <b>Downtrend</b> = below it for 10+ straight sessions · <b>Choppy</b> = neither (price crossing back and forth inside the last 10 sessions). Context, theme and grade together give the multi-dimensional read BEFORE the trade-level detail.</div>
+                </div>
+                {edgeOpen && !edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
               </div>
+
+              {/* ── 3-D EDGE MATRIX: Setup grade × Theme fit × Market context ── */}
+              {combos.length > 0 && (
+                <div style={{ marginTop: 18 }}>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>3-D edge matrix — grade × theme × market context</div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem" }}>
+                      <thead><tr style={{ color: "var(--muted)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                        <th style={{ textAlign: "left", padding: "4px 8px" }}>Grade</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Theme</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Market</th>
+                        <th style={{ textAlign: "right", padding: "4px 8px" }}>Trades</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Win %</th><th style={{ textAlign: "right", padding: "4px 8px" }}>PF</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Avg R</th><th></th>
+                      </tr></thead>
+                      <tbody>
+                        {combos.map(c => (
+                          <tr key={c.id} onClick={() => setEdgeOpen(edgeOpen === c.id ? null : c.id)} title="Click to see the exact trades behind this combination"
+                            style={{ cursor: "pointer", background: edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                            <td style={{ padding: "6px 8px", fontWeight: 800, color: c.G === "A+" ? "var(--green)" : c.G === "A" ? "var(--goldBright)" : c.G === "un" ? "var(--muted)" : "var(--text)" }}>{c.G === "un" ? "Ungraded" : c.G}</td>
+                            <td style={{ padding: "6px 8px", color: c.T === "in" ? "var(--green)" : c.T === "off" ? "var(--red)" : "var(--muted)" }}>{c.T === "in" ? "🟢 In" : c.T === "off" ? "🔴 Off" : "◦ Untagged"}</td>
+                            <td style={{ padding: "6px 8px", color: c.X === "trend" ? "var(--green)" : c.X === "down" ? "var(--red)" : c.X === "chop" ? "var(--goldBright)" : "var(--muted)" }}>{c.X === "un" ? "◦ No data" : CTX_LABEL[c.X]}</td>
+                            <td style={{ padding: "6px 8px", textAlign: "right", color: "var(--muted)" }}>{c.n}</td>
+                            <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 700, color: c.winPct >= 50 ? "var(--green)" : "var(--red)" }}>{c.winPct}%</td>
+                            <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 700, color: c.pf == null ? "var(--muted)" : c.pf >= 1 ? "var(--green)" : "var(--red)" }}>{c.pf == null ? "—" : c.pf === Infinity ? "∞" : c.pf.toFixed(2)}</td>
+                            <td style={{ padding: "6px 8px", textAlign: "right" }}>{c.avgR == null ? <span style={{ color: "var(--muted)" }}>—</span> : <b style={{ color: c.avgR >= 0 ? "var(--green)" : "var(--red)" }}>{(c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2)}R</b>}</td>
+                            <td style={{ padding: "6px 4px", color: "var(--muted)", fontSize: "0.66rem" }}>{edgeOpen === c.id ? "▴" : "▾"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {edgeOpen && edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
+                  <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 6 }}>Sorted by sample size. Small samples (under ~10 trades) are direction, not proof — click any row to inspect its exact trades before acting on it.</div>
+                </div>
+              )}
             </div>
           </>);
         })()}
+
+        {/* PLAYBOOK TRACKER — model-playbook targets vs live journal adherence */}
+        <div className="toolbar"><h2 className="sech guide" onMouseEnter={guideEnter("playbook", "Playbook tracker", "Define your model playbook as measurable targets — average loss, worst loss, payoff ratio, homerun share, win-rate floor — and this card scores your actual trades against them live. Green means on track; red means you're deviating from the system you designed.", undefined)} onMouseLeave={guideLeave("playbook")}>Playbook tracker</h2></div>
+        <PlaybookTracker trades={dateFiltered} uid={session?.user?.id} />
 
         {/* PERFORMANCE CALENDAR (monthly + yearly, TradeZella-style) */}
         <div className="toolbar"><h2 className="sech">Performance calendar</h2></div>
@@ -6162,6 +6362,10 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       <path d={eqSvg.linePos} fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                       <path d={eqSvg.lineNeg} fill="none" stroke="var(--red)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                     </g>
+                    {/* Equity SMAs — the derisk (5) / brake (10) / guardrail (20) overlay */}
+                    {eqSvg.smaPaths?.s20 && <path d={eqSvg.smaPaths.s20} fill="none" stroke="rgba(168,130,255,0.55)" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />}
+                    {eqSvg.smaPaths?.s10 && <path d={eqSvg.smaPaths.s10} fill="none" stroke="rgba(239,68,68,0.75)" strokeWidth="1.2" strokeDasharray="5 3" vectorEffect="non-scaling-stroke" />}
+                    {eqSvg.smaPaths?.s5 && <path d={eqSvg.smaPaths.s5} fill="none" stroke="var(--goldBright)" strokeWidth="1.4" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />}
                     {eqHover != null && eqSvg.pts[eqHover] && <line x1={eqSvg.pts[eqHover].x.toFixed(1)} y1="0" x2={eqSvg.pts[eqHover].x.toFixed(1)} y2="210" stroke="rgba(255,255,255,0.4)" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
                   </svg>
                   {eqHover != null && eqSvg.pts[eqHover] && (() => {
@@ -6183,6 +6387,19 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 </div>
               </div>
               <div className="xaxis">{eqSvg.xs.length ? eqSvg.xs.map((s, i) => <span key={i}>{s}</span>) : <span>—</span>}</div>
+              {/* SMA legend + the derisk/brake status — equity vs its own moving averages */}
+              {eqSvg.riskStatus && (
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 14px", marginTop: 8, fontSize: "0.62rem", color: "var(--muted)" }}>
+                  <span><span style={{ color: "var(--goldBright)" }}>┄┄</span> 5-SMA <span className="term" data-tip="Average of your last 5 equity points. Equity closing below it = the first warning: start derisking (smaller size, trim laggards).">derisk line</span></span>
+                  <span><span style={{ color: "var(--red)" }}>╌╌</span> 10-SMA <span className="term" data-tip="Average of your last 10 equity points. Equity below it = hard brake: no new risk until you've reviewed the open book and recent trades.">brake line</span></span>
+                  <span><span style={{ color: "rgba(168,130,255,0.9)" }}>──</span> 20-SMA guardrail</span>
+                  <span style={{ marginLeft: "auto", fontWeight: 800, padding: "3px 10px", borderRadius: 20,
+                    background: eqSvg.riskStatus === "brake" ? "rgba(239,68,68,0.14)" : eqSvg.riskStatus === "derisk" ? "rgba(240,192,80,0.14)" : "rgba(34,197,94,0.12)",
+                    color: eqSvg.riskStatus === "brake" ? "var(--red)" : eqSvg.riskStatus === "derisk" ? "var(--goldBright)" : "var(--green)" }}>
+                    {eqSvg.riskStatus === "brake" ? "🔴 BRAKE — equity below 10-SMA: no new risk, review trades" : eqSvg.riskStatus === "derisk" ? "🟡 DERISK — equity below 5-SMA: cut size, trim laggards" : "🟢 FULL RISK — equity above its 5-SMA"}
+                  </span>
+                </div>
+              )}
               <div className="charthint">{!eqSvg.n ? "No trades match this filter."
                 : eqSvg.pct ? <>Account return <span className="g">{sgnPct(eqSvg.totalRet)}</span> across {eqSvg.n} closed trade{eqSvg.n === 1 ? "" : "s"}.</>
                   : <>Account {eqSvg.totalPL >= 0 ? "grew" : "fell"} <span className={eqSvg.totalPL >= 0 ? "g" : "rd"}>{sgnMoney(eqSvg.totalPL)} ({sgnPct(eqSvg.totalRet)})</span> across {eqSvg.n} closed trade{eqSvg.n === 1 ? "" : "s"}.</>}</div>
