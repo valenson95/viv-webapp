@@ -105,10 +105,27 @@ function aggOf(list) {
     rlist,
   };
 }
-const HB = [[-99, -2, "≤−2R"], [-2, -1, "−2..−1"], [-1, -0.5, "−1..−0.5"], [-0.5, -0.05, "−0.5..0"], [-0.05, 0.05, "scratch"], [0.05, 1, "0..1"], [1, 2, "1..2"], [2, 3, "2..3"], [3, 5, "3..5"], [5, 99, "5R+"]];
+const HB = [[-99, -2, "≤ −2R"], [-2, -1, "−2 to −1"], [-1, -0.5, "−1 to −½"], [-0.5, -0.05, "−½ to 0"], [-0.05, 0.05, "scratch"], [0.05, 1, "0 to 1"], [1, 2, "1 to 2"], [2, 3, "2 to 3"], [3, 5, "3 to 5"], [5, 99, "5R+"]];
+
+/* ─── error boundary: a bad payload row must show a message, never a dead page ── */
+class QABoundary extends React.Component {
+  constructor(p) { super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(e) { return { err: e }; }
+  render() {
+    if (this.state.err) return (
+      <div style={{ padding: 40, color: T.text, fontSize: "0.8rem", lineHeight: 1.7 }}>
+        <b style={{ color: T.red }}>The Quant page hit a rendering error.</b>
+        <div style={{ color: T.muted, marginTop: 6 }}>{String(this.state.err?.message || this.state.err)}</div>
+        <div style={{ color: T.faint, marginTop: 6 }}>Usually a stale payload — rerun <code>node --env-file=.env.local scripts/edge-ledger.mjs</code> and refresh.</div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+export default function QuantAnalysis(props) { return <QABoundary><QuantAnalysisInner {...props} /></QABoundary>; }
 
 /* ─── page ───────────────────────────────────────────────────────────────── */
-export default function QuantAnalysis({ C, font, session, setPage }) {
+function QuantAnalysisInner({ C, font, session, setPage }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL;
   const [data, setData] = useState(null);
   const [mode, setMode] = useState("sys"); // "sys" = system cohort · "all" = full journal since May
@@ -196,11 +213,29 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
     const caps = W.map(c => c.capture).filter(v => v != null);
     const cutEarly = W.filter(c => c.capture != null && c.capture < 0.4);
     const bigLeftOnTable = W.filter(c => c.mfeR != null && c.blendedR != null && c.mfeR - c.blendedR >= 1.5);
-    // Extension-at-entry gate slice (≤4× is the gate)
-    const extKnown = rows.filter(c => c.extEntry != null);
-    const extOK = extKnown.filter(c => c.extEntry <= 4), extHot = extKnown.filter(c => c.extEntry > 4);
-    // Grade slice
-    const gA = rows.filter(c => /^A/.test(c.grade || "")), gB = rows.filter(c => /^B/.test(c.grade || "")), gU = rows.filter(c => !c.grade);
+    // Extension-at-entry gate slice (≤4× is the gate) — recorded value first, bar-computed fallback
+    const extOf = (c) => c.extEntry ?? c.extEntryCalc ?? null;
+    const extKnown = rows.filter(c => extOf(c) != null);
+    const extOK = extKnown.filter(c => extOf(c) <= 4), extHot = extKnown.filter(c => extOf(c) > 4);
+    // LoD-distance gate (≤0.60 ATR): captured entry_gates first, EOD approximation fallback
+    const lodOf = (c) => (c.gates && c.gates.lod_dist_atr != null) ? +c.gates.lod_dist_atr : (c.lodDistAtr ?? null);
+    const lodKnown = rows.filter(c => lodOf(c) != null);
+    const lodOK = lodKnown.filter(c => lodOf(c) <= 0.6), lodHot = lodKnown.filter(c => lodOf(c) > 0.6);
+    // Grade slice — grade may be a letter string (new payloads) or a legacy snapshot object
+    const gradeStr = (c) => typeof c.grade === "string" ? c.grade : (c.grade && c.grade.letter) || null;
+    const gA = rows.filter(c => /^A/.test(gradeStr(c) || "")), gB = rows.filter(c => /^B/.test(gradeStr(c) || "")), gU = rows.filter(c => !gradeStr(c));
+    // Trim tournament — the four counterfactuals vs never-trim, same EOD price basis
+    const tRows = rows.filter(c => c.vT3_25 != null && c.shadowR != null);
+    const variant = (key, label) => {
+      const vals = tRows.map(c => c[key]).filter(v => v != null && isFinite(v));
+      const beat = tRows.filter(c => c[key] != null && c.shadowR != null && c[key] >= c.shadowR).length;
+      return { key, label, n: vals.length, meanR: mean(vals), medR: median(vals), totR: vals.reduce((s, v) => s + v, 0), beatPct: tRows.length ? Math.round(100 * beat / tRows.length) : null };
+    };
+    const tourney = tRows.length >= 5 ? [
+      variant("vT3_25", "T+3 · trim 25%"), variant("vT3_33", "T+3 · trim 33%"),
+      variant("vT5_25", "T+5 · trim 25%"), variant("vT5_33", "T+5 · trim 33%"),
+      variant("shadowR", "Never trim (hold all)"),
+    ] : null;
     // Gate JSON coverage
     const gated = rows.filter(c => c.gates && Object.keys(c.gates).length);
     const gateSlice = (key, pass) => {
@@ -216,7 +251,8 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
       nearMiss, nearMissPct: lMFE.length ? Math.round(100 * nearMiss.length / lMFE.length) : null,
       capMed: median(caps), capN: caps.length, cutEarly, bigLeftOnTable,
       extOK: aggOf(extOK), extHot: aggOf(extHot), extUnknown: rows.length - extKnown.length,
-      gA: aggOf(gA), gB: aggOf(gB), gU: aggOf(gU),
+      lodOK: aggOf(lodOK), lodHot: aggOf(lodHot), lodUnknown: rows.length - lodKnown.length,
+      gA: aggOf(gA), gB: aggOf(gB), gU: aggOf(gU), gradeStr, tourney, tourneyN: tRows.length,
       gatedN: gated.length,
       gates: gated.length ? {
         lod: gateSlice("lod_dist_atr", v => +v <= 0.6),
@@ -441,9 +477,13 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
           {/* gate slices */}
           <div>
             <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted, marginBottom: 6 }}>Entry gates — expectancy each side of the gate</div>
-            {sliceRow("Extension ≤ 4× at entry", lab.extOK, "Campaigns entered with ATR%-multiple from the 50MA at or under 4× — the freshness gate. Expectancy here vs the hot side IS the gate's proof.")}
+            {sliceRow("Extension ≤ 4× at entry", lab.extOK, "Campaigns entered with ATR%-multiple from the 50MA at or under 4× — the freshness gate. Uses your recorded value when present, else computed from daily bars (SMA50 + ATR14 as of entry). Expectancy here vs the hot side IS the gate's proof.")}
             {sliceRow("Extension > 4× at entry", lab.extHot, "Chased entries — extension above 4× when the trigger fired. If this side's expectancy is negative, every violation has a known price.")}
-            {lab.extUnknown > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, padding: "5px 4px" }}>{lab.extUnknown} campaigns predate extension capture — excluded, not guessed.</div>}
+            {lab.extUnknown > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, padding: "5px 4px" }}>{lab.extUnknown} campaigns lack bar history for the extension calc — excluded, not guessed.</div>}
+            <div style={{ height: 10 }} />
+            {sliceRow("LoD-dist ≤ 0.6 ATR at entry", lab.lodOK, "Entries where the low-of-day sat within 60% of one ATR of the entry price — the tight-stop gate. Until the trade-log's live capture builds up, this uses the ENTRY DAY's final low from EOD bars — an upper bound of the true at-entry distance (the low can print after you entered).")}
+            {sliceRow("LoD-dist > 0.6 ATR at entry", lab.lodHot, "Gate violations — the stop anchor sat too far below the entry, making D wide and the R math expensive.")}
+            {lab.lodUnknown > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, padding: "5px 4px" }}>{lab.lodUnknown} campaigns lack an entry-day bar match for the LoD calc — excluded, not guessed.</div>}
             <div style={{ height: 10 }} />
             {sliceRow("A-grade setups", lab.gA, "Campaigns whose ticker carried an A/A+ setup grade (frozen at entry).")}
             {sliceRow("B-grade setups", lab.gB, "Campaigns graded B at entry.")}
@@ -508,7 +548,8 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={hist} margin={{ left: 0, right: 8, top: 18 }}>
               <CartesianGrid vertical={false} stroke={T.grid} strokeDasharray="3 5" />
-              <XAxis dataKey="bucket" {...axis} interval={0} angle={-32} textAnchor="end" height={46} />
+              {/* horizontal labels, upright — the slanted version was unreadable (Valen 2026-07-11) */}
+              <XAxis dataKey="bucket" {...axis} interval={0} angle={0} textAnchor="middle" height={28} tick={{ fill: T.muted, fontSize: 10, fontWeight: 600 }} />
               <YAxis {...axis} width={26} allowDecimals={false} />
               <Tooltip cursor={{ fill: "rgba(255,255,255,0.03)" }} content={<TT render={(p) => <>{p[0]?.payload?.bucket}: <b>{p[0]?.payload?.n}</b> campaigns</>} />} />
               <Bar dataKey="n" radius={[3, 3, 0, 0]} maxBarSize={34}>
@@ -563,6 +604,41 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
           </div>
         </div>
       </Panel>
+
+      {/* TRIM TOURNAMENT — T+3 vs T+5, 25% vs 33%, vs never trimming */}
+      {lab.tourney && (
+        <Panel title="Trim tournament — T+3 or T+5? 25% or 33%?" meta={`${lab.tourneyN} campaigns · same EOD price basis`}
+          footnote="How it works: every closed campaign is REPLAYED four ways — first trim of 25% or 33% at the day-3 or day-5 close, runner held to the final exit day's close — plus never trimming at all. All five use the same end-of-day closes, so the comparison is apples-to-apples (your ACTUAL result used real intraday fills and isn't directly comparable). Campaigns that ended before the trim day count unchanged — the rule simply never fired. Caveats: EOD closes only (no intraday), and the runner ignores your trailing stop — this measures the TRIM-TIMING choice, not the whole exit system. Re-judge every ~20 new campaigns.">
+          <Say>
+            {(() => {
+              const best = lab.tourney.slice().sort((a, b) => (b.meanR ?? -99) - (a.meanR ?? -99))[0];
+              const never = lab.tourney.find(v => v.key === "shadowR");
+              return <>Across these {lab.tourneyN} campaigns, <b style={{ color: T.goldBright }}>{best.label}</b> comes out best at <b>{sgnR(best.meanR)}</b> per trade{never && best.key !== "shadowR" ? <> vs <b>{sgnR(never.meanR)}</b> for never trimming — the trim earns its keep</> : never && best.key === "shadowR" ? <> — right now HOLDING beats every trim variant; sample is small, treat as direction</> : null}. Small samples move — the verdict firms up as campaigns accumulate.</>;
+            })()}
+          </Say>
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: 560 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(150px,1.4fr) 50px 85px 85px 85px 100px", gap: "0 10px", alignItems: "center", padding: "2px 4px 6px", fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted }}>
+                <span>Strategy</span><span>n</span><span style={{ textAlign: "right" }}>Mean R</span><span style={{ textAlign: "right" }}>Median R</span><span style={{ textAlign: "right" }}>Total R</span><span style={{ textAlign: "right" }}>≥ never-trim</span>
+              </div>
+              {lab.tourney.map(v => {
+                const best = lab.tourney.slice().sort((a, b) => (b.meanR ?? -99) - (a.meanR ?? -99))[0];
+                const isBest = v.key === best.key;
+                return (
+                  <div key={v.key} style={{ display: "grid", gridTemplateColumns: "minmax(150px,1.4fr) 50px 85px 85px 85px 100px", gap: "0 10px", alignItems: "center", padding: "8px 4px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.76rem", background: isBest ? "rgba(201,152,42,0.05)" : "transparent" }}>
+                    <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{v.label}{isBest && <span style={{ color: T.goldBright, fontSize: "0.6rem", fontWeight: 800, marginLeft: 8 }}>◂ BEST</span>}</span>
+                    <span style={{ color: T.muted, fontVariantNumeric: "tabular-nums" }}>{v.n}</span>
+                    <b style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: (v.meanR ?? 0) >= 0 ? T.green : T.red }}>{sgnR(v.meanR)}</b>
+                    <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{sgnR(v.medR)}</span>
+                    <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{sgnR(v.totR, 1)}</span>
+                    <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: T.muted }}>{v.key === "shadowR" ? "—" : v.beatPct + "%"}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Panel>
+      )}
 
       {/* equity + throttle */}
       <Panel title="System health — your equity, traded like a stock" meta={`${mode === "sys" ? "system cohort" : "full journal"} · exit order`}
@@ -678,8 +754,9 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
                 <tr key={i}>
                   <td style={{ ...tdBase, fontWeight: 700 }}>{c.ticker}</td>
                   <td style={{ ...tdBase, textAlign: "right", color: T.muted }}>{c.entryDate || "—"}</td>
-                  <td style={{ ...tdBase, color: T.muted }}>{c.grade || "—"}</td>
-                  <td style={{ ...tdBase, textAlign: "right", color: T.muted }}>{c.extEntry != null ? num(c.extEntry, 1) + "×" : "—"}</td>
+                  {/* grade may be a legacy snapshot OBJECT — render the letter only (raw object = React crash) */}
+                  <td style={{ ...tdBase, color: T.muted }}>{lab.gradeStr(c) || "—"}</td>
+                  <td style={{ ...tdBase, textAlign: "right", color: T.muted }}>{(c.extEntry ?? c.extEntryCalc) != null ? num(c.extEntry ?? c.extEntryCalc, 1) + "×" : "—"}</td>
                   <td style={{ ...tdBase, textAlign: "right", color: c.pl > 0 ? T.green : T.red }}>{fmt$(c.pl)}</td>
                   <td style={{ ...tdBase, textAlign: "right" }}>{num(c.blendedR ?? c.rSum)}</td>
                   <td style={{ ...tdBase, textAlign: "right", color: T.muted }}>{num(c.mfeR)}</td>

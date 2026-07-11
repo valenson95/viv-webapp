@@ -85,7 +85,9 @@ async function main() {
       // Entry-side context for the refinement lab: extension at entry (worst leg), frozen grade,
       // and the entry_gates JSON when the trade-log captured it (LoD-dist %ATR, RVOL, ORB wait…).
       extEntry: (() => { const e = legs.map((x) => x.ext_entry).filter((v) => v != null).map(Number); return e.length ? round(Math.max(...e)) : null; })(),
-      grade: legs.map((x) => x.grade_snapshot).find(Boolean) || null,
+      // grade_snapshot is an OBJECT ({stars, letter, pct, ...}) — fold to the LETTER string.
+      // Shipping the raw object crashed the Quant audit table (React can't render objects).
+      grade: (() => { const g = legs.map((x) => x.grade_snapshot).find(Boolean); return g ? (typeof g === "string" ? g : g.letter || null) : null; })(),
       gates: legs.map((x) => x.entry_gates).find((g) => g && typeof g === "object") || null,
       reasons: [...new Set(legs.map((x) => x.exit_reason).filter(Boolean))].join(" / "),
     };
@@ -99,7 +101,8 @@ async function main() {
   const bars = {};
   for (const t of tickers) {
     try {
-      const p1 = Math.floor(new Date("2026-04-01").getTime() / 1000), p2 = Math.floor(Date.now() / 1000);
+      // Window starts far enough back to compute SMA50 + ATR14 BEFORE the earliest (May) entries.
+      const p1 = Math.floor(new Date("2025-10-01").getTime() / 1000), p2 = Math.floor(Date.now() / 1000);
       const d = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(t)}?period1=${p1}&period2=${p2}&interval=1d`, { headers: { "User-Agent": "Mozilla/5.0" } }).then(j);
       const r0 = d?.chart?.result?.[0]; if (!r0) continue;
       const q = r0.indicators.quote[0];
@@ -113,6 +116,7 @@ async function main() {
 
   for (const c of campaigns) {
     c.mfeR = c.maeR = c.dayMFE = c.blendedR = c.shadowR = c.deriskCostR = c.capture = null; c.rescued = false; c.trimDay = null;
+    c.extEntryCalc = c.lodDistAtr = c.atrEntry = null; c.vT3_25 = c.vT3_33 = c.vT5_25 = c.vT5_33 = null;
     const B = bars[c.ticker];
     if (!B || !c.entry || !c.stop || c.stop >= c.entry || !c.entryDate || !c.lastExit) continue;
     const riskPS = c.entry - c.stop;
@@ -121,6 +125,33 @@ async function main() {
     let i1 = B.findIndex((b) => b.date > c.lastExit); i1 = i1 === -1 ? B.length : i1;
     if (i0 === -1 || i0 >= i1) continue;
     const win = B.slice(i0, i1);
+    // ---- entry-context backfill from bars (approximations, labelled as such in the UI) ----
+    // ATR14 = mean true range of the 14 bars BEFORE entry · SMA50 = mean close of the 50 before.
+    if (i0 >= 15) {
+      let trSum = 0;
+      for (let k = i0 - 14; k < i0; k++) { const b = B[k], pc = B[k - 1].c; trSum += Math.max(b.h - b.l, Math.abs(b.h - pc), Math.abs(b.l - pc)); }
+      const atr = trSum / 14;
+      if (atr > 0) {
+        c.atrEntry = round(atr, 4);
+        if (i0 >= 50) { const sma50 = B.slice(i0 - 50, i0).reduce((s, b) => s + b.c, 0) / 50; c.extEntryCalc = round((c.entry - sma50) / atr, 1); }
+        // LoD-distance %ATR: entry vs the ENTRY DAY's low. EOD approximation — the day's final
+        // low can print after the entry, so this is an UPPER bound of the at-entry distance.
+        if (B[i0].date === c.entryDate) c.lodDistAtr = round((c.entry - B[i0].l) / atr);
+      }
+    }
+    // ---- TRIM TOURNAMENT: what if the FIRST trim was f% at day-d close, runner to final close?
+    // Same price basis as shadowR (EOD closes) so the four variants and never-trim are directly
+    // comparable. If the campaign ended before day d, the rule never fires → variant = never-trim.
+    {
+      const fin = win[win.length - 1].c;
+      const vr = (d, f) => {
+        const px = win.length > d ? win[d].c : null;
+        const v = px == null ? (fin - c.entry) : f * (px - c.entry) + (1 - f) * (fin - c.entry);
+        return round(v / riskPS);
+      };
+      c.vT3_25 = vr(3, 0.25); c.vT3_33 = vr(3, 1 / 3);
+      c.vT5_25 = vr(5, 0.25); c.vT5_33 = vr(5, 1 / 3);
+    }
     let maxH = -1e18, minL = 1e18, iMax = 0;
     win.forEach((b, i) => { if (b.h > maxH) { maxH = b.h; iMax = i; } if (b.l < minL) minL = b.l; });
     c.mfeR = round((maxH - c.entry) / riskPS);
