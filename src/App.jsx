@@ -4661,6 +4661,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const [expandedTrade, setExpandedTrade] = useState(null); // full-page trade details overlay
   const [tdTab, setTdTab] = useState("chart"); // trade-details right pane: chart | replay | notes
   const [edgeOpen, setEdgeOpen] = useState(null); // Objective Edge: which group is expanded ("t:in", "t:off", "g:A+", …)
+  const [edgeNotes, setEdgeNotes] = useState({}); // Objective Edge definition blocks — collapsed by default, per-key expand
   const [tgts, setTgts] = useState(loadTargets); // TradeZella-style planning targets per trade id
   const tdTradeObj = expandedTrade ? (journaledTrades || []).find(x => x.id === expandedTrade) : null;
   const excursion = useTradeExcursion(tdTradeObj); // MAE/MFE/Best-Exit off real candles
@@ -5859,12 +5860,14 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     const smaPath = (arr) => { let out = "", pen = false; arr.forEach((v, i) => { if (v == null) { pen = false; return; } out += (pen ? " L" : " M") + X(i).toFixed(1) + "," + Y(v).toFixed(1); pen = true; }); return out.trim(); };
     const sma5 = smaOf(5), sma10 = smaOf(10), sma20 = smaOf(20);
     const lastV = eq[eq.length - 1], l5 = sma5[sma5.length - 1], l10 = sma10[sma10.length - 1], l20 = sma20[sma20.length - 1];
-    // Ladder: <5-SMA derisk · <10-SMA brake · <20-SMA SYSTEM OFFLINE (worst tier — the system
-    // itself is in drawdown, not one bad week: stand down to smallest/sim size + full audit).
-    const riskStatus = l20 != null && lastV < l20 ? "offline" : l10 != null && lastV < l10 ? "brake" : l5 != null && lastV < l5 ? "derisk" : l5 != null ? "full" : null;
+    // Pill ladder runs on the 5/10 lines only; the 20-SMA "no edge" state signals via a GLOW on
+    // its line instead of a loud card (Valen, 2026-07-11). hit = equity at/below the line now.
+    const hit = (lv) => lv != null && lastV <= lv * 1.002;
+    const hits = { s5: hit(l5), s10: hit(l10), s20: hit(l20) };
+    const riskStatus = l10 != null && lastV < l10 ? "brake" : l5 != null && lastV < l5 ? "derisk" : l5 != null ? "full" : null;
     return { yb, linePos: linePath(posSegs), lineNeg: linePath(negSegs), areaPos: areaPath(posSegs), areaNeg: areaPath(negSegs), yLabels, xs, totalPL, totalRet, n, pct,
       pts: eq.map((v, i) => ({ x: X(i), y: Y(v), v, key: i === 0 ? "Start" : groupKeys[i - 1], delta: i === 0 ? 0 : (eq[i] - eq[i - 1]) })), startCap, W, H,
-      smaPaths: { s5: smaPath(sma5), s10: smaPath(sma10), s20: smaPath(sma20) }, riskStatus, lastV, l5, l10, l20 };
+      smaPaths: { s5: smaPath(sma5), s10: smaPath(sma10), s20: smaPath(sma20) }, riskStatus, hits, lastV, l5, l10, l20 };
   }, [dateFiltered, startCap, eqMode, eqXAxis]);
   const [eqSmaOn, setEqSmaOn] = useState({ s5: true, s10: true, s20: true }); // legend toggles
 
@@ -6417,7 +6420,11 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   {offT.n > 0 && <Row id="t:off" label="🔴 Off-theme" s={offT} accent="var(--red)" />}
                   {unT.n > 0 && <Row id="t:un" label="◦ Untagged" s={unT} accent="var(--muted)" />}
                   {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
-                  {THEME_COVERAGE_START && <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>🧭 Theme metrics track from <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the date of the first theme snapshot. Trades entered earlier aren't theme-tagged: themes rotate constantly, so a later snapshot can't honestly judge an older trade. Grade metrics cover all trades.</div>}
+                  {THEME_COVERAGE_START && <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
+                    🧭 Tracked from <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b>
+                    <span onClick={() => setEdgeNotes(n => ({ ...n, theme: !n.theme }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.theme ? "hide ▴" : "why? ▾"}</span>
+                    {edgeNotes.theme && <div style={{ marginTop: 4 }}>The date of the first theme snapshot. Trades entered earlier aren't theme-tagged: themes rotate constantly, so a later snapshot can't honestly judge an older trade. Grade metrics cover all trades.</div>}
+                  </div>}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By market context (at entry)</div>
@@ -6426,7 +6433,11 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   {mDown.n > 0 && <Row id="m:down" label={<span className="term" data-tip="Downtrend market: SPY closed BELOW its 21-day EMA for 10 or more straight sessions before your entry. Persistent downside tape — fresh long breakout risk is swimming upstream.">📉 Downtrend</span>} s={mDown} accent="var(--red)" />}
                   {mUn.n > 0 && <Row id="m:un" label={<span className="term" data-tip="No verdict: the entry date predates the SPY history loaded, the date is missing, or the price feed didn't answer. Never guessed.">◦ No data</span>} s={mUn} accent="var(--muted)" />}
                   {!spyCtxDays && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Loading SPY history… (needs the deployed /api — shows “No data” in local dev.)</div>}
-                  <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>📐 <b style={{ color: "var(--goldBright)" }}>Definition:</b> the market's state at ENTRY, from SPY vs its 21-day EMA as of the last completed session BEFORE your entry day (the entry day's close isn't known when you enter — no lookahead) — <b>Trending</b> = SPY closed above the EMA21 for 10+ straight sessions · <b>Downtrend</b> = below it for 10+ straight sessions · <b>Choppy</b> = neither (price crossing back and forth inside the last 10 sessions). Context, theme and grade together give the multi-dimensional read BEFORE the trade-level detail.</div>
+                  <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
+                    📐 SPY vs its 21-day EMA, past 10 sessions, judged at entry
+                    <span onClick={() => setEdgeNotes(n => ({ ...n, market: !n.market }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.market ? "hide ▴" : "full definition ▾"}</span>
+                    {edgeNotes.market && <div style={{ marginTop: 4 }}>The market's state at ENTRY, from SPY vs its 21-day EMA as of the last completed session BEFORE your entry day (the entry day's close isn't known when you enter — no lookahead) — <b>Trending</b> = SPY closed above the EMA21 for 10+ straight sessions · <b>Downtrend</b> = below it for 10+ straight sessions · <b>Choppy</b> = neither (price crossing back and forth inside the last 10 sessions). Context, theme and grade together give the multi-dimensional read BEFORE the trade-level detail.</div>}
+                  </div>
                 </div>
                 {edgeOpen && !edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
               </div>
@@ -6436,7 +6447,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 <div style={{ marginTop: 18 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>3-D edge matrix — grade × theme × market context</div>
                   <div style={{ background: "rgba(201,152,42,0.06)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "8px 12px", fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, marginBottom: 8 }}>
-                    🧭 This matrix starts at <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the first theme snapshot. Trades entered before that have no theme tracking, so crossing them here would be inaccurate; they're excluded from the matrix (the single-dimension columns above still cover every trade).
+                    🧭 Starts at <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the first theme snapshot
+                    <span onClick={() => setEdgeNotes(n => ({ ...n, matrix: !n.matrix }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.matrix ? "hide ▴" : "why? ▾"}</span>
+                    {edgeNotes.matrix && <div style={{ marginTop: 4 }}>Trades entered before that have no theme tracking, so crossing them here would be inaccurate; they're excluded from the matrix (the single-dimension columns above still cover every trade).</div>}
                   </div>
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem", tableLayout: "fixed" }}>
@@ -6521,10 +6534,21 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       <path d={eqSvg.linePos} fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                       <path d={eqSvg.lineNeg} fill="none" stroke="var(--red)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                     </g>
-                    {/* Equity SMAs — derisk (5) / brake (10) / system-offline (20). All dotted; legend toggles each on/off */}
-                    {eqSmaOn.s20 && eqSvg.smaPaths?.s20 && <path d={eqSvg.smaPaths.s20} fill="none" stroke="rgba(168,130,255,0.65)" strokeWidth="1.2" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
-                    {eqSmaOn.s10 && eqSvg.smaPaths?.s10 && <path d={eqSvg.smaPaths.s10} fill="none" stroke="rgba(239,68,68,0.75)" strokeWidth="1.2" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
-                    {eqSmaOn.s5 && eqSvg.smaPaths?.s5 && <path d={eqSvg.smaPaths.s5} fill="none" stroke="var(--goldBright)" strokeWidth="1.4" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
+                    {/* Equity SMAs — derisk (5) / brake (10) / no-edge (20). All dotted; legend toggles each.
+                        When equity is AT/BELOW a line, that line GLOWS (soft wide underlay) — the "you've
+                        hit it" signal, replacing the old status card for the 20-SMA. */}
+                    {eqSmaOn.s20 && eqSvg.smaPaths?.s20 && <>
+                      {eqSvg.hits?.s20 && <path d={eqSvg.smaPaths.s20} fill="none" stroke="rgba(168,130,255,0.30)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+                      <path d={eqSvg.smaPaths.s20} fill="none" stroke={eqSvg.hits?.s20 ? "rgba(190,160,255,0.95)" : "rgba(168,130,255,0.65)"} strokeWidth="1.2" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+                    </>}
+                    {eqSmaOn.s10 && eqSvg.smaPaths?.s10 && <>
+                      {eqSvg.hits?.s10 && <path d={eqSvg.smaPaths.s10} fill="none" stroke="rgba(239,68,68,0.28)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+                      <path d={eqSvg.smaPaths.s10} fill="none" stroke={eqSvg.hits?.s10 ? "rgba(255,110,110,0.95)" : "rgba(239,68,68,0.75)"} strokeWidth="1.2" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+                    </>}
+                    {eqSmaOn.s5 && eqSvg.smaPaths?.s5 && <>
+                      {eqSvg.hits?.s5 && <path d={eqSvg.smaPaths.s5} fill="none" stroke="rgba(240,192,80,0.30)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+                      <path d={eqSvg.smaPaths.s5} fill="none" stroke="var(--goldBright)" strokeWidth="1.4" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+                    </>}
                     {eqHover != null && eqSvg.pts[eqHover] && <line x1={eqSvg.pts[eqHover].x.toFixed(1)} y1="0" x2={eqSvg.pts[eqHover].x.toFixed(1)} y2="210" stroke="rgba(255,255,255,0.4)" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
                   </svg>
                   {eqHover != null && eqSvg.pts[eqHover] && (() => {
@@ -6553,14 +6577,14 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                     ["s10", "10-SMA brake", "var(--red)", "Average of your last 10 equity points. Equity below it = hard brake: no new risk until you've reviewed the open book and recent trades. Click to show/hide the line."],
                     ["s20", "20-SMA no edge", "rgba(168,130,255,0.9)", "Average of your last 20 equity points — the edge line. Equity below it means the system has NO EDGE right now: this is a real system drawdown, not one bad week. Stand down to smallest or sim-only size and run a full audit — which setups, which tape, which rule bled — before re-engaging at size. Click to show/hide the line."]].map(([k, lbl, col, tip]) => (
                     <span key={k} onClick={() => setEqSmaOn(o => ({ ...o, [k]: !o[k] }))} style={{ cursor: "pointer", opacity: eqSmaOn[k] ? 1 : 0.35, userSelect: "none" }}>
-                      <span style={{ color: col }}>┄┄</span> <span className="term" data-tip={tip}>{lbl}</span>
+                      <span style={{ color: col }}>┄┄</span> <span className="term" data-tip={tip} style={eqSvg.hits?.[k] && eqSmaOn[k] ? { color: col, fontWeight: 800 } : undefined}>{lbl}</span>
+                      {eqSvg.hits?.[k] && eqSmaOn[k] && <span style={{ color: col, fontSize: "0.56rem", fontWeight: 800, marginLeft: 4 }}>● hit</span>}
                     </span>
                   ))}
                   <span style={{ marginLeft: "auto", fontWeight: 800, padding: "3px 10px", borderRadius: 20,
-                    background: eqSvg.riskStatus === "offline" ? "rgba(168,130,255,0.16)" : eqSvg.riskStatus === "brake" ? "rgba(239,68,68,0.14)" : eqSvg.riskStatus === "derisk" ? "rgba(240,192,80,0.14)" : "rgba(34,197,94,0.12)",
-                    color: eqSvg.riskStatus === "offline" ? "rgba(190,160,255,1)" : eqSvg.riskStatus === "brake" ? "var(--red)" : eqSvg.riskStatus === "derisk" ? "var(--goldBright)" : "var(--green)" }}>
-                    {eqSvg.riskStatus === "offline" ? "🟣 NO EDGE — equity below 20-SMA: smallest/sim size only + full system audit"
-                      : eqSvg.riskStatus === "brake" ? "🔴 BRAKE — equity below 10-SMA: no new risk, review trades"
+                    background: eqSvg.riskStatus === "brake" ? "rgba(239,68,68,0.14)" : eqSvg.riskStatus === "derisk" ? "rgba(240,192,80,0.14)" : "rgba(34,197,94,0.12)",
+                    color: eqSvg.riskStatus === "brake" ? "var(--red)" : eqSvg.riskStatus === "derisk" ? "var(--goldBright)" : "var(--green)" }}>
+                    {eqSvg.riskStatus === "brake" ? "🔴 BRAKE — equity below 10-SMA: no new risk, review trades"
                       : eqSvg.riskStatus === "derisk" ? "🟡 DERISK — equity below 5-SMA: cut size, trim laggards"
                       : "🟢 FULL RISK — equity above its 5-SMA"}
                   </span>
