@@ -12,6 +12,23 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 
 const TFS = [{ k: "1min", lbl: "1m" }, { k: "5min", lbl: "5m" }, { k: "15min", lbl: "15m" }, { k: "60min", lbl: "1h" }, { k: "1day", lbl: "D" }];
 const iso = (d) => (d ? String(d).slice(0, 10) : "");
+// ── US Eastern (market time) is the chart's baseline, whatever the viewer's clock ──
+// Bars are shifted so the axis renders ET wall-clock; fill times (stored as ET, e.g. "09:36:56")
+// parse onto the same shifted axis. Handles EDT/EST automatically via Intl.
+const etOffsetSec = (epochSec) => {
+  const d = new Date(epochSec * 1000);
+  const et = new Date(d.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const utc = new Date(d.toLocaleString("en-US", { timeZone: "UTC" }));
+  return Math.round((et - utc) / 1000);
+};
+const toEt = (t) => t + etOffsetSec(t);
+// Fill timestamp on the shifted axis: ET wall-clock parsed as if UTC.
+const fillEpoch = (dateStr, timeStr, fallback) => {
+  const d = iso(dateStr); if (!d) return null;
+  const t = (timeStr || fallback || "").trim();
+  const ms = Date.parse(`${d}T${t || "09:30:00"}Z`);
+  return Number.isNaN(ms) ? null : ms / 1000;
+};
 const kfmt = (v) => { const a = Math.abs(v); return (v < 0 ? "-" : "+") + "$" + (a >= 1000 ? (a / 1000).toFixed(1) + "k" : a.toFixed(0)); };
 function pickRes(entry, exit) { const days = Math.max(0, (new Date(iso(exit) || iso(entry)) - new Date(iso(entry))) / 86400000); return days <= 1 ? "5min" : days <= 5 ? "15min" : days <= 25 ? "60min" : "1day"; }
 function ema(vals, p) { const k = 2 / (p + 1); let e = null; return vals.map(v => { e = e == null ? v : v * k + e * (1 - k); return e; }); }
@@ -68,7 +85,7 @@ export default function TradeReplayChart({ trade, C, font }) {
     const f = start.toISOString().slice(0, 10), t = end.toISOString().slice(0, 10);
     const useSample = () => { const c = genSample(trade, tf); if (!c.length) { setStatus("empty"); return; } barsRef.current = c; setSample(true); setStatus("ok"); };
     fetch(`/api/candles?symbol=${encodeURIComponent(trade.ticker)}&from=${f}&to=${t}&res=${tf}`)
-      .then(r => r.json()).then(j => { if (dead) return; const candles = (j.candles || []).map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })); if (!candles.length) { useSample(); return; } barsRef.current = candles; setSample(false); setStatus("ok"); })
+      .then(r => r.json()).then(j => { if (dead) return; const candles = (j.candles || []).map(c => ({ time: toEt(c.time), open: c.open, high: c.high, low: c.low, close: c.close })); if (!candles.length) { useSample(); return; } barsRef.current = candles; setSample(false); setStatus("ok"); })
       .catch(() => { if (!dead) useSample(); });
     return () => { dead = true; };
   }, [trade.ticker, trade.entry, trade.exit, tf]);
@@ -90,10 +107,18 @@ export default function TradeReplayChart({ trade, C, font }) {
     // Events vs levels: entry/exit = arrow markers at the exact fill bars ONLY; the locked
     // stop is a standing LEVEL, so only the stop draws a horizontal line.
     if (stopP) s.createPriceLine({ price: stopP, color: RED, lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: "stop " + stopP });
-    const nearest = (dstr) => { const target = new Date(iso(dstr)).getTime() / 1000; let b = bars[0], best = 1e18; for (const c of bars) { const d = Math.abs(c.time - target); if (d < best) { best = d; b = c; } } return b; };
+    // Fills at their EXACT time bars (entry_time/exit_time stored as ET; date-only rows fall
+    // back to 09:30 ET open). TradeZella-style arrows: BUY side = green ▲ below the bar,
+    // SELL side = red ▼ above the bar — colored by SIDE, not by P&L.
+    const nearestT = (target) => { let b = bars[0], best = 1e18; for (const c of bars) { const d = Math.abs(c.time - target); if (d < best) { best = d; b = c; } } return b; };
     const marks = [];
-    if (trade.entry) marks.push({ time: nearest(trade.entry).time, position: isLong ? "belowBar" : "aboveBar", color: GOLD, shape: isLong ? "arrowUp" : "arrowDown", text: "ENTRY " + entryP.toFixed(2) });
-    if (trade.exit) marks.push({ time: nearest(trade.exit).time, position: isLong ? "aboveBar" : "belowBar", color: up ? GRN : RED, shape: isLong ? "arrowDown" : "arrowUp", text: "EXIT " + exitP.toFixed(2) });
+    const fills = (trade._fills && trade._fills.length > 1) ? trade._fills : [trade];
+    for (const f of fills) {
+      const eT = fillEpoch(f.entry, f.entryTime), xT = fillEpoch(f.exit, f.exitTime, "15:59:00");
+      const eP = Number(f.entryP) || entryP, xP = Number(f.exitP) || exitP;
+      if (eT != null) marks.push({ time: nearestT(eT).time, position: isLong ? "belowBar" : "aboveBar", color: isLong ? GRN : RED, shape: isLong ? "arrowUp" : "arrowDown", text: (fills.length > 1 ? "" : "ENTRY ") + eP.toFixed(2) });
+      if (xT != null && f.exit) marks.push({ time: nearestT(xT).time, position: isLong ? "aboveBar" : "belowBar", color: isLong ? RED : GRN, shape: isLong ? "arrowDown" : "arrowUp", text: (fills.length > 1 ? "" : "EXIT ") + xP.toFixed(2) });
+    }
     marks.sort((a, b) => a.time - b.time);
     s.setMarkers(marks);
     chart.timeScale().fitContent();
@@ -152,9 +177,9 @@ export default function TradeReplayChart({ trade, C, font }) {
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 10, color: C.muted, fontSize: "0.72rem" }}>
         <span><i style={{ display: "inline-block", width: 10, height: 2, background: C.goldBright, verticalAlign: "middle", marginRight: 5 }} />EMA9</span>
         <span><i style={{ display: "inline-block", width: 10, height: 2, background: BLUE, verticalAlign: "middle", marginRight: 5 }} />EMA21</span>
-        <span style={{ color: C.goldBright, fontWeight: 700 }}>▲ entry</span>
-        <span style={{ color: up ? GRN : RED, fontWeight: 700 }}>▼ exit</span>
-        <span style={{ marginLeft: "auto", fontStyle: "italic" }}>TradingView Lightweight-Charts · your fills at the exact bars · drawings auto-save per trade</span>
+        <span style={{ color: GRN, fontWeight: 700 }}>▲ buy fill</span>
+        <span style={{ color: RED, fontWeight: 700 }}>▼ sell fill</span>
+        <span style={{ marginLeft: "auto", fontStyle: "italic" }}>times in US Eastern (ET) · fills at their exact time bars · drawings auto-save per trade</span>
       </div>
     </div>
   );

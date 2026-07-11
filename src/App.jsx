@@ -233,10 +233,10 @@ function useDragReorder(length) {
 // quickly, accept a modest win rate, and let a handful of huge winners carry the P&L.
 // Targets persist per-user in localStorage; metrics recompute live from closed trades.
 const PLAYBOOK_PRESET = {
-  name: "Derisk fast · hunt homeruns",
-  targets: { avgLoss: 5, worstLoss: 8, payoff: 2, homerunShare: 50, winRate: 30 },
+  name: "Playbook design",
+  targets: { avgLoss: 5, payoff: 2, homerunShare: 50, winRate: 30 },
 };
-function PlaybookTracker({ trades, uid }) {
+function PlaybookTracker({ trades, uid, setPage }) {
   const KEY = `viv-playbook-${uid || "anon"}-v1`;
   const [pb, setPb] = useState(() => { try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); return s && s.targets ? { ...PLAYBOOK_PRESET, ...s, targets: { ...PLAYBOOK_PRESET.targets, ...s.targets } } : PLAYBOOK_PRESET; } catch { return PLAYBOOK_PRESET; } });
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(pb)); } catch { /* quota */ } }, [pb, KEY]);
@@ -280,19 +280,30 @@ function PlaybookTracker({ trades, uid }) {
   }, [pb, m]);
   const ROWS = [
     { k: "avgLoss", label: "Average loss", dir: "lte", unit: "%", v: m.avgLoss, def: "Mean size of your losing trades. The playbook's core: derisk fast so the average loss stays tiny — this number IS your worst-case discipline." },
-    { k: "worstLoss", label: "Worst single loss", dir: "lte", unit: "%", v: m.worstLoss, def: "Your biggest single loser. One blowout undoes twenty good stops — it must stay capped." },
     { k: "payoff", label: "Avg win ÷ avg loss", dir: "gte", unit: "×", v: m.payoff, def: "How much bigger the average win is than the average loss. Homerun systems need this well above 2 because the win rate runs low." },
     { k: "homerunShare", label: `Homerun share (top ${m.topN || 1} win${m.topN === 1 ? "" : "s"})`, dir: "gte", unit: "%", v: m.homerunShare, def: "Share of total gross profit that came from your biggest ~10% of winners. High = the homerun engine is working: a few big trades carry the book." },
     { k: "winRate", label: "Win rate floor", dir: "gte", unit: "%", v: m.winRate, def: "The minimum hit rate for the math to hold. A homerun playbook survives a modest win rate — but not below the floor you set here." },
   ];
   const fmt = (v, unit) => v == null ? "—" : (unit === "×" ? v.toFixed(2) + "×" : v.toFixed(1) + "%");
+  const goDesign = () => { try { sessionStorage.setItem("viv-goto-sim", "1"); } catch { /* private mode */ } setPage && setPage("tools"); };
+  // No design yet → the invitation, not an empty preset (member ask 2026-07-11)
+  if (!pb.designed) return (
+    <div className="card reveal" style={{ padding: "26px 24px", marginBottom: 18, textAlign: "center" }}>
+      <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--goldBright)", marginBottom: 8 }}>Design your playbook to track your performance live</div>
+      <div style={{ fontSize: "0.76rem", color: "var(--muted)", lineHeight: 1.7, maxWidth: 620, margin: "0 auto 14px" }}>
+        Build your system in the Return Simulator — your win rate, average loss, winner sizes — then hit <b style={{ color: "var(--goldBright)" }}>🎯 Sync to Playbook</b>.
+        It becomes your benchmark here: your real trades score against it live, ON TRACK or DEVIATING, with your projected curve vs the design. The best feedback loop a trader can have.
+      </div>
+      <button className="distbtn on" onClick={goDesign}>✎ Design my playbook → Return Simulator</button>
+    </div>
+  );
   return (
     <div className="card reveal" style={{ padding: "16px 20px", marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
         <input value={pb.name} onChange={e => setPb(p => ({ ...p, name: e.target.value }))} title="Name your playbook"
           style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "var(--goldBright)", fontWeight: 800, fontSize: "0.86rem", padding: "5px 10px", minWidth: 200 }} />
-        <span style={{ fontSize: "0.64rem", color: "var(--muted)" }}>{m.n} closed trade{m.n === 1 ? "" : "s"} in this slice · targets are yours to edit — the verdicts update live</span>
-        <button className="distbtn" style={{ marginLeft: "auto" }} onClick={() => setPb(PLAYBOOK_PRESET)} title="Restore the default derisk-fast/homerun targets">↺ Reset preset</button>
+        <span style={{ fontSize: "0.64rem", color: "var(--muted)" }}>{m.n} closed trade{m.n === 1 ? "" : "s"} in this slice · every change saves automatically and stays until YOU change it</span>
+        <button className="distbtn" style={{ marginLeft: "auto" }} onClick={goDesign} title="Rework the design in the Return Simulator, then re-sync — nothing here changes until you sync">✎ Edit playbook design</button>
       </div>
       {ROWS.map((r, i) => {
         const tgt = Number(pb.targets[r.k]);
@@ -2545,6 +2556,10 @@ function ReturnSimulatorTab({ guideEnter, guideLeave, gactive, expert, portfolio
   const baseStart = +portfolioSize || 0;
   const baseCurrent = (currentCapital != null && currentCapital > 0) ? currentCapital : baseStart;
   const [simStart, setSimStart] = useState("");
+  // Default-fill capital from the member's real numbers the moment they load (editable — a
+  // member's own typed value is never overwritten; we only fill an EMPTY field).
+  useEffect(() => { if (baseStart > 0) setSimStart(s => s === "" ? String(Math.round(baseStart)) : s); }, [baseStart]);
+  useEffect(() => { if (baseCurrent > 0) setSimCurrent(s => s === "" ? String(Math.round(baseCurrent)) : s); }, [baseCurrent]);
   const [simCurrent, setSimCurrent] = useState("");
   const [simPosSize, setSimPosSize] = useState("12");
   const [simLossMode, setSimLossMode] = useState("count"); // "count" | "rate"
@@ -2716,11 +2731,10 @@ return (
               let topLeft = Math.max(1, Math.ceil(wN * 0.1)), topSum = 0; // top ~10% of winners by size
               for (const r of tiers.slice().sort((a, b) => b.gain - a.gain)) { const take = Math.min(topLeft, r.count); topSum += take * r.gain; topLeft -= take; if (!topLeft) break; }
               let cur = {}; try { cur = JSON.parse(localStorage.getItem(KEY) || "null") || {}; } catch { /* fresh */ }
-              const next = { ...cur, name: "My designed system", simSize: +simPosSize || 15,
+              const next = { ...cur, name: cur.designed && cur.name ? cur.name : "Playbook design", designed: true, simSize: +simPosSize || 15,
                 targets: { ...(cur.targets || {}), avgLoss, winRate: +sim.winRate.toFixed(1),
                   payoff: avgLoss > 0 ? +(avgWin / avgLoss).toFixed(2) : 0,
-                  homerunShare: wSum > 0 ? +((topSum / wSum) * 100).toFixed(0) : 0,
-                  worstLoss: (cur.targets && cur.targets.worstLoss) || Math.round(avgLoss * 1.6) } };
+                  homerunShare: wSum > 0 ? +((topSum / wSum) * 100).toFixed(0) : 0 } };
               try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* quota */ }
               if (goCompare && setPage) { try { sessionStorage.setItem("viv-goto-playbook", "1"); } catch {} setPage("journal"); }
             };
@@ -3140,6 +3154,8 @@ function PremiumTour({ onPlayStateChange }) {
 }
 function PremiumToolsPage({ setPage, onLogout, session, demo, portfolioSize, journaledTrades, positions, displayName }) {
   const[tab,setTab]=useState(0);const tabs=["Setup Grader","Return Simulator","Risk","Expectancy","Risk Finance"];
+  // Arrived via the Playbook tracker's "Edit playbook design" → open straight on the Return Simulator.
+  useEffect(() => { try { if (sessionStorage.getItem("viv-goto-sim")) { sessionStorage.removeItem("viv-goto-sim"); setTab(1); } } catch { /* private mode */ } }, []);
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const realizedPL = useMemo(() => (journaledTrades || []).reduce((s, t) => s + (t.plDollar || 0), 0), [journaledTrades]);
   const currentCapital = (+portfolioSize || 0) + realizedPL;
@@ -6457,7 +6473,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
         {/* PLAYBOOK TRACKER — model-playbook targets vs live journal adherence.
             Reached via "Compare stats" in the Return Simulator (sessionStorage flag → scroll). */}
         <div className="toolbar" id="playbook-tracker"><h2 className="sech guide" onMouseEnter={guideEnter("playbook", "Playbook tracker", "Define your model playbook as measurable targets — average loss, worst loss, payoff ratio, homerun share, win-rate floor — and this card scores your actual trades against them live. Green means on track; red means you're deviating from the system you designed. Design a system in the Return Simulator and hit Sync to Playbook to make it your benchmark.", undefined)} onMouseLeave={guideLeave("playbook")}>Playbook tracker</h2></div>
-        <PlaybookTracker trades={dateFiltered} uid={session?.user?.id} />
+        <PlaybookTracker trades={dateFiltered} uid={session?.user?.id} setPage={setPage} />
 
         {/* PERFORMANCE CALENDAR (monthly + yearly, TradeZella-style) */}
         <div className="toolbar"><h2 className="sech">Performance calendar</h2></div>
@@ -6530,7 +6546,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 14px", marginTop: 8, fontSize: "0.62rem", color: "var(--muted)" }}>
                   {[["s5", "5-SMA derisk", "var(--goldBright)", "Average of your last 5 equity points. Equity closing below it = the first warning: start derisking — smaller size, trim laggards. Click to show/hide the line."],
                     ["s10", "10-SMA brake", "var(--red)", "Average of your last 10 equity points. Equity below it = hard brake: no new risk until you've reviewed the open book and recent trades. Click to show/hide the line."],
-                    ["s20", "20-SMA offline", "rgba(168,130,255,0.9)", "Average of your last 20 equity points — the system-health line. Equity below it means the SYSTEM is in a real drawdown, not one bad week: stand down to smallest (or sim-only) size and run a full audit — which setups, which tape, which rule — before re-engaging at size. Click to show/hide the line."]].map(([k, lbl, col, tip]) => (
+                    ["s20", "20-SMA no edge", "rgba(168,130,255,0.9)", "Average of your last 20 equity points — the edge line. Equity below it means the system has NO EDGE right now: this is a real system drawdown, not one bad week. Stand down to smallest or sim-only size and run a full audit — which setups, which tape, which rule bled — before re-engaging at size. Click to show/hide the line."]].map(([k, lbl, col, tip]) => (
                     <span key={k} onClick={() => setEqSmaOn(o => ({ ...o, [k]: !o[k] }))} style={{ cursor: "pointer", opacity: eqSmaOn[k] ? 1 : 0.35, userSelect: "none" }}>
                       <span style={{ color: col }}>┄┄</span> <span className="term" data-tip={tip}>{lbl}</span>
                     </span>
@@ -6538,7 +6554,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   <span style={{ marginLeft: "auto", fontWeight: 800, padding: "3px 10px", borderRadius: 20,
                     background: eqSvg.riskStatus === "offline" ? "rgba(168,130,255,0.16)" : eqSvg.riskStatus === "brake" ? "rgba(239,68,68,0.14)" : eqSvg.riskStatus === "derisk" ? "rgba(240,192,80,0.14)" : "rgba(34,197,94,0.12)",
                     color: eqSvg.riskStatus === "offline" ? "rgba(190,160,255,1)" : eqSvg.riskStatus === "brake" ? "var(--red)" : eqSvg.riskStatus === "derisk" ? "var(--goldBright)" : "var(--green)" }}>
-                    {eqSvg.riskStatus === "offline" ? "🟣 SYSTEM OFFLINE — equity below 20-SMA: smallest/sim size only + full system audit"
+                    {eqSvg.riskStatus === "offline" ? "🟣 NO EDGE — equity below 20-SMA: smallest/sim size only + full system audit"
                       : eqSvg.riskStatus === "brake" ? "🔴 BRAKE — equity below 10-SMA: no new risk, review trades"
                       : eqSvg.riskStatus === "derisk" ? "🟡 DERISK — equity below 5-SMA: cut size, trim laggards"
                       : "🟢 FULL RISK — equity above its 5-SMA"}
@@ -7064,8 +7080,8 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                           )}
                           <Rw k="Average Entry" v={"$" + entryP.toFixed(2)} />
                           <Rw k="Average Exit" v={"$" + exitP.toFixed(2)} />
-                          <Rw k="Entry Time" v={(tradeDateISO(t.entry) || "—") + (t.entryTime ? " " + t.entryTime : "")} />
-                          <Rw k="Exit Time" v={(tradeDateISO(t.exit) || "—") + (t.exitTime ? " " + t.exitTime : "")} />
+                          <Rw k="Entry Time" v={(tradeDateISO(t.entry) || "—") + (t.entryTime ? " · " + t.entryTime + " ET" : "")} />
+                          <Rw k="Exit Time" v={(tradeDateISO(t.exit) || "—") + (t.exitTime ? " · " + t.exitTime + " ET" : "")} />
                           <Rw k="Best Exit Price" v={ex && ex.mfe != null ? "$" + Number(ex.mfe).toFixed(2) : "--"} c="var(--green)" tip="The MFE price — the best the market offered while you were in" />
                           <Rw k="Best Exit Time" v={ex && ex.bestT != null ? excTime(ex.bestT, ex.res) : "--"} />
                           <Rw k="Hold Time" v={holdLabel(t)} />
@@ -7076,10 +7092,17 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                           <Rw k="Exit Reason" v={t.reason || "—"} />
                         </div>
                         <div className="tdz-right">
-                          {/* ONE review chart (Valen 2026-07-11): TradingView-style with the real fills as
-                              ▲/▼ arrows at the exact bars, drawings auto-saved per trade — replay removed.
-                              Notes live directly BELOW the chart (no tabs). */}
-                          <div className="revchart" style={{ marginBottom: 14 }}><TradeReplayChart trade={t} C={C} font={font} /></div>
+                          {/* THE GENUINE TRADINGVIEW CHART (Valen: "I only accept the TradingView chart").
+                              TradingView's free embed cannot draw custom fill arrows — that capability is
+                              their Advanced Charts (Charting Library) license, application in progress.
+                              Until approval: real TV chart + the fills listed at their exact ET times below;
+                              on approval this swaps to arrows ON the chart, TradeZella-style. */}
+                          <TVChart symbol={t.ticker} interval={tradeDateISO(t.entry) === (tradeDateISO(t.exit) || tradeDateISO(t.entry)) ? "5" : "D"} height={560} />
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0 14px" }}>
+                            <span style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 9, padding: "6px 12px", fontSize: "0.74rem", color: "var(--green)", fontWeight: 700 }}>▲ BUY {Number(t.shares || 0).toLocaleString()} @ ${entryP.toFixed(2)}{t.entryTime ? ` · ${t.entryTime} ET` : ""} · {tradeDateISO(t.entry)}</span>
+                            <span style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.28)", borderRadius: 9, padding: "6px 12px", fontSize: "0.74rem", color: "var(--red)", fontWeight: 700 }}>▼ SELL @ ${exitP.toFixed(2)}{t.exitTime ? ` · ${t.exitTime} ET` : ""} · {tradeDateISO(t.exit) || "—"}</span>
+                            {t.stop ? <span style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)", borderRadius: 9, padding: "6px 12px", fontSize: "0.74rem", color: "var(--muted)", fontWeight: 700 }}>stop ${Number(t.stop).toFixed(2)}</span> : null}
+                          </div>
                           {true && (
                             <>
                               {isAdmin && (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>)}
