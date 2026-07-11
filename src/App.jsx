@@ -263,7 +263,8 @@ function PlaybookTracker({ trades, uid, setPage }) {
     const avgWinR = winRs.length ? mean(winRs) : null;
     const noR = closed.filter(t => rOf(t) == null).length;
     return { n: closed.length, avgLoss, worstLoss, payoff, winRate, homerunShare, topN: wins.length ? topN : 0, avgWin,
-      winPcts: wins.map(t => Number(t.plPct) || 0), winRs, avgLossR, avgWinR, payoffR: avgWinR != null && avgLossR ? avgWinR / avgLossR : null, noR };
+      winPcts: wins.map(t => Number(t.plPct) || 0), winRs, lossRs, lossPcts: losses.map(t => Math.abs(Number(t.plPct) || 0)),
+      avgLossR, avgWinR, payoffR: avgWinR != null && avgLossR ? avgWinR / avgLossR : null, noR };
   }, [trades]);
   // ── DESIGN PROGRESS — pace vs the design's structure (trade count + winner tiers). This is what
   // catches "all ratios green but the homeruns aren't happening": each tier shows how many winners
@@ -289,6 +290,7 @@ function PlaybookTracker({ trades, uid, setPage }) {
   }, [pb.design, m]);
   const [more, setMore] = useState(false);
   const [hov, setHov] = useState(null); // hovered trade index on the projection chart (0..100)
+  const [roll, setRoll] = useState(1);  // MC seed — ↻ rolls another equally-likely future
   // Arrived via the simulator's "Compare stats" button → scroll here and open the comparison.
   useEffect(() => {
     try {
@@ -330,16 +332,24 @@ function PlaybookTracker({ trades, uid, setPage }) {
     { k: "payoff", label: "Avg win ÷ avg loss", tip: "The PAYOFF ratio — how much bigger the average win is than the average loss" + (uR ? ", measured in R (each trade scaled by its own risk; trades without a recorded R excluded)" : "") + ". NOT the same as Profit factor in Key metrics: payoff compares average sizes and ignores how often you win; profit factor divides TOTAL $ won by TOTAL $ lost, so frequency is baked in. A low-win-rate homerun system needs payoff comfortably above 2.", design: `≥ ${tg.payoff}×`, live: livePayoff == null ? null : livePayoff.toFixed(2) + "×", ok: pass(livePayoff, "gte", Number(tg.payoff), 0.005) },
     { k: "homerunShare", label: `Homerun share (top ${m.topN || 1} win${m.topN === 1 ? "" : "s"})`, tip: "Share of total gross profit that came from your biggest ~10% of winners. High = a few big trades carry the book, exactly as designed.", design: `≥ ${tg.homerunShare}%`, live: m.homerunShare == null ? null : m.homerunShare.toFixed(1) + "%", ok: pass(m.homerunShare, "gte", Number(tg.homerunShare)) },
   ];
-  // ── ONE verdict for the whole card — every failing check named in plain English.
-  const failList = ROWS.filter(r => r.ok === false).map(r => r.label.split(" (")[0].toLowerCase());
+  // ── ONE verdict — reconciled across the card's TWO judges (Valen 2026-07-12): the ratio checks
+  // + expectancy measure the EDGE (outcome per trade); the winner ladder measures the SHAPE (are
+  // the big winners the design counts on actually landing). A higher win rate + smaller losses can
+  // carry the edge ahead while the tail runs behind — one label must tell that whole story, never
+  // a red banner above a green "trading ahead" strip.
+  const ratioFails = ROWS.filter(r => r.ok === false).map(r => r.label.split(" (")[0].toLowerCase());
   const tiersBehind = pace ? pace.tiers.filter(x => !x.ok) : [];
-  tiersBehind.forEach(x => failList.push(`+${x.gain}${pace.suffix}+ winners behind pace`));
+  const failList = [...ratioFails, ...tiersBehind.map(x => `+${x.gain}${pace.suffix}+ winners behind pace`)];
   const checksN = ROWS.filter(r => r.ok != null).length + (pace ? pace.tiers.length : 0);
+  const edgeAhead = proj.evSim != null && proj.evAct != null && proj.evAct >= proj.evSim;
+  const fmtEv = (v) => (v >= 0 ? "+" : "") + v.toFixed(2) + proj.suffix;
   const verdict = failList.length === 0
     ? { word: "ON TRACK", col: "var(--green)", bd: "rgba(34,197,94,0.35)", bg: "rgba(34,197,94,0.07)", why: `all ${checksN} checks passing` }
-    : (tiersBehind.length === 0 && failList.length === 1)
-      ? { word: "DRIFTING", col: "var(--goldBright)", bd: "rgba(240,192,80,0.35)", bg: "rgba(201,152,42,0.07)", why: "1 check failing: " + failList[0] }
-      : { word: "OFF TRACK", col: "var(--red)", bd: "rgba(239,68,68,0.35)", bg: "rgba(239,68,68,0.07)", why: `${failList.length} of ${checksN} checks failing — ` + failList.join(" · ") };
+    : (ratioFails.length === 0 && tiersBehind.length > 0 && edgeAhead)
+      ? { word: "AHEAD ON EDGE · BEHIND ON SHAPE", col: "var(--goldBright)", bd: "rgba(240,192,80,0.35)", bg: "rgba(201,152,42,0.07)", why: `every ratio passes and your expectancy (${fmtEv(proj.evAct)}/trade) beats the design (${fmtEv(proj.evSim)}) — but ${tiersBehind.length} winner tier${tiersBehind.length === 1 ? " is" : "s are"} behind pace. The edge is being carried by a higher win rate and smaller losses, NOT the big winners the design counts on — it holds only while the win rate does. Land the tail to make it robust.` }
+      : (tiersBehind.length === 0 && failList.length === 1)
+        ? { word: "DRIFTING", col: "var(--goldBright)", bd: "rgba(240,192,80,0.35)", bg: "rgba(201,152,42,0.07)", why: "1 check failing: " + failList[0] }
+        : { word: "OFF TRACK", col: "var(--red)", bd: "rgba(239,68,68,0.35)", bg: "rgba(239,68,68,0.07)", why: `${failList.length} of ${checksN} checks failing — ` + failList.join(" · ") };
   const GRID = "minmax(150px,1.5fr) minmax(120px,1fr) minmax(110px,1fr) 90px";
   const goDesign = () => { try { sessionStorage.setItem("viv-goto-sim", "1"); } catch { /* private mode */ } setPage && setPage("tools"); };
   // No design yet → the invitation, not an empty preset (member ask 2026-07-11)
@@ -426,34 +436,64 @@ function PlaybookTracker({ trades, uid, setPage }) {
             </span>
             {proj.evSim != null && proj.evAct != null && (
               <b style={{ marginLeft: "auto", fontSize: "0.7rem", color: proj.evAct >= proj.evSim ? "var(--green)" : "var(--red)" }}>
-                {proj.evAct >= proj.evSim ? "trading ahead of the design" : `lagging the design by ${(proj.evSim - proj.evAct).toFixed(2)}${proj.suffix}/trade`}
+                {proj.evAct >= proj.evSim ? (tiersBehind.length ? "ahead on edge — shape behind (see ladder)" : "trading ahead of the design") : `lagging the design by ${(proj.evSim - proj.evAct).toFixed(2)}${proj.suffix}/trade`}
               </b>
             )}
           </div>
-          {/* Projected equity — designed vs actual, compounded over the next 100 trades. INTERACTIVE:
-              glide/drag across the chart to read both curves at any trade (pointer events cover touch). */}
+          {/* Projected equity — SIMULATED trade-by-trade from the design's REAL mix (losses,
+              small wins, the occasional homer), not smooth compounding: a straight "average" line
+              hides the drawdowns the design actually implies (Valen 2026-07-12). Seeded PRNG keeps
+              the chart stable between renders; ↻ rolls another equally-likely future. INTERACTIVE:
+              glide/drag across the chart to read both curves at any trade. */}
           {proj.evSim != null && proj.evAct != null && (() => {
             const N = 100, sz = proj.size / 100;
-            // % design: growth = size% × ev% per trade · R design: growth = risk% × evR per trade
-            const curveOf = (ev) => Array.from({ length: N + 1 }, (_, i) => Math.pow(1 + sz * (proj.unitR ? ev : ev / 100), i));
-            const simC = curveOf(proj.evSim), actC = curveOf(proj.evAct);
-            const all = [...simC, ...actC]; const lo = Math.min(...all); const hiR = Math.max(...all); const hi = hiR === lo ? lo + 1 : hiR;
+            const gPer = (r) => 1 + sz * (proj.unitR ? r : r / 100); // one trade's equity multiplier
+            const mulberry = (seed) => () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+            // DESIGN pool = the saved design's exact outcomes: each tier's winners at their gain,
+            // leftover (sub-tier) winners at half the smallest gain, losers at −avg loss.
+            const dz = pb.design || {};
+            const dTiers = (dz.tiers || []).filter(t => t.gain > 0 && t.count > 0);
+            const tierWins = dTiers.reduce((s, t) => s + t.count, 0);
+            const designPool = [];
+            dTiers.forEach(t => { for (let i = 0; i < t.count; i++) designPool.push(t.gain); });
+            const smallW = Math.max(0, (dz.winners || 0) - tierWins);
+            const smallG = dTiers.length ? Math.min(...dTiers.map(t => t.gain)) / 2 : 1;
+            for (let i = 0; i < smallW; i++) designPool.push(smallG);
+            for (let i = 0; i < (dz.losers || 0); i++) designPool.push(-(Number(tg.avgLoss) || 0));
+            // YOUR pool = your actual recorded outcomes in the design's own unit
+            const actPool = proj.unitR
+              ? [...m.winRs, ...(m.lossRs || []).map(v => -v)]
+              : [...m.winPcts, ...(m.lossPcts || []).map(v => -v)];
+            const walk = (pool, seed) => { const r = mulberry(seed); let eq = 1; const out = [1]; for (let i = 0; i < N; i++) { eq *= gPer(pool[Math.floor(r() * pool.length)]); out.push(eq); } return out; };
+            const smoothOf = (ev) => Array.from({ length: N + 1 }, (_, i) => Math.pow(gPer(ev), i)); // fallback for old saves without structure
+            // Dispersion band: 120 design runs → P10–P90 envelope + median endpoint (what "on
+            // design" REALLY spans — the design is a distribution, not one line).
+            const RUNS = 120;
+            const paths = designPool.length ? Array.from({ length: RUNS }, (_, k) => walk(designPool, roll * 7919 + k * 104729 + 1)) : null;
+            const band = paths ? Array.from({ length: N + 1 }, (_, i) => { const col = paths.map(p => p[i]).sort((a, b) => a - b); return [col[Math.floor(RUNS * 0.1)], col[Math.floor(RUNS * 0.9)]]; }) : null;
+            const finals = paths ? paths.map(p => p[N]).sort((a, b) => a - b) : null;
+            const medSim = finals ? finals[Math.floor(RUNS / 2)] : proj.multSim;
+            const simC = paths ? paths[roll % RUNS] : smoothOf(proj.evSim);
+            const actC = actPool.length ? walk(actPool, roll * 15485863 + 7) : smoothOf(proj.evAct);
+            const all = [...simC, ...actC, ...(band ? band.flat() : [])]; const lo = Math.min(...all); const hiR = Math.max(...all); const hi = hiR === lo ? lo + 1 : hiR;
             const X = (i) => (i / N) * 600, Y = (v) => 10 + (1 - (v - lo) / (hi - lo)) * 158;
             const path = (arr) => "M" + arr.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" L");
             const h = hov == null ? null : Math.min(N, Math.max(0, hov));
             return (
               <div style={{ marginTop: 12 }}>
                 <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "2px 12px", marginBottom: 6 }}>
-                  <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)" }}>Projected equity — next 100 trades</span>
+                  <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)" }}>Projected equity — next 100 trades, simulated</span>
                   <span style={{ fontSize: "0.7rem", color: h == null ? "var(--muted)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
                     {h == null ? "glide across the chart to inspect any trade" : <>trade {h} · design <b style={{ color: "var(--goldBright)" }}>×{simC[h].toFixed(3)}</b> · you <b>×{actC[h].toFixed(3)}</b> · gap <b style={{ color: actC[h] >= simC[h] ? "var(--green)" : "var(--red)" }}>{(actC[h] - simC[h] >= 0 ? "+" : "") + (actC[h] - simC[h]).toFixed(3)}</b></>}
                   </span>
+                  {paths && <button className="distbtn" style={{ marginLeft: "auto", fontSize: "0.62rem", padding: "3px 10px" }} onClick={() => setRoll(r => r + 1)} title="Both lines are ONE possible future drawn from the trade mix — roll the dice again to see another equally-likely path">↻ another future</button>}
                 </div>
                 <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 10px", background: "rgba(255,255,255,0.015)", touchAction: "none", cursor: "crosshair" }}
                   onPointerMove={e => { const r = e.currentTarget.getBoundingClientRect(); const f = Math.min(1, Math.max(0, (e.clientX - r.left - 10) / Math.max(1, r.width - 20))); setHov(Math.round(f * N)); }}
                   onPointerLeave={() => setHov(null)}>
                   <svg viewBox="0 0 600 180" style={{ width: "100%", height: 160, display: "block" }} preserveAspectRatio="none" role="img" aria-label="Designed vs actual projected equity">
                     <line x1="0" y1={Y(1).toFixed(1)} x2="600" y2={Y(1).toFixed(1)} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                    {band && <path d={"M" + band.map((b, i) => `${X(i).toFixed(1)},${Y(b[1]).toFixed(1)}`).join(" L") + " L" + band.slice().reverse().map((b, i) => `${X(N - i).toFixed(1)},${Y(b[0]).toFixed(1)}`).join(" L") + " Z"} fill="rgba(201,152,42,0.08)" stroke="none" />}
                     <path d={path(simC)} fill="none" stroke="var(--goldBright)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
                     <path d={path(actC)} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeDasharray="5 3" vectorEffect="non-scaling-stroke" />
                     {h != null && (<>
@@ -464,8 +504,9 @@ function PlaybookTracker({ trades, uid, setPage }) {
                   </svg>
                 </div>
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "0.64rem", color: "var(--muted)", marginTop: 6 }}>
-                  <span><i style={{ display: "inline-block", width: 12, height: 2, background: "var(--goldBright)", verticalAlign: "middle", marginRight: 5 }} />the system as designed → <b style={{ color: "var(--goldBright)" }}>×{proj.multSim?.toFixed(2)}</b></span>
-                  <span><i style={{ display: "inline-block", width: 12, height: 2, background: "rgba(255,255,255,0.55)", verticalAlign: "middle", marginRight: 5 }} />your actuals if nothing changes → <b>×{proj.multAct?.toFixed(2)}</b></span>
+                  <span className="term" data-tip={paths ? "One simulated run of the design's exact trade mix — its losses, small wins and homers in random order. The jagged dips are REAL: they're the drawdowns your design implies even when it works." : "Smooth expectancy compounding (re-save your design in the simulator to unlock the trade-mix simulation)."}><i style={{ display: "inline-block", width: 12, height: 2, background: "var(--goldBright)", verticalAlign: "middle", marginRight: 5 }} />the design, one run of {N} trades → <b style={{ color: "var(--goldBright)" }}>×{simC[N].toFixed(2)}</b></span>
+                  {paths && <span className="term" data-tip="120 simulated runs of the same design — 80% of futures end inside this band. Judge yourself against the BAND, not one line."><i style={{ display: "inline-block", width: 12, height: 8, background: "rgba(201,152,42,0.25)", verticalAlign: "middle", marginRight: 5 }} />80% of design futures → median <b style={{ color: "var(--goldBright)" }}>×{medSim.toFixed(2)}</b>, band ×{finals[Math.floor(RUNS * 0.1)].toFixed(2)}–×{finals[Math.floor(RUNS * 0.9)].toFixed(2)}</span>}
+                  <span className="term" data-tip="The same 100 trades drawn from YOUR actual recorded outcomes instead of the design's — what continuing to trade exactly as you have would look like."><i style={{ display: "inline-block", width: 12, height: 2, background: "rgba(255,255,255,0.55)", verticalAlign: "middle", marginRight: 5 }} />your actual trade mix, one run → <b>×{actC[N].toFixed(2)}</b></span>
                 </div>
               </div>
             );
@@ -477,6 +518,17 @@ function PlaybookTracker({ trades, uid, setPage }) {
 }
 
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "July 12, 2026",
+    title: "🎲 Playbook tracker: honest verdict + a projection that shows the bumps",
+    items: [
+      "The verdict now reconciles its two judges. When every ratio passes and your expectancy beats the design but the big winners are behind schedule, it says exactly that — AHEAD ON EDGE · BEHIND ON SHAPE — instead of a red banner sitting above a green strip.",
+      "Projected equity is now a real simulation: it draws 100 trades from your design's actual mix — losses, small wins, the occasional homer — so the line is jagged like real trading, not a straight average that hides drawdowns.",
+      "A soft gold band shows where 80% of the design's futures land across 120 simulated runs — judge yourself against the band, not one line. Hit ↻ another future to roll a different equally-likely path.",
+      "The white dashed line resamples YOUR actual recorded trades forward — what the next 100 trades look like if nothing changes.",
+    ],
+  },
   {
     tag: "New",
     date: "July 11, 2026",
