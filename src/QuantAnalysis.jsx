@@ -59,6 +59,14 @@ const Kpi = ({ label, value, tone, sub }) => (
   </div>
 );
 const dot = (c) => <i style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: c, marginRight: 7, verticalAlign: "middle" }} />;
+// "WHAT IT SAYS NOW" — one plain-English sentence per panel, computed from the live data.
+// The chart is evidence; this line is the finding. (TradeZella-style narrative insight.)
+const Say = ({ children }) => (
+  <div style={{ margin: "0 0 12px", padding: "10px 14px", borderLeft: `3px solid ${T.gold}`, background: "rgba(201,152,42,0.05)", borderRadius: "0 10px 10px 0", fontSize: "0.76rem", lineHeight: 1.7, color: T.text }}>
+    <span style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, display: "block", marginBottom: 2 }}>What it says now</span>
+    {children}
+  </div>
+);
 const Chip = ({ ok, children }) => (
   <span style={{ fontWeight: 800, fontSize: "0.62rem", whiteSpace: "nowrap", color: ok == null ? T.muted : ok ? T.green : T.red }}>
     {ok == null ? "—" : (ok ? "✓ " : "✕ ")}{children}
@@ -304,8 +312,20 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
         <span style={{ fontSize: "0.62rem", color: T.faint }}>{String(data.asof).slice(0, 16).replace("T", " ")} UTC</span>
       </div>
 
+      {/* how to read this page — the 30-second orientation */}
+      <section style={{ background: "rgba(201,152,42,0.04)", border: `1px solid var(--borderGold, rgba(201,152,42,0.3))`, borderRadius: 14, padding: "14px 20px", marginBottom: 16 }}>
+        <SecHead>How to read this page</SecHead>
+        <div style={{ fontSize: "0.74rem", lineHeight: 1.75, color: T.muted, marginTop: 8, maxWidth: "100ch" }}>
+          The journal records your trades; <b style={{ color: T.text }}>this page judges the SYSTEM behind them</b>. It answers five questions, one section each:
+          is the system doing its job (<b style={{ color: T.text }}>scoreboard</b> — 10 numbers with fixed targets; every MISS names the section that explains it) ·
+          do my <b style={{ color: T.text }}>entry rules</b> make money · how much of each winner do my <b style={{ color: T.text }}>exits</b> keep ·
+          am I following the <b style={{ color: T.text }}>trim rule</b> and does it pay · and what can the <b style={{ color: T.text }}>next 100 trades</b> look like.
+          Read the gold "WHAT IT SAYS NOW" line first in every section — the chart below it is just the evidence. Hover any dotted term for its definition.
+        </div>
+      </section>
+
       {/* reconciliation — why this N vs the journal's N */}
-      <Panel title="Reconciliation — this page vs the journal" meta={`${rec.fillsVerified ?? "—"} fills → ${rec.campaignsAll ?? allCamps.length} campaigns → ${rec.campaignsSystem ?? "—"} system`}
+      <Panel title="What's counted here (vs the journal)" meta={`${rec.fillsVerified ?? "—"} fills → ${rec.campaignsAll ?? allCamps.length} campaigns → ${rec.campaignsSystem ?? "—"} system`}
         footnote="The journal page counts campaign rows across its date filter; this page counts the SAME campaigns, chosen by the toggle above. Full journal here ≈ the journal page with no date filter (minus the exclusions listed). Every number on this page is computed from exactly the cohort named in the header — nothing is inherited from a different population.">
         <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 26px" }}>
           {[
@@ -328,6 +348,10 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
 
       {/* BENCHMARK SCOREBOARD — the religious tracker */}
       <section style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "16px 20px", marginBottom: 16 }}>
+        <div style={{ marginBottom: 10 }}>
+          <SecHead>System scoreboard — is the system doing its job?</SecHead>
+          <div style={{ fontSize: "0.68rem", color: T.muted, marginTop: 4, lineHeight: 1.6 }}>Ten numbers, each with a FIXED target the system was designed to. This is the whole page in one table — everything below only explains the misses.</div>
+        </div>
         <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "4px 12px", padding: "12px 16px", borderRadius: 12, background: bd.bg, border: `1px solid ${bd.bd}`, marginBottom: 12 }}>
           <b style={{ color: bd.col, fontSize: "0.95rem", fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{bd.word}</b>
           <span style={{ fontSize: "0.7rem", color: T.muted, lineHeight: 1.5, flex: "1 1 220px", minWidth: 0 }}>
@@ -363,8 +387,13 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
       </section>
 
       {/* ENTRY REFINEMENT LAB */}
-      <Panel title="Entry Refinement Lab — stops, gates & entry quality" meta={`winners with MAE data: ${lab.wMAEn}`}
+      <Panel title="Entries — do your entry rules make money?" meta={`winners with MAE data: ${lab.wMAEn}`}
         footnote="Reading order: (1) the rung table validates the 3-stop structure against how deep eventual WINNERS actually dip — if most winners survive rung 1, the first stop is earning its keep at ⅓ size; many winners through rung 2 = entries are loose against the LoD or triggers fire early. (2) Deep losses list every breach of the −0.67R design cap (+ slippage allowance) BY NAME — each is slippage, a sizing-anchor mismatch (size with the SAME D as the stops — the SOFI lesson) or discipline. (3) Gate slices prove each entry gate with your own money: a gate that doesn't separate expectancy is theatre; a gate you keep violating profitably is mis-calibrated. MAE/MFE from EOD bars — intraday depth can be worse; treat rung percentages as lower bounds.">
+        <Say>
+          {lab.avgLossR != null && <>Your average loser costs <b>{sgnR(lab.avgLossR)}</b> against the −0.67R design cap{lab.avgLossR >= -0.75 ? " — the stop structure is holding" : " — worse than design: slippage, sizing-anchor mismatch or discipline"}. </>}
+          {lab.breaches.length > 0 && <><b style={{ color: T.red }}>{lab.breaches.length} loser{lab.breaches.length === 1 ? "" : "s"}</b> blew past −0.85R (the chips below name them). </>}
+          {lab.extOK.n >= 3 && lab.extHot.n >= 3 ? <>Entries taken fresh (≤4× extended) run <b>{sgnR(lab.extOK.expR)}</b>/trade vs <b>{sgnR(lab.extHot.expR)}</b> when chased — that difference is what the extension gate is worth in your own money.</> : <>Not enough campaigns on both sides of the extension gate yet to price it — keep logging.</>}
+        </Say>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18 }}>
           {/* 3-stop rung validation */}
           <div>
@@ -429,8 +458,12 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
 
       {/* EXIT / WINNER MANAGEMENT LAB */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(430px, 1fr))", gap: 16 }}>
-        <Panel title="Winner management — banked vs best offered" meta={`median capture ${num(lab.capMed)} · n=${lab.capN}`}
-          footnote={`Marks on the dashed line sold the exact top. ${lab.cutEarly.length} winners banked under 40% of what they offered (cut early); ${lab.bigLeftOnTable.length} left ≥ 1.5R on the table. Red marks right of zero are the near-miss losers — ${lab.nearMiss.length} losers saw ≥ +1R before dying red; the T+3 trim window exists to convert exactly these.`}>
+        <Panel title="Exits — how much of each winner do you keep?" meta={`median capture ${num(lab.capMed)} · n=${lab.capN}`}
+          footnote={`How to read: every dot is one trade. Across = the BEST profit it ever offered (its peak, in R). Up = what you actually BANKED. A dot on the gold dashed line sold the exact top; the further below the line, the more was given back. Red dots to the right of 0R are losers that were winners first. (The measure behind this is MFE — maximum favorable excursion — from daily bars.)`}>
+          <Say>
+            {lab.capMed != null ? <>You keep <b>{Math.round(lab.capMed * 100)}%</b> of what your average winner offers (target ≥ 50%){lab.capMed >= 0.5 ? " — exits are doing their job" : " — winners are being cut early"}. </> : <>No capture data yet. </>}
+            {lab.nearMiss.length > 0 ? <><b style={{ color: T.red }}>{lab.nearMiss.length} loser{lab.nearMiss.length === 1 ? "" : "s"}</b> had ≥ +1R of open profit and still died red — those are the trades the T+3 trim exists to bank. That's the single most fixable leak on this chart.</> : <>No loser died red after showing +1R — the trim window is catching them.</>}
+          </Say>
           <ResponsiveContainer width="100%" height={240}>
             <ScatterChart margin={{ left: 0, right: 12, top: 12 }}>
               <CartesianGrid stroke={T.grid} strokeDasharray="3 5" />
@@ -449,8 +482,18 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
           </ResponsiveContainer>
         </Panel>
 
-        <Panel title="R distribution" meta={`n=${A.nR} scored campaigns`}
-          footnote="Healthy shape for a trim system: losses walled at −1R, a genuine 3–5R right tail, no single-outlier dependence. Mass left of −1R = stop discipline; a thinning right tail = runners cut early (cross-check the capture panel).">
+        <Panel title="Result shape — where do your trades finish?" meta={`n=${A.nR} scored campaigns`}
+          footnote="How to read: each bar counts trades that finished at that R (R = profit measured in units of what you risked: risk $1,000, make $3,000 = +3R; lose the full stop = −1R). A healthy trim-system shape: losses WALLED at −1R (nothing further left), and a real tail of +3R/+5R winners on the right — that tail pays for everything.">
+          <Say>
+            {(() => {
+              const beyond = A.rlist.filter(r => r < -1.05).length, losers = A.rlist.filter(r => r <= 0).length;
+              const tail = A.rlist.filter(r => r >= 2).length;
+              return <>
+                {losers ? <>The loss wall: <b>{beyond === 0 ? "holding — no loser finished beyond −1R" : <span style={{ color: T.red }}>{beyond} of {losers} losers finished beyond −1R</span>}</b>. </> : null}
+                Right tail: <b>{tail}</b> trade{tail === 1 ? "" : "s"} at +2R or better{tail ? " — the tail exists; protect it" : " — no big winners yet, which is what the expectancy math is waiting on"}.
+              </>;
+            })()}
+          </Say>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={hist} margin={{ left: 0, right: 8, top: 18 }}>
               <CartesianGrid vertical={false} stroke={T.grid} strokeDasharray="3 5" />
@@ -467,8 +510,13 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
       </div>
 
       {/* derisk protocol — system cohort by definition */}
-      <Panel title="Derisk protocol — T+3 → T+5 trim (system cohort)" meta={`adherence ${num(dk.adherencePct, 0)}% · target ≥ 80%`}
-        footnote={`Left: the day each winner's maximum profit printed — median day ${dk.medDayMFE}, inside the window: the rule is aimed where trades actually peak. Center: first-trim timing; marks left of the band are early trims (acceptable only on extreme extension). Right: the shadow test per campaign — bars above zero indicate the trim beat the never-trim counterfactual; running total ${num(-dk.deriskCostR)}R of value added across ${dk.deriskCostN} campaigns. This panel always reads the system cohort — the protocol didn't exist before ${data.systemEntry}.`}>
+      <Panel title="The T+3–5 trim rule — are you doing it, and does it pay?" meta={`adherence ${num(dk.adherencePct, 0)}% · target ≥ 80%`}
+        footnote={`How to read the three charts: LEFT — the day (after entry) each winner hit its maximum profit; the shaded band is day 3–5, and dots inside it mean the rule is aimed exactly where your trades peak. CENTER — the day you actually took your first trim; dots left of the band = trimmed early. RIGHT — the "what if I never trimmed" test per trade: a green bar means trimming beat holding the full position to the end. This panel always reads the system cohort — the protocol didn't exist before ${data.systemEntry}.`}>
+        <Say>
+          You executed the trim inside day 3–5 on <b style={{ color: (dk.adherencePct ?? 0) >= 80 ? T.text : T.red }}>{num(dk.adherencePct, 0)}%</b> of trimmed trades (target 80%).
+          {dk.medDayMFE != null && <> Your winners peak on day <b>{dk.medDayMFE}</b> — inside the window, so the rule FITS your trading; the gap is execution, not design.</>}
+          {dk.deriskCostR != null && <> Net effect so far: trimming has {-dk.deriskCostR >= 0 ? <>ADDED <b style={{ color: T.green }}>{num(-dk.deriskCostR)}R</b></> : <>cost <b style={{ color: T.red }}>{num(dk.deriskCostR)}R</b></>} vs never trimming, across {dk.deriskCostN} trades.</>}
+        </Say>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18 }}>
           {[{ d: mfeDots, t: "DAY OF MAX PROFIT" }, { d: trimDots, t: "DAY OF FIRST TRIM" }].map((cfg, k) => (
             <div key={k}>
@@ -506,8 +554,15 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
       </Panel>
 
       {/* equity + throttle */}
-      <Panel title="Equity curve — cumulative R" meta={`${mode === "sys" ? "system cohort" : "full journal"} · exit order`}
+      <Panel title="System health — your equity, traded like a stock" meta={`${mode === "sys" ? "system cohort" : "full journal"} · exit order`}
         footnote={`Gold = cumulative R in exit order; dashed = its ${eqMaP}-trade moving average. Trade your OWN equity like a stock: above the MA = in gear, full unit risk; below = real drawdown → halve new-position risk until it reclaims the line. Red dots mark trades taken below the line. Lower panel = rolling-10 expectancy; sustained sub-+0.25R warrants investigation before the month forces it.`}>
+        {eqState && (
+          <Say>
+            The system is <b style={{ color: eqState.above ? T.green : T.red }}>{eqState.above ? "IN GEAR" : "IN A REAL DRAWDOWN"}</b> — equity sits {eqState.gap > 0 ? "+" : ""}{eqState.gap}R {eqState.above ? "above" : "below"} its own {eqMaP}-trade average.
+            {eqState.above ? " Rule: full unit risk is allowed." : " Rule: halve new-position risk until the line is reclaimed — the throttle forces you smallest when cold."}
+            {roll.length > 0 && <> The last-10-trades expectancy is <b>{(roll[roll.length - 1].exp >= 0 ? "+" : "") + roll[roll.length - 1].exp}R</b> per trade{roll[roll.length - 1].exp >= 0.25 ? " — above the +0.25R line." : " — below the +0.25R line; watch it."}</>}
+          </Say>
+        )}
         {eqState && (
           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "10px 16px", marginBottom: 14 }}>
             <span style={{ display: "inline-flex", alignItems: "center", fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.1em", color: eqState.above ? T.green : T.red, border: `1px solid ${(eqState.above ? T.green : T.red)}44`, borderRadius: 99, padding: "4px 13px" }}>
@@ -585,8 +640,11 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
       </Panel>
 
       {/* Monte Carlo */}
-      <Panel title="Monte Carlo — 10,000 paths × 100 trades" meta={`resampled from ${mode === "sys" ? "system" : "full-journal"} R · ${mc.riskPct}% risk · n=${mc.n}`}
-        footnote="Each path draws 100 trades from the realized R-distribution of the SELECTED cohort. The 95th-percentile drawdown is the calibrated circuit-breaker: an excursion beyond it is not normal variance for this system — halt and diagnose. Directional until n ≥ 50.">
+      <Panel title="What can the next 100 trades look like?" meta={`10,000 simulated paths · resampled from ${mode === "sys" ? "system" : "full-journal"} R · ${mc.riskPct}% risk · n=${mc.n}`}
+        footnote="How to read: the computer replays YOUR real trade results 10,000 times in random order, 100 trades per run, and reports the spread. Median = the realistic base case. 5th percentile = unlucky ordering of the SAME skill. The 95th-percentile drawdown is your circuit-breaker: a real drawdown deeper than that is NOT normal variance for this system — halt and diagnose. Directional until n ≥ 50.">
+        <Say>
+          {mc.retP50 != null ? <>Same trading, shuffled 10,000 ways: the middle path makes <b>{(mc.retP50 >= 0 ? "+" : "") + num(mc.retP50, 1)}%</b> per 100 trades, and even the unlucky 5% start at <b>{(mc.retP5 >= 0 ? "+" : "") + num(mc.retP5, 1)}%</b>. Your circuit-breaker: a drawdown beyond <b style={{ color: T.red }}>{num(mc.ddP95, 1)}%</b> means something CHANGED — stop and diagnose, don't push through.</> : <>Not enough scored trades to simulate yet.</>}
+        </Say>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "14px 18px" }}>
           <Kpi label="Median path" value={(mc.retP50 >= 0 ? "+" : "") + num(mc.retP50, 1) + "%"} tone={(mc.retP50 ?? 0) >= 0 ? T.green : T.red} sub="realistic base case" />
           <Kpi label="5th percentile" value={(mc.retP5 >= 0 ? "+" : "") + num(mc.retP5, 1) + "%"} sub="unlucky, same skill" />
