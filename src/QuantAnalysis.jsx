@@ -436,6 +436,25 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         </div>
       </Panel>
 
+      {/* DATA COVERAGE — every exclusion NAMED. An unnamed exclusion is how "is AMD missing?"
+          happens; this panel makes silent data loss structurally impossible to hide. */}
+      {data.coverage && (
+        <Panel title="Data coverage — every exclusion has a name" meta={`${data.coverage.scored} of ${allCamps.length} campaigns fully scored · ${data.coverage.intraday0} with intraday day-0`} collapsed
+          footnote="Scored = has bar-derived metrics (MFE/MAE, sims). A campaign can still count in win rate and $ P&L while excluded here — exclusion reasons are about the R/bar math only. If a name you traded is missing from BOTH the scored set and this list, that IS a bug: flag it immediately.">
+          {(data.coverage.excluded || []).length === 0
+            ? <div style={{ fontSize: "0.72rem", color: T.muted }}>Nothing excluded — every campaign carries full metrics.</div>
+            : (data.coverage.excluded || []).map((x, i) => (
+              <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "6px 4px", borderTop: i ? `1px solid ${T.borderSoft}` : "none", fontSize: "0.72rem" }}>
+                <b style={{ minWidth: 56 }}>{x.t}</b>
+                <span style={{ color: T.muted, minWidth: 84, fontVariantNumeric: "tabular-nums" }}>{x.d || "no date"}</span>
+                <span style={{ color: T.faint, fontSize: "0.66rem" }}>{x.sys ? "system cohort" : "full journal"}</span>
+                <span style={{ color: T.muted, flex: "1 1 240px" }}>{x.why}</span>
+              </div>
+            ))}
+          {(data.coverage.barsMissing || []).length > 0 && <div style={{ fontSize: "0.66rem", color: T.red, marginTop: 8 }}>Price-feed gaps (rerun the ledger; if persistent, the ticker may be delisted/renamed): {data.coverage.barsMissing.join(" · ")}</div>}
+        </Panel>
+      )}
+
       {/* BENCHMARK SCOREBOARD — the religious tracker */}
       <section style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "16px 20px", marginBottom: 16 }}>
         <div style={{ marginBottom: 10 }}>
@@ -490,7 +509,8 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           {lab.breaches.length > 0 && <><b style={{ color: T.red }}>{lab.breaches.length} loser{lab.breaches.length === 1 ? "" : "s"}</b> exceeded their own era's cap (chips below). </>}
           {lab.extOK.n >= 3 && lab.extHot.n >= 3 ? <>Entries taken fresh (≤4× extended) run <b>{sgnR(lab.extOK.expR)}</b>/trade vs <b>{sgnR(lab.extHot.expR)}</b> when chased — that difference is what the extension gate is worth in your own money.</> : <>Not enough campaigns on both sides of the extension gate yet to price it — keep logging.</>}
         </Say>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 14, alignItems: "start" }}>
+        {/* one rule per ROW — full-width cards, never a cramped mosaic (Valen 2026-07-11) */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
           {/* ── RULE CARD: 3-stop structure ── */}
           <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
             <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Rule · 3-stop structure — how deep do winners dip?</div>
@@ -501,7 +521,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
                 <div style={{ marginTop: 3, color: T.muted }}>Replaying your {lab.simN} campaigns: 3-stop <b style={{ color: T.text, fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.sim3)}</b>/trade vs one full stop <b style={{ color: T.text, fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.sim1)}</b>/trade → difference <b style={{ color: lab.simDelta >= 0 ? T.green : T.red, fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.simDelta)}</b> per trade. EOD replay from the day after entry; both arms share the same assumptions, so the DIFFERENCE is the honest read.</div>
               </div>
             )}
-            <div style={{ fontSize: "0.62rem", color: T.faint, lineHeight: 1.5, marginBottom: 4 }}>Dips measured from the day AFTER entry (entry-day noise removed — that low usually prints before an ORB entry). True depth sits between this and the raw daily number.</div>
+            <div style={{ fontSize: "0.62rem", color: T.faint, lineHeight: 1.5, marginBottom: 4 }}>Dips measured from your ENTRY TIME onward: entry-day heat comes from 5-minute bars where your entry time is recorded ({(data.coverage?.intraday0 ?? 0)} campaigns covered); trades without a time skip day 0 (that low usually prints before an ORB entry). Later days use daily lows.</div>
             {[
               { lvl: "through rung 1 (−0.33R)", v: lab.rung33, note: "expected to be common — that's why only ⅓ of size sits there", warnAt: null },
               { lvl: "through rung 2 (−0.67R)", v: lab.rung67, note: "should be rare — high = loose entries vs LoD or early triggers", warnAt: 25 },

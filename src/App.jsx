@@ -493,6 +493,7 @@ const WHATS_NEW = [
       "NEW: Plan backwards from a target — type the total % return you want and the simulator tells you how many trades it takes at your win rate, risk and winner mix (e.g. 162 trades to double at 0.5% risk), with a one-click 'Use this plan' that fills your design. You can't plan a trade count — you CAN plan a target.",
       "Your saved playbook design is now the simulator's DEFAULT: 'Edit playbook design' opens on exactly what you saved — unit, risk, tiers, losers — never factory numbers. Save once, and it sticks until you save again.",
       "NEW: an Interface style you can choose in Settings — keep the signature VIV Classic (near-black + gold) or switch to Zella Clean, a calmer, flatter look with Inter typography, softer whites and a toned-down accent. It flips instantly, saves to your browser, and you can revert to Classic any time.",
+      "The 3-D edge matrix now opens as a HEATMAP — one grid per theme state (in / off / untagged), grade down the side, market context across the top, each cell tinted green or red by its average R so your edge (and the cold corners) jump out at a glance. Click any cell to see its exact trades, or flip to the classic Table view with the toggle up top.",
     ],
   },
   {
@@ -4908,6 +4909,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const [tdTab, setTdTab] = useState("chart"); // trade-details right pane: chart | replay | notes
   const [edgeOpen, setEdgeOpen] = useState(null); // Objective Edge: which group is expanded ("t:in", "t:off", "g:A+", …)
   const [edgeNotes, setEdgeNotes] = useState({}); // Objective Edge definition blocks — collapsed by default, per-key expand
+  const [edgeMatrixView, setEdgeMatrixView] = useState("heatmap"); // 3-D edge matrix presentation: "heatmap" (default) | "table"
   const [tgts, setTgts] = useState(loadTargets); // TradeZella-style planning targets per trade id
   const tdTradeObj = expandedTrade ? (journaledTrades || []).find(x => x.id === expandedTrade) : null;
   const excursion = useTradeExcursion(tdTradeObj); // MAE/MFE/Best-Exit off real candles
@@ -6706,12 +6708,95 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
               {/* ── 3-D EDGE MATRIX: Setup grade × Theme fit × Market context ── */}
               {combos.length > 0 && (
                 <div style={{ marginTop: 18 }}>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>3-D edge matrix — grade × theme × market context</div>
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
+                    <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)" }}>3-D edge matrix — grade × theme × market context</div>
+                    {/* view toggle — heatmap (default, visual) vs the classic sortable table (unchanged) */}
+                    <div style={{ marginLeft: "auto", display: "inline-flex", border: "1px solid var(--borderGold)", borderRadius: 8, overflow: "hidden", fontSize: "0.62rem", fontWeight: 700 }}>
+                      {[["heatmap", "Heatmap"], ["table", "Table"]].map(([v, lbl]) => (
+                        <button key={v} type="button" onClick={() => setEdgeMatrixView(v)}
+                          style={{ padding: "4px 10px", border: "none", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.04em",
+                            background: edgeMatrixView === v ? "rgba(240,192,80,0.14)" : "transparent",
+                            color: edgeMatrixView === v ? "var(--goldBright)" : "var(--muted)" }}>{lbl}</button>
+                      ))}
+                    </div>
+                  </div>
                   <div style={{ background: "rgba(201,152,42,0.06)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "8px 12px", fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, marginBottom: 8 }}>
                     Starts at <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the first theme snapshot
                     <span onClick={() => setEdgeNotes(n => ({ ...n, matrix: !n.matrix }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.matrix ? "hide ▴" : "why? ▾"}</span>
                     {edgeNotes.matrix && <div style={{ marginTop: 4 }}>Trades entered before that have no theme tracking, so crossing them here would be inaccurate; they're excluded from the matrix (the single-dimension columns above still cover every trade).</div>}
                   </div>
+                  {edgeMatrixView === "heatmap" ? (() => {
+                    // HEATMAP — same `combos` data, laid out as grade × context grids, one panel per theme state.
+                    // Colour = outcome (avgR) only; numbers stay neutral. Cells reuse the combo id so the
+                    // shared EdgeList drill-down below the matrix renders the exact trades on click.
+                    const GRADE_ORDER = ["A+", "A", "B", "C", "un"];
+                    const CTX_ORDER = ["trend", "chop", "down", "un"];
+                    const gradeLabel = (g) => g === "un" ? "Ungraded" : g;
+                    const ctxHead = (x) => x === "un"
+                      ? <>{dot("rgba(255,255,255,0.25)")}No data</>
+                      : <>{dot(CTX_DOT[x])}{CTX_LABEL[x]}</>;
+                    const themePanels = [
+                      { key: "in", label: "In-theme", dotc: "var(--green)" },
+                      { key: "off", label: "Off-theme", dotc: "var(--red)" },
+                      { key: "un", label: "Untagged", dotc: "rgba(255,255,255,0.25)" },
+                    ];
+                    const byId = Object.fromEntries(combos.map(c => [c.id, c]));
+                    const cellBg = (id) => {
+                      const c = byId[id];
+                      if (!c || c.avgR == null) return "rgba(255,255,255,0.02)";
+                      const a = Math.min(0.45, Math.abs(c.avgR) * 0.25);
+                      if (a < 0.02) return "rgba(255,255,255,0.03)";
+                      return c.avgR >= 0 ? `rgba(34,197,94,${a.toFixed(3)})` : `rgba(239,68,68,${a.toFixed(3)})`;
+                    };
+                    const panels = themePanels
+                      .map(p => {
+                        const grades = GRADE_ORDER.filter(g => combos.some(c => c.T === p.key && c.G === g));
+                        const ctxs = CTX_ORDER.filter(x => combos.some(c => c.T === p.key && c.X === x));
+                        return { ...p, grades, ctxs };
+                      })
+                      .filter(p => p.grades.length && p.ctxs.length);
+                    if (!panels.length) return null;
+                    return (
+                      <div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-start" }}>
+                          {panels.map(p => (
+                            <div key={p.key} style={{ flex: "1 1 300px", minWidth: 0 }}>
+                              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text)", marginBottom: 6, display: "flex", alignItems: "center" }}>{dot(p.dotc)}{p.label}</div>
+                              <div style={{ overflowX: "auto" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: `minmax(60px,auto) repeat(${p.ctxs.length}, minmax(92px,1fr))`, gap: 4 }}>
+                                  {/* header row: blank corner + context columns */}
+                                  <div />
+                                  {p.ctxs.map(x => (
+                                    <div key={x} style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)", fontWeight: 700, padding: "2px 4px", display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>{ctxHead(x)}</div>
+                                  ))}
+                                  {/* one row per grade */}
+                                  {p.grades.map(g => (
+                                    <React.Fragment key={g}>
+                                      <div style={{ fontSize: "0.72rem", fontWeight: 800, color: g === "un" ? "var(--muted)" : "var(--text)", display: "flex", alignItems: "center", whiteSpace: "nowrap", paddingRight: 4 }}>{gradeLabel(g)}</div>
+                                      {p.ctxs.map(x => {
+                                        const id = `x:${g}|${p.key}|${x}`;
+                                        const c = byId[id];
+                                        const open = edgeOpen === id;
+                                        if (!c) return <div key={x} style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: "0.8rem" }}>—</div>;
+                                        return (
+                                          <div key={x} onClick={() => setEdgeOpen(open ? null : id)} title="Click to see the exact trades behind this combination"
+                                            style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: cellBg(id), border: open ? "1px solid var(--goldBright)" : "1px solid rgba(255,255,255,0.06)", boxShadow: open ? "0 0 0 1px var(--goldBright)" : "none", padding: "5px 7px", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
+                                            <div style={{ fontSize: "0.82rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "var(--text)" }}>{c.avgR == null ? "—" : (c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2) + "R"}</div>
+                                            <div style={{ fontSize: "0.58rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>n={c.n} · {c.winPct}%</div>
+                                          </div>
+                                        );
+                                      })}
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Colour = average R per trade. Click any cell to see its exact trades. Cells under ~10 trades are direction, not proof.</div>
+                      </div>
+                    );
+                  })() : (
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem", tableLayout: "fixed" }}>
                       <colgroup><col style={{ width: "13%" }} /><col style={{ width: "15%" }} /><col style={{ width: "18%" }} /><col style={{ width: "11%" }} /><col style={{ width: "12%" }} /><col style={{ width: "12%" }} /><col style={{ width: "13%" }} /><col style={{ width: "6%" }} /></colgroup>
@@ -6741,8 +6826,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                       </tbody>
                     </table>
                   </div>
+                  )}
                   {edgeOpen && edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
-                  <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 6 }}>Sorted by sample size. Small samples (under ~10 trades) are direction, not proof — click any row to inspect its exact trades before acting on it.</div>
+                  {edgeMatrixView === "table" && <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 6 }}>Sorted by sample size. Small samples (under ~10 trades) are direction, not proof — click any row to inspect its exact trades before acting on it.</div>}
                 </div>
               )}
             </div>

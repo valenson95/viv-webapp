@@ -116,16 +116,43 @@ async function main() {
     } catch { /* skip ticker */ }
   }
 
+  // ---------- intraday day-0 lows (post-ENTRY-TIME) ----------
+  // Valen (2026-07-11): rung analysis must check dips AFTER the moment of entry, including entry
+  // day. Where a campaign has a recorded entry time and sits inside Yahoo's ~60-day 5-minute
+  // window, fetch the entry day's 5m bars and keep the LOW that printed from the entry bar on.
+  // Older/timeless campaigns fall back to day-after-entry (labelled in the UI).
+  const cutoffIntraday = new Date(Date.now() - 55 * 864e5).toISOString().slice(0, 10);
+  for (const c of campaigns) {
+    c.day0PostLow = null;
+    if (!c.entryTime || !c.entryDate || c.entryDate < cutoffIntraday || !symOK(c.ticker) || !c.entry) continue;
+    try {
+      const day0 = Math.floor(new Date(c.entryDate + "T00:00:00-04:00").getTime() / 1000);
+      const d5 = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(c.ticker)}?period1=${day0}&period2=${day0 + 86400}&interval=5m`, { headers: { "User-Agent": "Mozilla/5.0" } }).then(j);
+      const r5 = d5?.chart?.result?.[0]; if (!r5?.timestamp) continue;
+      const q5 = r5.indicators.quote[0];
+      const entryTs = Math.floor(new Date(c.entryDate + "T" + c.entryTime + "-04:00").getTime() / 1000);
+      const lows = r5.timestamp.map((ts, i) => ({ ts, l: q5.low[i] })).filter((b) => b.l != null && b.ts >= entryTs - 300); // include the bar the entry printed in
+      if (lows.length) c.day0PostLow = Math.min(...lows.map((b) => b.l));
+      await new Promise((r) => setTimeout(r, 150));
+    } catch { /* skip */ }
+  }
+
   for (const c of campaigns) {
     c.mfeR = c.maeR = c.dayMFE = c.blendedR = c.shadowR = c.deriskCostR = c.capture = null; c.rescued = false; c.trimDay = null;
-    c.extEntryCalc = c.lodDistAtr = c.atrEntry = null; c.vT3_25 = c.vT3_33 = c.vT5_25 = c.vT5_33 = null;
+    c.extEntryCalc = c.lodDistAtr = c.atrEntry = null; c.vT3_25 = c.vT3_33 = c.vT5_25 = c.vT5_33 = null; c.intraday0 = false;
+    // COVERAGE: every skip records WHY — silent exclusions are how an "AMD is missing" scare
+    // happens. The page prints this manifest; nothing falls out of the dataset unnamed.
+    c.skipReason = null;
     const B = bars[c.ticker];
-    if (!B || !c.entry || !c.stop || c.stop >= c.entry || !c.entryDate || !c.lastExit) continue;
+    if (!c.entry || !c.entryDate || !c.lastExit) { c.skipReason = "missing entry/exit data"; continue; }
+    if (!c.stop) { c.skipReason = "no original stop recorded"; continue; }
+    if (c.stop >= c.entry) { c.skipReason = "stop at/above entry (BE or blended add) — no R unit"; continue; }
+    if (!B) { c.skipReason = "no price bars returned for ticker"; continue; }
     const riskPS = c.entry - c.stop;
-    if (riskPS / c.entry < 0.002) continue; // stop ≈ entry (BE-stop row) → R denominators explode; $-stats only
+    if (riskPS / c.entry < 0.002) { c.skipReason = "stop ≈ entry — R denominator too small"; continue; }
     const i0 = B.findIndex((b) => b.date >= c.entryDate);
     let i1 = B.findIndex((b) => b.date > c.lastExit); i1 = i1 === -1 ? B.length : i1;
-    if (i0 === -1 || i0 >= i1) continue;
+    if (i0 === -1 || i0 >= i1) { c.skipReason = "entry/exit dates outside bar history"; continue; }
     const win = B.slice(i0, i1);
     // ---- entry-context backfill from bars (approximations, labelled as such in the UI) ----
     // ATR14 = mean true range of the 14 bars BEFORE entry · SMA50 = mean close of the 50 before.
@@ -158,15 +185,24 @@ async function main() {
     win.forEach((b, i) => { if (b.h > maxH) { maxH = b.h; iMax = i; } if (b.l < minL) minL = b.l; });
     c.mfeR = round((maxH - c.entry) / riskPS);
     c.maeR = round((minL - c.entry) / riskPS);
-    // MAE from the day AFTER entry — the entry-day low usually prints BEFORE an ORB entry (and
-    // the stop IS that LoD), so day-0 lows poison rung analysis. True adverse depth sits between
-    // maeR1 (this, a lower bound) and maeR (upper bound).
-    c.maeR1 = win.length > 1 ? round((Math.min(...win.slice(1).map((b) => b.l)) - c.entry) / riskPS) : null;
+    // Post-entry MAE: day-0 low measured from the ENTRY TIME (5m bars) where available — the
+    // exact check Valen asked for — plus all later days' lows. Without a recorded time, day 0
+    // is skipped (its low usually prints before an ORB entry and the stop IS that LoD).
+    {
+      const lows = win.slice(1).map((b) => b.l);
+      if (c.day0PostLow != null) { lows.push(c.day0PostLow); c.intraday0 = true; }
+      c.maeR1 = lows.length ? round((Math.min(...lows) - c.entry) / riskPS) : null;
+    }
     // ── 3-STOP vs 1-STOP counterfactual (EOD, day AFTER entry onward; gap-through exits at open).
     // Same walk, same window for both — so the COMPARISON is fair even where absolutes are approximate.
     {
       const simStops = (levels, weights) => {
         const rem = weights.slice(); let r = 0;
+        // day 0 from the entry time, when the 5m data covers it — stops are resting orders, so
+        // post-entry low ≤ level ⇒ that tranche filled at the level
+        if (c.day0PostLow != null) {
+          levels.forEach((lv, ix) => { if (rem[ix] > 0 && c.day0PostLow <= lv) { r += rem[ix] * (lv - c.entry) / riskPS; rem[ix] = 0; } });
+        }
         for (let k = 1; k < win.length; k++) {
           const b = win[k];
           levels.forEach((lv, ix) => {
@@ -431,6 +467,15 @@ async function main() {
       campaignsAll: campaigns.length, campaignsSystem: sys.length,
       optionCampaigns: campaigns.filter((c) => c.option).length,
       openRunners: positions.length, systemEntry: SYSTEM_ENTRY, since: SINCE,
+      // integrity check: every verified fill must be inside exactly one campaign
+      legsSum: campaigns.reduce((s, c) => s + c.legs, 0),
+    },
+    // COVERAGE MANIFEST — every campaign excluded from bar-derived metrics, BY NAME + reason.
+    coverage: {
+      scored: campaigns.filter((c) => c.mfeR != null).length,
+      intraday0: campaigns.filter((c) => c.intraday0).length,
+      excluded: campaigns.filter((c) => c.skipReason).map((c) => ({ t: c.ticker, d: c.entryDate, sys: isSystem(c), why: c.skipReason })),
+      barsMissing: [...new Set(campaigns.filter((c) => c.skipReason === "no price bars returned for ticker").map((c) => c.ticker))],
     },
     // ALL campaigns since May (sys flag marks the system cohort) — the page computes either
     // population client-side from the same list, so the journal and the quant page reconcile.
