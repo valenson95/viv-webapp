@@ -79,13 +79,15 @@ export default function TradeReplayChart({ trade, C, font }) {
     chart._l9 = l9; chart._l21 = l21; chart._e9 = e9; chart._e21 = e21;
     const isLong = (trade.tradeType || "Long") !== "Short";
     const entryP = Number(trade.entryP) || 0, exitP = Number(trade.exitP) || 0, stopP = Number(trade.stop) || 0, up = (Number(trade.plDollar) || 0) >= 0;
-    if (entryP) s.createPriceLine({ price: entryP, color: GOLD, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "entry " + entryP });
-    if (exitP) s.createPriceLine({ price: exitP, color: up ? GRN : RED, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "exit " + exitP });
+    // Events vs levels: entry/exit are point-in-time EVENTS → arrow markers at the fill bar ONLY.
+    // Drawing them ALSO as full-width pricelines doubled every fill visually (member-reported —
+    // a breakeven trade looked like "two entries and two exits"). Only the STOP is a standing
+    // LEVEL, so only the stop keeps a horizontal line.
     if (stopP) s.createPriceLine({ price: stopP, color: RED, lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: "stop " + stopP });
     const nearest = (dstr) => { const target = new Date(iso(dstr)).getTime() / 1000; let b = bars[0], best = 1e18; for (const c of bars) { const d = Math.abs(c.time - target); if (d < best) { best = d; b = c; } } return b; };
     const marks = [];
-    if (trade.entry) marks.push({ time: nearest(trade.entry).time, position: isLong ? "belowBar" : "aboveBar", color: GOLD, shape: isLong ? "arrowUp" : "arrowDown", text: "ENTRY " + entryP });
-    if (trade.exit) marks.push({ time: nearest(trade.exit).time, position: isLong ? "aboveBar" : "belowBar", color: up ? GRN : RED, shape: isLong ? "arrowDown" : "arrowUp", text: "EXIT " + exitP });
+    if (trade.entry) marks.push({ time: nearest(trade.entry).time, position: isLong ? "belowBar" : "aboveBar", color: GOLD, shape: isLong ? "arrowUp" : "arrowDown", text: "ENTRY " + entryP.toFixed(2) });
+    if (trade.exit) marks.push({ time: nearest(trade.exit).time, position: isLong ? "aboveBar" : "belowBar", color: up ? GRN : RED, shape: isLong ? "arrowDown" : "arrowUp", text: "EXIT " + exitP.toFixed(2) });
     marks.sort((a, b) => a.time - b.time); s._marks = marks;
     s.setMarkers(scrubRef.current >= bars.length ? marks : marks.filter(m => bars.findIndex(b => b.time === m.time) < scrubRef.current));
     chart.timeScale().fitContent();

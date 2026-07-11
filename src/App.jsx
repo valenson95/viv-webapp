@@ -231,6 +231,16 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 10, 2026",
+    title: "🔍 Auditable charts — click any distribution bar + fills on the trade chart",
+    items: [
+      "Return distribution is now fully auditable: CLICK any bar to see the exact trades inside it — ticker, exit date, return and P&L — and jump straight into any trade's details. Every number on this chart can now prove itself.",
+      "Trade details: the first tab is now Chart & Replay — your real entry (▲) and exit (▼) marked at the exact bars they filled, your stop as a line, plus candle-by-candle playback. Entry/exit no longer draw duplicate horizontal lines (a breakeven trade used to look like two entries and two exits).",
+      "The full TradingView widget (indicators + drawing tools) lives on its own TradingView tab — its embed can't overlay fills, which is why the marked chart is now the default.",
+    ],
+  },
+  {
+    tag: "New",
+    date: "July 10, 2026",
     title: "📅 Daily Setups — dates, NEW/DAY-N badges & ticker search",
     items: [
       "Every card now shows its release date, and repeat tickers carry a DAY-N badge with the grade change vs the previous mention (B→A ↑ = the setup is maturing; ↓ = weakening). First calls posted today are marked NEW.",
@@ -5642,8 +5652,12 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   }, [DIST_RANGE]);
   const [distPanelOpen, setDistPanelOpen] = useState(false);
   const [distEdits, setDistEdits] = useState({});        // {bucketIdx: count} what-if overrides
-  const distBase = useMemo(() => DIST_BUCKETS.map(b => dateFiltered.filter(t => { const r = Number(t.plPct) || 0; return r >= b.lo && r < b.hi; }).length), [DIST_BUCKETS, dateFiltered]);
-  useEffect(() => { setDistEdits({}); }, [dateFiltered]);   // a new slice clears the what-if edits
+  // Per-bucket TRADE LISTS (not just counts) — every bar is auditable: click it to see exactly
+  // which trades it counts (ticker · date · return · P&L → open details). [[feedback-aggregates-must-be-auditable]]
+  const distTrades = useMemo(() => DIST_BUCKETS.map(b => dateFiltered.filter(t => { const r = Number(t.plPct) || 0; return r >= b.lo && r < b.hi; })), [DIST_BUCKETS, dateFiltered]);
+  const distBase = useMemo(() => distTrades.map(a => a.length), [distTrades]);
+  const [distSel, setDistSel] = useState(null);             // clicked bucket index → audit panel
+  useEffect(() => { setDistEdits({}); setDistSel(null); }, [dateFiltered]);   // a new slice clears the what-if edits + selection
   const distCounts = DIST_BUCKETS.map((_, i) => distEdits[i] !== undefined ? distEdits[i] : (distBase[i] || 0));
   const distTotal = distCounts.reduce((a, c) => a + c, 0);
   const distWins = DIST_BUCKETS.reduce((a, b, i) => a + (b.side === "pos" ? distCounts[i] : 0), 0);
@@ -6176,7 +6190,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           </div>{/* /chartcol */}
 
           <div className="chartcol distcol">
-            <div className="toolbar"><h2 className="sech guide" onMouseEnter={guideEnter("dist", "Return distribution", "The size of your wins and losses. Losses sit left in red, wins right in green. Healthy trading keeps losses small.", "/audio/journal-distribution.mp3")} onMouseLeave={guideLeave("dist")}>Return distribution</h2></div>
+            <div className="toolbar"><h2 className="sech guide" onMouseEnter={guideEnter("dist", "Return distribution", "The size of your wins and losses. Losses sit left in red, wins right in green. Healthy trading keeps losses small. Click any bar to see the exact trades inside it.", "/audio/journal-distribution.mp3")} onMouseLeave={guideLeave("dist")}>Return distribution</h2></div>
             <div className="card reveal">
               <div className={"disthead" + (distPanelOpen ? " open" : "")} onClick={() => setDistPanelOpen(o => !o)}>
                 <div className="label" style={{ margin: 0 }}>Trade outcomes by size — losses left, wins right</div>
@@ -6208,8 +6222,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "stretch" }}>
                       {DIST_BUCKETS.map((b, i) => {
                         const c = distCounts[i], h = yFor(c);
-                        return (<div key={i} title={`${b.lab}: ${c} trade${c === 1 ? "" : "s"}`} style={{ flex: 1, position: "relative" }}>
-                          {c ? <div style={{ position: "absolute", left: "14%", right: "14%", height: h, ...(b.side === "neg" ? { top: halfH } : { top: halfH - h }), background: b.side === "neg" ? "linear-gradient(180deg,#ff6b6b,#b83232)" : "linear-gradient(180deg,#33d484,#1f8f57)", borderRadius: b.side === "neg" ? "0 0 3px 3px" : "3px 3px 0 0" }} /> : null}
+                        const sel = distSel === i;
+                        return (<div key={i} title={`${b.lab}: ${c} trade${c === 1 ? "" : "s"} — click to see them`} onClick={() => c && setDistSel(s => s === i ? null : i)} style={{ flex: 1, position: "relative", cursor: c ? "pointer" : "default" }}>
+                          {c ? <div style={{ position: "absolute", left: "14%", right: "14%", height: h, ...(b.side === "neg" ? { top: halfH } : { top: halfH - h }), background: b.side === "neg" ? "linear-gradient(180deg,#ff6b6b,#b83232)" : "linear-gradient(180deg,#33d484,#1f8f57)", borderRadius: b.side === "neg" ? "0 0 3px 3px" : "3px 3px 0 0", outline: sel ? "2px solid var(--goldBright)" : "none", outlineOffset: 1 }} /> : null}
                         </div>);
                       })}
                     </div>
@@ -6223,9 +6238,36 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                 return <span key={i} style={{ flex: 1, textAlign: "center" }}>{show ? (b.lo > 0 ? "+" : b.lo < 0 ? "−" : "") + Math.abs(b.lo) + (major ? "%" : "") : ""}</span>;
               })}</div>
               <div className="charthint">{!dateFiltered.length ? "No trades match this filter."
-                : dstats.wins ? <>Wins reach up to <span className="g">{dstats.lw ? sgnPct(Number(dstats.lw.plPct)) : "—"}</span>{dstats.losses ? <>, while losses stay contained (worst <span className="rd">−{Math.abs(Number(dstats.ll?.plPct) || 0).toFixed(2)}%</span>)</> : " with no losing trades in this slice"}. Small losses, larger wins is the shape of an edge.</>
-                  : <>Every trade in this slice lost (worst <span className="rd">−{Math.abs(Number(dstats.ll?.plPct) || 0).toFixed(2)}%</span>). Tighten the setup or cut faster.</>}{" "}
+                : dstats.wins ? <>Wins reach up to <span className="g">{dstats.lw ? sgnPct(Number(dstats.lw.plPct)) : "—"}</span>{dstats.losses ? <>, while losses stay contained (worst <span className="rd">−{Math.abs(Number(dstats.ll?.plPct) || 0).toFixed(2)}%</span>)</> : " with no losing trades in this slice"}. Small losses, larger wins is the shape of an edge. Click any bar to see its exact trades.</>
+                  : <>Every trade in this slice lost (worst <span className="rd">−{Math.abs(Number(dstats.ll?.plPct) || 0).toFixed(2)}%</span>). Tighten the setup or cut faster. Click any bar to see its exact trades.</>}{" "}
                 <span className="distopenlink" onClick={(e) => { e.stopPropagation(); setDistPanelOpen(o => !o); }}>{distPanelOpen ? "Hide the data sheet ↑" : "Click here to open & edit the data ↓"}</span></div>
+
+              {/* ── Bucket audit panel — the exact trades behind the clicked bar ── */}
+              {distSel != null && DIST_BUCKETS[distSel] && (() => {
+                const b = DIST_BUCKETS[distSel];
+                const rows = (distTrades[distSel] || []).slice().sort((x, y) => Math.abs(Number(y.plPct) || 0) - Math.abs(Number(x.plPct) || 0));
+                const edited = distEdits[distSel] !== undefined && distEdits[distSel] !== (distBase[distSel] || 0);
+                return (
+                  <div style={{ marginTop: 10, border: "1px solid var(--borderGold)", borderRadius: 10, padding: "10px 12px", background: "rgba(255,255,255,0.02)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: "0.66rem", fontWeight: 800, color: b.side === "pos" ? "var(--green)" : "var(--red)" }}>{b.lab}</span>
+                      <span style={{ fontSize: "0.6rem", color: "var(--muted)" }}>{rows.length} trade{rows.length === 1 ? "" : "s"} in this bucket</span>
+                      {edited && <span style={{ fontSize: "0.56rem", color: "var(--gold)" }}>bar shows a what-if edit — this list is your REAL trades only</span>}
+                      <button className="distbtn" style={{ marginLeft: "auto" }} onClick={() => setDistSel(null)}>✕ Close</button>
+                    </div>
+                    {rows.length === 0 ? <div style={{ fontSize: "0.62rem", color: "var(--muted)" }}>No real trades here.</div> : rows.map((t, k) => (
+                      <div key={t.id ?? k} onClick={() => openReview(t)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 6px", borderRadius: 7, cursor: "pointer", fontSize: "0.66rem", borderBottom: k < rows.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <span style={{ fontWeight: 800, minWidth: 52 }}>{t.ticker}</span>
+                        <span style={{ color: "var(--muted)", minWidth: 78 }}>{tradeDateISO(t.exit) || "—"}</span>
+                        <span style={{ color: (Number(t.plPct) || 0) >= 0 ? "var(--green)" : "var(--red)", minWidth: 62, fontVariantNumeric: "tabular-nums" }}>{sgnPct(Number(t.plPct) || 0)}</span>
+                        <span style={{ color: (Number(t.plDollar) || 0) >= 0 ? "var(--green)" : "var(--red)", fontVariantNumeric: "tabular-nums" }}>{sgnMoney(Number(t.plDollar) || 0)}</span>
+                        <span style={{ marginLeft: "auto", color: "var(--gold)" }}>View ›</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
 
               <div className={"distpanel" + (distPanelOpen ? " open" : "")}>
                   <div className="distpanel-inner">
@@ -6665,18 +6707,22 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                         </div>
                         <div className="tdz-right">
                           <div className="tdz-tabs">
-                            <button className={"tdz-tab" + (tdTab === "chart" ? " on" : "")} onClick={() => setTdTab("chart")}>Chart</button>
-                            <button className={"tdz-tab" + (tdTab === "replay" ? " on" : "")} onClick={() => setTdTab("replay")}>Replay</button>
+                            <button className={"tdz-tab" + (tdTab === "chart" ? " on" : "")} onClick={() => setTdTab("chart")}>Chart & Replay</button>
+                            <button className={"tdz-tab" + (tdTab === "replay" ? " on" : "")} onClick={() => setTdTab("replay")}>TradingView</button>
                             <button className={"tdz-tab" + (tdTab === "notes" ? " on" : "")} onClick={() => setTdTab("notes")}>Notes</button>
                           </div>
                           {tdTab === "chart" && (
                             <>
-                              <TVChart symbol={t.ticker} interval={tradeDateISO(t.entry) === (tradeDateISO(t.exit) || tradeDateISO(t.entry)) ? "5" : "D"} height={560} />
-                              <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8 }}>Full TradingView chart — indicators, drawing tools, timeframes. Your entry {entryP ? `$${entryP.toFixed(2)}` : ""}{exitP ? ` → exit $${exitP.toFixed(2)}` : ""}{t.stop ? ` · stop $${Number(t.stop).toFixed(2)}` : ""}. Fills plotted + candle-by-candle playback live on the Replay tab.</div>
+                              {/* DEFAULT = your fills ON the chart (▲ entry / ▼ exit at the exact bars, stop line) + candle-by-candle replay.
+                                  The embedded TradingView widget (next tab) cannot plot custom fills — that's why it's not the default. */}
+                              <div className="revchart" style={{ marginBottom: 0 }}><TradeReplayChart trade={t} C={C} font={font} /></div>
                             </>
                           )}
                           {tdTab === "replay" && (
-                            <div className="revchart" style={{ marginBottom: 0 }}><TradeReplayChart trade={t} C={C} font={font} /></div>
+                            <>
+                              <TVChart symbol={t.ticker} interval={tradeDateISO(t.entry) === (tradeDateISO(t.exit) || tradeDateISO(t.entry)) ? "5" : "D"} height={560} />
+                              <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8 }}>Full TradingView chart — indicators, drawing tools, timeframes. TradingView's embed can't overlay your fills; your entry {entryP ? `$${entryP.toFixed(2)}` : ""}{exitP ? ` → exit $${exitP.toFixed(2)}` : ""}{t.stop ? ` · stop $${Number(t.stop).toFixed(2)}` : ""} are marked on the Chart & Replay tab.</div>
+                            </>
                           )}
                           {tdTab === "notes" && (
                             <>
