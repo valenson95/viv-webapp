@@ -176,12 +176,21 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
   })), [A]);
 
   // ── ENTRY REFINEMENT LAB ───────────────────────────────────────────────────
+  // ERA-AWARE loss discipline (Valen 2026-07-11): the 3-stop rule went live with SOFI on
+  // 2026-07-10. Before that, a loser's DESIGN cap was the full stop (−1R); only from Jul 10
+  // is the cap −0.67R. Judging June losers against the 3-stop cap would manufacture breaches.
+  const THREE_STOP_START = "2026-07-10";
   const lab = useMemo(() => {
     const W = rows.filter(c => c.pl > 0), L = rows.filter(c => c.pl <= 0);
     const wMAE = W.map(c => c.maeR).filter(v => v != null);
     const rung = (lvl) => wMAE.length ? Math.round(100 * wMAE.filter(v => v <= lvl).length / wMAE.length) : null;
     const lR = L.map(c => c.blendedR ?? c.rSum).filter(v => v != null && isFinite(v));
-    const breaches = L.filter(c => { const r = c.blendedR ?? c.rSum; return r != null && r <= -0.85; });
+    const is3s = (c) => c.entryDate && c.entryDate >= THREE_STOP_START;
+    // breach = loss beyond THAT trade's design cap + slippage allowance:
+    // 3-stop era → cap 0.67R (breach < −0.85R) · before → full stop 1R (breach < −1.15R)
+    const breaches = L.filter(c => { const r = c.blendedR ?? c.rSum; return r != null && r <= (is3s(c) ? -0.85 : -1.15); });
+    const L3 = L.filter(is3s);
+    const l3R = L3.map(c => c.blendedR ?? c.rSum).filter(v => v != null && isFinite(v));
     const lMFE = L.map(c => c.mfeR).filter(v => v != null);
     const nearMiss = L.filter(c => c.mfeR != null && c.mfeR >= 1);
     const caps = W.map(c => c.capture).filter(v => v != null);
@@ -202,6 +211,7 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
     return {
       wMAEn: wMAE.length, rung33: rung(-0.33), rung67: rung(-0.67), rung100: rung(-1.0),
       avgLossR: mean(lR), worstR: lR.length ? Math.min(...lR) : null,
+      n3sLosers: L3.length, avgLoss3s: mean(l3R), // 3-stop era only (entered ≥ 2026-07-10)
       breaches, breachPct: L.length ? Math.round(100 * breaches.length / L.length) : null,
       nearMiss, nearMissPct: lMFE.length ? Math.round(100 * nearMiss.length / lMFE.length) : null,
       capMed: median(caps), capN: caps.length, cutEarly, bigLeftOnTable,
@@ -225,8 +235,8 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
       { label: "Profit factor ($)", live: num(A.pf), bench: "≥ 1.30", ok: A.pf == null ? null : A.pf >= 1.3, tip: "Gross $ won ÷ gross $ lost. 1.3 = every dollar lost buys $1.30 back — the minimum for a system worth sizing up." },
       { label: "Edge ratio", live: num(A.edgeRatio), bench: "≥ 1.20", ok: A.edgeRatio == null ? null : A.edgeRatio >= 1.2, tip: "Actual payoff ÷ the payoff your win rate REQUIRES to break even. 1.2 = 20% margin of safety over breakeven." },
       { label: "SQN (Tharp)", live: num(A.sqn), bench: "≥ 1.6", ok: A.sqn == null ? null : A.sqn >= 1.6, tip: "System Quality Number = mean(R)/σ(R)·√n. 1.6 = tradeable, 2–3 = good, 3+ = excellent. Punishes inconsistency, not just low returns." },
-      { label: "Average loss (R)", live: sgnR(lab.avgLossR), bench: "≥ −0.75R", ok: lab.avgLossR == null ? null : lab.avgLossR >= -0.75, tip: "The 3-stop structure's designed worst case is −0.67R. Average loser worse than −0.75R = slippage, sizing-anchor mismatch (the SOFI lesson) or discipline leak." },
-      { label: "Deep losses (< −0.85R)", live: lab.breachPct == null ? "—" : lab.breaches.length + " (" + lab.breachPct + "% of losers)", bench: "≤ 10%", ok: lab.breachPct == null ? null : lab.breachPct <= 10, tip: "Losses beyond −0.85R breach the 3-stop design cap + slippage allowance. Each one has a name — see the Entry Refinement Lab." },
+      { label: "Avg loss — 3-stop era", live: lab.avgLoss3s == null ? "no closed losers yet" : sgnR(lab.avgLoss3s) + ` (n=${lab.n3sLosers})`, bench: "≥ −0.75R", ok: lab.n3sLosers >= 3 ? lab.avgLoss3s >= -0.75 : null, tip: "The 3-stop rule went live with SOFI on 2026-07-10 — only losers entered from that date are judged against its −0.67R design cap (+ slippage). Earlier trades ran a full −1R stop by design and are NOT graded here. Verdict activates at 3 losers." },
+      { label: "Deep losses (beyond design cap)", live: lab.breachPct == null ? "—" : lab.breaches.length + " (" + lab.breachPct + "% of losers)", bench: "≤ 10%", ok: lab.breachPct == null ? null : lab.breachPct <= 10, tip: "Era-aware: a breach means the loss exceeded THAT trade's own design cap + slippage — beyond −0.85R for 3-stop-era trades (entered ≥ 2026-07-10), beyond −1.15R for the full-stop era before it. Each breach has a name — see the Entries section." },
       { label: "Winner capture (median)", live: num(lab.capMed), bench: "≥ 0.50", ok: lab.capMed == null ? null : lab.capMed >= 0.5, tip: "Banked R ÷ best R offered (MFE), winners only. Below 0.5 = the exits give back more than half of what the trades offer — cutting winners too early." },
       { label: "Near-miss losers", live: lab.nearMissPct == null ? "—" : lab.nearMiss.length + " (" + lab.nearMissPct + "% of losers)", bench: "≤ 15%", ok: lab.nearMissPct == null ? null : lab.nearMissPct <= 15, tip: "Losers that saw ≥ +1R open profit before dying red. The T+3 trim window exists precisely to convert these — each one is a missed protocol application." },
       { label: "T+3–5 trim adherence", live: dk.adherencePct != null ? num(dk.adherencePct, 0) + "%" : "—", bench: "≥ 80%", ok: dk.adherencePct == null ? null : dk.adherencePct >= 80, tip: "Share of trimmed system campaigns whose FIRST trim landed on day 3–5 — the derisk protocol executed as designed. (System cohort only.)" },
@@ -390,14 +400,15 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
       <Panel title="Entries — do your entry rules make money?" meta={`winners with MAE data: ${lab.wMAEn}`}
         footnote="Reading order: (1) the rung table validates the 3-stop structure against how deep eventual WINNERS actually dip — if most winners survive rung 1, the first stop is earning its keep at ⅓ size; many winners through rung 2 = entries are loose against the LoD or triggers fire early. (2) Deep losses list every breach of the −0.67R design cap (+ slippage allowance) BY NAME — each is slippage, a sizing-anchor mismatch (size with the SAME D as the stops — the SOFI lesson) or discipline. (3) Gate slices prove each entry gate with your own money: a gate that doesn't separate expectancy is theatre; a gate you keep violating profitably is mis-calibrated. MAE/MFE from EOD bars — intraday depth can be worse; treat rung percentages as lower bounds.">
         <Say>
-          {lab.avgLossR != null && <>Your average loser costs <b>{sgnR(lab.avgLossR)}</b> against the −0.67R design cap{lab.avgLossR >= -0.75 ? " — the stop structure is holding" : " — worse than design: slippage, sizing-anchor mismatch or discipline"}. </>}
-          {lab.breaches.length > 0 && <><b style={{ color: T.red }}>{lab.breaches.length} loser{lab.breaches.length === 1 ? "" : "s"}</b> blew past −0.85R (the chips below name them). </>}
+          {lab.avgLossR != null && <>Your average loser costs <b>{sgnR(lab.avgLossR)}</b> across this cohort. The 3-stop rule only exists from <b>2026-07-10 (SOFI)</b> — {lab.n3sLosers >= 1 ? <>its own losers so far average <b>{sgnR(lab.avgLoss3s)}</b> (n={lab.n3sLosers}) against the −0.67R design cap</> : <>no 3-stop-era loser has closed yet, so its −0.67R cap has nothing to grade</>}; earlier trades ran a full −1R stop by design and are judged against THAT. </>}
+          {lab.breaches.length > 0 && <><b style={{ color: T.red }}>{lab.breaches.length} loser{lab.breaches.length === 1 ? "" : "s"}</b> exceeded their own era's cap (chips below). </>}
           {lab.extOK.n >= 3 && lab.extHot.n >= 3 ? <>Entries taken fresh (≤4× extended) run <b>{sgnR(lab.extOK.expR)}</b>/trade vs <b>{sgnR(lab.extHot.expR)}</b> when chased — that difference is what the extension gate is worth in your own money.</> : <>Not enough campaigns on both sides of the extension gate yet to price it — keep logging.</>}
         </Say>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18 }}>
           {/* 3-stop rung validation */}
           <div>
             <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted, marginBottom: 6 }}>3-stop structure — how deep do winners dip?</div>
+            <div style={{ fontSize: "0.62rem", color: T.faint, lineHeight: 1.5, marginBottom: 4 }}>Winners from BEFORE 2026-07-10 backtest where the rungs would have sat; winners after it validate the live rule. Same question either way: does normal winner heat survive each rung?</div>
             {[
               { lvl: "through rung 1 (−0.33R)", v: lab.rung33, note: "expected to be common — that's why only ⅓ of size sits there", warnAt: null },
               { lvl: "through rung 2 (−0.67R)", v: lab.rung67, note: "should be rare — high = loose entries vs LoD or early triggers", warnAt: 25 },
@@ -410,12 +421,12 @@ export default function QuantAnalysis({ C, font, session, setPage }) {
               </div>
             ))}
             <div style={{ marginTop: 10, fontSize: "0.74rem", display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
-              <span>avg loss <b style={{ color: (lab.avgLossR ?? 0) >= -0.75 ? T.text : T.red, fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.avgLossR)}</b> <span style={{ color: T.faint, fontSize: "0.62rem" }}>design cap −0.67R</span></span>
+              <span>avg loss <b style={{ fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.avgLossR)}</b> <span style={{ color: T.faint, fontSize: "0.62rem" }}>cohort · cap −1R before 07-10, −0.67R after</span></span>
               <span>worst <b style={{ fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.worstR)}</b></span>
             </div>
             {lab.breaches.length > 0 && (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted, marginBottom: 4 }}>Deep-loss breaches (&lt; −0.85R) — every one has a name</div>
+                <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted, marginBottom: 4 }}>Losses beyond their own era's design cap — every one has a name</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {lab.breaches.map((c, i) => (
                     <span key={i} title={`${c.ticker} · ${c.lastExit || ""} · ${sgnR(c.blendedR ?? c.rSum)} · ${c.reasons || ""}`}
