@@ -27,7 +27,7 @@ async function main() {
   if (!UID) throw new Error("could not resolve admin user_id");
 
   // entry_gates is a late migration (supabase/entry-gates.sql) — fall back gracefully until it exists.
-  const SEL = "ticker,entry_date,exit_date,entry_price,exit_price,shares,stop_price,pl_dollar,r_mult,exit_reason,position_id,ext_entry,ext_exit,trade_type,source,is_sample,is_deleted,grade_snapshot";
+  const SEL = "ticker,entry_date,entry_time,exit_date,entry_price,exit_price,shares,stop_price,pl_dollar,r_mult,exit_reason,position_id,ext_entry,ext_exit,trade_type,source,is_sample,is_deleted,grade_snapshot";
   const getTrades = (sel) => fetch(`${URL_}/rest/v1/trades?select=${sel}&user_id=eq.${UID}&exit_date=gte.${SINCE}&order=exit_date.asc&limit=2000`, { headers: H }).then(j);
   let rawFetched = await getTrades(SEL + ",entry_gates");
   if (!Array.isArray(rawFetched)) rawFetched = await getTrades(SEL);
@@ -76,6 +76,8 @@ async function main() {
       legs: legs.length, pl: round(pl, 0),
       rSum: rLegs.length ? round(sum(rLegs)) : null,
       entryDate: legs.map((x) => x.entry_date).filter(Boolean).sort()[0] || null,
+      entryTime: legs.map((x) => x.entry_time).filter(Boolean).sort()[0] || null, // ET wall-clock
+
       lastExit: legs.map((x) => x.exit_date).filter(Boolean).sort().slice(-1)[0] || null,
       firstTrimExit: trims.map((x) => x.exit_date).filter(Boolean).sort()[0] || null,
       trimmed: trims.length > 0,
@@ -302,17 +304,61 @@ async function main() {
     }
     rets.sort((a, b) => a - b); dds.sort((a, b) => a - b);
     const q = (arr, p) => arr[Math.floor(p * arr.length)];
+    // Distribution of the 10,000 path outcomes (for the bell-curve view): 28 equal bins P1→P99.
+    const lo = q(rets, 0.01), hi = q(rets, 0.99), BINS = 28;
+    const histo = { lo: round(lo, 1), hi: round(hi, 1), counts: new Array(BINS).fill(0) };
+    if (hi > lo) for (const r of rets) { if (r >= lo && r <= hi) histo.counts[Math.min(BINS - 1, Math.floor(((r - lo) / (hi - lo)) * BINS))]++; }
     return {
       label, n: rlist.length, trades: TR, riskPct: RISK_PCT,
       retP5: round(q(rets, 0.05), 1), retP50: round(q(rets, 0.5), 1), retP95: round(q(rets, 0.95), 1),
       ddP50: round(q(dds, 0.5), 1), ddP95: round(q(dds, 0.05), 1), // dds ascending: worst at start
       pNegative: round(100 * rets.filter((r) => r < 0).length / PATHS, 1),
       pDD10: round(100 * dds.filter((d) => d < -10).length / PATHS, 1),
+      histo,
     };
   }
   const rSys = sys.map((c) => c.blendedR ?? c.rSum).filter((v) => v != null && isFinite(v));
   const rAll = campaigns.map((c) => c.blendedR ?? c.rSum).filter((v) => v != null && isFinite(v));
   const monte = { system: mc(rSys, "New system (Jul→)"), all: mc(rAll, "All since May") };
+
+  // ---------- 30-MIN WAIT-GATE SIMULATION ----------
+  // Only campaigns with a RECORDED entry time before 10:00 ET are eligible (the gate would have
+  // delayed exactly these; later entries are unaffected). Counterfactual: enter at the first
+  // 5-min bar open at/after 10:00 ET on the entry day, SAME stop level, ride to the same final
+  // EOD close (shadow basis, comparable to shadowR). Yahoo 5m history only reaches ~60 days back
+  // — campaigns without a time or beyond the window are EXCLUDED, never guessed.
+  const cutoff60 = new Date(Date.now() - 55 * 864e5).toISOString().slice(0, 10);
+  const eligible = campaigns.filter((c) => c.entryTime && c.entryTime < "10:00:00" && c.entryDate >= cutoff60
+    && c.entry && c.stop && c.stop < c.entry && c.shadowR != null && symOK(c.ticker));
+  for (const c of eligible) {
+    try {
+      const day0 = Math.floor(new Date(c.entryDate + "T00:00:00-04:00").getTime() / 1000);
+      const d5 = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(c.ticker)}?period1=${day0}&period2=${day0 + 86400}&interval=5m`, { headers: { "User-Agent": "Mozilla/5.0" } }).then(j);
+      const r5 = d5?.chart?.result?.[0]; if (!r5?.timestamp) continue;
+      const q5 = r5.indicators.quote[0];
+      // 10:00 ET on the entry day (summer = EDT, UTC−4 — his 2026 book is entirely EDT)
+      const tenET = Math.floor(new Date(c.entryDate + "T10:00:00-04:00").getTime() / 1000);
+      const idx = r5.timestamp.findIndex((ts, i) => ts >= tenET && q5.open[i] != null);
+      if (idx === -1) continue;
+      const waitPx = q5.open[idx];
+      if (!(waitPx > 0)) continue;
+      c.waitEntryPx = round(waitPx, 4);
+      if (waitPx <= c.stop) { c.waitShadowR = null; c.waitSkipped = "gapped below stop by 10:00"; continue; }
+      const B = bars[c.ticker];
+      const iEnd = (() => { let i = B.findIndex((b) => b.date > c.lastExit); return (i === -1 ? B.length : i) - 1; })();
+      if (iEnd < 0) continue;
+      c.waitShadowR = round((B[iEnd].c - waitPx) / (waitPx - c.stop));
+      await new Promise((r) => setTimeout(r, 200));
+    } catch { /* skip ticker/day */ }
+  }
+  const wgPairs = campaigns.filter((c) => c.waitShadowR != null && c.shadowR != null);
+  const waitGate = {
+    eligible: eligible.length, simmed: wgPairs.length,
+    noTime: campaigns.filter((c) => !c.entryTime).length,
+    actMeanR: wgPairs.length ? round(sum(wgPairs.map((c) => c.shadowR)) / wgPairs.length) : null,
+    waitMeanR: wgPairs.length ? round(sum(wgPairs.map((c) => c.waitShadowR)) / wgPairs.length) : null,
+    pairs: wgPairs.map((c) => ({ t: c.ticker, d: c.entryDate, act: c.shadowR, wait: c.waitShadowR })),
+  };
 
   // ---------- open book ----------
   let free = 0, atRisk = 0, openRisk = 0, naked = 0;
@@ -351,7 +397,7 @@ async function main() {
   const payload_edge = {
     asof: new Date().toISOString(), since: SINCE, systemStart: SYSTEM_START, systemEntry: SYSTEM_ENTRY,
     method: "IBKR fill rebuild, equities-focused ESTIMATE — TradeZella owns realized truth. Pipeline-verified ISO-dated rows only (legacy slash-dated manual journal rows excluded); exact-duplicate fills deduped. Month cards = campaign-month slices; system cohort = campaigns entered on/after " + SYSTEM_ENTRY + ". R = blended campaign R vs initial risk (entry−stop, first-leg stop); MFE/shadow from EOD bars.",
-    verdict, buckets, derisk, monte, provenance, maeInsight, equityR, rollingExp, openCampaigns, rBasis,
+    verdict, buckets, derisk, monte, waitGate, provenance, maeInsight, equityR, rollingExp, openCampaigns, rBasis,
     stopCoverage: { system: "100%", note: "R exists only where a stop was recorded; system cohort fully covered" },
     openBook: { positions: positions.length, riskFree: free, atRisk, naked, openRiskUsd: round(openRisk, 0) },
     // Reconciliation bridge — the exact ladder from "what the journal shows" to "what N is here".

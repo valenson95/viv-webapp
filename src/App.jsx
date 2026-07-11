@@ -492,6 +492,7 @@ const WHATS_NEW = [
       "Winner-ladder pacing is now exact: 'due by now' shows the true pro-rated number (0.5 due, never rounded to 0), so a planned homerun that hasn't landed reads BEHIND — not a false ON PACE.",
       "NEW: Plan backwards from a target — type the total % return you want and the simulator tells you how many trades it takes at your win rate, risk and winner mix (e.g. 162 trades to double at 0.5% risk), with a one-click 'Use this plan' that fills your design. You can't plan a trade count — you CAN plan a target.",
       "Your saved playbook design is now the simulator's DEFAULT: 'Edit playbook design' opens on exactly what you saved — unit, risk, tiers, losers — never factory numbers. Save once, and it sticks until you save again.",
+      "NEW: an Interface style you can choose in Settings — keep the signature VIV Classic (near-black + gold) or switch to Zella Clean, a calmer, flatter look with Inter typography, softer whites and a toned-down accent. It flips instantly, saves to your browser, and you can revert to Classic any time.",
     ],
   },
   {
@@ -9459,7 +9460,7 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs .memrow .jd{margin-left:0; width:100%}
   }`;
 
-function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, userEmail, displayName, onDisplayNameChange, session, onIbkrSync, onRunIntegrity, integrityReport, integrityRunning, intradayFeatureEnabled, onToggleIntradayFeature, intradayColumnAvailable, isMobile, isIbkrMode = false, ibkrSyncInfo = null, onSetSyncMode }) {
+function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, uiTheme = "classic", setUiTheme = () => {}, userEmail, displayName, onDisplayNameChange, session, onIbkrSync, onRunIntegrity, integrityReport, integrityRunning, intradayFeatureEnabled, onToggleIntradayFeature, intradayColumnAvailable, isMobile, isIbkrMode = false, ibkrSyncInfo = null, onSetSyncMode }) {
   const [syncModeBusy, setSyncModeBusy] = useState(false);
   const toggleSyncMode = async (mode) => {
     if (!onSetSyncMode) return;
@@ -9749,6 +9750,12 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <div className="seg" id="prefFont">
               {FONT_OPTS.map(o => (<button key={o.key} className={fontSize === o.key ? "on" : ""} onClick={() => setFontSize(o.key)}>{o.label}</button>))}
             </div>
+          </div>
+
+          <div className="prefrow">
+            <div className="pl"><div className="t"><span className="term" data-tip="Choose the overall look of the app. VIV Classic is the signature near-black + gold look. Zella Clean is a calmer, flatter alternative with Inter typography, softer whites and a toned-down gold accent — everything else works exactly the same. Switch back any time.">Interface style</span></div>
+              <div className="d">VIV Classic is the signature near-black + gold look. Zella Clean is a calmer, flatter alternative — Inter type, softer whites, muted accent. Switches instantly and you can revert any time.</div></div>
+            <div className="seg" id="prefTheme"><button className={uiTheme === "classic" ? "on" : ""} onClick={() => setUiTheme("classic")}>VIV Classic</button><button className={uiTheme === "zella" ? "on" : ""} onClick={() => setUiTheme("zella")}>Zella Clean</button></div>
           </div>
 
           <div className="prefrow">
@@ -10511,6 +10518,46 @@ const mobileCSS = `
 }
 `;
 
+// ─── "Zella Clean" interface style — an OPTIONAL CSS-variable override layer ───
+// Members default to VIV Classic (see `viv-ui-theme` localStorage, default "classic"). When they opt into
+// Zella Clean in Settings, we add `theme-zella` to <body> and this rule set re-defines the design tokens
+// with higher specificity than the `:root{}` blocks inside PREM_CSS/JOUR_CSS/DASH_CSS/SET_CSS.
+//
+// HOW IT REACHES EVERYTHING: those four scoped stylesheets declare the tokens (--gold, --text, --bg …) on
+// `:root` (i.e. <html>). Custom properties inherit, so redefining them on `body.theme-zella` (specificity
+// 0,1,1 > :root's 0,1,0) wins for every descendant — both the scoped `.vp/.vj/.vd/.vs` CSS classes AND the
+// many inline `style={{ color:"var(--gold)" }}` references, which resolve the token from the nearest
+// ancestor. We ALSO scope each container explicitly (0,2,1) as belt-and-braces in case a container ever
+// declares a token on itself. Reverting to VIV Classic just removes the body class — pixel-identical.
+//
+// KNOWN GAP: inline styles that use JS literals from the `C = {…}` object (e.g. `color: C.gold`) are baked
+// hexes, not tokens, so this layer can't recolor them (shared helpers, wordmark, login, sidebar). That is
+// intentional per spec — we don't rewrite literal hexes.
+const THEME_CSS = `
+body.theme-zella,
+body.theme-zella .vp, body.theme-zella .vj, body.theme-zella .vd, body.theme-zella .vs{
+  --bg:#0d0e14; --bg2:#14161f; --white:#F4F5F7;
+  --text:#E7E9EE; --muted:#9AA0B0; --faint:#6B7180;
+  --gold:#b8912f; --goldBright:#d9b04a; --goldMid:#a07f2a; --goldDeep:#6e5a1f;
+  --goldDim:rgba(184,145,47,0.12); --borderGold:rgba(184,145,47,0.24);
+  --glass:rgba(255,255,255,0.028); --border:rgba(255,255,255,0.08);
+  --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'Plus Jakarta Sans',sans-serif;
+}
+/* Base page bg (covers overscroll) + Inter body font when Zella Clean is on. */
+body.theme-zella{ background:#0d0e14; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Plus Jakarta Sans',sans-serif; }
+/* Calmer surfaces: drop the gold radial glow behind each container, flatten to a plain bg. */
+body.theme-zella .vp, body.theme-zella .vj, body.theme-zella .vd, body.theme-zella .vs{
+  background:var(--bg); font-family:var(--font);
+}
+/* Flatter cards: tighter radius + no heavy saturation, hairline border reads cleaner. */
+body.theme-zella .vp .card, body.theme-zella .vj .card, body.theme-zella .vd .card, body.theme-zella .vs .card{
+  border-radius:14px; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+}
+/* Quiet the drifting gold particles/pulses so the backdrop stays calm and cool. */
+body.theme-zella .viv-bg-particle, body.theme-zella .viv-bg-pulse{ display:none; }
+`;
+
 // ─── Animated app background — calm grid + drifting particles + cursor glow ───
 const appBgCSS = `
 .viv-bg-particle{position:absolute;border-radius:50%;background:rgba(240,192,80,0.6);animation-name:vivFloat;animation-timing-function:ease-in-out;animation-iteration-count:infinite;will-change:transform,opacity;}
@@ -10612,6 +10659,31 @@ function AppInner() {
     tag.textContent = mobileCSS;
     document.head.appendChild(tag);
   }, []);
+  // Inject the optional "Zella Clean" interface-style token layer once. It only takes effect while
+  // <body> carries the `theme-zella` class (see uiTheme below) — otherwise it's inert, so VIV Classic
+  // members render exactly as before.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (document.getElementById("viv-theme-css")) return;
+    const tag = document.createElement("style");
+    tag.id = "viv-theme-css";
+    tag.textContent = THEME_CSS;
+    document.head.appendChild(tag);
+  }, []);
+  // Interface style: "classic" (VIV Classic, the default) or "zella" (Zella Clean). Persisted per browser.
+  const [uiTheme, setUiThemeState] = useState(() => {
+    try { return localStorage.getItem("viv-ui-theme") === "zella" ? "zella" : "classic"; } catch { return "classic"; }
+  });
+  const setUiTheme = useCallback((t) => {
+    const next = t === "zella" ? "zella" : "classic";
+    try { localStorage.setItem("viv-ui-theme", next); } catch { /* private mode — ignore */ }
+    setUiThemeState(next);
+  }, []);
+  // Reflect the choice onto <body> instantly (no reload). Removing the class restores VIV Classic exactly.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.classList.toggle("theme-zella", uiTheme === "zella");
+  }, [uiTheme]);
   const screenW = useScreenWidth();
   const isMobile = screenW < 768;
   const isTablet = screenW >= 768 && screenW < 1024;
@@ -11797,7 +11869,7 @@ function AppInner() {
       {page === "modelbook" && <ModelBookShell setPage={setPage} onLogout={handleLogout} session={session} displayName={displayName} journaledTrades={journaledTrades} />}
       {page === "mentor" && <MentorShell setPage={setPage} onLogout={handleLogout} session={session} />}
       {page === "quant" && isAdmin && <QuantAnalysis C={C} font={font} session={session} setPage={setPage} />}
-      {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
+      {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} uiTheme={uiTheme} setUiTheme={setUiTheme} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
       <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />
       <FeedbackWidget session={session} isAdmin={(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()} displayName={displayName} C={C} font={font} isMobile={isMobile} />
