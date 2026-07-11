@@ -7092,17 +7092,12 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                           <Rw k="Exit Reason" v={t.reason || "—"} />
                         </div>
                         <div className="tdz-right">
-                          {/* THE GENUINE TRADINGVIEW CHART (Valen: "I only accept the TradingView chart").
-                              TradingView's free embed cannot draw custom fill arrows — that capability is
-                              their Advanced Charts (Charting Library) license, application in progress.
-                              Until approval: real TV chart + the fills listed at their exact ET times below;
-                              on approval this swaps to arrows ON the chart, TradeZella-style. */}
-                          <TVChart symbol={t.ticker} interval={tradeDateISO(t.entry) === (tradeDateISO(t.exit) || tradeDateISO(t.entry)) ? "5" : "D"} height={560} />
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0 14px" }}>
-                            <span style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 9, padding: "6px 12px", fontSize: "0.74rem", color: "var(--green)", fontWeight: 700 }}>▲ BUY {Number(t.shares || 0).toLocaleString()} @ ${entryP.toFixed(2)}{t.entryTime ? ` · ${t.entryTime} ET` : ""} · {tradeDateISO(t.entry)}</span>
-                            <span style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.28)", borderRadius: 9, padding: "6px 12px", fontSize: "0.74rem", color: "var(--red)", fontWeight: 700 }}>▼ SELL @ ${exitP.toFixed(2)}{t.exitTime ? ` · ${t.exitTime} ET` : ""} · {tradeDateISO(t.exit) || "—"}</span>
-                            {t.stop ? <span style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)", borderRadius: 9, padding: "6px 12px", fontSize: "0.74rem", color: "var(--muted)", fontWeight: 700 }}>stop ${Number(t.stop).toFixed(2)}</span> : null}
-                          </div>
+                          {/* INTERIM review chart while the TradingView Advanced Charts license is pending
+                              (application prepared 2026-07-11 — on approval this swaps to the genuine TV
+                              chart with createExecutionShape() fill arrows, TradeZella-style, + server-saved
+                              drawings). Until then: fills as ▲/▼ arrows at their exact ET time bars,
+                              drawings auto-saved per trade. */}
+                          <div className="revchart" style={{ marginBottom: 14 }}><TradeReplayChart trade={t} C={C} font={font} /></div>
                           {true && (
                             <>
                               {isAdmin && (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>)}
