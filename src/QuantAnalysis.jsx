@@ -93,7 +93,7 @@ const Chip = ({ ok, children }) => (
   </span>
 );
 // Donut gauge (Rocketsheets-style ring, doctrine colours) — pct 0..100, number in the centre
-const Donut = ({ pct, center, label, sub, color = T.gold }) => {
+const Donut = ({ pct, center, label, sub, color = T.gold, tip }) => {
   const r = 25, cir = 2 * Math.PI * r, f = Math.min(1, Math.max(0, (pct || 0) / 100));
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "1 1 150px", minWidth: 150, padding: "2px 14px 2px 0", borderRight: `1px solid ${T.borderSoft}` }}>
@@ -103,7 +103,7 @@ const Donut = ({ pct, center, label, sub, color = T.gold }) => {
         <text x="32" y="36" textAnchor="middle" fill={T.text} fontSize="12.5" fontWeight="800" style={{ fontVariantNumeric: "tabular-nums" }}>{center}</text>
       </svg>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: T.faint }}>{label}</div>
+        <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: T.faint }}>{tip ? <span className="term" data-tip={tip}>{label}</span> : label}</div>
         {sub && <div style={{ fontSize: "0.62rem", color: T.muted, marginTop: 2, lineHeight: 1.45 }}>{sub}</div>}
       </div>
     </div>
@@ -577,15 +577,23 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       {/* KPI strip — donuts for the two ratio dials, trend arrows = last 10 trades vs all-time */}
       <section style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "14px 20px", marginBottom: 16 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "14px 18px", alignItems: "center" }}>
-          <Kpi label="Net P&L" value={fmt$(A.net)} tone={A.net >= 0 ? T.green : T.red} sub="this cohort, closed only" />
+          <Kpi label="Net P&L" value={fmt$(A.net)} tone={A.net >= 0 ? T.green : T.red} sub="this cohort, closed only"
+            tip="Realized dollars across this cohort's closed campaigns. There's no direct lever on this number — it follows expectancy × number of trades × sizing. Fix the inputs, not the output." />
           <Kpi label="Expectancy" value={sgnR(A.expR)} tone={(A.expR ?? 0) >= 0 ? T.green : T.red}
+            tip="Average R per closed campaign — the edge itself. Two levers: (1) stop losses beyond the design cap (see Entries), (2) bank more of what each winner offers (see Exits). Everything else is noise."
             sub={extra.r10 != null ? <>last 10: <b style={{ color: extra.r10 >= (A.expR ?? 0) ? T.green : T.red }}>{sgnR(extra.r10)} {extra.r10 >= (A.expR ?? 0) ? "▲ improving" : "▼ declining"}</b></> : "mean R / campaign"} />
           <Donut pct={A.wr} center={A.wr == null ? "—" : Math.round(A.wr) + "%"} label="Win rate"
+            tip="Share of campaigns that closed positive. Improve it with stricter entry gates (fresh ≤4×, tight LoD) — but don't chase it: your homerun design only NEEDS ~40%, and forcing a higher win rate usually shrinks the winners that pay for everything."
             sub={extra.w10 != null ? <>{A.nW}W/{A.nL}L · last 10: <b style={{ color: extra.w10 >= (A.wr ?? 0) ? T.green : T.red }}>{extra.w10}% {extra.w10 >= (A.wr ?? 0) ? "▲" : "▼"}</b></> : `${A.nW}W / ${A.nL}L`} />
-          <Donut pct={A.payoff != null ? Math.min(100, A.payoff / 3 * 100) : 0} center={num(A.payoff)} label="Payoff ($)" sub={`breakeven needs ${num(A.wBE)} · ring full at 3.0`} />
-          <Kpi label="Profit factor" value={A.pf === Infinity ? "∞" : num(A.pf)} sub="gross won ÷ gross lost" />
-          <Kpi label="SQN" value={num(A.sqn)} sub="Tharp scale · 2+ good" />
-          <Kpi label="Sample" value={`${A.n} / 50`} sub={A.n >= 30 ? "outcome readable" : "building to 30 — judge adherence"} />
+          <Donut pct={A.payoff != null ? Math.min(100, A.payoff / 3 * 100) : 0} center={num(A.payoff)} label="Payoff ($)"
+            tip="Average $ win ÷ average $ loss. Improve the top (capture more of system-max — Exits) and the bottom (keep losers at their design cap — Entries). Ring fills at 3.0 — a comfortable homerun-system level."
+            sub={`breakeven needs ${num(A.wBE)} · ring full at 3.0`} />
+          <Kpi label="Profit factor" value={A.pf === Infinity ? "∞" : num(A.pf)} sub="gross won ÷ gross lost"
+            tip="TOTAL $ won ÷ TOTAL $ lost — frequency included. 1.3+ = worth pressing. It moves when either expectancy lever moves; a single deep loss drags it hard, which is why the deep-loss benchmark exists." />
+          <Kpi label="SQN" value={num(A.sqn)} sub="Tharp scale · 2+ good"
+            tip="System Quality Number = average R ÷ the SPREAD of your R results × √n. It rewards CONSISTENCY, not just profit: two systems with the same average, the steadier one scores higher. Scale: under 1.6 hard to trade · 2–3 good · 3+ excellent. Improve it by removing extremes — cap the deep losses, avoid the occasional oversized bet — and by simply logging more trades (√n grows it as the sample proves itself)." />
+          <Kpi label="Sample" value={`${A.n} / 50`} sub={A.n >= 30 ? "outcome readable" : "building to 30 — judge adherence"}
+            tip="Closed campaigns in this cohort. Below ~30, two or three trades can flip every verdict — so judge ADHERENCE (did you follow the rules), not outcome. At 30 the sign of the edge is readable; at 50 the Monte Carlo is calibrated." />
         </div>
       </section>
 
@@ -1012,7 +1020,15 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           </ComposedChart>
         </ResponsiveContainer>
         {ovl && <div style={{ fontSize: "0.64rem", color: T.muted, margin: "2px 0 6px" }}><i style={{ display: "inline-block", width: 12, height: 2, background: T.blue, verticalAlign: "middle", marginRight: 5 }} />same trades in DOLLARS (right axis) — where blue and gold diverge, position sizing did the work, not the edge.</div>}
-        <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.faint, margin: "10px 0 2px" }}>Rolling 10-trade expectancy — the pulse (white line, vs the +0.25R target)</div>
+        <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "2px 12px", margin: "10px 0 2px" }}>
+          <span className="term" data-tip="A moving window: after every trade, take just the LAST 10 trades and average their R. Trade #24's value = the average of trades 15–24. The all-time average moves slowly; this line shows what you're doing LATELY — it turns down many trades before the overall numbers do." style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.faint }}>The pulse — average R of your last 10 trades</span>
+          {roll.length > 0 && (
+            <span style={{ fontSize: "0.7rem", fontVariantNumeric: "tabular-nums" }}>
+              now <b style={{ color: roll[roll.length - 1].exp >= 0.25 ? T.green : T.red }}>{(roll[roll.length - 1].exp >= 0 ? "+" : "") + roll[roll.length - 1].exp}R</b>
+              <span style={{ color: T.faint, fontSize: "0.62rem" }}> per trade · target ≥ +0.25R {roll[roll.length - 1].exp >= 0.25 ? "✓" : "✕"}</span>
+            </span>
+          )}
+        </div>
         <ResponsiveContainer width="100%" height={110}>
           <LineChart data={roll} margin={{ left: 0, right: 8, top: 10 }}>
             <XAxis dataKey="i" {...axis} hide />
