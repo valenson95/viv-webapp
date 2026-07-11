@@ -51,9 +51,11 @@ const Panel = ({ title, meta, children, footnote, collapsed = false }) => {
     </section>
   );
 };
-const Kpi = ({ label, value, tone, sub }) => (
+const Kpi = ({ label, value, tone, sub, tip }) => (
   <div style={{ flex: "1 1 138px", minWidth: 138, padding: "2px 18px 2px 0", borderRight: `1px solid ${T.borderSoft}` }}>
-    <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: T.faint }}>{label}</div>
+    <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: T.faint }}>
+      {tip ? <span className="term" data-tip={tip}>{label}</span> : label}
+    </div>
     <div style={{ fontSize: "1.35rem", fontWeight: 800, color: tone || T.text, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em", marginTop: 3 }}>{value}</div>
     {sub && <div style={{ fontSize: "0.62rem", color: T.muted, marginTop: 2, lineHeight: 1.45 }}>{sub}</div>}
   </div>
@@ -105,7 +107,7 @@ function aggOf(list) {
     rlist,
   };
 }
-const HB = [[-99, -2, "≤ −2R"], [-2, -1, "−2 to −1"], [-1, -0.5, "−1 to −½"], [-0.5, -0.05, "−½ to 0"], [-0.05, 0.05, "scratch"], [0.05, 1, "0 to 1"], [1, 2, "1 to 2"], [2, 3, "2 to 3"], [3, 5, "3 to 5"], [5, 99, "5R+"]];
+const HB = [[-99, -2, "≤ −2R"], [-2, -1, "−2 to −1"], [-1, -0.5, "−1 to −0.5"], [-0.5, -0.05, "−0.5 to 0"], [-0.05, 0.05, "scratch"], [0.05, 1, "0 to 1"], [1, 2, "1 to 2"], [2, 3, "2 to 3"], [3, 5, "3 to 5"], [5, 99, "5R+"]];
 
 /* ─── error boundary: a bad payload row must show a message, never a dead page ── */
 class QABoundary extends React.Component {
@@ -338,7 +340,17 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
   );
 
   return (
-    <div style={{ fontFamily: font, maxWidth: 1120, margin: "0 auto", color: T.text }}>
+    <div className="qa" style={{ fontFamily: font, maxWidth: 1120, margin: "0 auto", color: T.text }}>
+      {/* .term tooltips are scoped to .vj/.vp in App.jsx — this page needs its own scope or every
+          data-tip is silently dead (Valen found the definitions never showed, 2026-07-11). */}
+      <style>{`
+        .qa .term{border-bottom:1px dotted rgba(201,152,42,0.5); cursor:help; position:relative}
+        .qa .term:hover::after{content:attr(data-tip); position:absolute; left:0; top:150%; width:300px;
+          background:#11111b; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 13px;
+          font-size:0.68rem; line-height:1.65; color:#E7E9EE; z-index:60; white-space:normal; font-weight:500;
+          text-transform:none; letter-spacing:0; box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+        .qa .term.tipright:hover::after{left:auto; right:0}
+      `}</style>
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "4px 0 18px", flexWrap: "wrap" }}>
         <button onClick={() => setPage && setPage("dashboard")} style={{ background: "transparent", border: `1px solid ${T.border}`, color: T.muted, borderRadius: 8, padding: "5px 13px", cursor: "pointer", fontFamily: font, fontSize: "0.72rem" }}>← Dashboard</button>
@@ -434,7 +446,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
 
       {/* ENTRY REFINEMENT LAB */}
       <Panel title="Entries — do your entry rules make money?" meta={`winners with MAE data: ${lab.wMAEn}`}
-        footnote="Reading order: (1) the rung table validates the 3-stop structure against how deep eventual WINNERS actually dip — if most winners survive rung 1, the first stop is earning its keep at ⅓ size; many winners through rung 2 = entries are loose against the LoD or triggers fire early. (2) Deep losses list every breach of the −0.67R design cap (+ slippage allowance) BY NAME — each is slippage, a sizing-anchor mismatch (size with the SAME D as the stops — the SOFI lesson) or discipline. (3) Gate slices prove each entry gate with your own money: a gate that doesn't separate expectancy is theatre; a gate you keep violating profitably is mis-calibrated. MAE/MFE from EOD bars — intraday depth can be worse; treat rung percentages as lower bounds.">
+        footnote="Reading order: (1) the rung table validates the 3-stop structure against how deep eventual WINNERS actually dip — if most winners survive rung 1, the first stop is earning its keep at ⅓ size; many winners through rung 2 = entries are loose against the LoD or triggers fire early. (2) Deep losses list every breach of the −0.67R design cap (+ slippage allowance) BY NAME — each is slippage, a sizing-anchor mismatch (size with the SAME D as the stops — the SOFI lesson) or discipline. (3) Gate slices prove each entry gate with your own money: a gate that doesn't separate expectancy is theatre; a gate you keep violating profitably is mis-calibrated. IMPORTANT on the rung numbers: MAE comes from DAILY bars, and the entry day's low usually prints BEFORE an ORB entry (you buy after the low of day forms) — the bar can't see the clock, so dips that happened before you were even in the trade still count. The rung percentages are therefore OVERSTATED (upper bounds). They'll sharpen automatically once entry-time gate capture builds up.">
         <Say>
           {lab.avgLossR != null && <>Your average loser costs <b>{sgnR(lab.avgLossR)}</b> across this cohort. The 3-stop rule only exists from <b>2026-07-10 (SOFI)</b> — {lab.n3sLosers >= 1 ? <>its own losers so far average <b>{sgnR(lab.avgLoss3s)}</b> (n={lab.n3sLosers}) against the −0.67R design cap</> : <>no 3-stop-era loser has closed yet, so its −0.67R cap has nothing to grade</>}; earlier trades ran a full −1R stop by design and are judged against THAT. </>}
           {lab.breaches.length > 0 && <><b style={{ color: T.red }}>{lab.breaches.length} loser{lab.breaches.length === 1 ? "" : "s"}</b> exceeded their own era's cap (chips below). </>}
@@ -448,7 +460,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
             {[
               { lvl: "through rung 1 (−0.33R)", v: lab.rung33, note: "expected to be common — that's why only ⅓ of size sits there", warnAt: null },
               { lvl: "through rung 2 (−0.67R)", v: lab.rung67, note: "should be rare — high = loose entries vs LoD or early triggers", warnAt: 25 },
-              { lvl: "through full stop (−1.00R)", v: lab.rung100, note: "anomaly — a winner shouldn't survive the full sweep (EOD approximation)", warnAt: 5 },
+              { lvl: "through full stop (−1.00R)", v: lab.rung100, note: "mostly the entry-day low printing BEFORE the entry (daily bars can't see the clock) — a real post-entry sweep would have stopped the trade", warnAt: null },
             ].map(r => (
               <div key={r.lvl} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "7px 2px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.74rem" }}>
                 <span style={{ flex: "0 0 190px", fontWeight: 700 }}>{r.lvl}</span>
@@ -481,8 +493,8 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
             {sliceRow("Extension > 4× at entry", lab.extHot, "Chased entries — extension above 4× when the trigger fired. If this side's expectancy is negative, every violation has a known price.")}
             {lab.extUnknown > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, padding: "5px 4px" }}>{lab.extUnknown} campaigns lack bar history for the extension calc — excluded, not guessed.</div>}
             <div style={{ height: 10 }} />
-            {sliceRow("LoD-dist ≤ 0.6 ATR at entry", lab.lodOK, "Entries where the low-of-day sat within 60% of one ATR of the entry price — the tight-stop gate. Until the trade-log's live capture builds up, this uses the ENTRY DAY's final low from EOD bars — an upper bound of the true at-entry distance (the low can print after you entered).")}
-            {sliceRow("LoD-dist > 0.6 ATR at entry", lab.lodHot, "Gate violations — the stop anchor sat too far below the entry, making D wide and the R math expensive.")}
+            {sliceRow("LoD-dist ≤ 0.6 ATR", lab.lodOK, "Entries where the low-of-day sat within 60% of one ATR of the entry price — the tight-stop gate. Until the trade-log's live capture builds up, this uses the ENTRY DAY's final low from EOD bars — an upper bound of the true at-entry distance (the low can print after you entered).")}
+            {sliceRow("LoD-dist > 0.6 ATR", lab.lodHot, "Gate violations — the stop anchor sat too far below the entry, making D wide and the R math expensive.")}
             {lab.lodUnknown > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, padding: "5px 4px" }}>{lab.lodUnknown} campaigns lack an entry-day bar match for the LoD calc — excluded, not guessed.</div>}
             <div style={{ height: 10 }} />
             {sliceRow("A-grade setups", lab.gA, "Campaigns whose ticker carried an A/A+ setup grade (frozen at entry).")}
@@ -521,7 +533,10 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
               <XAxis type="number" dataKey="x" name="MFE" {...axis} domain={[0, Math.ceil(scat.max)]} tickFormatter={(t) => t + "R"} />
               <YAxis type="number" dataKey="y" name="banked" {...axis} width={38} tickFormatter={(t) => t + "R"} />
               <ZAxis range={[46, 46]} />
-              <ReferenceLine segment={[{ x: 0, y: 0 }, { x: Math.ceil(scat.max), y: Math.ceil(scat.max) }]} stroke={T.goldSoft} strokeDasharray="5 4" />
+              {/* the "kept everything it offered" 45° line — ifOverflow keeps it VISIBLE even though
+                  its top end exceeds the y-domain (recharts silently discarded it before; Valen
+                  reported "I don't see any gold line") */}
+              <ReferenceLine segment={[{ x: 0, y: 0 }, { x: Math.ceil(scat.max), y: Math.ceil(scat.max) }]} stroke={T.goldSoft} strokeWidth={1.5} strokeDasharray="5 4" ifOverflow="hidden" />
               <ReferenceLine y={0} stroke={T.border} />
               <Tooltip cursor={{ stroke: T.border }} content={<TT render={(p) => {
                 const d = p[0]?.payload; if (!d) return null;
@@ -733,12 +748,18 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           {mc.retP50 != null ? <>Same trading, shuffled 10,000 ways: the middle path makes <b>{(mc.retP50 >= 0 ? "+" : "") + num(mc.retP50, 1)}%</b> per 100 trades, and even the unlucky 5% start at <b>{(mc.retP5 >= 0 ? "+" : "") + num(mc.retP5, 1)}%</b>. Your circuit-breaker: a drawdown beyond <b style={{ color: T.red }}>{num(mc.ddP95, 1)}%</b> means something CHANGED — stop and diagnose, don't push through.</> : <>Not enough scored trades to simulate yet.</>}
         </Say>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "14px 18px" }}>
-          <Kpi label="Median path" value={(mc.retP50 >= 0 ? "+" : "") + num(mc.retP50, 1) + "%"} tone={(mc.retP50 ?? 0) >= 0 ? T.green : T.red} sub="realistic base case" />
-          <Kpi label="5th percentile" value={(mc.retP5 >= 0 ? "+" : "") + num(mc.retP5, 1) + "%"} sub="unlucky, same skill" />
-          <Kpi label="95th percentile" value={(mc.retP95 >= 0 ? "+" : "") + num(mc.retP95, 1) + "%"} sub="do not extrapolate" />
-          <Kpi label="Median max DD" value={num(mc.ddP50, 1) + "%"} sub="expected breathing" />
-          <Kpi label="95th pct max DD" value={num(mc.ddP95, 1) + "%"} tone={T.red} sub="circuit-breaker line" />
-          <Kpi label="P(negative path)" value={num(mc.pNegative, 1) + "%"} sub="100-trade sequence ends red" />
+          <Kpi label="Median path" value={(mc.retP50 >= 0 ? "+" : "") + num(mc.retP50, 1) + "%"} tone={(mc.retP50 ?? 0) >= 0 ? T.green : T.red} sub="realistic base case"
+            tip="If you took 100 more trades exactly like your past ones, half the simulated futures make MORE than this and half make less — the honest 'what to expect' number. Improve it by raising expectancy: cut the deep losses and let the big winners finish (see the Entries and Exits sections)." />
+          <Kpi label="5th percentile" value={(mc.retP5 >= 0 ? "+" : "") + num(mc.retP5, 1) + "%"} sub="unlucky, same skill"
+            tip="The bottom 5% of simulated futures — SAME skill, worst luck in trade ORDER. If this number is still positive, even an unlucky streak doesn't sink the system. Improve it by making results more consistent (smaller loss tail), not by trading more." />
+          <Kpi label="95th percentile" value={(mc.retP95 >= 0 ? "+" : "") + num(mc.retP95, 1) + "%"} sub="do not extrapolate"
+            tip="The luckiest 5% of futures. It exists to STOP you extrapolating a hot streak — if your live results ever track this line, that's luck, not a new normal. Nothing to improve; it's a guardrail against overconfidence." />
+          <Kpi label="Median max DD" value={num(mc.ddP50, 1) + "%"} sub="expected breathing"
+            tip="The typical worst peak-to-trough dip inside 100 trades. This much drawdown is NORMAL for your system — feeling pain here is not a signal to change anything. Shrinks if you cut risk per trade or tighten the loss tail." />
+          <Kpi label="95th pct max DD" value={num(mc.ddP95, 1) + "%"} tone={T.red} sub="circuit-breaker line"
+            tip="Only 5% of simulated futures ever dip deeper than this. So if your REAL drawdown exceeds it, something changed (market, execution, or you) — halt new risk and diagnose; don't push through. This is your pre-agreed stop-trading line." />
+          <Kpi label="P(negative path)" value={num(mc.pNegative, 1) + "%"} sub="100-trade sequence ends red"
+            tip="The share of simulated 100-trade futures that end below breakeven. Near zero = the edge is robust to bad ordering. If this creeps up, expectancy is thinning — check the scoreboard's failing rows first." />
         </div>
       </Panel>
 
