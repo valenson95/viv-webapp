@@ -118,32 +118,48 @@ async function main() {
 
   // ---------- intraday day-0 lows (post-ENTRY-TIME) ----------
   // Valen (2026-07-11): rung analysis must check dips AFTER the moment of entry, including entry
-  // day. Where a campaign has a recorded entry time and sits inside Yahoo's ~60-day 5-minute
-  // window, fetch the entry day's 5m bars and keep the LOW that printed from the entry bar on.
-  // Older/timeless campaigns fall back to day-after-entry (labelled in the UI).
-  const cutoffIntraday = new Date(Date.now() - 55 * 864e5).toISOString().slice(0, 10);
+  // day. 5-minute bars come from HIS OWN deployed Polygon proxy (/api/candles) — no 60-day
+  // horizon like Yahoo, so every campaign with a recorded entry time is covered. Session-filtered
+  // (09:30–16:00 ET) and clamped to the daily bar's low (bad-print guard). Timeless campaigns
+  // fall back to day-after-entry (labelled in the UI).
+  const CANDLES_API = "https://www.valensontrades.com/api/candles";
+  const fiveMinCache = {};
+  const fiveMin = async (tk, date) => {
+    const ck = tk + "|" + date;
+    if (fiveMinCache[ck] !== undefined) return fiveMinCache[ck];
+    // RETRY: a transient proxy failure must never cache as a permanent null — that silently
+    // shrank the wait-gate sample between runs (caught 2026-07-11).
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const d = await fetch(`${CANDLES_API}?symbol=${encodeURIComponent(tk)}&from=${date}&to=${date}&res=5min`).then(j);
+        if (d?.ok && Array.isArray(d.candles) && d.candles.length) {
+          const open = Math.floor(new Date(date + "T09:30:00-04:00").getTime() / 1000);
+          const close = Math.floor(new Date(date + "T16:00:00-04:00").getTime() / 1000);
+          const out = d.candles.filter((b) => b.time >= open && b.time < close).map((b) => ({ ts: b.time, o: b.open, h: b.high, l: b.low }));
+          await new Promise((r) => setTimeout(r, 120));
+          return (fiveMinCache[ck] = out.length ? out : null);
+        }
+        if (d?.ok && Array.isArray(d.candles) && !d.candles.length) return (fiveMinCache[ck] = null); // genuinely no data (halted/holiday)
+      } catch (e) { if (attempt === 2) console.error("fiveMin FAIL after retries:", tk, date, e.message); }
+      await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+    }
+    return (fiveMinCache[ck] = null);
+  };
+  const etTime = (t) => (t && t.length === 5 ? t + ":00" : t); // "09:35" → "09:35:00"
   for (const c of campaigns) {
     c.day0PostLow = null;
-    if (!c.entryTime || !c.entryDate || c.entryDate < cutoffIntraday || !symOK(c.ticker) || !c.entry) continue;
-    try {
-      const day0 = Math.floor(new Date(c.entryDate + "T00:00:00-04:00").getTime() / 1000);
-      const d5 = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(c.ticker)}?period1=${day0}&period2=${day0 + 86400}&interval=5m`, { headers: { "User-Agent": "Mozilla/5.0" } }).then(j);
-      const r5 = d5?.chart?.result?.[0]; if (!r5?.timestamp) continue;
-      const q5 = r5.indicators.quote[0];
-      const entryTs = Math.floor(new Date(c.entryDate + "T" + c.entryTime + "-04:00").getTime() / 1000);
-      const closeTs = Math.floor(new Date(c.entryDate + "T16:00:00-04:00").getTime() / 1000);
-      // session bars only — Yahoo's 16:00 auction row can carry garbage prints (MRVL printed a
-      // fake 235.81 low=high at 16:00 vs a real 288.09 daily low; caught 2026-07-11)
-      const lows = r5.timestamp.map((ts, i) => ({ ts, l: q5.low[i] })).filter((b) => b.l != null && b.ts >= entryTs - 300 && b.ts < closeTs);
-      if (lows.length) {
-        let lo5 = Math.min(...lows.map((b) => b.l));
-        // the DAILY bar is the authority: a 5m low below the day's true low is a bad print
-        const dBar = (bars[c.ticker] || []).find((b) => b.date === c.entryDate);
-        if (dBar && lo5 < dBar.l) lo5 = dBar.l;
-        c.day0PostLow = lo5;
-      }
-      await new Promise((r) => setTimeout(r, 150));
-    } catch { /* skip */ }
+    if (!c.entryTime || !c.entryDate || !symOK(c.ticker) || !c.entry) continue;
+    const bars5 = await fiveMin(c.ticker, c.entryDate);
+    if (!bars5) continue;
+    const entryTs = Math.floor(new Date(c.entryDate + "T" + etTime(c.entryTime) + "-04:00").getTime() / 1000);
+    if (!isFinite(entryTs)) continue;
+    const lows = bars5.filter((b) => b.l != null && b.ts >= entryTs - 300);
+    if (lows.length) {
+      let lo5 = Math.min(...lows.map((b) => b.l));
+      const dBar = (bars[c.ticker] || []).find((b) => b.date === c.entryDate);
+      if (dBar && lo5 < dBar.l) lo5 = dBar.l; // daily bar is the authority
+      c.day0PostLow = lo5;
+    }
   }
 
   for (const c of campaigns) {
@@ -441,69 +457,52 @@ async function main() {
   // 5-min bar open at/after 10:00 ET on the entry day, SAME stop level, ride to the same final
   // EOD close (shadow basis, comparable to shadowR). Yahoo 5m history only reaches ~60 days back
   // — campaigns without a time or beyond the window are EXCLUDED, never guessed.
-  const cutoff60 = new Date(Date.now() - 55 * 864e5).toISOString().slice(0, 10);
-  const eligible = campaigns.filter((c) => c.entryTime && c.entryTime < "10:00:00" && c.entryDate >= cutoff60
+  // 5m bars now come from the deployed Polygon proxy — NO date horizon, so every campaign with a
+  // recorded pre-10:00 ET entry time is simulatable (the sample Valen asked for).
+  const eligible = campaigns.filter((c) => c.entryTime && etTime(c.entryTime) < "10:00:00"
     && c.entry && c.stop && c.stop < c.entry && c.shadowR != null && symOK(c.ticker));
   for (const c of eligible) {
     try {
-      const day0 = Math.floor(new Date(c.entryDate + "T00:00:00-04:00").getTime() / 1000);
-      const d5 = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(c.ticker)}?period1=${day0}&period2=${day0 + 86400}&interval=5m`, { headers: { "User-Agent": "Mozilla/5.0" } }).then(j);
-      const r5 = d5?.chart?.result?.[0]; if (!r5?.timestamp) continue;
-      const q5 = r5.indicators.quote[0];
-      // 10:00 ET on the entry day (summer = EDT, UTC−4 — his 2026 book is entirely EDT)
+      const bars5 = await fiveMin(c.ticker, c.entryDate);
+      if (!bars5) continue;
       const tenET = Math.floor(new Date(c.entryDate + "T10:00:00-04:00").getTime() / 1000);
-      const idx = r5.timestamp.findIndex((ts, i) => ts >= tenET && q5.open[i] != null);
-      if (idx === -1) continue;
-      const waitPx = q5.open[idx];
+      const first10 = bars5.find((b) => b.ts >= tenET && b.o != null);
+      if (!first10) continue;
+      const waitPx = first10.o;
       if (!(waitPx > 0)) continue;
       c.waitEntryPx = round(waitPx, 4);
-      if (waitPx <= c.stop) {
-        // The gate's whole edge: price already at/below the stop by 10:00 → the waited trade is
-        // NEVER TAKEN → 0R, while the early entry ate the loss. Count it as a loss AVOIDED.
-        c.waitShadowR = 0; c.waitAvoided = true;
-        const B0 = bars[c.ticker];
-        const iEnd0 = (() => { let i = B0.findIndex((b) => b.date > c.lastExit); return (i === -1 ? B0.length : i) - 1; })();
-        if (iEnd0 >= 0) {
-          const i0c = B0.findIndex((b) => b.date >= c.entryDate);
-          const laterLow0 = i0c >= 0 && i0c + 1 <= iEnd0 ? Math.min(...B0.slice(i0c + 1, iEnd0 + 1).map((b) => b.l)) : Infinity;
-          const entryTs0 = Math.floor(new Date(c.entryDate + "T" + (c.entryTime || "09:30:00") + "-04:00").getTime() / 1000);
-          const close00 = Math.floor(new Date(c.entryDate + "T16:00:00-04:00").getTime() / 1000);
-          const ls0 = r5.timestamp.map((ts2, i2) => ({ ts: ts2, l: q5.low[i2] })).filter((b) => b.l != null && b.ts >= entryTs0 && b.ts < close00);
-          let d0lo = ls0.length ? Math.min(...ls0.map((b) => b.l)) : Infinity;
-          const dB = B0.find((b) => b.date === c.entryDate); if (dB && d0lo < dB.l) d0lo = dB.l;
-          const swept0 = Math.min(d0lo, laterLow0) <= c.stop;
-          c.actGateR = round(((swept0 ? c.stop : B0[iEnd0].c) - c.entry) / (c.entry - c.stop));
-        }
-        continue;
-      }
-      // STOP-AWARE on BOTH arms (Valen caught the distortion: a 10:00 entry near the stop shrinks
-      // the risk unit, and ignoring stop-outs then inflates the waited arm — MRVL read +13.2R).
-      // Each arm: if the post-entry low (5m day 0, then daily lows) touches the stop → that arm
-      // exits AT the stop (−1R). Otherwise both ride to the same final day's close.
       const B = bars[c.ticker];
       const iEnd = (() => { let i = B.findIndex((b) => b.date > c.lastExit); return (i === -1 ? B.length : i) - 1; })();
       if (iEnd < 0) continue;
       const i0b = B.findIndex((b) => b.date >= c.entryDate);
       const laterLow = i0b >= 0 && i0b + 1 <= iEnd ? Math.min(...B.slice(i0b + 1, iEnd + 1).map((b) => b.l)) : Infinity;
-      const close0 = Math.floor(new Date(c.entryDate + "T16:00:00-04:00").getTime() / 1000);
       const dBar0 = B.find((b) => b.date === c.entryDate);
       const low5After = (fromTs) => {
-        const ls = r5.timestamp.map((ts2, i2) => ({ ts: ts2, l: q5.low[i2] })).filter((b) => b.l != null && b.ts >= fromTs && b.ts < close0); // session only — 16:00 auction prints can be garbage
+        const ls = bars5.filter((b) => b.l != null && b.ts >= fromTs);
         if (!ls.length) return Infinity;
         let lo = Math.min(...ls.map((b) => b.l));
-        if (dBar0 && lo < dBar0.l) lo = dBar0.l; // daily bar is the authority
+        if (dBar0 && lo < dBar0.l) lo = dBar0.l; // daily bar is the authority (bad-print guard)
         return lo;
       };
-      const entryTs2 = Math.floor(new Date(c.entryDate + "T" + (c.entryTime || "09:30:00") + "-04:00").getTime() / 1000);
+      if (waitPx <= c.stop) {
+        // The gate's whole edge: price already at/below the stop by 10:00 → the waited trade is
+        // NEVER TAKEN → 0R, while the early entry ate the loss. Count it as a loss AVOIDED.
+        c.waitShadowR = 0; c.waitAvoided = true;
+        const entryTs0 = Math.floor(new Date(c.entryDate + "T" + etTime(c.entryTime) + "-04:00").getTime() / 1000);
+        const swept0 = Math.min(low5After(entryTs0), laterLow) <= c.stop;
+        c.actGateR = round(((swept0 ? c.stop : B[iEnd].c) - c.entry) / (c.entry - c.stop));
+        continue;
+      }
+      // STOP-AWARE on BOTH arms (the MRVL lesson): a post-entry low touching the stop exits AT
+      // the stop; survivors ride to the same final day's close.
+      const entryTs2 = Math.floor(new Date(c.entryDate + "T" + etTime(c.entryTime) + "-04:00").getTime() / 1000);
       const armR = (px, fromTs) => {
-        const d0Low = low5After(fromTs);
-        const swept = Math.min(d0Low, laterLow) <= c.stop;
+        const swept = Math.min(low5After(fromTs), laterLow) <= c.stop;
         const D = px - c.stop;
         return round(((swept ? c.stop : B[iEnd].c) - px) / D);
       };
       c.actGateR = armR(c.entry, entryTs2);      // as traded, stop-aware, same basis
       c.waitShadowR = armR(waitPx, tenET);       // waited to 10:00, stop-aware
-      await new Promise((r) => setTimeout(r, 200));
     } catch { /* skip ticker/day */ }
   }
   const wgPairs = campaigns.filter((c) => c.waitShadowR != null && c.actGateR != null);
