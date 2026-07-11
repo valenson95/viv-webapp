@@ -305,8 +305,11 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
     const variant = (key, label) => {
       const vals = tRows.map(c => c[key]).filter(v => v != null && isFinite(v));
       const beat = tRows.filter(c => c[key] != null && c.shadowR != null && c[key] >= c.shadowR).length;
-      return { key, label, n: vals.length, meanR: mean(vals), medR: median(vals), totR: vals.reduce((s, v) => s + v, 0), beatPct: tRows.length ? Math.round(100 * beat / tRows.length) : null };
+      return { key, label, n: vals.length, meanR: mean(vals), medR: median(vals), totR: vals.reduce((s, v) => s + v, 0), beatN: beat, beatPct: tRows.length ? Math.round(100 * beat / tRows.length) : null };
     };
+    // when the level trims actually FILL (day 1–5) — the "optimal trim day" answer
+    const d3s = tRows.map(c => c.hit3Day).filter(v => v != null), d5s = tRows.map(c => c.hit5Day).filter(v => v != null);
+    const fillDays = { n3: d3s.length, med3: median(d3s), n5: d5s.length, med5: median(d5s), all: tRows.length };
     const tourney = tRows.length >= 5 ? [
       variant("vHis3", "One trim · 50% @ +3R"),
       variant("vHis4", "One trim · 50% @ +4R"),
@@ -345,7 +348,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       capMed: median(caps), capN: caps.length, cutEarly, bigLeftOnTable,
       extOK: aggOf(extOK), extHot: aggOf(extHot), extUnknown: rows.length - extKnown.length,
       lodOK: aggOf(lodOK), lodHot: aggOf(lodHot), lodUnknown: rows.length - lodKnown.length,
-      gA: aggOf(gA), gB: aggOf(gB), gU: aggOf(gU), gradeStr, tourney, tourneyN: tRows.length,
+      gA: aggOf(gA), gB: aggOf(gB), gU: aggOf(gU), gradeStr, tourney, tourneyN: tRows.length, fillDays,
       gatedN: gated.length,
       gates: gated.length ? {
         lod: gateSlice("lod_dist_atr", v => +v <= 0.6),
@@ -954,7 +957,8 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         <Panel title="Trim tournament — which 50% derisk combo wins?" meta={`${lab.tourneyN} campaigns · same EOD price basis`}
           howto={[
             "Every closed campaign is REPLAYED under each combo, all on the same end-of-day closes — apples-to-apples.",
-            "Priority trigger: the +R level printing (days 1–5, even BEFORE the day 3–5 window). Time fallback: the last close inside the 5-day window.",
+            "Priority trigger: the +R level printing (days 1–5, even BEFORE the day 3–5 window). Time fallback: the last close inside the 5-day window — EVERY combo trims or time-stops by day 5, no strategy waits longer.",
+            "Entry-day prints don't fill (daily bars can't see whether the day-0 high came before or after your entry) — conservative: it can only understate the level combos, never flatter them.",
             "One-trim rows: the full 50% at one level. Ladder rows: two trims (20/25/30% mixes) — first at +3R, second at +5R.",
             "The runner (remaining 50%) always rides to the final exit close. Campaigns that ended before a trigger count unchanged for that combo.",
             "Caveats: EOD closes only; runners ignore the trailing stop — this measures the TRIM choice, not the whole exit system. Re-judge every ~20 new campaigns.",
@@ -966,22 +970,34 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
               return <>Across these {lab.tourneyN} campaigns, <b style={{ color: T.goldBright }}>{best.label}</b> comes out best at <b>{sgnR(best.meanR)}</b> per trade{never && best.key !== "shadowR" ? <> vs <b>{sgnR(never.meanR)}</b> for never trimming — the trim earns its keep</> : never && best.key === "shadowR" ? <> — right now HOLDING beats every trim variant; sample is small, treat as direction</> : null}. Small samples move — the verdict firms up as campaigns accumulate.</>;
             })()}
           </Say>
+          {lab.fillDays && (
+            <div style={{ fontSize: "0.7rem", color: T.muted, margin: "0 0 10px", lineHeight: 1.6 }}>
+              When the level trims actually fill: <b style={{ color: T.text }}>+3R printed on {lab.fillDays.n3} of {lab.fillDays.all}</b> trades (median day {num(lab.fillDays.med3, 0)}) · <b style={{ color: T.text }}>+5R on {lab.fillDays.n5} of {lab.fillDays.all}</b> (median day {num(lab.fillDays.med5, 0)}) · the rest time-stop at the window or ended early.
+            </div>
+          )}
           <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: 560 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "minmax(150px,1.4fr) 50px 85px 85px 85px 100px", gap: "0 10px", alignItems: "center", padding: "2px 4px 6px", fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted }}>
-                <span>Strategy</span><span>n</span><span style={{ textAlign: "right" }}>Mean R</span><span style={{ textAlign: "right" }}>Median R</span><span style={{ textAlign: "right" }}>Total R</span><span style={{ textAlign: "right" }}>≥ never-trim</span>
+            <div style={{ minWidth: 640 }}>
+              {/* every column carries its PURPOSE on hover (Valen: a column without a stated
+                  purpose is noise) */}
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(150px,1.4fr) 50px 85px 85px 85px 130px", gap: "0 10px", alignItems: "center", padding: "2px 4px 6px", fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted }}>
+                <span className="term" data-tip={"WHAT: the trim recipe being replayed.\nPURPOSE: each row is the same 25 trades under a different rule — only the rule changes, so the ranking IS the decision."}>Strategy</span>
+                <span className="term" data-tip={"WHAT: how many campaigns were replayed under this rule.\nPURPOSE: identical across rows by design — same trades, fair fight."}>n</span>
+                <span style={{ textAlign: "right" }}><span className="term tipright" data-tip={"WHAT: average R per trade under this rule.\nPURPOSE: the headline — the rule with the highest mean makes you the most per trade. This is the ranking column."}>Mean R</span></span>
+                <span style={{ textAlign: "right" }}><span className="term tipright" data-tip={"WHAT: sort all trades under this rule — the middle one.\nWHY IT'S THE SAME EVERY ROW: your middle trade is a LOSER (win rate ~40%), and losers never reach a trim trigger — every combo leaves them untouched. The combos only differentiate the WINNERS, which is why Mean and Total move while Median doesn't.\nPURPOSE: proves the ranking isn't driven by the typical trade — it's the winners' tails."}>Median R</span></span>
+                <span style={{ textAlign: "right" }}><span className="term tipright" data-tip={"WHAT: sum of all 25 trades' R under this rule.\nPURPOSE: the whole-book difference — mean × n. Small per-trade edges compound into visible R here."}>Total R</span></span>
+                <span style={{ textAlign: "right" }}><span className="term tipright" data-tip={"WHAT: on how many individual trades this rule did AT LEAST as well as holding everything to the end.\nPURPOSE: consistency check — a high mean with a LOW percentage here means one lucky trade carried the rule; high mean + high percentage = the rule wins broadly. Shown as trades and %."}>Beats holding</span></span>
               </div>
               {lab.tourney.map(v => {
                 const best = lab.tourney.slice().sort((a, b) => (b.meanR ?? -99) - (a.meanR ?? -99))[0];
                 const isBest = v.key === best.key;
                 return (
-                  <div key={v.key} style={{ display: "grid", gridTemplateColumns: "minmax(150px,1.4fr) 50px 85px 85px 85px 100px", gap: "0 10px", alignItems: "center", padding: "8px 4px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.76rem", background: isBest ? "rgba(201,152,42,0.05)" : "transparent" }}>
+                  <div key={v.key} style={{ display: "grid", gridTemplateColumns: "minmax(150px,1.4fr) 60px 90px 90px 90px 130px", gap: "0 10px", alignItems: "center", padding: "8px 4px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.76rem", background: isBest ? "rgba(201,152,42,0.05)" : "transparent" }}>
                     <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{v.label}{isBest && <span style={{ color: T.goldBright, fontSize: "0.6rem", fontWeight: 800, marginLeft: 8 }}>◂ BEST</span>}</span>
                     <span style={{ color: T.muted, fontVariantNumeric: "tabular-nums" }}>{v.n}</span>
                     <b style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: (v.meanR ?? 0) >= 0 ? T.green : T.red }}>{sgnR(v.meanR)}</b>
                     <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{sgnR(v.medR)}</span>
                     <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{sgnR(v.totR, 1)}</span>
-                    <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: T.muted }}>{v.key === "shadowR" ? "—" : v.beatPct + "%"}</span>
+                    <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: T.muted }}>{v.key === "shadowR" ? "—" : `${v.beatN} of ${lab.tourneyN} · ${v.beatPct}%`}</span>
                   </div>
                 );
               })}

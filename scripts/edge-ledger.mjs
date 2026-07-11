@@ -239,6 +239,10 @@ async function main() {
         r += (1 - fTot) * (finPx - c.entry); // unfilled legs + the 50% runner ride to the final close
         return round(r / riskPS);
       };
+      // which DAY each level printed (1–5, null = never in the window) — feeds the
+      // "when do the trims actually happen" read on the tournament panel
+      const hitDay = (tgtR) => { const lvl = c.entry + tgtR * riskPS; for (let k = 1; k < Math.min(win.length, 6); k++) if (win[k].h >= lvl) return k; return null; };
+      c.hit3Day = hitDay(3); c.hit5Day = hitDay(5);
       c.vHis3 = combo([{ f: 0.5, tgt: 3 }]);
       c.vHis4 = combo([{ f: 0.5, tgt: 4 }]);
       c.vHis5 = combo([{ f: 0.5, tgt: 5 }]);
