@@ -254,8 +254,23 @@ function PlaybookTracker({ trades, uid, setPage }) {
     const topN = Math.max(1, Math.ceil(wins.length * 0.1));
     const top = wins.slice().sort((a, b) => (Number(b.plDollar) || 0) - (Number(a.plDollar) || 0)).slice(0, topN);
     const homerunShare = gross > 0 ? top.reduce((s, t) => s + Math.max(0, Number(t.plDollar) || 0), 0) / gross * 100 : null;
-    return { n: closed.length, avgLoss, worstLoss, payoff, winRate, homerunShare, topN: wins.length ? topN : 0, avgWin };
+    return { n: closed.length, avgLoss, worstLoss, payoff, winRate, homerunShare, topN: wins.length ? topN : 0, avgWin, winPcts: wins.map(t => Number(t.plPct) || 0) };
   }, [trades]);
+  // ── DESIGN PROGRESS — pace vs the design's structure (trade count + winner tiers). This is what
+  // catches "all ratios green but the homeruns aren't happening": each tier shows how many winners
+  // of that size the design expects BY NOW (pro-rated) vs how many actually landed.
+  const pace = useMemo(() => {
+    const d = pb.design;
+    if (!d || !d.total || !Array.isArray(d.tiers) || !d.tiers.length) return null;
+    const frac = Math.min(1, m.n / d.total);
+    const tiers = d.tiers.slice().sort((a, b) => b.gain - a.gain).map((t, i, arr) => {
+      const hi = i === 0 ? Infinity : arr[i - 1].gain;              // tier band: [gain, next-bigger tier)
+      const actual = m.winPcts.filter(p => p >= t.gain && p < hi).length;
+      const expectedNow = t.count * frac;
+      return { gain: t.gain, planned: t.count, actual, expectedNow, ok: actual >= Math.floor(expectedNow) };
+    });
+    return { total: d.total, taken: m.n, remaining: Math.max(0, d.total - m.n), frac, tiers };
+  }, [pb.design, m]);
   const [more, setMore] = useState(false);
   // Arrived via the simulator's "Compare stats" button → scroll here and open the comparison.
   useEffect(() => {
@@ -322,6 +337,33 @@ function PlaybookTracker({ trades, uid, setPage }) {
           </div>
         );
       })}
+      {/* ── DESIGN PROGRESS — trades taken vs the design's total + per-tier homerun pacing ── */}
+      {pace && (
+        <div style={{ marginTop: 12, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
+            <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)" }}>Design progress</span>
+            <span className="term" data-tip="Your playbook's math is defined over a total number of trades — the expectancy only realizes across the full count. This tracks how far through the design you are and how many trades remain." style={{ fontSize: "0.7rem", fontWeight: 800, color: "var(--goldBright)" }}>
+              {pace.taken.toLocaleString()} of {pace.total.toLocaleString()} trades · {pace.remaining.toLocaleString()} to go
+            </span>
+            <div style={{ flex: "1 1 160px", minWidth: 120, height: 6, borderRadius: 4, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+              <div style={{ width: (pace.frac * 100).toFixed(1) + "%", height: "100%", background: "var(--goldBright)" }} />
+            </div>
+            <span style={{ fontSize: "0.62rem", color: "var(--muted)" }}>{(pace.frac * 100).toFixed(0)}% through the design</span>
+          </div>
+          {pace.tiers.map((t, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 12px", padding: "6px 4px", borderTop: "1px solid rgba(255,255,255,0.05)", fontSize: "0.72rem" }}>
+              <span className="term" data-tip={`The design plans ${t.planned} winners of +${t.gain}% or larger over the full ${pace.total.toLocaleString()}-trade cycle. "Expected by now" pro-rates that to how far through the cycle you are — falling behind on the BIG tiers is how a playbook silently dies while every ratio still looks fine.`} style={{ fontWeight: 700, minWidth: 110 }}>+{t.gain}%+ winners</span>
+              <span style={{ color: "var(--muted)" }}>planned {t.planned}</span>
+              <span style={{ color: "var(--muted)" }}>expected by now ≈ {t.expectedNow.toFixed(1)}</span>
+              <b style={{ color: t.ok ? "var(--green)" : "var(--red)", fontVariantNumeric: "tabular-nums" }}>actual {t.actual}</b>
+              <span style={{ marginLeft: "auto", fontWeight: 800, fontSize: "0.6rem", padding: "2px 9px", borderRadius: 20,
+                background: t.ok ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.14)", color: t.ok ? "var(--green)" : "var(--red)" }}>
+                {t.ok ? "🟢 ON PACE" : `🔴 BEHIND — need ${Math.max(0, Math.ceil(t.expectedNow) - t.actual)} more by this point`}</span>
+            </div>
+          ))}
+          <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>The ratio targets above can all be green while the design still fails — if the big-tier winners aren't landing at pace, the expectancy math never materializes. This block is the honest check.</div>
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
         <div style={{ fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, flex: 1 }}>The playbook thesis: keep every loss near-nothing (derisk fast), so a handful of homerun winners carry the whole book. Verdicts recompute from the same trades this page shows — use the date filter to score just a specific period.</div>
         <button className="distbtn" onClick={() => setMore(o => !o)}>{more ? "Hide details ▴" : "More details ▾"}</button>
@@ -2567,6 +2609,7 @@ function ReturnSimulatorTab({ guideEnter, guideLeave, gactive, expert, portfolio
   const [simWinRate, setSimWinRate] = useState("40");
   const [simAvgLoss, setSimAvgLoss] = useState("5");
   const [simTiers, setSimTiers] = useState([{ count: "80", gain: "5" }, { count: "10", gain: "50" }, { count: "10", gain: "100" }]);
+  const [pbSaved, setPbSaved] = useState(false); // "design saved ✓" flash after Save playbook design
   const [simScenarios, setSimScenarios] = useState([]);
 
   const sim = useMemo(() => {
@@ -2708,12 +2751,19 @@ return (
               {simTiers.map((row, i) => (
                 <tr key={i}>
                   <td style={{ textAlign: "left" }}><input className="in" style={{ maxWidth: 120 }} value={row.gain} onChange={e => setSimTiers(t => t.map((r, idx) => idx === i ? { ...r, gain: e.target.value } : r))} /></td>
-                  <td><input className="in" style={{ maxWidth: 120, marginLeft: "auto" }} value={row.count} onChange={e => setSimTiers(t => t.map((r, idx) => idx === i ? { ...r, count: e.target.value } : r))} /></td>
+                  <td style={{ position: "relative" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "flex-end", width: "100%" }}>
+                      <input className="in" style={{ maxWidth: 120 }} value={row.count} onChange={e => setSimTiers(t => t.map((r, idx) => idx === i ? { ...r, count: e.target.value } : r))} />
+                      <button title="Remove this winner tier" disabled={simTiers.length <= 1} onClick={() => setSimTiers(t => t.filter((_, idx) => idx !== i))}
+                        style={{ background: "transparent", border: "none", color: simTiers.length <= 1 ? "var(--faint)" : "var(--muted)", cursor: simTiers.length <= 1 ? "default" : "pointer", fontSize: "0.85rem", padding: "0 2px" }}>✕</button>
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
           </div>
+          <button className="btn" style={{ marginTop: 8, fontSize: "0.72rem", padding: "6px 12px" }} onClick={() => setSimTiers(t => [...t, { gain: "", count: "" }])}>＋ Add winner tier</button>
           <div className="hint" style={{ marginTop: 8 }}>Most wins are small; a few are huge. That mix is what drives compounding.</div>
           <button className="btn" style={{ marginTop: 14 }} onClick={() => sim && setSimScenarios(s => [...s, { id: Date.now(), posSize: +simPosSize || 0, avgLoss: +simAvgLoss || 0, winRate: sim.winRate, totalReturn: sim.totalReturn, endEq: sim.endEq, total: sim.total }].slice(-3))}>＋ Save as scenario to compare</button>
           {/* ── Simulator → Playbook loop: this design becomes the tracker's BENCHMARK; live journal
@@ -2734,14 +2784,19 @@ return (
               const next = { ...cur, name: cur.designed && cur.name ? cur.name : "Playbook design", designed: true, simSize: +simPosSize || 15,
                 targets: { ...(cur.targets || {}), avgLoss, winRate: +sim.winRate.toFixed(1),
                   payoff: avgLoss > 0 ? +(avgWin / avgLoss).toFixed(2) : 0,
-                  homerunShare: wSum > 0 ? +((topSum / wSum) * 100).toFixed(0) : 0 } };
+                  homerunShare: wSum > 0 ? +((topSum / wSum) * 100).toFixed(0) : 0 },
+                // The design's STRUCTURE — total trade count + winner tiers — so the tracker can show
+                // pace: trades taken vs planned, and per-tier expected-by-now vs actual (a member can
+                // pass every ratio target while still missing the homeruns the design depends on).
+                design: { total: sim.total, winners: sim.winners, losers: sim.losers, tiers } };
               try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* quota */ }
               if (goCompare && setPage) { try { sessionStorage.setItem("viv-goto-playbook", "1"); } catch {} setPage("journal"); }
             };
             return (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                <button className="btn" disabled={!sim} onClick={() => syncToPlaybook(false)} title="Save this design as your Playbook tracker benchmark — your live trades then score against it">🎯 Sync to Playbook</button>
-                <button className="btn" disabled={!sim} onClick={() => syncToPlaybook(true)} title="Sync this design AND jump to the Playbook tracker to see your live stats compared against it">Compare stats → Playbook tracker</button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, alignItems: "center" }}>
+                <button className="btn" disabled={!sim} onClick={() => { syncToPlaybook(false); setPbSaved(true); setTimeout(() => setPbSaved(false), 3000); }} title="Lock in this design as your Playbook benchmark — it stays until you save a new one">💾 Save playbook design</button>
+                <button className="btn" disabled={!sim} onClick={() => syncToPlaybook(true)} title="Save this design AND jump to the Playbook tracker: your live stats compared against it — the feedback loop">Compare stats → Playbook tracker</button>
+                {pbSaved && <span style={{ color: "var(--green)", fontSize: "0.72rem", fontWeight: 700 }}>design saved ✓ — the Playbook tracker now benchmarks against it</span>}
               </div>
             );
           })()}
@@ -6436,7 +6491,12 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
                   <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
                     📐 SPY vs its 21-day EMA, past 10 sessions, judged at entry
                     <span onClick={() => setEdgeNotes(n => ({ ...n, market: !n.market }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.market ? "hide ▴" : "full definition ▾"}</span>
-                    {edgeNotes.market && <div style={{ marginTop: 4 }}>The market's state at ENTRY, from SPY vs its 21-day EMA as of the last completed session BEFORE your entry day (the entry day's close isn't known when you enter — no lookahead) — <b>Trending</b> = SPY closed above the EMA21 for 10+ straight sessions · <b>Downtrend</b> = below it for 10+ straight sessions · <b>Choppy</b> = neither (price crossing back and forth inside the last 10 sessions). Context, theme and grade together give the multi-dimensional read BEFORE the trade-level detail.</div>}
+                    {edgeNotes.market && <div style={{ marginTop: 6, display: "grid", gap: 5 }}>
+                      <div><b style={{ color: "var(--green)" }}>📈 Trending</b> — SPY closed above its 21-day EMA for 10 or more straight sessions.</div>
+                      <div><b style={{ color: "var(--goldBright)" }}>🌊 Choppy</b> — price crossed back and forth through the EMA21 within the last 10 sessions.</div>
+                      <div><b style={{ color: "var(--red)" }}>📉 Downtrend</b> — SPY closed below its 21-day EMA for 10 or more straight sessions.</div>
+                      <div style={{ opacity: 0.8 }}>Judged on the last completed session before your entry — the entry day's close isn't known when you enter (no lookahead).</div>
+                    </div>}
                   </div>
                 </div>
                 {edgeOpen && !edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
