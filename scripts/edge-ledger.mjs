@@ -225,24 +225,47 @@ async function main() {
       };
       c.sim3stop = simStops([c.entry - riskPS / 3, c.entry - 2 * riskPS / 3, c.entry - riskPS], [1 / 3, 1 / 3, 1 / 3]);
       c.sim1stop = simStops([c.entry - riskPS], [1]);
-    }
-    // SYSTEM-MAX R (Valen's spec, 2026-07-11): the best HIS T+3–5 system could have delivered —
-    // trim 25% or 33% at the day-3, day-4 or day-5 close (whichever combination is best), runner
-    // sold at its post-trim PEAK high. A raw sold-the-top ceiling assumes a system he doesn't
-    // trade, so capture is now measured against THIS attainable ceiling instead.
-    {
-      let best = null;
-      for (const d of [3, 4, 5]) {
-        if (win.length <= d) break; // campaign ended before this trim day
-        const trimPx = win[d].c;
-        const after = win.slice(d + 1);
-        const runnerPx = after.length ? Math.max(...after.map((b) => b.h)) : win[win.length - 1].c;
-        for (const f of [0.25, 1 / 3]) {
-          const r = (f * (trimPx - c.entry) + (1 - f) * (runnerPx - c.entry)) / riskPS;
-          if (best == null || r > best) best = r;
+      // ── VALEN'S ACTUAL TRIM RULE (his spec, 2026-07-11): sell 50% TOTAL into strength —
+      // filled at +3R (or +5R variant) if price prints it first (limit fill at the level,
+      // days 1–5), otherwise 50% at the day-4 close (mid of the T+3–5 window; falls back to
+      // the nearest available day). His 25+25 / 20+30 / 30+20 combos all sum to 50%, so one
+      // 50% tranche is the EOD-granularity equivalent. Runner rides to the final close.
+      const vHis = (tgtR) => {
+        const lvl = c.entry + tgtR * riskPS;
+        let trimPx = null;
+        for (let k = 1; k < Math.min(win.length, 6); k++) { if (win[k].h >= lvl) { trimPx = lvl; break; } }
+        if (trimPx == null) {
+          let dIdx = null;
+          for (const d of [4, 3, 5]) if (win.length > d) { dIdx = d; break; }
+          if (dIdx != null) trimPx = win[dIdx].c;
         }
+        const fin = win[win.length - 1].c;
+        if (trimPx == null) return round((fin - c.entry) / riskPS); // ended before the window — no trim possible
+        return round((0.5 * (trimPx - c.entry) + 0.5 * (fin - c.entry)) / riskPS);
+      };
+      c.vHis3 = vHis(3); c.vHis5 = vHis(5);
+    }
+    // SYSTEM-MAX R (Valen's ACTUAL rule, v2 2026-07-11): the ceiling his own trim system could
+    // have delivered — sell 50% INTO STRENGTH at +3R (riding the fill up to +5R if that day
+    // offers it); if +3R never prints by day 5, 50% at the BEST close inside the T+3–5 window;
+    // runner sold at its post-trim PEAK. His 25+25/20+30/30+20 combos all sum to 50%.
+    {
+      const lvl3 = c.entry + 3 * riskPS, lvl5 = c.entry + 5 * riskPS;
+      let trimPx = null, trimIdx = null;
+      for (let k = 1; k < Math.min(win.length, 6); k++) {
+        if (win[k].h >= lvl3) { trimPx = Math.min(win[k].h, lvl5); trimIdx = k; break; }
       }
-      c.sysMaxR = best != null ? round(best) : c.mfeR; // ended before day 3 → best possible = sell the peak
+      if (trimPx == null) {
+        let best = null, bi = null;
+        for (const d of [3, 4, 5]) if (win.length > d && (best == null || win[d].c > best)) { best = win[d].c; bi = d; }
+        if (best != null) { trimPx = best; trimIdx = bi; }
+      }
+      if (trimPx == null) c.sysMaxR = c.mfeR; // ended before the window — best possible = its peak
+      else {
+        const after = win.slice(trimIdx + 1);
+        const runnerPx = after.length ? Math.max(...after.map((b) => b.h)) : win[win.length - 1].c;
+        c.sysMaxR = round((0.5 * (trimPx - c.entry) + 0.5 * (runnerPx - c.entry)) / riskPS);
+      }
     }
     c.dayMFE = iMax; // trading days after entry
     if (c.initShares > 0) c.blendedR = round(c.pl / (riskPS * c.initShares));

@@ -308,10 +308,12 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       return { key, label, n: vals.length, meanR: mean(vals), medR: median(vals), totR: vals.reduce((s, v) => s + v, 0), beatPct: tRows.length ? Math.round(100 * beat / tRows.length) : null };
     };
     const tourney = tRows.length >= 5 ? [
+      variant("vHis3", "YOUR RULE · 50% @ +3R, else window"),
+      variant("vHis5", "YOUR RULE · 50% @ +5R, else window"),
       variant("vT3_25", "T+3 · trim 25%"), variant("vT3_33", "T+3 · trim 33%"),
       variant("vT5_25", "T+5 · trim 25%"), variant("vT5_33", "T+5 · trim 33%"),
       variant("shadowR", "Never trim (hold all)"),
-    ] : null;
+    ].filter(v => v.n > 0) : null;
     // Gate JSON coverage
     const gated = rows.filter(c => c.gates && Object.keys(c.gates).length);
     const gateSlice = (key, pass) => {
@@ -429,9 +431,9 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           data-tip is silently dead (Valen found the definitions never showed, 2026-07-11). */}
       <style>{`
         .qa .term{border-bottom:1px dotted rgba(201,152,42,0.5); cursor:help; position:relative}
-        .qa .term:hover::after{content:attr(data-tip); position:absolute; left:0; top:150%; width:300px;
+        .qa .term:hover::after{content:attr(data-tip); position:absolute; left:0; top:150%; width:320px;
           background:#11111b; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 13px;
-          font-size:0.68rem; line-height:1.65; color:#E7E9EE; z-index:60; white-space:normal; font-weight:500;
+          font-size:0.68rem; line-height:1.65; color:#E7E9EE; z-index:60; white-space:pre-line; font-weight:500;
           text-transform:none; letter-spacing:0; box-shadow:0 10px 30px rgba(0,0,0,0.6)}
         .qa .term.tipright:hover::after{left:auto; right:0}
         body.qa-open .viv-cursor-glow{display:none !important}
@@ -578,22 +580,22 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       <section style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "14px 20px", marginBottom: 16 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "14px 18px", alignItems: "center" }}>
           <Kpi label="Net P&L" value={fmt$(A.net)} tone={A.net >= 0 ? T.green : T.red} sub="this cohort, closed only"
-            tip="Realized dollars across this cohort's closed campaigns. There's no direct lever on this number — it follows expectancy × number of trades × sizing. Fix the inputs, not the output." />
+            tip={"WHAT: realized $ across this cohort's closed campaigns.\nIMPROVE: no direct lever — it follows expectancy × trades × sizing. Fix the inputs, not the output."} />
           <Kpi label="Expectancy" value={sgnR(A.expR)} tone={(A.expR ?? 0) >= 0 ? T.green : T.red}
-            tip="Average R per closed campaign — the edge itself. Two levers: (1) stop losses beyond the design cap (see Entries), (2) bank more of what each winner offers (see Exits). Everything else is noise."
+            tip={"WHAT: average R per closed campaign — the edge itself.\nIMPROVE (only 2 levers):\n· stop losses beyond the design cap → Entries section\n· bank more of what winners offer → Exits section"}
             sub={extra.r10 != null ? <>last 10: <b style={{ color: extra.r10 >= (A.expR ?? 0) ? T.green : T.red }}>{sgnR(extra.r10)} {extra.r10 >= (A.expR ?? 0) ? "▲ improving" : "▼ declining"}</b></> : "mean R / campaign"} />
           <Donut pct={A.wr} center={A.wr == null ? "—" : Math.round(A.wr) + "%"} label="Win rate"
-            tip="Share of campaigns that closed positive. Improve it with stricter entry gates (fresh ≤4×, tight LoD) — but don't chase it: your homerun design only NEEDS ~40%, and forcing a higher win rate usually shrinks the winners that pay for everything."
+            tip={"WHAT: share of campaigns that closed positive.\nIMPROVE: stricter entry gates (fresh ≤4×, tight LoD).\nCAUTION: don't chase it — your design only needs ~40%; forcing more usually shrinks the big winners that pay for everything."}
             sub={extra.w10 != null ? <>{A.nW}W/{A.nL}L · last 10: <b style={{ color: extra.w10 >= (A.wr ?? 0) ? T.green : T.red }}>{extra.w10}% {extra.w10 >= (A.wr ?? 0) ? "▲" : "▼"}</b></> : `${A.nW}W / ${A.nL}L`} />
           <Donut pct={A.payoff != null ? Math.min(100, A.payoff / 3 * 100) : 0} center={num(A.payoff)} label="Payoff ($)"
-            tip="Average $ win ÷ average $ loss. Improve the top (capture more of system-max — Exits) and the bottom (keep losers at their design cap — Entries). Ring fills at 3.0 — a comfortable homerun-system level."
+            tip={"WHAT: average $ win ÷ average $ loss.\nIMPROVE:\n· top — capture more of system-max (Exits)\n· bottom — keep losers at their design cap (Entries)\nRING: fills at 3.0, a comfortable homerun-system level."}
             sub={`breakeven needs ${num(A.wBE)} · ring full at 3.0`} />
           <Kpi label="Profit factor" value={A.pf === Infinity ? "∞" : num(A.pf)} sub="gross won ÷ gross lost"
-            tip="TOTAL $ won ÷ TOTAL $ lost — frequency included. 1.3+ = worth pressing. It moves when either expectancy lever moves; a single deep loss drags it hard, which is why the deep-loss benchmark exists." />
+            tip={"WHAT: TOTAL $ won ÷ TOTAL $ lost (frequency included).\nSCALE: 1.0 breakeven · 1.3+ worth pressing.\nIMPROVE: same 2 levers as expectancy — one deep loss drags it hard, which is why the deep-loss benchmark exists."} />
           <Kpi label="SQN" value={num(A.sqn)} sub="Tharp scale · 2+ good"
-            tip="System Quality Number = average R ÷ the SPREAD of your R results × √n. It rewards CONSISTENCY, not just profit: two systems with the same average, the steadier one scores higher. Scale: under 1.6 hard to trade · 2–3 good · 3+ excellent. Improve it by removing extremes — cap the deep losses, avoid the occasional oversized bet — and by simply logging more trades (√n grows it as the sample proves itself)." />
+            tip={"WHAT: System Quality Number — average R ÷ SPREAD of results × √n. Rewards CONSISTENCY: same average, steadier results = higher score.\nSCALE: <1.6 hard to trade · 2–3 good · 3+ excellent.\nIMPROVE:\n· cap the deep losses (removes downside extremes)\n· no oversized one-off bets\n· log more trades — √n grows it as the sample proves itself"} />
           <Kpi label="Sample" value={`${A.n} / 50`} sub={A.n >= 30 ? "outcome readable" : "building to 30 — judge adherence"}
-            tip="Closed campaigns in this cohort. Below ~30, two or three trades can flip every verdict — so judge ADHERENCE (did you follow the rules), not outcome. At 30 the sign of the edge is readable; at 50 the Monte Carlo is calibrated." />
+            tip={"WHAT: closed campaigns in this cohort.\nWHY IT MATTERS:\n· under 30 — 2-3 trades can flip every verdict → judge ADHERENCE, not outcome\n· at 30 — the edge's sign is readable\n· at 50 — Monte Carlo calibrated"} />
         </div>
       </section>
 
@@ -715,6 +717,15 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
               if (!wg || !wg.simmed) return <div style={{ fontSize: "0.68rem", color: T.muted, lineHeight: 1.6 }}>No eligible campaigns simulated yet — needs a recorded pre-10:00 entry time and 5-minute bar history (≈60 days). Grows automatically as entries are logged with times.</div>;
               return (
                 <div style={{ fontSize: "0.74rem", lineHeight: 1.8 }}>
+                  {/* VERDICT — key pointers, from HIS data only */}
+                  <div style={{ padding: "8px 12px", borderRadius: 10, marginBottom: 8, background: (wg.actMeanR ?? 0) >= (wg.waitMeanR ?? 0) ? "rgba(239,68,68,0.07)" : "rgba(34,197,94,0.07)", border: `1px solid ${(wg.actMeanR ?? 0) >= (wg.waitMeanR ?? 0) ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)"}` }}>
+                    <Chip ok={(wg.waitMeanR ?? 0) > (wg.actMeanR ?? 0)}>{(wg.waitMeanR ?? 0) > (wg.actMeanR ?? 0) ? "WAITING WOULD HAVE HELPED" : "WAITING WOULD HAVE COST YOU"}</Chip>
+                    <div style={{ marginTop: 3, color: T.muted, fontSize: "0.7rem", lineHeight: 1.6 }}>
+                      <div>· Same trades, re-timed — not missed: {(wg.skipped || []).length ? `only ${(wg.skipped || []).length} of ${wg.eligible} would never have triggered (below the stop by 10:00)` : "every eligible trade still triggers"}.</div>
+                      <div>· The cost is WORSE ENTRIES on the runners, not missed trades — early fills caught the moves waiting would have diluted.</div>
+                      <div>· n={wg.simmed} — direction only until n ≥ 15.</div>
+                    </div>
+                  </div>
                   <div>Pre-10:00 entries, replayed as if you'd waited for the 10:00 ET bar — <b>both arms stop-aware</b>: a post-entry low touching the stop exits AT the stop; survivors ride to the same final day's close.</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 18px", marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
                     <span>as traded <b style={{ color: (wg.actMeanR ?? 0) >= 0 ? T.green : T.red }}>{sgnR(wg.actMeanR)}</b>/trade</span>
@@ -773,7 +784,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         <Panel title="Exits — how much of each winner do you keep?" meta={`median: ${lab.capMed != null ? Math.round(lab.capMed * 100) + "%" : "—"} of system-max captured · n=${lab.capN}`}
           howto={[
             "Every dot is ONE trade.",
-            "Across = the best YOUR SYSTEM could have banked: trim 25% or 33% at the best day-3/4/5 close, runner sold at its post-trim peak. Not the raw price top — you don't trade a sell-the-top system.",
+            "Across = the best YOUR RULE could have banked: 50% into strength at +3R (up to +5R if that day offers it), else 50% at the best close in the T+3–5 window; runner sold at its post-trim peak.",
             "Up = what you actually BANKED.",
             "A dot ON the gold dashed line executed the system perfectly — the line is now attainable by definition.",
             "Red dots to the right of 0R are losers that were winners first — the trim window exists to bank those.",
@@ -783,7 +794,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
             lab.capMed != null
               ? <>You bank <b>{Math.round(lab.capMed * 100)}%</b> of what your OWN SYSTEM could have delivered (target ≥ 50%){lab.capMed >= 0.5 ? " — exits are doing their job." : " — winners are being cut early."}</>
               : <>No capture data yet.</>,
-            <>The ceiling here is your T+3–5 system's best (trim 25/33% at the best day-3/4/5 close, runner at its post-trim peak) — NOT the raw price top, which your system never sells.</>,
+            <>The ceiling here is YOUR RULE executed perfectly: 50% sold into strength at +3R (up to +5R if offered), else at the best close in the T+3–5 window; runner sold at its post-trim peak. Not the raw price top — your system never sells that.</>,
             lab.nearMiss.length > 0
               ? <><b style={{ color: T.red }}>{lab.nearMiss.length} loser{lab.nearMiss.length === 1 ? "" : "s"}</b> had ≥ +1R open and died red — the trades the trim window exists to bank. Most fixable leak here.</>
               : <>No loser died red after showing +1R — the trim window is catching them.</>,
@@ -878,10 +889,12 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
               </ResponsiveContainer>
             </div>
           ))}
+        </div>
+        {/* trim-value chart gets its OWN full-width row (Valen) — bars breathe, fewer wraps */}
+        <div style={{ marginTop: 14 }}>
           <div>
             {(() => {
-              // SORTED by value (best → worst), scalable: ticker labels drop past 20 bars, the
-              // tooltip keeps them. Headline = the % of trades where trimming helped.
+              // SORTED by value (best → worst); every bar named; wraps to extra rows, no scrolling.
               const tv = rows.filter(c => c.deriskCostR != null)
                 .map(c => ({ t: c.ticker, v: +(-c.deriskCostR).toFixed(2), shadowR: c.shadowR, actual: c.blendedR }))
                 .sort((a, b) => b.v - a.v);
@@ -925,11 +938,11 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       {lab.tourney && (
         <Panel title="Trim tournament — T+3 or T+5? 25% or 33%?" meta={`${lab.tourneyN} campaigns · same EOD price basis`}
           howto={[
-            "Every closed campaign is REPLAYED four ways: first trim of 25% or 33% at the day-3 or day-5 close, runner held to the final exit day's close — plus a fifth row: never trimming.",
-            "All five use the same end-of-day closes, so the comparison is apples-to-apples. (Your ACTUAL result used real intraday fills — not directly comparable.)",
-            "Campaigns that ended before the trim day count unchanged — the rule simply never fired.",
-            "Caveats: EOD closes only, and the runner ignores your trailing stop — this measures the TRIM-TIMING choice, not the whole exit system.",
-            "Re-judge every ~20 new campaigns; small samples move.",
+            "Every closed campaign is REPLAYED under each strategy, all on the same end-of-day closes — apples-to-apples.",
+            "YOUR RULE rows = your actual system: 50% sold at the +3R (or +5R) limit if price prints it in days 1–5, otherwise 50% at the day-4 close (mid of your T+3–5 window); runner to the final close. Your 25+25 / 20+30 / 30+20 combos all sum to 50%, so one 50% tranche is the EOD equivalent.",
+            "T+3/T+5 rows = simpler fixed-day variants for comparison. Never trim = hold everything to the end.",
+            "Campaigns that ended before a rule could fire count unchanged for that rule.",
+            "Caveats: EOD closes only; runners ignore the trailing stop — this measures the TRIM choice, not the whole exit system. Re-judge every ~20 new campaigns.",
           ]}>
           <Say>
             {(() => {
