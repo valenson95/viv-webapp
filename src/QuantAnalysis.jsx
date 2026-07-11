@@ -349,7 +349,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       extMech: channel(aggOf(extOK), aggOf(extHot)), lodMech: channel(aggOf(lodOK), aggOf(lodHot)), gradeMech: channel(aggOf(gA), aggOf(gU)),
       sim3, sim1, simN: simPairs.length, simDelta: sim3 != null && sim1 != null ? sim3 - sim1 : null,
       wMAEn: wMAE.length, rung33: rung(-0.33), rung67: rung(-0.67), rung100: rung(-1.0),
-      avgLossR: mean(lR), worstR: lR.length ? Math.min(...lR) : null,
+      avgLossR: mean(lR), worstR: lR.length ? Math.min(...lR) : null, nLossR: lR.length,
       n3sLosers: L3.length, avgLoss3s: mean(l3R), // 3-stop era only (entered ≥ 2026-07-10)
       breaches, breachPct: L.length ? Math.round(100 * breaches.length / L.length) : null,
       nearMiss, nearMissPct: lMFE.length ? Math.round(100 * nearMiss.length / lMFE.length) : null,
@@ -663,14 +663,17 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           "Gate boxes: expectancy on each side of the gate. A gate that doesn't separate expectancy is theatre; a gate you violate profitably is mis-calibrated.",
           "Rung caveat: MAE uses DAILY bars, and the entry-day low usually prints BEFORE an ORB entry — the bar can't see the clock. Rung percentages are OVERSTATED (upper bounds) until entry-time capture builds up.",
         ]}>
+        {/* SECTION HEADLINE — one pointer per rule card below; each states ITS OWN sub-sample
+            (they differ by design: loss-side reads use losers, gate reads use both sides). */}
         <Say points={[
-          lab.avgLossR != null && <>Average loser: <b>{sgnR(lab.avgLossR)}</b> across this cohort.</>,
+          <span style={{ color: T.faint, fontSize: "0.68rem" }}>One line per rule card below — each computed from its own stated sample, full detail in its card:</span>,
+          lab.avgLossR != null && <>Average loser: <b>{sgnR(lab.avgLossR)}</b> — all {lab.nLossR} losers with an R in this cohort → 3-stop card.</>,
           lab.n3sLosers >= 1
-            ? <>3-stop era (from 2026-07-10): losers average <b>{sgnR(lab.avgLoss3s)}</b> (n={lab.n3sLosers}) vs the −0.67R design cap. Earlier trades are judged against their own full −1R stop.</>
-            : <>3-stop era (from 2026-07-10): no closed loser yet — its −0.67R cap has nothing to grade. Earlier trades are judged against their own full −1R stop.</>,
-          lab.breaches.length > 0 && <><b style={{ color: T.red }}>{lab.breaches.length} loser{lab.breaches.length === 1 ? "" : "s"}</b> exceeded their own era's cap — named in the chips below.</>,
+            ? <>3-stop era (from 2026-07-10): losers average <b>{sgnR(lab.avgLoss3s)}</b> (n={lab.n3sLosers} — far below the ≥3 needed; not yet a verdict) vs the −0.67R cap. Earlier trades judged vs their own −1R stop.</>
+            : <>3-stop era (from 2026-07-10): no closed loser yet — its −0.67R cap has nothing to grade. Earlier trades judged vs their own −1R stop.</>,
+          lab.breaches.length > 0 && <><b style={{ color: T.red }}>{lab.breaches.length} of {lab.nLossR} losers</b> exceeded their own era's cap — named in the chips → 3-stop card.</>,
           lab.extOK.n >= 3 && lab.extHot.n >= 3
-            ? <>Extension gate priced in your money: fresh entries <b>{sgnR(lab.extOK.expR)}</b>/trade vs <b>{sgnR(lab.extHot.expR)}</b> chased.</>
+            ? <>Extension gate: fresh entries <b>{sgnR(lab.extOK.expR)}</b>/trade (n={lab.extOK.n}) vs <b>{sgnR(lab.extHot.expR)}</b> chased (n={lab.extHot.n}) → extension card carries the mechanism.</>
             : <>Extension gate: not enough campaigns on both sides yet — keep logging.</>,
         ]} />
         {/* one rule per ROW — full-width cards, never a cramped mosaic (Valen 2026-07-11) */}
