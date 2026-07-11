@@ -308,10 +308,12 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       return { key, label, n: vals.length, meanR: mean(vals), medR: median(vals), totR: vals.reduce((s, v) => s + v, 0), beatPct: tRows.length ? Math.round(100 * beat / tRows.length) : null };
     };
     const tourney = tRows.length >= 5 ? [
-      variant("vHis3", "YOUR RULE · 50% @ +3R, else window"),
-      variant("vHis5", "YOUR RULE · 50% @ +5R, else window"),
-      variant("vT3_25", "T+3 · trim 25%"), variant("vT3_33", "T+3 · trim 33%"),
-      variant("vT5_25", "T+5 · trim 25%"), variant("vT5_33", "T+5 · trim 33%"),
+      variant("vHis3", "One trim · 50% @ +3R"),
+      variant("vHis4", "One trim · 50% @ +4R"),
+      variant("vHis5", "One trim · 50% @ +5R"),
+      variant("vL2030", "Ladder · 20% @ +3R, 30% @ +5R"),
+      variant("vL2525", "Ladder · 25% @ +3R, 25% @ +5R"),
+      variant("vL3020", "Ladder · 30% @ +3R, 20% @ +5R"),
       variant("shadowR", "Never trim (hold all)"),
     ].filter(v => v.n > 0) : null;
     // Gate JSON coverage
@@ -321,7 +323,19 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       const p = have.filter(c => pass(c.gates[key])), f = have.filter(c => !pass(c.gates[key]));
       return { n: have.length, pass: aggOf(p), fail: aggOf(f) };
     };
+    // MECHANISM decomposition (Valen's lens): expectancy moves through exactly three channels —
+    // win rate, winner size, loser size. For each gate, attribute the pass-vs-fail expectancy
+    // gap to its channels so the gate's PURPOSE can be checked against what it actually does.
+    const channel = (a, b) => {
+      if (!a || !b || a.n < 5 || b.n < 4 || a.expR == null || b.expR == null) return null;
+      const cWr = (((a.wr ?? 0) - (b.wr ?? 0)) / 100) * ((b.avgWinR ?? 0) - (b.avgLossR ?? 0)); // more wins swap losses for wins
+      const cWin = ((a.wr ?? 0) / 100) * ((a.avgWinR ?? 0) - (b.avgWinR ?? 0));                 // bigger winners
+      const cLoss = (1 - (a.wr ?? 0) / 100) * ((a.avgLossR ?? 0) - (b.avgLossR ?? 0));          // shallower losers
+      const parts = [["higher win rate", cWr], ["bigger winners", cWin], ["smaller losses", cLoss]].sort((x, y) => Math.abs(y[1]) - Math.abs(x[1]));
+      return { top: parts[0][0], topV: parts[0][1], cWr, cWin, cLoss, a, b };
+    };
     return {
+      extMech: channel(aggOf(extOK), aggOf(extHot)), lodMech: channel(aggOf(lodOK), aggOf(lodHot)), gradeMech: channel(aggOf(gA), aggOf(gU)),
       sim3, sim1, simN: simPairs.length, simDelta: sim3 != null && sim1 != null ? sim3 - sim1 : null,
       wMAEn: wMAE.length, rung33: rung(-0.33), rung67: rung(-0.67), rung100: rung(-1.0),
       avgLossR: mean(lR), worstR: lR.length ? Math.min(...lR) : null,
@@ -695,6 +709,10 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
             <div style={{ marginBottom: 4 }}>{lab.extOK.n >= 5 && lab.extHot.n >= 4
               ? <Chip ok={(lab.extOK.expR ?? -9) > (lab.extHot.expR ?? -9)}>{(lab.extOK.expR ?? -9) > (lab.extHot.expR ?? -9) ? "GATE EARNS ITS KEEP — fresh entries make more" : "NOT SEPARATING — chased entries did as well; keep watching"}</Chip>
               : <Chip ok={null}>BUILDING SAMPLE</Chip>}</div>
+            <div style={{ fontSize: "0.64rem", color: T.muted, lineHeight: 1.6, marginBottom: 4 }}>
+              <div>· PURPOSE: loss-side — a fresh entry sits near support, so failures cost less; chases snap back through wide stops.</div>
+              {lab.extMech && <div>· MEASURED: works mostly through <b style={{ color: T.text }}>{lab.extMech.top}</b> ({sgnR(lab.extMech.topV)}/trade of the gap) — wins {sgnR(lab.extMech.a.avgWinR)} vs {sgnR(lab.extMech.b.avgWinR)} · losses {sgnR(lab.extMech.a.avgLossR)} vs {sgnR(lab.extMech.b.avgLossR)} · win rate {Math.round(lab.extMech.a.wr)}% vs {Math.round(lab.extMech.b.wr)}%.</div>}
+            </div>
             {sliceRow("Extension ≤ 4× at entry", lab.extOK, "Campaigns entered with ATR%-multiple from the 50MA at or under 4× — the freshness gate. Uses your recorded value when present, else computed from daily bars (SMA50 + ATR14 as of entry). Expectancy here vs the hot side IS the gate's proof.")}
             {sliceRow("Extension > 4× at entry", lab.extHot, "Chased entries — extension above 4× when the trigger fired. If this side's expectancy is negative, every violation has a known price.")}
             {lab.extUnknown > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, padding: "5px 4px" }}>{lab.extUnknown} campaigns lack bar history for the calc — excluded, not guessed.</div>}
@@ -705,6 +723,10 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
             <div style={{ marginBottom: 4 }}>{lab.lodOK.n >= 5 && lab.lodHot.n >= 5
               ? <Chip ok={(lab.lodOK.expR ?? -9) > (lab.lodHot.expR ?? -9)}>{(lab.lodOK.expR ?? -9) > (lab.lodHot.expR ?? -9) ? "GATE EARNS ITS KEEP — tight entries make more" : "NOT SEPARATING — loose entries did as well; keep watching"}</Chip>
               : <Chip ok={null}>BUILDING SAMPLE</Chip>}</div>
+            <div style={{ fontSize: "0.64rem", color: T.muted, lineHeight: 1.6, marginBottom: 4 }}>
+              <div>· PURPOSE: win-side — a tight D means the same move pays MORE R per trade (losses are capped at −1R either way).</div>
+              {lab.lodMech && <div>· MEASURED: works mostly through <b style={{ color: T.text }}>{lab.lodMech.top}</b> ({sgnR(lab.lodMech.topV)}/trade of the gap) — wins {sgnR(lab.lodMech.a.avgWinR)} vs {sgnR(lab.lodMech.b.avgWinR)} · losses {sgnR(lab.lodMech.a.avgLossR)} vs {sgnR(lab.lodMech.b.avgLossR)} · win rate {Math.round(lab.lodMech.a.wr)}% vs {Math.round(lab.lodMech.b.wr)}%.</div>}
+            </div>
             {sliceRow("LoD-dist ≤ 0.6 ATR", lab.lodOK, "Entries where the low-of-day sat within 60% of one ATR of the entry price — the tight-stop gate. Until the trade-log's live capture builds up, this uses the ENTRY DAY's final low from EOD bars — an upper bound of the true at-entry distance (the low can print after you entered).")}
             {sliceRow("LoD-dist > 0.6 ATR", lab.lodHot, "Gate violations — the stop anchor sat too far below the entry, making D wide and the R math expensive.")}
             {lab.lodUnknown > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, padding: "5px 4px" }}>{lab.lodUnknown} campaigns lack an entry-day bar match — excluded, not guessed.</div>}
@@ -721,8 +743,8 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
                   <div style={{ padding: "8px 12px", borderRadius: 10, marginBottom: 8, background: (wg.actMeanR ?? 0) >= (wg.waitMeanR ?? 0) ? "rgba(239,68,68,0.07)" : "rgba(34,197,94,0.07)", border: `1px solid ${(wg.actMeanR ?? 0) >= (wg.waitMeanR ?? 0) ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)"}` }}>
                     <Chip ok={(wg.waitMeanR ?? 0) > (wg.actMeanR ?? 0)}>{(wg.waitMeanR ?? 0) > (wg.actMeanR ?? 0) ? "WAITING WOULD HAVE HELPED" : "WAITING WOULD HAVE COST YOU"}</Chip>
                     <div style={{ marginTop: 3, color: T.muted, fontSize: "0.7rem", lineHeight: 1.6 }}>
-                      <div>· Same trades, re-timed — not missed: {(wg.skipped || []).length ? `only ${(wg.skipped || []).length} of ${wg.eligible} would never have triggered (below the stop by 10:00)` : "every eligible trade still triggers"}.</div>
-                      <div>· The cost is WORSE ENTRIES on the runners, not missed trades — early fills caught the moves waiting would have diluted.</div>
+                      <div>· {wg.avoided ? <><b style={{ color: T.green }}>{wg.avoided} loss{wg.avoided === 1 ? "" : "es"} avoided entirely</b> — price was at/below the stop by 10:00, so the waited trade is never taken (counted as 0R for the wait).</> : <>No trade was invalidated by 10:00 — every eligible entry still triggers, just re-timed.</>}</div>
+                      <div>· The gate's trade-off in your data: it skips some losers, but dilutes the runners it delays into.</div>
                       <div>· n={wg.simmed} — direction only until n ≥ 15.</div>
                     </div>
                   </div>
@@ -734,16 +756,12 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
                   </div>
                   <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {(wg.pairs || []).map((p, i) => (
-                      <span key={i} title={`${p.t} ${p.d}: as traded ${sgnR(p.act)} · waited ${sgnR(p.wait)}`}
-                        style={{ fontSize: "0.64rem", border: `1px solid ${T.borderSoft}`, borderRadius: 99, padding: "2px 9px", color: p.wait >= p.act ? T.green : T.muted, fontVariantNumeric: "tabular-nums" }}>
-                        {p.t} {sgnR(p.act, 1)} → {sgnR(p.wait, 1)}
+                      <span key={i} title={`${p.t} ${p.d}: as traded ${sgnR(p.act)} · ${p.avoided ? "wait would have SKIPPED this trade — loss avoided" : "waited " + sgnR(p.wait)}`}
+                        style={{ fontSize: "0.64rem", border: `1px solid ${p.avoided ? "rgba(34,197,94,0.4)" : T.borderSoft}`, borderRadius: 99, padding: "2px 9px", color: p.avoided ? T.green : p.wait >= p.act ? T.green : T.muted, fontVariantNumeric: "tabular-nums" }}>
+                        {p.t} {sgnR(p.act, 1)} → {p.avoided ? "avoided" : sgnR(p.wait, 1)}
                       </span>
                     ))}
-                    {(wg.skipped || []).map((s, i) => (
-                      <span key={"s" + i} title={s.why} style={{ fontSize: "0.64rem", border: `1px dashed ${T.borderSoft}`, borderRadius: 99, padding: "2px 9px", color: T.faint }}>
-                        {s.t} — {s.why}
-                      </span>
-                    ))}
+                    {/* avoided losers render inside pairs with the "avoided" tag */}
                   </div>
                   <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 6, lineHeight: 1.5 }}>{wg.noTime} campaigns have no recorded entry time — excluded, not guessed. Verdict from YOUR data only; treat as direction until n ≥ 15.</div>
                 </div>
@@ -756,6 +774,10 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
             <div style={{ marginBottom: 4 }}>{lab.gA.n >= 5
               ? <Chip ok={(lab.gA.expR ?? -9) > (lab.gU.expR ?? -9)}>{(lab.gA.expR ?? -9) > (lab.gU.expR ?? -9) ? "A-GRADES OUTPERFORM — the grader is predictive" : "A-GRADES UNDERPERFORMING — grading and outcomes disagree; review what the grader rewards"}</Chip>
               : <Chip ok={null}>BUILDING SAMPLE</Chip>}</div>
+            <div style={{ fontSize: "0.64rem", color: T.muted, lineHeight: 1.6, marginBottom: 4 }}>
+              <div>· PURPOSE: both sides — a better base should win more often AND run further when it works.</div>
+              {lab.gradeMech && <div>· MEASURED: the A-vs-ungraded gap runs mostly through <b style={{ color: T.text }}>{lab.gradeMech.top}</b> ({sgnR(lab.gradeMech.topV)}/trade) — wins {sgnR(lab.gradeMech.a.avgWinR)} vs {sgnR(lab.gradeMech.b.avgWinR)} · losses {sgnR(lab.gradeMech.a.avgLossR)} vs {sgnR(lab.gradeMech.b.avgLossR)}.</div>}
+            </div>
             {sliceRow("A-grade setups", lab.gA, "Campaigns whose ticker carried an A/A+ setup grade (frozen at entry).")}
             {sliceRow("B-grade setups", lab.gB, "Campaigns graded B at entry.")}
             {sliceRow("Ungraded", lab.gU, "No grade recorded at entry — the pre-grader era or skipped grading.")}
@@ -905,28 +927,21 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
                   TRIM VALUE ADDED VS NEVER-TRIM (R) <span style={{ color: T.muted, letterSpacing: 0, textTransform: "none", fontWeight: 600 }}>· one bar per trade, sorted</span>
                 </div>
                 <div style={{ marginBottom: 4 }}><Chip ok={(-dk.deriskCostR ?? 0) >= 0}>{`HELPED ON ${helped} OF ${tv.length} · NET ${sgnR(-dk.deriskCostR, 1)}`}</Chip></div>
-                {/* every bar named, NO sideways scrolling — big samples WRAP to extra rows
-                    (one-glance rule, Valen). Shared Y domain keeps rows comparable. */}
-                {(() => {
-                  const PER = 14;
-                  const yMin = Math.min(0, ...tv.map(x => x.v)), yMax = Math.max(0.5, ...tv.map(x => x.v));
-                  return Array.from({ length: Math.ceil(tv.length / PER) }, (_, ri) => tv.slice(ri * PER, ri * PER + PER)).map((chunk, ri) => (
-                    <ResponsiveContainer key={ri} width="100%" height={140}>
-                      <BarChart data={chunk} margin={{ left: 0, right: 8, top: 8 }}>
-                        <XAxis dataKey="t" {...axis} interval={0} angle={-38} textAnchor="end" height={40} tick={{ ...axis.tick, fontSize: 8.5 }} />
-                        <YAxis {...axis} width={30} tickFormatter={(t) => t + "R"} domain={[yMin, yMax]} />
-                        <ReferenceLine y={0} stroke={T.border} />
-                        <Tooltip cursor={{ fill: "rgba(255,255,255,0.03)" }} content={<TT render={(p) => {
-                          const d = p[0]?.payload; if (!d) return null;
-                          return <><b>{d.t}</b><div>never-trim: {num(d.shadowR)}R · actual: {num(d.actual)}R</div><div>trim {d.v >= 0 ? "added" : "cost"} <b>{num(Math.abs(d.v))}R</b></div></>;
-                        }} />} />
-                        <Bar dataKey="v" radius={[2, 2, 0, 0]} maxBarSize={18}>
-                          {chunk.map((d, i) => <Cell key={i} fill={d.v >= 0 ? T.green : T.red} fillOpacity={0.7} />)}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ));
-                })()}
+                {/* ONE line, every bar named (Valen) — full-width row gives 25+ bars room */}
+                <ResponsiveContainer width="100%" height={170}>
+                  <BarChart data={tv} margin={{ left: 0, right: 8, top: 8 }}>
+                    <XAxis dataKey="t" {...axis} interval={0} angle={-38} textAnchor="end" height={42} tick={{ ...axis.tick, fontSize: 8.5 }} />
+                    <YAxis {...axis} width={30} tickFormatter={(t) => t + "R"} />
+                    <ReferenceLine y={0} stroke={T.border} />
+                    <Tooltip cursor={{ fill: "rgba(255,255,255,0.03)" }} content={<TT render={(p) => {
+                      const d = p[0]?.payload; if (!d) return null;
+                      return <><b>{d.t}</b><div>never-trim: {num(d.shadowR)}R · actual: {num(d.actual)}R</div><div>trim {d.v >= 0 ? "added" : "cost"} <b>{num(Math.abs(d.v))}R</b></div></>;
+                    }} />} />
+                    <Bar dataKey="v" radius={[2, 2, 0, 0]} maxBarSize={22}>
+                      {tv.map((d, i) => <Cell key={i} fill={d.v >= 0 ? T.green : T.red} fillOpacity={0.7} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
                 {excluded.length > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 4, lineHeight: 1.5 }}>Not shown ({excluded.length}, no original stop → no R math): {excluded.map(c => c.ticker).join(" · ")}.</div>}
               </>);
             })()}
@@ -936,12 +951,12 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
 
       {/* TRIM TOURNAMENT — T+3 vs T+5, 25% vs 33%, vs never trimming */}
       {lab.tourney && (
-        <Panel title="Trim tournament — T+3 or T+5? 25% or 33%?" meta={`${lab.tourneyN} campaigns · same EOD price basis`}
+        <Panel title="Trim tournament — which 50% derisk combo wins?" meta={`${lab.tourneyN} campaigns · same EOD price basis`}
           howto={[
-            "Every closed campaign is REPLAYED under each strategy, all on the same end-of-day closes — apples-to-apples.",
-            "YOUR RULE rows = your actual system: 50% sold at the +3R (or +5R) limit if price prints it in days 1–5, otherwise 50% at the day-4 close (mid of your T+3–5 window); runner to the final close. Your 25+25 / 20+30 / 30+20 combos all sum to 50%, so one 50% tranche is the EOD equivalent.",
-            "T+3/T+5 rows = simpler fixed-day variants for comparison. Never trim = hold everything to the end.",
-            "Campaigns that ended before a rule could fire count unchanged for that rule.",
+            "Every closed campaign is REPLAYED under each combo, all on the same end-of-day closes — apples-to-apples.",
+            "Priority trigger: the +R level printing (days 1–5, even BEFORE the day 3–5 window). Time fallback: the last close inside the 5-day window.",
+            "One-trim rows: the full 50% at one level. Ladder rows: two trims (20/25/30% mixes) — first at +3R, second at +5R.",
+            "The runner (remaining 50%) always rides to the final exit close. Campaigns that ended before a trigger count unchanged for that combo.",
             "Caveats: EOD closes only; runners ignore the trailing stop — this measures the TRIM choice, not the whole exit system. Re-judge every ~20 new campaigns.",
           ]}>
           <Say>

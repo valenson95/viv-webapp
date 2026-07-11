@@ -225,25 +225,26 @@ async function main() {
       };
       c.sim3stop = simStops([c.entry - riskPS / 3, c.entry - 2 * riskPS / 3, c.entry - riskPS], [1 / 3, 1 / 3, 1 / 3]);
       c.sim1stop = simStops([c.entry - riskPS], [1]);
-      // ── VALEN'S ACTUAL TRIM RULE (his spec, 2026-07-11): sell 50% TOTAL into strength —
-      // filled at +3R (or +5R variant) if price prints it first (limit fill at the level,
-      // days 1–5), otherwise 50% at the day-4 close (mid of the T+3–5 window; falls back to
-      // the nearest available day). His 25+25 / 20+30 / 30+20 combos all sum to 50%, so one
-      // 50% tranche is the EOD-granularity equivalent. Runner rides to the final close.
-      const vHis = (tgtR) => {
-        const lvl = c.entry + tgtR * riskPS;
-        let trimPx = null;
-        for (let k = 1; k < Math.min(win.length, 6); k++) { if (win[k].h >= lvl) { trimPx = lvl; break; } }
-        if (trimPx == null) {
-          let dIdx = null;
-          for (const d of [4, 3, 5]) if (win.length > d) { dIdx = d; break; }
-          if (dIdx != null) trimPx = win[dIdx].c;
-        }
-        const fin = win[win.length - 1].c;
-        if (trimPx == null) return round((fin - c.entry) / riskPS); // ended before the window — no trim possible
-        return round((0.5 * (trimPx - c.entry) + 0.5 * (fin - c.entry)) / riskPS);
+      // ── VALEN'S TRIM COMBO TOURNAMENT (spec v3, 2026-07-11): derisk 50% TOTAL into strength.
+      // Priority trigger = the +R level printing (days 1–5, even before the day-3 window);
+      // time fallback = the LAST close inside the 5-day window (day 5, or the last day the
+      // trade was still open past day 3). Combos: one 50% trim at +3R/+4R/+5R, or TWO trims
+      // laddered +3R then +5R in 20/30 · 25/25 · 30/20 splits. Runner always to final close.
+      const finPx = win[win.length - 1].c;
+      const fillLevel = (tgtR) => { const lvl = c.entry + tgtR * riskPS; for (let k = 1; k < Math.min(win.length, 6); k++) if (win[k].h >= lvl) return lvl; return null; };
+      const windowClose = () => { if (win.length <= 3) return null; return win[Math.min(5, win.length - 1)].c; };
+      const combo = (legs) => {
+        let r = 0, fTot = 0;
+        for (const L of legs) { const px = fillLevel(L.tgt) ?? windowClose(); if (px != null) { r += L.f * (px - c.entry); fTot += L.f; } }
+        r += (1 - fTot) * (finPx - c.entry); // unfilled legs + the 50% runner ride to the final close
+        return round(r / riskPS);
       };
-      c.vHis3 = vHis(3); c.vHis5 = vHis(5);
+      c.vHis3 = combo([{ f: 0.5, tgt: 3 }]);
+      c.vHis4 = combo([{ f: 0.5, tgt: 4 }]);
+      c.vHis5 = combo([{ f: 0.5, tgt: 5 }]);
+      c.vL2030 = combo([{ f: 0.2, tgt: 3 }, { f: 0.3, tgt: 5 }]);
+      c.vL2525 = combo([{ f: 0.25, tgt: 3 }, { f: 0.25, tgt: 5 }]);
+      c.vL3020 = combo([{ f: 0.3, tgt: 3 }, { f: 0.2, tgt: 5 }]);
     }
     // SYSTEM-MAX R (Valen's ACTUAL rule, v2 2026-07-11): the ceiling his own trim system could
     // have delivered — sell 50% INTO STRENGTH at +3R (riding the fill up to +5R if that day
@@ -452,7 +453,25 @@ async function main() {
       const waitPx = q5.open[idx];
       if (!(waitPx > 0)) continue;
       c.waitEntryPx = round(waitPx, 4);
-      if (waitPx <= c.stop) { c.waitShadowR = null; c.waitSkipped = "price was at/below the stop by 10:00 — the waited entry never triggers"; continue; }
+      if (waitPx <= c.stop) {
+        // The gate's whole edge: price already at/below the stop by 10:00 → the waited trade is
+        // NEVER TAKEN → 0R, while the early entry ate the loss. Count it as a loss AVOIDED.
+        c.waitShadowR = 0; c.waitAvoided = true;
+        const B0 = bars[c.ticker];
+        const iEnd0 = (() => { let i = B0.findIndex((b) => b.date > c.lastExit); return (i === -1 ? B0.length : i) - 1; })();
+        if (iEnd0 >= 0) {
+          const i0c = B0.findIndex((b) => b.date >= c.entryDate);
+          const laterLow0 = i0c >= 0 && i0c + 1 <= iEnd0 ? Math.min(...B0.slice(i0c + 1, iEnd0 + 1).map((b) => b.l)) : Infinity;
+          const entryTs0 = Math.floor(new Date(c.entryDate + "T" + (c.entryTime || "09:30:00") + "-04:00").getTime() / 1000);
+          const close00 = Math.floor(new Date(c.entryDate + "T16:00:00-04:00").getTime() / 1000);
+          const ls0 = r5.timestamp.map((ts2, i2) => ({ ts: ts2, l: q5.low[i2] })).filter((b) => b.l != null && b.ts >= entryTs0 && b.ts < close00);
+          let d0lo = ls0.length ? Math.min(...ls0.map((b) => b.l)) : Infinity;
+          const dB = B0.find((b) => b.date === c.entryDate); if (dB && d0lo < dB.l) d0lo = dB.l;
+          const swept0 = Math.min(d0lo, laterLow0) <= c.stop;
+          c.actGateR = round(((swept0 ? c.stop : B0[iEnd0].c) - c.entry) / (c.entry - c.stop));
+        }
+        continue;
+      }
       // STOP-AWARE on BOTH arms (Valen caught the distortion: a 10:00 entry near the stop shrinks
       // the risk unit, and ignoring stop-outs then inflates the waited arm — MRVL read +13.2R).
       // Each arm: if the post-entry low (5m day 0, then daily lows) touches the stop → that arm
@@ -487,10 +506,10 @@ async function main() {
   const waitGate = {
     eligible: eligible.length, simmed: wgPairs.length,
     noTime: campaigns.filter((c) => !c.entryTime).length,
-    skipped: eligible.filter((c) => c.waitSkipped).map((c) => ({ t: c.ticker, d: c.entryDate, why: c.waitSkipped })),
+    avoided: wgPairs.filter((c) => c.waitAvoided).length,
     actMeanR: wgPairs.length ? round(sum(wgPairs.map((c) => c.actGateR)) / wgPairs.length) : null,
     waitMeanR: wgPairs.length ? round(sum(wgPairs.map((c) => c.waitShadowR)) / wgPairs.length) : null,
-    pairs: wgPairs.map((c) => ({ t: c.ticker, d: c.entryDate, act: c.actGateR, wait: c.waitShadowR })),
+    pairs: wgPairs.map((c) => ({ t: c.ticker, d: c.entryDate, act: c.actGateR, wait: c.waitShadowR, avoided: !!c.waitAvoided })),
     method: "both arms stop-aware: post-entry lows (5m day 0, daily after) at/below the stop exit AT the stop; survivors ride to the final day's close",
   };
 
