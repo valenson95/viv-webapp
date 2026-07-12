@@ -31,8 +31,13 @@ function parseElements(xml, name) {
     while ((x = ar.exec(m[1])) !== null) a[x[1]] = x[2]; if (Object.keys(a).length) out.push(a); }
   return out;
 }
-const ymd = v => (v && String(v).length >= 8) ? `${String(v).slice(0,4)}-${String(v).slice(4,6)}-${String(v).slice(6,8)}` : "";
-const hm  = v => (v && String(v).length >= 4) ? `${String(v).slice(0,2)}:${String(v).slice(2,4)}` : "";
+// Flex dateTime is "YYYYMMDD;HHMMSS" (sometimes date-only). The old hm() sliced the FIRST four
+// chars — the YEAR — so every cron-synced trade stored exit_time "20:26" (caught via JH,
+// 2026-07-12). Split date/time parts first and VALIDATE the output; garbage in → "" out.
+const dPart = v => String(v || "").split(";")[0];
+const tPart = v => { const s = String(v || ""); if (s.includes(";")) return s.split(";")[1] || ""; return /^\d{14}$/.test(s) ? s.slice(8) : ""; };
+const ymd = v => { const m = /^(\d{4})(\d{2})(\d{2})$/.exec(dPart(v)) || /^(\d{4})-(\d{2})-(\d{2})/.exec(dPart(v)); return m ? `${m[1]}-${m[2]}-${m[3]}` : ""; };
+const hm  = v => { const t = tPart(v).replace(/[^0-9]/g, ""); return t.length >= 4 ? `${t.slice(0,2)}:${t.slice(2,4)}` : ""; };
 async function fetchText(u){ const r = await fetch(u, { headers: { "User-Agent": "VIV-Webapp/1.0" } }); return await r.text(); }
 
 // Pull a user's Flex statement XML (same 2-step flow as the existing ibkr-sync.js).
@@ -73,11 +78,18 @@ function toFills(xml) {
 
   return closing.map(a => {
     const qty = Math.abs(Number(a.quantity) || 0);
-    const cost = Math.abs(Number(a.cost) || 0);          // IBKR-matched entry basis
-    const proceeds = Math.abs(Number(a.proceeds) || 0);  // exit value
+    // Currency conversion (parity with ibkr-sync.js "Sync now"): the cron path used RAW local-
+    // currency numbers, which booked JP/KR fills at yen/won magnitudes (JH's broken foreign rows,
+    // 2026-07-12). Convert via fxRateToBase; non-USD fills WITHOUT a rate are dropped, never raw.
+    const fx = Number(a.fxRateToBase) || 0;
+    const cur = (a.currency || "USD").toUpperCase();
+    const conv = v => { const n = Number(v) || 0; return cur !== "USD" && fx > 0 ? n * fx : n; };
+    const fxOk = cur === "USD" || fx > 0;
+    const cost = Math.abs(conv(a.cost));          // IBKR-matched entry basis
+    const proceeds = Math.abs(conv(a.proceeds));  // exit value
     const entry_price = qty ? +(cost / qty).toFixed(6) : null;
-    const exit_price = (qty && proceeds) ? +(proceeds / qty).toFixed(6) : (Number(a.tradePrice) || null);
-    const pl = Number(a.fifoPnlRealized);
+    const exit_price = (qty && proceeds) ? +(proceeds / qty).toFixed(6) : (conv(a.tradePrice) || null);
+    const pl = conv(a.fifoPnlRealized);
     const openDT = openByKey[`${a.symbol}|${a.dateTime || ""}|${qty}`] || "";
     return {
       exec_id: a.ibExecID,                                 // unique → idempotency key
@@ -90,11 +102,13 @@ function toFills(xml) {
       entry_price,
       exit_price,
       shares: qty,
-      commission: Math.abs(Number(a.ibCommission) || 0),
+      commission: Math.abs(conv(a.ibCommission)),
+      _fxOk: fxOk,
       pl_dollar: Number.isFinite(pl) ? +pl.toFixed(2) : null,
       pl_pct: (entry_price && qty) ? +((pl / (entry_price * qty)) * 100).toFixed(2) : null,
     };
-  }).filter(f => f.exec_id && f.ticker && f.exit_date && f.shares > 0);
+  }).filter(f => f.exec_id && f.ticker && f.exit_date && f.shares > 0 && f._fxOk)
+    .map(({ _fxOk, ...f }) => f);
 }
 
 export default async function handler(req, res) {

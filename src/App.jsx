@@ -519,6 +519,17 @@ function PlaybookTracker({ trades, uid, setPage }) {
 
 const WHATS_NEW = [
   {
+    tag: "Fix",
+    date: "July 12, 2026",
+    title: "🛠 Journal reliability: deleted trades stay deleted + crash fix",
+    items: [
+      "Deleted a synced trade? It now stays deleted — previously certain foreign-market trades could reappear after the nightly sync no matter how many times you removed them.",
+      "Fixed an app-wide crash (\"Something went wrong\") when opening details of a trade with a missing/blank date — the chart now shows an empty state instead, and dates you type are cleaned up on save.",
+      "Foreign-market trades (Tokyo, Korea…) synced overnight are now converted to USD exactly like the manual \"Sync now\" button — no more yen/won-sized P&L rows.",
+      "Fixed trade times recorded by the nightly sync — a formatting bug stamped many trades with the same bogus time.",
+    ],
+  },
+  {
     tag: "New",
     date: "July 12, 2026",
     title: "🎲 Playbook tracker: honest verdict + a projection that shows the bumps",
@@ -6050,10 +6061,13 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   const [fxSel, setFxSel] = useState(() => new Set());
   const [fxBusy, setFxBusy] = useState(false);
   const [fxDismissed, setFxDismissed] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem("viv-fxflag-dismissed") || "[]")); } catch { return new Set(); } });
+  // Flag only rows whose VALUES look unconverted (raw JPY/KRW magnitudes). A foreign-exchange
+  // suffix alone (.T/.KS) is NOT an error once Flex conversion is on — flagging every foreign
+  // ticker forever kept sending JH back into the delete loop (2026-07-12).
   const fxFlagged = useMemo(() => (journaledTrades || []).filter(t =>
     !fxDismissed.has(t.id) &&
     (t.source === "ibkr" || t.source === "ibkr-sync") &&
-    (/\.[A-Za-z]{1,3}$/.test(String(t.ticker || "")) || Math.abs(Number(t.plPct) || 0) > 300 || (Number(t.entryP) || 0) > 50000)
+    (Math.abs(Number(t.plPct) || 0) > 300 || (Number(t.entryP) || 0) > 50000)
   ), [journaledTrades, fxDismissed]);
   useEffect(() => { setFxSel(new Set(fxFlagged.map(t => t.id))); }, [fxFlagged.length]); // default: all checked
   const fxDismiss = () => { const next = new Set([...fxDismissed, ...fxFlagged.map(t => t.id)]); setFxDismissed(next); try { localStorage.setItem("viv-fxflag-dismissed", JSON.stringify([...next])); } catch {} setFxReviewOpen(false); };
@@ -6063,8 +6077,11 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
     const ids = [...fxSel];
     let failed = 0;
     for (const id of ids) {
-      // soft-delete + FREE the exec id so the fixed sync can re-import this fill converted to USD
-      const { error } = await supabase.from("trades").update({ is_deleted: true, ib_exec_id: null }).eq("id", id).eq("user_id", session.user.id);
+      // Soft-delete KEEPING the exec id. Freeing it (the old behaviour) made the tombstone
+      // invisible to the sync's dedupe, so the same fill re-imported EVERY day — JH's JP/KR
+      // trades resurrected three times in 48h (2026-07-12). The one-time "re-import converted"
+      // migration is long done; a delete must now mean gone forever.
+      const { error } = await supabase.from("trades").update({ is_deleted: true }).eq("id", id).eq("user_id", session.user.id);
       if (error) failed++;
     }
     if (!failed) {
@@ -11805,8 +11822,12 @@ function AppInner() {
       const { data: existing } = await supabase.from("trades").select("id").eq("user_id", uid).or("is_deleted.is.null,is_deleted.eq.false");
       const existingIds = new Set((existing || []).map(t => t.id));
       const currentIds = new Set(journaledTrades.filter(t => existingIds.has(t.id)).map(t => t.id));
+      // Dates are stored NORMALIZED (M/D/YY → ISO via tradeDateISO) and blank → NULL, never "".
+      // An empty-string date builds an Invalid Date downstream and .toISOString() throws — this
+      // took the whole app down for a member whose edited rows had entry_date "" (JH, 2026-07-12).
+      const dbDate = v => { const s = String(v == null ? "" : v).trim(); return s ? tradeDateISO(s) : null; };
       const tradeRow = t => ({
-        user_id: uid, ticker: t.ticker || "", entry_date: t.entry || "", entry_time: t.entryTime || "", exit_date: t.exit || "", exit_time: t.exitTime || "",
+        user_id: uid, ticker: t.ticker || "", entry_date: dbDate(t.entry), entry_time: t.entryTime || "", exit_date: dbDate(t.exit), exit_time: t.exitTime || "",
         entry_price: t.entryP || 0, exit_price: t.exitP || 0, shares: t.shares || 0,
         stop_price: t.stop || 0, setup: t.setup || "", tags: t.tags || [],
         pl_pct: t.plPct || 0, pl_dollar: t.plDollar || 0, r_mult: t.rMult || 0,

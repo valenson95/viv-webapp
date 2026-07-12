@@ -61,11 +61,14 @@ export default async function handler(req, res) {
   // CUTOVER GUARD: only fills on/after the cutover date (today). Existing history untouched.
   const eligible = fillsArr.filter(f => f.exec_id && (!cutover_date || (f.exit_date || f.entry_date) >= cutover_date));
 
+  // Dates land valid-ISO-or-NULL — never "" or garbage. An empty-string date stored here later
+  // builds an Invalid Date in the client and .toISOString() throws (app-wide crash, JH 2026-07-12).
+  const isoOr = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(s || "") ? s : null);
   const rows = eligible.map(f => ({
     user_id,
     ticker: f.ticker,
-    entry_date: f.entry_date, entry_time: f.entry_time || "",
-    exit_date: f.exit_date,   exit_time: f.exit_time || "",
+    entry_date: isoOr(f.entry_date), entry_time: f.entry_time || "",
+    exit_date: isoOr(f.exit_date),   exit_time: f.exit_time || "",
     entry_price: f.entry_price, exit_price: f.exit_price,
     shares: f.shares, commission: f.commission ?? 0,
     pl_pct: f.pl_pct ?? null, pl_dollar: f.pl_dollar ?? null,

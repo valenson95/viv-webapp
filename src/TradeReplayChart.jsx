@@ -82,6 +82,10 @@ export default function TradeReplayChart({ trade, C, font }) {
     let dead = false; setStatus("loading");
     const start = new Date(iso(trade.entry)); start.setDate(start.getDate() - (tf === "1day" ? 40 : 6));
     const end = new Date(iso(trade.exit) || iso(trade.entry)); end.setDate(end.getDate() + (tf === "1day" ? 12 : 3));
+    // A trade with a blank/garbage date builds an Invalid Date, and .toISOString() THROWS
+    // (RangeError: Invalid time value) — this crashed the whole app for a member whose manual
+    // rows had entry_date "" (JH, 2026-07-12). No valid window → no fetch, show empty state.
+    if (isNaN(start) || isNaN(end)) { setStatus("empty"); return; }
     const f = start.toISOString().slice(0, 10), t = end.toISOString().slice(0, 10);
     const useSample = () => { const c = genSample(trade, tf); if (!c.length) { setStatus("empty"); return; } barsRef.current = c; setSample(true); setStatus("ok"); };
     fetch(`/api/candles?symbol=${encodeURIComponent(trade.ticker)}&from=${f}&to=${t}&res=${tf}`)
