@@ -201,6 +201,23 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
   }, [allCamps, data]);
   const rows = useMemo(() => mode === "sys" ? allCamps.filter(isSys) : allCamps, [allCamps, isSys, mode]);
   const A = useMemo(() => aggOf(rows), [rows]);
+  // R-vs-$ reconciliation (Valen 2026-07-12: "expectancy positive but net $ negative — why?").
+  // Partials ARE counted (a campaign = all its legs summed; R = blended vs initial risk) — the
+  // gap is the $ RISKED PER R not being constant across campaigns. Computed live, named names.
+  const sizing = useMemo(() => {
+    const rOf = (c) => c.blendedR ?? c.rSum;
+    const withR = rows.filter((c) => rOf(c) != null && Math.abs(rOf(c)) > 0.05 && c.pl != null);
+    const unit = (c) => Math.abs(c.pl / rOf(c));
+    const w = withR.filter((c) => c.pl > 0), l = withR.filter((c) => c.pl < 0);
+    const avg = (a) => (a.length ? a.reduce((s, c) => s + unit(c), 0) / a.length : null);
+    const uw = avg(w), ul = avg(l);
+    const sumR = withR.reduce((s, c) => s + rOf(c), 0);
+    const noR = rows.filter((c) => rOf(c) == null);
+    const big = withR.length ? withR.reduce((a, b) => (unit(a) > unit(b) ? a : b)) : null;
+    const small = withR.length ? withR.reduce((a, b) => (unit(a) < unit(b) ? a : b)) : null;
+    const mid = uw != null && ul != null ? (uw + ul) / 2 : null;
+    return { uw, ul, sumR, nR: withR.length, noRn: noR.length, noRpl: noR.reduce((s, c) => s + (c.pl || 0), 0), big, small, unit, mid, evenNet: mid != null ? sumR * mid : null };
+  }, [rows]);
 
   // ── verdict for the SELECTED cohort (same thresholds as the ledger script)
   const verdict = useMemo(() => {
@@ -371,16 +388,16 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
   const dk = data?.derisk || {};
   const board = useMemo(() => {
     const rowsB = [
-      { label: "Expectancy / trade", live: sgnR(A.expR), bench: "≥ +0.25R", ok: A.expR == null ? null : A.expR >= 0.25, tip: "Mean R per closed campaign. +0.25R is the rolling line the system must hold — below it for 10+ trades, investigate before the month forces you to." },
-      { label: "Profit factor ($)", live: num(A.pf), bench: "≥ 1.30", ok: A.pf == null ? null : A.pf >= 1.3, tip: "Gross $ won ÷ gross $ lost. 1.3 = every dollar lost buys $1.30 back — the minimum for a system worth sizing up." },
-      { label: "Edge ratio", live: num(A.edgeRatio), bench: "≥ 1.20", ok: A.edgeRatio == null ? null : A.edgeRatio >= 1.2, tip: "Actual payoff ÷ the payoff your win rate REQUIRES to break even. 1.2 = 20% margin of safety over breakeven." },
-      { label: "SQN (Tharp)", live: num(A.sqn), bench: "≥ 1.6", ok: A.sqn == null ? null : A.sqn >= 1.6, tip: "System Quality Number = mean(R)/σ(R)·√n. 1.6 = tradeable, 2–3 = good, 3+ = excellent. Punishes inconsistency, not just low returns." },
-      { label: "Avg loss — 3-stop era", live: lab.avgLoss3s == null ? "no closed losers yet" : sgnR(lab.avgLoss3s) + ` (n=${lab.n3sLosers})`, bench: "≥ −0.75R", ok: lab.n3sLosers >= 3 ? lab.avgLoss3s >= -0.75 : null, tip: "The 3-stop rule went live with SOFI on 2026-07-10 — only losers entered from that date are judged against its −0.67R design cap (+ slippage). Earlier trades ran a full −1R stop by design and are NOT graded here. Verdict activates at 3 losers." },
-      { label: "Deep losses (beyond design cap)", live: lab.breachPct == null ? "—" : lab.breaches.length + " (" + lab.breachPct + "% of losers)", bench: "≤ 10%", ok: lab.breachPct == null ? null : lab.breachPct <= 10, tip: "Era-aware: a breach means the loss exceeded THAT trade's own design cap + slippage — beyond −0.85R for 3-stop-era trades (entered ≥ 2026-07-10), beyond −1.15R for the full-stop era before it. Each breach has a name — see the Entries section." },
-      { label: "Winner capture (median)", live: num(lab.capMed), bench: "≥ 0.50", ok: lab.capMed == null ? null : lab.capMed >= 0.5, tip: "Banked R ÷ best R offered (MFE), winners only. Below 0.5 = the exits give back more than half of what the trades offer — cutting winners too early." },
-      { label: "Near-miss losers", live: lab.nearMissPct == null ? "—" : lab.nearMiss.length + " (" + lab.nearMissPct + "% of losers)", bench: "≤ 15%", ok: lab.nearMissPct == null ? null : lab.nearMissPct <= 15, tip: "Losers that saw ≥ +1R open profit before dying red. The T+3 trim window exists precisely to convert these — each one is a missed protocol application." },
-      { label: "T+3–5 trim adherence", live: dk.adherencePct != null ? num(dk.adherencePct, 0) + "%" : "—", bench: "≥ 80%", ok: dk.adherencePct == null ? null : dk.adherencePct >= 80, tip: "Share of trimmed system campaigns whose FIRST trim landed on day 3–5 — the derisk protocol executed as designed. (System cohort only.)" },
-      { label: "Equity vs its " + eqMaP + "-MA", live: eqState ? (eqState.above ? "above " : "below ") + sgnR(eqState.gap) : "—", bench: "above", ok: eqState ? eqState.above : null, tip: "Trade your own equity curve like a stock: below its MA = real drawdown, not noise → halve new-position risk until it reclaims the line." },
+      { label: "Expectancy / trade", live: sgnR(A.expR), bench: "≥ +0.25R", ok: A.expR == null ? null : A.expR >= 0.25, tip: "· mean R per closed campaign — the edge itself\n· +0.25R = the rolling line the system must hold\n· below it 10+ trades → investigate before the month forces you to\n· improve: cap losses (Entries) · bank more of what winners offer (Exits)" },
+      { label: "Profit factor ($)", live: num(A.pf), bench: "≥ 1.30", ok: A.pf == null ? null : A.pf >= 1.3, tip: "· gross $ won ÷ gross $ lost (frequency baked in)\n· 1.30 = every $1 lost buys $1.30 back — minimum worth sizing up\n· measured in DOLLARS, so uneven position sizing moves it even when R is fine\n· improve: same two levers as expectancy + equal $ risk per R" },
+      { label: "Edge ratio", live: num(A.edgeRatio), bench: "≥ 1.20", ok: A.edgeRatio == null ? null : A.edgeRatio >= 1.2, tip: "· actual payoff ÷ the payoff your win rate REQUIRES to break even\n· 1.20 = a 20% margin of safety over breakeven\n· improve: bigger winners (Exits) or fewer premature stops (Entries)\n· don't fix it by chasing win rate — that shrinks payoff" },
+      { label: "SQN (Tharp)", live: num(A.sqn), bench: "≥ 1.6", ok: A.sqn == null ? null : A.sqn >= 1.6, tip: "· System Quality Number: average R ÷ spread of results × √n\n· rewards CONSISTENCY — same average with steadier results = higher score\n· scale: <1.6 hard to trade · 2–3 good · 3+ excellent\n· improve: cap deep losses · no oversized one-offs · more logged trades (√n grows it)" },
+      { label: "Avg loss — 3-stop era", live: lab.avgLoss3s == null ? "no closed losers yet" : sgnR(lab.avgLoss3s) + ` (n=${lab.n3sLosers})`, bench: "≥ −0.75R", ok: lab.n3sLosers >= 3 ? lab.avgLoss3s >= -0.75 : null, tip: "· 3-stop rule live 2026-07-10 (SOFI first) — only losers ENTERED from that date judged\n· design cap −0.67R (+ slippage allowance = −0.75R line)\n· earlier trades ran a full −1R stop BY DESIGN — never graded against a rule that didn't exist\n· verdict activates at 3 losers" },
+      { label: "Deep losses (beyond design cap)", live: lab.breachPct == null ? "—" : lab.breaches.length + " (" + lab.breachPct + "% of losers)", bench: "≤ 10%", ok: lab.breachPct == null ? null : lab.breachPct <= 10, tip: "· a breach = loss beyond THAT trade's own era cap + slippage\n· 3-stop era: beyond −0.85R · full-stop era: beyond −1.15R\n· every breach is NAMED in the Entries section — slippage, sizing-anchor mismatch, or discipline\n· improve: size with the SAME D as the stops · honour the rungs" },
+      { label: "Winner capture (median)", live: num(lab.capMed), bench: "≥ 0.50", ok: lab.capMed == null ? null : lab.capMed >= 0.5, tip: "· banked R ÷ best R the trade offered (its peak), winners only\n· below 0.50 = exits give back more than half of what trades offer\n· improve: trail the runner properly · trim into strength not weakness → Exits section" },
+      { label: "Near-miss losers", live: lab.nearMissPct == null ? "—" : lab.nearMiss.length + " (" + lab.nearMissPct + "% of losers)", bench: "≤ 15%", ok: lab.nearMissPct == null ? null : lab.nearMissPct <= 15, tip: "· losers that saw ≥ +1R open profit before dying red\n· the T+3–5 trim window exists precisely to convert these\n· each one = a missed protocol application, not bad luck\n· improve: derisk 50% into strength when +3R…+5R prints or by day 5" },
+      { label: "T+3–5 trim adherence", live: dk.adherencePct != null ? num(dk.adherencePct, 0) + "%" : "—", bench: "≥ 80%", ok: dk.adherencePct == null ? null : dk.adherencePct >= 80, tip: "· share of trimmed system campaigns whose FIRST trim landed on day 3–5\n· the derisk protocol executed as designed (system cohort only)\n· improve: calendar the T+3 check per open campaign — execution gap, not design gap" },
+      { label: "Equity vs its " + eqMaP + "-MA", live: eqState ? (eqState.above ? "above " : "below ") + sgnR(eqState.gap) : "—", bench: "above", ok: eqState ? eqState.above : null, tip: "· trade your own equity curve like a stock\n· below its MA = real drawdown, not noise\n· response: halve new-position risk until it reclaims the line\n· above = normal operations" },
     ];
     const fails = rowsB.filter(r => r.ok === false);
     const level = fails.length === 0 ? "on" : fails.length === 1 ? "drift" : "off";
@@ -456,6 +473,9 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           data-tip is silently dead (Valen found the definitions never showed, 2026-07-11). */}
       <style>{`
         .qa .term{border-bottom:1px dotted rgba(201,152,42,0.5); cursor:help; position:relative}
+        /* a .term inside an ellipsis cell (overflow:hidden) CLIPS its own tooltip — hover must
+           un-clip and float above the rows below (the "SQN shows ? but no tip" bug, 2026-07-12) */
+        .qa .term:hover{overflow:visible !important; z-index:60}
         .qa .term:hover::after{content:attr(data-tip); position:absolute; left:0; top:150%; width:320px;
           background:#11111b; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 13px;
           font-size:0.68rem; line-height:1.65; color:#E7E9EE; z-index:60; white-space:pre-line; font-weight:500;
@@ -636,6 +656,26 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           <Kpi label="Sample" value={`${A.n} / 50`} sub={A.n >= 30 ? "outcome readable" : "building to 30 — judge adherence"}
             tip={"· closed campaigns in this cohort\n· under 30: 2–3 trades can flip verdicts → judge ADHERENCE, not outcome\n· at 30: the edge's sign is readable\n· at 50: Monte Carlo calibrated"} />
         </div>
+        {/* R-vs-$ reconciliation — shown whenever the two disagree in sign or the risk unit is
+            wildly uneven. Partials ARE counted; the gap is SIZING, and it names names. */}
+        {sizing.uw != null && sizing.ul != null && (((A.net ?? 0) < 0) !== ((A.expR ?? 0) < 0) || sizing.ul > sizing.uw * 1.5 || sizing.uw > sizing.ul * 1.5) && (
+          <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 12, background: "rgba(201,152,42,0.05)", border: "1px solid rgba(201,152,42,0.3)" }}>
+            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Why R and $ disagree — your risk unit wasn't constant</div>
+            {[
+              <>Not a math error, and partials ARE counted — every campaign is all its legs summed; R is blended against the initial risk.</>,
+              <>This cohort made <b>{sgnR(sizing.sumR)}</b> across {sizing.nR} R-scored campaigns, yet {fmt$(A.net)} in dollars — because <b>$ risked per 1R was not the same trade to trade</b>.</>,
+              <>Losers carried <b>{fmt$(sizing.ul)}</b> of risk per R on average vs <b>{fmt$(sizing.uw)}</b> on winners — the losses were simply BIGGER bets.</>,
+              sizing.big && sizing.small && <>Extremes: <b>{sizing.big.ticker}</b> risked ≈{fmt$(sizing.unit(sizing.big))}/R while <b>{sizing.small.ticker}</b> risked ≈{fmt$(sizing.unit(sizing.small))}/R — a {Math.round(sizing.unit(sizing.big) / Math.max(1, sizing.unit(sizing.small)))}× spread.</>,
+              sizing.evenNet != null && <>At ONE constant unit (≈{fmt$(sizing.mid)}/R) the same R would have been ≈ <b style={{ color: sizing.evenNet >= 0 ? T.green : T.red }}>{fmt$(sizing.evenNet)}</b>.</>,
+              sizing.noRn > 0 && <>{sizing.noRn} campaign{sizing.noRn === 1 ? "" : "s"} without a recorded R ({fmt$(sizing.noRpl)}) count in $ but are invisible to expectancy.</>,
+              <>Fix: R-based sizing only works when 1R = the SAME dollars everywhere — pick the unit, size every entry to it.</>,
+            ].filter(Boolean).map((p, i) => (
+              <div key={i} style={{ display: "flex", gap: 9, padding: "2px 0", fontSize: "0.72rem", lineHeight: 1.6, color: T.muted }}>
+                <span style={{ color: T.gold, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* WHERE THE MONEY CAME FROM — per-ticker campaign P&L, top and bottom */}
@@ -676,6 +716,31 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           "Gate boxes: expectancy on each side of the gate. A gate that doesn't separate expectancy is theatre; a gate you violate profitably is mis-calibrated.",
           "Rung caveat: MAE uses DAILY bars, and the entry-day low usually prints BEFORE an ORB entry — the bar can't see the clock. Rung percentages are OVERSTATED (upper bounds) until entry-time capture builds up.",
         ]}>
+        {/* OVERALL VERDICT — the whole section answered first, one plain-English box
+            (Valen 2026-07-12: "should have a summary explaining the verdict across all criteria"). */}
+        {(() => {
+          const wg = data.waitGate || {};
+          const defensiveOk = lab.nLossR > 0 && lab.breaches.length / lab.nLossR <= 0.1;
+          const extDiff = lab.extOK.n >= 3 && lab.extHot.n >= 3 ? lab.extOK.expR - lab.extHot.expR : null;
+          return (
+            <div style={{ padding: "10px 14px", borderRadius: 12, marginBottom: 10, background: defensiveOk ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.07)", border: `1px solid ${defensiveOk ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}` }}>
+              <div style={{ marginBottom: 6 }}>
+                <Chip ok={defensiveOk}>{defensiveOk ? "ENTRY RULES: DEFENSIVE JOB DONE · OFFENSIVE PROOF PENDING" : "ENTRY RULES: LOSSES LEAKING PAST THE CAP"}</Chip>
+                <span style={{ marginLeft: 10 }}><SampleTag n={lab.nLossR} rec={30} label="losers judged" /></span>
+              </div>
+              {[
+                <>Entry rules serve expectancy through two channels: <b>smaller losses</b> (the defence) and <b>better entries → more/bigger winners</b> (the offence). Verdict per channel:</>,
+                <>DEFENCE — {defensiveOk ? <><b style={{ color: T.green }}>working</b>: only {lab.breaches.length} of {lab.nLossR} losers exceeded their own era's cap (target ≤10%); the stop discipline is doing its job</> : <><b style={{ color: T.red }}>leaking</b>: {lab.breaches.length} of {lab.nLossR} losers blew past their cap — that's the leak to fix first</>}.</>,
+                <>OFFENCE — <b>not proven yet at this sample</b>: {extDiff == null ? "extension gate lacks trades on both sides" : Math.abs(extDiff) < 0.15 ? `the ≤4× freshness gate reads a wash so far (${sgnR(lab.extOK.expR)} fresh vs ${sgnR(lab.extHot.expR)} chased)` : extDiff > 0 ? `the ≤4× freshness gate is earning its keep (+${extDiff.toFixed(2)}R separation)` : `chased entries did BETTER so far (${sgnR(lab.extHot.expR)} vs ${sgnR(lab.extOK.expR)}) — small n, don't conclude`}; the 30-min wait gate is at n={wg.simmed ?? 0} of 15 needed; LoD/RVOL slices wait on live entry-gate capture.</>,
+                <>Plain English: <b>your entry rules are not losing you money — but they haven't yet proven they MAKE you money.</b> Keep logging; the offence verdicts firm up as the sample builds to 30.</>,
+              ].map((p, i) => (
+                <div key={i} style={{ display: "flex", gap: 9, padding: "2px 0", fontSize: "0.72rem", lineHeight: 1.6, color: T.muted }}>
+                  <span style={{ color: T.gold, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         {/* SECTION HEADLINE — one pointer per rule card below; each states ITS OWN sub-sample
             (they differ by design: loss-side reads use losers, gate reads use both sides). */}
         <Say points={[
