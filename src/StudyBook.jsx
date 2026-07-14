@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { SECTIONS } from "./SetupGrader.jsx";
 
 // ══════════════════════════════════════════════════════════════════
 // STUDY BOOK — private study wing of My Book (admin). Historical EXERCISE
@@ -15,24 +14,34 @@ import { SECTIONS } from "./SetupGrader.jsx";
 
 export const isStudyRow = (r) => !!(r && r.metrics && r.metrics.study);
 
-// Every metric either system flags as worth recording — same keys every time.
+// TWO LAYERS PER SETUP (Valen 2026-07-14):
+//   buckets = HIS tickable checklist — only what eyes can verify on a historical chart,
+//             organized grader-style in 3 buckets per setup. No data-context items here
+//             (no theme/liquidity/ADR/rank — backtesting can't see those on the chart).
+//   metrics = the AUTO-PULLED data section — filled by study-fill.mjs / Claude; he only
+//             corrects, never sources. Data-threshold factors (ADR≥4, RVol>1, ext≤4…) are
+//             derived from these values at analysis time, so they need no tick at all.
 export const STUDY_SETUPS = {
   "Momentum Breakout": {
-    checks: [
-      ["tight", "Tightening series — ≥3 days with range < 0.6×ATR14 (RMV≈0)"],
-      ["orderly", "Orderly base — zero −4% days inside, ascending swing lows"],
-      ["pole", "Prior pole ≥30% in 1–3 months"],
-      ["linear", "Pole linear — no whipsaw chart"],
-      ["young", "Young trend — ≤3rd breakout, not extended/late"],
-      ["prior_nr", "Day before trigger = narrow-range or negative day"],
-      ["leader", "Leader — top-2% momentum rank (AS ≥98 any of 1M/3M/6M)"],
-      ["adr", "ADR20 ≥ 4%"],
-      ["theme", "Theme cluster — ≥3 group-mates on the leaderboard"],
-      ["re", "Day-1 range expansion ≥4% AND ≤2 up-days before trigger"],
-      ["vol", "Volume > prior day · entry pace ≥1.3× run rate"],
-      ["closehi", "Closed ≥70% of the day's range"],
-      ["ma_surf", "Surfing rising 10/20-day MA into the pivot"],
-      ["regime", "Regime ON — index 10SMA > 20SMA, no fast-selling phase"],
+    buckets: [
+      { title: "Prior move / trend", items: [
+        ["pole", "Prior pole — big move ≥30% into the base"],
+        ["linear", "Pole linear — clean advance, no whipsaw"],
+        ["young", "Young trend — 1st–3rd breakout, not late/extended"],
+      ]},
+      { title: "Base quality", items: [
+        ["tight", "Tightening series — ≥3 narrow-range days (range < 0.6×ATR)"],
+        ["vol_dry", "Volume drying up in the base (lower than usual)"],
+        ["orderly", "Orderly base — no big red bars inside, ascending lows"],
+        ["prior_nr", "Day before trigger = narrow-range or negative day"],
+        ["ma_surf", "Surfing rising 10/20-day MA into the pivot"],
+      ]},
+      { title: "Trigger day", items: [
+        ["re", "Day-1 range expansion ≥4% — bar visibly bigger than last 5–10"],
+        ["up2", "≤2 up-days before the trigger (not buying day 3)"],
+        ["closehi", "Closed ≥70% of the day's range"],
+        ["vol_exp", "Volume expansion — trigger bar volume above prior day"],
+      ]},
     ],
     metrics: [
       ["rs", "AS/RS rank"], ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"],
@@ -43,38 +52,49 @@ export const STUDY_SETUPS = {
       ["re_pct", "Trigger day % move"], ["vol_ratio", "Volume ÷ prior day"],
       ["rvol_eod", "RVol 50d EOD"], ["run_rate", "Run rate at entry (×)"],
       ["closing_range", "Closing range % (C−L)/(H−L)"], ["stop_width_adr", "LOD stop width (×ADR)"],
+      ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
     ],
   },
   "Episodic Pivot": {
-    checks: [
-      ["gap", "Gap up ≥10% (or 4%+ earnings day on ≥3× avg volume)"],
-      ["volpace", "Massive open volume — full ADV inside 15–20 min"],
-      ["premkt", "Huge volume already in pre-market / after-hours"],
-      ["growth", "Big YoY EPS/revenue growth + beat + guidance up"],
-      ["neglect", "Neglected — <20% run in prior 3 months"],
-      ["first", "FIRST big surprise (not a recent 2nd EP)"],
-      ["coverage", "Little/no analyst coverage (undiscovered)"],
-      ["liquid", "Liquid enough for intended size"],
-      ["stopw", "Stop ≤1–1.5× ADR from entry"],
-      ["regime", "Regime ON — index 10SMA > 20SMA"],
+    buckets: [
+      { title: "Before the gap", items: [
+        ["neglect", "Neglected — flat/basing, no big run in prior months"],
+        ["first", "FIRST big surprise (no recent prior EP gap on the chart)"],
+        ["base_ok", "Coming out of an orderly base, not a downtrend knife"],
+      ]},
+      { title: "Gap day", items: [
+        ["gap", "Gap up ≥10% visible (or 4%+ earnings-day range expansion)"],
+        ["vol_huge", "Huge volume bar — dwarfs recent bars"],
+        ["closehi", "Held the gap — closed in the upper part of the day's range"],
+      ]},
+      { title: "Structure", items: [
+        ["stopw", "Stop ≤1–1.5× ADR from entry (tight structure available)"],
+        ["cont", "No overhead resistance nearby (blue sky / clears the base)"],
+      ]},
     ],
     metrics: [
       ["gap_pct", "Gap %"], ["rvol_eod", "RVol 50d EOD (≥3× gate)"], ["run_rate", "Run rate at entry (×)"],
       ["premkt_vol_k", "Pre-market volume (k sh)"], ["yoy_eps", "YoY EPS growth %"], ["yoy_rev", "YoY revenue growth %"],
       ["neglect_3m", "3-mo return before EP %"], ["surprise_num", "Surprise # (1st / 2nd…)"],
       ["analysts", "Analyst count"], ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"],
-      ["stop_width_adr", "Stop width (×ADR)"],
+      ["stop_width_adr", "Stop width (×ADR)"], ["regime", "Regime (SPY 10>20) Y/N"],
     ],
   },
   "Parabolic": {
-    checks: [
-      ["stretch", "Stretched — +50–100% (large) / +300–1000% (small) in days–weeks"],
-      ["updays", "3–5+ consecutive up days into the move"],
-      ["ext", "Extension ≥7× ATR% from the 50MA (climax band)"],
-      ["trigger", "Trigger — first red 5-min / opening-range break in trade direction"],
-      ["vwap", "VWAP fail (short) / reclaim (long) confirmed"],
-      ["stopw", "Stop at day-extreme ≤1 ADR"],
-      ["target", "Target = 10/20-day MA (cover/exit zone, not a trail)"],
+    buckets: [
+      { title: "The stretch", items: [
+        ["stretch", "Vertical — +50–100% (large) / +300%+ (small) in days–weeks"],
+        ["updays", "3–5+ consecutive up days into the climax"],
+        ["ext_vis", "Far above all rising MAs — visibly climactic"],
+      ]},
+      { title: "Trigger", items: [
+        ["trigger", "First crack — big red bar / break of opening range in trade direction"],
+        ["vwap", "VWAP fail (short) / reclaim (long) — if intraday visible"],
+      ]},
+      { title: "Structure", items: [
+        ["stopw", "Stop at day-extreme ≤1 ADR"],
+        ["target", "Room to the 10/20-day MA — target zone far enough to pay"],
+      ]},
     ],
     metrics: [
       ["run_pct", "Run % into climax"], ["run_days", "Run length (days)"], ["consec_updays", "Consecutive up days"],
@@ -83,6 +103,18 @@ export const STUDY_SETUPS = {
     ],
   },
 };
+
+// Data-derived factor flags — computed from the AUTO metrics at analysis time (no tick needed).
+// Thresholds per winner-dna.md; blank metric = "not measured" (excluded), never "failed".
+export const DATA_FLAGS = [
+  ["adr4", "ADR20 ≥ 4% (data)", (m) => m.adr20 == null || m.adr20 === "" ? null : +m.adr20 >= 4],
+  ["vol_gt_prior", "Volume > prior day (data)", (m) => m.vol_ratio == null || m.vol_ratio === "" ? null : +m.vol_ratio > 1],
+  ["rvol_hot", "RVol 50d ≥ 1.5 (data)", (m) => m.rvol_eod == null || m.rvol_eod === "" ? null : +m.rvol_eod >= 1.5],
+  ["ext_ok", "Ext from 50MA ≤ 4× (data)", (m) => m.ext_50ma == null || m.ext_50ma === "" ? null : +m.ext_50ma <= 4],
+  ["pole30", "3-mo return ≥ +30% (data)", (m) => { const v = m.pole_pct ?? m.ret_3m; return v == null || v === "" ? null : +v >= 30; }],
+  ["stop_tight", "Stop ≤ 1× ADR (data)", (m) => m.stop_width_adr == null || m.stop_width_adr === "" ? null : +m.stop_width_adr <= 1],
+  ["leader98", "AS ≥ 98 (data)", (m) => { const v = parseFloat(m.rs); return Number.isNaN(v) ? null : v >= 98; }],
+];
 
 // Outcome anatomy — burst shape + campaign shape, shared by all setups.
 const OUTCOME_METRICS = [
@@ -109,31 +141,28 @@ export function outcomeClass(study) {
 const MB_OUTCOME = { monster: "Huge Winner", "big winner": "Winner", "works small": "Subpar", failure: "Loser" };
 
 // factor lift across resolved studies: P(factor | winner) / P(factor | failure).
-// Covers BOTH the auto-computed factor checks (metrics.study.checks) and Valen's own
-// Setup-Grader observation ticks (row.ticked, same "si-ii" keys as the grader) — so the
-// data answers "do MY eyeball criteria predict winners?" separately from the bar-math.
+// TWO factor classes: 👁 Valen's chart-readable ticks (study.checks, from the buckets) and
+// 📊 data-derived flags computed from the auto metrics (DATA_FLAGS — no tick needed; a blank
+// metric = "not measured" and that study is excluded from THAT flag, never counted as failed).
 export function liftTable(rows) {
-  const entries = rows.filter(r => r.metrics?.study && outcomeClass(r.metrics.study))
-    .map(r => ({ s: r.metrics.study, ticked: new Set(r.ticked || []) }));
-  const win = entries.filter(e => ["big winner", "monster"].includes(outcomeClass(e.s)));
-  const fail = entries.filter(e => outcomeClass(e.s) === "failure");
+  const entries = rows.filter(r => r.metrics?.study && outcomeClass(r.metrics.study)).map(r => r.metrics.study);
+  const isWin = (s) => ["big winner", "monster"].includes(outcomeClass(s));
+  const win = entries.filter(isWin), fail = entries.filter(s => outcomeClass(s) === "failure");
   const out = [];
-  const push = (group, label, has) => {
-    const pW = win.length ? win.filter(has).length / win.length : 0;
-    const pF = fail.length ? fail.filter(has).length / fail.length : 0;
+  const push = (group, label, val /* s -> true|false|null */) => {
+    const w = win.map(val).filter(x => x !== null), f = fail.map(val).filter(x => x !== null);
+    if (!w.length && !f.length) return;
+    const pW = w.length ? w.filter(Boolean).length / w.length : 0;
+    const pF = f.length ? f.filter(Boolean).length / f.length : 0;
     out.push({ setup: group, label, pW, pF, lift: pF > 0 ? pW / pF : (pW > 0 ? Infinity : 0) });
   };
-  const keys = new Set();
-  entries.forEach(e => Object.keys(e.s.checks || {}).forEach(k => keys.add(`${e.s.setup}|${k}`)));
-  keys.forEach(sk => {
-    const [setup, k] = sk.split("|");
-    const label = (STUDY_SETUPS[setup]?.checks.find(c => c[0] === k) || [])[1] || k;
-    push(setup, label, e => e.s.setup === setup && e.s.checks?.[k]);
-  });
-  SECTIONS.forEach((sec, si) => { if (sec.reminder) return; sec.items.forEach((it, ii) => {
-    const key = si + "-" + ii;
-    if (entries.some(e => e.ticked.has(key))) push("👁 Observation", it.c, e => e.ticked.has(key));
-  }); });
+  const seen = new Set();
+  entries.forEach(s => (STUDY_SETUPS[s.setup]?.buckets || []).forEach(b => b.items.forEach(([k, label]) => {
+    const id = `${s.setup}|${k}`;
+    if (seen.has(id)) return; seen.add(id);
+    push(`👁 ${s.setup}`, label, (e) => e.setup === s.setup ? !!e.checks?.[k] : null);
+  })));
+  DATA_FLAGS.forEach(([k, label, fn]) => push("📊 Data", label, (e) => fn(e.m || {})));
   return { rows: out.sort((a, b) => b.lift - a.lift), nWin: win.length, nFail: fail.length, n: entries.length };
 }
 
@@ -229,43 +258,31 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
         {chartSlot("after_img", "LTF chart", "Daily/intraday — the tightening, the trigger bar, the stop structure")}
       </div>
 
-      <div style={sect}>Factor card ({s.setup})</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))", gap: "2px 18px" }}>
-        {def.checks.map(([k, t]) => (
-          <label key={k} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: "0.76rem", padding: "3px 0", cursor: "pointer" }}>
-            <input type="checkbox" style={{ accentColor: C.goldBright, marginTop: 3 }} checked={!!s.checks[k]} onChange={e => setS({ checks: { ...s.checks, [k]: e.target.checked } })} />{t}
-          </label>
-        ))}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 8, marginTop: 10 }}>
-        {def.metrics.map(([k, t]) => (
-          <div key={k}><label style={lbl}>{t}</label><input style={inputS} value={s.m[k] ?? ""} onChange={e => setS({ m: { ...s.m, [k]: e.target.value } })} /></div>
+      {/* 👁 HIS ticks — only chart-readable factors, grader-style 3 buckets per setup.
+          Data-context items (theme/liquidity/ADR/rank) are NOT here: backtested charts
+          can't show them, so they live below as auto-pulled values + DATA_FLAGS. */}
+      <div style={sect}>👁 My ticks — what the chart shows ({s.setup})</div>
+      {(() => { const total = def.buckets.reduce((n, b) => n + b.items.length, 0);
+        const on = def.buckets.reduce((n, b) => n + b.items.filter(([k]) => s.checks[k]).length, 0);
+        return <div style={{ fontSize: "0.66rem", color: C.muted, marginBottom: 8 }}>{on}/{total} ticked — eyeball reps; tick only what the chart actually shows</div>; })()}
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        {def.buckets.map((b, bi) => (
+          <div key={bi} style={{ flex: 1, minWidth: 250, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>{b.title}</div>
+            {b.items.map(([k, t]) => (
+              <label key={k} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: "0.74rem", padding: "3px 0", cursor: "pointer" }}>
+                <input type="checkbox" style={{ accentColor: C.goldBright, marginTop: 3 }} checked={!!s.checks[k]} onChange={e => setS({ checks: { ...s.checks, [k]: e.target.checked } })} />{t}
+              </label>
+            ))}
+          </div>
         ))}
       </div>
 
-      {/* Valen's OWN eyeball ticks — the exact Setup Grader checklist, same "si-ii" keys,
-          stored on row.ticked so studies get the grader's objective star math and the
-          observations flow into the lift table as their own factor class. */}
-      <div style={sect}>👁 My observations — Setup Grader criteria (tick what you SEE on the chart)</div>
-      {(() => { let total = 0, passed = 0, starHit = 0, starTotal = 0;
-        SECTIONS.forEach((sec, si) => { if (sec.reminder) return; sec.items.forEach((it, ii) => {
-          total++; if (it.star) starTotal++;
-          if ((row.ticked || []).includes(si + "-" + ii)) { passed++; if (it.star) starHit++; }
-        }); });
-        return <div style={{ fontSize: "0.66rem", color: C.muted, marginBottom: 8 }}>{passed}/{total} ticked · {starHit}/{starTotal} ★-makers — same objective math as the grader; these are YOUR pattern-recognition reps</div>; })()}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        {SECTIONS.filter(sec => !sec.reminder).map((sec, si) => (
-          <div key={si} style={{ flex: 1, minWidth: 250, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px" }}>
-            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>{sec.title}</div>
-            {sec.items.map((it, ii) => { const key = si + "-" + ii; const on = (row.ticked || []).includes(key);
-              return (
-                <label key={key} title={it.s} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: "0.74rem", padding: "2px 0", cursor: "pointer" }}>
-                  <input type="checkbox" style={{ accentColor: C.goldBright, marginTop: 3 }} checked={on}
-                    onChange={() => setRow(r => ({ ...r, ticked: on ? (r.ticked || []).filter(x => x !== key) : [...(r.ticked || []), key] }))} />
-                  <span>{it.c}{it.star && <span style={{ color: C.goldBright, fontSize: "0.6rem", marginLeft: 5 }}>★ maker</span>}</span>
-                </label>
-              ); })}
-          </div>
+      {/* 📊 Auto section — study-fill.mjs / Claude fills these; Valen only corrects. */}
+      <div style={sect}>📊 Auto-pulled data — filled by VIV, correct anything that looks wrong</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 8 }}>
+        {def.metrics.map(([k, t]) => (
+          <div key={k}><label style={lbl}>{t}</label><input style={inputS} value={s.m[k] ?? ""} onChange={e => setS({ m: { ...s.m, [k]: e.target.value } })} /></div>
         ))}
       </div>
 
