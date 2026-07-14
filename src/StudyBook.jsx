@@ -120,7 +120,7 @@ export const DATA_FLAGS = [
 // Outcome anatomy — burst shape + campaign shape, shared by all setups.
 const OUTCOME_METRICS = [
   ["mfe_d1", "MFE % day 1"], ["mfe_d3", "MFE % day 3"], ["mfe_d5", "MFE % day 5"], ["mfe_d20", "MFE % day 20"],
-  ["day2_pct", "Day-2 % move (follow-through size)"], ["burst_days", "Burst length (days)"], ["burst_pct", "Burst magnitude %"],
+  ["day2_pct", "Day-2 % move (follow-through size)"], ["burst_days", "Burst length (up-closes AFTER trigger; +1 = Bonde count)"], ["burst_pct", "Burst magnitude % (from pre-trigger close)"],
   ["mae", "MAE % (before MFE)"], ["giveback_pct", "Giveback after burst %"],
   ["days_above_10ma", "Days above 10MA (campaign length)"], ["trail_r", "Trail-exit total R (10/20MA sim)"],
   ["ext_at_peak", "Ext from 50MA at burst peak (×ATR%)"],
