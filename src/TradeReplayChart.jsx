@@ -65,17 +65,58 @@ export default function TradeReplayChart({ trade, C, font }) {
     try { localStorage.setItem(drawKey, JSON.stringify(drawingsRef.current)); setSavedTick(t => t + 1); } catch { /* quota — drawing stays on screen this session */ }
   }, [drawKey]);
 
+  const mouseRef = useRef(null); // cursor position while a trend draft is pending — dashed preview
+
+  // Bar spacing in seconds (median of the first gaps) — lets clicks/renders extrapolate past the data.
+  const barStep = () => { const b = barsRef.current; if (b.length < 2) return 300; const g = []; for (let i = 1; i < Math.min(b.length, 25); i++) g.push(b[i].time - b[i - 1].time); g.sort((x, y) => x - y); return g[Math.floor(g.length / 2)] || 300; };
+  // x-coordinate → epoch time, valid ANYWHERE on the canvas. The native coordinateToTime()
+  // returns null in the whitespace right of the last bar — which is exactly where rays get
+  // drawn — so ray/trend clicks there saved t=null and never rendered (Mandy 2026-07-14).
+  const xToTime = (x) => {
+    const chart = chartRef.current, b = barsRef.current; if (!chart || !b.length) return null;
+    const l = chart.timeScale().coordinateToLogical(x); if (l == null) return null;
+    const last = b.length - 1;
+    if (l <= 0) return b[0].time + l * barStep();
+    if (l >= last) return b[last].time + (l - last) * barStep();
+    const i = Math.floor(l); return b[i].time + (l - i) * (b[i + 1].time - b[i].time);
+  };
+  // epoch time → x-coordinate on the CURRENT timeframe's bars. The native timeToCoordinate()
+  // returns null for any time that isn't exactly a bar time on this TF, so drawings made on 5m
+  // vanished after switching to 15m/1h/D. Interpolates between surrounding bars instead.
+  const timeToX = (tm) => {
+    const chart = chartRef.current, b = barsRef.current; if (!chart || !b.length || tm == null || typeof tm !== "number") return null;
+    const last = b.length - 1; let l;
+    if (tm <= b[0].time) l = (tm - b[0].time) / barStep();
+    else if (tm >= b[last].time) l = last + (tm - b[last].time) / barStep();
+    else { let lo = 0, hi = last; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (b[m].time <= tm) lo = m; else hi = m; } l = lo + (tm - b[lo].time) / ((b[hi].time - b[lo].time) || 1); }
+    return chart.timeScale().logicalToCoordinate(l);
+  };
+
   const redraw = useCallback(() => {
     const cv = canvasRef.current, chart = chartRef.current, s = seriesRef.current; if (!cv || !chart || !s) return;
-    const ctx = cv.getContext("2d"); const w = cv.width = cv.clientWidth, h = cv.height = cv.clientHeight; ctx.clearRect(0, 0, w, h);
-    const ts = chart.timeScale(); const X = (t) => ts.timeToCoordinate(t), Y = (p) => s.priceToCoordinate(p);
+    const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = w * dpr; cv.height = h * dpr; // crisp lines on retina
+    const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, w, h);
+    const Y = (p) => s.priceToCoordinate(p);
     const line = (x1, y1, x2, y2, color) => { ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
     for (const d of drawingsRef.current) {
       const y = Y(d.p1.price); if (y == null) continue;
       if (d.type === "hline") { line(0, y, w, y, GOLD); ctx.fillStyle = GOLD; ctx.font = "10px " + font; ctx.fillText(d.p1.price.toFixed(2), 4, y - 4); }
-      else if (d.type === "hray") { const x = X(d.p1.t); if (x != null) { line(x, y, w, y, GOLD); ctx.fillStyle = GOLD; ctx.font = "10px " + font; ctx.fillText(d.p1.price.toFixed(2), x + 4, y - 4); } }
-      else if (d.type === "trend" && d.p2) { const x1 = X(d.p1.t), y1 = Y(d.p1.price), x2 = X(d.p2.t), y2 = Y(d.p2.price); if (x1 != null && x2 != null && y1 != null && y2 != null) line(x1, y1, x2, y2, BLUE); }
+      else if (d.type === "hray") { const x = timeToX(d.p1.t); if (x != null) { line(x, y, w, y, GOLD); ctx.fillStyle = GOLD; ctx.font = "10px " + font; ctx.fillText(d.p1.price.toFixed(2), x + 4, y - 4); } }
+      else if (d.type === "trend" && d.p2) { const x1 = timeToX(d.p1.t), y1 = Y(d.p1.price), x2 = timeToX(d.p2.t), y2 = Y(d.p2.price); if (x1 != null && x2 != null && y1 != null && y2 != null) line(x1, y1, x2, y2, BLUE); }
     }
+    // pending trend draft: anchor dot + dashed preview to the cursor (first click used to be
+    // invisible, which read as "the tool doesn't work")
+    const draft = draftRef.current;
+    if (draft) {
+      const x = timeToX(draft.t), y = Y(draft.price);
+      if (x != null && y != null) {
+        ctx.fillStyle = BLUE; ctx.beginPath(); ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.fill();
+        const mp = mouseRef.current;
+        if (mp) { ctx.setLineDash([4, 4]); line(x, y, mp.x, mp.y, BLUE); ctx.setLineDash([]); }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [font, GOLD, BLUE]);
 
   useEffect(() => {
@@ -134,11 +175,21 @@ export default function TradeReplayChart({ trade, C, font }) {
   const onCanvasClick = (e) => {
     const chart = chartRef.current, s = seriesRef.current; if (!chart || !s) return; const T = toolRef.current; if (T === "cursor") return;
     const rect = canvasRef.current.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top;
-    const price = s.coordinateToPrice(y), t = chart.timeScale().coordinateToTime(x); if (price == null) return;
+    const price = s.coordinateToPrice(y), t = xToTime(x); if (price == null) return;
     if (T === "hline") drawingsRef.current.push({ type: "hline", p1: { price } });
-    else if (T === "hray") drawingsRef.current.push({ type: "hray", p1: { t, price } });
-    else if (T === "trend") { if (!draftRef.current) { draftRef.current = { t, price }; return; } drawingsRef.current.push({ type: "trend", p1: draftRef.current, p2: { t, price } }); draftRef.current = null; }
+    else if (T === "hray") { if (t == null) return; drawingsRef.current.push({ type: "hray", p1: { t, price } }); }
+    else if (T === "trend") {
+      if (t == null) return;
+      if (!draftRef.current) { draftRef.current = { t, price }; redraw(); return; } // anchor dot appears immediately
+      drawingsRef.current.push({ type: "trend", p1: draftRef.current, p2: { t, price } }); draftRef.current = null; mouseRef.current = null;
+    }
     persistDrawings();
+    redraw();
+  };
+  const onCanvasMove = (e) => { // dashed preview while a trend anchor is pending
+    if (toolRef.current !== "trend" || !draftRef.current || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    mouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     redraw();
   };
 
@@ -146,7 +197,7 @@ export default function TradeReplayChart({ trade, C, font }) {
   const entryP = Number(trade.entryP) || 0, exitP = Number(trade.exitP) || 0, stopP = Number(trade.stop) || 0, pl = Number(trade.plDollar) || 0, r = trade.rMult, sh = Number(trade.shares) || 0, up = pl >= 0;
   const Pill = ({ label, children }) => <span style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 9, padding: "7px 12px", fontSize: "0.76rem", color: C.muted, fontWeight: 600 }}>{label} {children}</span>;
   const b = (t, c) => <b style={{ color: c || "#fff", fontWeight: 800 }}>{t}</b>;
-  const tBtn = (k, label, title) => <button title={title} onClick={() => setTool(k)} style={{ background: tool === k ? C.goldDim : "transparent", color: tool === k ? C.goldBright : C.muted, border: `1px solid ${tool === k ? C.borderGold : "transparent"}`, borderRadius: 7, padding: "5px 9px", fontFamily: font, fontSize: "0.7rem", fontWeight: 700, cursor: "pointer" }}>{label}</button>;
+  const tBtn = (k, label, title) => <button title={title} onClick={() => { setTool(k); if (k !== "trend") { draftRef.current = null; mouseRef.current = null; redraw(); } }} style={{ background: tool === k ? C.goldDim : "transparent", color: tool === k ? C.goldBright : C.muted, border: `1px solid ${tool === k ? C.borderGold : "transparent"}`, borderRadius: 7, padding: "5px 9px", fontFamily: font, fontSize: "0.7rem", fontWeight: 700, cursor: "pointer" }}>{label}</button>;
 
   return (
     <div style={{ fontFamily: font }}>
@@ -173,7 +224,7 @@ export default function TradeReplayChart({ trade, C, font }) {
       {/* chart */}
       <div style={{ position: "relative", height: 500, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.border}`, background: "#0e0e16" }}>
         <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
-        <canvas ref={canvasRef} onClick={onCanvasClick} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: tool === "cursor" ? "none" : "auto", cursor: tool === "cursor" ? "default" : "crosshair" }} />
+        <canvas ref={canvasRef} onClick={onCanvasClick} onMouseMove={onCanvasMove} onMouseLeave={() => { mouseRef.current = null; redraw(); }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: tool === "cursor" ? "none" : "auto", cursor: tool === "cursor" ? "default" : "crosshair" }} />
         {status !== "ok" && <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.82rem" }}>{status === "loading" ? "Loading candles…" : status === "empty" ? `No candle data for ${trade.ticker}` : status === "nolib" ? "Chart engine not loaded" : "Couldn't load candles (check POLYGON_API_KEY)"}</div>}
         {status === "ok" && sample && <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(201,152,42,0.18)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.05em", padding: "3px 8px", borderRadius: 6, pointerEvents: "none" }}>SAMPLE · live candles on deploy</div>}
       </div>
