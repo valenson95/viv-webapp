@@ -52,7 +52,7 @@ export const STUDY_SETUPS = {
       ["breakout_num", "Breakout # in trend (1st/2nd/3rd…)"], ["up_days_before", "Up-days in a row before trigger"],
       ["re_pct", "Trigger day % move"], ["gap_pct", "Gap % (open vs prior close)"], ["vol_ratio", "Volume ÷ prior day"],
       ["rvol_eod", "RVol 50d EOD"], ["rvol_30m", "RVOL 1st 30min (vs same window, 20d)"], ["vol30_adv_pct", "1st-30min vol as % of ADV"], ["run_rate", "Run rate at entry (×)"],
-      ["closing_range", "Closing range % (C−L)/(H−L)"], ["entry_px", "Entry (5-min ORH — standing rule)"], ["stop_width_adr", "LoD stop width from entry (×ADR)"],
+      ["closing_range", "Closing range % (C−L)/(H−L)"], ["entry_px", "Entry (5-min ORH — standing rule)"], ["pivot_px", "Pivot (annotated) $ — gates the sim"], ["stop_width_adr", "LoD stop width from entry (×ADR)"],
       ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
       ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
@@ -130,6 +130,8 @@ const OUTCOME_METRICS = [
   ["mae", "MAE % (before MFE)"], ["giveback_pct", "Giveback after burst %"],
   ["days_above_10ma", "Days above 10MA (campaign length)"], ["trail_r", "Trail-exit total R (10/20MA sim)"],
   ["ext_at_peak", "Ext from 50MA at burst peak (×ATR%)"],
+  ["rr_est", "Est. R:R (20d MFE ÷ risk)"], ["sim_r", "Sim R (trim-into-strength + SMA10 trail)"],
+  ["sim_mgmt", "Best management (which trim variant won)"], ["trade_verdict", "Trade verdict (win/loss sim)"],
 ];
 
 // Tick sub-categories (Valen 2026-07-14): a ticked parent factor can carry one refinement,
