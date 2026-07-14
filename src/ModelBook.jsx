@@ -3,13 +3,15 @@ import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
 import { SECTIONS } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
-import { isStudyRow, StudyEditor, StudyScoreboard, outcomeClass } from "./StudyBook.jsx";
+import { isStudyRow, StudyEditor, StudyScoreboard, outcomeClass, studyQuality } from "./StudyBook.jsx";
 
 // A study starred for the Model Book shows as a card; its star count comes from the study's
 // auto quality grade (tick-%) rather than the 16-criteria Model Book ticks it doesn't have.
+// Quality is computed LIVE from the current ticks (studyQuality), never read from a stored
+// grade.letter — that stale-grade path drifted whenever ticks were edited outside the editor.
 const STUDY_LETTER_N = { "A+": 5, A: 4, B: 3, C: 2 };
 const inModelBook = (r) => isStudyRow(r) && !!r.metrics?.study?.in_model_book;
-const cardStars = (r) => isStudyRow(r) ? (STUDY_LETTER_N[r.metrics?.study?.grade?.letter] || 0) : r.stars;
+const cardStars = (r) => isStudyRow(r) ? (STUDY_LETTER_N[studyQuality(r.metrics.study).letter] || 0) : r.stars;
 
 // tolerant date → ISO (journal trades carry ISO or M/D/YY)
 const mbISO = (d) => {
@@ -477,7 +479,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 <b style={{ width: 64, color: firstOfGroup ? undefined : "transparent" }}>{r.ticker}{firstOfGroup && groupN > 1 ? <span style={{ color: C.muted, fontWeight: 400, fontSize: "0.64rem" }}> ×{groupN}</span> : null}</b>
                 <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
                 <span style={{ width: 150 }}>{r.pattern}</span>
-                <span style={{ width: 70, color: s.grade?.letter ? C.goldBright : C.muted, fontWeight: 700 }}>{s.grade?.letter || "—"}</span>
+                {(() => { const q = studyQuality(s); return <span style={{ width: 70, color: q.letter === "—" ? C.muted : q.letter === "A+" ? "#7ef0a0" : C.goldBright, fontWeight: 700 }} title={`${q.on}/${q.total} criteria ticked`}>{q.letter}</span>; })()}
                 <span style={{ flex: 1, color: C.muted, fontSize: "0.7rem" }}>{s.regime_tag || ""}</span>
                 {cls && <span style={{ fontWeight: 700, color: cls === "failure" ? C.red : "#7ef0a0" }}>{cls}</span>}
                 <button title={inModelBook(r) ? "In the Model Book — click to remove" : "Add to the Model Book"} onClick={(e) => { e.stopPropagation(); toggleModelBook(r); }} style={{ background: "transparent", border: "none", color: inModelBook(r) ? C.goldBright : C.muted, cursor: "pointer", fontSize: "1rem" }}>{inModelBook(r) ? "★" : "☆"}</button>
