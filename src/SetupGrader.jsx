@@ -173,7 +173,11 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
 
   // ── grade object + persistence ──
   const autoLive = [...auto].filter(k => on.has(k)); // dots only count while their tick is still on
-  const grade = { stars, pct, passed, total: TOTAL, starHit, starmakers: STARMAKERS, letter, label: gLabel, ticked: [...on], auto: autoLive };
+  // chart_img persists with the grade so reopening a saved grade shows its chart again (JH bug
+  // 2026-07-14). Only real storage URLs are kept — the data-URL fallback (storage unreachable)
+  // would bloat localStorage past its quota and can't be shared across devices anyway.
+  const grade = { stars, pct, passed, total: TOTAL, starHit, starmakers: STARMAKERS, letter, label: gLabel, ticked: [...on], auto: autoLive,
+    chart_img: /^https?:/.test(chartImg) ? chartImg : "", note: note.trim() };
   const posSyms = Array.from(new Set((positions || []).map(p => String(p.sym || p.symbol || "").toUpperCase().trim()).filter(Boolean)));
   const posSet = new Set(posSyms);
   const saved = loadActiveGrades();
@@ -183,7 +187,9 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const loadTicker = (sym) => {
     const g = getGrade(sym);
     setTicker(sym); setOn(new Set(g && g.ticked ? g.ticked : [])); setAuto(new Set(g && g.auto ? g.auto : []));
-    setChartImg(""); setNote(""); setEditDate(null); // switching tickers leaves post-edit mode
+    // the saved grade's own chart + annotation come back with it (JH bug 2026-07-14);
+    // the daily_setups prefill below only fills whatever is still blank.
+    setChartImg(g?.chart_img || ""); setNote(g?.note || ""); setEditDate(null); // switching tickers leaves post-edit mode
     loadSeq.current = sym; // stamp: only the LATEST loadTicker may prefill (kills the cross-ticker race)
     // If I already have a post for this ticker (e.g. published via "pull my daily ideas"),
     // pull its chart + annotation back into the kit so republish/share-card keeps them.

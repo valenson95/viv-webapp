@@ -28,3 +28,9 @@ alter table public.trades add column if not exists grade_snapshot jsonb;
 -- grade instead of deleting it — Open Positions' Grade column, Model Book, and published
 -- Daily Setups keep reading it; only the grader's list hides it. Re-grading un-archives.
 alter table public.setup_grades add column if not exists archived boolean not null default false;
+
+-- Chart + annotation persist WITH the grade (2026-07-14, JH report): reopening a saved grade
+-- must bring back its pasted chart. Previously the chart only lived on daily_setups posts, so
+-- members who save-without-publishing lost it. Stored as a trade-charts public URL, never base64.
+alter table public.setup_grades add column if not exists chart_img text;
+alter table public.setup_grades add column if not exists note text;

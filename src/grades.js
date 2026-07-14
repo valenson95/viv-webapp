@@ -43,7 +43,7 @@ export async function initGrades(uid) {
       const sym = r.symbol;
       const localRow = local[sym];
       if (!localRow || new Date(r.updated_at) >= new Date(localRow.updatedAt || 0)) {
-        merged[sym] = { sym, stars: r.stars, letter: r.letter, pct: +r.pct || 0, starHit: r.star_hit, starmakers: r.starmakers, ticked: r.ticked || [], auto: r.auto || [], archived: !!r.archived, updatedAt: r.updated_at };
+        merged[sym] = { sym, stars: r.stars, letter: r.letter, pct: +r.pct || 0, starHit: r.star_hit, starmakers: r.starmakers, ticked: r.ticked || [], auto: r.auto || [], archived: !!r.archived, chart_img: r.chart_img || "", note: r.note || "", updatedAt: r.updated_at };
       } else {
         pushUp.push(localRow); // local edit is newer than the server copy — sync it up
       }
@@ -56,10 +56,12 @@ export async function initGrades(uid) {
       // (some rows with `auto`, some without) 400s the whole request. So: include `auto`
       // on EVERY row iff any row has it (the column exists once gold-dot grades exist).
       const withAuto = pushUp.some(g => g.auto && g.auto.length);
+      const withChart = pushUp.some(g => g.chart_img || g.note); // column exists after setup-grades.sql rerun
       const { error: upErr } = await supabase.from("setup_grades").upsert(pushUp.map(g => ({
         user_id: UID, symbol: g.sym, stars: g.stars || 0, letter: g.letter || null, pct: g.pct ?? null,
         star_hit: g.starHit ?? null, starmakers: g.starmakers ?? null, ticked: g.ticked || [], updated_at: g.updatedAt || new Date().toISOString(),
         ...(withAuto ? { auto: g.auto || [] } : {}),
+        ...(withChart ? { chart_img: g.chart_img || null, note: g.note || null } : {}),
       })));
       if (upErr) console.error("grade push-up:", upErr.message);
     }
@@ -89,6 +91,13 @@ export function saveGrade(sym, grade) {
       // un-archive server-side separately (best-effort; column may not exist yet)
       if (wasArchived) supabase.from("setup_grades").update({ archived: false })
         .eq("user_id", UID).eq("symbol", s).then(() => {});
+      // chart + annotation ride separately (best-effort, same pattern as `archived`) so a
+      // missing column can never fail the grade save itself. JH 2026-07-14: saved grades
+      // must reopen WITH their chart — daily_setups is not a fallback for non-publishers.
+      if (row.chart_img || row.note) supabase.from("setup_grades")
+        .update({ chart_img: row.chart_img || null, note: row.note || null, updated_at: row.updatedAt })
+        .eq("user_id", UID).eq("symbol", s)
+        .then(({ error: e2 }) => { if (e2) console.error("grade chart sync (run setup-grades.sql once):", e2.message); });
     });
   }
 }
