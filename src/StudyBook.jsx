@@ -52,7 +52,7 @@ export const STUDY_SETUPS = {
       ["breakout_num", "Breakout # in trend (1st/2nd/3rd…)"], ["up_days_before", "Up-days in a row before trigger"],
       ["re_pct", "Trigger day % move"], ["gap_pct", "Gap % (open vs prior close)"], ["vol_ratio", "Volume ÷ prior day"],
       ["rvol_eod", "RVol 50d EOD"], ["run_rate", "Run rate at entry (×)"],
-      ["closing_range", "Closing range % (C−L)/(H−L)"], ["stop_width_adr", "LOD stop width (×ADR)"],
+      ["closing_range", "Closing range % (C−L)/(H−L)"], ["entry_px", "Entry (5-min ORH — standing rule)"], ["stop_width_adr", "LoD stop width from entry (×ADR)"],
       ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
     ],
   },
@@ -78,7 +78,7 @@ export const STUDY_SETUPS = {
       ["premkt_vol_k", "Pre-market volume (k sh)"], ["yoy_eps", "YoY EPS growth %"], ["yoy_rev", "YoY revenue growth %"],
       ["neglect_3m", "3-mo return before EP %"], ["surprise_num", "Surprise # (1st / 2nd…)"],
       ["analysts", "Analyst count"], ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"],
-      ["stop_width_adr", "Stop width (×ADR)"], ["regime", "Regime (SPY 10>20) Y/N"],
+      ["entry_px", "Entry (5-min ORH — standing rule)"], ["stop_width_adr", "LoD stop width from entry (×ADR)"], ["regime", "Regime (SPY 10>20) Y/N"],
     ],
   },
   "Parabolic": {

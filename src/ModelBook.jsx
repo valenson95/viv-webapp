@@ -446,13 +446,20 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           {studyRows.length === 0 && studyEditing === null && (
             <div style={{ color: C.muted, fontSize: "0.82rem", padding: "18px 0" }}>No studies yet — hit ＋ New study. Grade blind (grade + prediction locked before the outcome opens), then record what happened. The scoreboard finds your winner DNA as the sample grows.</div>
           )}
-          {studyRows.map(r => {
+          {/* grouped by ticker, dates in chronological order — one ticker can hold many
+              studies (different trigger dates); the ticker prints once per group */}
+          {[...studyRows].sort((a, b) => a.ticker === b.ticker
+              ? String(a.entry_date || "").localeCompare(String(b.entry_date || ""))
+              : (a.ticker < b.ticker ? -1 : 1))
+            .map((r, i, arr) => {
             const s = r.metrics.study; const cls = outcomeClass(s);
+            const firstOfGroup = i === 0 || arr[i - 1].ticker !== r.ticker;
+            const groupN = arr.filter(x => x.ticker === r.ticker).length;
             return (
-              <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 7, fontSize: "0.78rem", cursor: "pointer" }}
+              <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: firstOfGroup && i > 0 ? 7 : 4, marginTop: firstOfGroup && i > 0 ? 12 : 0, fontSize: "0.78rem", cursor: "pointer" }}
                 onClick={() => setStudyEditing(r)}
                 onMouseEnter={e => e.currentTarget.style.borderColor = C.borderGold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
-                <b style={{ width: 64 }}>{r.ticker}</b>
+                <b style={{ width: 64, color: firstOfGroup ? undefined : "transparent" }}>{r.ticker}{firstOfGroup && groupN > 1 ? <span style={{ color: C.muted, fontWeight: 400, fontSize: "0.64rem" }}> ×{groupN}</span> : null}</b>
                 <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
                 <span style={{ width: 150 }}>{r.pattern}</span>
                 <span style={{ width: 70, color: s.grade?.letter ? C.goldBright : C.muted, fontWeight: 700 }}>{s.grade?.letter || "—"}</span>

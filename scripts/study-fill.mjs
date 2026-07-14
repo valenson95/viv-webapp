@@ -16,12 +16,14 @@ const T = TICKER.toUpperCase();
 const PROXY = "https://www.valensontrades.com/api/candles";
 
 const shift = (ds, n) => { const d = new Date(ds+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
-async function bars(sym, from, to) {
-  const r = await fetch(`${PROXY}?symbol=${sym}&from=${from}&to=${to}&res=1day`);
+async function bars(sym, from, to, res="1day") {
+  const r = await fetch(`${PROXY}?symbol=${sym}&from=${from}&to=${to}&res=${res}`);
   const j = await r.json();
   if (!j.ok || !j.candles?.length) throw new Error(`${sym}: ${j.error || "no bars"}`);
-  return j.candles.map(c => ({ d: new Date(c.time*1000).toISOString().slice(0,10), o:c.open, h:c.high, l:c.low, c:c.close, v:c.volume }));
+  return j.candles.map(c => ({ d: new Date(c.time*1000).toISOString().slice(0,10), t:c.time, o:c.open, h:c.high, l:c.low, c:c.close, v:c.volume }));
 }
+// Minutes-since-midnight in New York for an epoch-seconds bar (DST-safe).
+const etMins = (sec) => { const [h, m] = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour12: false, hour: "2-digit", minute: "2-digit" }).format(new Date(sec*1000)).split(":"); return +h*60 + +m; };
 const sma = (a, n, i) => i+1>=n ? a.slice(i-n+1, i+1).reduce((s,x)=>s+x.c,0)/n : null;
 function atr14(a, i) { // Wilder
   if (i < 15) return null;
@@ -58,9 +60,27 @@ const ret = (n) => ti-n>=0 ? (prev.c/all[ti-1-n].c-1)*100 : null;
 const lin = r2(all.slice(Math.max(0,ti-63),ti).map(b=>Math.log(b.c)));
 let bnum=1; for(let k=Math.max(1,ti-90);k<ti;k++) if(all[k].c/all[k-1].c>=1.04 && all[k].v>all[k-1].v) bnum++;
 const si = spy.length-1; const spyOK = sma(spy,10,si) > sma(spy,20,si);
+// ENTRY ANCHOR (Valen 2026-07-14, HARD): entry = 5-MIN OPENING-RANGE HIGH, stop = LoD — always.
+// Real 5-min bars via the proxy; fallback = daily open (≈ORH floor) if intraday is unavailable.
+let entry = null, entryModel = "";
+for (let attempt = 0; attempt < 2 && entry == null; attempt++) {
+  try {
+    const intr = await bars(T, t.d, t.d, "5min");
+    const rth = intr.filter(b => { const m = etMins(b.t); return m >= 570 && m < 960; }); // 09:30–16:00 ET
+    if (rth.length) { entry = rth[0].h; entryModel = "5-min ORH"; }
+    break; // bars came back (even if no RTH rows) — don't retry
+  } catch (e) { // Polygon free tier = 5 req/min; wait out the window once rather than silently
+    if (attempt === 0 && /maximum requests|exceeded/i.test(String(e.message))) { // degrading the anchor
+      console.log("  (rate-limited on 5-min bars — waiting 61s and retrying…)");
+      await new Promise(r => setTimeout(r, 61000));
+    } else break; // genuinely unavailable for this date/plan
+  }
+}
+if (entry == null) { entry = t.o; entryModel = "daily open (5-min bars unavailable — ≈ORH)"; }
 // outcome (may be partial if <20 sessions elapsed)
 const post = all.slice(ti+1, ti+22);
-const entry = t.c, lod = t.l;
+const lod = t.l;
+if (entry < lod) { entry = t.o; entryModel = "daily open (ORH below LoD artifact)"; }
 const mfe = (n) => post.length ? (Math.max(...post.slice(0,n).map(b=>b.h))/entry-1)*100 : null;
 const day2 = post[0] ? (post[0].c/t.c-1)*100 : null;
 let bdays=0; for(let k=0;k<post.length && (k===0?post[k].c>t.c:post[k].c>post[k-1].c);k++) bdays++;
@@ -81,6 +101,7 @@ const f=(x,d=1)=>x==null||Number.isNaN(x)?null:+x.toFixed(d);
 const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(ret(63)), ext_50ma:f(ext50,2),
   from_high_pct:f(fromHigh), breakout_num:bnum+" (approx: 4% RE-days last 90)", up_days_before:upb, re_pct:f(re), gap_pct:f(gap),
   vol_ratio:f(volr,2), rvol_eod:f(rvol,2), closing_range:f(crange,0), stop_width_adr:f(((entry-lod)/entry*100)/adr20,2),
+  entry_px:`${f(entry,2)} (${entryModel})`,
   ret_1m:f(ret(21)), ret_3m:f(ret(63)), ret_6m:f(ret(126)), regime: spyOK?"Y":"N", rs:"pending as-rank (needs POLYGON_API_KEY)" };
 // SUGGESTED ticks only — checks belong to VALEN's eyes now (2026-07-14 split: his buckets vs auto data).
 // Printed for cross-reference, NEVER written into the row.
@@ -91,7 +112,7 @@ const outcome = { mfe_d1:f(mfe(1)), mfe_d3:f(mfe(3)), mfe_d5:f(mfe(5)), mfe_d20:
   burst_days:bdays||null, burst_pct:f(bpct), mae:f(mae), giveback_pct:f(give), days_above_10ma:exitC!=null?d10:`${d10}+ (still above)`,
   trail_r:f(trailR,2), ext_at_peak:f(extPeak,2), followthru: day2==null?"":(day2>0?"yes":"no") };
 
-console.log(`\n=== ${T} @ ${t.d} (trigger close ${t.c}, LOD ${t.l}) ===`);
+console.log(`\n=== ${T} @ ${t.d} (entry ${entry.toFixed(2)} = ${entryModel} · LoD stop ${t.l} · close ${t.c}) ===`);
 console.log("METRICS:", JSON.stringify(m, null, 1));
 console.log("SUGGESTED TICKS (data view — verify with your eyes, not written to the row):",
   Object.entries(suggested).filter(([,v])=>v).map(([k,v])=>v===true?k:`${k}=${v}`).join(", ") || "none");
@@ -102,7 +123,7 @@ if (WRITE) {
   // (m + outcome + _computed) while Valen's layers (checks/ticks/grade/refusal/charts) are preserved.
   const { data: ex } = await sb.from("model_book").select("id,metrics").eq("created_by",UID).eq("ticker",T).eq("entry_date",t.d);
   const existing = (ex||[]).find(r => r.metrics?.study);
-  const note = `study-fill.mjs ${new Date().toISOString().slice(0,10)} · entry anchor = trigger close · base/pole spans = eyeball on chart`;
+  const note = `study-fill.mjs ${new Date().toISOString().slice(0,10)} · entry = ${entryModel}, stop = LoD (Valen's standing rule) · base/pole spans = eyeball on chart`;
   if (existing) {
     const s0 = existing.metrics.study;
     const study = { ...s0, m: { ...s0.m, ...m, rs: s0.m?.rs && !/pending/.test(String(s0.m.rs)) ? s0.m.rs : m.rs }, outcome: { ...s0.outcome, ...outcome }, _computed: note };
