@@ -454,8 +454,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 <b style={{ width: 64 }}>{r.ticker}</b>
                 <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
                 <span style={{ width: 150 }}>{r.pattern}</span>
-                <span style={{ width: 70, color: s.grade?.locked ? C.goldBright : C.muted, fontWeight: 700 }}>{s.grade?.locked ? s.grade.letter : "ungraded"}</span>
-                <span style={{ flex: 1, color: C.muted, fontSize: "0.7rem" }}>{s.grade?.locked ? `predicted ${s.grade.prediction}` : ""}</span>
+                <span style={{ width: 70, color: s.grade?.letter ? C.goldBright : C.muted, fontWeight: 700 }}>{s.grade?.letter || "—"}</span>
+                <span style={{ flex: 1, color: C.muted, fontSize: "0.7rem" }}>{s.regime_tag || ""}</span>
                 {cls && <span style={{ fontWeight: 700, color: cls === "failure" ? C.red : "#7ef0a0" }}>{cls}</span>}
                 <button title="Delete study" onClick={(e) => { e.stopPropagation(); remove(r); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: "0.95rem" }}>×</button>
               </div>
