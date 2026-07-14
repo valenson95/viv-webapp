@@ -51,7 +51,7 @@ export const STUDY_SETUPS = {
       ["ext_50ma", "Ext from 50MA (×ATR%)"], ["from_high_pct", "% below 52wk high"],
       ["breakout_num", "Breakout # in trend (1st/2nd/3rd…)"], ["up_days_before", "Up-days in a row before trigger"],
       ["re_pct", "Trigger day % move"], ["gap_pct", "Gap % (open vs prior close)"], ["vol_ratio", "Volume ÷ prior day"],
-      ["rvol_eod", "RVol 50d EOD"], ["run_rate", "Run rate at entry (×)"],
+      ["rvol_eod", "RVol 50d EOD"], ["rvol_30m", "RVOL 1st 30min (vs same window, 20d)"], ["vol30_adv_pct", "1st-30min vol as % of ADV"], ["run_rate", "Run rate at entry (×)"],
       ["closing_range", "Closing range % (C−L)/(H−L)"], ["entry_px", "Entry (5-min ORH — standing rule)"], ["stop_width_adr", "LoD stop width from entry (×ADR)"],
       ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
     ],
@@ -75,7 +75,8 @@ export const STUDY_SETUPS = {
     ],
     metrics: [
       ["gap_pct", "Gap %"], ["rvol_eod", "RVol 50d EOD (≥3× gate)"], ["run_rate", "Run rate at entry (×)"],
-      ["premkt_vol_k", "Pre-market volume (k sh)"], ["yoy_eps", "YoY EPS growth %"], ["yoy_rev", "YoY revenue growth %"],
+      ["premkt_vol_k", "Pre-market volume (k sh)"], ["rvol_30m", "RVOL 1st 30min (vs same window, 20d)"], ["vol30_adv_pct", "1st-30min vol as % of ADV"],
+      ["yoy_eps", "YoY EPS growth %"], ["yoy_rev", "YoY revenue growth %"],
       ["neglect_3m", "3-mo return before EP %"], ["surprise_num", "Surprise # (1st / 2nd…)"],
       ["analysts", "Analyst count"], ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"],
       ["entry_px", "Entry (5-min ORH — standing rule)"], ["stop_width_adr", "LoD stop width from entry (×ADR)"], ["regime", "Regime (SPY 10>20) Y/N"],
@@ -111,6 +112,8 @@ export const DATA_FLAGS = [
   ["adr4", "ADR20 ≥ 4% (data)", (m) => m.adr20 == null || m.adr20 === "" ? null : +m.adr20 >= 4],
   ["vol_gt_prior", "Volume > prior day (data)", (m) => m.vol_ratio == null || m.vol_ratio === "" ? null : +m.vol_ratio > 1],
   ["rvol_hot", "RVol 50d ≥ 1.5 (data)", (m) => m.rvol_eod == null || m.rvol_eod === "" ? null : +m.rvol_eod >= 1.5],
+  // Jeff's documented gate: ~40% of a full day's volume by the first 30 min (time-matched pace)
+  ["jeff40", "1st-30min vol ≥ 40% of ADV (data)", (m) => m.vol30_adv_pct == null || m.vol30_adv_pct === "" ? null : +m.vol30_adv_pct >= 40],
   ["ext_ok", "Ext from 50MA ≤ 4× (data)", (m) => m.ext_50ma == null || m.ext_50ma === "" ? null : +m.ext_50ma <= 4],
   ["pole30", "3-mo return ≥ +30% (data)", (m) => { const v = m.pole_pct ?? m.ret_3m; return v == null || v === "" ? null : +v >= 30; }],
   ["stop_tight", "Stop ≤ 1× ADR (data)", (m) => m.stop_width_adr == null || m.stop_width_adr === "" ? null : +m.stop_width_adr <= 1],

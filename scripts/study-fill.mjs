@@ -62,19 +62,34 @@ let bnum=1; for(let k=Math.max(1,ti-90);k<ti;k++) if(all[k].c/all[k-1].c>=1.04 &
 const si = spy.length-1; const spyOK = sma(spy,10,si) > sma(spy,20,si);
 // ENTRY ANCHOR (Valen 2026-07-14, HARD): entry = 5-MIN OPENING-RANGE HIGH, stop = LoD — always.
 // Real 5-min bars via the proxy; fallback = daily open (≈ORH floor) if intraday is unavailable.
-let entry = null, entryModel = "";
-for (let attempt = 0; attempt < 2 && entry == null; attempt++) {
-  try {
-    const intr = await bars(T, t.d, t.d, "5min");
-    const rth = intr.filter(b => { const m = etMins(b.t); return m >= 570 && m < 960; }); // 09:30–16:00 ET
-    if (rth.length) { entry = rth[0].h; entryModel = "5-min ORH"; }
-    break; // bars came back (even if no RTH rows) — don't retry
-  } catch (e) { // Polygon free tier = 5 req/min; wait out the window once rather than silently
-    if (attempt === 0 && /maximum requests|exceeded/i.test(String(e.message))) { // degrading the anchor
+// One 5-min fetch spanning the trigger day + ~45 prior calendar days serves BOTH:
+//   entry anchor (5-min ORH) AND time-matched intraday volume (no live RVOL exists for
+//   backdated stocks — this rebuilds it from bars: trigger's first-30-min volume vs the
+//   same 09:30–10:00 window averaged over the prior 20 sessions, plus Jeff's %-of-ADV read).
+let entry = null, entryModel = "", rvol30 = null, vol30adv = null;
+let intr = null;
+for (let attempt = 0; attempt < 2 && !intr; attempt++) {
+  try { intr = await bars(T, shift(t.d, -45), t.d, "5min"); }
+  catch (e) { // Polygon free tier = 5 req/min; wait out the window once rather than silently degrading
+    if (attempt === 0 && /maximum requests|exceeded/i.test(String(e.message))) {
       console.log("  (rate-limited on 5-min bars — waiting 61s and retrying…)");
       await new Promise(r => setTimeout(r, 61000));
     } else break; // genuinely unavailable for this date/plan
   }
+}
+if (intr) {
+  const rth = intr.filter(b => { const m = etMins(b.t); return m >= 570 && m < 960; }); // 09:30–16:00 ET
+  const byDay = {}; rth.forEach(b => (byDay[b.d] ||= []).push(b));
+  const trigBars = byDay[t.d] || [];
+  if (trigBars.length) { entry = trigBars[0].h; entryModel = "5-min ORH"; }
+  const w30 = (bb) => bb.filter(b => etMins(b.t) < 600).reduce((s, b) => s + b.v, 0); // 09:30–10:00
+  const prior = Object.keys(byDay).filter(d => d < t.d).sort().slice(-20);
+  if (trigBars.length && prior.length >= 5) {
+    const avg30 = prior.reduce((s, d) => s + w30(byDay[d]), 0) / prior.length;
+    if (avg30 > 0) rvol30 = w30(trigBars) / avg30;
+  }
+  const adv20v = win(20).reduce((s, b) => s + b.v, 0) / 20;
+  if (trigBars.length && adv20v > 0) vol30adv = w30(trigBars) / adv20v * 100;
 }
 if (entry == null) { entry = t.o; entryModel = "daily open (5-min bars unavailable — ≈ORH)"; }
 // outcome (may be partial if <20 sessions elapsed)
@@ -100,7 +115,8 @@ const f=(x,d=1)=>x==null||Number.isNaN(x)?null:+x.toFixed(d);
 
 const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(ret(63)), ext_50ma:f(ext50,2),
   from_high_pct:f(fromHigh), breakout_num:bnum+" (approx: 4% RE-days last 90)", up_days_before:upb, re_pct:f(re), gap_pct:f(gap),
-  vol_ratio:f(volr,2), rvol_eod:f(rvol,2), closing_range:f(crange,0), stop_width_adr:f(((entry-lod)/entry*100)/adr20,2),
+  vol_ratio:f(volr,2), rvol_eod:f(rvol,2), rvol_30m:f(rvol30,2), vol30_adv_pct:f(vol30adv,0),
+  closing_range:f(crange,0), stop_width_adr:f(((entry-lod)/entry*100)/adr20,2),
   entry_px:`${f(entry,2)} (${entryModel})`,
   ret_1m:f(ret(21)), ret_3m:f(ret(63)), ret_6m:f(ret(126)), regime: spyOK?"Y":"N", rs:"pending as-rank (needs POLYGON_API_KEY)" };
 // SUGGESTED ticks only — checks belong to VALEN's eyes now (2026-07-14 split: his buckets vs auto data).
