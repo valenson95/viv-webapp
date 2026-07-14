@@ -5,6 +5,12 @@ import { SECTIONS } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
 import { isStudyRow, StudyEditor, StudyScoreboard, outcomeClass } from "./StudyBook.jsx";
 
+// A study starred for the Model Book shows as a card; its star count comes from the study's
+// auto quality grade (tick-%) rather than the 16-criteria Model Book ticks it doesn't have.
+const STUDY_LETTER_N = { "A+": 5, A: 4, B: 3, C: 2 };
+const inModelBook = (r) => isStudyRow(r) && !!r.metrics?.study?.in_model_book;
+const cardStars = (r) => isStudyRow(r) ? (STUDY_LETTER_N[r.metrics?.study?.grade?.letter] || 0) : r.stars;
+
 // tolerant date → ISO (journal trades carry ISO or M/D/YY)
 const mbISO = (d) => {
   if (!d) return "";
@@ -307,11 +313,12 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   useEffect(() => { try { if (sessionStorage.getItem("viv-mb-prefill")) setEditing({}); } catch {} }, []);
 
   const visible = rows.filter(r => {
-    if (isStudyRow(r)) return false; // studies live in their own 📚 view until promoted
+    // studies live in their own 📚 view UNLESS starred for the Model Book (then they show as cards too)
+    if (isStudyRow(r) && !inModelBook(r)) return false;
     if (fScope === "official" && !r.is_published) return false;
     if (fScope === "mine" && r.created_by !== uid) return false;
     if (fPattern !== "All" && r.pattern !== fPattern) return false;
-    const eff = effectiveStars(r.stars, (r.elite || []).length).n;
+    const eff = effectiveStars(cardStars(r), (r.elite || []).length).n;
     if (fTier !== "All" && eff !== +fTier) return false;
     return true;
   });
@@ -364,6 +371,14 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     if (!window.confirm(`Delete ${row.ticker} from the Model Book? This cannot be undone.`)) return;
     const { error } = await supabase.from("model_book").delete().eq("id", row.id);
     if (error) setError(String(error.message)); else { setDetail(null); load(); }
+  };
+  // one-click star toggle on a study row: flips metrics.study.in_model_book (no duplication —
+  // the study stays for lift; starred ⇒ it also shows as a Model Book card)
+  const toggleModelBook = async (row) => {
+    const mt = { ...row.metrics, study: { ...row.metrics.study, in_model_book: !row.metrics?.study?.in_model_book } };
+    setRows(rs => rs.map(x => x.id === row.id ? { ...x, metrics: mt } : x)); // optimistic
+    const { error } = await supabase.from("model_book").update({ metrics: mt }).eq("id", row.id);
+    if (error) { setError(String(error.message)); load(); }
   };
 
   const chip = (active) => ({
@@ -465,6 +480,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 <span style={{ width: 70, color: s.grade?.letter ? C.goldBright : C.muted, fontWeight: 700 }}>{s.grade?.letter || "—"}</span>
                 <span style={{ flex: 1, color: C.muted, fontSize: "0.7rem" }}>{s.regime_tag || ""}</span>
                 {cls && <span style={{ fontWeight: 700, color: cls === "failure" ? C.red : "#7ef0a0" }}>{cls}</span>}
+                <button title={inModelBook(r) ? "In the Model Book — click to remove" : "Add to the Model Book"} onClick={(e) => { e.stopPropagation(); toggleModelBook(r); }} style={{ background: "transparent", border: "none", color: inModelBook(r) ? C.goldBright : C.muted, cursor: "pointer", fontSize: "1rem" }}>{inModelBook(r) ? "★" : "☆"}</button>
                 <button title="Delete study" onClick={(e) => { e.stopPropagation(); remove(r); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: "0.95rem" }}>×</button>
               </div>
             );
@@ -475,7 +491,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {/* card grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
         {(studyMode ? [] : visible).map(r => {
-          const eff = effectiveStars(r.stars, (r.elite || []).length);
+          const eff = effectiveStars(cardStars(r), (r.elite || []).length);
           return (
             <div key={r.id} onClick={() => setDetail(r)} style={{ background: C.glass, border: `1px solid ${eff.n >= 6 ? "rgba(126,240,160,0.3)" : C.border}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "transform .15s, border-color .15s" }}
               onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.borderColor = C.borderGold; }}
@@ -489,7 +505,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                   <span style={{ fontWeight: 800, fontSize: "1.02rem", color: C.white }}>{r.ticker}</span>
                   <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.gold, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 9px", borderRadius: 99 }}>{r.pattern}</span>
-                  {!r.is_published && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: isAdmin ? C.muted : "#8ab4f8", border: `1px solid ${isAdmin ? C.border : "rgba(138,180,248,0.35)"}`, padding: "2px 8px", borderRadius: 99 }}>{isAdmin ? "DRAFT" : "🔒 PERSONAL"}</span>}
+                  {inModelBook(r) && <span title="Starred from a 📚 Study" style={{ fontSize: "0.58rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, padding: "2px 8px", borderRadius: 99 }}>📚 study</span>}
+                  {!r.is_published && !isStudyRow(r) && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: isAdmin ? C.muted : "#8ab4f8", border: `1px solid ${isAdmin ? C.border : "rgba(138,180,248,0.35)"}`, padding: "2px 8px", borderRadius: 99 }}>{isAdmin ? "DRAFT" : "🔒 PERSONAL"}</span>}
                   {r.is_published && <span title="Curated by the VIV team" style={{ fontSize: "0.58rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 8px", borderRadius: 99 }}>⭐ VIV</span>}
                   {r.outcome && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: r.outcome === "Huge Winner" ? "#7ef0a0" : r.outcome === "Winner" ? C.green : r.outcome === "Loser" ? C.red : C.muted, border: `1px solid ${C.border}`, padding: "2px 8px", borderRadius: 99 }}>{r.outcome}</span>}
                   <span style={{ marginLeft: "auto", fontSize: "0.8rem", fontWeight: 800, color: (r.run_pct || 0) >= 0 ? C.green : C.red }}>{r.run_pct != null ? `${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : ""}</span>
@@ -507,7 +524,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
       {/* detail overlay */}
       {detail && (() => {
-        const r = detail, eff = effectiveStars(r.stars, (r.elite || []).length);
+        const r = detail, eff = effectiveStars(cardStars(r), (r.elite || []).length);
         return (
           <div onClick={e => { if (e.target === e.currentTarget) setDetail(null); }} style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(4,4,8,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
             <div style={{ width: "min(880px,100%)", background: "linear-gradient(180deg, rgba(18,18,26,0.95), rgba(8,8,14,0.98))", border: `1px solid ${C.borderGold}`, borderRadius: 20, padding: "22px 24px", boxShadow: "0 40px 100px rgba(0,0,0,0.72)" }}>
@@ -586,7 +603,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               {r.lesson && <div style={{ marginBottom: 14 }}><div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>The lesson</div><div style={{ fontSize: "0.88rem", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.lesson}</div></div>}
               {(isAdmin || (r.created_by === uid && !r.is_published)) && (
                 <div style={{ display: "flex", gap: 10, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
-                  <button onClick={() => { setEditing(r); setDetail(null); }} style={{ background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>Edit</button>
+                  <button onClick={() => { if (isStudyRow(r)) { setStudyMode(true); setStudyEditing(r); } else setEditing(r); setDetail(null); }} style={{ background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>{isStudyRow(r) ? "Edit study" : "Edit"}</button>
                   <button onClick={() => remove(r)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.red, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>Delete</button>
                 </div>
               )}

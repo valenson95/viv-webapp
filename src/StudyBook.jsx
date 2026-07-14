@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 // ══════════════════════════════════════════════════════════════════
 // STUDY BOOK — private study wing of My Book (admin). Historical EXERCISE
@@ -266,12 +266,27 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   const lbl = { fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.muted, marginBottom: 4, display: "block" };
   const sect = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "14px 0 8px" };
   const cls = outcomeClass(s);
+  // ── click-to-zoom lightbox: click either chart to enlarge, ←/→ toggles HTF↔LTF, Esc closes ──
+  const [zoom, setZoom] = useState(null); // null | "before_img" | "after_img"
+  const zoomSlots = ["before_img", "after_img"].filter(k => row[k]); // only attached charts
+  useEffect(() => {
+    if (!zoom) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") { setZoom(null); return; }
+      if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && zoomSlots.length > 1) {
+        e.preventDefault();
+        setZoom(z => { const i = zoomSlots.indexOf(z); return zoomSlots[(i + (e.key === "ArrowRight" ? 1 : -1) + zoomSlots.length) % zoomSlots.length]; });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoom, zoomSlots.length]);
   const chartSlot = (slot, title, hint) => (
     <div style={{ flex: 1, minWidth: 240 }}>
       <label style={lbl}>{title}</label>
       <div style={{ fontSize: "0.62rem", color: C.muted, marginBottom: 6 }}>{hint}</div>
       <input type="file" accept="image/*" onChange={e => onUpload(e.target.files[0], slot, setRow)} style={{ fontSize: "0.7rem", color: C.muted }} />
-      {row[slot] && <img src={row[slot]} alt="" style={{ display: "block", marginTop: 8, width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)" }} />}
+      {row[slot] && <img src={row[slot]} alt="" onClick={() => setZoom(slot)} title="Click to zoom (← → toggles HTF/LTF · Esc closes)" style={{ display: "block", marginTop: 8, width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)", cursor: "zoom-in" }} />}
     </div>
   );
   const doSave = () => {
@@ -286,9 +301,15 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   };
   return (
     <div style={{ background: C.glass, border: `1px solid ${C.goldBright}`, borderRadius: 14, padding: 18, marginBottom: 18, fontFamily: font }}>
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>📚 Study {row.ticker ? `· ${row.ticker}` : "· new"}</span>
-        <button title="Collapse (changes not saved)" onClick={onCancel} style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.72rem", padding: "4px 12px", cursor: "pointer" }}>✕ collapse</button>
+        {/* Star toggle = "show this study in the Model Book too". No duplication — the study stays
+            in 📚 for the lift stats; when starred it ALSO appears as a Model Book card. Saved with the study. */}
+        <button title={s.in_model_book ? "In the Model Book — click to remove" : "Add to the Model Book (the winners' textbook). Saved when you save the study."}
+          onClick={() => setS({ in_model_book: !s.in_model_book })}
+          style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${s.in_model_book ? C.borderGold : C.border}`, color: s.in_model_book ? C.goldBright : C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.78rem", fontWeight: 700, padding: "4px 12px", cursor: "pointer" }}>
+          {s.in_model_book ? "★" : "☆"} Model Book</button>
+        <button title="Collapse (changes not saved)" onClick={onCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.72rem", padding: "4px 12px", cursor: "pointer" }}>✕ collapse</button>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div style={{ width: 110 }}><label style={lbl}>Ticker</label><input style={inputS} value={row.ticker} onChange={e => setRow(r => ({ ...r, ticker: e.target.value.toUpperCase() }))} /></div>
@@ -383,6 +404,20 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
         <button disabled={busy} onClick={doSave} style={{ background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 22px", borderRadius: 99, cursor: "pointer" }}>{busy ? "Saving…" : "Save study"}</button>
         <button onClick={onCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
       </div>
+
+      {/* click-to-zoom lightbox — ← → toggles HTF↔LTF, click backdrop or Esc to close */}
+      {zoom && row[zoom] && (
+        <div onClick={e => { if (e.target === e.currentTarget) setZoom(null); }}
+          style={{ position: "fixed", inset: 0, zIndex: 1400, background: "rgba(4,4,8,0.9)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10, color: C.white, fontFamily: font }}>
+            {zoomSlots.length > 1 && <button onClick={() => setZoom(zoomSlots[(zoomSlots.indexOf(zoom) - 1 + zoomSlots.length) % zoomSlots.length])} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 10, fontSize: "1.3rem", cursor: "pointer" }} aria-label="Previous">‹</button>}
+            <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>{zoom === "before_img" ? "HTF chart" : "LTF chart"}{zoomSlots.length > 1 ? " · ← → to toggle" : ""}</span>
+            {zoomSlots.length > 1 && <button onClick={() => setZoom(zoomSlots[(zoomSlots.indexOf(zoom) + 1) % zoomSlots.length])} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 10, fontSize: "1.3rem", cursor: "pointer" }} aria-label="Next">›</button>}
+            <button onClick={() => setZoom(null)} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.muted, width: 40, height: 40, borderRadius: 10, fontSize: "1.1rem", cursor: "pointer", marginLeft: 8 }} aria-label="Close">✕</button>
+          </div>
+          <img src={row[zoom]} alt={zoom} style={{ maxWidth: "96vw", maxHeight: "82vh", objectFit: "contain", borderRadius: 10, border: `1px solid ${C.borderGold}`, cursor: "zoom-out" }} onClick={() => setZoom(null)} />
+        </div>
+      )}
     </div>
   );
 }
