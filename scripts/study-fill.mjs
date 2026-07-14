@@ -70,6 +70,11 @@ let d10=0, exitC=null;
 for(let k=ti+1;k<all.length;k++){ const s10=sma(all,10,k); if(s10 && all[k].c<s10){ exitC=all[k].c; break; } d10++; }
 const trailR = exitC!=null && entry>lod ? (exitC-entry)/(entry-lod) : null;
 const give = (hiIdx!=null && post.length>hiIdx+1) ? (Math.min(...post.slice(hiIdx+1,hiIdx+11).map(b=>b.l))/post[hiIdx].h-1)*100 : null;
+// ATR% Multiple from 50-MA at the burst PEAK (extension-tracker standing metric):
+// how stretched big winners GET before the burst dies — feeds the ≥7× trim-into-strength bands.
+let extPeak = null;
+if (hiIdx != null) { const pk = ti+1+hiIdx, s50pk = sma(all,50,pk), Apk = atr14(all,pk);
+  if (s50pk && Apk) extPeak = (all[pk].h - s50pk) / Apk; }
 const f=(x,d=1)=>x==null||Number.isNaN(x)?null:+x.toFixed(d);
 
 const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(ret(63)), ext_50ma:f(ext50,2),
@@ -82,7 +87,7 @@ const suggested = { tight:tight>=3, orderly, pole:(ret(63)??0)>=30, linear:lin>=
   re:re>=4&&upb<=2, up2:upb<=2, vol_exp:volr>1, closehi:crange>=70, ma_surf:!!maSurf };
 const outcome = { mfe_d1:f(mfe(1)), mfe_d3:f(mfe(3)), mfe_d5:f(mfe(5)), mfe_d20:f(mfe(20)), day2_pct:f(day2),
   burst_days:bdays||null, burst_pct:f(bpct), mae:f(mae), giveback_pct:f(give), days_above_10ma:exitC!=null?d10:`${d10}+ (still above)`,
-  trail_r:f(trailR,2), followthru: day2==null?"":(day2>0?"yes":"no") };
+  trail_r:f(trailR,2), ext_at_peak:f(extPeak,2), followthru: day2==null?"":(day2>0?"yes":"no") };
 
 console.log(`\n=== ${T} @ ${t.d} (trigger close ${t.c}, LOD ${t.l}) ===`);
 console.log("METRICS:", JSON.stringify(m, null, 1));
@@ -91,11 +96,23 @@ console.log("SUGGESTED TICKS (data view — verify with your eyes, not written t
 console.log("DATA SAYS NO:", Object.entries(suggested).filter(([,v])=>!v).map(([k])=>k).join(", ") || "none");
 console.log("OUTCOME:", JSON.stringify(outcome, null, 1));
 if (WRITE) {
-  const study = { setup:"Momentum Breakout", direction:"long", regime_tag: spyOK?"regime ON (SPY 10>20)":"regime OFF",
-    checks:{}, m, grade:{letter:""}, outcome, refusal:"",
-    _computed:`study-fill.mjs ${new Date().toISOString().slice(0,10)} · entry anchor = trigger close · base/pole spans = eyeball on chart` };
-  const { data, error } = await sb.from("model_book").insert({ created_by:UID, ticker:T, pattern:"Momentum Breakout",
-    stars:0, entry_date:t.d, is_published:false, elite:[], ticked:[], characteristics:[], metrics:{ study } }).select("id");
-  if (error) { console.error("✗ insert:", error.message); process.exit(1); }
-  console.log(`✓ inserted study row id=${data[0].id} — open 📚 Studies in My Book to attach charts + grade`);
+  // Upsert semantics: an existing study row for this ticker+date gets its AUTO layers refreshed
+  // (m + outcome + _computed) while Valen's layers (checks/ticks/grade/refusal/charts) are preserved.
+  const { data: ex } = await sb.from("model_book").select("id,metrics").eq("created_by",UID).eq("ticker",T).eq("entry_date",t.d);
+  const existing = (ex||[]).find(r => r.metrics?.study);
+  const note = `study-fill.mjs ${new Date().toISOString().slice(0,10)} · entry anchor = trigger close · base/pole spans = eyeball on chart`;
+  if (existing) {
+    const s0 = existing.metrics.study;
+    const study = { ...s0, m: { ...s0.m, ...m, rs: s0.m?.rs && !/pending/.test(String(s0.m.rs)) ? s0.m.rs : m.rs }, outcome: { ...s0.outcome, ...outcome }, _computed: note };
+    const { error } = await sb.from("model_book").update({ metrics: { ...existing.metrics, study } }).eq("id", existing.id);
+    if (error) { console.error("✗ update:", error.message); process.exit(1); }
+    console.log(`✓ refreshed auto layers on existing study row id=${existing.id} (your ticks/grade/charts untouched)`);
+  } else {
+    const study = { setup:"Momentum Breakout", direction:"long", regime_tag: spyOK?"regime ON (SPY 10>20)":"regime OFF",
+      checks:{}, m, grade:{letter:""}, outcome, refusal:"", _computed: note };
+    const { data, error } = await sb.from("model_book").insert({ created_by:UID, ticker:T, pattern:"Momentum Breakout",
+      stars:0, entry_date:t.d, is_published:false, elite:[], ticked:[], characteristics:[], metrics:{ study } }).select("id");
+    if (error) { console.error("✗ insert:", error.message); process.exit(1); }
+    console.log(`✓ inserted study row id=${data[0].id} — open 📚 Studies in My Book to attach charts + grade`);
+  }
 } else console.log("(dry-run — add --write to insert into My Book studies)");

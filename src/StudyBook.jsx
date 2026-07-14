@@ -122,6 +122,7 @@ const OUTCOME_METRICS = [
   ["day2_pct", "Day-2 % move (follow-through size)"], ["burst_days", "Burst length (days)"], ["burst_pct", "Burst magnitude %"],
   ["mae", "MAE % (before MFE)"], ["giveback_pct", "Giveback after burst %"],
   ["days_above_10ma", "Days above 10MA (campaign length)"], ["trail_r", "Trail-exit total R (10/20MA sim)"],
+  ["ext_at_peak", "Ext from 50MA at burst peak (×ATR%)"],
 ];
 
 const GRADES = ["C", "B", "A", "A+"];
