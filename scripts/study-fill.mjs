@@ -60,6 +60,14 @@ const ret = (n) => ti-n>=0 ? (prev.c/all[ti-1-n].c-1)*100 : null;
 const lin = r2(all.slice(Math.max(0,ti-63),ti).map(b=>Math.log(b.c)));
 let bnum=1; for(let k=Math.max(1,ti-90);k<ti;k++) if(all[k].c/all[k-1].c>=1.04 && all[k].v>all[k-1].v) bnum++;
 const si = spy.length-1; const spyOK = sma(spy,10,si) > sma(spy,20,si);
+// Market condition (Valen 2026-07-14, pre-registered): SPY's last 10 sessions vs its SMA20 —
+// ≥8/10 closes above = Uptrend · ≤2/10 above = Downtrend · 3–7 (hovering) = Chop.
+let spyCond = null, spyAbove = null;
+if (spy.length >= 30) {
+  spyAbove = 0;
+  for (let k = si-9; k <= si; k++) { const s20 = sma(spy,20,k); if (s20 && spy[k].c > s20) spyAbove++; }
+  spyCond = spyAbove >= 8 ? "Uptrend" : spyAbove <= 2 ? "Downtrend" : "Chop";
+}
 // ENTRY ANCHOR (Valen 2026-07-14, HARD): entry = 5-MIN OPENING-RANGE HIGH, stop = LoD — always.
 // Real 5-min bars via the proxy; fallback = daily open (≈ORH floor) if intraday is unavailable.
 // One 5-min fetch spanning the trigger day + ~45 prior calendar days serves BOTH:
@@ -118,7 +126,9 @@ const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(r
   vol_ratio:f(volr,2), rvol_eod:f(rvol,2), rvol_30m:f(rvol30,2), vol30_adv_pct:f(vol30adv,0),
   closing_range:f(crange,0), stop_width_adr:f(((entry-lod)/entry*100)/adr20,2),
   entry_px:`${f(entry,2)} (${entryModel})`,
-  ret_1m:f(ret(21)), ret_3m:f(ret(63)), ret_6m:f(ret(126)), regime: spyOK?"Y":"N", rs:"pending as-rank (needs POLYGON_API_KEY)" };
+  ret_1m:f(ret(21)), ret_3m:f(ret(63)), ret_6m:f(ret(126)), regime: spyOK?"Y":"N",
+  spy_10d20: spyCond ? `${spyCond} (${spyAbove}/10 closes above 20SMA)` : null,
+  rs:"pending as-rank (needs POLYGON_API_KEY)" };
 // SUGGESTED ticks only — checks belong to VALEN's eyes now (2026-07-14 split: his buckets vs auto data).
 // Printed for cross-reference, NEVER written into the row.
 const suggested = { tight:tight>=3, orderly, pole:(ret(63)??0)>=30, linear:lin>=0.8, young:bnum<=3, prior_nr:priorNR,
@@ -142,14 +152,14 @@ if (WRITE) {
   const note = `study-fill.mjs ${new Date().toISOString().slice(0,10)} · entry = ${entryModel}, stop = LoD (Valen's standing rule) · base/pole spans = eyeball on chart`;
   if (existing) {
     const s0 = existing.metrics.study;
-    const study = { ...s0, m: { ...s0.m, ...m, rs: s0.m?.rs && !/pending/.test(String(s0.m.rs)) ? s0.m.rs : m.rs }, outcome: { ...s0.outcome, ...outcome }, _computed: note };
+    const study = { ...s0, m: { ...s0.m, ...m, rs: s0.m?.rs && !/pending/.test(String(s0.m.rs)) ? s0.m.rs : m.rs }, outcome: { ...s0.outcome, ...outcome },
+      regime_tag: s0.regime_tag || spyCond || "", _computed: note }; // his dropdown pick wins; auto fills blanks only
     const { error } = await sb.from("model_book").update({ metrics: { ...existing.metrics, study } }).eq("id", existing.id);
     if (error) { console.error("✗ update:", error.message); process.exit(1); }
     console.log(`✓ refreshed auto layers on existing study row id=${existing.id} (your ticks/grade/charts untouched)`);
   } else {
-    // regime_tag matches the editor's Market-condition dropdown (Uptrend/Chop/Downtrend).
-    // SPY 10>20 only proves Uptrend; false could be chop OR downtrend → left blank for his eyes.
-    const study = { setup:"Momentum Breakout", direction:"long", regime_tag: spyOK?"Uptrend":"",
+    // regime_tag = the pre-registered SPY 10-sessions-vs-SMA20 condition (matches the dropdown).
+    const study = { setup:"Momentum Breakout", direction:"long", regime_tag: spyCond || "",
       checks:{}, m, grade:{letter:""}, outcome, refusal:"", _computed: note };
     const { data, error } = await sb.from("model_book").insert({ created_by:UID, ticker:T, pattern:"Momentum Breakout",
       stars:0, entry_date:t.d, is_published:false, elite:[], ticked:[], characteristics:[], metrics:{ study } }).select("id");

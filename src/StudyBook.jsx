@@ -54,6 +54,7 @@ export const STUDY_SETUPS = {
       ["rvol_eod", "RVol 50d EOD"], ["rvol_30m", "RVOL 1st 30min (vs same window, 20d)"], ["vol30_adv_pct", "1st-30min vol as % of ADV"], ["run_rate", "Run rate at entry (×)"],
       ["closing_range", "Closing range % (C−L)/(H−L)"], ["entry_px", "Entry (5-min ORH — standing rule)"], ["stop_width_adr", "LoD stop width from entry (×ADR)"],
       ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
+      ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
   },
   "Episodic Pivot": {
@@ -80,6 +81,7 @@ export const STUDY_SETUPS = {
       ["neglect_3m", "3-mo return before EP %"], ["surprise_num", "Surprise # (1st / 2nd…)"],
       ["analysts", "Analyst count"], ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"],
       ["entry_px", "Entry (5-min ORH — standing rule)"], ["stop_width_adr", "LoD stop width from entry (×ADR)"], ["regime", "Regime (SPY 10>20) Y/N"],
+      ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
   },
   "Parabolic": {
@@ -102,6 +104,7 @@ export const STUDY_SETUPS = {
       ["run_pct", "Run % into climax"], ["run_days", "Run length (days)"], ["consec_updays", "Consecutive up days"],
       ["ext_50ma", "Ext from 50MA (×ATR%)"], ["dist_10ma_pct", "Distance to 10MA %"], ["dist_20ma_pct", "Distance to 20MA %"],
       ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"], ["rvol_eod", "RVol 50d on climax day"],
+      ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
   },
 };
