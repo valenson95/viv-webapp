@@ -23,3 +23,8 @@ create policy sg_all_own on public.setup_grades for all to authenticated
 -- Per-trade grade snapshot: freezes the symbol's grade onto the trade so later re-grades
 -- never rewrite history (drives the grade-vs-outcome analytics).
 alter table public.trades add column if not exists grade_snapshot jsonb;
+
+-- Archive flag (2026-07-14): removing a symbol from the screening watchlist ARCHIVES its
+-- grade instead of deleting it — Open Positions' Grade column, Model Book, and published
+-- Daily Setups keep reading it; only the grader's list hides it. Re-grading un-archives.
+alter table public.setup_grades add column if not exists archived boolean not null default false;

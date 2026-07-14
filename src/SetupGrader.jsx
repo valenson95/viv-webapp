@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { loadGrades, getGrade, saveGrade, removeGrade, letterFor, useGrades } from "./grades.js";
+import { loadActiveGrades, getGrade, saveGrade, archiveGrade, letterFor, useGrades } from "./grades.js";
 import { supabase } from "./supabaseClient";
 import { publishSetup } from "./dailySetups.js";
 import { renderShareCard, copyCard } from "./shareCard.js";
@@ -176,7 +176,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const grade = { stars, pct, passed, total: TOTAL, starHit, starmakers: STARMAKERS, letter, label: gLabel, ticked: [...on], auto: autoLive };
   const posSyms = Array.from(new Set((positions || []).map(p => String(p.sym || p.symbol || "").toUpperCase().trim()).filter(Boolean)));
   const posSet = new Set(posSyms);
-  const saved = loadGrades();
+  const saved = loadActiveGrades();
   const savedRows = Object.values(saved).sort((a, b) => (b.stars - a.stars) || (a.sym < b.sym ? -1 : 1));
 
   const flashMsg = (m) => { setFlash(m); setTimeout(() => setFlash(""), 3400); };
@@ -248,7 +248,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     try { await navigator.clipboard.writeText(text); flashMsg(`Copied ${rows.length} name${rows.length > 1 ? "s" : ""} as text 📋`); }
     catch { flashMsg("Clipboard blocked by the browser"); }
   };
-  const loadRowsSel = () => Object.values(loadGrades()).filter(g => sel.has(g.sym)).sort((a, b) => (b.stars - a.stars) || (a.sym < b.sym ? -1 : 1));
+  const loadRowsSel = () => Object.values(loadActiveGrades()).filter(g => sel.has(g.sym)).sort((a, b) => (b.stars - a.stars) || (a.sym < b.sym ? -1 : 1));
   const downloadCards = async () => {
     const rows = loadRowsSel();
     if (!rows.length) return;
@@ -435,7 +435,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                       <td style={{ padding: "9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><MiniStars C={C} n={g.stars} /></td>
                       <td style={{ padding: "9px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: "0.82rem", color: C.text, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>{Math.round((g.pct || 0) * 100)}%</td>
                       <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button onClick={(e) => { e.stopPropagation(); loadTicker(g.sym); }} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 11px", borderRadius: 8, cursor: "pointer" }}>Open</button></td>
-                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button title="Remove" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Remove ${g.sym} from the watchlist?\n\nThis DELETES its saved grade everywhere — including the Grade column on Open Positions. (Grades already frozen onto closed trades are kept.)`)) removeGrade(g.sym); }} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>×</button></td>
+                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button title="Remove from this list (grade is kept)" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Remove ${g.sym} from the screening watchlist?\n\nThe saved grade is KEPT everywhere it's used — Open Positions' Grade column, the Model Book, and any published Daily Setups. This only clears ${g.sym} from this list; grade it again anytime to bring it back.`)) archiveGrade(g.sym); }} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>×</button></td>
                     </tr>
                   );
                 })}

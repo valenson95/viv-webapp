@@ -43,7 +43,7 @@ export async function initGrades(uid) {
       const sym = r.symbol;
       const localRow = local[sym];
       if (!localRow || new Date(r.updated_at) >= new Date(localRow.updatedAt || 0)) {
-        merged[sym] = { sym, stars: r.stars, letter: r.letter, pct: +r.pct || 0, starHit: r.star_hit, starmakers: r.starmakers, ticked: r.ticked || [], auto: r.auto || [], updatedAt: r.updated_at };
+        merged[sym] = { sym, stars: r.stars, letter: r.letter, pct: +r.pct || 0, starHit: r.star_hit, starmakers: r.starmakers, ticked: r.ticked || [], auto: r.auto || [], archived: !!r.archived, updatedAt: r.updated_at };
       } else {
         pushUp.push(localRow); // local edit is newer than the server copy — sync it up
       }
@@ -75,6 +75,7 @@ export function saveGrade(sym, grade) {
   const s = String(sym || "").toUpperCase().trim();
   if (!s) return;
   const all = loadGrades();
+  const wasArchived = !!all[s]?.archived; // re-grading an archived symbol brings it back to the watchlist
   const row = { ...grade, sym: s, updatedAt: new Date().toISOString() };
   all[s] = row;
   persist(all);
@@ -83,7 +84,12 @@ export function saveGrade(sym, grade) {
       user_id: UID, symbol: s, stars: row.stars || 0, letter: row.letter || null, pct: row.pct ?? null,
       star_hit: row.starHit ?? null, starmakers: row.starmakers ?? null, ticked: row.ticked || [], updated_at: row.updatedAt,
       ...(row.auto && row.auto.length ? { auto: row.auto } : {}), // column exists after daily-setups.sql
-    }).then(({ error }) => { if (error) console.error("grade sync:", error.message); });
+    }).then(({ error }) => {
+      if (error) { console.error("grade sync:", error.message); return; }
+      // un-archive server-side separately (best-effort; column may not exist yet)
+      if (wasArchived) supabase.from("setup_grades").update({ archived: false })
+        .eq("user_id", UID).eq("symbol", s).then(() => {});
+    });
   }
 }
 export function removeGrade(sym) {
@@ -92,6 +98,30 @@ export function removeGrade(sym) {
   delete all[s];
   persist(all);
   if (UID) supabase.from("setup_grades").delete().eq("user_id", UID).eq("symbol", s).then(() => {});
+}
+
+// ARCHIVE, not delete (Valen 2026-07-14): removing a name from the screening watchlist must
+// NEVER alter the saved grade — the Open Positions Grade column, Model Book, and published
+// Daily Setups all keep reading it. The row just leaves the grader's list; re-grading the
+// symbol un-archives it. Server flag is best-effort (column via supabase/setup-grades.sql —
+// idempotent, re-run once); until the column exists the archive still works on this device.
+export function archiveGrade(sym) {
+  const s = String(sym || "").toUpperCase().trim();
+  const all = loadGrades();
+  if (!all[s]) return;
+  all[s] = { ...all[s], archived: true, updatedAt: new Date().toISOString() };
+  persist(all);
+  if (UID) supabase.from("setup_grades").update({ archived: true, updated_at: all[s].updatedAt })
+    .eq("user_id", UID).eq("symbol", s)
+    .then(({ error }) => { if (error) console.error("grade archive (run setup-grades.sql once):", error.message); });
+}
+// Watchlist view = non-archived grades only. getGrade()/loadGrades() intentionally still
+// return archived rows so grade consumers (positions column, Model Book) are unaffected.
+export function loadActiveGrades() {
+  const all = loadGrades();
+  const out = {};
+  Object.entries(all).forEach(([k, v]) => { if (!v?.archived) out[k] = v; });
+  return out;
 }
 
 // stars (0–5) → letter grade, matching the Setup Grader's grade labels.
