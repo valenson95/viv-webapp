@@ -3,6 +3,7 @@ import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
 import { SECTIONS } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
+import { isStudyRow, StudyEditor, StudyScoreboard, outcomeClass } from "./StudyBook.jsx";
 
 // tolerant date → ISO (journal trades carry ISO or M/D/YY)
 const mbISO = (d) => {
@@ -277,6 +278,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [editing, setEditing] = useState(null); // null | {} (new) | row (edit)
   const [busy, setBusy] = useState(false);
   const [zoom, setZoom] = useState(null); // lightbox: { imgs: {before, after}, slot: "before"|"after" }
+  const [studyMode, setStudyMode] = useState(false); // 📚 Studies view (admin, inside My Book)
+  const [studyEditing, setStudyEditing] = useState(null); // null | {} (new) | row (edit)
 
   // Lightbox keyboard nav — ← → flips before/after, Esc closes (Esc also closes the detail overlay)
   useEffect(() => {
@@ -304,6 +307,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   useEffect(() => { try { if (sessionStorage.getItem("viv-mb-prefill")) setEditing({}); } catch {} }, []);
 
   const visible = rows.filter(r => {
+    if (isStudyRow(r)) return false; // studies live in their own 📚 view until promoted
     if (fScope === "official" && !r.is_published) return false;
     if (fScope === "mine" && r.created_by !== uid) return false;
     if (fPattern !== "All" && r.pattern !== fPattern) return false;
@@ -311,7 +315,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     if (fTier !== "All" && eff !== +fTier) return false;
     return true;
   });
-  const mineCount = rows.filter(r => r.created_by === uid).length; // must match the fScope==='mine' predicate
+  const mineCount = rows.filter(r => r.created_by === uid && !isStudyRow(r)).length; // must match the fScope==='mine' predicate
+  const studyRows = rows.filter(r => r.created_by === uid && isStudyRow(r));
 
   const uploadImg = async (file, slot, setRow) => {
     if (!file) return;
@@ -382,8 +387,11 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {/* filters */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 18px", alignItems: "center" }}>
         {[["All", "All"], ["official", "⭐ VIV Official"], ["mine", `🔒 My Book${mineCount ? ` (${mineCount})` : ""}`]].map(([k, label]) => (
-          <button key={k} onClick={() => setFScope(k)} style={chip(fScope === k)}>{label}</button>
+          <button key={k} onClick={() => { setFScope(k); if (k !== "mine") setStudyMode(false); }} style={chip(fScope === k)}>{label}</button>
         ))}
+        {isAdmin && fScope === "mine" && (
+          <button onClick={() => setStudyMode(m => !m)} style={chip(studyMode)}>📚 Studies{studyRows.length ? ` (${studyRows.length})` : ""}</button>
+        )}
         <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
         {["All", ...PATTERNS].map(p => {
           const n = p === "All" ? rows.length : rows.filter(r => r.pattern === p).length;
@@ -420,11 +428,45 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       })()}
       {error === "setup" && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "30px 0", textAlign: "center" }}>📖 The Model Book is being set up — check back shortly.</div>}
       {error && error !== "setup" && <div style={{ color: C.red, fontSize: "0.8rem", padding: "12px 0" }}>{error}</div>}
-      {!loading && !error && visible.length === 0 && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "30px 0", textAlign: "center" }}>No entries match this filter yet.</div>}
+      {!studyMode && !loading && !error && visible.length === 0 && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "30px 0", textAlign: "center" }}>No entries match this filter yet.</div>}
+
+      {/* 📚 STUDIES — private study wing of My Book (admin): study a bunch BEFORE posting.
+          Rows are model_book rows with metrics.study; excluded from the card grid until promoted. */}
+      {studyMode && fScope === "mine" && isAdmin && (
+        <div style={{ marginBottom: 20 }}>
+          <StudyScoreboard C={C} rows={studyRows} />
+          {studyEditing !== null ? (
+            <StudyEditor C={C} font={font} busy={busy} initial={studyEditing.id ? studyEditing : null}
+              onSave={async (r) => { await save(r); setStudyEditing(null); }}
+              onCancel={() => setStudyEditing(null)} onUpload={uploadImg} />
+          ) : (
+            <button onClick={() => setStudyEditing({})} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", marginBottom: 14 }}>＋ New study</button>
+          )}
+          {studyRows.length === 0 && studyEditing === null && (
+            <div style={{ color: C.muted, fontSize: "0.82rem", padding: "18px 0" }}>No studies yet — hit ＋ New study. Grade blind (grade + prediction locked before the outcome opens), then record what happened. The scoreboard finds your winner DNA as the sample grows.</div>
+          )}
+          {studyRows.map(r => {
+            const s = r.metrics.study; const cls = outcomeClass(s);
+            return (
+              <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 7, fontSize: "0.78rem", cursor: "pointer" }}
+                onClick={() => setStudyEditing(r)}
+                onMouseEnter={e => e.currentTarget.style.borderColor = C.borderGold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
+                <b style={{ width: 64 }}>{r.ticker}</b>
+                <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
+                <span style={{ width: 150 }}>{r.pattern}</span>
+                <span style={{ width: 70, color: s.grade?.locked ? C.goldBright : C.muted, fontWeight: 700 }}>{s.grade?.locked ? s.grade.letter : "ungraded"}</span>
+                <span style={{ flex: 1, color: C.muted, fontSize: "0.7rem" }}>{s.grade?.locked ? `predicted ${s.grade.prediction}` : ""}</span>
+                {cls && <span style={{ fontWeight: 700, color: cls === "failure" ? C.red : "#7ef0a0" }}>{cls}</span>}
+                <button title="Delete study" onClick={(e) => { e.stopPropagation(); remove(r); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: "0.95rem" }}>×</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* card grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
-        {visible.map(r => {
+        {(studyMode ? [] : visible).map(r => {
           const eff = effectiveStars(r.stars, (r.elite || []).length);
           return (
             <div key={r.id} onClick={() => setDetail(r)} style={{ background: C.glass, border: `1px solid ${eff.n >= 6 ? "rgba(126,240,160,0.3)" : C.border}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "transform .15s, border-color .15s" }}
