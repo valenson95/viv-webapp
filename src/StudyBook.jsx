@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { SECTIONS } from "./SetupGrader.jsx";
 
 // ══════════════════════════════════════════════════════════════════
 // STUDY BOOK — private study wing of My Book (admin). Historical EXERCISE
@@ -107,21 +108,32 @@ export function outcomeClass(study) {
 }
 const MB_OUTCOME = { monster: "Huge Winner", "big winner": "Winner", "works small": "Subpar", failure: "Loser" };
 
-// factor lift across resolved studies: P(factor | winner) / P(factor | failure)
+// factor lift across resolved studies: P(factor | winner) / P(factor | failure).
+// Covers BOTH the auto-computed factor checks (metrics.study.checks) and Valen's own
+// Setup-Grader observation ticks (row.ticked, same "si-ii" keys as the grader) — so the
+// data answers "do MY eyeball criteria predict winners?" separately from the bar-math.
 export function liftTable(rows) {
-  const entries = rows.map(r => r.metrics.study).filter(s => s && outcomeClass(s));
-  const win = entries.filter(s => ["big winner", "monster"].includes(outcomeClass(s)));
-  const fail = entries.filter(s => outcomeClass(s) === "failure");
-  const keys = new Set();
-  entries.forEach(s => Object.keys(s.checks || {}).forEach(k => keys.add(`${s.setup}|${k}`)));
+  const entries = rows.filter(r => r.metrics?.study && outcomeClass(r.metrics.study))
+    .map(r => ({ s: r.metrics.study, ticked: new Set(r.ticked || []) }));
+  const win = entries.filter(e => ["big winner", "monster"].includes(outcomeClass(e.s)));
+  const fail = entries.filter(e => outcomeClass(e.s) === "failure");
   const out = [];
+  const push = (group, label, has) => {
+    const pW = win.length ? win.filter(has).length / win.length : 0;
+    const pF = fail.length ? fail.filter(has).length / fail.length : 0;
+    out.push({ setup: group, label, pW, pF, lift: pF > 0 ? pW / pF : (pW > 0 ? Infinity : 0) });
+  };
+  const keys = new Set();
+  entries.forEach(e => Object.keys(e.s.checks || {}).forEach(k => keys.add(`${e.s.setup}|${k}`)));
   keys.forEach(sk => {
     const [setup, k] = sk.split("|");
     const label = (STUDY_SETUPS[setup]?.checks.find(c => c[0] === k) || [])[1] || k;
-    const pW = win.length ? win.filter(s => s.setup === setup && s.checks?.[k]).length / win.length : 0;
-    const pF = fail.length ? fail.filter(s => s.setup === setup && s.checks?.[k]).length / fail.length : 0;
-    out.push({ setup, k, label, pW, pF, lift: pF > 0 ? pW / pF : (pW > 0 ? Infinity : 0) });
+    push(setup, label, e => e.s.setup === setup && e.s.checks?.[k]);
   });
+  SECTIONS.forEach((sec, si) => { if (sec.reminder) return; sec.items.forEach((it, ii) => {
+    const key = si + "-" + ii;
+    if (entries.some(e => e.ticked.has(key))) push("👁 Observation", it.c, e => e.ticked.has(key));
+  }); });
   return { rows: out.sort((a, b) => b.lift - a.lift), nWin: win.length, nFail: fail.length, n: entries.length };
 }
 
@@ -228,6 +240,32 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 8, marginTop: 10 }}>
         {def.metrics.map(([k, t]) => (
           <div key={k}><label style={lbl}>{t}</label><input style={inputS} value={s.m[k] ?? ""} onChange={e => setS({ m: { ...s.m, [k]: e.target.value } })} /></div>
+        ))}
+      </div>
+
+      {/* Valen's OWN eyeball ticks — the exact Setup Grader checklist, same "si-ii" keys,
+          stored on row.ticked so studies get the grader's objective star math and the
+          observations flow into the lift table as their own factor class. */}
+      <div style={sect}>👁 My observations — Setup Grader criteria (tick what you SEE on the chart)</div>
+      {(() => { let total = 0, passed = 0, starHit = 0, starTotal = 0;
+        SECTIONS.forEach((sec, si) => { if (sec.reminder) return; sec.items.forEach((it, ii) => {
+          total++; if (it.star) starTotal++;
+          if ((row.ticked || []).includes(si + "-" + ii)) { passed++; if (it.star) starHit++; }
+        }); });
+        return <div style={{ fontSize: "0.66rem", color: C.muted, marginBottom: 8 }}>{passed}/{total} ticked · {starHit}/{starTotal} ★-makers — same objective math as the grader; these are YOUR pattern-recognition reps</div>; })()}
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        {SECTIONS.filter(sec => !sec.reminder).map((sec, si) => (
+          <div key={si} style={{ flex: 1, minWidth: 250, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>{sec.title}</div>
+            {sec.items.map((it, ii) => { const key = si + "-" + ii; const on = (row.ticked || []).includes(key);
+              return (
+                <label key={key} title={it.s} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: "0.74rem", padding: "2px 0", cursor: "pointer" }}>
+                  <input type="checkbox" style={{ accentColor: C.goldBright, marginTop: 3 }} checked={on}
+                    onChange={() => setRow(r => ({ ...r, ticked: on ? (r.ticked || []).filter(x => x !== key) : [...(r.ticked || []), key] }))} />
+                  <span>{it.c}{it.star && <span style={{ color: C.goldBright, fontSize: "0.6rem", marginLeft: 5 }}>★ maker</span>}</span>
+                </label>
+              ); })}
+          </div>
         ))}
       </div>
 
