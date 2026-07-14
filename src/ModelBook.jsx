@@ -356,8 +356,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       : supabase.from("model_book").insert(body);
     const { error } = await q;
     setBusy(false);
-    if (error) { setError(String(error.message)); return; }
+    if (error) { setError(String(error.message)); return false; }
     setEditing(null); load();
+    return true;
   };
   const remove = async (row) => {
     if (!window.confirm(`Delete ${row.ticker} from the Model Book? This cannot be undone.`)) return;
@@ -379,7 +380,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           onMouseEnter={guideEnter ? guideEnter("modelbook", "Model Book", "Two books in one: the ⭐ VIV Official library — curated elite setups, read-only — and 🔒 My Book, your private collection only you can see. Study the before chart, the exact factors that made it elite, then the outcome. Stars are computed from the Setup Grader ticks (objective, no bias). Fields marked with a gold dot were auto-read off the chart by VIV — edit any that look off. Pattern recognition is built by reps: same patterns, hundreds of examples.", undefined) : undefined}
           onMouseLeave={guideLeave ? guideLeave("modelbook") : undefined}>Model Book</h2>
         <span style={{ fontSize: "0.74rem", color: C.muted }}>study the best — before → factors → after</span>
-        {!editing && <button onClick={() => setEditing({})} style={{ marginLeft: "auto", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer" }}>{isAdmin ? "+ Add entry" : "+ Add to my book"}</button>}
+        {!editing && !studyEditing && <button onClick={() => (studyMode && fScope === "mine" && isAdmin) ? setStudyEditing({}) : setEditing({})} style={{ marginLeft: "auto", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer" }}>{(studyMode && fScope === "mine" && isAdmin) ? "＋ New study" : isAdmin ? "+ Add entry" : "+ Add to my book"}</button>}
       </div>
 
       {editing !== null && <MBEditor C={C} font={font} busy={busy} isAdmin={isAdmin} initial={editing.id ? editing : null} onSave={save} onCancel={() => setEditing(null)} onUpload={uploadImg} journaledTrades={journaledTrades} />}
@@ -437,7 +438,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           <StudyScoreboard C={C} rows={studyRows} />
           {studyEditing !== null ? (
             <StudyEditor C={C} font={font} busy={busy} initial={studyEditing.id ? studyEditing : null}
-              onSave={async (r) => { await save(r); setStudyEditing(null); }}
+              onSave={async (r) => { if (await save(r)) setStudyEditing(null); }}
               onCancel={() => setStudyEditing(null)} onUpload={uploadImg} />
           ) : (
             <button onClick={() => setStudyEditing({})} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", marginBottom: 14 }}>＋ New study</button>
