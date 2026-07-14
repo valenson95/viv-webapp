@@ -47,6 +47,7 @@ let upb=0; for(let k=ti-1;k>0 && all[k].c>all[k-1].c; k--) upb++;
 const orderly = !win(20).some((b,i,arr)=>i>0 && b.c/arr[i-1].c<=0.96);
 const priorNR = (prev.h-prev.l)<0.6*A || prev.c<all[ti-2].c;
 const re = (t.c/prev.c-1)*100, volr = t.v/prev.v, crange = (t.c-t.l)/(t.h-t.l)*100;
+const gap = (t.o/prev.c-1)*100; // trigger-day gap % (open vs prior close) — pairs with his "gapped" tick + band
 const rvol = t.v/(win(50).reduce((s,b)=>s+b.v,0)/50);
 const hi52 = Math.max(...all.slice(Math.max(0,ti-252),ti).map(b=>b.h));
 const fromHigh = (t.c/hi52-1)*100;
@@ -78,13 +79,14 @@ if (hiIdx != null) { const pk = ti+1+hiIdx, s50pk = sma(all,50,pk), Apk = atr14(
 const f=(x,d=1)=>x==null||Number.isNaN(x)?null:+x.toFixed(d);
 
 const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(ret(63)), ext_50ma:f(ext50,2),
-  from_high_pct:f(fromHigh), breakout_num:bnum+" (approx: 4% RE-days last 90)", up_days_before:upb, re_pct:f(re),
+  from_high_pct:f(fromHigh), breakout_num:bnum+" (approx: 4% RE-days last 90)", up_days_before:upb, re_pct:f(re), gap_pct:f(gap),
   vol_ratio:f(volr,2), rvol_eod:f(rvol,2), closing_range:f(crange,0), stop_width_adr:f(((entry-lod)/entry*100)/adr20,2),
   ret_1m:f(ret(21)), ret_3m:f(ret(63)), ret_6m:f(ret(126)), regime: spyOK?"Y":"N", rs:"pending as-rank (needs POLYGON_API_KEY)" };
 // SUGGESTED ticks only — checks belong to VALEN's eyes now (2026-07-14 split: his buckets vs auto data).
 // Printed for cross-reference, NEVER written into the row.
 const suggested = { tight:tight>=3, orderly, pole:(ret(63)??0)>=30, linear:lin>=0.8, young:bnum<=3, prior_nr:priorNR,
-  re:re>=4&&upb<=2, up2:upb<=2, vol_exp:volr>1, closehi:crange>=70, ma_surf:!!maSurf };
+  re:re>=4&&upb<=2, up2:upb<=2, vol_exp:volr>1, closehi:crange>=70, ma_surf:!!maSurf,
+  gapped:gap>=1, gap_band: gap>=1 ? (gap<2?"<2":gap<5?"2-5":gap<10?"5-10":">10") : null };
 const outcome = { mfe_d1:f(mfe(1)), mfe_d3:f(mfe(3)), mfe_d5:f(mfe(5)), mfe_d20:f(mfe(20)), day2_pct:f(day2),
   burst_days:bdays||null, burst_pct:f(bpct), mae:f(mae), giveback_pct:f(give), days_above_10ma:exitC!=null?d10:`${d10}+ (still above)`,
   trail_r:f(trailR,2), ext_at_peak:f(extPeak,2), followthru: day2==null?"":(day2>0?"yes":"no") };
@@ -92,8 +94,8 @@ const outcome = { mfe_d1:f(mfe(1)), mfe_d3:f(mfe(3)), mfe_d5:f(mfe(5)), mfe_d20:
 console.log(`\n=== ${T} @ ${t.d} (trigger close ${t.c}, LOD ${t.l}) ===`);
 console.log("METRICS:", JSON.stringify(m, null, 1));
 console.log("SUGGESTED TICKS (data view — verify with your eyes, not written to the row):",
-  Object.entries(suggested).filter(([,v])=>v).map(([k])=>k).join(", ") || "none");
-console.log("DATA SAYS NO:", Object.entries(suggested).filter(([,v])=>!v).map(([k])=>k).join(", ") || "none");
+  Object.entries(suggested).filter(([,v])=>v).map(([k,v])=>v===true?k:`${k}=${v}`).join(", ") || "none");
+console.log("DATA SAYS NO:", Object.entries(suggested).filter(([,v])=>v===false).map(([k])=>k).join(", ") || "none");
 console.log("OUTCOME:", JSON.stringify(outcome, null, 1));
 if (WRITE) {
   // Upsert semantics: an existing study row for this ticker+date gets its AUTO layers refreshed
@@ -108,7 +110,9 @@ if (WRITE) {
     if (error) { console.error("✗ update:", error.message); process.exit(1); }
     console.log(`✓ refreshed auto layers on existing study row id=${existing.id} (your ticks/grade/charts untouched)`);
   } else {
-    const study = { setup:"Momentum Breakout", direction:"long", regime_tag: spyOK?"regime ON (SPY 10>20)":"regime OFF",
+    // regime_tag matches the editor's Market-condition dropdown (Uptrend/Chop/Downtrend).
+    // SPY 10>20 only proves Uptrend; false could be chop OR downtrend → left blank for his eyes.
+    const study = { setup:"Momentum Breakout", direction:"long", regime_tag: spyOK?"Uptrend":"",
       checks:{}, m, grade:{letter:""}, outcome, refusal:"", _computed: note };
     const { data, error } = await sb.from("model_book").insert({ created_by:UID, ticker:T, pattern:"Momentum Breakout",
       stars:0, entry_date:t.d, is_published:false, elite:[], ticked:[], characteristics:[], metrics:{ study } }).select("id");

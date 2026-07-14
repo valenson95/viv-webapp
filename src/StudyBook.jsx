@@ -27,7 +27,7 @@ export const STUDY_SETUPS = {
       { title: "Prior move / trend", items: [
         ["pole", "Prior pole — big move ≥30% into the base"],
         ["linear", "Pole linear — clean advance, no whipsaw"],
-        ["young", "Young trend — 1st–3rd breakout, not late/extended"],
+        ["young", "Young trend — 1st–3rd breakout, not late/extended"], // sub-categorized by leg (checks.young_leg: "1"|"2"|"3") — Valen 2026-07-14
       ]},
       { title: "Base quality", items: [
         ["tight", "Tightening series — ≥3 narrow-range days (range < 0.6×ATR)"],
@@ -41,6 +41,7 @@ export const STUDY_SETUPS = {
         ["up2", "≤2 up-days before the trigger (not buying day 3)"],
         ["closehi", "Closed ≥70% of the day's range"],
         ["vol_exp", "Volume expansion — trigger bar volume above prior day"],
+        ["gapped", "Gapped up on the trigger day"], // sub-categorized by gap % (checks.gap_band) — Valen 2026-07-14
       ]},
     ],
     metrics: [
@@ -49,7 +50,7 @@ export const STUDY_SETUPS = {
       ["pole_pct", "Pole run-up %"], ["pole_days", "Pole length (days)"],
       ["ext_50ma", "Ext from 50MA (×ATR%)"], ["from_high_pct", "% below 52wk high"],
       ["breakout_num", "Breakout # in trend (1st/2nd/3rd…)"], ["up_days_before", "Up-days in a row before trigger"],
-      ["re_pct", "Trigger day % move"], ["vol_ratio", "Volume ÷ prior day"],
+      ["re_pct", "Trigger day % move"], ["gap_pct", "Gap % (open vs prior close)"], ["vol_ratio", "Volume ÷ prior day"],
       ["rvol_eod", "RVol 50d EOD"], ["run_rate", "Run rate at entry (×)"],
       ["closing_range", "Closing range % (C−L)/(H−L)"], ["stop_width_adr", "LOD stop width (×ADR)"],
       ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
@@ -125,7 +126,26 @@ const OUTCOME_METRICS = [
   ["ext_at_peak", "Ext from 50MA at burst peak (×ATR%)"],
 ];
 
-const GRADES = ["C", "B", "A", "A+"];
+// Tick sub-categories (Valen 2026-07-14): a ticked parent factor can carry one refinement,
+// stored beside the ticks in study.checks[store]. Each option becomes its own lift row, so the
+// commonality read can say "monsters come off the 1st leg" / "the 2–5% gaps outperform".
+// Un-ticking the parent clears the sub-choice. Sub-choice is optional (blank = not measured).
+export const SUBCATS = {
+  young: { store: "young_leg", options: [["1", "1st leg"], ["2", "2nd leg"], ["3", "3rd leg"]] },
+  gapped: { store: "gap_band", options: [["<2", "<2%"], ["2-5", "2–5%"], ["5-10", "5–10%"], [">10", ">10%"]] },
+};
+
+// Quality is AUTO-COMPUTED from how many checklist criteria are ticked (Valen 2026-07-14) —
+// same shape as the Setup Grader: tick-% → stars → letter. No manual grade input.
+export function studyQuality(study) {
+  const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Momentum Breakout"];
+  const total = def.buckets.reduce((n, b) => n + b.items.length, 0);
+  const on = def.buckets.reduce((n, b) => n + b.items.filter(([k]) => study.checks?.[k]).length, 0);
+  const stars = on ? Math.round(on / total * 5) : 0;
+  return { on, total, letter: on === 0 ? "—" : ({ 5: "A+", 4: "A", 3: "B" }[stars] || "C") };
+}
+
+const MARKET_CONDITIONS = ["Uptrend", "Chop", "Downtrend"];
 
 // Pre-registered outcome classes (winner-dna.md) — direction-aware, never re-defined after data.
 export function outcomeClass(study) {
@@ -163,6 +183,22 @@ export function liftTable(rows) {
     if (seen.has(id)) return; seen.add(id);
     push(`👁 ${s.setup}`, label, (e) => e.setup === s.setup ? !!e.checks?.[k] : null);
   })));
+  // Sub-category lift rows (young-trend legs, gap-% bands): parent not ticked = false
+  // (didn't have the factor); parent ticked but sub-choice blank = null (not measured).
+  Object.entries(SUBCATS).forEach(([parent, sub]) => {
+    const parentSetups = new Set();
+    Object.entries(STUDY_SETUPS).forEach(([name, d]) =>
+      d.buckets.some(b => b.items.some(([k]) => k === parent)) && parentSetups.add(name));
+    entries.forEach(s => { if (!parentSetups.has(s.setup) || seen.has(`${s.setup}|${parent}|sub`)) return;
+      seen.add(`${s.setup}|${parent}|sub`);
+      const parentLabel = STUDY_SETUPS[s.setup].buckets.flatMap(b => b.items).find(([k]) => k === parent)?.[1].split(" — ")[0];
+      sub.options.forEach(([val, optLabel]) => push(`👁 ${s.setup}`, `${parentLabel} — ${optLabel}`, (e) => {
+        if (e.setup !== s.setup) return null;
+        if (!e.checks?.[parent]) return false;
+        return e.checks[sub.store] ? String(e.checks[sub.store]) === val : null;
+      }));
+    });
+  });
   DATA_FLAGS.forEach(([k, label, fn]) => push("📊 Data", label, (e) => fn(e.m || {})));
   return { rows: out.sort((a, b) => b.lift - a.lift), nWin: win.length, nFail: fail.length, n: entries.length };
 }
@@ -232,7 +268,10 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   );
   const doSave = () => {
     if (!row.ticker.trim()) { alert("Ticker first."); return; }
-    const body = { ...row, pattern: s.setup === "Parabolic" ? `Parabolic ${s.direction === "short" ? "Short" : "Long"}` : s.setup,
+    const q = studyQuality(s); // grade is derived from ticks at save time — stored for the grid + calibration
+    const body = { ...row,
+      metrics: { ...row.metrics, study: { ...s, grade: { letter: q.letter === "—" ? "" : q.letter, auto: true, on: q.on, total: q.total } } },
+      pattern: s.setup === "Parabolic" ? `Parabolic ${s.direction === "short" ? "Short" : "Long"}` : s.setup,
       outcome: cls ? MB_OUTCOME[cls] : null, thesis: row.thesis,
       lesson: [s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n") || null };
     onSave(body);
@@ -252,9 +291,18 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           </select></div>
         {s.setup === "Parabolic" && <div style={{ width: 110 }}><label style={lbl}>Direction</label>
           <select style={inputS} value={s.direction} onChange={e => setS({ direction: e.target.value })}><option>short</option><option>long</option></select></div>}
-        <div style={{ width: 170 }}><label style={lbl}>Market condition</label><input style={inputS} placeholder="uptrend / chop / …" value={s.regime_tag} onChange={e => setS({ regime_tag: e.target.value })} /></div>
-        <div style={{ width: 130 }}><label style={lbl}>Quality (optional)</label>
-          <select style={inputS} value={s.grade?.letter || ""} onChange={e => setS({ grade: { letter: e.target.value } })}><option value="">—</option>{GRADES.map(g => <option key={g}>{g}</option>)}</select></div>
+        <div style={{ width: 150 }}><label style={lbl}>Market condition</label>
+          <select style={inputS} value={s.regime_tag || ""} onChange={e => setS({ regime_tag: e.target.value })}>
+            <option value="">—</option>
+            {MARKET_CONDITIONS.map(o => <option key={o}>{o}</option>)}
+            {s.regime_tag && !MARKET_CONDITIONS.includes(s.regime_tag) && <option>{s.regime_tag}</option>}
+          </select></div>
+        {(() => { const q = studyQuality(s); // quality = tick count, computed live — never typed
+          return <div style={{ width: 130 }}><label style={lbl}>Quality (auto)</label>
+            <div style={{ ...inputS, display: "flex", justifyContent: "space-between", alignItems: "center" }} title="Auto-graded from your ticks — tick-% → letter, same scale as the Setup Grader">
+              <b style={{ color: q.letter === "A+" ? "#7ef0a0" : q.letter === "A" ? C.goldBright : C.muted }}>{q.letter}</b>
+              <span style={{ fontSize: "0.62rem", color: C.muted }}>{q.on}/{q.total}</span>
+            </div></div>; })()}
       </div>
 
       <div style={sect}>Charts — two timeframes</div>
@@ -274,11 +322,22 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
         {def.buckets.map((b, bi) => (
           <div key={bi} style={{ flex: 1, minWidth: 250, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px" }}>
             <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>{b.title}</div>
-            {b.items.map(([k, t]) => (
-              <label key={k} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: "0.74rem", padding: "3px 0", cursor: "pointer" }}>
-                <input type="checkbox" style={{ accentColor: C.goldBright, marginTop: 3 }} checked={!!s.checks[k]} onChange={e => setS({ checks: { ...s.checks, [k]: e.target.checked } })} />{t}
-              </label>
-            ))}
+            {b.items.map(([k, t]) => { const sub = SUBCATS[k];
+              return <div key={k} style={{ padding: "3px 0" }}>
+                <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: "0.74rem", cursor: "pointer" }}>
+                  <input type="checkbox" style={{ accentColor: C.goldBright, marginTop: 3 }} checked={!!s.checks[k]}
+                    onChange={e => setS({ checks: { ...s.checks, [k]: e.target.checked, ...(sub && !e.target.checked ? { [sub.store]: "" } : {}) } })} />{t}
+                </label>
+                {sub && s.checks[k] && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "5px 0 2px 24px" }}>
+                    {sub.options.map(([val, optLabel]) => { const onOpt = String(s.checks[sub.store] || "") === val;
+                      return <button key={val} type="button"
+                        onClick={() => setS({ checks: { ...s.checks, [sub.store]: onOpt ? "" : val } })}
+                        style={{ background: onOpt ? "rgba(212,175,55,0.18)" : "transparent", border: `1px solid ${onOpt ? C.goldBright : C.border}`, color: onOpt ? C.goldBright : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.64rem", fontWeight: 700, padding: "3px 10px", cursor: "pointer" }}>
+                        {optLabel}</button>; })}
+                  </div>
+                )}
+              </div>; })}
           </div>
         ))}
       </div>
