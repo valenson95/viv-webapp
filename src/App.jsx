@@ -1287,28 +1287,42 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds, 
       pos += e.signedQty;
       cycle.push(e);
       if (pos === 0 && cycle.length) {
-        const buys = cycle.filter(c => c.signedQty > 0);
-        const sells = cycle.filter(c => c.signedQty < 0);
-        const isLong = (buys[0] ? buys[0].date + buys[0].time : "z") <= (sells[0] ? sells[0].date + sells[0].time : "z");
-        const entryLegs = isLong ? buys : sells, exitLegs = isLong ? sells : buys;
-        const qty = entryLegs.reduce((s, c) => s + c.quantity, 0);
-        const entryP = qty ? entryLegs.reduce((s, c) => s + c.price * c.quantity, 0) / qty : 0;
-        const exitQty = exitLegs.reduce((s, c) => s + c.quantity, 0);
-        const exitP = exitQty ? exitLegs.reduce((s, c) => s + c.price * c.quantity, 0) / exitQty : 0;
-        const first = cycle[0], last = cycle[cycle.length - 1];
-        const commission = cycle.reduce((s, c) => s + c.commission, 0);
-        const realized = cycle.reduce((s, c) => s + c.realizedPnl, 0);
-        const plDollar = realized != null ? realized : ((exitP - entryP) * qty - commission); // != null: a true $0 break-even must not fall through to −commission
-        const plPct = entryP > 0 ? (plDollar / (entryP * qty)) * 100 : 0;
-        // Gate on EXIT date, not entry date — a pre-floor open that closes post-floor is a post-floor
-        // realized event (P/L hits this month's books) and belongs in the journal. Earlier this filter
-        // used first.date and silently dropped legit close-outs (e.g. April open → May close).
-        if (last.date >= IBKR_SYNC_FLOOR && qty > 0) {
-          closed.push({ ticker: sym, entry: first.date, entryTime: first.time, exit: last.date, exitTime: last.time,
-            entryP: +entryP.toFixed(4), exitP: +exitP.toFixed(4), shares: qty, plPct: +plPct.toFixed(2),
-            plDollar: +plDollar.toFixed(2), commission: +commission.toFixed(2), execId: last.execID, tradeId: last.tradeID,
-            tradeType: isLong ? "Long" : "Short" });
-        }
+        // ONE ROW PER EXIT FILL — never one blended row per flat-to-flat cycle. The old single-row
+        // emit weighted-averaged all partial exits into one entry (JH's "conflating partial entries
+        // in one", 2026-07-12) AND double-counted: partials imported while the lot was open carried
+        // their own execIds, then the flatten emitted the whole cycle again under the LAST fill's
+        // execId. Per-fill rows keep the SAME execId in both phases, so dedupe holds and each
+        // partial exit stays an auditable row (same weighted-avg-cost convention as the partials
+        // path below; summed across the cycle it equals IBKR's FIFO total, commissions included).
+        const first = cycle[0];
+        const isLong = first.signedQty > 0;
+        const cycleExecIds = cycle
+          .filter(c => (isLong && c.signedQty < 0) || (!isLong && c.signedQty > 0))
+          .map(c => c.execID).filter(Boolean);
+        let openShares = 0, openCost = 0;
+        cycle.forEach(c => {
+          const isOpening = (isLong && c.signedQty > 0) || (!isLong && c.signedQty < 0);
+          if (isOpening) {
+            openShares += c.quantity;
+            openCost += c.price * c.quantity;
+          } else if (openShares > 0) {
+            const avgEntryP = openCost / openShares;
+            const closedQty = c.quantity;
+            // Gate on the EXIT fill date, not entry date — a pre-floor open that closes post-floor
+            // is a post-floor realized event (P/L hits this month's books) and belongs in the journal.
+            if (c.date >= IBKR_SYNC_FLOOR && closedQty > 0) {
+              const plDollar = (isLong ? (c.price - avgEntryP) : (avgEntryP - c.price)) * closedQty - c.commission;
+              const plPct = avgEntryP > 0 ? (plDollar / (avgEntryP * closedQty)) * 100 : 0;
+              closed.push({ ticker: sym, entry: first.date, entryTime: first.time, exit: c.date, exitTime: c.time,
+                entryP: +avgEntryP.toFixed(4), exitP: +c.price.toFixed(4), shares: closedQty, plPct: +plPct.toFixed(2),
+                plDollar: +plDollar.toFixed(2), commission: +c.commission.toFixed(2), execId: c.execID, tradeId: c.tradeID,
+                tradeType: isLong ? "Long" : "Short", cycleExecIds });
+            }
+            const ratio = (openShares - closedQty) / openShares;
+            openCost *= Math.max(0, ratio);
+            openShares -= closedQty;
+          }
+        });
         cycle = [];
       }
     });
@@ -1394,11 +1408,19 @@ function buildIbkrPreview(data, positions, journaledTrades, softDeletedExecIds, 
   // AND shares within 5% — handles the common case where the manual entry date drifts by a day from IBKR's
   // first BUY exec (timezone, manual-typing error, split-day fill). This is what stops the "Sync re-imports
   // everything I already closed manually" duplicate cycle.
+  const journaledByExecId = new Map();
+  (journaledTrades || []).forEach(t => { if (t.ibExecId) journaledByExecId.set(t.ibExecId, t); });
   const tradeRows = closed.map(c => {
     const ignored = isIgnored(c.ticker);
-    const synced = (journaledTrades || []).find(t => t.ibExecId && t.ibExecId === c.execId);
+    const synced = journaledByExecId.get(c.execId);
     if (synced) return { ...c, action: "synced", matchId: synced.id, ignored };
     if (c.execId && _deletedExecIds.has(c.execId)) return { ...c, action: "synced", matchId: null, prevDeleted: true, ignored };
+    // LEGACY-CYCLE GUARD: rows synced before 2026-07-13 were ONE blended row per flat-to-flat cycle,
+    // keyed on the LAST exit fill's execId (and users hand-adjusted some of those — JH). If ANY
+    // sibling exit fill of this cycle is already journaled (or was soft-deleted), that row already
+    // accounts for this fill's P&L — importing it separately would double-count. Treat as synced.
+    const sibling = (c.cycleExecIds || []).find(id => id !== c.execId && (journaledByExecId.has(id) || _deletedExecIds.has(id)));
+    if (sibling) return { ...c, action: "synced", matchId: journaledByExecId.get(sibling)?.id ?? null, viaCycleSibling: true, ignored };
     const tickerHits = (journaledTrades || []).filter(t => !isIbkr(t.source) && (t.ticker || "").toUpperCase() === c.ticker.toUpperCase());
     let cands = tickerHits.filter(t => tradeDateISO(t.entry) === tradeDateISO(c.entry) || tradeDateISO(t.exit) === tradeDateISO(c.exit));
     if (cands.length === 0) cands = tickerHits.filter(t => dayDiff(t.entry, c.entry) <= 3 && sharesClose(t.shares, c.shares, 0.05));

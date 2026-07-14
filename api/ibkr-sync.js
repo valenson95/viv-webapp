@@ -156,6 +156,12 @@ export default async function handler(req, res) {
     let trades = parseElements(stmtXml, "Trade")
       .map((a) => {
         const dt = parseDateTime(a.dateTime || (a.tradeDate ? a.tradeDate + (a.tradeTime ? ";" + a.tradeTime : "") : ""));
+        // DATE comes from tradeDate — IBKR's official EXCHANGE trade date, timezone-independent.
+        // dateTime is a wall-clock in the Flex query's CONFIGURED timezone: on an Asia-configured
+        // statement a US-afternoon fill rolls past midnight and lands a DAY LATE (JH's PANW
+        // Jul-8 partials booked as Jul-9, 2026-07-12). dateTime only supplies the time-of-day.
+        const tradeDay = parseDateTime(a.tradeDate || "").date;
+        if (tradeDay) dt.date = tradeDay;
         const fx = Number(a.fxRateToBase) || 0;
         const cur = (a.currency || "USD").toUpperCase();
         const conv = (v) => { const n = Number(v) || 0; return cur !== "USD" && fx > 0 ? n * fx : n; };

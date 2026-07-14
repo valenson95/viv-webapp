@@ -92,11 +92,20 @@ export default async function handler(req, res) {
   if (rows.length) {
     const execIds = rows.map(r => r.ib_exec_id);
     const { data: existing, error: exErr } = await sb
-      .from("trades").select("ib_exec_id").eq("user_id", user_id).in("ib_exec_id", execIds);
+      .from("trades").select("ib_exec_id, shares").eq("user_id", user_id).in("ib_exec_id", execIds);
     if (exErr) return res.status(500).json({ ok: false, error: exErr.message });
-    const seen = new Set((existing || []).map(r => r.ib_exec_id));
+    const seen = new Map((existing || []).map(r => [r.ib_exec_id, r]));
     const toInsert = rows.filter(r => !seen.has(r.ib_exec_id));
-    const toRefresh = rows.filter(r => seen.has(r.ib_exec_id));
+    // REFRESH GUARD: only refresh a row whose share count matches the incoming fill. Legacy
+    // client-synced rows were ONE blended row per flat-to-flat cycle keyed on one fill's execId
+    // — and users hand-corrected some of those (JH's PANW, 2026-07-12). Stamping a single fill's
+    // exit/P&L onto an aggregate (or hand-edited) row silently corrupts it. Share mismatch =
+    // not this fill's row = never touch it.
+    const sharesMatch = (a, b) => {
+      const aN = Number(a) || 0, bN = Number(b) || 0;
+      return Math.abs(aN - bN) <= Math.max(1, Math.max(aN, bN) * 0.05);
+    };
+    const toRefresh = rows.filter(r => seen.has(r.ib_exec_id) && sharesMatch(seen.get(r.ib_exec_id).shares, r.shares));
     if (toInsert.length) {
       const { data: ins, error: insErr } = await sb.from("trades").insert(toInsert).select("id");
       // 23505 = a concurrent run inserted it first; the index did its job, so tolerate it.
