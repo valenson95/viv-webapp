@@ -3565,7 +3565,7 @@ return (
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
         <div className="spacer"></div>
@@ -6359,7 +6359,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
           <div className="spacer"></div>
@@ -9021,7 +9021,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
           <div className="spacer"></div>
@@ -9863,7 +9863,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
           <div className="spacer"></div>
@@ -10354,6 +10354,7 @@ function ModelBookShell({ setPage, onLogout, session, displayName, journaledTrad
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a className="on" style={{ cursor: "pointer" }}>Model Book</a>
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip to relaunch */}
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
           <div className="spacer"></div>
@@ -10386,6 +10387,7 @@ function DailySetupsShell({ setPage, onLogout, session, displayName }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a className="on" style={{ cursor: "pointer" }}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+            {isAdmin && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
           <div className="spacer"></div>
@@ -10420,6 +10422,7 @@ function MentorShell({ setPage, onLogout, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a className="on" style={{ cursor: "pointer" }}>Mentor</a>
+            {isAdmin && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
           <div className="spacer"></div>

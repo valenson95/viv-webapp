@@ -281,12 +281,16 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [error, setError] = useState(null);
   const [fPattern, setFPattern] = useState("All");
   const [fTier, setFTier] = useState("All"); // All | 7 | 6 | 5
-  const [fScope, setFScope] = useState("All"); // All | official (VIV published) | mine (my personal book)
+  // Deep link from the top nav ("Studies" admin link): viv-mb-view=studies opens My Book → 📚 Studies
+  // directly. Read-and-clear synchronously so it only steers this mount, never a later visit.
+  const mbDeepLink = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("viv-mb-view") : null;
+  if (mbDeepLink) sessionStorage.removeItem("viv-mb-view");
+  const [fScope, setFScope] = useState(mbDeepLink === "studies" ? "mine" : "All"); // All | official (VIV published) | mine (my personal book)
   const [detail, setDetail] = useState(null);
   const [editing, setEditing] = useState(null); // null | {} (new) | row (edit)
   const [busy, setBusy] = useState(false);
   const [zoom, setZoom] = useState(null); // lightbox: { imgs: {before, after}, slot: "before"|"after" }
-  const [studyMode, setStudyMode] = useState(false); // 📚 Studies view (admin, inside My Book)
+  const [studyMode, setStudyMode] = useState(mbDeepLink === "studies"); // 📚 Studies view (admin, inside My Book)
   const [studyEditing, setStudyEditing] = useState(null); // null | {} (new) | row (edit)
 
   // Lightbox keyboard nav — ← → flips before/after, Esc closes (Esc also closes the detail overlay)
@@ -407,8 +411,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         {[["All", "All"], ["official", "⭐ VIV Official"], ["mine", `🔒 My Book${mineCount ? ` (${mineCount})` : ""}`]].map(([k, label]) => (
           <button key={k} onClick={() => { setFScope(k); if (k !== "mine") setStudyMode(false); }} style={chip(fScope === k)}>{label}</button>
         ))}
-        {isAdmin && fScope === "mine" && (
-          <button onClick={() => setStudyMode(m => !m)} style={chip(studyMode)}>📚 Studies{studyRows.length ? ` (${studyRows.length})` : ""}</button>
+        {isAdmin && (
+          <button onClick={() => { if (fScope !== "mine") { setFScope("mine"); setStudyMode(true); } else setStudyMode(m => !m); }}
+            style={chip(studyMode && fScope === "mine")}>📚 Studies{studyRows.length ? ` (${studyRows.length})` : ""}</button>
         )}
         <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
         {["All", ...PATTERNS].map(p => {

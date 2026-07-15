@@ -486,7 +486,10 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       `}</style>
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "4px 0 18px", flexWrap: "wrap" }}>
-        <button onClick={() => setPage && setPage("dashboard")} style={{ background: "transparent", border: `1px solid ${T.border}`, color: T.muted, borderRadius: 8, padding: "5px 13px", cursor: "pointer", fontFamily: font, fontSize: "0.72rem" }}>← Dashboard</button>
+        {[["dashboard", "← Dashboard"], ["journal", "Journal"], ["tools", "Premium tools"], ["daily", "Daily Setups"], ["modelbook", "Model Book"], ["studies", "Studies"], ["settings", "Settings"]].map(([pg, label]) => (
+          <button key={pg} onClick={() => { if (pg === "studies") { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); } else setPage && setPage(pg); }}
+            style={{ background: "transparent", border: `1px solid ${T.border}`, color: T.muted, borderRadius: 8, padding: "5px 13px", cursor: "pointer", fontFamily: font, fontSize: "0.72rem" }}>{label}</button>
+        ))}
         <div>
           <div style={{ fontSize: "1.05rem", fontWeight: 800, letterSpacing: "-0.01em" }}>Quant Analysis</div>
           <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 1 }}>{mode === "sys" ? `SYSTEM COHORT · ENTERED ≥ ${data.systemEntry} · LIVE RECORD` : `STRESS-TEST OVERLAY · FULL HISTORY SINCE ${data.since || "2026-05-01"}`} · N={A.n} CLOSED CAMPAIGNS</div>
