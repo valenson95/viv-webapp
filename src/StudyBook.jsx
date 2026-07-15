@@ -39,6 +39,7 @@ export const STUDY_SETUPS = {
         ["higher_lows", "Higher lows forming into the pivot"],
         ["prior_nr", "Day before trigger = narrow-range or negative day"],
         ["inside", "Inside bar(s) right before the trigger — coil tell", "bonus"],
+        ["ma_conv", "SMA 10/20/50 converging at the pivot", "bonus"],
         ["ma_surf", "Surfing rising 10/20-day MA into the pivot"],
       ]},
       { title: "Trigger day", items: [
