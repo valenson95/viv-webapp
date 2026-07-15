@@ -234,6 +234,19 @@ export function StudyScoreboard({ C, rows }) {
         ))}
         <div style={box}><b style={{ fontSize: "1.1rem" }}>{nWin}W / {nFail}F</b><div style={{ fontSize: "0.6rem", color: C.muted }}>RESOLVED CLASSES</div></div>
       </div>
+      {/* Outcome-class glossary — the PRE-REGISTERED definitions (winner-dna.md); measured from
+          the trigger day's 5-min-ORH entry, never re-defined after seeing data. */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10, fontSize: "0.62rem", color: C.muted }}>
+        {[["🦖 Monster", "ran +20% or more within 20 sessions of the trigger — the campaign class the whole study hunts"],
+          ["🏆 Big winner", "ran +8% or more within 5 sessions — a real burst (the 8–40% class)"],
+          ["🌱 Works small", "only +4–8% in 5 sessions — the idea worked but paid little; partials matter here"],
+          ["💀 Failure", "under +4% in 5 sessions, or broke the trigger-day low before ever reaching +4% — the control group that makes lift math possible"],
+        ].map(([term, def]) => (
+          <span key={term} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "3px 9px" }}>
+            <b style={{ color: C.goldBright }}>{term}</b> — {def}
+          </span>
+        ))}
+      </div>
       {lifts.length > 0 && (
         <>
           <div style={{ fontSize: "0.62rem", color: small ? "#e0a955" : C.muted, marginBottom: 6 }}>
