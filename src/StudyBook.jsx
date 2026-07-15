@@ -30,10 +30,15 @@ export const STUDY_SETUPS = {
         ["young", "Young trend — 1st–3rd breakout, not late/extended"], // sub-categorized by leg (checks.young_leg: "1"|"2"|"3") — Valen 2026-07-14
       ]},
       { title: "Base quality", items: [
-        ["tight", "Tightening series — ≥3 narrow-range days (range < 0.6×ATR)"],
+        // Eyeball layer stays QUALITATIVE (mentor verbatim) — the 0.6×ATR quantification is a
+        // winner-dna.md ⚠️-knob and lives in metrics.tight_days (study-fill.mjs), not in his ticks.
+        // 3rd element "bonus" = tracked in the lift table but excluded from the quality score.
+        ["tight", "Tightening series — ≥3 visibly narrow-range days pre-trigger"],
         ["vol_dry", "Volume drying up in the base (lower than usual)"],
-        ["orderly", "Orderly base — no big red bars inside, ascending lows"],
+        ["orderly", "Orderly base — no big red bars inside"],
+        ["higher_lows", "Higher lows forming into the pivot"],
         ["prior_nr", "Day before trigger = narrow-range or negative day"],
+        ["inside", "Inside bar(s) right before the trigger — coil tell", "bonus"],
         ["ma_surf", "Surfing rising 10/20-day MA into the pivot"],
       ]},
       { title: "Trigger day", items: [
@@ -147,8 +152,9 @@ export const SUBCATS = {
 // same shape as the Setup Grader: tick-% → stars → letter. No manual grade input.
 export function studyQuality(study) {
   const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Momentum Breakout"];
-  const total = def.buckets.reduce((n, b) => n + b.items.length, 0);
-  const on = def.buckets.reduce((n, b) => n + b.items.filter(([k]) => study.checks?.[k]).length, 0);
+  const scored = def.buckets.flatMap(b => b.items).filter(it => !it[2]); // bonus ticks don't grade
+  const total = scored.length;
+  const on = scored.filter(([k]) => study.checks?.[k]).length;
   const stars = on ? Math.round(on / total * 5) : 0;
   return { on, total, letter: on === 0 ? "—" : ({ 5: "A+", 4: "A", 3: "B" }[stars] || "C") };
 }
@@ -344,18 +350,19 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           Data-context items (theme/liquidity/ADR/rank) are NOT here: backtested charts
           can't show them, so they live below as auto-pulled values + DATA_FLAGS. */}
       <div style={sect}>👁 My ticks — what the chart shows ({s.setup})</div>
-      {(() => { const total = def.buckets.reduce((n, b) => n + b.items.length, 0);
-        const on = def.buckets.reduce((n, b) => n + b.items.filter(([k]) => s.checks[k]).length, 0);
-        return <div style={{ fontSize: "0.66rem", color: C.muted, marginBottom: 8 }}>{on}/{total} ticked — eyeball reps; tick only what the chart actually shows</div>; })()}
+      {(() => { const scored = def.buckets.flatMap(b => b.items).filter(it => !it[2]);
+        const on = scored.filter(([k]) => s.checks[k]).length;
+        return <div style={{ fontSize: "0.66rem", color: C.muted, marginBottom: 8 }}>{on}/{scored.length} ticked — eyeball reps; tick only what the chart actually shows (bonus ticks tracked, not graded)</div>; })()}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         {def.buckets.map((b, bi) => (
           <div key={bi} style={{ flex: 1, minWidth: 250, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px" }}>
             <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>{b.title}</div>
-            {b.items.map(([k, t]) => { const sub = SUBCATS[k];
+            {b.items.map(([k, t, bonus]) => { const sub = SUBCATS[k];
               return <div key={k} style={{ padding: "3px 0" }}>
                 <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: "0.74rem", cursor: "pointer" }}>
                   <input type="checkbox" style={{ accentColor: C.goldBright, marginTop: 3 }} checked={!!s.checks[k]}
-                    onChange={e => setS({ checks: { ...s.checks, [k]: e.target.checked, ...(sub && !e.target.checked ? { [sub.store]: "" } : {}) } })} />{t}
+                    onChange={e => setS({ checks: { ...s.checks, [k]: e.target.checked, ...(sub && !e.target.checked ? { [sub.store]: "" } : {}) } })} />
+                  <span>{t}{bonus && <span style={{ marginLeft: 6, border: `1px solid ${C.goldBright}`, color: C.goldBright, borderRadius: 99, fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".06em", padding: "1px 7px", verticalAlign: "1px" }}>BONUS</span>}</span>
                 </label>
                 {sub && s.checks[k] && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "5px 0 2px 24px" }}>
