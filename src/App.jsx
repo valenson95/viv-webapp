@@ -4512,7 +4512,81 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .tdz-tabs{display:flex; gap:6px; margin-bottom:12px}
 .vj .tdz-tab{background:rgba(255,255,255,0.03); border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-weight:700; font-size:0.76rem; padding:8px 20px; border-radius:99px; cursor:pointer; transition:all .14s}
 .vj .tdz-tab.on{background:linear-gradient(135deg,var(--goldBright),var(--goldMid)); color:#08080e; border-color:transparent}
-@media (max-width: 960px){ .vj .tdz{grid-template-columns:1fr} .vj .tdz-left{position:static; max-height:none} }`;
+@media (max-width: 960px){ .vj .tdz{grid-template-columns:1fr} .vj .tdz-left{position:static; max-height:none} }
+
+/* ═══════════ PRO-MODE LAYOUT (.vj.expert) — ported from mockups/journal-pro.html ═══════════ */
+/* Uniform Pro card chrome (mirrors DashboardPage's .vd.expert): 16px radius + tooltips escape the card edge. */
+.vj.expert .card{border-radius:16px; padding:18px 20px; overflow:visible}
+.vj.expert .card::before{border-radius:inherit}
+.vj.expert .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+.vj.expert .cardhead .label{flex:1}
+.vj.expert .infodot{position:relative; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none}
+.vj.expert .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+.vj.expert .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+.vj.expert .eyebrow-row{display:flex; align-items:center; gap:8px}
+.vj.expert .eyebrow-row .eyebrow{flex:1}
+/* P1. Command header */
+.vj.expert .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
+.vj.expert .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+.vj.expert .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px; font-variant-numeric:tabular-nums}
+.vj.expert .cmdactions{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+.vj.expert .cmdactions .btn.ghost{background:transparent}
+.vj.expert .cmdactions .conn{margin-left:0}
+/* P2. KPI strip */
+.vj.expert .kpistrip{display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-top:6px}
+.vj.expert .kpi{padding:14px 18px; display:flex; flex-direction:column; min-height:112px}
+.vj.expert .kpi .cardhead{padding-bottom:8px; margin-bottom:10px}
+.vj.expert .kpibody{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-height:0}
+.vj.expert .kpibody.stack{flex-direction:column; align-items:flex-start; justify-content:center; gap:5px}
+.vj.expert .kpimain{min-width:0}
+.vj.expert .kpinum{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; line-height:1.05; white-space:nowrap; font-variant-numeric:tabular-nums}
+.vj.expert .kpinum.green{color:var(--green)} .vj.expert .kpinum.red{color:var(--red)} .vj.expert .kpinum.gold{color:var(--goldBright)}
+.vj.expert .kpisub{font-size:0.68rem; color:var(--muted); margin-top:4px; white-space:nowrap}
+.vj.expert .kpiviz{flex:none; width:70px; height:40px}
+.vj.expert .kpiviz svg{width:100%; height:100%; display:block; overflow:visible}
+.vj.expert .wrviz{position:relative}
+.vj.expert .wrviz .wrzone{pointer-events:stroke; cursor:help}
+.vj.expert .wrtip{display:none; position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:8px 12px; box-shadow:0 10px 30px rgba(0,0,0,0.55); font-size:0.74rem; font-weight:700; white-space:nowrap}
+.vj.expert .wrtip.win{color:#86efac} .vj.expert .wrtip.loss{color:#fca5a5}
+.vj.expert .wrviz:has(.wrzone.win:hover) .wrtip.win{display:block}
+.vj.expert .wrviz:has(.wrzone.loss:hover) .wrtip.loss{display:block}
+.vj.expert .wlbar{display:flex; height:6px; width:100%; border-radius:980px; overflow:hidden; background:rgba(255,255,255,0.08)}
+.vj.expert .wlbar .win{background:var(--green)} .vj.expert .wlbar .loss{background:var(--red)}
+@media(max-width:1200px){ .vj.expert .kpistrip{grid-template-columns:repeat(3,1fr)} }
+@media(max-width:760px){ .vj.expert .kpistrip{grid-template-columns:repeat(2,1fr)} }
+/* P3. Filter bar — slim Pro row (reuses the base .filterbar) */
+.vj.expert .filterbar{margin-top:14px; margin-bottom:0}
+/* P4. Charts row */
+.vj.expert .chartrow{display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-top:14px; align-items:start}
+.vj.expert .chartrow .charthint{display:block}
+@media(max-width:1000px){ .vj.expert .chartrow{grid-template-columns:1fr} }
+/* P5. Calendar + key metrics row */
+.vj.expert .calmetrow{display:grid; grid-template-columns:1.2fr 1fr; gap:14px; margin-top:14px; align-items:stretch}
+@media(max-width:1000px){ .vj.expert .calmetrow{grid-template-columns:1fr} }
+.vj.expert .metricsmini{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+.vj.expert .mmtile{background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:10px; padding:9px 10px; cursor:grab}
+.vj.expert .mmtile.dragging{opacity:0.4; border-color:var(--borderGold); cursor:grabbing}
+.vj.expert .mmk{font-size:0.56rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--faint); font-weight:700}
+.vj.expert .mmv{font-size:0.78rem; font-weight:800; margin-top:4px; letter-spacing:-0.01em; font-variant-numeric:tabular-nums}
+.vj.expert .mmv.green{color:var(--green)} .vj.expert .mmv.red{color:var(--red)} .vj.expert .mmv.gold{color:var(--goldBright)}
+/* P5b. Playbook strip */
+.vj.expert .playbookstrip{margin-top:14px}
+/* P6. Objective edge + edge matrix */
+.vj.expert .edgegrid{display:grid; grid-template-columns:1.1fr 1fr; gap:14px; margin-top:14px; align-items:start}
+@media(max-width:1000px){ .vj.expert .edgegrid{grid-template-columns:1fr} }
+.vj.expert .edgerows{display:flex; flex-direction:column; gap:2px; margin-top:2px}
+/* P7. Analytics row — 4-up */
+.vj.expert .vagrid{grid-template-columns:repeat(4,1fr); margin-top:14px}
+@media(max-width:1100px){ .vj.expert .vagrid{grid-template-columns:repeat(2,1fr)} }
+@media(max-width:600px){ .vj.expert .vagrid{grid-template-columns:1fr} }
+.vj.expert .vacard{padding:16px 17px}
+/* P8. Closed trades table — dense Pro chrome, scoped to the Pro .tablewrap only (guided uses .tbl-scroll) */
+.vj.expert .tradehead .sech,.vj.expert .tradehead h2{font-size:0.95rem}
+.vj.expert .countchip{background:var(--goldDim); color:var(--goldBright); font-size:0.66rem; font-weight:800; padding:3px 10px; border-radius:980px}
+.vj.expert .tablewrap{overflow-x:auto; container-type:inline-size}
+.vj.expert .tablewrap thead th{position:sticky; top:0; z-index:2; background:rgba(9,9,15,0.94); font-size:0.58rem; padding:9px 10px}
+.vj.expert .tablewrap tbody tr.traderow td{height:auto; padding:8px 10px; font-size:0.74rem; font-variant-numeric:tabular-nums}
+@media(min-width:761px){ .vj.expert .tablewrap tbody tr.traderow td{white-space:nowrap} }`;
 
 // Admin-only AI deep-review block — renders the ai_review JSON Claude writes to Supabase
 // (score · process dimensions · narrative/regime/SL · the read). Members never see this.
@@ -5936,6 +6010,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   useEffect(() => { try { localStorage.setItem("viv-view", tableView); } catch {} }, [tableView]);
   const expert = uiMode === "pro";
   const showPro = tableView === "pro"; // columns controlled ONLY by the Simple/Pro toggle (not Guided/Pro mode), matching the Dashboard
+  const [edgeGroup, setEdgeGroup] = useState("grade"); // Pro-only: Objective Edge 3-way seg (grade | theme | context). Pure UI state.
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => { try { return localStorage.getItem("viv-jwelcome-x") === "1"; } catch { return false; } });
 
   // guide assistant (hover → narrate), mirrors DashboardPage
@@ -6343,6 +6418,1323 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   };
   const firstName = (displayName && displayName.trim()) || (session?.user?.email ? session.user.email.split("@")[0] : "trader");
 
+  // ── Shared blocks used by BOTH Guided and Pro layouts (pure cut-paste extractions) ──
+  const objectiveEdge = (proLayout) => {
+          const pop = dateFiltered.filter(t => t.exit);
+          if (!pop.length) return null;
+          const agg = (rows) => {
+            const n = rows.length;
+            const wins = rows.filter(t => (Number(t.plPct) || 0) > 0).length;
+            const rRows = rows.filter(t => t.rMult != null);
+            const avgR = rRows.length ? rRows.reduce((s, t) => s + Number(t.rMult), 0) / rRows.length : null;
+            const gw = rows.reduce((s, t) => s + Math.max(0, Number(t.plDollar) || 0), 0);
+            const gl = rows.reduce((s, t) => s + Math.max(0, -(Number(t.plDollar) || 0)), 0);
+            const pf = gl > 0 ? gw / gl : (gw > 0 ? Infinity : null); // profit factor: gross wins ÷ gross losses
+            return { n, winPct: n ? Math.round(100 * wins / n) : 0, avgR, pf };
+          };
+          const letterOf = (t) => (t.gradeSnapshot && t.gradeSnapshot.letter) || (getSavedGrade(t.ticker) || {}).letter || null;
+          const byGrade = ["A+", "A", "B", "C"].map(L => ({ L, ...agg(pop.filter(t => letterOf(t) === L)) })).filter(g => g.n > 0);
+          const ungraded = agg(pop.filter(t => !letterOf(t)));
+          const fitOf = (t) => { const th = sectorFor(t.ticker); return th ? themeFit(th, t.entry) : null; };
+          const inT = agg(pop.filter(t => fitOf(t) === "in")), offT = agg(pop.filter(t => fitOf(t) === "off"));
+          const unT = agg(pop.filter(t => !fitOf(t))); // pre-coverage, missing entry date, or unknown sector — NEVER guessed
+          // Market context at ENTRY (SPY vs EMA21 — trending / choppy / downtrend, see spyCtxOf)
+          const ctxOf = (t) => spyCtxOf(t.entry);
+          const mTrend = agg(pop.filter(t => ctxOf(t) === "trend")), mChop = agg(pop.filter(t => ctxOf(t) === "chop"));
+          const mDown = agg(pop.filter(t => ctxOf(t) === "down")), mUn = agg(pop.filter(t => !ctxOf(t)));
+          // Colour doctrine (design-research pass, 2026-07-11): numbers stay NEUTRAL; green/red is
+          // reserved for the outcome column (Avg R) so the one number that means money is the one
+          // that pops. Category identity (theme/market) = a small controlled dot, never coloured text
+          // or emoji (uncontrollable saturated blobs on a dark theme).
+          const cell = (v, good) => <b style={{ color: v == null ? "var(--muted)" : good ? "var(--green)" : "var(--red)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2) + "R"}</b>;
+          const pfCell = (pf) => <span className="term" data-tip="Profit factor = gross $ won ÷ gross $ lost in this group. Above 1 = the group makes money; 2+ = every dollar lost buys two back." style={{ color: pf == null ? "var(--muted)" : "var(--text)", fontWeight: 600, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>PF {pf == null ? "—" : pf === Infinity ? "∞" : pf.toFixed(2)}</span>;
+          const dot = (c) => <i style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: c, marginRight: 7, verticalAlign: "middle", flex: "none" }} />;
+          const CTX_LABEL = { trend: "Trending", chop: "Choppy", down: "Downtrend" };
+          const CTX_DOT = { trend: "var(--green)", chop: "var(--gold)", down: "var(--red)" };
+          // click a group → expand the exact trades behind the number (with sector + the snapshot ranks used)
+          const groupTrades = (id) => {
+            if (id === "t:in") return pop.filter(t => fitOf(t) === "in");
+            if (id === "t:off") return pop.filter(t => fitOf(t) === "off");
+            if (id === "t:un") return pop.filter(t => !fitOf(t));
+            if (id && id.startsWith("g:")) { const L = id.slice(2); return L === "un" ? pop.filter(t => !letterOf(t)) : pop.filter(t => letterOf(t) === L); }
+            if (id && id.startsWith("m:")) { const c = id.slice(2); return c === "un" ? pop.filter(t => !ctxOf(t)) : pop.filter(t => ctxOf(t) === c); }
+            if (id && id.startsWith("x:")) { // 3-D combo: grade|theme|context — SAME population as the matrix (entries ≥ theme coverage)
+              const [G, T, X] = id.slice(2).split("|");
+              return pop.filter(t => { const iso = tradeDateISO(t.entry); return iso && THEME_COVERAGE_START && iso >= THEME_COVERAGE_START; })
+                .filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
+            }
+            return [];
+          };
+          // 3-D matrix: Grade × Theme × Context — ONLY trades entered from THEME_COVERAGE_START
+          // (2026-06-26, the first theme snapshot). Earlier trades have no honest theme tag, so a
+          // 3-D cell built on them would be fake precision. The 1-D columns above still cover all trades.
+          const pop3d = pop.filter(t => { const iso = tradeDateISO(t.entry); return iso && THEME_COVERAGE_START && iso >= THEME_COVERAGE_START; });
+          const combos = [];
+          const gKeys = [...byGrade.map(g => g.L), ...(ungraded.n ? ["un"] : [])];
+          for (const G of gKeys) for (const T of ["in", "off", "un"]) for (const X of ["trend", "chop", "down", "un"]) {
+            const rows = pop3d.filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
+            if (rows.length) combos.push({ id: `x:${G}|${T}|${X}`, G, T, X, ...agg(rows) });
+          }
+          combos.sort((a, b) => b.n - a.n);
+          // NOTE: every cell must be shrink/wrap-safe — fixed minWidths inside a minmax(300px,1fr)
+          // grid track overflowed into the neighbouring column (member-reported UI bug).
+          const Row = ({ label, s, accent, id }) => (
+            <div onClick={id ? () => setEdgeOpen(edgeOpen === id ? null : id) : undefined}
+              title={id ? "Click to see the exact trades behind this number" : undefined}
+              style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 10px", padding: "8px 6px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "0.8rem", cursor: id ? "pointer" : "default", background: edgeOpen === id ? "rgba(240,192,80,0.05)" : "transparent", borderRadius: 8, minWidth: 0 }}>
+              <span style={{ flex: "1 1 84px", minWidth: 0, fontWeight: 800, color: accent || "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+              <span style={{ color: "var(--muted)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{s.n} trade{s.n !== 1 ? "s" : ""}</span>
+              <span style={{ color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{s.winPct}% win</span>
+              {pfCell(s.pf)}
+              {cell(s.avgR, (s.avgR || 0) >= 0)}
+              {id && <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>{edgeOpen === id ? "▴" : "▾"}</span>}
+            </div>
+          );
+          const EdgeList = ({ id }) => {
+            const rows = groupTrades(id);
+            if (!rows.length) return null;
+            const isTheme = id.startsWith("t:");
+            return (
+              <div style={{ gridColumn: "1 / -1", background: "rgba(255,255,255,0.02)", border: "1px solid var(--borderGold)", borderRadius: 12, padding: "10px 14px", marginTop: 4 }}>
+                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>
+                  The {rows.length} trade{rows.length !== 1 ? "s" : ""} behind “{id === "t:in" ? "In-theme" : id === "t:off" ? "Off-theme" : id === "t:un" ? "Untagged"
+                    : id === "m:trend" ? "Trending tape" : id === "m:chop" ? "Choppy tape" : id === "m:down" ? "Downtrend tape" : id === "m:un" ? "No market data"
+                    : id.startsWith("x:") ? (() => { const [G, T, X] = id.slice(2).split("|"); return `${G === "un" ? "Ungraded" : G} · ${T === "in" ? "In-theme" : T === "off" ? "Off-theme" : "Untagged"} · ${X === "un" ? "No mkt data" : ({ trend: "Trending", chop: "Choppy", down: "Downtrend" })[X]}`; })()
+                    : id.slice(2) + " setups"}”
+                  {isTheme && id !== "t:un" && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · judged against the theme snapshot at each trade's ENTRY date</span>}
+                  {id === "t:un" && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · entered before theme coverage, missing an entry date, or unknown sector — never guessed. Fix the entry date via Edit trade and it re-tags automatically.</span>}
+                </div>
+                {rows.map((t, i) => {
+                  const th = sectorFor(t.ticker);
+                  const rk = isTheme && th ? themeRanks(th, t.entry) : null;
+                  return (
+                    <div key={t.id || i} onClick={() => openReview(t)} title="Open trade details"
+                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 4px", borderTop: i ? "1px solid rgba(255,255,255,0.04)" : "none", fontSize: "0.78rem", cursor: "pointer", flexWrap: "wrap" }}>
+                      <b style={{ minWidth: 52, color: "var(--white)" }}>{t.ticker}</b>
+                      <span style={{ minWidth: 120, color: "var(--goldBright)", fontWeight: 600 }}>{th || "— no sector"}</span>
+                      <span style={{ minWidth: 78, color: "var(--muted)" }}>{tradeDateISO(t.entry) || "—"}</span>
+                      {isTheme && (rk
+                        ? <span style={{ color: "var(--muted)", fontSize: "0.72rem", whiteSpace: "nowrap" }}>wk #{rk.week ?? "–"} · mo #{rk.month ?? "–"} <span style={{ opacity: 0.7 }}>@ {rk.date}</span></span>
+                        : <span style={{ color: "var(--muted)", fontSize: "0.72rem", fontStyle: "italic" }}>{!th ? "sector unknown" : !tradeDateISO(t.entry) ? "no entry date — not judged" : "before theme coverage"}</span>)}
+                      <span style={{ minWidth: 62, fontWeight: 700, color: (Number(t.plPct) || 0) > 0 ? "var(--green)" : "var(--red)" }}>{sgnPct(Number(t.plPct))}</span>
+                      <span style={{ color: "var(--muted)" }}>{t.rMult != null ? sgnR(Number(t.rMult)) : "—"}</span>
+                      <span style={{ marginLeft: "auto", color: "var(--goldBright)", fontSize: "0.7rem" }}>details ›</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          };
+          if (!byGrade.length && !inT.n && !offT.n) return null;
+          const matrixBlock = combos.length > 0 && (
+                <div style={{ marginTop: 18 }}>
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
+                    <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)" }}>3-D edge matrix — grade × theme × market context</div>
+                    {/* view toggle — heatmap (default, visual) vs the classic sortable table (unchanged) */}
+                    <div style={{ marginLeft: "auto", display: "inline-flex", border: "1px solid var(--borderGold)", borderRadius: 8, overflow: "hidden", fontSize: "0.62rem", fontWeight: 700 }}>
+                      {[["heatmap", "Heatmap"], ["table", "Table"]].map(([v, lbl]) => (
+                        <button key={v} type="button" onClick={() => setEdgeMatrixView(v)}
+                          style={{ padding: "4px 10px", border: "none", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.04em",
+                            background: edgeMatrixView === v ? "rgba(240,192,80,0.14)" : "transparent",
+                            color: edgeMatrixView === v ? "var(--goldBright)" : "var(--muted)" }}>{lbl}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ background: "rgba(201,152,42,0.06)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "8px 12px", fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, marginBottom: 8 }}>
+                    Starts at <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the first theme snapshot
+                    <span onClick={() => setEdgeNotes(n => ({ ...n, matrix: !n.matrix }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.matrix ? "hide ▴" : "why? ▾"}</span>
+                    {edgeNotes.matrix && <div style={{ marginTop: 4 }}>Trades entered before that have no theme tracking, so crossing them here would be inaccurate; they're excluded from the matrix (the single-dimension columns above still cover every trade).</div>}
+                  </div>
+                  {edgeMatrixView === "heatmap" ? (() => {
+                    // HEATMAP — same `combos` data, laid out as grade × context grids, one panel per theme state.
+                    // Colour = outcome (avgR) only; numbers stay neutral. Cells reuse the combo id so the
+                    // shared EdgeList drill-down below the matrix renders the exact trades on click.
+                    const GRADE_ORDER = ["A+", "A", "B", "C", "un"];
+                    const CTX_ORDER = ["trend", "chop", "down", "un"];
+                    const gradeLabel = (g) => g === "un" ? "Ungraded" : g;
+                    const ctxHead = (x) => x === "un"
+                      ? <>{dot("rgba(255,255,255,0.25)")}No data</>
+                      : <>{dot(CTX_DOT[x])}{CTX_LABEL[x]}</>;
+                    const themePanels = [
+                      { key: "in", label: "In-theme", dotc: "var(--green)" },
+                      { key: "off", label: "Off-theme", dotc: "var(--red)" },
+                      { key: "un", label: "Untagged", dotc: "rgba(255,255,255,0.25)" },
+                    ];
+                    const byId = Object.fromEntries(combos.map(c => [c.id, c]));
+                    const cellBg = (id) => {
+                      const c = byId[id];
+                      if (!c || c.avgR == null) return "rgba(255,255,255,0.02)";
+                      const a = Math.min(0.45, Math.abs(c.avgR) * 0.25);
+                      if (a < 0.02) return "rgba(255,255,255,0.03)";
+                      return c.avgR >= 0 ? `rgba(34,197,94,${a.toFixed(3)})` : `rgba(239,68,68,${a.toFixed(3)})`;
+                    };
+                    const panels = themePanels
+                      .map(p => {
+                        const grades = GRADE_ORDER.filter(g => combos.some(c => c.T === p.key && c.G === g));
+                        const ctxs = CTX_ORDER.filter(x => combos.some(c => c.T === p.key && c.X === x));
+                        return { ...p, grades, ctxs };
+                      })
+                      .filter(p => p.grades.length && p.ctxs.length);
+                    if (!panels.length) return null;
+                    return (
+                      <div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-start" }}>
+                          {panels.map(p => (
+                            <div key={p.key} style={{ flex: "1 1 300px", minWidth: 0 }}>
+                              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text)", marginBottom: 6, display: "flex", alignItems: "center" }}>{dot(p.dotc)}{p.label}</div>
+                              <div style={{ overflowX: "auto" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: `minmax(60px,auto) repeat(${p.ctxs.length}, minmax(92px,1fr))`, gap: 4 }}>
+                                  {/* header row: blank corner + context columns */}
+                                  <div />
+                                  {p.ctxs.map(x => (
+                                    <div key={x} style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)", fontWeight: 700, padding: "2px 4px", display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>{ctxHead(x)}</div>
+                                  ))}
+                                  {/* one row per grade */}
+                                  {p.grades.map(g => (
+                                    <React.Fragment key={g}>
+                                      <div style={{ fontSize: "0.72rem", fontWeight: 800, color: g === "un" ? "var(--muted)" : "var(--text)", display: "flex", alignItems: "center", whiteSpace: "nowrap", paddingRight: 4 }}>{gradeLabel(g)}</div>
+                                      {p.ctxs.map(x => {
+                                        const id = `x:${g}|${p.key}|${x}`;
+                                        const c = byId[id];
+                                        const open = edgeOpen === id;
+                                        if (!c) return <div key={x} style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: "0.8rem" }}>—</div>;
+                                        return (
+                                          <div key={x} onClick={() => setEdgeOpen(open ? null : id)} title="Click to see the exact trades behind this combination"
+                                            style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: cellBg(id), border: open ? "1px solid var(--goldBright)" : "1px solid rgba(255,255,255,0.06)", boxShadow: open ? "0 0 0 1px var(--goldBright)" : "none", padding: "5px 7px", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
+                                            <div style={{ fontSize: "0.82rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "var(--text)" }}>{c.avgR == null ? "—" : (c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2) + "R"}</div>
+                                            <div style={{ fontSize: "0.58rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>n={c.n} · {c.winPct}%</div>
+                                          </div>
+                                        );
+                                      })}
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Colour = average R per trade. Click any cell to see its exact trades. Cells under ~10 trades are direction, not proof.</div>
+                      </div>
+                    );
+                  })() : (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem", tableLayout: "fixed" }}>
+                      <colgroup><col style={{ width: "13%" }} /><col style={{ width: "15%" }} /><col style={{ width: "18%" }} /><col style={{ width: "11%" }} /><col style={{ width: "12%" }} /><col style={{ width: "12%" }} /><col style={{ width: "13%" }} /><col style={{ width: "6%" }} /></colgroup>
+                      <thead><tr style={{ color: "var(--muted)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                        <th style={{ textAlign: "left", padding: "4px 8px" }}>Grade</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Theme</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Market</th>
+                        <th style={{ textAlign: "right", padding: "4px 8px" }}>Trades</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Win %</th><th style={{ textAlign: "right", padding: "4px 8px" }}>PF</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Avg R</th><th></th>
+                      </tr></thead>
+                      <tbody>
+                        {combos.map(c => (
+                          /* NOTE: .vj tbody td right-aligns everything past column 2 — the first three
+                             (text) columns need EXPLICIT textAlign:left or headers and cells drift apart
+                             (the Market-column misalignment Valen caught, 2026-07-11). */
+                          <tr key={c.id} onClick={() => setEdgeOpen(edgeOpen === c.id ? null : c.id)} title="Click to see the exact trades behind this combination"
+                            onMouseEnter={e => { if (edgeOpen !== c.id) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent"; }}
+                            style={{ cursor: "pointer", background: edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 800, color: c.G === "un" ? "var(--muted)" : "var(--text)" }}>{c.G === "un" ? "Ungraded" : c.G}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.T === "un" ? "var(--muted)" : "var(--text)" }}>{c.T === "in" ? <>{dot("var(--green)")}In</> : c.T === "off" ? <>{dot("var(--red)")}Off</> : <>{dot("rgba(255,255,255,0.25)")}Untagged</>}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.X === "un" ? "var(--muted)" : "var(--text)" }}>{c.X === "un" ? <>{dot("rgba(255,255,255,0.25)")}No data</> : <>{dot(CTX_DOT[c.X])}{CTX_LABEL[c.X]}</>}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{c.n}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: "var(--text)" }}>{c.winPct}%</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: c.pf == null ? "var(--muted)" : "var(--text)" }}>{c.pf == null ? "—" : c.pf === Infinity ? "∞" : c.pf.toFixed(2)}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums" }}>{c.avgR == null ? <span style={{ color: "var(--muted)" }}>—</span> : <b style={{ color: c.avgR >= 0 ? "var(--green)" : "var(--red)" }}>{(c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2)}R</b>}</td>
+                            <td style={{ padding: "8px 4px", textAlign: "right", color: "var(--muted)", fontSize: "0.66rem" }}>{edgeOpen === c.id ? "▴" : "▾"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  )}
+                  {edgeOpen && edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
+                  {edgeMatrixView === "table" && <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 6 }}>Sorted by sample size. Small samples (under ~10 trades) are direction, not proof — click any row to inspect its exact trades before acting on it.</div>}
+                </div>
+          );
+          if (proLayout) return (
+            <div className="edgegrid">
+              {/* Objective Edge — one group at a time via the 3-way seg (reuses the same Row/EdgeList content) */}
+              <div className="card">
+                <div className="cardhead"><span className="label">Objective Edge</span><span className="infodot" data-tip="Connects your process to your results across three dimensions judged at entry: the setup grade you gave the trade, whether its sector was in-theme, and the market context — SPY trending, choppy, or in a downtrend versus its 21-day EMA.">i</span></div>
+                <div className="seg" style={{ marginBottom: 8 }}>
+                  <button className={edgeGroup === "grade" ? "on" : ""} type="button" onClick={() => setEdgeGroup("grade")}>By setup grade</button>
+                  <button className={edgeGroup === "theme" ? "on" : ""} type="button" onClick={() => setEdgeGroup("theme")}>By theme fit</button>
+                  <button className={edgeGroup === "context" ? "on" : ""} type="button" onClick={() => setEdgeGroup("context")}>By market context</button>
+                </div>
+                <div className="edgerows">
+                  {edgeGroup === "grade" && <>
+                    {byGrade.map(g => <Row key={g.L} id={"g:" + g.L} label={g.L + " setups"} s={g} />)}
+                    {ungraded.n > 0 && <Row id="g:un" label="Ungraded" s={ungraded} accent="var(--muted)" />}
+                    {byGrade.length === 0 && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Grade setups in Premium Tools → Setup Grader; results correlate here automatically.</div>}
+                  </>}
+                  {edgeGroup === "theme" && <>
+                    {inT.n > 0 && <Row id="t:in" label={<>{dot("var(--green)")}In-theme</>} s={inT} />}
+                    {offT.n > 0 && <Row id="t:off" label={<>{dot("var(--red)")}Off-theme</>} s={offT} />}
+                    {unT.n > 0 && <Row id="t:un" label={<>{dot("rgba(255,255,255,0.25)")}Untagged</>} s={unT} accent="var(--muted)" />}
+                    {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
+                  </>}
+                  {edgeGroup === "context" && <>
+                    {mTrend.n > 0 && <Row id="m:trend" label={<span className="term" data-tip="Trending market: SPY closed ABOVE its 21-day EMA for 10+ straight sessions before entry.">{dot(CTX_DOT.trend)}Trending</span>} s={mTrend} />}
+                    {mChop.n > 0 && <Row id="m:chop" label={<span className="term" data-tip="Choppy market: within the last 10 sessions before entry, SPY crossed back and forth around its 21-day EMA.">{dot(CTX_DOT.chop)}Choppy</span>} s={mChop} />}
+                    {mDown.n > 0 && <Row id="m:down" label={<span className="term" data-tip="Downtrend market: SPY closed BELOW its 21-day EMA for 10+ straight sessions before entry.">{dot(CTX_DOT.down)}Downtrend</span>} s={mDown} />}
+                    {mUn.n > 0 && <Row id="m:un" label={<>{dot("rgba(255,255,255,0.25)")}No data</>} s={mUn} accent="var(--muted)" />}
+                    {!spyCtxDays && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Loading SPY history… (needs the deployed /api — shows “No data” in local dev.)</div>}
+                  </>}
+                  {edgeOpen && !edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
+                </div>
+              </div>
+              {/* Edge Matrix — the existing 3-D matrix with its heatmap/table toggle */}
+              <div className="card">
+                <div className="cardhead"><span className="label">Edge Matrix</span><span className="infodot" data-tip="Grade × market context × theme fit crossed in one view so you can see exactly which combination your edge lives in. Toggle the heatmap or the sortable table.">i</span></div>
+                {matrixBlock || <div style={{ fontSize: "0.72rem", color: "var(--muted)", padding: "4px 2px" }}>Not enough theme-tracked trades yet to cross grade × theme × market. The single-dimension groups on the left still cover every trade.</div>}
+                {edgeOpen && edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
+              </div>
+            </div>
+          );
+          return (<>
+            <div className="toolbar" style={{ marginTop: 26 }}><h2 className="sech guide" onMouseEnter={guideEnter("objedge", "Objective edge", "This connects your process to your results across three dimensions judged at entry: the setup grade you gave the trade, whether its sector was in-theme, and the market context — was SPY trending, choppy or in a downtrend versus its 21-day EMA. The 3-D matrix crosses all three so you see exactly which combination your edge lives in.", undefined)} onMouseLeave={guideLeave("objedge")}>Objective edge</h2></div>
+            <div className="card reveal" style={{ padding: "16px 20px", marginBottom: 18 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By setup grade</div>
+                  {byGrade.map(g => <Row key={g.L} id={"g:" + g.L} label={g.L + " setups"} s={g} />)}
+                  {ungraded.n > 0 && <Row id="g:un" label="Ungraded" s={ungraded} accent="var(--muted)" />}
+                  {byGrade.length === 0 && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Grade setups in Premium Tools → Setup Grader; results correlate here automatically.</div>}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By theme fit (at entry)</div>
+                  {inT.n > 0 && <Row id="t:in" label={<>{dot("var(--green)")}In-theme</>} s={inT} />}
+                  {offT.n > 0 && <Row id="t:off" label={<>{dot("var(--red)")}Off-theme</>} s={offT} />}
+                  {unT.n > 0 && <Row id="t:un" label={<>{dot("rgba(255,255,255,0.25)")}Untagged</>} s={unT} accent="var(--muted)" />}
+                  {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
+                  {THEME_COVERAGE_START && <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
+                    Tracked from <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b>
+                    <span onClick={() => setEdgeNotes(n => ({ ...n, theme: !n.theme }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.theme ? "hide ▴" : "why? ▾"}</span>
+                    {edgeNotes.theme && <div style={{ marginTop: 4 }}>The date of the first theme snapshot. Trades entered earlier aren't theme-tagged: themes rotate constantly, so a later snapshot can't honestly judge an older trade. Grade metrics cover all trades.</div>}
+                  </div>}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By market context (at entry)</div>
+                  {mTrend.n > 0 && <Row id="m:trend" label={<span className="term" data-tip="Trending market: SPY closed ABOVE its 21-day EMA for 10 or more straight sessions, as of the last completed session before your entry. The tape had a persistent uptrend under your trade.">{dot(CTX_DOT.trend)}Trending</span>} s={mTrend} />}
+                  {mChop.n > 0 && <Row id="m:chop" label={<span className="term" data-tip="Choppy market: within the last 10 sessions before your entry, SPY crossed back and forth around its 21-day EMA — neither side held 10 straight closes. Whipsaw conditions: breakouts get faded.">{dot(CTX_DOT.chop)}Choppy</span>} s={mChop} />}
+                  {mDown.n > 0 && <Row id="m:down" label={<span className="term" data-tip="Downtrend market: SPY closed BELOW its 21-day EMA for 10 or more straight sessions before your entry. Persistent downside tape — fresh long breakout risk is swimming upstream.">{dot(CTX_DOT.down)}Downtrend</span>} s={mDown} />}
+                  {mUn.n > 0 && <Row id="m:un" label={<span className="term" data-tip="No verdict: the entry date predates the SPY history loaded, the date is missing, or the price feed didn't answer. Never guessed.">{dot("rgba(255,255,255,0.25)")}No data</span>} s={mUn} accent="var(--muted)" />}
+                  {!spyCtxDays && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Loading SPY history… (needs the deployed /api — shows “No data” in local dev.)</div>}
+                  <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
+                    SPY vs its 21-day EMA, past 10 sessions, judged at entry
+                    <span onClick={() => setEdgeNotes(n => ({ ...n, market: !n.market }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.market ? "hide ▴" : "full definition ▾"}</span>
+                    {edgeNotes.market && <div style={{ marginTop: 6, display: "grid", gap: 5 }}>
+                      <div><b style={{ color: "var(--text)" }}>{dot(CTX_DOT.trend)}Trending</b> — SPY closed above its 21-day EMA for 10 or more straight sessions.</div>
+                      <div><b style={{ color: "var(--text)" }}>{dot(CTX_DOT.chop)}Choppy</b> — price crossed back and forth through the EMA21 within the last 10 sessions.</div>
+                      <div><b style={{ color: "var(--text)" }}>{dot(CTX_DOT.down)}Downtrend</b> — SPY closed below its 21-day EMA for 10 or more straight sessions.</div>
+                      <div style={{ opacity: 0.8 }}>Judged on the last completed session before your entry — the entry day's close isn't known when you enter (no lookahead).</div>
+                    </div>}
+                  </div>
+                </div>
+                {edgeOpen && !edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
+              </div>
+
+              {/* ── 3-D EDGE MATRIX: Setup grade × Theme fit × Market context ── */}
+              {matrixBlock}
+            </div>
+          </>);
+  };
+  const equityCardBody = (<>
+              <div className="row">
+                <div className="label">Account value over time</div>
+                <div className="spacer"></div>
+                <div className="seg" id="eqSeg">
+                  <button className={eqMode === "$" ? "on" : ""} disabled={privacyMode} onClick={() => !privacyMode && setEqYAxis("$")} title={privacyMode ? "Privacy mode is on — turn it off to view dollar amounts" : ""}>$</button>
+                  <button className={eqMode === "%" ? "on" : ""} onClick={() => setEqYAxis("%")}>%</button>
+                </div>
+                <div className="seg" id="eqXSeg">
+                  <button className={eqXAxis === "trades" ? "on" : ""} onClick={() => setEqXAxis("trades")}>By Date</button>
+                  <button className={eqXAxis === "months" ? "on" : ""} onClick={() => setEqXAxis("months")}>By Month</button>
+                </div>
+              </div>
+              <div className="chartwrap">
+                <div className="yaxis">{eqSvg.yLabels.map((l, i) => <span key={i}>{l}</span>)}</div>
+                <div className="plot" style={{ position: "relative" }}
+                  onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); if (!r.width || !eqSvg.pts || !eqSvg.pts.length) return; const sx = ((e.clientX - r.left) / r.width) * eqSvg.W; let bi = 0, bd = 1e18; eqSvg.pts.forEach((p, i) => { const d = Math.abs(p.x - sx); if (d < bd) { bd = d; bi = i; } }); setEqHover(bi); }}
+                  onMouseLeave={() => setEqHover(null)}>
+                  <svg viewBox="0 0 600 210" preserveAspectRatio="none" className="eqsvg" role="img" aria-label="Equity curve">
+                    <defs>
+                      <linearGradient id="jeqgPos" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(34,197,94,0.32)" /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient>
+                      <linearGradient id="jeqgNeg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(239,68,68,0.30)" /><stop offset="100%" stopColor="rgba(239,68,68,0)" /></linearGradient>
+                    </defs>
+                    <line x1="0" y1="52" x2="600" y2="52" className="grid" /><line x1="0" y1="105" x2="600" y2="105" className="grid" /><line x1="0" y1="158" x2="600" y2="158" className="grid" />
+                    <line x1="0" y1={eqSvg.yb.toFixed(1)} x2="600" y2={eqSvg.yb.toFixed(1)} stroke="rgba(255,255,255,0.22)" strokeWidth="1" strokeDasharray="4 4" />
+                    <g id="eqRise">
+                      <path d={eqSvg.areaPos} fill="url(#jeqgPos)" />
+                      <path d={eqSvg.areaNeg} fill="url(#jeqgNeg)" />
+                      <path d={eqSvg.linePos} fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                      <path d={eqSvg.lineNeg} fill="none" stroke="var(--red)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                    </g>
+                    {/* Equity SMAs — derisk (5) / brake (10) / no-edge (20). All dotted; legend toggles each.
+                        When equity is AT/BELOW a line, that line GLOWS (soft wide underlay) — the "you've
+                        hit it" signal, replacing the old status card for the 20-SMA. */}
+                    {eqSmaOn.s20 && eqSvg.smaPaths?.s20 && <>
+                      {eqSvg.hits?.s20 && <path d={eqSvg.smaPaths.s20} fill="none" stroke="rgba(168,130,255,0.30)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+                      <path d={eqSvg.smaPaths.s20} fill="none" stroke={eqSvg.hits?.s20 ? "rgba(190,160,255,0.95)" : "rgba(168,130,255,0.65)"} strokeWidth="1.2" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+                    </>}
+                    {eqSmaOn.s10 && eqSvg.smaPaths?.s10 && <>
+                      {eqSvg.hits?.s10 && <path d={eqSvg.smaPaths.s10} fill="none" stroke="rgba(239,68,68,0.28)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+                      <path d={eqSvg.smaPaths.s10} fill="none" stroke={eqSvg.hits?.s10 ? "rgba(255,110,110,0.95)" : "rgba(239,68,68,0.75)"} strokeWidth="1.2" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+                    </>}
+                    {eqSmaOn.s5 && eqSvg.smaPaths?.s5 && <>
+                      {eqSvg.hits?.s5 && <path d={eqSvg.smaPaths.s5} fill="none" stroke="rgba(240,192,80,0.30)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+                      <path d={eqSvg.smaPaths.s5} fill="none" stroke="var(--goldBright)" strokeWidth="1.4" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+                    </>}
+                    {eqHover != null && eqSvg.pts[eqHover] && <line x1={eqSvg.pts[eqHover].x.toFixed(1)} y1="0" x2={eqSvg.pts[eqHover].x.toFixed(1)} y2="210" stroke="rgba(255,255,255,0.4)" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
+                  </svg>
+                  {eqHover != null && eqSvg.pts[eqHover] && (() => {
+                    const p = eqSvg.pts[eqHover];
+                    const leftPct = (p.x / eqSvg.W) * 100, topPct = (p.y / eqSvg.H) * 100;
+                    const ret = eqSvg.startCap > 0 ? (p.v - eqSvg.startCap) / eqSvg.startCap * 100 : 0;
+                    const dpct = eqSvg.startCap > 0 ? p.delta / eqSvg.startCap * 100 : 0;
+                    const valStr = privacyMode ? ((ret >= 0 ? "+" : "−") + Math.abs(ret).toFixed(1) + "%") : ("$" + Math.round(p.v).toLocaleString());
+                    const dStr = privacyMode ? ((p.delta >= 0 ? "+" : "−") + Math.abs(dpct).toFixed(1) + "%") : ((p.delta >= 0 ? "+" : "−") + "$" + Math.abs(Math.round(p.delta)).toLocaleString());
+                    return (<>
+                      <div style={{ position: "absolute", left: leftPct + "%", top: topPct + "%", width: 9, height: 9, borderRadius: "50%", background: "#fff", border: "2px solid var(--gold)", transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: 4 }} />
+                      <div style={{ position: "absolute", left: leftPct + "%", top: 4, transform: leftPct > 65 ? "translateX(calc(-100% - 10px))" : "translateX(10px)", pointerEvents: "none", zIndex: 5, background: "rgba(8,8,14,0.96)", border: "1px solid var(--borderGold)", borderRadius: 8, padding: "6px 9px", fontSize: "0.62rem", fontWeight: 700, whiteSpace: "nowrap", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,0.55)" }}>
+                        <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: "0.52rem", marginBottom: 2 }}>{p.key === "Start" ? "Starting capital" : (eqXAxis === "months" ? "Month " : "") + p.key}</div>
+                        <div>{valStr}</div>
+                        {p.key !== "Start" && <div style={{ color: p.delta >= 0 ? "var(--green)" : "var(--red)", marginTop: 1, fontSize: "0.55rem" }}>{dStr} that {eqXAxis === "months" ? "month" : "day"}</div>}
+                      </div>
+                    </>);
+                  })()}
+                </div>
+              </div>
+              <div className="xaxis">{eqSvg.xs.length ? eqSvg.xs.map((s, i) => <span key={i}>{s}</span>) : <span>—</span>}</div>
+              {/* SMA legend + the derisk/brake status — equity vs its own moving averages */}
+              {eqSvg.riskStatus && (
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 14px", marginTop: 8, fontSize: "0.62rem", color: "var(--muted)" }}>
+                  {[["s5", "5-SMA derisk", "var(--goldBright)", "Average of your last 5 equity points. Equity closing below it = the first warning: start derisking — smaller size, trim laggards. Click to show/hide the line."],
+                    ["s10", "10-SMA brake", "var(--red)", "Average of your last 10 equity points. Equity below it = hard brake: no new risk until you've reviewed the open book and recent trades. Click to show/hide the line."],
+                    ["s20", "20-SMA no edge", "rgba(168,130,255,0.9)", "Average of your last 20 equity points — the edge line. Equity below it means the system has NO EDGE right now: this is a real system drawdown, not one bad week. Stand down to smallest or sim-only size and run a full audit — which setups, which tape, which rule bled — before re-engaging at size. Click to show/hide the line."]].map(([k, lbl, col, tip]) => (
+                    <span key={k} onClick={() => setEqSmaOn(o => ({ ...o, [k]: !o[k] }))} style={{ cursor: "pointer", opacity: eqSmaOn[k] ? 1 : 0.35, userSelect: "none" }}>
+                      <span style={{ color: col }}>┄┄</span> <span className="term" data-tip={tip} style={eqSvg.hits?.[k] && eqSmaOn[k] ? { color: col, fontWeight: 800 } : undefined}>{lbl}</span>
+                      {eqSvg.hits?.[k] && eqSmaOn[k] && <span style={{ color: col, fontSize: "0.56rem", fontWeight: 800, marginLeft: 4 }}>● hit</span>}
+                    </span>
+                  ))}
+                  <span style={{ marginLeft: "auto", fontWeight: 800, padding: "3px 10px", borderRadius: 20,
+                    background: eqSvg.riskStatus === "brake" ? "rgba(239,68,68,0.14)" : eqSvg.riskStatus === "derisk" ? "rgba(240,192,80,0.14)" : "rgba(34,197,94,0.12)",
+                    color: eqSvg.riskStatus === "brake" ? "var(--red)" : eqSvg.riskStatus === "derisk" ? "var(--goldBright)" : "var(--green)" }}>
+                    {eqSvg.riskStatus === "brake" ? "🔴 BRAKE — equity below 10-SMA: no new risk, review trades"
+                      : eqSvg.riskStatus === "derisk" ? "🟡 DERISK — equity below 5-SMA: cut size, trim laggards"
+                      : "🟢 FULL RISK — equity above its 5-SMA"}
+                  </span>
+                </div>
+              )}
+              <div className="charthint">{!eqSvg.n ? "No trades match this filter."
+                : eqSvg.pct ? <>Account return <span className="g">{sgnPct(eqSvg.totalRet)}</span> across {eqSvg.n} closed trade{eqSvg.n === 1 ? "" : "s"}.</>
+                  : <>Account {eqSvg.totalPL >= 0 ? "grew" : "fell"} <span className={eqSvg.totalPL >= 0 ? "g" : "rd"}>{sgnMoney(eqSvg.totalPL)} ({sgnPct(eqSvg.totalRet)})</span> across {eqSvg.n} closed trade{eqSvg.n === 1 ? "" : "s"}.</>}</div>
+  </>);
+  const distCardBody = (<>
+              <div className={"disthead" + (distPanelOpen ? " open" : "")} onClick={() => setDistPanelOpen(o => !o)}>
+                <div className="label" style={{ margin: 0 }}>Trade outcomes by size — losses left, wins right</div>
+                <span className="disthint2" style={{ marginLeft: "auto", color: distRpt >= 0 ? "var(--green)" : "var(--red)" }}>Return/trade {distFmtPct(distRpt)}</span>
+                <button className={"distbtn" + (distPanelOpen ? " on" : "")} type="button" onClick={(e) => { e.stopPropagation(); setDistPanelOpen(o => !o); }}>{distPanelOpen ? "Hide data ▴" : "Open & edit data ▾"}</button>
+                <span className="chev2" style={{ marginLeft: 6 }}>&#9662;</span>
+              </div>
+              {(() => {
+                const CH = 270, halfH = (CH - 26) / 2, maxC = Math.max(...distCounts, 1);
+                const step = maxC <= 4 ? 1 : maxC <= 8 ? 2 : maxC <= 20 ? 5 : maxC <= 40 ? 10 : Math.ceil(maxC / 50) * 10;
+                const niceMax = Math.max(step, Math.ceil(maxC / step) * step);
+                const yFor = (v) => v / niceMax * halfH;
+                const ticks = []; for (let v = 0; v <= niceMax; v += step) ticks.push(v);
+                const yLab = { position: "absolute", right: 2, fontSize: "0.5rem", color: "var(--muted)" };
+                const gl = (v) => ({ position: "absolute", left: 0, right: 0, borderTop: v === 0 ? "1px solid rgba(255,255,255,0.18)" : "1px dashed rgba(255,255,255,0.06)" });
+                return (
+                <div style={{ display: "flex", gap: 6, marginTop: 18 }}>
+                  <div style={{ position: "relative", width: 24, height: CH, flexShrink: 0 }}>
+                    {ticks.map(v => (<React.Fragment key={"y" + v}>
+                      <span style={{ ...yLab, top: halfH - yFor(v) - 5 }}>{v}</span>
+                      {v > 0 && <span style={{ ...yLab, top: halfH + yFor(v) - 5 }}>{v}</span>}
+                    </React.Fragment>))}
+                  </div>
+                  <div style={{ position: "relative", flex: 1, height: CH }}>
+                    {ticks.map(v => (<React.Fragment key={"g" + v}>
+                      <div style={{ ...gl(v), top: halfH - yFor(v) }} />
+                      {v > 0 && <div style={{ ...gl(v), top: halfH + yFor(v) }} />}
+                    </React.Fragment>))}
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "stretch" }}>
+                      {DIST_BUCKETS.map((b, i) => {
+                        const c = distCounts[i], h = yFor(c);
+                        const sel = distSel === i;
+                        return (<div key={i} title={`${b.lab}: ${c} trade${c === 1 ? "" : "s"} — click to see them`} onClick={() => c && setDistSel(s => s === i ? null : i)} style={{ flex: 1, position: "relative", cursor: c ? "pointer" : "default" }}>
+                          {c ? <div style={{ position: "absolute", left: "14%", right: "14%", height: h, ...(b.side === "neg" ? { top: halfH } : { top: halfH - h }), background: b.side === "neg" ? "linear-gradient(180deg,#ff6b6b,#b83232)" : "linear-gradient(180deg,#33d484,#1f8f57)", borderRadius: b.side === "neg" ? "0 0 3px 3px" : "3px 3px 0 0", outline: sel ? "2px solid var(--goldBright)" : "none", outlineOffset: 1 }} /> : null}
+                        </div>);
+                      })}
+                    </div>
+                  </div>
+                </div>);
+              })()}
+              <div className="distx" style={{ paddingLeft: 30 }}>{DIST_BUCKETS.map((b, i) => {
+                if (b.lo === -Infinity) return <span key={i} style={{ flex: 1, textAlign: "center" }}>≤−{DIST_RANGE}</span>;
+                if (b.hi === Infinity) return <span key={i} style={{ flex: 1, textAlign: "center" }}>+{DIST_RANGE}</span>;
+                const major = b.lo % 10 === 0, show = b.lo % 4 === 0;
+                return <span key={i} style={{ flex: 1, textAlign: "center" }}>{show ? (b.lo > 0 ? "+" : b.lo < 0 ? "−" : "") + Math.abs(b.lo) + (major ? "%" : "") : ""}</span>;
+              })}</div>
+              <div className="charthint">{!dateFiltered.length ? "No trades match this filter."
+                : dstats.wins ? <>Wins reach up to <span className="g">{dstats.lw ? sgnPct(Number(dstats.lw.plPct)) : "—"}</span>{dstats.losses ? <>, while losses stay contained (worst <span className="rd">−{Math.abs(Number(dstats.ll?.plPct) || 0).toFixed(2)}%</span>)</> : " with no losing trades in this slice"}. Small losses, larger wins is the shape of an edge. Click any bar to see its exact trades.</>
+                  : <>Every trade in this slice lost (worst <span className="rd">−{Math.abs(Number(dstats.ll?.plPct) || 0).toFixed(2)}%</span>). Tighten the setup or cut faster. Click any bar to see its exact trades.</>}{" "}
+                <span className="distopenlink" onClick={(e) => { e.stopPropagation(); setDistPanelOpen(o => !o); }}>{distPanelOpen ? "Hide the data sheet ↑" : "Click here to open & edit the data ↓"}</span></div>
+
+              {/* ── Bucket audit panel — the exact trades behind the clicked bar ── */}
+              {distSel != null && DIST_BUCKETS[distSel] && (() => {
+                const b = DIST_BUCKETS[distSel];
+                const rows = (distTrades[distSel] || []).slice().sort((x, y) => Math.abs(Number(y.plPct) || 0) - Math.abs(Number(x.plPct) || 0));
+                const edited = distEdits[distSel] !== undefined && distEdits[distSel] !== (distBase[distSel] || 0);
+                return (
+                  <div style={{ marginTop: 10, border: "1px solid var(--borderGold)", borderRadius: 10, padding: "10px 12px", background: "rgba(255,255,255,0.02)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: "0.66rem", fontWeight: 800, color: b.side === "pos" ? "var(--green)" : "var(--red)" }}>{b.lab}</span>
+                      <span style={{ fontSize: "0.6rem", color: "var(--muted)" }}>{rows.length} trade{rows.length === 1 ? "" : "s"} in this bucket</span>
+                      {edited && <span style={{ fontSize: "0.56rem", color: "var(--gold)" }}>bar shows a what-if edit — this list is your REAL trades only</span>}
+                      <button className="distbtn" style={{ marginLeft: "auto" }} onClick={() => setDistSel(null)}>✕ Close</button>
+                    </div>
+                    {rows.length === 0 ? <div style={{ fontSize: "0.62rem", color: "var(--muted)" }}>No real trades here.</div> : rows.map((t, k) => (
+                      <div key={t.id ?? k} onClick={() => openReview(t)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 6px", borderRadius: 7, cursor: "pointer", fontSize: "0.66rem", borderBottom: k < rows.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <span style={{ fontWeight: 800, minWidth: 52 }}>{t.ticker}</span>
+                        <span style={{ color: "var(--muted)", minWidth: 78 }}>{tradeDateISO(t.exit) || "—"}</span>
+                        <span style={{ color: (Number(t.plPct) || 0) >= 0 ? "var(--green)" : "var(--red)", minWidth: 62, fontVariantNumeric: "tabular-nums" }}>{sgnPct(Number(t.plPct) || 0)}</span>
+                        <span style={{ color: (Number(t.plDollar) || 0) >= 0 ? "var(--green)" : "var(--red)", fontVariantNumeric: "tabular-nums" }}>{sgnMoney(Number(t.plDollar) || 0)}</span>
+                        <span style={{ marginLeft: "auto", color: "var(--gold)" }}>View ›</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              <div className={"distpanel" + (distPanelOpen ? " open" : "")}>
+                  <div className="distpanel-inner">
+                    <div className="disttoolbar">
+                      <button className={"distbtn" + (Object.keys(distEdits).length === 0 ? " on" : "")} onClick={() => setDistEdits({})} title="Restore the actual counts from your trades">↺ Refill from trades</button>
+                      <button className="distbtn" onClick={() => { const z = {}; DIST_BUCKETS.forEach((_, i) => z[i] = 0); setDistEdits(z); }} title="Zero every bucket to model from scratch">Clear all</button>
+                      <span style={{ fontSize: "0.62rem", color: "var(--muted)" }}>Edit any count to model a different distribution — the chart and stats update live.</span>
+                    </div>
+                    <div className="distsum">
+                      <div className="ds"><div className="dsk">Total trades</div><div className="dsv">{distTotal}</div></div>
+                      <div className="ds"><div className="dsk">Wins / Losses</div><div className="dsv">{distWins} / {distLosses}</div></div>
+                      <div className="ds"><div className="dsk">Win rate</div><div className="dsv">{distTotal ? Math.round(distWins / distTotal * 100) : 0}%</div></div>
+                      <div className="ds"><div className="dsk">Return / trade</div><div className={"dsv " + (distRpt >= 0 ? "green" : "red")}>{distFmtPct(distRpt)}</div></div>
+                    </div>
+                    <table className="disttable">
+                      <thead><tr><th>Return bucket</th><th>Side</th><th># Trades</th><th>Midpoint</th><th>Contribution</th></tr></thead>
+                      <tbody>
+                        {DIST_BUCKETS.map((b, i) => {
+                          const contrib = distTotal ? distCounts[i] * b.mid / distTotal : 0;
+                          const edited = distEdits[i] !== undefined && distEdits[i] !== (distBase[i] || 0);
+                          return (
+                            <tr key={i}>
+                              <td>{b.lab}</td>
+                              <td style={{ color: b.side === "pos" ? "var(--green)" : "var(--red)" }}>{b.side === "pos" ? "Win" : "Loss"}</td>
+                              <td><input className={"distin" + (edited ? " edited" : "")} type="number" min="0" step="1" value={distCounts[i]} onChange={e => { let v = parseInt(e.target.value, 10); if (isNaN(v) || v < 0) v = 0; setDistEdits(p => ({ ...p, [i]: v })); }} /></td>
+                              <td>{(b.mid >= 0 ? "+" : "−") + Math.abs(b.mid)}%</td>
+                              <td className={contrib >= 0 ? "g" : "r"}>{distFmtPct(contrib)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <div className="distnote">Contribution = midpoint × (count ÷ total). Editing here is a what-if model; it doesn't change your logged trades.</div>
+                  </div>
+                </div>
+  </>);
+  const closedTradesTable = (
+          <table>
+            <thead>
+              <tr>
+                <th><span className="term" data-tip="Whether the trade finished a Win (green) or a Loss (red).">Result</span></th>
+                <th><span className="term" data-tip="The ticker. The dot shows the source: gold = IBKR-synced, grey = manual.">Symbol</span></th>
+                <th className="pro-only"><span className="term" data-tip="Average price you entered the trade at.">Entry $</span></th>
+                <th className="pro-only"><span className="term" data-tip="Price you exited the trade at.">Exit $</span></th>
+                <th className="pro-only"><span className="term" data-tip="Number of shares traded.">Shares</span></th>
+                <th><span className="term" data-tip="The date you opened the trade.">Entry date</span></th>
+                <th><span className="term" data-tip="The date you closed the trade.">Exit date</span></th>
+                {false && <th><span className="term" data-tip="The pattern or reason you took the trade.">Setup</span></th> /* Setup column hidden (Valen 2026-07-05) — data still lives in the preview/details */}
+                <th className="pro-only"><span className="term" data-tip="DeepVue sector, in/off-theme judged against the tracker at your entry date. Green = top-5 leader (with the trend); red = off-theme.">Theme</span></th>
+                <th className="pro-only"><span className="term tipright" data-tip="Your protective stop on this trade.">Stop</span></th>
+                <th className="pro-only"><span className="term tipright" data-tip="How many days you held the trade.">Hold</span></th>
+                <th><span className="term tipright" data-tip="Percentage gain or loss on the trade.">Return</span></th>
+                <th><span className="term tipright" data-tip="Dollar profit or loss banked on the trade.">P/L</span></th>
+                <th><span className="term tipright" data-tip="R-multiple — profit/loss in units of your initial risk.">R</span></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {dateFiltered.length === 0 && (
+                <tr><td colSpan={14} className="nodata">No trades match this filter. Clear the filters to see your full track record.</td></tr>
+              )}
+              {dateFiltered.map(t => {
+                const up = (Number(t.plPct) || 0) > 0;
+                const cls = up ? "st-win" : "st-loss", plc = up ? "pl up" : "pl dn";
+                const ibkr = t.source === "ibkr" || t.source === "reconciled";
+                const isOpen = expandedTrade === t.id;
+                return (
+                  <React.Fragment key={t.id}>
+                    <tr id={"jtrade-" + t.id} className={"traderow clickrow" + (isOpen ? " rev-open" : "") + (highlightTradeId === t.id ? " jumphl" : "")} onClick={() => setPreviewTrade(t)}>
+                      <td data-l="Result"><span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span></td>
+                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}{(() => {
+                        // OPEN-CAMPAIGN badge: this row is realized-so-far from partial trims of a position
+                        // you STILL HOLD — it updates in real time as you trim, and folds into the single
+                        // final campaign row when the position fully closes (same rows, so no double-count).
+                        const sym = String(t.ticker || "").toUpperCase();
+                        const isTrimOnly = (t._fills || [t]).every(f => (f.reason || "") === "Partial Trim");
+                        const stillOpen = isTrimOnly && (positions || []).some(p => String(p.sym || "").toUpperCase() === sym);
+                        return stillOpen ? <span className="term" data-tip="Realized-so-far: partial trims of a position you still hold. This row moves your equity curve in real time and merges into one final row when the position closes — never double-counted." style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, color: "var(--goldBright)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>OPEN · partials</span> : null;
+                      })()}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}{isAdmin && t.extExit != null ? <span className="term" data-tip={`Extension at exit: ${Number(t.extExit).toFixed(1)}× ATR from the 50-day MA${t.extEntry != null ? ` (entry was ${Number(t.extEntry).toFixed(1)}×)` : ""}. ≥7× = sold into strength (rare, 3-sigma territory) · <2× = a stop/management exit near the mean.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--goldBright)" : t.extExit < 2 ? "var(--red)" : "var(--muted)", border: `1px solid ${t.extExit >= 7 ? "rgba(34,197,94,0.35)" : t.extExit >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(t.extExit).toFixed(1)}×</span> : null}</span></td>
+                      <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
+                      <td className="pro-only" data-l="Exit $">${(Number(t.exitP) || 0).toFixed(2)}</td>
+                      <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
+                      <td data-l="Entry date">{tradeDateISO(t.entry) || t.entry || "—"}</td>
+                      <td data-l="Exit date">{tradeDateISO(t.exit) || t.exit || "—"}</td>
+                      {false && <td data-l="Setup">{t.setup ? <span className="tag">{t.setup}</span> : "—"}</td>}
+                      <td className="pro-only" data-l="Theme">{(() => {
+                        const th = sectorFor(t.ticker);
+                        if (!th) return <span className="term" data-tip="No DeepVue sector mapped for this ticker yet.">—</span>;
+                        const fit = themeFit(th, t.entry), r = themeRanks(th, t.entry) || {}, rk = (x) => x ? "#" + x : "—";
+                        if (!fit) return <span className="term" data-tip={`⚪ Untagged — entry date is before the first DeepVue tracker snapshot${THEME_COVERAGE_START ? ` (${THEME_COVERAGE_START})` : ""} or unreadable. A later theme snapshot never judges an older trade.`} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: "0.62rem", fontWeight: 700, background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap", cursor: "help" }}>⚪ {th}</span>;
+                        const tip = fit === "in"
+                          ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend. Judged vs the ${r.date} tracker snapshot (nearest at/before entry).`
+                          : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. Leaders that week: ${top5("week", t.entry).slice(0,3).join(", ")}. Judged vs the ${r.date} tracker snapshot (nearest at/before entry).`;
+                        const g = fit === "in";
+                        return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: "0.62rem", fontWeight: 700, background: g ? "var(--greenDim)" : "var(--redDim)", border: `1px solid ${g ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)"}`, color: g ? "var(--green)" : "var(--red)", whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
+                      })()}</td>
+                      <td className="pro-only" data-l="Stop">{
+                        (isIbkrMode && t.source === "ibkr" && t.needsStop && !t.stop)
+                          ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "3px 9px", fontSize: "0.66rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Needs stop</button>
+                          : (t.stop ? "$" + Number(t.stop).toFixed(2) : "—")
+                      }</td>
+                      <td className="pro-only" data-l="Hold">{holdLabel(t)}</td>
+                      <td data-l="Return"><span className={plc}>{sgnPct(Number(t.plPct))}</span></td>
+                      <td data-l="P/L"><span className={plc}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></td>
+                      <td data-l="R">{
+                        (isIbkrMode && t.source === "ibkr" && t.needsStop && !t.stop)
+                          ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "2px 8px", fontSize: "0.62rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Add stop</button>
+                          : <span className={(Number(t.rMult) || 0) >= 0 ? "pl up" : "pl dn"}>{t.rMult == null ? "—" : sgnR(Number(t.rMult))}</span>
+                      }</td>
+                      <td className="revcell" data-l=""><button className="revbtn" onClick={(e) => { e.stopPropagation(); setPreviewTrade(t); }}>View ›</button></td>
+                    </tr>
+                    {false && (
+                      <tr className="revrow"><td colSpan={14}>
+                        <div className={"revpanel" + (closingReview ? " closing" : "")}>
+                          <div className="revhead">
+                            <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
+                            <span className="revtick">{t.ticker}</span>
+                            <span className="revmeta"><b>{(Number(t.shares) || 0).toLocaleString()}</b> sh · {(tradeDateISO(t.entry) || t.entry || "—")} → {(tradeDateISO(t.exit) || t.exit || "—")}</span>
+                            <span className="revmeta">Setup <b>{t.setup || "—"}</b></span>
+                            <button className="revclose" aria-label="Close" onClick={closeReview}>&times;</button>
+                          </div>
+                          <div className="revgrid">
+                            <div className="revcol">
+                              <div className="revcoltitle">Trade stats</div>
+                              <div className="mgr"><span>Entry price</span><b>${(Number(t.entryP) || 0).toFixed(2)}</b></div>
+                              <div className="mgr"><span>Exit price</span><b>${(Number(t.exitP) || 0).toFixed(2)}</b></div>
+                              <div className="mgr"><span>Shares</span><b>{(Number(t.shares) || 0).toLocaleString()}</b></div>
+                              <div className="mgr"><span>Hold time</span><b>{holdLabel(t)}</b></div>
+                              <div className="mgr"><span>Stop</span><b>{t.stop ? "$" + Number(t.stop).toFixed(2) : "—"}</b></div>
+                              <div className="mgr"><span>Commission</span><b>{privacyMode ? "••••" : "$" + (parseFloat(t.commission) || 0).toFixed(2)}</b></div>
+                            </div>
+                            <div className="revcol">
+                              <div className="revcoltitle">Result</div>
+                              <div className="mgr"><span>Return</span><b className={up ? "green" : "red"}>{sgnPct(Number(t.plPct))}</b></div>
+                              <div className="mgr"><span>P/L</span><b className={(Number(t.plDollar) || 0) >= 0 ? "green" : "red"}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</b></div>
+                              <div className="mgr"><span>Realized R</span><b className={(Number(t.rMult) || 0) >= 0 ? "green" : "red"}>{t.rMult == null ? "—" : sgnR(Number(t.rMult))}</b></div>
+                              <div className="mgr"><span>Setup</span><b>{t.setup || "—"}</b></div>
+                              <div className="mgr"><span>Exit reason</span><b>{t.reason || "—"}</b></div>
+                            </div>
+                          </div>
+
+                          {/* Live candlestick replay chart */}
+                          <div className="revchart">
+                            <TradeReplayChart trade={t} C={C} font={font} />
+                          </div>
+
+                          {isAdmin ? (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>) : (
+                          <div className="revnotes">
+                            <div className="revchart-head" style={{ marginBottom: 0 }}>
+                              <span className="revcoltitle" style={{ margin: 0 }}>Trade review</span>
+                              <div className="spacer"></div>
+                              <button className="simbtn" onClick={() => saveReview(t.id)}>{reviewSavedId === t.id ? "Saved ✓" : "Save review"}</button>
+                            </div>
+                            <div className="notesgrid">
+                              <div><div className="nlabel r">What went right</div><textarea className="mgta" value={reviewDraft.right} onChange={e => setReviewDraft(r => ({ ...r, right: e.target.value }))} placeholder="What went right..." /></div>
+                              <div><div className="nlabel w">What went wrong</div><textarea className="mgta" value={reviewDraft.wrong} onChange={e => setReviewDraft(r => ({ ...r, wrong: e.target.value }))} placeholder="What went wrong..." /></div>
+                              <div><div className="nlabel l">Lesson learned</div><textarea className="mgta" value={reviewDraft.lessons} onChange={e => setReviewDraft(r => ({ ...r, lessons: e.target.value }))} placeholder="Lesson learned..." /></div>
+                            </div>
+                          </div>
+                          )}
+                          <div className="revfoot">
+                            {deleteStep === 0 && (
+                              <>
+                                <button className="revbtn" onClick={() => startEdit(t)} title="Edit this trade's information" style={{ background: "var(--goldDim)", color: "var(--goldBright)", borderColor: "var(--borderGold)", fontWeight: 700 }}>Edit trade</button>
+                                <button className="revdelbtn" onClick={() => setDeleteStep(1)} title="Delete this trade from your journal">Delete trade</button>
+                              </>
+                            )}
+                            {deleteStep === 1 && (
+                              <div className="revdelconfirm">
+                                <span className="revdelmsg">Delete this trade? This cannot be undone.</span>
+                                <button className="revdelbtn" onClick={() => setDeleteStep(2)}>Confirm</button>
+                                <button className="revbtn" onClick={() => setDeleteStep(0)}>Cancel</button>
+                              </div>
+                            )}
+                            {deleteStep === 2 && (
+                              <div className="revdelconfirm final">
+                                <span className="revdelmsg">Are you absolutely sure? This permanently removes the trade.</span>
+                                <button className="revdelbtn" onClick={() => { deleteTrade(t.id, true); setDeleteStep(0); }}>Yes, delete permanently</button>
+                                <button className="revbtn" onClick={() => setDeleteStep(0)}>Cancel</button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td></tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+  );
+  const tradePreviewPortal = (
+        previewTrade && createPortal((() => {
+          const t = previewTrade;
+          const up = (Number(t.plPct) || 0) > 0, cls = up ? "st-win" : "st-loss";
+          const th = sectorFor(t.ticker), fit = th ? themeFit(th, t.entry) : null;
+          const gr = getSavedGrade(t.ticker);
+          const gcol = !gr ? "var(--muted)" : gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--goldBright)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
+          const Row = ({ k, v, c }) => (<div className="tp-row"><span>{k}</span><b style={c ? { color: c } : undefined}>{v}</b></div>);
+          return (
+            <div className="vj tp-back" onClick={(e) => { if (e.target === e.currentTarget) setPreviewTrade(null); }}>
+              <div className="tp-panel" role="dialog" aria-label={`${t.ticker} trade preview`}>
+                <div className="tp-head">
+                  <span className="tp-tick">{t.ticker}</span>
+                  <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
+                  <button className="tp-x" aria-label="Close" onClick={() => setPreviewTrade(null)}>&times;</button>
+                </div>
+                <div className="tp-sub">Opened {tradeDateISO(t.entry) || t.entry || "—"} · Closed {tradeDateISO(t.exit) || t.exit || "—"} · Held {holdLabel(t)}</div>
+                <div className={"tp-pnl " + (up ? "up" : "dn")}>
+                  <div className="tp-pnl-lbl">Net P/L</div>
+                  <div className="tp-pnl-v">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</div>
+                  <div className="tp-pnl-meta">Return {sgnPct(Number(t.plPct))} · R {t.rMult == null ? "—" : sgnR(Number(t.rMult))}</div>
+                </div>
+                <div className="tp-grid">
+                  <Row k="Entry price" v={"$" + (Number(t.entryP) || 0).toFixed(2)} />
+                  <Row k="Exit price" v={"$" + (Number(t.exitP) || 0).toFixed(2)} />
+                  <Row k="Shares" v={(Number(t.shares) || 0).toLocaleString()} />
+                  <Row k="Stop" v={t.stop ? "$" + Number(t.stop).toFixed(2) : "—"} />
+                  <Row k="Setup" v={t.setup || "—"} />
+                  <Row k="Theme" v={th ? `${fit === "in" ? "🟢" : "🔴"} ${th}` : "—"} />
+                  <Row k="Setup grade" v={gr ? `${gr.letter} · ${gr.stars}★` : "Not graded"} c={gcol} />
+                  <Row k="Commission" v={privacyMode ? "••••" : "$" + (parseFloat(t.commission) || 0).toFixed(2)} />
+                </div>
+                {t.reason && <div className="tp-reason"><div className="tp-reason-h">Exit reason</div><div className="tp-reason-b">{t.reason}</div></div>}
+                <div className="tp-foot">
+                  <button className="tp-go" onClick={() => { setPreviewTrade(null); openReview(t); }}>Go to trade details ›</button>
+                  <button className="revbtn" title="Import this trade into the Model Book — everything already known is pre-filled" onClick={async () => {
+                    const g = getSavedGrade(t.ticker);
+                    try { const pf = {
+                      ticker: t.ticker, entry_date: tradeDateISO(t.entry) || "", exit_date: tradeDateISO(t.exit) || "",
+                      run_pct: t.plPct != null ? +Number(t.plPct).toFixed(1) : "", r_mult: t.rMult != null ? +Number(t.rMult).toFixed(2) : "",
+                      days_held: (() => { const a = new Date(tradeDateISO(t.entry) || t.entry), b = new Date(tradeDateISO(t.exit) || t.exit); return (isNaN(a) || isNaN(b)) ? "" : Math.max(0, Math.round((b - a) / 86400000)); })(),
+                      theme: sectorFor(t.ticker) || "", ticked: (g && g.ticked) || [],
+                      outcome: outcomeFromR(t.rMult, t.plPct) || "",
+                    };
+                    const ds = await fetchSetupPost(t.ticker); // pre-entry gameplan post = the BEFORE evidence
+                    if (ds) { if (ds.chart_img) pf.before_img = ds.chart_img; if (ds.note) pf.thesis = ds.note; }
+                    pf.metrics = { _auto: ["ticker", "entry_date", "exit_date", "run_pct", "r_mult", "days_held", "theme", "outcome", "before_img", "thesis"].filter(k => pf[k] !== "" && pf[k] != null) };
+                    sessionStorage.setItem("viv-mb-prefill", JSON.stringify(pf)); } catch {}
+                    setPreviewTrade(null); setPage && setPage("modelbook");
+                  }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)", fontWeight: 700 }}>📖 Model Book</button>
+                  <button className="revbtn" onClick={() => { setPreviewTrade(null); startEdit(t); }}>Edit</button>
+                </div>
+              </div>
+            </div>
+          );
+        })(), document.body)
+  );
+  const tradeDetailsPortal = (
+        expandedTrade && createPortal((() => {
+          const t = journaledTrades.find(x => x.id === expandedTrade);
+          if (!t) return null;
+          const up = (Number(t.plPct) || 0) > 0, cls = up ? "st-win" : "st-loss";
+          const gr = getSavedGrade(t.ticker);
+          const gcol = !gr ? "var(--muted)" : gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--goldBright)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
+          return (
+            <div className="vj td-back">
+              <div className="td-page">
+                <div className="td-top">
+                  <button className="revbtn" onClick={closeReview}>‹ Back to trades</button>
+                  <span className="revtick">{t.ticker}</span>
+                  <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
+                  {gr && <span className="td-grade" style={{ color: gcol }} title={`Setup grade ${gr.letter} · ${gr.stars}/5★`}>{gr.letter} · {gr.stars}★</span>}
+                  <div className="spacer"></div>
+                  <button className="revbtn" title="Pre-fill a Model Book entry from this trade" onClick={async () => {
+                    const g = getSavedGrade(t.ticker);
+                    try { const pf = {
+                      ticker: t.ticker, entry_date: tradeDateISO(t.entry) || "", exit_date: tradeDateISO(t.exit) || "",
+                      run_pct: t.plPct != null ? +Number(t.plPct).toFixed(1) : "", r_mult: t.rMult != null ? +Number(t.rMult).toFixed(2) : "",
+                      days_held: (() => { const a = new Date(tradeDateISO(t.entry) || t.entry), b = new Date(tradeDateISO(t.exit) || t.exit); return (isNaN(a) || isNaN(b)) ? "" : Math.max(0, Math.round((b - a) / 86400000)); })(),
+                      theme: sectorFor(t.ticker) || "", ticked: (g && g.ticked) || [],
+                      outcome: outcomeFromR(t.rMult, t.plPct) || "",
+                    };
+                    const ds = await fetchSetupPost(t.ticker); // pre-entry gameplan post = the BEFORE evidence
+                    if (ds) { if (ds.chart_img) pf.before_img = ds.chart_img; if (ds.note) pf.thesis = ds.note; }
+                    // gold-dot every field we pre-filled (ticked comes from HIS saved grader = human, no dot)
+                    pf.metrics = { _auto: ["ticker", "entry_date", "exit_date", "run_pct", "r_mult", "days_held", "theme", "outcome", "before_img", "thesis"].filter(k => pf[k] !== "" && pf[k] != null) };
+                    sessionStorage.setItem("viv-mb-prefill", JSON.stringify(pf)); } catch {}
+                    closeReview(); setPage && setPage("modelbook");
+                  }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)", fontWeight: 700 }}>📖 Add to Model Book</button>
+                  <button className="revbtn" onClick={() => startEdit(t)} style={{ background: "var(--goldDim)", color: "var(--goldBright)", borderColor: "var(--borderGold)", fontWeight: 700 }}>Edit trade</button>
+                </div>
+                <div className="td-body">
+                  {(() => {
+                    // ── TradeZella-style two-column: LEFT stats/planning panel · RIGHT chart+notes tabs ──
+                    const isLong = (t.tradeType || "Long") !== "Short";
+                    const shares = Number(t.shares) || 0, entryP = Number(t.entryP) || 0, exitP = Number(t.exitP) || 0;
+                    const net = Number(t.plDollar) || 0, comm = parseFloat(t.commission) || 0, gross = net + comm;
+                    const tg = tgts[t.id] || {};
+                    const target = tg.target ?? t.profitTarget ?? "";
+                    const stopT = tg.stop ?? t.plannedStop ?? (t.stop != null && t.stop !== "" ? Number(t.stop) : "");
+                    const setTgt = (patch) => setTgts(persistTarget(t.id, patch));
+                    const riskPS = stopT !== "" && entryP ? (isLong ? entryP - Number(stopT) : Number(stopT) - entryP) : null; // per-share risk
+                    const tradeRisk = riskPS != null && riskPS > 0 ? riskPS * shares : null;
+                    const plannedR = riskPS != null && riskPS > 0 && target !== "" ? (isLong ? Number(target) - entryP : entryP - Number(target)) / riskPS : null;
+                    const realR = t.rMult != null ? Number(t.rMult) : (riskPS != null && riskPS > 0 ? (isLong ? exitP - entryP : entryP - exitP) / riskPS : null);
+                    const ex = excursion; // {mae, mfe, bestT, res} | {na} | null(loading)
+                    const money = (v) => privacyMode ? "••••" : (v < 0 ? "-" : "") + "$" + Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 2 });
+                    const Rw = ({ k, v, c, tip }) => (<div className="tz-row" title={tip || undefined}><span>{k}</span><b style={c ? { color: c } : undefined}>{v}</b></div>);
+                    return (
+                      <div className="tdz">
+                        <div className="tdz-left">
+                          <div className="tz-npl" style={{ borderLeftColor: up ? "var(--green)" : "var(--red)" }}>
+                            <span>Net P&L</span>
+                            <b style={{ color: up ? "var(--green)" : "var(--red)" }}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(net)}</b>
+                          </div>
+                          <Rw k="Side" v={isLong ? "LONG" : "SHORT"} c={isLong ? "var(--green)" : "var(--red)"} />
+                          <Rw k="Commissions & Fees" v={privacyMode ? "••••" : "$" + comm.toFixed(2)} />
+                          <Rw k="Net ROI" v={sgnPct(Number(t.plPct))} c={up ? "var(--green)" : "var(--red)"} />
+                          <Rw k="Gross P&L" v={money(gross)} c={gross >= 0 ? "var(--green)" : "var(--red)"} />
+                          <Rw k="Adjusted Cost" v={money(entryP * shares)} />
+                          <div className="tz-row"><span className="term" data-tip="Max Adverse / Max Favorable Excursion — the worst price against you and the best price for you while the trade was open, from real market data.">Price MAE / MFE</span>
+                            <b>{ex == null ? "…" : ex.na ? "—" : (<><span style={{ color: "var(--red)" }}>${Number(ex.mae).toFixed(2)}</span><span style={{ color: "var(--muted)" }}> / </span><span style={{ color: "var(--green)" }}>${Number(ex.mfe).toFixed(2)}</span></>)}</b>
+                          </div>
+
+                          <div className="tz-sect">Profit Target <span className="term" data-tip="Your planned take-profit price. Planning inputs only — they never change your locked stop or your fills.">ⓘ</span></div>
+                          <div className="tz-row"><span>Target in Price</span><input className="tz-in" type="number" step="0.01" placeholder="—" value={target} onChange={e => setTgt({ target: e.target.value === "" ? null : +e.target.value })} /></div>
+                          <div className="tz-sect">Stop Loss <span className="term" data-tip="Your planned stop for R math. Defaults to the trade's locked original stop; editing this NEVER overwrites it.">ⓘ</span></div>
+                          <div className="tz-row"><span>Stop in Price</span><input className="tz-in" type="number" step="0.01" placeholder="—" value={stopT} onChange={e => setTgt({ stop: e.target.value === "" ? null : +e.target.value })} /></div>
+
+                          <Rw k="Initial Target" v={target !== "" ? "$" + Number(target).toFixed(2) : "--"} />
+                          <Rw k="Trade Risk" v={tradeRisk != null ? money(tradeRisk) : "--"} tip="(entry − planned stop) × shares" />
+                          <Rw k="Planned R-Multiple" v={plannedR != null ? plannedR.toFixed(2) + "R" : "--"} c={plannedR != null ? (plannedR >= 2 ? "var(--green)" : "var(--goldBright)") : undefined} />
+                          <Rw k="Realized R-Multiple" v={realR != null ? sgnR(realR) : "--"} c={realR != null ? (realR >= 0 ? "var(--green)" : "var(--red)") : undefined} />
+                          {isAdmin && (t.extEntry != null || t.extExit != null) && (
+                            <div className="tz-row"><span className="term" data-tip="ATR% Multiple from the 50-day MA at your entry → at your exit (same metric your charts print). Under 4× = fresh entry zone; 5× = statistically stretched; 7.5–8× = rare (3-sigma); 10×+ = extreme — the trim-into-strength zone. Insight only — it never changes your stops or fills.">Ext (×ATR from 50MA)</span>
+                              <b>
+                                <span style={{ color: t.extEntry == null ? "var(--faint)" : t.extEntry <= 4 ? "var(--green)" : t.extEntry < 7 ? "var(--goldBright)" : "var(--red)" }}>{t.extEntry != null ? Number(t.extEntry).toFixed(1) + "×" : "—"}</span>
+                                <span style={{ color: "var(--muted)" }}> → </span>
+                                <span style={{ color: t.extExit == null ? "var(--faint)" : t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--goldBright)" : "var(--text)" }}>{t.extExit != null ? Number(t.extExit).toFixed(1) + "×" : "—"}</span>
+                              </b>
+                            </div>
+                          )}
+                          <Rw k="Average Entry" v={"$" + entryP.toFixed(2)} />
+                          <Rw k="Average Exit" v={"$" + exitP.toFixed(2)} />
+                          <Rw k="Entry Time" v={(tradeDateISO(t.entry) || "—") + (t.entryTime ? " · " + t.entryTime + " ET" : "")} />
+                          <Rw k="Exit Time" v={(tradeDateISO(t.exit) || "—") + (t.exitTime ? " · " + t.exitTime + " ET" : "")} />
+                          <Rw k="Best Exit Price" v={ex && ex.mfe != null ? "$" + Number(ex.mfe).toFixed(2) : "--"} c="var(--green)" tip="The MFE price — the best the market offered while you were in" />
+                          <Rw k="Best Exit Time" v={ex && ex.bestT != null ? excTime(ex.bestT, ex.res) : "--"} />
+                          <Rw k="Hold Time" v={holdLabel(t)} />
+                          <Rw k="Shares" v={shares.toLocaleString()} />
+                          <Rw k="Locked Stop (original)" v={t.stop ? "$" + Number(t.stop).toFixed(2) : "—"} tip="Set at entry, drives official R — never overwritten" />
+                          <Rw k="Setup" v={t.setup || "—"} />
+                          <Rw k="Setup Grade" v={gr ? `${gr.letter} · ${gr.stars}★` : "Not graded"} c={gcol} />
+                          <Rw k="Exit Reason" v={t.reason || "—"} />
+                        </div>
+                        <div className="tdz-right">
+                          {/* INTERIM review chart while the TradingView Advanced Charts license is pending
+                              (application prepared 2026-07-11 — on approval this swaps to the genuine TV
+                              chart with createExecutionShape() fill arrows, TradeZella-style, + server-saved
+                              drawings). Until then: fills as ▲/▼ arrows at their exact ET time bars,
+                              drawings auto-saved per trade. */}
+                          <div className="revchart" style={{ marginBottom: 14 }}><TradeReplayChart trade={t} C={C} font={font} /></div>
+                          {true && (
+                            <>
+                              {isAdmin && (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>)}
+                              <div className="revnotes">
+                                <div className="revchart-head" style={{ marginBottom: 0 }}>
+                                  <span className="revcoltitle" style={{ margin: 0 }}>Trade review</span>
+                                  <div className="spacer"></div>
+                                  <button className="simbtn" onClick={() => saveReview(t.id)}>{reviewSavedId === t.id ? "Saved ✓" : "Save review"}</button>
+                                </div>
+                                <div className="notesgrid">
+                                  <div><div className="nlabel r">What went right</div><textarea className="mgta" value={reviewDraft.right} onChange={e => setReviewDraft(r => ({ ...r, right: e.target.value }))} placeholder="What went right..." /></div>
+                                  <div><div className="nlabel w">What went wrong</div><textarea className="mgta" value={reviewDraft.wrong} onChange={e => setReviewDraft(r => ({ ...r, wrong: e.target.value }))} placeholder="What went wrong..." /></div>
+                                  <div><div className="nlabel l">Lesson learned</div><textarea className="mgta" value={reviewDraft.lessons} onChange={e => setReviewDraft(r => ({ ...r, lessons: e.target.value }))} placeholder="Lesson learned..." /></div>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <div className="revfoot">
+                    {deleteStep === 0 && (<button className="revdelbtn" onClick={() => setDeleteStep(1)} title="Delete this trade from your journal">Delete trade</button>)}
+                    {deleteStep === 1 && (<div className="revdelconfirm"><span className="revdelmsg">Delete this trade? This cannot be undone.</span><button className="revdelbtn" onClick={() => setDeleteStep(2)}>Confirm</button><button className="revbtn" onClick={() => setDeleteStep(0)}>Cancel</button></div>)}
+                    {deleteStep === 2 && (<div className="revdelconfirm final"><span className="revdelmsg">Are you absolutely sure? This permanently removes the trade.</span><button className="revdelbtn" onClick={() => { deleteTrade(t.id, true); closeReview(); setDeleteStep(0); }}>Yes, delete permanently</button><button className="revbtn" onClick={() => setDeleteStep(0)}>Cancel</button></div>)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })(), document.body)
+  );
+  const factualEditorPortal = (
+        editingId && createPortal(
+          // Wrapped in .vj because the modal's CSS is scoped under `.vj`, but createPortal renders to
+          // document.body (outside the page's .vj root). Without this the overlay loses all styling and
+          // appears as an unstyled block at the bottom of the page. background/minHeight are neutralized
+          // so the .vj{} full-page background + min-height:100vh don't add a stray block. Vars are global (:root).
+          <div className="vj" style={{ background: "none", minHeight: 0 }}>
+          <div onClick={() => cancelEdit()} className="modal open">
+            <div onClick={e => e.stopPropagation()} className="modalcard" style={{ maxWidth: 640 }}>
+              <div className="modalhead"><div><div className="sech">Edit trade · {editRow.ticker}</div><div className="sub" style={{ marginTop: 4 }}>Update the factual details. R-Multiple recomputes from entry/exit and your stop.</div></div><button className="revclose" onClick={cancelEdit}>&times;</button></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {[["ticker", "Ticker", "text"], ["entry", "Entry date", "text"], ["exit", "Exit date", "text"], ["entryP", "Entry $", "number"], ["exitP", "Exit $", "number"], ["shares", "Shares", "number"], ["stop", "Stop", "number"]].map(([k, label, type]) => {
+                  // IBKR-synced trade: facts come straight from your broker and are locked. Only the stop is yours to enter.
+                  const locked = editRow.source === "ibkr" && k !== "stop";
+                  return (
+                  <div key={k}>
+                    <div className="label" style={{ marginBottom: 6 }}>{label}{locked && <span style={{ color: "var(--muted)", fontWeight: 600 }}> · from IBKR</span>}</div>
+                    <input type={type} disabled={locked} value={editRow[k] ?? ""} onChange={e => setEditRow(r => ({ ...r, [k]: type === "number" ? (e.target.value === "" ? "" : +e.target.value) : e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none", opacity: locked ? 0.55 : 1, cursor: locked ? "not-allowed" : "text" }} />
+                  </div>
+                  );
+                })}
+                <div>
+                  <div className="label" style={{ marginBottom: 6 }}>Setup</div>
+                  <select value={editRow.setup || ""} onChange={e => setEditRow(r => ({ ...r, setup: e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none" }}><option value="">—</option>{setupTypes.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                </div>
+                <div>
+                  <div className="label" style={{ marginBottom: 6 }}>Exit reason</div>
+                  <select value={editRow.reason || ""} onChange={e => setEditRow(r => ({ ...r, reason: e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none" }}><option value="">—</option>{exitReasons.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                </div>
+                <div>
+                  <div className="label" style={{ marginBottom: 6 }}>Direction</div>
+                  <select value={editRow.tradeType || "Long"} onChange={e => setEditRow(r => ({ ...r, tradeType: e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none" }}><option value="Long">Long</option><option value="Short">Short</option></select>
+                </div>
+              </div>
+              <div className="modalfoot"><button className="btn" onClick={() => deleteTrade(editingId)} style={{ color: "var(--red)", borderColor: "rgba(239,68,68,0.4)" }}>Delete trade</button><div className="spacer"></div><button className="btn" onClick={cancelEdit}>Cancel</button><button className="btn gold" onClick={saveEdit}>Save changes</button></div>
+            </div>
+          </div>
+          </div>,
+          document.body
+        )
+  );
+  const linkModalPortal = (
+        linkWizardOpen && linkWizardData && createPortal(
+          <div onClick={() => linkStatus !== "applying" && setLinkWizardOpen(false)} className="modal open">
+            <div onClick={e => e.stopPropagation()} className="modalcard">
+              <div className="modalhead">
+                <div>
+                  <div className="sech">Link historical trades</div>
+                  <div className="sub" style={{ marginTop: 4 }}>Connect each closed trade to the open position it came from, so your dashboard's <b>realized P/L</b> is accurate. Suggestions are matched by ticker and entry date. Nothing writes until you click <b>Apply</b>.</div>
+                </div>
+                <button className="revclose" onClick={() => setLinkWizardOpen(false)}>&times;</button>
+              </div>
+              {linkWizardData.length === 0 ? (
+                <div className="nodata">All journal trades are already linked. 🎉 No backfill needed.</div>
+              ) : (
+                <table className="linktable">
+                  <thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th><th>Shares</th><th>P/L %</th><th>State</th><th>Set to</th></tr></thead>
+                  <tbody>
+                    {linkWizardData.map(({ t, lots, suggestion, state }) => {
+                      const choice = linkChoices[t.id] ?? suggestion;
+                      const lkClass = state === "linked" ? "lk-linked" : state === "orphan" ? "lk-orphan" : state === "past" ? "lk-past" : "lk-unlinked";
+                      const lkLabel = state === "linked" ? "Linked" : state === "orphan" ? "Orphan" : state === "past" ? "Past" : "Unlinked";
+                      const up = (Number(t.plPct) || 0) >= 0;
+                      return (
+                        <tr key={t.id}>
+                          <td><b>{t.ticker}</b></td>
+                          <td>{tradeDateISO(t.entry) || "—"}</td>
+                          <td>{tradeDateISO(t.exit) || "—"}</td>
+                          <td>{(Number(t.shares) || 0).toLocaleString()}</td>
+                          <td><span className={up ? "pl up" : "pl dn"}>{sgnPct(Number(t.plPct))}</span></td>
+                          <td><span className={"lk " + lkClass}>{lkLabel}</span></td>
+                          <td>
+                            <select className="linksel" value={choice} onChange={e => setLinkChoices(prev => ({ ...prev, [t.id]: e.target.value === "past" || e.target.value === "skip" ? e.target.value : (Number(e.target.value) || e.target.value) }))} disabled={linkStatus === "applying"}>
+                              {lots.map(p => <option key={p.id} value={p.id}>→ {p.sym} (open · {tradeDateISO(p.entry) || "?"})</option>)}
+                              <option value="past">Past cycle / unlinked</option>
+                              <option value="skip">Skip (no change)</option>
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+              {linkError && <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "var(--red)", fontSize: "0.72rem", lineHeight: 1.5, wordBreak: "break-word" }}><b>Database write failed</b><br />{linkError}</div>}
+              <div className="modalfoot">
+                <button className="btn" onClick={() => { const all = {}; linkWizardData.forEach(r => { all[r.t.id] = r.suggestion; }); setLinkChoices(all); }}>Accept all suggestions</button>
+                <div className="spacer"></div>
+                <button className="btn" onClick={() => { setLinkWizardOpen(false); setLinkError(""); }} disabled={linkStatus === "applying"}>Cancel</button>
+                {linkWizardData.length > 0 && <button className="btn gold" onClick={linkApply} disabled={linkStatus === "applying"}>{linkStatus === "applying" ? "Applying…" : linkStatus === "done" ? "Done ✓" : (linkError ? "Retry" : "Apply links")}</button>}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+  );
+  if (expert) {
+    const RING = 94.2; // circumference of the win-rate donut (2π·15)
+    const winArc = (Math.max(0, Math.min(100, dstats.winRate)) / 100) * RING;
+    const wlDen = dstats.avgGain + dstats.avgLoss;
+    const wlWinPct = wlDen > 0 ? (dstats.avgGain / wlDen) * 100 : 50;
+    const headMeta = `${allTrades.length} closed trade${allTrades.length === 1 ? "" : "s"}${dfActive ? ` · ${dateFiltered.length} in view` : ""}${isIbkrMode && ibkrSyncInfo?.last_synced_at ? ` · last sync ${new Date(ibkrSyncInfo.last_synced_at).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}`;
+    const mmTiles = (() => {
+      const m = dstats;
+      return [
+        { k: "winRate", label: "Win rate", val: m.n ? Math.round(m.winRate) + "%" : "—", cls: "" },
+        { k: "avgGain", label: "Avg gain", val: m.wins ? sgnPct(m.avgGain) : "—", cls: "green" },
+        { k: "avgLoss", label: "Avg loss", val: m.losses ? "−" + Math.abs(m.avgLoss).toFixed(2) + "%" : "—", cls: "red" },
+        { k: "wlr", label: "Win/Loss ratio", val: (m.wins && m.losses) ? m.wlr.toFixed(2) : "—", cls: "gold" },
+        { k: "exp", label: "Expectancy", val: m.n ? (privacyMode ? sgnR(m.expectancy) : sgnMoney(m.totalPL / m.n)) : "—", cls: m.expectancy >= 0 ? "green" : "red" },
+        { k: "pf", label: "Profit factor", val: m.n ? (isFinite(m.pf) ? m.pf.toFixed(2) : (m.wins ? "∞" : "—")) : "—", cls: "gold" },
+        { k: "lw", label: "Largest win", val: m.lw ? sgnPct(Number(m.lw.plPct)) : "—", cls: "green" },
+        { k: "ll", label: "Largest loss", val: m.ll ? "−" + Math.abs(Number(m.ll.plPct)).toFixed(2) + "%" : "—", cls: "red" },
+        { k: "adjwl", label: "Adj. W/L ratio", val: (m.wins && m.losses) ? m.adjWL.toFixed(2) : "—", cls: "gold" },
+        { k: "avgr", label: "Avg R-mult", val: m.n ? sgnR(m.expectancy) : "—", cls: m.expectancy >= 0 ? "green" : "red" },
+        { k: "holdwin", label: "Avg hold (win)", val: m.wins ? Math.round(m.avgHoldWin) + "d" : "—", cls: "" },
+        { k: "holdlose", label: "Avg hold (lose)", val: m.losses ? Math.round(m.avgHoldLoss) + "d" : "—", cls: "" },
+        { k: "holdratio", label: "Hold ratio (W/L)", val: (m.wins && m.losses) ? m.holdRatio.toFixed(2) : "—", cls: "gold" },
+      ];
+    })();
+    return (
+      <div className={"vj expert" + (showPro ? " pro" : "")} ref={rootRef}>
+        <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
+        <audio ref={audioRef} preload="auto" onPlaying={() => setSpeaking(true)} onEnded={() => setSpeaking(false)} onPause={() => setSpeaking(false)} />
+        <div className="shell">
+
+          {/* NAV TABS */}
+          <div className="navbar">
+            <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+            <div className="tabs">
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+              <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+            </div>
+            <div className="spacer"></div>
+            <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+              <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
+              <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
+            </div>
+            <WhatsNew />
+            <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
+          </div>
+
+          {/* COACH — admin-only standing read from Claude (kept in Pro too) */}
+          {isAdmin && coachRead && <CoachHero data={coachRead} />}
+
+          {/* P1. COMMAND HEADER */}
+          <div className="cmdheader">
+            <div className="cmdleft">
+              <div className="eyebrow">Journal</div>
+              <h1 className="ch1">Track Record</h1>
+              <div className="cmdmeta">{headMeta}</div>
+            </div>
+            <div className="cmdactions">
+              <button className={"btn ghost" + (privacyMode ? " on" : "")} id="privacyBtn" onClick={() => setPrivacyMode(p => !p)} title="Show percentages instead of dollar amounts so you can screenshot without revealing your account size">{privacyMode ? "Privacy on" : "$ / %"}</button>
+              <div className="ddwrap">
+                <button className="btn ghost" onClick={(e) => { e.stopPropagation(); setShareMenuOpen(o => !o); }} title="Capture a branded image of your stats to share">{screenshotting ? "Capturing…" : shareStatus === "copied" ? "Copied ✓" : shareStatus === "downloaded" ? "Downloaded ✓" : "Share stats ▾"}</button>
+                <div className={"dd" + (shareMenuOpen ? " open" : "")}>
+                  <button onClick={() => { setShareMenuOpen(false); captureStats("copy"); }}>Copy image to clipboard</button>
+                  <button onClick={() => { setShareMenuOpen(false); captureStats("download"); }}>Download PNG</button>
+                </div>
+              </div>
+              <button className="btn ghost" onClick={() => exportMasterCSV(positions, dateFiltered)} title="Download your closed trades as a CSV file">Export CSV</button>
+              {!isIbkrMode ? (
+                <label className="btn gold" title="Import trades from a CSV file" style={{ cursor: "pointer" }}>Import CSV<input type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} /></label>
+              ) : (
+                <span className="btn ghost" title={ibkrSyncInfo?.last_synced_at ? "Last synced " + new Date(ibkrSyncInfo.last_synced_at).toLocaleString() : "Trades flow in automatically from IBKR"} style={{ borderColor: "rgba(34,197,94,0.4)", background: "rgba(34,197,94,0.10)", color: "#86efac", display: "inline-flex", alignItems: "center", gap: 7, cursor: "default" }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }}></span>Auto-syncing from IBKR{ibkrSyncInfo?.last_synced_at ? " · " + new Date(ibkrSyncInfo.last_synced_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Import result toast (shared feedback) */}
+          {importResult && (
+            <div className="welcome" style={{ borderColor: importResult.success ? "var(--borderGold)" : "rgba(239,68,68,0.4)" }}>
+              <span className="wd" style={{ background: importResult.success ? "var(--goldBright)" : "var(--red)" }}></span>
+              <div>{importResult.success
+                ? importResult.ibkr
+                  ? `IBKR statement detected — imported ${importResult.count} closed trade${importResult.count !== 1 ? "s" : ""}.`
+                  : importResult.master
+                    ? `Master import: ${importResult.posCount} position${importResult.posCount !== 1 ? "s" : ""} + ${importResult.tradeCount} trade${importResult.tradeCount !== 1 ? "s" : ""} imported. Remember to Save on both Dashboard and Journal.`
+                    : `Successfully imported ${importResult.count} trade${importResult.count > 1 ? "s" : ""}.`
+                : "Import failed — check that your CSV has a header row with recognizable column names."}</div>
+            </div>
+          )}
+
+          {/* P2. KPI STRIP */}
+          <div className="kpistrip" ref={el => { screenshotRef.current = el; }}>
+            {/* K1: Net Realized P/L */}
+            <div className="card kpi">
+              <div className="cardhead"><span className="label">Net Realized P/L</span><span className="infodot" data-tip="Your complete trading history in one number — total realized profit or loss banked across every closed trade, not still-open paper gains.">i</span></div>
+              <div className="kpibody">
+                <div className="kpimain">
+                  <div className={"kpinum " + (dstats.n ? (dstats.totalPL >= 0 ? "green" : "red") : "")}><Cu>{!dstats.n ? "—" : privacyMode ? sgnPct(dstats.totalRet) : sgnMoney(dstats.totalPL)}</Cu></div>
+                  <div className="kpisub">{dstats.n ? <>{sgnPct(dstats.totalRet)} · {dstats.n} trade{dstats.n === 1 ? "" : "s"}</> : "No trades match this filter"}</div>
+                </div>
+                <div className="kpiviz">
+                  <svg viewBox="0 0 320 50" preserveAspectRatio="none" role="img" aria-label="Cumulative realized P/L">
+                    <defs><linearGradient id="jkpiSpark" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={heroSpark.up ? "rgba(34,197,94,0.34)" : "rgba(239,68,68,0.30)"} /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient></defs>
+                    <path d={heroSpark.area} fill="url(#jkpiSpark)" />
+                    <path d={heroSpark.line} fill="none" stroke={heroSpark.up ? "var(--green)" : "var(--red)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            {/* K2: Win Rate */}
+            <div className="card kpi">
+              <div className="cardhead"><span className="label">Win Rate</span><span className="infodot" data-tip="Percentage of your closed trades that finished profitable. Hover the green arc for wins, the red track for losses.">i</span></div>
+              <div className="kpibody">
+                <div className="kpimain">
+                  <div className="kpinum">{dstats.n ? Math.round(dstats.winRate) + "%" : "—"}</div>
+                  <div className="kpisub">{dstats.n ? `${dstats.wins} W / ${dstats.losses} L` : "—"}</div>
+                </div>
+                <div className="kpiviz wrviz">
+                  <svg viewBox="0 0 40 40" role="img" aria-label={`${dstats.n ? Math.round(dstats.winRate) : 0}% win rate`}>
+                    <circle className="wrzone loss" cx="20" cy="20" r="15" fill="none" stroke="rgba(239,68,68,0.30)" strokeWidth="6" />
+                    <circle className="wrzone win" cx="20" cy="20" r="15" fill="none" stroke="var(--green)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${winArc.toFixed(1)} ${RING}`} transform="rotate(-90 20 20)" />
+                  </svg>
+                  <div className="wrtip win">{dstats.wins} win{dstats.wins === 1 ? "" : "s"}</div>
+                  <div className="wrtip loss">{dstats.losses} loss{dstats.losses === 1 ? "" : "es"}</div>
+                </div>
+              </div>
+            </div>
+            {/* K3: Profit Factor */}
+            <div className="card kpi">
+              <div className="cardhead"><span className="label">Profit Factor</span><span className="infodot" data-tip="Total profit from all winners divided by total loss from all losers — frequency is baked in, unlike the Win/Loss ratio which only compares average sizes. Above 1.0 means the system makes money.">i</span></div>
+              <div className="kpibody">
+                <div className="kpimain">
+                  <div className="kpinum gold">{dstats.n ? (isFinite(dstats.pf) ? dstats.pf.toFixed(2) : (dstats.wins ? "∞" : "—")) : "—"}</div>
+                  <div className="kpisub">gross win ÷ loss</div>
+                </div>
+              </div>
+            </div>
+            {/* K4: Expectancy / trade */}
+            <div className="card kpi">
+              <div className="cardhead"><span className="label">Expectancy</span><span className="infodot" data-tip="Your average dollar result per trade — total realized P/L divided by number of trades. Above zero is a positive edge. (Privacy shows it in R.)">i</span></div>
+              <div className="kpibody">
+                <div className="kpimain">
+                  <div className={"kpinum " + (dstats.expectancy >= 0 ? "green" : "red")}><Cu>{dstats.n ? (privacyMode ? sgnR(dstats.expectancy) : sgnMoney(per$)) : "—"}</Cu></div>
+                  <div className="kpisub">per trade · {dstats.n ? sgnR(dstats.expectancy) : "—"}</div>
+                </div>
+              </div>
+            </div>
+            {/* K5: Avg Win/Loss ratio */}
+            <div className="card kpi">
+              <div className="cardhead"><span className="label">Avg Win/Loss</span><span className="infodot" data-tip="Average win ÷ average loss — how much bigger a typical winner is than a typical loser.">i</span></div>
+              <div className="kpibody stack">
+                <div className="kpinum gold">{(dstats.wins && dstats.losses) ? dstats.wlr.toFixed(2) : "—"}</div>
+                <div className="wlbar"><div className="win" style={{ width: wlWinPct.toFixed(2) + "%" }}></div><div className="loss" style={{ width: (100 - wlWinPct).toFixed(2) + "%" }}></div></div>
+                <div className="kpisub">{dstats.wins ? sgnPct(dstats.avgGain) : "—"} win vs {dstats.losses ? "−" + Math.abs(dstats.avgLoss).toFixed(2) + "%" : "—"} loss</div>
+              </div>
+            </div>
+          </div>
+
+          {/* P3. FILTER BAR */}
+          <div className="filterbar">
+            <span className="flabel">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15 }}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
+              Filter
+            </span>
+            <label className="fctl">Ticker
+              <input className={"filtsel" + (filterTicker ? " active" : "")} value={filterTicker} placeholder="e.g. NVDA" onChange={e => setFilterTicker(e.target.value.toUpperCase().trim())} style={{ width: 92, textTransform: "uppercase" }} />
+            </label>
+            <label className="fctl">Setup
+              <select className={"filtsel" + (filterSetup !== "All" ? " active" : "")} value={filterSetup} onChange={e => setFilterSetup(e.target.value)}>
+                {["All", ...setupTypes].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </label>
+            <label className="fctl">Tag
+              <select className={"filtsel" + (filterTag !== "All" ? " active" : "")} value={filterTag} onChange={e => setFilterTag(e.target.value)}>
+                {["All", ...allTags].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </label>
+            <label className="fctl">Dates
+              <select className={"filtsel" + (dateRange !== "all" ? " active" : "")} value={dateRange} onChange={e => setDateRange(e.target.value)}>
+                <option value="all">All time</option>
+                <option value="mtd">This month</option>
+                <option value="qtd">This quarter</option>
+                <option value="ytd">Year to date</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="custom">Custom range…</option>
+              </select>
+            </label>
+            {dateRange === "custom" && (
+              <span className="fctl daterange">
+                <input type="date" className="filtsel" value={dateFrom} onChange={e => setDateFrom(e.target.value)} /><span style={{ color: "var(--muted)" }}>→</span><input type="date" className="filtsel" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+              </span>
+            )}
+            <span className="spacer"></span>
+            <span className="fcount">{dfActive ? `${dateFiltered.length} of ${allTrades.length} trades` : `All ${allTrades.length} trades`}</span>
+            {dfActive && <button className="btn" onClick={() => { setFilterTicker(""); setFilterSetup("All"); setFilterTag("All"); setDateRange("all"); setDateFrom(""); setDateTo(""); }}>Clear filters</button>}
+          </div>
+
+          {/* P4. CHARTS ROW — shared equity + distribution bodies, Pro card chrome */}
+          <div className="chartrow">
+            <div className="card">
+              <div className="cardhead"><span className="label" style={{ flex: "none" }}>Equity Curve</span><span className="infodot" data-tip="Your account value over time. A line climbing left to right means your account is growing — toggle dollars / percent, or trades / months.">i</span></div>
+              {equityCardBody}
+            </div>
+            <div className="card">
+              <div className="cardhead"><span className="label" style={{ flex: "none" }}>Return Distribution</span><span className="infodot" data-tip="The size of your wins and losses. Losses sit left in red, wins right in green — healthy trading keeps losses small and lets a few big winners carry the return.">i</span></div>
+              {distCardBody}
+            </div>
+          </div>
+
+          {/* P5. CALENDAR + KEY METRICS ROW */}
+          <div className="calmetrow">
+            <div className="card">
+              <div className="cardhead"><span className="label">Performance Calendar</span><span className="infodot" data-tip="Daily realized P/L, booked on each trade's exit date. Setup / tag / date filters apply; click a day to open its trades.">i</span></div>
+              <TradeCalendar trades={filtered} C={C} font={font} onOpenTrade={(t) => { setPreviewTrade && setPreviewTrade(null); openReview(t); }} />
+            </div>
+            <div className="card">
+              <div className="cardhead"><span className="label">Key Metrics</span><span className="infodot" data-tip="These numbers tell you whether your trading works. Win rate is how often you win; Expectancy is your average dollar result per trade; Avg R-multiple is that same edge measured in units of risk.">i</span></div>
+              <div className="metricsmini">
+                {statDrag.order.map((ti, vi) => { const t = mmTiles[ti]; return (
+                  <div key={t.k} className="mmtile" {...statDrag.dragProps(vi)} title="Drag to reorder">
+                    <div className="mmk">{t.label}</div>
+                    <div className={"mmv " + t.cls}>{t.val}</div>
+                  </div>
+                ); })}
+              </div>
+            </div>
+          </div>
+
+          {/* P5b. PLAYBOOK TRACKER — full-width */}
+          <div style={{ marginTop: 14 }}>
+            <PlaybookTracker trades={dateFiltered} uid={session?.user?.id} setPage={setPage} />
+          </div>
+
+          {/* P6. OBJECTIVE EDGE + EDGE MATRIX (two cards) */}
+          {objectiveEdge(true)}
+
+          {/* P7. ANALYTICS ROW */}
+          <div className="toolbar" style={{ marginTop: 20, display: "flex", alignItems: "center" }}>
+            <h2 className="sech">VIV Analytics</h2>
+            <div className="spacer"></div>
+            <div className="seg vaseg" title="Scope the analytics below to a time window">
+              {[["all", "All time"], ["month", "Month"], ["week", "Week"], ["day", "Day"]].map(([k, l]) => <button key={k} className={vaPeriod === k ? "on" : ""} onClick={() => setVaPeriod(k)}>{l}</button>)}
+            </div>
+          </div>
+          <div className="vagrid">
+            <div className="card vacard">
+              <div className="eyebrow-row"><span className="eyebrow">Recap</span><span className="infodot" data-tip="A snapshot of how you traded in this window — net P/L, win rate, the outlier trades that drove results, and the tags you leaned on.">i</span></div>
+              <div className="varecap">
+                <div className="vastat"><div className="vak">{PERIOD_NET_LABEL[vaPeriod]}</div><div className={"vav " + (va.net >= 0 ? "green" : "red")}>{va.n ? (privacyMode ? sgnPct(startCap > 0 ? va.net / startCap * 100 : 0) : sgnMoney(va.net)) : "—"}</div><div className="vasub">{va.n ? `${va.n} ${va.n === 1 ? "trade" : "trades"}` : "no trades in this period"}</div></div>
+                <div className="vastat"><div className="vak">Win rate</div><div className={"vav " + (va.winRate >= 50 ? "green" : (va.n ? "red" : ""))}>{va.n ? Math.round(va.winRate) + "%" : "—"}</div><div className="vasub">{va.n ? `${va.wins}W / ${va.losses}L` : "—"}</div></div>
+                <div className="vastat"><div className="vak">Outlier trades</div><div className="vav gold">{va.outliers.length}</div><div className="vasub">{va.outliers.length
+                  ? <>{(outliersExpanded ? va.outliers : va.outliers.slice(0, 3)).map(t => t.ticker).join(" · ")}{va.outliers.length > 3 ? <> · <span className="seemore" onClick={() => setOutliersExpanded(e => !e)}>{outliersExpanded ? "see less" : `see more (+${va.outliers.length - 3})`}</span></> : ""}</>
+                  : "|R| ≥ 2.5 · none"}</div></div>
+              </div>
+              <div className="vacommentary">{va.n
+                ? <>You closed <b>{va.n}</b> trade{va.n === 1 ? "" : "s"} in this view for <b>{sgnMoney(va.net)}</b> at a <b>{Math.round(va.winRate)}%</b> win rate{va.best ? <>, led by <b>{va.best.ticker}</b> ({sgnPct(Number(va.best.plPct))})</> : ""}. {va.expectancy >= 0 ? <>Expectancy held positive at <b>{sgnR(va.expectancy)}</b>/trade — keep doing more of the same.</> : <>Expectancy slipped to <b>{sgnR(va.expectancy)}</b>/trade — tighten entries and cut losers faster.</>}</>
+                : "No trades in this view yet — adjust the filters above."}</div>
+              <div className="vatagline"><span className="vak">Most-traded tags</span><div className="vatags">{va.tags.length ? va.tags.map(({ g, c }) => <span key={g} className="vatag">{g}<b>{c}</b></span>) : <span className="vasub">— no tags in this view</span>}</div></div>
+            </div>
+            <div className="card vacard">
+              <div className="eyebrow-row"><span className="eyebrow">Insights</span><span className="infodot" data-tip="Plain-language takeaways pulled from your numbers — what's working, what's leaking money, and the one habit worth fixing next.">i</span></div>
+              <ul className="valist">{vaInsights.map((o, i) => <li key={i}><span className={"ic " + o.k}>{o.ic}</span><span>{o.t}</span></li>)}</ul>
+            </div>
+            <div className="card vacard">
+              <div className="eyebrow-row"><span className="eyebrow" style={{ color: "var(--green)" }}>▲ Best winners</span><span className="infodot" data-tip="Your biggest winning trades in this window. Click a row to jump to it in Closed Trades. Study what they had in common — these are the setups to size up.">i</span></div>
+              <div className="vatrades">{va.winners.length ? va.winners.map(t => (
+                <div key={t.id} className="varow win clickable" title="Jump to this trade in Closed Trades" onClick={() => jumpToTrade(t)}><span className="vtk">{t.ticker}</span><span className="vsetup">{t.setup || "—"}</span><span className="vret green">{sgnPct(Number(t.plPct))}</span><span className="vpl green">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></div>
+              )) : <div className="vaempty">No winning trades in this view.</div>}</div>
+            </div>
+            <div className="card vacard">
+              <div className="eyebrow-row"><span className="eyebrow" style={{ color: "var(--red)" }}>▼ Worst losers</span><span className="infodot" data-tip="Your biggest losing trades in this window. Click a row to jump to it in Closed Trades. Look for the shared mistake — that's the leak to plug.">i</span></div>
+              <div className="vatrades">{va.losers.length ? va.losers.map(t => (
+                <div key={t.id} className="varow loss clickable" title="Jump to this trade in Closed Trades" onClick={() => jumpToTrade(t)}><span className="vtk">{t.ticker}</span><span className="vsetup">{t.setup || "—"}</span><span className="vret red">{sgnPct(Number(t.plPct))}</span><span className="vpl red">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></div>
+              )) : <div className="vaempty">No losing trades in this view — clean slate.</div>}</div>
+            </div>
+          </div>
+
+          {/* FX MIS-PRICING ALERT (shared handlers) */}
+          {fxFlagged.length > 0 && (
+            <div style={{ margin: "14px 0", padding: "13px 16px", borderRadius: 14, background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.35)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontSize: "1.05rem" }}>⚠️</span>
+              <div style={{ flex: 1, minWidth: 260, fontSize: "0.8rem", lineHeight: 1.5 }}>
+                <b style={{ color: "#fdba74" }}>{fxFlagged.length} synced trade{fxFlagged.length > 1 ? "s" : ""} look mis-priced.</b>{" "}
+                They match a known bug where non-USD trades were imported at raw local-currency prices. <b>Nothing is changed unless you confirm.</b>
+              </div>
+              <button className="btn" onClick={() => setFxReviewOpen(true)} style={{ background: "rgba(251,146,60,0.15)", borderColor: "rgba(251,146,60,0.45)", color: "#fdba74", fontWeight: 700 }}>Review them</button>
+            </div>
+          )}
+          {fxReviewOpen && (
+            <div style={{ margin: "0 0 16px", padding: "16px", borderRadius: 14, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(251,146,60,0.35)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                <b style={{ fontSize: "0.86rem" }}>Review flagged trades</b>
+                <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>Untick any row that's actually correct. Deleting only removes the bad import — after that, run <b>Sync now</b> (Settings → IBKR).</span>
+                <button onClick={() => setFxReviewOpen(false)} style={{ marginLeft: "auto", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", borderRadius: 8, width: 26, height: 26, cursor: "pointer" }}>×</button>
+              </div>
+              <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 10 }}>
+                {fxFlagged.map((t, i) => (
+                  <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderTop: i ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.76rem", cursor: "pointer" }}>
+                    <input type="checkbox" checked={fxSel.has(t.id)} onChange={() => setFxSel(prev => { const n = new Set(prev); n.has(t.id) ? n.delete(t.id) : n.add(t.id); return n; })} />
+                    <b style={{ minWidth: 76 }}>{t.ticker}</b>
+                    <span style={{ color: "var(--muted)", minWidth: 130 }}>{tradeDateISO(t.entry) || t.entry} → {tradeDateISO(t.exit) || t.exit}</span>
+                    <span style={{ minWidth: 130 }}>${Number(t.entryP || 0).toLocaleString()} → ${Number(t.exitP || 0).toLocaleString()}</span>
+                    <span style={{ fontWeight: 700, color: (Number(t.plDollar) || 0) >= 0 ? "var(--green)" : "var(--red)" }}>{(Number(t.plDollar) || 0) >= 0 ? "+" : "−"}${Math.abs(Number(t.plDollar) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  </label>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                <button className="btn" onClick={fxDeleteSelected} disabled={!fxSel.size || fxBusy} style={{ background: "rgba(239,68,68,0.14)", borderColor: "rgba(239,68,68,0.4)", color: "#fca5a5", fontWeight: 700 }}>{fxBusy ? "Removing…" : `Yes, these are wrong — remove ${fxSel.size} selected`}</button>
+                <button className="btn" onClick={fxDismiss} style={{ fontWeight: 700 }}>They're all correct — don't ask again</button>
+              </div>
+            </div>
+          )}
+
+          {/* P8. CLOSED TRADES TABLE — shared table, dense Pro chrome */}
+          <div className="card" style={{ padding: "16px 16px 18px", marginTop: 14 }}>
+            <div className="cardhead tradehead">
+              <h2 className="sech">Closed Trades</h2>
+              <span className="countchip">{dateFiltered.length}</span>
+              <span className="infodot" data-tip="Every closed trade. Click any row for a quick overview, its chart, and your review — what went right, what went wrong, and the lesson learned.">i</span>
+              <div className="spacer"></div>
+              <div className="seg" id="viewSeg">
+                <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
+                <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro · all columns</button>
+              </div>
+            </div>
+            <div className="tablewrap">
+              {closedTradesTable}
+            </div>
+          </div>
+
+          {/* SHARED PORTALS — Trade Preview · Trade Details · Factual Editor · Link modal (identical to Guided) */}
+          {tradePreviewPortal}
+          {tradeDetailsPortal}
+          {factualEditorPortal}
+          {linkModalPortal}
+
+        </div>{/* /shell */}
+      </div>
+    );
+  }
+
   return (
     <div className={"vj" + (expert ? " expert" : "") + (showPro ? " pro" : "")} ref={rootRef}>
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
@@ -6646,285 +8038,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
         </div>
 
         {/* OBJECTIVE EDGE — grade-vs-outcome + in/off-theme splits (the "does my process predict results" card) */}
-        {(() => {
-          const pop = dateFiltered.filter(t => t.exit);
-          if (!pop.length) return null;
-          const agg = (rows) => {
-            const n = rows.length;
-            const wins = rows.filter(t => (Number(t.plPct) || 0) > 0).length;
-            const rRows = rows.filter(t => t.rMult != null);
-            const avgR = rRows.length ? rRows.reduce((s, t) => s + Number(t.rMult), 0) / rRows.length : null;
-            const gw = rows.reduce((s, t) => s + Math.max(0, Number(t.plDollar) || 0), 0);
-            const gl = rows.reduce((s, t) => s + Math.max(0, -(Number(t.plDollar) || 0)), 0);
-            const pf = gl > 0 ? gw / gl : (gw > 0 ? Infinity : null); // profit factor: gross wins ÷ gross losses
-            return { n, winPct: n ? Math.round(100 * wins / n) : 0, avgR, pf };
-          };
-          const letterOf = (t) => (t.gradeSnapshot && t.gradeSnapshot.letter) || (getSavedGrade(t.ticker) || {}).letter || null;
-          const byGrade = ["A+", "A", "B", "C"].map(L => ({ L, ...agg(pop.filter(t => letterOf(t) === L)) })).filter(g => g.n > 0);
-          const ungraded = agg(pop.filter(t => !letterOf(t)));
-          const fitOf = (t) => { const th = sectorFor(t.ticker); return th ? themeFit(th, t.entry) : null; };
-          const inT = agg(pop.filter(t => fitOf(t) === "in")), offT = agg(pop.filter(t => fitOf(t) === "off"));
-          const unT = agg(pop.filter(t => !fitOf(t))); // pre-coverage, missing entry date, or unknown sector — NEVER guessed
-          // Market context at ENTRY (SPY vs EMA21 — trending / choppy / downtrend, see spyCtxOf)
-          const ctxOf = (t) => spyCtxOf(t.entry);
-          const mTrend = agg(pop.filter(t => ctxOf(t) === "trend")), mChop = agg(pop.filter(t => ctxOf(t) === "chop"));
-          const mDown = agg(pop.filter(t => ctxOf(t) === "down")), mUn = agg(pop.filter(t => !ctxOf(t)));
-          // Colour doctrine (design-research pass, 2026-07-11): numbers stay NEUTRAL; green/red is
-          // reserved for the outcome column (Avg R) so the one number that means money is the one
-          // that pops. Category identity (theme/market) = a small controlled dot, never coloured text
-          // or emoji (uncontrollable saturated blobs on a dark theme).
-          const cell = (v, good) => <b style={{ color: v == null ? "var(--muted)" : good ? "var(--green)" : "var(--red)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2) + "R"}</b>;
-          const pfCell = (pf) => <span className="term" data-tip="Profit factor = gross $ won ÷ gross $ lost in this group. Above 1 = the group makes money; 2+ = every dollar lost buys two back." style={{ color: pf == null ? "var(--muted)" : "var(--text)", fontWeight: 600, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>PF {pf == null ? "—" : pf === Infinity ? "∞" : pf.toFixed(2)}</span>;
-          const dot = (c) => <i style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: c, marginRight: 7, verticalAlign: "middle", flex: "none" }} />;
-          const CTX_LABEL = { trend: "Trending", chop: "Choppy", down: "Downtrend" };
-          const CTX_DOT = { trend: "var(--green)", chop: "var(--gold)", down: "var(--red)" };
-          // click a group → expand the exact trades behind the number (with sector + the snapshot ranks used)
-          const groupTrades = (id) => {
-            if (id === "t:in") return pop.filter(t => fitOf(t) === "in");
-            if (id === "t:off") return pop.filter(t => fitOf(t) === "off");
-            if (id === "t:un") return pop.filter(t => !fitOf(t));
-            if (id && id.startsWith("g:")) { const L = id.slice(2); return L === "un" ? pop.filter(t => !letterOf(t)) : pop.filter(t => letterOf(t) === L); }
-            if (id && id.startsWith("m:")) { const c = id.slice(2); return c === "un" ? pop.filter(t => !ctxOf(t)) : pop.filter(t => ctxOf(t) === c); }
-            if (id && id.startsWith("x:")) { // 3-D combo: grade|theme|context — SAME population as the matrix (entries ≥ theme coverage)
-              const [G, T, X] = id.slice(2).split("|");
-              return pop.filter(t => { const iso = tradeDateISO(t.entry); return iso && THEME_COVERAGE_START && iso >= THEME_COVERAGE_START; })
-                .filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
-            }
-            return [];
-          };
-          // 3-D matrix: Grade × Theme × Context — ONLY trades entered from THEME_COVERAGE_START
-          // (2026-06-26, the first theme snapshot). Earlier trades have no honest theme tag, so a
-          // 3-D cell built on them would be fake precision. The 1-D columns above still cover all trades.
-          const pop3d = pop.filter(t => { const iso = tradeDateISO(t.entry); return iso && THEME_COVERAGE_START && iso >= THEME_COVERAGE_START; });
-          const combos = [];
-          const gKeys = [...byGrade.map(g => g.L), ...(ungraded.n ? ["un"] : [])];
-          for (const G of gKeys) for (const T of ["in", "off", "un"]) for (const X of ["trend", "chop", "down", "un"]) {
-            const rows = pop3d.filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
-            if (rows.length) combos.push({ id: `x:${G}|${T}|${X}`, G, T, X, ...agg(rows) });
-          }
-          combos.sort((a, b) => b.n - a.n);
-          // NOTE: every cell must be shrink/wrap-safe — fixed minWidths inside a minmax(300px,1fr)
-          // grid track overflowed into the neighbouring column (member-reported UI bug).
-          const Row = ({ label, s, accent, id }) => (
-            <div onClick={id ? () => setEdgeOpen(edgeOpen === id ? null : id) : undefined}
-              title={id ? "Click to see the exact trades behind this number" : undefined}
-              style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 10px", padding: "8px 6px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "0.8rem", cursor: id ? "pointer" : "default", background: edgeOpen === id ? "rgba(240,192,80,0.05)" : "transparent", borderRadius: 8, minWidth: 0 }}>
-              <span style={{ flex: "1 1 84px", minWidth: 0, fontWeight: 800, color: accent || "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
-              <span style={{ color: "var(--muted)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{s.n} trade{s.n !== 1 ? "s" : ""}</span>
-              <span style={{ color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{s.winPct}% win</span>
-              {pfCell(s.pf)}
-              {cell(s.avgR, (s.avgR || 0) >= 0)}
-              {id && <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>{edgeOpen === id ? "▴" : "▾"}</span>}
-            </div>
-          );
-          const EdgeList = ({ id }) => {
-            const rows = groupTrades(id);
-            if (!rows.length) return null;
-            const isTheme = id.startsWith("t:");
-            return (
-              <div style={{ gridColumn: "1 / -1", background: "rgba(255,255,255,0.02)", border: "1px solid var(--borderGold)", borderRadius: 12, padding: "10px 14px", marginTop: 4 }}>
-                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>
-                  The {rows.length} trade{rows.length !== 1 ? "s" : ""} behind “{id === "t:in" ? "In-theme" : id === "t:off" ? "Off-theme" : id === "t:un" ? "Untagged"
-                    : id === "m:trend" ? "Trending tape" : id === "m:chop" ? "Choppy tape" : id === "m:down" ? "Downtrend tape" : id === "m:un" ? "No market data"
-                    : id.startsWith("x:") ? (() => { const [G, T, X] = id.slice(2).split("|"); return `${G === "un" ? "Ungraded" : G} · ${T === "in" ? "In-theme" : T === "off" ? "Off-theme" : "Untagged"} · ${X === "un" ? "No mkt data" : ({ trend: "Trending", chop: "Choppy", down: "Downtrend" })[X]}`; })()
-                    : id.slice(2) + " setups"}”
-                  {isTheme && id !== "t:un" && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · judged against the theme snapshot at each trade's ENTRY date</span>}
-                  {id === "t:un" && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · entered before theme coverage, missing an entry date, or unknown sector — never guessed. Fix the entry date via Edit trade and it re-tags automatically.</span>}
-                </div>
-                {rows.map((t, i) => {
-                  const th = sectorFor(t.ticker);
-                  const rk = isTheme && th ? themeRanks(th, t.entry) : null;
-                  return (
-                    <div key={t.id || i} onClick={() => openReview(t)} title="Open trade details"
-                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 4px", borderTop: i ? "1px solid rgba(255,255,255,0.04)" : "none", fontSize: "0.78rem", cursor: "pointer", flexWrap: "wrap" }}>
-                      <b style={{ minWidth: 52, color: "var(--white)" }}>{t.ticker}</b>
-                      <span style={{ minWidth: 120, color: "var(--goldBright)", fontWeight: 600 }}>{th || "— no sector"}</span>
-                      <span style={{ minWidth: 78, color: "var(--muted)" }}>{tradeDateISO(t.entry) || "—"}</span>
-                      {isTheme && (rk
-                        ? <span style={{ color: "var(--muted)", fontSize: "0.72rem", whiteSpace: "nowrap" }}>wk #{rk.week ?? "–"} · mo #{rk.month ?? "–"} <span style={{ opacity: 0.7 }}>@ {rk.date}</span></span>
-                        : <span style={{ color: "var(--muted)", fontSize: "0.72rem", fontStyle: "italic" }}>{!th ? "sector unknown" : !tradeDateISO(t.entry) ? "no entry date — not judged" : "before theme coverage"}</span>)}
-                      <span style={{ minWidth: 62, fontWeight: 700, color: (Number(t.plPct) || 0) > 0 ? "var(--green)" : "var(--red)" }}>{sgnPct(Number(t.plPct))}</span>
-                      <span style={{ color: "var(--muted)" }}>{t.rMult != null ? sgnR(Number(t.rMult)) : "—"}</span>
-                      <span style={{ marginLeft: "auto", color: "var(--goldBright)", fontSize: "0.7rem" }}>details ›</span>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          };
-          if (!byGrade.length && !inT.n && !offT.n) return null;
-          return (<>
-            <div className="toolbar" style={{ marginTop: 26 }}><h2 className="sech guide" onMouseEnter={guideEnter("objedge", "Objective edge", "This connects your process to your results across three dimensions judged at entry: the setup grade you gave the trade, whether its sector was in-theme, and the market context — was SPY trending, choppy or in a downtrend versus its 21-day EMA. The 3-D matrix crosses all three so you see exactly which combination your edge lives in.", undefined)} onMouseLeave={guideLeave("objedge")}>Objective edge</h2></div>
-            <div className="card reveal" style={{ padding: "16px 20px", marginBottom: 18 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By setup grade</div>
-                  {byGrade.map(g => <Row key={g.L} id={"g:" + g.L} label={g.L + " setups"} s={g} />)}
-                  {ungraded.n > 0 && <Row id="g:un" label="Ungraded" s={ungraded} accent="var(--muted)" />}
-                  {byGrade.length === 0 && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Grade setups in Premium Tools → Setup Grader; results correlate here automatically.</div>}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By theme fit (at entry)</div>
-                  {inT.n > 0 && <Row id="t:in" label={<>{dot("var(--green)")}In-theme</>} s={inT} />}
-                  {offT.n > 0 && <Row id="t:off" label={<>{dot("var(--red)")}Off-theme</>} s={offT} />}
-                  {unT.n > 0 && <Row id="t:un" label={<>{dot("rgba(255,255,255,0.25)")}Untagged</>} s={unT} accent="var(--muted)" />}
-                  {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
-                  {THEME_COVERAGE_START && <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
-                    Tracked from <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b>
-                    <span onClick={() => setEdgeNotes(n => ({ ...n, theme: !n.theme }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.theme ? "hide ▴" : "why? ▾"}</span>
-                    {edgeNotes.theme && <div style={{ marginTop: 4 }}>The date of the first theme snapshot. Trades entered earlier aren't theme-tagged: themes rotate constantly, so a later snapshot can't honestly judge an older trade. Grade metrics cover all trades.</div>}
-                  </div>}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By market context (at entry)</div>
-                  {mTrend.n > 0 && <Row id="m:trend" label={<span className="term" data-tip="Trending market: SPY closed ABOVE its 21-day EMA for 10 or more straight sessions, as of the last completed session before your entry. The tape had a persistent uptrend under your trade.">{dot(CTX_DOT.trend)}Trending</span>} s={mTrend} />}
-                  {mChop.n > 0 && <Row id="m:chop" label={<span className="term" data-tip="Choppy market: within the last 10 sessions before your entry, SPY crossed back and forth around its 21-day EMA — neither side held 10 straight closes. Whipsaw conditions: breakouts get faded.">{dot(CTX_DOT.chop)}Choppy</span>} s={mChop} />}
-                  {mDown.n > 0 && <Row id="m:down" label={<span className="term" data-tip="Downtrend market: SPY closed BELOW its 21-day EMA for 10 or more straight sessions before your entry. Persistent downside tape — fresh long breakout risk is swimming upstream.">{dot(CTX_DOT.down)}Downtrend</span>} s={mDown} />}
-                  {mUn.n > 0 && <Row id="m:un" label={<span className="term" data-tip="No verdict: the entry date predates the SPY history loaded, the date is missing, or the price feed didn't answer. Never guessed.">{dot("rgba(255,255,255,0.25)")}No data</span>} s={mUn} accent="var(--muted)" />}
-                  {!spyCtxDays && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Loading SPY history… (needs the deployed /api — shows “No data” in local dev.)</div>}
-                  <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
-                    SPY vs its 21-day EMA, past 10 sessions, judged at entry
-                    <span onClick={() => setEdgeNotes(n => ({ ...n, market: !n.market }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.market ? "hide ▴" : "full definition ▾"}</span>
-                    {edgeNotes.market && <div style={{ marginTop: 6, display: "grid", gap: 5 }}>
-                      <div><b style={{ color: "var(--text)" }}>{dot(CTX_DOT.trend)}Trending</b> — SPY closed above its 21-day EMA for 10 or more straight sessions.</div>
-                      <div><b style={{ color: "var(--text)" }}>{dot(CTX_DOT.chop)}Choppy</b> — price crossed back and forth through the EMA21 within the last 10 sessions.</div>
-                      <div><b style={{ color: "var(--text)" }}>{dot(CTX_DOT.down)}Downtrend</b> — SPY closed below its 21-day EMA for 10 or more straight sessions.</div>
-                      <div style={{ opacity: 0.8 }}>Judged on the last completed session before your entry — the entry day's close isn't known when you enter (no lookahead).</div>
-                    </div>}
-                  </div>
-                </div>
-                {edgeOpen && !edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
-              </div>
-
-              {/* ── 3-D EDGE MATRIX: Setup grade × Theme fit × Market context ── */}
-              {combos.length > 0 && (
-                <div style={{ marginTop: 18 }}>
-                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
-                    <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)" }}>3-D edge matrix — grade × theme × market context</div>
-                    {/* view toggle — heatmap (default, visual) vs the classic sortable table (unchanged) */}
-                    <div style={{ marginLeft: "auto", display: "inline-flex", border: "1px solid var(--borderGold)", borderRadius: 8, overflow: "hidden", fontSize: "0.62rem", fontWeight: 700 }}>
-                      {[["heatmap", "Heatmap"], ["table", "Table"]].map(([v, lbl]) => (
-                        <button key={v} type="button" onClick={() => setEdgeMatrixView(v)}
-                          style={{ padding: "4px 10px", border: "none", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.04em",
-                            background: edgeMatrixView === v ? "rgba(240,192,80,0.14)" : "transparent",
-                            color: edgeMatrixView === v ? "var(--goldBright)" : "var(--muted)" }}>{lbl}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ background: "rgba(201,152,42,0.06)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "8px 12px", fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, marginBottom: 8 }}>
-                    Starts at <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the first theme snapshot
-                    <span onClick={() => setEdgeNotes(n => ({ ...n, matrix: !n.matrix }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.matrix ? "hide ▴" : "why? ▾"}</span>
-                    {edgeNotes.matrix && <div style={{ marginTop: 4 }}>Trades entered before that have no theme tracking, so crossing them here would be inaccurate; they're excluded from the matrix (the single-dimension columns above still cover every trade).</div>}
-                  </div>
-                  {edgeMatrixView === "heatmap" ? (() => {
-                    // HEATMAP — same `combos` data, laid out as grade × context grids, one panel per theme state.
-                    // Colour = outcome (avgR) only; numbers stay neutral. Cells reuse the combo id so the
-                    // shared EdgeList drill-down below the matrix renders the exact trades on click.
-                    const GRADE_ORDER = ["A+", "A", "B", "C", "un"];
-                    const CTX_ORDER = ["trend", "chop", "down", "un"];
-                    const gradeLabel = (g) => g === "un" ? "Ungraded" : g;
-                    const ctxHead = (x) => x === "un"
-                      ? <>{dot("rgba(255,255,255,0.25)")}No data</>
-                      : <>{dot(CTX_DOT[x])}{CTX_LABEL[x]}</>;
-                    const themePanels = [
-                      { key: "in", label: "In-theme", dotc: "var(--green)" },
-                      { key: "off", label: "Off-theme", dotc: "var(--red)" },
-                      { key: "un", label: "Untagged", dotc: "rgba(255,255,255,0.25)" },
-                    ];
-                    const byId = Object.fromEntries(combos.map(c => [c.id, c]));
-                    const cellBg = (id) => {
-                      const c = byId[id];
-                      if (!c || c.avgR == null) return "rgba(255,255,255,0.02)";
-                      const a = Math.min(0.45, Math.abs(c.avgR) * 0.25);
-                      if (a < 0.02) return "rgba(255,255,255,0.03)";
-                      return c.avgR >= 0 ? `rgba(34,197,94,${a.toFixed(3)})` : `rgba(239,68,68,${a.toFixed(3)})`;
-                    };
-                    const panels = themePanels
-                      .map(p => {
-                        const grades = GRADE_ORDER.filter(g => combos.some(c => c.T === p.key && c.G === g));
-                        const ctxs = CTX_ORDER.filter(x => combos.some(c => c.T === p.key && c.X === x));
-                        return { ...p, grades, ctxs };
-                      })
-                      .filter(p => p.grades.length && p.ctxs.length);
-                    if (!panels.length) return null;
-                    return (
-                      <div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-start" }}>
-                          {panels.map(p => (
-                            <div key={p.key} style={{ flex: "1 1 300px", minWidth: 0 }}>
-                              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text)", marginBottom: 6, display: "flex", alignItems: "center" }}>{dot(p.dotc)}{p.label}</div>
-                              <div style={{ overflowX: "auto" }}>
-                                <div style={{ display: "grid", gridTemplateColumns: `minmax(60px,auto) repeat(${p.ctxs.length}, minmax(92px,1fr))`, gap: 4 }}>
-                                  {/* header row: blank corner + context columns */}
-                                  <div />
-                                  {p.ctxs.map(x => (
-                                    <div key={x} style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)", fontWeight: 700, padding: "2px 4px", display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>{ctxHead(x)}</div>
-                                  ))}
-                                  {/* one row per grade */}
-                                  {p.grades.map(g => (
-                                    <React.Fragment key={g}>
-                                      <div style={{ fontSize: "0.72rem", fontWeight: 800, color: g === "un" ? "var(--muted)" : "var(--text)", display: "flex", alignItems: "center", whiteSpace: "nowrap", paddingRight: 4 }}>{gradeLabel(g)}</div>
-                                      {p.ctxs.map(x => {
-                                        const id = `x:${g}|${p.key}|${x}`;
-                                        const c = byId[id];
-                                        const open = edgeOpen === id;
-                                        if (!c) return <div key={x} style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: "0.8rem" }}>—</div>;
-                                        return (
-                                          <div key={x} onClick={() => setEdgeOpen(open ? null : id)} title="Click to see the exact trades behind this combination"
-                                            style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: cellBg(id), border: open ? "1px solid var(--goldBright)" : "1px solid rgba(255,255,255,0.06)", boxShadow: open ? "0 0 0 1px var(--goldBright)" : "none", padding: "5px 7px", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
-                                            <div style={{ fontSize: "0.82rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "var(--text)" }}>{c.avgR == null ? "—" : (c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2) + "R"}</div>
-                                            <div style={{ fontSize: "0.58rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>n={c.n} · {c.winPct}%</div>
-                                          </div>
-                                        );
-                                      })}
-                                    </React.Fragment>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Colour = average R per trade. Click any cell to see its exact trades. Cells under ~10 trades are direction, not proof.</div>
-                      </div>
-                    );
-                  })() : (
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem", tableLayout: "fixed" }}>
-                      <colgroup><col style={{ width: "13%" }} /><col style={{ width: "15%" }} /><col style={{ width: "18%" }} /><col style={{ width: "11%" }} /><col style={{ width: "12%" }} /><col style={{ width: "12%" }} /><col style={{ width: "13%" }} /><col style={{ width: "6%" }} /></colgroup>
-                      <thead><tr style={{ color: "var(--muted)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                        <th style={{ textAlign: "left", padding: "4px 8px" }}>Grade</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Theme</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Market</th>
-                        <th style={{ textAlign: "right", padding: "4px 8px" }}>Trades</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Win %</th><th style={{ textAlign: "right", padding: "4px 8px" }}>PF</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Avg R</th><th></th>
-                      </tr></thead>
-                      <tbody>
-                        {combos.map(c => (
-                          /* NOTE: .vj tbody td right-aligns everything past column 2 — the first three
-                             (text) columns need EXPLICIT textAlign:left or headers and cells drift apart
-                             (the Market-column misalignment Valen caught, 2026-07-11). */
-                          <tr key={c.id} onClick={() => setEdgeOpen(edgeOpen === c.id ? null : c.id)} title="Click to see the exact trades behind this combination"
-                            onMouseEnter={e => { if (edgeOpen !== c.id) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent"; }}
-                            style={{ cursor: "pointer", background: edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 800, color: c.G === "un" ? "var(--muted)" : "var(--text)" }}>{c.G === "un" ? "Ungraded" : c.G}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.T === "un" ? "var(--muted)" : "var(--text)" }}>{c.T === "in" ? <>{dot("var(--green)")}In</> : c.T === "off" ? <>{dot("var(--red)")}Off</> : <>{dot("rgba(255,255,255,0.25)")}Untagged</>}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.X === "un" ? "var(--muted)" : "var(--text)" }}>{c.X === "un" ? <>{dot("rgba(255,255,255,0.25)")}No data</> : <>{dot(CTX_DOT[c.X])}{CTX_LABEL[c.X]}</>}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{c.n}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: "var(--text)" }}>{c.winPct}%</td>
-                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: c.pf == null ? "var(--muted)" : "var(--text)" }}>{c.pf == null ? "—" : c.pf === Infinity ? "∞" : c.pf.toFixed(2)}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums" }}>{c.avgR == null ? <span style={{ color: "var(--muted)" }}>—</span> : <b style={{ color: c.avgR >= 0 ? "var(--green)" : "var(--red)" }}>{(c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2)}R</b>}</td>
-                            <td style={{ padding: "8px 4px", textAlign: "right", color: "var(--muted)", fontSize: "0.66rem" }}>{edgeOpen === c.id ? "▴" : "▾"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  )}
-                  {edgeOpen && edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
-                  {edgeMatrixView === "table" && <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 6 }}>Sorted by sample size. Small samples (under ~10 trades) are direction, not proof — click any row to inspect its exact trades before acting on it.</div>}
-                </div>
-              )}
-            </div>
-          </>);
-        })()}
+        {objectiveEdge(false)}
 
         {/* PLAYBOOK TRACKER — model-playbook targets vs live journal adherence.
             Reached via "Compare stats" in the Return Simulator (sessionStorage flag → scroll). */}
@@ -6942,212 +8056,14 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           <div className="chartcol eqcol">
             <div className="toolbar"><h2 className="sech guide" onMouseEnter={guideEnter("eq", "Equity curve", "Your account value over time. A line climbing left to right means your account is growing. Toggle dollars / percent.", "/audio/equity-curve.mp3")} onMouseLeave={guideLeave("eq")}>Equity curve</h2></div>
             <div className="card reveal">
-              <div className="row">
-                <div className="label">Account value over time</div>
-                <div className="spacer"></div>
-                <div className="seg" id="eqSeg">
-                  <button className={eqMode === "$" ? "on" : ""} disabled={privacyMode} onClick={() => !privacyMode && setEqYAxis("$")} title={privacyMode ? "Privacy mode is on — turn it off to view dollar amounts" : ""}>$</button>
-                  <button className={eqMode === "%" ? "on" : ""} onClick={() => setEqYAxis("%")}>%</button>
-                </div>
-                <div className="seg" id="eqXSeg">
-                  <button className={eqXAxis === "trades" ? "on" : ""} onClick={() => setEqXAxis("trades")}>By Date</button>
-                  <button className={eqXAxis === "months" ? "on" : ""} onClick={() => setEqXAxis("months")}>By Month</button>
-                </div>
-              </div>
-              <div className="chartwrap">
-                <div className="yaxis">{eqSvg.yLabels.map((l, i) => <span key={i}>{l}</span>)}</div>
-                <div className="plot" style={{ position: "relative" }}
-                  onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); if (!r.width || !eqSvg.pts || !eqSvg.pts.length) return; const sx = ((e.clientX - r.left) / r.width) * eqSvg.W; let bi = 0, bd = 1e18; eqSvg.pts.forEach((p, i) => { const d = Math.abs(p.x - sx); if (d < bd) { bd = d; bi = i; } }); setEqHover(bi); }}
-                  onMouseLeave={() => setEqHover(null)}>
-                  <svg viewBox="0 0 600 210" preserveAspectRatio="none" className="eqsvg" role="img" aria-label="Equity curve">
-                    <defs>
-                      <linearGradient id="jeqgPos" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(34,197,94,0.32)" /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient>
-                      <linearGradient id="jeqgNeg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(239,68,68,0.30)" /><stop offset="100%" stopColor="rgba(239,68,68,0)" /></linearGradient>
-                    </defs>
-                    <line x1="0" y1="52" x2="600" y2="52" className="grid" /><line x1="0" y1="105" x2="600" y2="105" className="grid" /><line x1="0" y1="158" x2="600" y2="158" className="grid" />
-                    <line x1="0" y1={eqSvg.yb.toFixed(1)} x2="600" y2={eqSvg.yb.toFixed(1)} stroke="rgba(255,255,255,0.22)" strokeWidth="1" strokeDasharray="4 4" />
-                    <g id="eqRise">
-                      <path d={eqSvg.areaPos} fill="url(#jeqgPos)" />
-                      <path d={eqSvg.areaNeg} fill="url(#jeqgNeg)" />
-                      <path d={eqSvg.linePos} fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                      <path d={eqSvg.lineNeg} fill="none" stroke="var(--red)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                    </g>
-                    {/* Equity SMAs — derisk (5) / brake (10) / no-edge (20). All dotted; legend toggles each.
-                        When equity is AT/BELOW a line, that line GLOWS (soft wide underlay) — the "you've
-                        hit it" signal, replacing the old status card for the 20-SMA. */}
-                    {eqSmaOn.s20 && eqSvg.smaPaths?.s20 && <>
-                      {eqSvg.hits?.s20 && <path d={eqSvg.smaPaths.s20} fill="none" stroke="rgba(168,130,255,0.30)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
-                      <path d={eqSvg.smaPaths.s20} fill="none" stroke={eqSvg.hits?.s20 ? "rgba(190,160,255,0.95)" : "rgba(168,130,255,0.65)"} strokeWidth="1.2" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
-                    </>}
-                    {eqSmaOn.s10 && eqSvg.smaPaths?.s10 && <>
-                      {eqSvg.hits?.s10 && <path d={eqSvg.smaPaths.s10} fill="none" stroke="rgba(239,68,68,0.28)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
-                      <path d={eqSvg.smaPaths.s10} fill="none" stroke={eqSvg.hits?.s10 ? "rgba(255,110,110,0.95)" : "rgba(239,68,68,0.75)"} strokeWidth="1.2" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
-                    </>}
-                    {eqSmaOn.s5 && eqSvg.smaPaths?.s5 && <>
-                      {eqSvg.hits?.s5 && <path d={eqSvg.smaPaths.s5} fill="none" stroke="rgba(240,192,80,0.30)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
-                      <path d={eqSvg.smaPaths.s5} fill="none" stroke="var(--goldBright)" strokeWidth="1.4" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
-                    </>}
-                    {eqHover != null && eqSvg.pts[eqHover] && <line x1={eqSvg.pts[eqHover].x.toFixed(1)} y1="0" x2={eqSvg.pts[eqHover].x.toFixed(1)} y2="210" stroke="rgba(255,255,255,0.4)" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
-                  </svg>
-                  {eqHover != null && eqSvg.pts[eqHover] && (() => {
-                    const p = eqSvg.pts[eqHover];
-                    const leftPct = (p.x / eqSvg.W) * 100, topPct = (p.y / eqSvg.H) * 100;
-                    const ret = eqSvg.startCap > 0 ? (p.v - eqSvg.startCap) / eqSvg.startCap * 100 : 0;
-                    const dpct = eqSvg.startCap > 0 ? p.delta / eqSvg.startCap * 100 : 0;
-                    const valStr = privacyMode ? ((ret >= 0 ? "+" : "−") + Math.abs(ret).toFixed(1) + "%") : ("$" + Math.round(p.v).toLocaleString());
-                    const dStr = privacyMode ? ((p.delta >= 0 ? "+" : "−") + Math.abs(dpct).toFixed(1) + "%") : ((p.delta >= 0 ? "+" : "−") + "$" + Math.abs(Math.round(p.delta)).toLocaleString());
-                    return (<>
-                      <div style={{ position: "absolute", left: leftPct + "%", top: topPct + "%", width: 9, height: 9, borderRadius: "50%", background: "#fff", border: "2px solid var(--gold)", transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: 4 }} />
-                      <div style={{ position: "absolute", left: leftPct + "%", top: 4, transform: leftPct > 65 ? "translateX(calc(-100% - 10px))" : "translateX(10px)", pointerEvents: "none", zIndex: 5, background: "rgba(8,8,14,0.96)", border: "1px solid var(--borderGold)", borderRadius: 8, padding: "6px 9px", fontSize: "0.62rem", fontWeight: 700, whiteSpace: "nowrap", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,0.55)" }}>
-                        <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: "0.52rem", marginBottom: 2 }}>{p.key === "Start" ? "Starting capital" : (eqXAxis === "months" ? "Month " : "") + p.key}</div>
-                        <div>{valStr}</div>
-                        {p.key !== "Start" && <div style={{ color: p.delta >= 0 ? "var(--green)" : "var(--red)", marginTop: 1, fontSize: "0.55rem" }}>{dStr} that {eqXAxis === "months" ? "month" : "day"}</div>}
-                      </div>
-                    </>);
-                  })()}
-                </div>
-              </div>
-              <div className="xaxis">{eqSvg.xs.length ? eqSvg.xs.map((s, i) => <span key={i}>{s}</span>) : <span>—</span>}</div>
-              {/* SMA legend + the derisk/brake status — equity vs its own moving averages */}
-              {eqSvg.riskStatus && (
-                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 14px", marginTop: 8, fontSize: "0.62rem", color: "var(--muted)" }}>
-                  {[["s5", "5-SMA derisk", "var(--goldBright)", "Average of your last 5 equity points. Equity closing below it = the first warning: start derisking — smaller size, trim laggards. Click to show/hide the line."],
-                    ["s10", "10-SMA brake", "var(--red)", "Average of your last 10 equity points. Equity below it = hard brake: no new risk until you've reviewed the open book and recent trades. Click to show/hide the line."],
-                    ["s20", "20-SMA no edge", "rgba(168,130,255,0.9)", "Average of your last 20 equity points — the edge line. Equity below it means the system has NO EDGE right now: this is a real system drawdown, not one bad week. Stand down to smallest or sim-only size and run a full audit — which setups, which tape, which rule bled — before re-engaging at size. Click to show/hide the line."]].map(([k, lbl, col, tip]) => (
-                    <span key={k} onClick={() => setEqSmaOn(o => ({ ...o, [k]: !o[k] }))} style={{ cursor: "pointer", opacity: eqSmaOn[k] ? 1 : 0.35, userSelect: "none" }}>
-                      <span style={{ color: col }}>┄┄</span> <span className="term" data-tip={tip} style={eqSvg.hits?.[k] && eqSmaOn[k] ? { color: col, fontWeight: 800 } : undefined}>{lbl}</span>
-                      {eqSvg.hits?.[k] && eqSmaOn[k] && <span style={{ color: col, fontSize: "0.56rem", fontWeight: 800, marginLeft: 4 }}>● hit</span>}
-                    </span>
-                  ))}
-                  <span style={{ marginLeft: "auto", fontWeight: 800, padding: "3px 10px", borderRadius: 20,
-                    background: eqSvg.riskStatus === "brake" ? "rgba(239,68,68,0.14)" : eqSvg.riskStatus === "derisk" ? "rgba(240,192,80,0.14)" : "rgba(34,197,94,0.12)",
-                    color: eqSvg.riskStatus === "brake" ? "var(--red)" : eqSvg.riskStatus === "derisk" ? "var(--goldBright)" : "var(--green)" }}>
-                    {eqSvg.riskStatus === "brake" ? "🔴 BRAKE — equity below 10-SMA: no new risk, review trades"
-                      : eqSvg.riskStatus === "derisk" ? "🟡 DERISK — equity below 5-SMA: cut size, trim laggards"
-                      : "🟢 FULL RISK — equity above its 5-SMA"}
-                  </span>
-                </div>
-              )}
-              <div className="charthint">{!eqSvg.n ? "No trades match this filter."
-                : eqSvg.pct ? <>Account return <span className="g">{sgnPct(eqSvg.totalRet)}</span> across {eqSvg.n} closed trade{eqSvg.n === 1 ? "" : "s"}.</>
-                  : <>Account {eqSvg.totalPL >= 0 ? "grew" : "fell"} <span className={eqSvg.totalPL >= 0 ? "g" : "rd"}>{sgnMoney(eqSvg.totalPL)} ({sgnPct(eqSvg.totalRet)})</span> across {eqSvg.n} closed trade{eqSvg.n === 1 ? "" : "s"}.</>}</div>
+              {equityCardBody}
             </div>
           </div>{/* /chartcol */}
 
           <div className="chartcol distcol">
             <div className="toolbar"><h2 className="sech guide" onMouseEnter={guideEnter("dist", "Return distribution", "The size of your wins and losses. Losses sit left in red, wins right in green. Healthy trading keeps losses small. Click any bar to see the exact trades inside it.", "/audio/journal-distribution.mp3")} onMouseLeave={guideLeave("dist")}>Return distribution</h2></div>
             <div className="card reveal">
-              <div className={"disthead" + (distPanelOpen ? " open" : "")} onClick={() => setDistPanelOpen(o => !o)}>
-                <div className="label" style={{ margin: 0 }}>Trade outcomes by size — losses left, wins right</div>
-                <span className="disthint2" style={{ marginLeft: "auto", color: distRpt >= 0 ? "var(--green)" : "var(--red)" }}>Return/trade {distFmtPct(distRpt)}</span>
-                <button className={"distbtn" + (distPanelOpen ? " on" : "")} type="button" onClick={(e) => { e.stopPropagation(); setDistPanelOpen(o => !o); }}>{distPanelOpen ? "Hide data ▴" : "Open & edit data ▾"}</button>
-                <span className="chev2" style={{ marginLeft: 6 }}>&#9662;</span>
-              </div>
-              {(() => {
-                const CH = 270, halfH = (CH - 26) / 2, maxC = Math.max(...distCounts, 1);
-                const step = maxC <= 4 ? 1 : maxC <= 8 ? 2 : maxC <= 20 ? 5 : maxC <= 40 ? 10 : Math.ceil(maxC / 50) * 10;
-                const niceMax = Math.max(step, Math.ceil(maxC / step) * step);
-                const yFor = (v) => v / niceMax * halfH;
-                const ticks = []; for (let v = 0; v <= niceMax; v += step) ticks.push(v);
-                const yLab = { position: "absolute", right: 2, fontSize: "0.5rem", color: "var(--muted)" };
-                const gl = (v) => ({ position: "absolute", left: 0, right: 0, borderTop: v === 0 ? "1px solid rgba(255,255,255,0.18)" : "1px dashed rgba(255,255,255,0.06)" });
-                return (
-                <div style={{ display: "flex", gap: 6, marginTop: 18 }}>
-                  <div style={{ position: "relative", width: 24, height: CH, flexShrink: 0 }}>
-                    {ticks.map(v => (<React.Fragment key={"y" + v}>
-                      <span style={{ ...yLab, top: halfH - yFor(v) - 5 }}>{v}</span>
-                      {v > 0 && <span style={{ ...yLab, top: halfH + yFor(v) - 5 }}>{v}</span>}
-                    </React.Fragment>))}
-                  </div>
-                  <div style={{ position: "relative", flex: 1, height: CH }}>
-                    {ticks.map(v => (<React.Fragment key={"g" + v}>
-                      <div style={{ ...gl(v), top: halfH - yFor(v) }} />
-                      {v > 0 && <div style={{ ...gl(v), top: halfH + yFor(v) }} />}
-                    </React.Fragment>))}
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "stretch" }}>
-                      {DIST_BUCKETS.map((b, i) => {
-                        const c = distCounts[i], h = yFor(c);
-                        const sel = distSel === i;
-                        return (<div key={i} title={`${b.lab}: ${c} trade${c === 1 ? "" : "s"} — click to see them`} onClick={() => c && setDistSel(s => s === i ? null : i)} style={{ flex: 1, position: "relative", cursor: c ? "pointer" : "default" }}>
-                          {c ? <div style={{ position: "absolute", left: "14%", right: "14%", height: h, ...(b.side === "neg" ? { top: halfH } : { top: halfH - h }), background: b.side === "neg" ? "linear-gradient(180deg,#ff6b6b,#b83232)" : "linear-gradient(180deg,#33d484,#1f8f57)", borderRadius: b.side === "neg" ? "0 0 3px 3px" : "3px 3px 0 0", outline: sel ? "2px solid var(--goldBright)" : "none", outlineOffset: 1 }} /> : null}
-                        </div>);
-                      })}
-                    </div>
-                  </div>
-                </div>);
-              })()}
-              <div className="distx" style={{ paddingLeft: 30 }}>{DIST_BUCKETS.map((b, i) => {
-                if (b.lo === -Infinity) return <span key={i} style={{ flex: 1, textAlign: "center" }}>≤−{DIST_RANGE}</span>;
-                if (b.hi === Infinity) return <span key={i} style={{ flex: 1, textAlign: "center" }}>+{DIST_RANGE}</span>;
-                const major = b.lo % 10 === 0, show = b.lo % 4 === 0;
-                return <span key={i} style={{ flex: 1, textAlign: "center" }}>{show ? (b.lo > 0 ? "+" : b.lo < 0 ? "−" : "") + Math.abs(b.lo) + (major ? "%" : "") : ""}</span>;
-              })}</div>
-              <div className="charthint">{!dateFiltered.length ? "No trades match this filter."
-                : dstats.wins ? <>Wins reach up to <span className="g">{dstats.lw ? sgnPct(Number(dstats.lw.plPct)) : "—"}</span>{dstats.losses ? <>, while losses stay contained (worst <span className="rd">−{Math.abs(Number(dstats.ll?.plPct) || 0).toFixed(2)}%</span>)</> : " with no losing trades in this slice"}. Small losses, larger wins is the shape of an edge. Click any bar to see its exact trades.</>
-                  : <>Every trade in this slice lost (worst <span className="rd">−{Math.abs(Number(dstats.ll?.plPct) || 0).toFixed(2)}%</span>). Tighten the setup or cut faster. Click any bar to see its exact trades.</>}{" "}
-                <span className="distopenlink" onClick={(e) => { e.stopPropagation(); setDistPanelOpen(o => !o); }}>{distPanelOpen ? "Hide the data sheet ↑" : "Click here to open & edit the data ↓"}</span></div>
-
-              {/* ── Bucket audit panel — the exact trades behind the clicked bar ── */}
-              {distSel != null && DIST_BUCKETS[distSel] && (() => {
-                const b = DIST_BUCKETS[distSel];
-                const rows = (distTrades[distSel] || []).slice().sort((x, y) => Math.abs(Number(y.plPct) || 0) - Math.abs(Number(x.plPct) || 0));
-                const edited = distEdits[distSel] !== undefined && distEdits[distSel] !== (distBase[distSel] || 0);
-                return (
-                  <div style={{ marginTop: 10, border: "1px solid var(--borderGold)", borderRadius: 10, padding: "10px 12px", background: "rgba(255,255,255,0.02)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontSize: "0.66rem", fontWeight: 800, color: b.side === "pos" ? "var(--green)" : "var(--red)" }}>{b.lab}</span>
-                      <span style={{ fontSize: "0.6rem", color: "var(--muted)" }}>{rows.length} trade{rows.length === 1 ? "" : "s"} in this bucket</span>
-                      {edited && <span style={{ fontSize: "0.56rem", color: "var(--gold)" }}>bar shows a what-if edit — this list is your REAL trades only</span>}
-                      <button className="distbtn" style={{ marginLeft: "auto" }} onClick={() => setDistSel(null)}>✕ Close</button>
-                    </div>
-                    {rows.length === 0 ? <div style={{ fontSize: "0.62rem", color: "var(--muted)" }}>No real trades here.</div> : rows.map((t, k) => (
-                      <div key={t.id ?? k} onClick={() => openReview(t)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 6px", borderRadius: 7, cursor: "pointer", fontSize: "0.66rem", borderBottom: k < rows.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <span style={{ fontWeight: 800, minWidth: 52 }}>{t.ticker}</span>
-                        <span style={{ color: "var(--muted)", minWidth: 78 }}>{tradeDateISO(t.exit) || "—"}</span>
-                        <span style={{ color: (Number(t.plPct) || 0) >= 0 ? "var(--green)" : "var(--red)", minWidth: 62, fontVariantNumeric: "tabular-nums" }}>{sgnPct(Number(t.plPct) || 0)}</span>
-                        <span style={{ color: (Number(t.plDollar) || 0) >= 0 ? "var(--green)" : "var(--red)", fontVariantNumeric: "tabular-nums" }}>{sgnMoney(Number(t.plDollar) || 0)}</span>
-                        <span style={{ marginLeft: "auto", color: "var(--gold)" }}>View ›</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-
-              <div className={"distpanel" + (distPanelOpen ? " open" : "")}>
-                  <div className="distpanel-inner">
-                    <div className="disttoolbar">
-                      <button className={"distbtn" + (Object.keys(distEdits).length === 0 ? " on" : "")} onClick={() => setDistEdits({})} title="Restore the actual counts from your trades">↺ Refill from trades</button>
-                      <button className="distbtn" onClick={() => { const z = {}; DIST_BUCKETS.forEach((_, i) => z[i] = 0); setDistEdits(z); }} title="Zero every bucket to model from scratch">Clear all</button>
-                      <span style={{ fontSize: "0.62rem", color: "var(--muted)" }}>Edit any count to model a different distribution — the chart and stats update live.</span>
-                    </div>
-                    <div className="distsum">
-                      <div className="ds"><div className="dsk">Total trades</div><div className="dsv">{distTotal}</div></div>
-                      <div className="ds"><div className="dsk">Wins / Losses</div><div className="dsv">{distWins} / {distLosses}</div></div>
-                      <div className="ds"><div className="dsk">Win rate</div><div className="dsv">{distTotal ? Math.round(distWins / distTotal * 100) : 0}%</div></div>
-                      <div className="ds"><div className="dsk">Return / trade</div><div className={"dsv " + (distRpt >= 0 ? "green" : "red")}>{distFmtPct(distRpt)}</div></div>
-                    </div>
-                    <table className="disttable">
-                      <thead><tr><th>Return bucket</th><th>Side</th><th># Trades</th><th>Midpoint</th><th>Contribution</th></tr></thead>
-                      <tbody>
-                        {DIST_BUCKETS.map((b, i) => {
-                          const contrib = distTotal ? distCounts[i] * b.mid / distTotal : 0;
-                          const edited = distEdits[i] !== undefined && distEdits[i] !== (distBase[i] || 0);
-                          return (
-                            <tr key={i}>
-                              <td>{b.lab}</td>
-                              <td style={{ color: b.side === "pos" ? "var(--green)" : "var(--red)" }}>{b.side === "pos" ? "Win" : "Loss"}</td>
-                              <td><input className={"distin" + (edited ? " edited" : "")} type="number" min="0" step="1" value={distCounts[i]} onChange={e => { let v = parseInt(e.target.value, 10); if (isNaN(v) || v < 0) v = 0; setDistEdits(p => ({ ...p, [i]: v })); }} /></td>
-                              <td>{(b.mid >= 0 ? "+" : "−") + Math.abs(b.mid)}%</td>
-                              <td className={contrib >= 0 ? "g" : "r"}>{distFmtPct(contrib)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                    <div className="distnote">Contribution = midpoint × (count ÷ total). Editing here is a what-if model; it doesn't change your logged trades.</div>
-                  </div>
-                </div>
+              {distCardBody}
             </div>
           </div>{/* /chartcol */}
         </div>{/* /chartrow */}
@@ -7246,397 +8162,19 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
 
         <div className="card" style={{ padding: "8px 6px" }}>
           <div className="tbl-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th><span className="term" data-tip="Whether the trade finished a Win (green) or a Loss (red).">Result</span></th>
-                <th><span className="term" data-tip="The ticker. The dot shows the source: gold = IBKR-synced, grey = manual.">Symbol</span></th>
-                <th className="pro-only"><span className="term" data-tip="Average price you entered the trade at.">Entry $</span></th>
-                <th className="pro-only"><span className="term" data-tip="Price you exited the trade at.">Exit $</span></th>
-                <th className="pro-only"><span className="term" data-tip="Number of shares traded.">Shares</span></th>
-                <th><span className="term" data-tip="The date you opened the trade.">Entry date</span></th>
-                <th><span className="term" data-tip="The date you closed the trade.">Exit date</span></th>
-                {false && <th><span className="term" data-tip="The pattern or reason you took the trade.">Setup</span></th> /* Setup column hidden (Valen 2026-07-05) — data still lives in the preview/details */}
-                <th className="pro-only"><span className="term" data-tip="DeepVue sector, in/off-theme judged against the tracker at your entry date. Green = top-5 leader (with the trend); red = off-theme.">Theme</span></th>
-                <th className="pro-only"><span className="term tipright" data-tip="Your protective stop on this trade.">Stop</span></th>
-                <th className="pro-only"><span className="term tipright" data-tip="How many days you held the trade.">Hold</span></th>
-                <th><span className="term tipright" data-tip="Percentage gain or loss on the trade.">Return</span></th>
-                <th><span className="term tipright" data-tip="Dollar profit or loss banked on the trade.">P/L</span></th>
-                <th><span className="term tipright" data-tip="R-multiple — profit/loss in units of your initial risk.">R</span></th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {dateFiltered.length === 0 && (
-                <tr><td colSpan={14} className="nodata">No trades match this filter. Clear the filters to see your full track record.</td></tr>
-              )}
-              {dateFiltered.map(t => {
-                const up = (Number(t.plPct) || 0) > 0;
-                const cls = up ? "st-win" : "st-loss", plc = up ? "pl up" : "pl dn";
-                const ibkr = t.source === "ibkr" || t.source === "reconciled";
-                const isOpen = expandedTrade === t.id;
-                return (
-                  <React.Fragment key={t.id}>
-                    <tr id={"jtrade-" + t.id} className={"traderow clickrow" + (isOpen ? " rev-open" : "") + (highlightTradeId === t.id ? " jumphl" : "")} onClick={() => setPreviewTrade(t)}>
-                      <td data-l="Result"><span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span></td>
-                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{t.ticker}{(() => {
-                        // OPEN-CAMPAIGN badge: this row is realized-so-far from partial trims of a position
-                        // you STILL HOLD — it updates in real time as you trim, and folds into the single
-                        // final campaign row when the position fully closes (same rows, so no double-count).
-                        const sym = String(t.ticker || "").toUpperCase();
-                        const isTrimOnly = (t._fills || [t]).every(f => (f.reason || "") === "Partial Trim");
-                        const stillOpen = isTrimOnly && (positions || []).some(p => String(p.sym || "").toUpperCase() === sym);
-                        return stillOpen ? <span className="term" data-tip="Realized-so-far: partial trims of a position you still hold. This row moves your equity curve in real time and merges into one final row when the position closes — never double-counted." style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, color: "var(--goldBright)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>OPEN · partials</span> : null;
-                      })()}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}{isAdmin && t.extExit != null ? <span className="term" data-tip={`Extension at exit: ${Number(t.extExit).toFixed(1)}× ATR from the 50-day MA${t.extEntry != null ? ` (entry was ${Number(t.extEntry).toFixed(1)}×)` : ""}. ≥7× = sold into strength (rare, 3-sigma territory) · <2× = a stop/management exit near the mean.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--goldBright)" : t.extExit < 2 ? "var(--red)" : "var(--muted)", border: `1px solid ${t.extExit >= 7 ? "rgba(34,197,94,0.35)" : t.extExit >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(t.extExit).toFixed(1)}×</span> : null}</span></td>
-                      <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
-                      <td className="pro-only" data-l="Exit $">${(Number(t.exitP) || 0).toFixed(2)}</td>
-                      <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
-                      <td data-l="Entry date">{tradeDateISO(t.entry) || t.entry || "—"}</td>
-                      <td data-l="Exit date">{tradeDateISO(t.exit) || t.exit || "—"}</td>
-                      {false && <td data-l="Setup">{t.setup ? <span className="tag">{t.setup}</span> : "—"}</td>}
-                      <td className="pro-only" data-l="Theme">{(() => {
-                        const th = sectorFor(t.ticker);
-                        if (!th) return <span className="term" data-tip="No DeepVue sector mapped for this ticker yet.">—</span>;
-                        const fit = themeFit(th, t.entry), r = themeRanks(th, t.entry) || {}, rk = (x) => x ? "#" + x : "—";
-                        if (!fit) return <span className="term" data-tip={`⚪ Untagged — entry date is before the first DeepVue tracker snapshot${THEME_COVERAGE_START ? ` (${THEME_COVERAGE_START})` : ""} or unreadable. A later theme snapshot never judges an older trade.`} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: "0.62rem", fontWeight: 700, background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap", cursor: "help" }}>⚪ {th}</span>;
-                        const tip = fit === "in"
-                          ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend. Judged vs the ${r.date} tracker snapshot (nearest at/before entry).`
-                          : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. Leaders that week: ${top5("week", t.entry).slice(0,3).join(", ")}. Judged vs the ${r.date} tracker snapshot (nearest at/before entry).`;
-                        const g = fit === "in";
-                        return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: "0.62rem", fontWeight: 700, background: g ? "var(--greenDim)" : "var(--redDim)", border: `1px solid ${g ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)"}`, color: g ? "var(--green)" : "var(--red)", whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
-                      })()}</td>
-                      <td className="pro-only" data-l="Stop">{
-                        (isIbkrMode && t.source === "ibkr" && t.needsStop && !t.stop)
-                          ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "3px 9px", fontSize: "0.66rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Needs stop</button>
-                          : (t.stop ? "$" + Number(t.stop).toFixed(2) : "—")
-                      }</td>
-                      <td className="pro-only" data-l="Hold">{holdLabel(t)}</td>
-                      <td data-l="Return"><span className={plc}>{sgnPct(Number(t.plPct))}</span></td>
-                      <td data-l="P/L"><span className={plc}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></td>
-                      <td data-l="R">{
-                        (isIbkrMode && t.source === "ibkr" && t.needsStop && !t.stop)
-                          ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "2px 8px", fontSize: "0.62rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Add stop</button>
-                          : <span className={(Number(t.rMult) || 0) >= 0 ? "pl up" : "pl dn"}>{t.rMult == null ? "—" : sgnR(Number(t.rMult))}</span>
-                      }</td>
-                      <td className="revcell" data-l=""><button className="revbtn" onClick={(e) => { e.stopPropagation(); setPreviewTrade(t); }}>View ›</button></td>
-                    </tr>
-                    {false && (
-                      <tr className="revrow"><td colSpan={14}>
-                        <div className={"revpanel" + (closingReview ? " closing" : "")}>
-                          <div className="revhead">
-                            <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
-                            <span className="revtick">{t.ticker}</span>
-                            <span className="revmeta"><b>{(Number(t.shares) || 0).toLocaleString()}</b> sh · {(tradeDateISO(t.entry) || t.entry || "—")} → {(tradeDateISO(t.exit) || t.exit || "—")}</span>
-                            <span className="revmeta">Setup <b>{t.setup || "—"}</b></span>
-                            <button className="revclose" aria-label="Close" onClick={closeReview}>&times;</button>
-                          </div>
-                          <div className="revgrid">
-                            <div className="revcol">
-                              <div className="revcoltitle">Trade stats</div>
-                              <div className="mgr"><span>Entry price</span><b>${(Number(t.entryP) || 0).toFixed(2)}</b></div>
-                              <div className="mgr"><span>Exit price</span><b>${(Number(t.exitP) || 0).toFixed(2)}</b></div>
-                              <div className="mgr"><span>Shares</span><b>{(Number(t.shares) || 0).toLocaleString()}</b></div>
-                              <div className="mgr"><span>Hold time</span><b>{holdLabel(t)}</b></div>
-                              <div className="mgr"><span>Stop</span><b>{t.stop ? "$" + Number(t.stop).toFixed(2) : "—"}</b></div>
-                              <div className="mgr"><span>Commission</span><b>{privacyMode ? "••••" : "$" + (parseFloat(t.commission) || 0).toFixed(2)}</b></div>
-                            </div>
-                            <div className="revcol">
-                              <div className="revcoltitle">Result</div>
-                              <div className="mgr"><span>Return</span><b className={up ? "green" : "red"}>{sgnPct(Number(t.plPct))}</b></div>
-                              <div className="mgr"><span>P/L</span><b className={(Number(t.plDollar) || 0) >= 0 ? "green" : "red"}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</b></div>
-                              <div className="mgr"><span>Realized R</span><b className={(Number(t.rMult) || 0) >= 0 ? "green" : "red"}>{t.rMult == null ? "—" : sgnR(Number(t.rMult))}</b></div>
-                              <div className="mgr"><span>Setup</span><b>{t.setup || "—"}</b></div>
-                              <div className="mgr"><span>Exit reason</span><b>{t.reason || "—"}</b></div>
-                            </div>
-                          </div>
-
-                          {/* Live candlestick replay chart */}
-                          <div className="revchart">
-                            <TradeReplayChart trade={t} C={C} font={font} />
-                          </div>
-
-                          {isAdmin ? (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>) : (
-                          <div className="revnotes">
-                            <div className="revchart-head" style={{ marginBottom: 0 }}>
-                              <span className="revcoltitle" style={{ margin: 0 }}>Trade review</span>
-                              <div className="spacer"></div>
-                              <button className="simbtn" onClick={() => saveReview(t.id)}>{reviewSavedId === t.id ? "Saved ✓" : "Save review"}</button>
-                            </div>
-                            <div className="notesgrid">
-                              <div><div className="nlabel r">What went right</div><textarea className="mgta" value={reviewDraft.right} onChange={e => setReviewDraft(r => ({ ...r, right: e.target.value }))} placeholder="What went right..." /></div>
-                              <div><div className="nlabel w">What went wrong</div><textarea className="mgta" value={reviewDraft.wrong} onChange={e => setReviewDraft(r => ({ ...r, wrong: e.target.value }))} placeholder="What went wrong..." /></div>
-                              <div><div className="nlabel l">Lesson learned</div><textarea className="mgta" value={reviewDraft.lessons} onChange={e => setReviewDraft(r => ({ ...r, lessons: e.target.value }))} placeholder="Lesson learned..." /></div>
-                            </div>
-                          </div>
-                          )}
-                          <div className="revfoot">
-                            {deleteStep === 0 && (
-                              <>
-                                <button className="revbtn" onClick={() => startEdit(t)} title="Edit this trade's information" style={{ background: "var(--goldDim)", color: "var(--goldBright)", borderColor: "var(--borderGold)", fontWeight: 700 }}>Edit trade</button>
-                                <button className="revdelbtn" onClick={() => setDeleteStep(1)} title="Delete this trade from your journal">Delete trade</button>
-                              </>
-                            )}
-                            {deleteStep === 1 && (
-                              <div className="revdelconfirm">
-                                <span className="revdelmsg">Delete this trade? This cannot be undone.</span>
-                                <button className="revdelbtn" onClick={() => setDeleteStep(2)}>Confirm</button>
-                                <button className="revbtn" onClick={() => setDeleteStep(0)}>Cancel</button>
-                              </div>
-                            )}
-                            {deleteStep === 2 && (
-                              <div className="revdelconfirm final">
-                                <span className="revdelmsg">Are you absolutely sure? This permanently removes the trade.</span>
-                                <button className="revdelbtn" onClick={() => { deleteTrade(t.id, true); setDeleteStep(0); }}>Yes, delete permanently</button>
-                                <button className="revbtn" onClick={() => setDeleteStep(0)}>Cancel</button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td></tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+          {closedTradesTable}
           </div>
         </div>
         <div className="charthint">Click any trade for its overview; open <b>trade details</b> for the full chart, stats and review. Switch to <b>Pro</b> above for all columns.</div>
 
         {/* ── TRADE PREVIEW (slide-in overview, TradeZella-style) ── */}
-        {previewTrade && createPortal((() => {
-          const t = previewTrade;
-          const up = (Number(t.plPct) || 0) > 0, cls = up ? "st-win" : "st-loss";
-          const th = sectorFor(t.ticker), fit = th ? themeFit(th, t.entry) : null;
-          const gr = getSavedGrade(t.ticker);
-          const gcol = !gr ? "var(--muted)" : gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--goldBright)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
-          const Row = ({ k, v, c }) => (<div className="tp-row"><span>{k}</span><b style={c ? { color: c } : undefined}>{v}</b></div>);
-          return (
-            <div className="vj tp-back" onClick={(e) => { if (e.target === e.currentTarget) setPreviewTrade(null); }}>
-              <div className="tp-panel" role="dialog" aria-label={`${t.ticker} trade preview`}>
-                <div className="tp-head">
-                  <span className="tp-tick">{t.ticker}</span>
-                  <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
-                  <button className="tp-x" aria-label="Close" onClick={() => setPreviewTrade(null)}>&times;</button>
-                </div>
-                <div className="tp-sub">Opened {tradeDateISO(t.entry) || t.entry || "—"} · Closed {tradeDateISO(t.exit) || t.exit || "—"} · Held {holdLabel(t)}</div>
-                <div className={"tp-pnl " + (up ? "up" : "dn")}>
-                  <div className="tp-pnl-lbl">Net P/L</div>
-                  <div className="tp-pnl-v">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</div>
-                  <div className="tp-pnl-meta">Return {sgnPct(Number(t.plPct))} · R {t.rMult == null ? "—" : sgnR(Number(t.rMult))}</div>
-                </div>
-                <div className="tp-grid">
-                  <Row k="Entry price" v={"$" + (Number(t.entryP) || 0).toFixed(2)} />
-                  <Row k="Exit price" v={"$" + (Number(t.exitP) || 0).toFixed(2)} />
-                  <Row k="Shares" v={(Number(t.shares) || 0).toLocaleString()} />
-                  <Row k="Stop" v={t.stop ? "$" + Number(t.stop).toFixed(2) : "—"} />
-                  <Row k="Setup" v={t.setup || "—"} />
-                  <Row k="Theme" v={th ? `${fit === "in" ? "🟢" : "🔴"} ${th}` : "—"} />
-                  <Row k="Setup grade" v={gr ? `${gr.letter} · ${gr.stars}★` : "Not graded"} c={gcol} />
-                  <Row k="Commission" v={privacyMode ? "••••" : "$" + (parseFloat(t.commission) || 0).toFixed(2)} />
-                </div>
-                {t.reason && <div className="tp-reason"><div className="tp-reason-h">Exit reason</div><div className="tp-reason-b">{t.reason}</div></div>}
-                <div className="tp-foot">
-                  <button className="tp-go" onClick={() => { setPreviewTrade(null); openReview(t); }}>Go to trade details ›</button>
-                  <button className="revbtn" title="Import this trade into the Model Book — everything already known is pre-filled" onClick={async () => {
-                    const g = getSavedGrade(t.ticker);
-                    try { const pf = {
-                      ticker: t.ticker, entry_date: tradeDateISO(t.entry) || "", exit_date: tradeDateISO(t.exit) || "",
-                      run_pct: t.plPct != null ? +Number(t.plPct).toFixed(1) : "", r_mult: t.rMult != null ? +Number(t.rMult).toFixed(2) : "",
-                      days_held: (() => { const a = new Date(tradeDateISO(t.entry) || t.entry), b = new Date(tradeDateISO(t.exit) || t.exit); return (isNaN(a) || isNaN(b)) ? "" : Math.max(0, Math.round((b - a) / 86400000)); })(),
-                      theme: sectorFor(t.ticker) || "", ticked: (g && g.ticked) || [],
-                      outcome: outcomeFromR(t.rMult, t.plPct) || "",
-                    };
-                    const ds = await fetchSetupPost(t.ticker); // pre-entry gameplan post = the BEFORE evidence
-                    if (ds) { if (ds.chart_img) pf.before_img = ds.chart_img; if (ds.note) pf.thesis = ds.note; }
-                    pf.metrics = { _auto: ["ticker", "entry_date", "exit_date", "run_pct", "r_mult", "days_held", "theme", "outcome", "before_img", "thesis"].filter(k => pf[k] !== "" && pf[k] != null) };
-                    sessionStorage.setItem("viv-mb-prefill", JSON.stringify(pf)); } catch {}
-                    setPreviewTrade(null); setPage && setPage("modelbook");
-                  }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)", fontWeight: 700 }}>📖 Model Book</button>
-                  <button className="revbtn" onClick={() => { setPreviewTrade(null); startEdit(t); }}>Edit</button>
-                </div>
-              </div>
-            </div>
-          );
-        })(), document.body)}
+        {tradePreviewPortal}
 
         {/* ── TRADE DETAILS (full-page) ── */}
-        {expandedTrade && createPortal((() => {
-          const t = journaledTrades.find(x => x.id === expandedTrade);
-          if (!t) return null;
-          const up = (Number(t.plPct) || 0) > 0, cls = up ? "st-win" : "st-loss";
-          const gr = getSavedGrade(t.ticker);
-          const gcol = !gr ? "var(--muted)" : gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--goldBright)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
-          return (
-            <div className="vj td-back">
-              <div className="td-page">
-                <div className="td-top">
-                  <button className="revbtn" onClick={closeReview}>‹ Back to trades</button>
-                  <span className="revtick">{t.ticker}</span>
-                  <span className={"status " + cls}><span className="d"></span>{up ? "Win" : "Loss"}</span>
-                  {gr && <span className="td-grade" style={{ color: gcol }} title={`Setup grade ${gr.letter} · ${gr.stars}/5★`}>{gr.letter} · {gr.stars}★</span>}
-                  <div className="spacer"></div>
-                  <button className="revbtn" title="Pre-fill a Model Book entry from this trade" onClick={async () => {
-                    const g = getSavedGrade(t.ticker);
-                    try { const pf = {
-                      ticker: t.ticker, entry_date: tradeDateISO(t.entry) || "", exit_date: tradeDateISO(t.exit) || "",
-                      run_pct: t.plPct != null ? +Number(t.plPct).toFixed(1) : "", r_mult: t.rMult != null ? +Number(t.rMult).toFixed(2) : "",
-                      days_held: (() => { const a = new Date(tradeDateISO(t.entry) || t.entry), b = new Date(tradeDateISO(t.exit) || t.exit); return (isNaN(a) || isNaN(b)) ? "" : Math.max(0, Math.round((b - a) / 86400000)); })(),
-                      theme: sectorFor(t.ticker) || "", ticked: (g && g.ticked) || [],
-                      outcome: outcomeFromR(t.rMult, t.plPct) || "",
-                    };
-                    const ds = await fetchSetupPost(t.ticker); // pre-entry gameplan post = the BEFORE evidence
-                    if (ds) { if (ds.chart_img) pf.before_img = ds.chart_img; if (ds.note) pf.thesis = ds.note; }
-                    // gold-dot every field we pre-filled (ticked comes from HIS saved grader = human, no dot)
-                    pf.metrics = { _auto: ["ticker", "entry_date", "exit_date", "run_pct", "r_mult", "days_held", "theme", "outcome", "before_img", "thesis"].filter(k => pf[k] !== "" && pf[k] != null) };
-                    sessionStorage.setItem("viv-mb-prefill", JSON.stringify(pf)); } catch {}
-                    closeReview(); setPage && setPage("modelbook");
-                  }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)", fontWeight: 700 }}>📖 Add to Model Book</button>
-                  <button className="revbtn" onClick={() => startEdit(t)} style={{ background: "var(--goldDim)", color: "var(--goldBright)", borderColor: "var(--borderGold)", fontWeight: 700 }}>Edit trade</button>
-                </div>
-                <div className="td-body">
-                  {(() => {
-                    // ── TradeZella-style two-column: LEFT stats/planning panel · RIGHT chart+notes tabs ──
-                    const isLong = (t.tradeType || "Long") !== "Short";
-                    const shares = Number(t.shares) || 0, entryP = Number(t.entryP) || 0, exitP = Number(t.exitP) || 0;
-                    const net = Number(t.plDollar) || 0, comm = parseFloat(t.commission) || 0, gross = net + comm;
-                    const tg = tgts[t.id] || {};
-                    const target = tg.target ?? t.profitTarget ?? "";
-                    const stopT = tg.stop ?? t.plannedStop ?? (t.stop != null && t.stop !== "" ? Number(t.stop) : "");
-                    const setTgt = (patch) => setTgts(persistTarget(t.id, patch));
-                    const riskPS = stopT !== "" && entryP ? (isLong ? entryP - Number(stopT) : Number(stopT) - entryP) : null; // per-share risk
-                    const tradeRisk = riskPS != null && riskPS > 0 ? riskPS * shares : null;
-                    const plannedR = riskPS != null && riskPS > 0 && target !== "" ? (isLong ? Number(target) - entryP : entryP - Number(target)) / riskPS : null;
-                    const realR = t.rMult != null ? Number(t.rMult) : (riskPS != null && riskPS > 0 ? (isLong ? exitP - entryP : entryP - exitP) / riskPS : null);
-                    const ex = excursion; // {mae, mfe, bestT, res} | {na} | null(loading)
-                    const money = (v) => privacyMode ? "••••" : (v < 0 ? "-" : "") + "$" + Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 2 });
-                    const Rw = ({ k, v, c, tip }) => (<div className="tz-row" title={tip || undefined}><span>{k}</span><b style={c ? { color: c } : undefined}>{v}</b></div>);
-                    return (
-                      <div className="tdz">
-                        <div className="tdz-left">
-                          <div className="tz-npl" style={{ borderLeftColor: up ? "var(--green)" : "var(--red)" }}>
-                            <span>Net P&L</span>
-                            <b style={{ color: up ? "var(--green)" : "var(--red)" }}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(net)}</b>
-                          </div>
-                          <Rw k="Side" v={isLong ? "LONG" : "SHORT"} c={isLong ? "var(--green)" : "var(--red)"} />
-                          <Rw k="Commissions & Fees" v={privacyMode ? "••••" : "$" + comm.toFixed(2)} />
-                          <Rw k="Net ROI" v={sgnPct(Number(t.plPct))} c={up ? "var(--green)" : "var(--red)"} />
-                          <Rw k="Gross P&L" v={money(gross)} c={gross >= 0 ? "var(--green)" : "var(--red)"} />
-                          <Rw k="Adjusted Cost" v={money(entryP * shares)} />
-                          <div className="tz-row"><span className="term" data-tip="Max Adverse / Max Favorable Excursion — the worst price against you and the best price for you while the trade was open, from real market data.">Price MAE / MFE</span>
-                            <b>{ex == null ? "…" : ex.na ? "—" : (<><span style={{ color: "var(--red)" }}>${Number(ex.mae).toFixed(2)}</span><span style={{ color: "var(--muted)" }}> / </span><span style={{ color: "var(--green)" }}>${Number(ex.mfe).toFixed(2)}</span></>)}</b>
-                          </div>
-
-                          <div className="tz-sect">Profit Target <span className="term" data-tip="Your planned take-profit price. Planning inputs only — they never change your locked stop or your fills.">ⓘ</span></div>
-                          <div className="tz-row"><span>Target in Price</span><input className="tz-in" type="number" step="0.01" placeholder="—" value={target} onChange={e => setTgt({ target: e.target.value === "" ? null : +e.target.value })} /></div>
-                          <div className="tz-sect">Stop Loss <span className="term" data-tip="Your planned stop for R math. Defaults to the trade's locked original stop; editing this NEVER overwrites it.">ⓘ</span></div>
-                          <div className="tz-row"><span>Stop in Price</span><input className="tz-in" type="number" step="0.01" placeholder="—" value={stopT} onChange={e => setTgt({ stop: e.target.value === "" ? null : +e.target.value })} /></div>
-
-                          <Rw k="Initial Target" v={target !== "" ? "$" + Number(target).toFixed(2) : "--"} />
-                          <Rw k="Trade Risk" v={tradeRisk != null ? money(tradeRisk) : "--"} tip="(entry − planned stop) × shares" />
-                          <Rw k="Planned R-Multiple" v={plannedR != null ? plannedR.toFixed(2) + "R" : "--"} c={plannedR != null ? (plannedR >= 2 ? "var(--green)" : "var(--goldBright)") : undefined} />
-                          <Rw k="Realized R-Multiple" v={realR != null ? sgnR(realR) : "--"} c={realR != null ? (realR >= 0 ? "var(--green)" : "var(--red)") : undefined} />
-                          {isAdmin && (t.extEntry != null || t.extExit != null) && (
-                            <div className="tz-row"><span className="term" data-tip="ATR% Multiple from the 50-day MA at your entry → at your exit (same metric your charts print). Under 4× = fresh entry zone; 5× = statistically stretched; 7.5–8× = rare (3-sigma); 10×+ = extreme — the trim-into-strength zone. Insight only — it never changes your stops or fills.">Ext (×ATR from 50MA)</span>
-                              <b>
-                                <span style={{ color: t.extEntry == null ? "var(--faint)" : t.extEntry <= 4 ? "var(--green)" : t.extEntry < 7 ? "var(--goldBright)" : "var(--red)" }}>{t.extEntry != null ? Number(t.extEntry).toFixed(1) + "×" : "—"}</span>
-                                <span style={{ color: "var(--muted)" }}> → </span>
-                                <span style={{ color: t.extExit == null ? "var(--faint)" : t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--goldBright)" : "var(--text)" }}>{t.extExit != null ? Number(t.extExit).toFixed(1) + "×" : "—"}</span>
-                              </b>
-                            </div>
-                          )}
-                          <Rw k="Average Entry" v={"$" + entryP.toFixed(2)} />
-                          <Rw k="Average Exit" v={"$" + exitP.toFixed(2)} />
-                          <Rw k="Entry Time" v={(tradeDateISO(t.entry) || "—") + (t.entryTime ? " · " + t.entryTime + " ET" : "")} />
-                          <Rw k="Exit Time" v={(tradeDateISO(t.exit) || "—") + (t.exitTime ? " · " + t.exitTime + " ET" : "")} />
-                          <Rw k="Best Exit Price" v={ex && ex.mfe != null ? "$" + Number(ex.mfe).toFixed(2) : "--"} c="var(--green)" tip="The MFE price — the best the market offered while you were in" />
-                          <Rw k="Best Exit Time" v={ex && ex.bestT != null ? excTime(ex.bestT, ex.res) : "--"} />
-                          <Rw k="Hold Time" v={holdLabel(t)} />
-                          <Rw k="Shares" v={shares.toLocaleString()} />
-                          <Rw k="Locked Stop (original)" v={t.stop ? "$" + Number(t.stop).toFixed(2) : "—"} tip="Set at entry, drives official R — never overwritten" />
-                          <Rw k="Setup" v={t.setup || "—"} />
-                          <Rw k="Setup Grade" v={gr ? `${gr.letter} · ${gr.stars}★` : "Not graded"} c={gcol} />
-                          <Rw k="Exit Reason" v={t.reason || "—"} />
-                        </div>
-                        <div className="tdz-right">
-                          {/* INTERIM review chart while the TradingView Advanced Charts license is pending
-                              (application prepared 2026-07-11 — on approval this swaps to the genuine TV
-                              chart with createExecutionShape() fill arrows, TradeZella-style, + server-saved
-                              drawings). Until then: fills as ▲/▼ arrows at their exact ET time bars,
-                              drawings auto-saved per trade. */}
-                          <div className="revchart" style={{ marginBottom: 14 }}><TradeReplayChart trade={t} C={C} font={font} /></div>
-                          {true && (
-                            <>
-                              {isAdmin && (<><RationaleBlock rationale={t.rationale} /><AiReviewBlock review={t.aiReview} /></>)}
-                              <div className="revnotes">
-                                <div className="revchart-head" style={{ marginBottom: 0 }}>
-                                  <span className="revcoltitle" style={{ margin: 0 }}>Trade review</span>
-                                  <div className="spacer"></div>
-                                  <button className="simbtn" onClick={() => saveReview(t.id)}>{reviewSavedId === t.id ? "Saved ✓" : "Save review"}</button>
-                                </div>
-                                <div className="notesgrid">
-                                  <div><div className="nlabel r">What went right</div><textarea className="mgta" value={reviewDraft.right} onChange={e => setReviewDraft(r => ({ ...r, right: e.target.value }))} placeholder="What went right..." /></div>
-                                  <div><div className="nlabel w">What went wrong</div><textarea className="mgta" value={reviewDraft.wrong} onChange={e => setReviewDraft(r => ({ ...r, wrong: e.target.value }))} placeholder="What went wrong..." /></div>
-                                  <div><div className="nlabel l">Lesson learned</div><textarea className="mgta" value={reviewDraft.lessons} onChange={e => setReviewDraft(r => ({ ...r, lessons: e.target.value }))} placeholder="Lesson learned..." /></div>
-                                </div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  <div className="revfoot">
-                    {deleteStep === 0 && (<button className="revdelbtn" onClick={() => setDeleteStep(1)} title="Delete this trade from your journal">Delete trade</button>)}
-                    {deleteStep === 1 && (<div className="revdelconfirm"><span className="revdelmsg">Delete this trade? This cannot be undone.</span><button className="revdelbtn" onClick={() => setDeleteStep(2)}>Confirm</button><button className="revbtn" onClick={() => setDeleteStep(0)}>Cancel</button></div>)}
-                    {deleteStep === 2 && (<div className="revdelconfirm final"><span className="revdelmsg">Are you absolutely sure? This permanently removes the trade.</span><button className="revdelbtn" onClick={() => { deleteTrade(t.id, true); closeReview(); setDeleteStep(0); }}>Yes, delete permanently</button><button className="revbtn" onClick={() => setDeleteStep(0)}>Cancel</button></div>)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })(), document.body)}
+        {tradeDetailsPortal}
 
         {/* INLINE FACTUAL EDITOR — opens over a modal when an inline Edit is triggered */}
-        {editingId && createPortal(
-          // Wrapped in .vj because the modal's CSS is scoped under `.vj`, but createPortal renders to
-          // document.body (outside the page's .vj root). Without this the overlay loses all styling and
-          // appears as an unstyled block at the bottom of the page. background/minHeight are neutralized
-          // so the .vj{} full-page background + min-height:100vh don't add a stray block. Vars are global (:root).
-          <div className="vj" style={{ background: "none", minHeight: 0 }}>
-          <div onClick={() => cancelEdit()} className="modal open">
-            <div onClick={e => e.stopPropagation()} className="modalcard" style={{ maxWidth: 640 }}>
-              <div className="modalhead"><div><div className="sech">Edit trade · {editRow.ticker}</div><div className="sub" style={{ marginTop: 4 }}>Update the factual details. R-Multiple recomputes from entry/exit and your stop.</div></div><button className="revclose" onClick={cancelEdit}>&times;</button></div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {[["ticker", "Ticker", "text"], ["entry", "Entry date", "text"], ["exit", "Exit date", "text"], ["entryP", "Entry $", "number"], ["exitP", "Exit $", "number"], ["shares", "Shares", "number"], ["stop", "Stop", "number"]].map(([k, label, type]) => {
-                  // IBKR-synced trade: facts come straight from your broker and are locked. Only the stop is yours to enter.
-                  const locked = editRow.source === "ibkr" && k !== "stop";
-                  return (
-                  <div key={k}>
-                    <div className="label" style={{ marginBottom: 6 }}>{label}{locked && <span style={{ color: "var(--muted)", fontWeight: 600 }}> · from IBKR</span>}</div>
-                    <input type={type} disabled={locked} value={editRow[k] ?? ""} onChange={e => setEditRow(r => ({ ...r, [k]: type === "number" ? (e.target.value === "" ? "" : +e.target.value) : e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none", opacity: locked ? 0.55 : 1, cursor: locked ? "not-allowed" : "text" }} />
-                  </div>
-                  );
-                })}
-                <div>
-                  <div className="label" style={{ marginBottom: 6 }}>Setup</div>
-                  <select value={editRow.setup || ""} onChange={e => setEditRow(r => ({ ...r, setup: e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none" }}><option value="">—</option>{setupTypes.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                </div>
-                <div>
-                  <div className="label" style={{ marginBottom: 6 }}>Exit reason</div>
-                  <select value={editRow.reason || ""} onChange={e => setEditRow(r => ({ ...r, reason: e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none" }}><option value="">—</option>{exitReasons.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                </div>
-                <div>
-                  <div className="label" style={{ marginBottom: 6 }}>Direction</div>
-                  <select value={editRow.tradeType || "Long"} onChange={e => setEditRow(r => ({ ...r, tradeType: e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none" }}><option value="Long">Long</option><option value="Short">Short</option></select>
-                </div>
-              </div>
-              <div className="modalfoot"><button className="btn" onClick={() => deleteTrade(editingId)} style={{ color: "var(--red)", borderColor: "rgba(239,68,68,0.4)" }}>Delete trade</button><div className="spacer"></div><button className="btn" onClick={cancelEdit}>Cancel</button><button className="btn gold" onClick={saveEdit}>Save changes</button></div>
-            </div>
-          </div>
-          </div>,
-          document.body
-        )}
+        {factualEditorPortal}
 
         {/* welcome banner */}
         {!expert && !welcomeDismissed && (
@@ -7648,59 +8186,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
         )}
 
         {/* LINK HISTORICAL TRADES MODAL */}
-        {linkWizardOpen && linkWizardData && createPortal(
-          <div onClick={() => linkStatus !== "applying" && setLinkWizardOpen(false)} className="modal open">
-            <div onClick={e => e.stopPropagation()} className="modalcard">
-              <div className="modalhead">
-                <div>
-                  <div className="sech">Link historical trades</div>
-                  <div className="sub" style={{ marginTop: 4 }}>Connect each closed trade to the open position it came from, so your dashboard's <b>realized P/L</b> is accurate. Suggestions are matched by ticker and entry date. Nothing writes until you click <b>Apply</b>.</div>
-                </div>
-                <button className="revclose" onClick={() => setLinkWizardOpen(false)}>&times;</button>
-              </div>
-              {linkWizardData.length === 0 ? (
-                <div className="nodata">All journal trades are already linked. 🎉 No backfill needed.</div>
-              ) : (
-                <table className="linktable">
-                  <thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th><th>Shares</th><th>P/L %</th><th>State</th><th>Set to</th></tr></thead>
-                  <tbody>
-                    {linkWizardData.map(({ t, lots, suggestion, state }) => {
-                      const choice = linkChoices[t.id] ?? suggestion;
-                      const lkClass = state === "linked" ? "lk-linked" : state === "orphan" ? "lk-orphan" : state === "past" ? "lk-past" : "lk-unlinked";
-                      const lkLabel = state === "linked" ? "Linked" : state === "orphan" ? "Orphan" : state === "past" ? "Past" : "Unlinked";
-                      const up = (Number(t.plPct) || 0) >= 0;
-                      return (
-                        <tr key={t.id}>
-                          <td><b>{t.ticker}</b></td>
-                          <td>{tradeDateISO(t.entry) || "—"}</td>
-                          <td>{tradeDateISO(t.exit) || "—"}</td>
-                          <td>{(Number(t.shares) || 0).toLocaleString()}</td>
-                          <td><span className={up ? "pl up" : "pl dn"}>{sgnPct(Number(t.plPct))}</span></td>
-                          <td><span className={"lk " + lkClass}>{lkLabel}</span></td>
-                          <td>
-                            <select className="linksel" value={choice} onChange={e => setLinkChoices(prev => ({ ...prev, [t.id]: e.target.value === "past" || e.target.value === "skip" ? e.target.value : (Number(e.target.value) || e.target.value) }))} disabled={linkStatus === "applying"}>
-                              {lots.map(p => <option key={p.id} value={p.id}>→ {p.sym} (open · {tradeDateISO(p.entry) || "?"})</option>)}
-                              <option value="past">Past cycle / unlinked</option>
-                              <option value="skip">Skip (no change)</option>
-                            </select>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-              {linkError && <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "var(--red)", fontSize: "0.72rem", lineHeight: 1.5, wordBreak: "break-word" }}><b>Database write failed</b><br />{linkError}</div>}
-              <div className="modalfoot">
-                <button className="btn" onClick={() => { const all = {}; linkWizardData.forEach(r => { all[r.t.id] = r.suggestion; }); setLinkChoices(all); }}>Accept all suggestions</button>
-                <div className="spacer"></div>
-                <button className="btn" onClick={() => { setLinkWizardOpen(false); setLinkError(""); }} disabled={linkStatus === "applying"}>Cancel</button>
-                {linkWizardData.length > 0 && <button className="btn gold" onClick={linkApply} disabled={linkStatus === "applying"}>{linkStatus === "applying" ? "Applying…" : linkStatus === "done" ? "Done ✓" : (linkError ? "Retry" : "Apply links")}</button>}
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+        {linkModalPortal}
 
         {/* guide assistant */}
         <div className={"guidepanel" + (speaking ? " speaking" : "")} aria-live="polite">
@@ -8117,6 +8603,64 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .tabs::-webkit-scrollbar{display:none}
 .vd .tabs a{white-space:nowrap}
 .vd .hero{grid-template-columns:1fr}
+  }
+/* ═══════════ PRO-MODE LAYOUT (.vd.expert) — ported from mockups/dashboard-pro.html ═══════════ */
+/* Uniform Pro card chrome: tighter radius + tooltips escape the card edge (overflow visible). */
+.vd.expert .card{border-radius:16px; padding:18px 20px; overflow:visible}
+.vd.expert .card::before{border-radius:inherit}
+/* Every Pro card header: micro-label + info dot, divided from the body (Pro's replacement for the guided voice). */
+.vd.expert .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+.vd.expert .cardhead .label{flex:1}
+.vd.expert .infodot{position:relative; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none}
+.vd.expert .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+.vd.expert .tipwrap{position:relative; cursor:help}
+.vd.expert .infodot:hover::after,.vd.expert .tipwrap:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+/* P1. Command header */
+.vd.expert .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
+.vd.expert .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+.vd.expert .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px; font-variant-numeric:tabular-nums}
+.vd.expert .cmdactions{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+.vd.expert .btn.ghost{background:transparent}
+.vd.expert .btn.goldoutline{background:transparent; border:1px solid var(--borderGold); color:var(--goldBright)}
+.vd.expert .btn.goldoutline:hover{background:var(--goldDim); color:var(--goldBright)}
+.vd.expert .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-size:0.62rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em}
+.vd.expert .ghostchip:hover{color:var(--text); border-color:var(--borderGold)}
+/* P2. KPI strip — five short cards, collapsing 5→3→2 */
+.vd.expert .kpistrip{display:grid; grid-template-columns:repeat(5,1fr); gap:14px}
+.vd.expert .kpi{padding:14px 18px; display:flex; flex-direction:column; min-height:112px}
+.vd.expert .kpi .cardhead{padding-bottom:8px; margin-bottom:10px}
+.vd.expert .kpibody{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-height:0}
+.vd.expert .kpimain{min-width:0}
+.vd.expert .kpinum{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; line-height:1.05; white-space:nowrap; font-variant-numeric:tabular-nums}
+.vd.expert .kpinum.green{color:var(--green)}
+.vd.expert .kpinum.red{color:var(--red)}
+.vd.expert .kpinum.gold{color:var(--goldBright)}
+.vd.expert .kpisub{font-size:0.68rem; color:var(--muted); margin-top:4px; white-space:nowrap}
+.vd.expert .kpichip{display:inline-block; margin-top:7px; font-size:0.6rem; font-weight:700; padding:3px 9px; border-radius:980px; background:var(--goldDim); color:var(--goldBright); letter-spacing:0.03em}
+.vd.expert .kpiviz{flex:none; width:70px; height:40px}
+.vd.expert .kpiviz svg{width:100%; height:100%; display:block; overflow:visible}
+@media(max-width:1200px){ .vd.expert .kpistrip{grid-template-columns:repeat(3,1fr)} }
+@media(max-width:760px){ .vd.expert .kpistrip{grid-template-columns:repeat(2,1fr)} }
+/* P2b. Config row */
+.vd.expert .cfggrid{display:grid; grid-template-columns:repeat(4,1fr); gap:0}
+.vd.expert .cfgitem{padding:0 20px; border-left:1px solid var(--border)}
+.vd.expert .cfgitem:first-child{padding-left:0; border-left:none}
+.vd.expert .cfghint{font-size:0.68rem; color:var(--faint); margin-top:8px}
+.vd.expert .cfgitem .stepper .stepval{min-width:64px}
+@media(max-width:900px){ .vd.expert .cfggrid{grid-template-columns:1fr 1fr; gap:18px 0} .vd.expert .cfgitem{border-left:none; padding:0} }
+/* P3. Context row */
+.vd.expert .ctxrow{display:grid; grid-template-columns:1fr 1fr 1.2fr; gap:14px; align-items:start}
+@media(max-width:1100px){ .vd.expert .ctxrow{grid-template-columns:1fr} }
+.vd.expert .ctxrow .allocbar{margin:4px 0 12px}
+.vd.expert .ctxrow .alloclegend{gap:16px; font-size:0.74rem}
+.vd.expert .ctxrow .allocnote{font-size:0.72rem; color:var(--faint); margin-top:12px; padding-top:12px; border-top:1px solid var(--border)}
+/* P4. Positions table — Pro only tightens container/density + sticky head; the table markup is shared with Guided */
+.vd.expert .poscard{padding:16px 16px 18px}
+.vd.expert .poshead h2{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+.vd.expert .countchip{background:var(--goldDim); color:var(--goldBright); font-size:0.66rem; font-weight:800; padding:3px 10px; border-radius:980px}
+@media(min-width:761px){
+.vd.expert .poscard thead th{font-size:0.58rem; padding:9px 10px; position:sticky; top:0; z-index:2; background:rgba(9,9,15,0.94)}
+.vd.expert .poscard tbody td{padding:8px 10px; font-size:0.74rem}
   }`;
 
 function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning, displayName }) {
@@ -8897,6 +9441,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
   const [eqCollapsed, setEqCollapsed] = useState(false);
   const [manageId, setManageId] = useState(null);
   const [sellOpen, setSellOpen] = useState(false);
+  const [cfgOpen, setCfgOpen] = useState(false); // Pro layout: reveal the relocated sizing controls (⚙ Configure)
   const [capEditing, setCapEditing] = useState(false);
   const [capDraft, setCapDraft] = useState("");
   const [activeGuide, setActiveGuide] = useState(null);
@@ -9005,207 +9550,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
   const addAndManage = () => { const newId = positions.reduce((m, p) => Math.max(m, p.id || 0), 0) + 1; addPosition(); setSellOpen(false); setManageId(newId); };
   const firstName = (displayName && displayName.trim()) || (session?.user?.email ? session.user.email.split("@")[0] : "trader");
 
-  return (
-    <div className={"vd" + (expert ? " expert" : "") + (showPro ? " pro" : "")} ref={rootRef}>
-      <style dangerouslySetInnerHTML={{ __html: DASH_CSS }} />
-      <audio ref={audioRef} preload="auto" onPlaying={() => setSpeaking(true)} onEnded={() => setSpeaking(false)} onPause={() => setSpeaking(false)} />
-      <div className="shell">
-
-        {/* NAV TABS */}
-        <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
-          <div className="tabs">
-            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
-          </div>
-          <div className="spacer"></div>
-          <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
-            <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
-            <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
-          </div>
-          <WhatsNew />
-          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
-        </div>
-
-        {/* HEADER */}
-        <div className="reveal">
-          <div className="eyebrow">Dashboard</div>
-          <div className="row" style={{ marginTop: 6 }}>
-            <div className="h1">Welcome back, <span className="goldname">{firstName}</span></div>
-          </div>
-          <div className="sub">Your trading compounding cockpit. Everything below updates live from your positions and closed trades.</div>
-        </div>
-
-        {/* 1. ONE DOMINANT NUMBER */}
-        <div className="hero">
-          <div className={"card north guide reveal" + (openPL < 0 ? " north-neg" : "") + gactive("pl")} onMouseEnter={guideEnter("pl", "Open profit and loss", "How much your open positions are up or down right now. Green means you're in profit; the line below is your realized equity trend.", "/audio/open-pl.mp3")} onMouseLeave={guideLeave("pl")}>
-            <div className="label">Open P/L · this month's live result</div>
-            <div className="big" style={{ color: openPL >= 0 ? "var(--green)" : "var(--red)" }}><Cu>{usdSigned(openPL)}</Cu></div>
-            <div className="meta">{pctSigned(openPLpct)} across {openCount} open position{openCount === 1 ? "" : "s"} · you're {openPL >= 0 ? "green" : "red"} on open risk</div>
-            <svg className="spark" viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Realized equity trend">
-              <defs><linearGradient id="sparkg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={spark && !spark.up ? "rgba(239,68,68,0.30)" : "rgba(34,197,94,0.34)"} /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient></defs>
-              <g id="sparkRise">
-                <path d={sparkArea} fill="url(#sparkg)" />
-                <path d={sparkLine} fill="none" stroke={spark && !spark.up ? "var(--red)" : "var(--green)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-              </g>
-            </svg>
-            <div className="sparklabel">{spark ? `Realized P/L trend · ${(journaledTrades || []).length} closed trades` : "Realized equity trend"}</div>
-          </div>
-
-          <div className={"card mini guide reveal" + gactive("rts")} onMouseEnter={guideEnter("rts", "Risk in the market", "The total you'd lose if every open position hit its stop at once. Keep it inside your risk rule.", "/audio/risk-market.mp3")} onMouseLeave={guideLeave("rts")}>
-            <div className="label"><span className="term" data-tip="Risk To Stop: the total dollars you'd lose right now if every open position hit its stop. This is your real exposure.">Risk in the market <span className="plain">(RTS)</span></span></div>
-            <div className={"val " + (rtsTotal > 0 ? "red" : "green")}><Cu>{usd0(rtsTotal)}</Cu></div>
-            <div className="hint">{pct2(rtsPct)} of equity at risk{totals.tgtRotePct ? (rtsPct <= totals.tgtRotePct ? ` — well inside your ${pct2(totals.tgtRotePct)} rule` : ` — over your ${pct2(totals.tgtRotePct)} rule`) : ""}</div>
-          </div>
-
-          <div className={"card mini equity guide" + (eqCollapsed ? " collapsed" : "") + (useSecuredProfit ? "" : " off") + gactive("eq")} onMouseEnter={guideEnter("eq", "Live risk budget and sizing", "Set how much of your account you'll risk and across how many trades. The right side shows your budget and per-trade sizing.", "/audio/console.mp3")} onMouseLeave={guideLeave("eq")}>
-            <button className="collapsehdr" onClick={() => setEqCollapsed(c => !c)} aria-expanded={!eqCollapsed}>
-              <span className="collapsetitle">Live Risk Budget &amp; Sizing</span>
-              <span className="collapsesummary">{`Equity ${usd0(compEquity)} · Budget ${usd0(budget.totalBudget)} · Available ${usd0(budget.available)}`}</span>
-              <span className="chev" aria-hidden="true">&#9662;</span>
-            </button>
-            <div className="equity-grid">
-              {/* LEFT: compounding equity */}
-              <div className="eq-left">
-                <div className="label"><span className="term" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">Compounding equity <span className="plain">(ROTE base)</span></span></div>
-                <div className="val gold" title="Click to edit your starting capital" style={{ cursor: "pointer" }} onClick={() => { setCapDraft(String(+portfolioSize || 0)); setCapEditing(true); }}>{usd0(compEquity)}</div>
-                <div className="breakdown">
-                  Start{" "}
-                  {capEditing ? (
-                    <input className="capinput" autoFocus value={capDraft} onChange={e => setCapDraft(e.target.value)} onBlur={() => { const v = parseFloat(capDraft.replace(/[^0-9.]/g, "")) || 0; setPortfolioSize(v); setCapEditing(false); }} onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }} />
-                  ) : (
-                    <span className="editcap" title="Click to edit your starting capital" onClick={() => { setCapDraft(String(+portfolioSize || 0)); setCapEditing(true); }}>
-                      <span className="capval">{usd0(+portfolioSize || 0)}</span><span className="pencil">&#9998;</span>
-                    </span>
-                  )}
-                  <span className="op">+ {usd0(compRealizedPL)} realized</span>
-                  <span className="op tl">{useSecuredProfit ? `+ ${usd0(securedProfit)} trail-locked` : "trail-locked excluded"}</span>
-                </div>
-                <div className="tlrow">
-                  <div className="tllabel">
-                    <span className="term" data-tip="Trail-locked profit is calculated automatically: the sum of (stop − entry) × shares for every position whose stop sits above entry. You only choose whether it counts toward your sizing base.">Include trail-locked profit</span>
-                    <small className="gtip">Auto-calculated from your stops · {usd0(securedProfit)} locked right now</small>
-                  </div>
-                  <div className="seg tlseg">
-                    <button className={useSecuredProfit ? "on" : ""} onClick={() => setUseSecuredProfit(true)}>ON &#9679;</button>
-                    <button className={!useSecuredProfit ? "on" : ""} onClick={() => setUseSecuredProfit(false)}>OFF</button>
-                  </div>
-                </div>
-              </div>
-              {/* INPUTS */}
-              <div className="eq-col">
-                <div className="ctrl">
-                  <div className="label"><span className="term" data-tip="Target ROTE: the % of total equity you're willing to have at risk across ALL open trades at once. Your total risk budget = equity × this %.">Target ROTE <span className="plain">(risk budget %)</span></span></div>
-                  <div className="ctrlinput">
-                    <input className="numfield" value={targetRote} onChange={e => setTargetRote(e.target.value)} />
-                    <span className="suffix">%</span>
-                  </div>
-                </div>
-                <div className="ctrl">
-                  <div className="label"><span className="term" data-tip="The most open positions you'll hold at once. Sizing divides your risk budget across this many trades so you don't over-concentrate.">Maximum positions</span></div>
-                  <div className="stepper">
-                    <button onClick={() => setRNumStocks(n => Math.max(0, (n || 0) - 1))} disabled={(rNumStocks || 0) <= 0} aria-label="decrease">&minus;</button>
-                    <span className="stepval">{rNumStocks || 0}</span>
-                    <button onClick={() => setRNumStocks(n => (n || 0) + 1)} aria-label="increase">+</button>
-                  </div>
-                </div>
-              </div>
-              {/* OUTPUTS */}
-              <div className="eq-col">
-                <div className="outgrid">
-                  <div className="out">
-                    <div className="outlabel">Total risk budget</div>
-                    <div className="outval gold">{usd0(budget.totalBudget)}</div>
-                    <div className="outsub"><span className="g">{pct2(budget.tgtRote * 100)}</span> of <span className="g">{usd0(compEquity)}</span></div>
-                  </div>
-                  <div className="out">
-                    <div className="outlabel">R per trade <span className="plain">(full)</span></div>
-                    <div className="outval">{(rNumStocks || 0) > 0 ? usd0(rPerTrade) : "—"}</div>
-                    <div className="outsub"><span className="g">{(rNumStocks || 0) > 0 ? pct2(budget.tgtRote * 100 / rNumStocks) : "—"}</span> ROTE each</div>
-                  </div>
-                  <div className="out">
-                    <div className="outlabel">Current ROTE</div>
-                    <div className="outval">{pct2(totals.currentRotePct)}</div>
-                    <div className="outsub">Target: <span className="g">{pct2(totals.tgtRotePct)}</span> max</div>
-                  </div>
-                  <div className="out">
-                    <div className="outlabel">Available</div>
-                    <div className={"outval " + (rawAvail >= 0 ? "green" : "red")}>{usd0(rawAvail)}</div>
-                    <div className="outsub"><span className="g">{pct2(budget.availablePct)}</span> ROTE remaining</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* RISK ALLOCATION */}
-        <div className={"card alloc guide reveal" + gactive("alloc")} onMouseEnter={guideEnter("alloc", "Risk allocation", "A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.", "/audio/allocation.mp3")} onMouseLeave={guideLeave("alloc")}>
-          <div className="row">
-            <div className="label">Risk allocation</div>
-            <div className="spacer"></div>
-            <div className="allocnote">{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
-          </div>
-          <div className={"allocbar" + (over ? " over" : "")}>
-            <div className="allocfill" style={{ width: allocPct.toFixed(0) + "%" }}></div>
-          </div>
-          <div className="alloclegend">
-            <span className="leg"><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b>&nbsp;<span>({budget.atRiskCount})</span></span>
-            <span className="leg"><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b>&nbsp;<span>({budget.totalBudget > 0 ? Math.round(budget.available / budget.totalBudget * 100) : 0}%)</span></span>
-            <span className="leg"><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b>&nbsp;<span>(freed {usd0(budget.freedRisk)})</span></span>
-          </div>
-          <div className={"deploy" + (over ? " over" : "")}>
-            <div className="deployhead">{over ? <>You are <b>{usd0(-rawAvail)}</b> over your risk budget</> : <>You can deploy <b>{usd0(Math.max(0, rawAvail))}</b> more risk</>}</div>
-            <div className="deploysub">
-              {over ? "Close a position or tighten a stop before adding new risk — or raise Target ROTE if you mean to risk more."
-                : (rNumStocks || 0) > 0 ? <>That's <b>{pct2(budget.availablePct)} ROTE</b> free. Room for <b>{fullTrades} full-R trade{fullTrades === 1 ? "" : "s"}</b> at {usd0(rPerTrade)} each, or <b>{halfTrades} half-R</b> at {usd0(rPerTrade / 2)} each.</>
-                  : <>Set your Maximum positions above to see how that splits into per-trade sizing.</>}
-            </div>
-          </div>
-        </div>
-
-        {/* welcome banner */}
-        {!expert && !welcomeDismissed && (
-          <div className="welcome">
-            <span className="dot"></span>
-            <div><b>New here?</b> Hover any card and the guide in the corner will explain it — <b>out loud</b>. Mute the voiceover anytime, or switch to <span className="term" data-tip="Pro mode hides all the guidance and voiceover for experienced traders.">Pro</span> (top-right) to turn the whole tutorial off.</div>
-            <span className="x" onClick={() => { setWelcomeDismissed(true); try { localStorage.setItem("viv-welcome-x", "1"); } catch {} }}>&times;</span>
-          </div>
-        )}
-
-        {/* THEME LEADERS STRIP (this week's DeepVue leaders) */}
-        <ThemeStrip C={C} font={font} />
-        <MarketContext C={C} font={font} />
-        <EdgeLedger C={C} font={font} session={session} setPage={setPage} />  {/* admin-only: renders null for members */}
-
-        {/* TABLE */}
-        <div className="toolbar">
-          <h2>Open Positions</h2>
-          <div className="spacer"></div>
-          <div className="seg" id="viewSeg">
-            <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
-            <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
-          </div>
-          <button className="btn" onClick={fetchLivePrices} disabled={priceLoading}>{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
-          <button
-            className="btn gold"
-            onClick={() => onManualSave && onManualSave()}
-            disabled={saveStatus === "saving"}
-            title={saveStatus === "error" ? (saveErrorMsg || "Save failed — click to retry") : "Save all open positions"}
-            style={saveStatus === "saved" ? { background: "rgba(34,197,94,0.18)", borderColor: "rgba(34,197,94,0.4)", color: "#86efac" } : saveStatus === "error" ? { background: "rgba(239,68,68,0.16)", borderColor: "rgba(239,68,68,0.4)", color: "#fca5a5" } : undefined}
-          >{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Retry save" : "Save"}</button>
-          <button className="btn gold" onClick={addAndManage}>+ Add Position</button>
-        </div>
-
-        <div className={"card guide" + gactive("pos")} style={{ padding: "8px 6px" }} onMouseEnter={guideEnter("pos", "Open positions", "Every trade you currently hold. The colored status shows which positions are at risk.", "/audio/positions.mp3")} onMouseLeave={guideLeave("pos")}>
-          <div className="pos-scroll">
-          {/* Click a sortable header (Symbol / Position size / R / P/L) to sort the open positions. */}
+  const positionsTable = (
           <table>
             <thead>
               <tr>
@@ -9416,6 +9761,446 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
               )}
             </tbody>
           </table>
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ─── PRO-MODE LAYOUT (dashboard-pro.html) ───
+  // When expert (uiMode === "pro") the dashboard renders a distinct Command-Center
+  // arrangement: command header → KPI strip → (Configure) sizing row → context row →
+  // full-width positions table. All figures reuse the SAME memos/handlers computed above;
+  // the positions table (positionsTable) and Theme/Market/Edge components are shared, not
+  // duplicated. Guided (!expert) falls through to the original return below, untouched.
+  // ═══════════════════════════════════════════════════════════════════════
+  if (expert) {
+    const clamp01 = (x) => Math.max(0, Math.min(1, x || 0));
+    const SEMI = 91.1, RING = 94.2; // arc length of the micro semicircle gauge / donut ring
+    const kRiskFrac = totals.tgtRotePct > 0 ? clamp01(rtsPct / totals.tgtRotePct) : 0;
+    const kRoteFrac = totals.tgtRotePct > 0 ? clamp01(totals.currentRotePct / totals.tgtRotePct) : 0;
+    const kBudgetFrac = budget.totalBudget > 0 ? clamp01(budget.deployedRisk / budget.totalBudget) : 0;
+    const refreshedAgo = lastPriceRefresh ? (() => { const m = Math.floor((Date.now() - lastPriceRefresh.getTime()) / 60000); return m <= 0 ? "just now" : m === 1 ? "1 min ago" : m + " min ago"; })() : null;
+    const stepRote = (d) => setTargetRote(String((Math.max(0.25, Math.min(10, (+targetRote || 0) + d))).toFixed(2)));
+    return (
+      <div className={"vd expert" + (showPro ? " pro" : "")} ref={rootRef}>
+        <style dangerouslySetInnerHTML={{ __html: DASH_CSS }} />
+        <audio ref={audioRef} preload="auto" onPlaying={() => setSpeaking(true)} onEnded={() => setSpeaking(false)} onPause={() => setSpeaking(false)} />
+        <div className="shell">
+
+          {/* NAV TABS */}
+          <div className="navbar">
+            <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+            <div className="tabs">
+              <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+            </div>
+            <div className="spacer"></div>
+            <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+              <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
+              <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
+            </div>
+            <WhatsNew />
+            <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
+          </div>
+
+          {/* P1. COMMAND HEADER */}
+          <div className="cmdheader">
+            <div className="cmdleft">
+              <div className="eyebrow">Dashboard</div>
+              <h1 className="ch1">Command Center</h1>
+              <div className="cmdmeta">{openCount} open position{openCount === 1 ? "" : "s"}{refreshedAgo ? ` · prices refreshed ${refreshedAgo}` : ""}</div>
+            </div>
+            <div className="cmdactions">
+              <button className="btn ghost" onClick={fetchLivePrices} disabled={priceLoading}>{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
+              <button
+                className="btn gold"
+                onClick={() => onManualSave && onManualSave()}
+                disabled={saveStatus === "saving"}
+                title={saveStatus === "error" ? (saveErrorMsg || "Save failed — click to retry") : "Save all open positions"}
+                style={saveStatus === "saved" ? { background: "rgba(34,197,94,0.18)", borderColor: "rgba(34,197,94,0.4)", color: "#86efac" } : saveStatus === "error" ? { background: "rgba(239,68,68,0.16)", borderColor: "rgba(239,68,68,0.4)", color: "#fca5a5" } : undefined}
+              >{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Retry save" : "Save"}</button>
+              <button className="btn goldoutline" onClick={addAndManage}>+ Add Position</button>
+            </div>
+          </div>
+
+          {/* P2. KPI STRIP */}
+          <div className="kpistrip">
+
+            {/* K1: Open P/L */}
+            <div className="card kpi">
+              <div className="cardhead"><span className="label">Open P/L</span><span className="infodot" data-tip="How much your open positions are up or down right now. Green means you're in profit; the line below is your realized equity trend.">i</span></div>
+              <div className="kpibody">
+                <div className="kpimain">
+                  <div className={"kpinum " + (openPL >= 0 ? "green" : "red")}><Cu>{usdSigned(openPL)}</Cu></div>
+                  <div className="kpisub">{pctSigned(openPLpct)} across {openCount} position{openCount === 1 ? "" : "s"}</div>
+                </div>
+                <div className="kpiviz tipwrap" data-tip={spark ? `Realized P/L trend · ${(journaledTrades || []).length} closed trades` : "Realized equity trend"}>
+                  <svg viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Realized equity trend">
+                    <defs><linearGradient id="sparkgPro" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={spark && !spark.up ? "rgba(239,68,68,0.30)" : "rgba(34,197,94,0.34)"} /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient></defs>
+                    <path d={sparkArea} fill="url(#sparkgPro)" />
+                    <path d={sparkLine} fill="none" stroke={spark && !spark.up ? "var(--red)" : "var(--green)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* K2: Risk in Market */}
+            <div className="card kpi">
+              <div className="cardhead"><span className="label">Risk in Market</span><span className="infodot" data-tip="The total you'd lose if every open position hit its stop at once. Keep it inside your risk rule.">i</span></div>
+              <div className="kpibody">
+                <div className="kpimain">
+                  <div className={"kpinum " + (rtsTotal > 0 ? "red" : "green")}>{usd0(rtsTotal)}</div>
+                  <div className="kpisub">{pct2(rtsPct)} of equity</div>
+                </div>
+                <div className="kpiviz">
+                  <svg viewBox="0 0 70 40" role="img" aria-label="risk versus ROTE cap">
+                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="6" strokeLinecap="round" />
+                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="var(--goldBright)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(kRiskFrac * SEMI).toFixed(1)} 999`} />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* K3: Equity */}
+            <div className="card kpi">
+              <div className="cardhead"><span className="label">Equity</span><span className="infodot" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">i</span></div>
+              <div className="kpibody">
+                <div className="kpimain">
+                  <div className="kpinum gold">{usd0(compEquity)}</div>
+                  <div className="kpisub">Base {usd0(+portfolioSize || 0)} + {usd0(compRealizedPL)} realized</div>
+                  <span className="kpichip">Trail-locked · {useSecuredProfit ? "ON" : "OFF"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* K4: Risk Budget */}
+            <div className="card kpi">
+              <div className="cardhead">
+                <span className="label">Risk Budget</span>
+                <span className="infodot" data-tip="Your total risk budget: equity × Target ROTE. Available is what's left to deploy once current risk is subtracted.">i</span>
+                <button className="ghostchip" onClick={() => setCfgOpen(o => !o)} aria-expanded={cfgOpen} title="Show sizing configuration">⚙ Configure</button>
+              </div>
+              <div className="kpibody">
+                <div className="kpimain">
+                  <div className="kpinum gold">{usd0(budget.totalBudget)}</div>
+                  <div className="kpisub">Available {usd0(budget.available)}</div>
+                </div>
+                <div className="kpiviz">
+                  <svg viewBox="0 0 40 40" role="img" aria-label="risk budget deployed">
+                    <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(34,197,94,0.35)" strokeWidth="6" />
+                    <circle cx="20" cy="20" r="15" fill="none" stroke="var(--goldBright)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(kBudgetFrac * RING).toFixed(1)} ${RING}`} transform="rotate(-90 20 20)" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* K5: Current ROTE */}
+            <div className="card kpi">
+              <div className="cardhead"><span className="label">Current ROTE</span><span className="infodot" data-tip="Your risk currently on the table as a percent of total equity, measured against the Target ROTE cap you've set.">i</span></div>
+              <div className="kpibody">
+                <div className="kpimain">
+                  <div className="kpinum">{pct2(totals.currentRotePct)}</div>
+                  <div className="kpisub">Target {pct2(totals.tgtRotePct)}</div>
+                </div>
+                <div className="kpiviz">
+                  <svg viewBox="0 0 70 40" role="img" aria-label="current ROTE versus target">
+                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="6" strokeLinecap="round" />
+                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="var(--goldBright)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(kRoteFrac * SEMI).toFixed(1)} 999`} />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* P2b. CONFIG ROW — relocated sizing controls; same state/handlers as Guided's "Live Risk Budget & Sizing" */}
+          {cfgOpen && (
+            <div className="card cfgrow" style={{ marginTop: 14 }}>
+              <div className="cardhead"><span className="label">Sizing Configuration</span><span className="infodot" data-tip="Adjust the inputs that drive your risk budget and position sizing.">i</span></div>
+              <div className="cfggrid">
+                <div className="cfgitem">
+                  <div className="label" style={{ marginBottom: 9 }}>Starting capital</div>
+                  {capEditing ? (
+                    <input className="capinput" autoFocus value={capDraft} onChange={e => setCapDraft(e.target.value)} onBlur={() => { const v = parseFloat(capDraft.replace(/[^0-9.]/g, "")) || 0; setPortfolioSize(v); setCapEditing(false); }} onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }} />
+                  ) : (
+                    <span className="editcap" title="Click to edit your starting capital" onClick={() => { setCapDraft(String(+portfolioSize || 0)); setCapEditing(true); }}>
+                      <span className="capval">{usd0(+portfolioSize || 0)}</span><span className="pencil">&#9998;</span>
+                    </span>
+                  )}
+                  <div className="cfghint">+ {usd0(compRealizedPL)} realized</div>
+                </div>
+                <div className="cfgitem">
+                  <div className="label" style={{ marginBottom: 9 }}>Target ROTE</div>
+                  <div className="stepper">
+                    <button aria-label="decrease target ROTE" onClick={() => stepRote(-0.25)}>&minus;</button>
+                    <span className="stepval">{pct2(+targetRote || 0)}</span>
+                    <button aria-label="increase target ROTE" onClick={() => stepRote(0.25)}>+</button>
+                  </div>
+                </div>
+                <div className="cfgitem">
+                  <div className="label" style={{ marginBottom: 9 }}>Maximum positions</div>
+                  <div className="stepper">
+                    <button aria-label="decrease max positions" onClick={() => setRNumStocks(n => Math.max(0, (n || 0) - 1))} disabled={(rNumStocks || 0) <= 0}>&minus;</button>
+                    <span className="stepval">{rNumStocks || 0}</span>
+                    <button aria-label="increase max positions" onClick={() => setRNumStocks(n => (n || 0) + 1)}>+</button>
+                  </div>
+                </div>
+                <div className="cfgitem">
+                  <div className="label" style={{ marginBottom: 9 }}>Trail-locked profit</div>
+                  <div className="seg tlseg">
+                    <button className={useSecuredProfit ? "on" : ""} onClick={() => setUseSecuredProfit(true)}>ON</button>
+                    <button className={!useSecuredProfit ? "on" : ""} onClick={() => setUseSecuredProfit(false)}>OFF</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* P3. CONTEXT ROW */}
+          <div className="ctxrow" style={{ marginTop: 14 }}>
+            <div className="card">
+              <div className="cardhead"><span className="label">Risk Allocation</span><span className="infodot" data-tip="A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.">i</span></div>
+              <div className={"allocbar" + (over ? " over" : "")}><div className="allocfill" style={{ width: allocPct.toFixed(0) + "%" }}></div></div>
+              <div className="alloclegend">
+                <span className="leg tipwrap" data-tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></span>
+                <span className="leg tipwrap" data-tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></span>
+                <span className="leg tipwrap" data-tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></span>
+              </div>
+              <div className="allocnote">{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
+            </div>
+            <MarketContext C={C} font={font} />
+            <ThemeStrip C={C} font={font} />
+          </div>
+          <EdgeLedger C={C} font={font} session={session} setPage={setPage} />  {/* admin-only: renders null for members */}
+
+          {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS */}
+          <div className="card poscard" style={{ marginTop: 14 }}>
+            <div className="cardhead poshead">
+              <h2>Open Positions</h2>
+              <span className="countchip">{openCount}</span>
+              <span className="infodot" data-tip="Every trade you currently hold. The colored status shows which positions are at risk.">i</span>
+              <div className="spacer"></div>
+              <div className="seg" id="viewSeg">
+                <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
+                <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
+              </div>
+            </div>
+            <div className="pos-scroll">
+              {positionsTable}
+            </div>
+            <button className="addrow" type="button" onClick={addAndManage}>+ Add Position</button>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={"vd" + (expert ? " expert" : "") + (showPro ? " pro" : "")} ref={rootRef}>
+      <style dangerouslySetInnerHTML={{ __html: DASH_CSS }} />
+      <audio ref={audioRef} preload="auto" onPlaying={() => setSpeaking(true)} onEnded={() => setSpeaking(false)} onPause={() => setSpeaking(false)} />
+      <div className="shell">
+
+        {/* NAV TABS */}
+        <div className="navbar">
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="tabs">
+            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+          {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          </div>
+          <div className="spacer"></div>
+          <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+            <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
+            <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
+          </div>
+          <WhatsNew />
+          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
+        </div>
+
+        {/* HEADER */}
+        <div className="reveal">
+          <div className="eyebrow">Dashboard</div>
+          <div className="row" style={{ marginTop: 6 }}>
+            <div className="h1">Welcome back, <span className="goldname">{firstName}</span></div>
+          </div>
+          <div className="sub">Your trading compounding cockpit. Everything below updates live from your positions and closed trades.</div>
+        </div>
+
+        {/* 1. ONE DOMINANT NUMBER */}
+        <div className="hero">
+          <div className={"card north guide reveal" + (openPL < 0 ? " north-neg" : "") + gactive("pl")} onMouseEnter={guideEnter("pl", "Open profit and loss", "How much your open positions are up or down right now. Green means you're in profit; the line below is your realized equity trend.", "/audio/open-pl.mp3")} onMouseLeave={guideLeave("pl")}>
+            <div className="label">Open P/L · this month's live result</div>
+            <div className="big" style={{ color: openPL >= 0 ? "var(--green)" : "var(--red)" }}><Cu>{usdSigned(openPL)}</Cu></div>
+            <div className="meta">{pctSigned(openPLpct)} across {openCount} open position{openCount === 1 ? "" : "s"} · you're {openPL >= 0 ? "green" : "red"} on open risk</div>
+            <svg className="spark" viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Realized equity trend">
+              <defs><linearGradient id="sparkg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={spark && !spark.up ? "rgba(239,68,68,0.30)" : "rgba(34,197,94,0.34)"} /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient></defs>
+              <g id="sparkRise">
+                <path d={sparkArea} fill="url(#sparkg)" />
+                <path d={sparkLine} fill="none" stroke={spark && !spark.up ? "var(--red)" : "var(--green)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              </g>
+            </svg>
+            <div className="sparklabel">{spark ? `Realized P/L trend · ${(journaledTrades || []).length} closed trades` : "Realized equity trend"}</div>
+          </div>
+
+          <div className={"card mini guide reveal" + gactive("rts")} onMouseEnter={guideEnter("rts", "Risk in the market", "The total you'd lose if every open position hit its stop at once. Keep it inside your risk rule.", "/audio/risk-market.mp3")} onMouseLeave={guideLeave("rts")}>
+            <div className="label"><span className="term" data-tip="Risk To Stop: the total dollars you'd lose right now if every open position hit its stop. This is your real exposure.">Risk in the market <span className="plain">(RTS)</span></span></div>
+            <div className={"val " + (rtsTotal > 0 ? "red" : "green")}><Cu>{usd0(rtsTotal)}</Cu></div>
+            <div className="hint">{pct2(rtsPct)} of equity at risk{totals.tgtRotePct ? (rtsPct <= totals.tgtRotePct ? ` — well inside your ${pct2(totals.tgtRotePct)} rule` : ` — over your ${pct2(totals.tgtRotePct)} rule`) : ""}</div>
+          </div>
+
+          <div className={"card mini equity guide" + (eqCollapsed ? " collapsed" : "") + (useSecuredProfit ? "" : " off") + gactive("eq")} onMouseEnter={guideEnter("eq", "Live risk budget and sizing", "Set how much of your account you'll risk and across how many trades. The right side shows your budget and per-trade sizing.", "/audio/console.mp3")} onMouseLeave={guideLeave("eq")}>
+            <button className="collapsehdr" onClick={() => setEqCollapsed(c => !c)} aria-expanded={!eqCollapsed}>
+              <span className="collapsetitle">Live Risk Budget &amp; Sizing</span>
+              <span className="collapsesummary">{`Equity ${usd0(compEquity)} · Budget ${usd0(budget.totalBudget)} · Available ${usd0(budget.available)}`}</span>
+              <span className="chev" aria-hidden="true">&#9662;</span>
+            </button>
+            <div className="equity-grid">
+              {/* LEFT: compounding equity */}
+              <div className="eq-left">
+                <div className="label"><span className="term" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">Compounding equity <span className="plain">(ROTE base)</span></span></div>
+                <div className="val gold" title="Click to edit your starting capital" style={{ cursor: "pointer" }} onClick={() => { setCapDraft(String(+portfolioSize || 0)); setCapEditing(true); }}>{usd0(compEquity)}</div>
+                <div className="breakdown">
+                  Start{" "}
+                  {capEditing ? (
+                    <input className="capinput" autoFocus value={capDraft} onChange={e => setCapDraft(e.target.value)} onBlur={() => { const v = parseFloat(capDraft.replace(/[^0-9.]/g, "")) || 0; setPortfolioSize(v); setCapEditing(false); }} onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }} />
+                  ) : (
+                    <span className="editcap" title="Click to edit your starting capital" onClick={() => { setCapDraft(String(+portfolioSize || 0)); setCapEditing(true); }}>
+                      <span className="capval">{usd0(+portfolioSize || 0)}</span><span className="pencil">&#9998;</span>
+                    </span>
+                  )}
+                  <span className="op">+ {usd0(compRealizedPL)} realized</span>
+                  <span className="op tl">{useSecuredProfit ? `+ ${usd0(securedProfit)} trail-locked` : "trail-locked excluded"}</span>
+                </div>
+                <div className="tlrow">
+                  <div className="tllabel">
+                    <span className="term" data-tip="Trail-locked profit is calculated automatically: the sum of (stop − entry) × shares for every position whose stop sits above entry. You only choose whether it counts toward your sizing base.">Include trail-locked profit</span>
+                    <small className="gtip">Auto-calculated from your stops · {usd0(securedProfit)} locked right now</small>
+                  </div>
+                  <div className="seg tlseg">
+                    <button className={useSecuredProfit ? "on" : ""} onClick={() => setUseSecuredProfit(true)}>ON &#9679;</button>
+                    <button className={!useSecuredProfit ? "on" : ""} onClick={() => setUseSecuredProfit(false)}>OFF</button>
+                  </div>
+                </div>
+              </div>
+              {/* INPUTS */}
+              <div className="eq-col">
+                <div className="ctrl">
+                  <div className="label"><span className="term" data-tip="Target ROTE: the % of total equity you're willing to have at risk across ALL open trades at once. Your total risk budget = equity × this %.">Target ROTE <span className="plain">(risk budget %)</span></span></div>
+                  <div className="ctrlinput">
+                    <input className="numfield" value={targetRote} onChange={e => setTargetRote(e.target.value)} />
+                    <span className="suffix">%</span>
+                  </div>
+                </div>
+                <div className="ctrl">
+                  <div className="label"><span className="term" data-tip="The most open positions you'll hold at once. Sizing divides your risk budget across this many trades so you don't over-concentrate.">Maximum positions</span></div>
+                  <div className="stepper">
+                    <button onClick={() => setRNumStocks(n => Math.max(0, (n || 0) - 1))} disabled={(rNumStocks || 0) <= 0} aria-label="decrease">&minus;</button>
+                    <span className="stepval">{rNumStocks || 0}</span>
+                    <button onClick={() => setRNumStocks(n => (n || 0) + 1)} aria-label="increase">+</button>
+                  </div>
+                </div>
+              </div>
+              {/* OUTPUTS */}
+              <div className="eq-col">
+                <div className="outgrid">
+                  <div className="out">
+                    <div className="outlabel">Total risk budget</div>
+                    <div className="outval gold">{usd0(budget.totalBudget)}</div>
+                    <div className="outsub"><span className="g">{pct2(budget.tgtRote * 100)}</span> of <span className="g">{usd0(compEquity)}</span></div>
+                  </div>
+                  <div className="out">
+                    <div className="outlabel">R per trade <span className="plain">(full)</span></div>
+                    <div className="outval">{(rNumStocks || 0) > 0 ? usd0(rPerTrade) : "—"}</div>
+                    <div className="outsub"><span className="g">{(rNumStocks || 0) > 0 ? pct2(budget.tgtRote * 100 / rNumStocks) : "—"}</span> ROTE each</div>
+                  </div>
+                  <div className="out">
+                    <div className="outlabel">Current ROTE</div>
+                    <div className="outval">{pct2(totals.currentRotePct)}</div>
+                    <div className="outsub">Target: <span className="g">{pct2(totals.tgtRotePct)}</span> max</div>
+                  </div>
+                  <div className="out">
+                    <div className="outlabel">Available</div>
+                    <div className={"outval " + (rawAvail >= 0 ? "green" : "red")}>{usd0(rawAvail)}</div>
+                    <div className="outsub"><span className="g">{pct2(budget.availablePct)}</span> ROTE remaining</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RISK ALLOCATION */}
+        <div className={"card alloc guide reveal" + gactive("alloc")} onMouseEnter={guideEnter("alloc", "Risk allocation", "A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.", "/audio/allocation.mp3")} onMouseLeave={guideLeave("alloc")}>
+          <div className="row">
+            <div className="label">Risk allocation</div>
+            <div className="spacer"></div>
+            <div className="allocnote">{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
+          </div>
+          <div className={"allocbar" + (over ? " over" : "")}>
+            <div className="allocfill" style={{ width: allocPct.toFixed(0) + "%" }}></div>
+          </div>
+          <div className="alloclegend">
+            <span className="leg"><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b>&nbsp;<span>({budget.atRiskCount})</span></span>
+            <span className="leg"><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b>&nbsp;<span>({budget.totalBudget > 0 ? Math.round(budget.available / budget.totalBudget * 100) : 0}%)</span></span>
+            <span className="leg"><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b>&nbsp;<span>(freed {usd0(budget.freedRisk)})</span></span>
+          </div>
+          <div className={"deploy" + (over ? " over" : "")}>
+            <div className="deployhead">{over ? <>You are <b>{usd0(-rawAvail)}</b> over your risk budget</> : <>You can deploy <b>{usd0(Math.max(0, rawAvail))}</b> more risk</>}</div>
+            <div className="deploysub">
+              {over ? "Close a position or tighten a stop before adding new risk — or raise Target ROTE if you mean to risk more."
+                : (rNumStocks || 0) > 0 ? <>That's <b>{pct2(budget.availablePct)} ROTE</b> free. Room for <b>{fullTrades} full-R trade{fullTrades === 1 ? "" : "s"}</b> at {usd0(rPerTrade)} each, or <b>{halfTrades} half-R</b> at {usd0(rPerTrade / 2)} each.</>
+                  : <>Set your Maximum positions above to see how that splits into per-trade sizing.</>}
+            </div>
+          </div>
+        </div>
+
+        {/* welcome banner */}
+        {!expert && !welcomeDismissed && (
+          <div className="welcome">
+            <span className="dot"></span>
+            <div><b>New here?</b> Hover any card and the guide in the corner will explain it — <b>out loud</b>. Mute the voiceover anytime, or switch to <span className="term" data-tip="Pro mode hides all the guidance and voiceover for experienced traders.">Pro</span> (top-right) to turn the whole tutorial off.</div>
+            <span className="x" onClick={() => { setWelcomeDismissed(true); try { localStorage.setItem("viv-welcome-x", "1"); } catch {} }}>&times;</span>
+          </div>
+        )}
+
+        {/* THEME LEADERS STRIP (this week's DeepVue leaders) */}
+        <ThemeStrip C={C} font={font} />
+        <MarketContext C={C} font={font} />
+        <EdgeLedger C={C} font={font} session={session} setPage={setPage} />  {/* admin-only: renders null for members */}
+
+        {/* TABLE */}
+        <div className="toolbar">
+          <h2>Open Positions</h2>
+          <div className="spacer"></div>
+          <div className="seg" id="viewSeg">
+            <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
+            <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
+          </div>
+          <button className="btn" onClick={fetchLivePrices} disabled={priceLoading}>{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
+          <button
+            className="btn gold"
+            onClick={() => onManualSave && onManualSave()}
+            disabled={saveStatus === "saving"}
+            title={saveStatus === "error" ? (saveErrorMsg || "Save failed — click to retry") : "Save all open positions"}
+            style={saveStatus === "saved" ? { background: "rgba(34,197,94,0.18)", borderColor: "rgba(34,197,94,0.4)", color: "#86efac" } : saveStatus === "error" ? { background: "rgba(239,68,68,0.16)", borderColor: "rgba(239,68,68,0.4)", color: "#fca5a5" } : undefined}
+          >{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Retry save" : "Save"}</button>
+          <button className="btn gold" onClick={addAndManage}>+ Add Position</button>
+        </div>
+
+        <div className={"card guide" + gactive("pos")} style={{ padding: "8px 6px" }} onMouseEnter={guideEnter("pos", "Open positions", "Every trade you currently hold. The colored status shows which positions are at risk.", "/audio/positions.mp3")} onMouseLeave={guideLeave("pos")}>
+          <div className="pos-scroll">
+          {/* Click a sortable header (Symbol / Position size / R / P/L) to sort the open positions. */}
+          {positionsTable}
           </div>
           <button className="addrow" type="button" onClick={addAndManage}>+ Add Position</button>
         </div>
