@@ -3354,6 +3354,21 @@ const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vp .card{padding:18px 16px}
 .vp .intro{flex-direction:column}
 .vp .rtable th,.vp .rtable td{padding:8px 5px; font-size:0.74rem}
+  }
+/* ═══════════ PRO-MODE LAYOUT (.vp.expert) — ported from mockups/premium-pro.html ═══════════ */
+/* Uniform Pro card chrome (mirrors DashboardPage's .vd.expert): 16px radius, tighter padding, tooltips escape the card edge. */
+.vp.expert .card{border-radius:16px; padding:18px 20px; overflow:visible}
+.vp.expert .card::before{border-radius:inherit}
+/* P1. Command header — eyebrow + h1 + muted meta (Pro drops the welcome banner + tutorial tour). */
+.vp.expert .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:8px}
+.vp.expert .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+.vp.expert .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px; font-variant-numeric:tabular-nums}
+/* P2. Tool tabs — compact pill segment row (reuses .seg / .seg button) */
+.vp.expert .toolseg{margin:18px 0 24px; flex-wrap:wrap}
+.vp.expert .toolseg button{padding:8px 16px; font-size:0.76rem}
+@media(max-width:600px){
+.vp.expert .toolseg{overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none}
+.vp.expert .toolseg::-webkit-scrollbar{display:none}
   }`;
 
 // ─── Count-up ("accelerometer" roll) — ports the mockup countUp; rolls a number's
@@ -3541,12 +3556,68 @@ const gactive = (key) => (!expert && activeGuide === key ? " guide-active" : "")
 const guideProps = { guideEnter, guideLeave, gactive, expert };
 
 const TOOLTABS = [
-  { k: "grader", label: "Setup Grader" },
-  { k: "sim", label: "Return Simulator" },
-  { k: "risk", label: "Position Risk" },
-  { k: "exp", label: "Expectancy" },
-  { k: "fin", label: "Risk Finance" },
+  { k: "grader", label: "Setup Grader", tip: "Grade any breakout out of 5 stars across Leadership & Stock Selection, Prior Move, and Base Quality — the 5th star only unlocks when the highest-signal factors line up together." },
+  { k: "sim", label: "Return Simulator", tip: "Plays your trading style forward over many trades to show how your account could compound — set risk per trade, win rate, and winner sizes, and it projects your ending balance." },
+  { k: "risk", label: "Position Risk", tip: "The #1 rule is to never lose much on one trade — enter price, risk per trade %, and your stop, and it tells you exactly how many shares to buy." },
+  { k: "exp", label: "Expectancy", tip: "Does your strategy actually make money? Blends win rate with average win and loss into an edge per trade — above zero means you make money over time." },
+  { k: "fin", label: "Risk Finance", tip: "You're up on a trade — now protect it. Shows how many shares to sell so the rest becomes risk-free, riding on house money." },
 ];
+
+// ─── PRO-MODE LAYOUT (ported from mockups/premium-pro.html) — command header + Pro pill tabs +
+// the same 5 tool components/guideProps, restyled via .vp.expert chrome. The Guided return below
+// is left unchanged. Pro strips the welcome banner, the tutorial tour and the floating guide panel.
+if (expert) return (
+  <div className="vp expert" ref={rootRef}>
+    <style dangerouslySetInnerHTML={{ __html: PREM_CSS }} />
+    <div className="shell">
+
+      {/* NAV */}
+      <div className="navbar">
+        <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+        <div className="tabs">
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+          <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+        </div>
+        <div className="spacer"></div>
+        <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+          <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
+          <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
+        </div>
+        <WhatsNew />
+        <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
+      </div>
+
+      {/* P1. COMMAND HEADER */}
+      <div className="cmdheader">
+        <div className="cmdleft">
+          <div className="eyebrow">Premium tools</div>
+          <h1 className="ch1">Calculators</h1>
+          <div className="cmdmeta">5 tools · run the numbers before you place a trade</div>
+        </div>
+      </div>
+
+      {/* P2. TOOL TABS — the existing 5 tabs restyled as the Pro pill seg */}
+      <div className="seg toolseg" id="toolTabs">
+        {TOOLTABS.map((t, i) => (
+          <button key={t.k} className={tab === i ? "on" : ""} title={t.tip} onClick={() => setTab(i)}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* P3. ACTIVE PANEL — same components + guideProps as Guided; Pro card chrome via .vp.expert CSS */}
+      {tab === 0 && <SetupGraderTab C={C} font={font} positions={positions} session={session} isAdmin={isAdmin} {...guideProps} />}
+      {tab === 1 && <ReturnSimulatorTab portfolioSize={portfolioSize} currentCapital={currentCapital} session={session} setPage={setPage} {...guideProps} />}
+      {tab === 2 && <RiskTab demo={demo} {...guideProps} />}
+      {tab === 3 && <ExpectancyTab demo={demo} {...guideProps} />}
+      {tab === 4 && <RiskFinanceTab demo={demo} {...guideProps} />}
+
+    </div>
+  </div>
+);
 
 // ─── RETURN ───
 return (
@@ -10420,7 +10491,61 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs .codeshow{font-size:1.15rem}
 .vs .memrow{flex-wrap:wrap}
 .vs .memrow .jd{margin-left:0; width:100%}
-  }`;
+  }
+/* ═══════════ PRO-MODE LAYOUT (.vs.expert) — ported from mockups/settings-pro.html ═══════════ */
+/* Uniform Pro card chrome (mirrors DashboardPage's .vd.expert): 16px radius, tighter padding, tooltips escape the card edge. */
+.vs.expert .card{border-radius:16px; padding:18px 20px; overflow:visible; margin-top:0}
+.vs.expert .card::before{border-radius:inherit}
+/* Admin Owner Zone renders unchanged inside Pro — restore its sub-card margins + descriptions the Pro chrome would otherwise strip. */
+.vs.expert .ownerzone .card{margin:12px}
+.vs.expert .ownerzone .carddesc{display:block}
+/* P1. Command header — eyebrow + h1 + muted meta (Pro drops the welcome banner, guide panel + tour). */
+.vs.expert .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
+.vs.expert .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+.vs.expert .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px}
+/* Uniform card header: label + info dot, divided from the body (mirrors .vj.expert). */
+.vs.expert .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+.vs.expert .cardhead .label{flex:1}
+.vs.expert .infodot{position:relative; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none}
+.vs.expert .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+.vs.expert .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+/* Pro keeps the compact field hints the mockup shows (autosaves note, connection hints). */
+.vs.expert .hint{font-size:0.68rem; color:var(--faint); line-height:1.4}
+.vs.expert .field .hint{display:block}
+/* P2 / P4. Two-column page grid (stacks under 900px). */
+.vs.expert .pgrid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+@media(max-width:900px){
+.vs.expert .pgrid{grid-template-columns:1fr} }
+/* Preferences — dense rows, label left / control right. */
+.vs.expert .prow{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:11px 0; border-bottom:1px solid rgba(255,255,255,0.06); flex-wrap:wrap}
+.vs.expert .prow:last-child{border-bottom:none}
+.vs.expert .prow .plabel{font-size:0.8rem; font-weight:700; color:var(--text)}
+.vs.expert .prowctrl{display:flex; gap:6px; flex-wrap:wrap}
+/* Small pill chips (mirrors .vd.expert .ghostchip). */
+.vs.expert .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-size:0.62rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em; transition:all .15s}
+.vs.expert .ghostchip:hover{color:var(--text); border-color:var(--borderGold)}
+.vs.expert .ghostchip.on{background:var(--goldDim); color:var(--goldBright); border-color:var(--borderGold)}
+.vs.expert .ghostchip:disabled{opacity:0.6; cursor:default}
+/* IBKR status meta. */
+.vs.expert .ibkrmeta{font-size:0.72rem; color:var(--faint)}
+/* P4. Lists & Labels — three compact columns in one card. */
+.vs.expert .llgrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0}
+.vs.expert .llcol{padding:0 20px; border-left:1px solid var(--border)}
+.vs.expert .llcol:first-child{padding-left:0; border-left:none}
+.vs.expert .llcol:last-child{padding-right:0}
+.vs.expert .llcol .label{margin-bottom:2px}
+.vs.expert .llgrid .chips{display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; min-height:24px}
+.vs.expert .llgrid .chip{display:inline-flex; align-items:center; gap:5px; font-size:0.7rem; font-weight:600; background:var(--goldDim); border:1px solid var(--borderGold); color:var(--gold); border-radius:8px; padding:4px 9px}
+.vs.expert .llgrid .chip .cx{cursor:pointer; opacity:0.55; font-size:0.85em; line-height:1}
+.vs.expert .llgrid .chip .cx:hover{opacity:1}
+.vs.expert .llrow{display:flex; gap:6px; align-items:center}
+.vs.expert .llrow .in{padding:7px 10px; font-size:0.76rem}
+@media(max-width:760px){
+.vs.expert .llgrid{grid-template-columns:1fr}
+.vs.expert .llcol{padding:16px 0 0; border-left:none; border-top:1px solid var(--border)}
+.vs.expert .llcol:first-child{padding-top:0; border-top:none} }
+@media(max-width:600px){
+.vs.expert .prow{flex-direction:column; align-items:flex-start; gap:8px} }`;
 
 function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, uiTheme = "classic", setUiTheme = () => {}, userEmail, displayName, onDisplayNameChange, session, onIbkrSync, onRunIntegrity, integrityReport, integrityRunning, intradayFeatureEnabled, onToggleIntradayFeature, intradayColumnAvailable, isMobile, isIbkrMode = false, ibkrSyncInfo = null, onSetSyncMode }) {
   const [syncModeBusy, setSyncModeBusy] = useState(false);
@@ -10587,6 +10712,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
   const [snoozeReset, setSnoozeReset] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [ibkrTutOpenM, setIbkrTutOpenM] = useState(false);
+  const [connEditOpen, setConnEditOpen] = useState(false);
   const [viewAsMember, setViewAsMember] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
 
@@ -10631,6 +10757,411 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
   const FONT_OPTS = [{ key: "small", label: "Small" }, { key: "standard", label: "Standard" }, { key: "large", label: "Large" }];
   const firstName = (displayName && displayName.trim()) || (userEmail ? userEmail.split("@")[0] : "trader");
   const integ = integrityReport;
+
+  // ── Shared blocks rendered in BOTH Guided and Pro (hoisted verbatim so the Pro tree reuses
+  //    them without duplicating any data-writing path). Guided's render is byte-identical. ──
+  const ownerZone = isAdmin && (
+          <div className="ownerzone">
+            <div className="ownerhead">
+              <span className="ownerbadge">● Owner only</span>
+              <div style={{ flex: 1 }}><div className="cardtitle" style={{ fontSize: "0.98rem" }}>Access management &amp; data protection</div><div className="carddesc" style={{ marginTop: 2 }}>Members never see this section. Manage who can register and back up everyone's data.</div></div>
+              <div className="seg" id="viewAs" title="Preview what a normal member sees"><button className={!viewAsMember ? "on" : ""} onClick={() => setViewAsMember(false)}>View as owner</button><button className={viewAsMember ? "on" : ""} onClick={() => setViewAsMember(true)}>View as member</button></div>
+            </div>
+            <div className="membernote">A regular member sees <b>none</b> of this — the entire owner zone is hidden for non-admins. Switch back to <b>View as owner</b> to manage codes, members, and backups.</div>
+
+            {/* access code */}
+            <div className={"card guide" + gactive("code")} onMouseEnter={guideEnter("code", "Registration code", "The code new members need to create an account. Share it in your community. Set a new one and the old code stops working immediately, so you can rotate it whenever you want.", "/audio/settings-code.mp3")} onMouseLeave={guideLeave("code")}>
+              <div className="cardtitle" style={{ fontSize: "0.95rem" }}>Active registration code</div>
+              <div className="carddesc">New members need this to sign up. Share it in your Skool community. Setting a new one deactivates the old one immediately.</div>
+              <div className="row" style={{ marginTop: 14, gap: 14 }}><span className="codeshow">{activeCode ? activeCode.code : "— none —"}</span>
+                <button className={"btn" + (codeCopied ? " ok" : "")} onClick={() => { if (activeCode) { try { navigator.clipboard.writeText(activeCode.code); } catch {} setCodeCopied(true); setTimeout(() => setCodeCopied(false), 1500); } }} disabled={!activeCode}>{codeCopied ? "Copied ✓" : "Copy"}</button>
+                <button className="btn red" onClick={() => activeCode && handleDeactivateCode(activeCode.id)} disabled={!activeCode}>Deactivate</button></div>
+              <div className="row" style={{ marginTop: 16, alignItems: "flex-end" }}>
+                <div className="field" style={{ flex: 1, minWidth: 220 }}><label>Set a new code</label><input className="in" value={newCode} onChange={e => setNewCode(e.target.value.toUpperCase())} onKeyDown={e => { if (e.key === "Enter") handleCreateCode(); }} placeholder="e.g. VIV-JUN-2026" style={{ fontFamily: "ui-monospace,SFMono-Regular,Menlo,monospace", letterSpacing: "0.06em" }} /></div>
+                <button className="btn gold" onClick={handleCreateCode} disabled={codeLoading}>{codeLoading ? "Saving…" : "Set new code"}</button>
+              </div>
+            </div>
+
+            {/* members */}
+            <div className="card">
+              <div className="cardtitle" style={{ fontSize: "0.95rem" }}>Registered members <span style={{ color: "var(--faint)", fontWeight: 600, fontSize: "0.8rem" }}>· {allMembers.length} total</span></div>
+              <div style={{ marginTop: 12, maxHeight: 340, overflowY: "auto" }}>
+                {allMembers.map(m => (
+                  <div className="memrow" key={m.id}>
+                    <div><div className="mn">{m.display_name || (m.email ? m.email.split("@")[0] : "Member")}</div><div className="me">{m.email}</div></div>
+                    {m.is_admin && <span className="adm">Admin</span>}
+                    <span className="jd">Joined {m.created_at ? new Date(m.created_at).toLocaleDateString() : "—"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* backup & restore — handlers copied verbatim from the existing render (write to Supabase) */}
+            <div className="card">
+              <div className="cardtitle" style={{ fontSize: "0.95rem" }}>Backup &amp; restore</div>
+              <div className="carddesc">Export all member data (positions, trades, profiles, settings). <b>Run a backup before every deploy.</b> Restore is non-destructive — it only adds or updates, never deletes.</div>
+              <div className="row" style={{ marginTop: 16, gap: 10 }}>
+                <button className="btn green" onClick={async () => {
+                  try {
+                    setBackupStatus("Exporting...");
+                    // Fetch ALL data from ALL tables
+                    const [posRes, tradeRes, profRes, settRes] = await Promise.all([
+                      supabase.from("positions").select("*"),
+                      supabase.from("trades").select("*").or("is_deleted.is.null,is_deleted.eq.false"),
+                      supabase.from("profiles").select("*"),
+                      supabase.from("user_settings").select("*"),
+                    ]);
+                    const backup = {
+                      exported_at: new Date().toISOString(),
+                      version: "1.0",
+                      counts: {
+                        positions: (posRes.data || []).length,
+                        trades: (tradeRes.data || []).length,
+                        profiles: (profRes.data || []).length,
+                        settings: (settRes.data || []).length,
+                      },
+                      positions: posRes.data || [],
+                      trades: tradeRes.data || [],
+                      profiles: profRes.data || [],
+                      settings: settRes.data || [],
+                    };
+                    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `VIV_Backup_${new Date().toISOString().slice(0,10)}_${new Date().toISOString().slice(11,16).replace(":","")}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    setBackupStatus(`Exported: ${backup.counts.positions} positions, ${backup.counts.trades} trades, ${backup.counts.profiles} profiles`);
+                  } catch (err) {
+                    setBackupStatus("Export failed: " + err.message);
+                  }
+                }}>⤓ Export full backup (JSON)</button>
+
+                <button className="btn gold" onClick={async () => {
+                  try {
+                    setBackupStatus("Exporting CSV...");
+                    const [posRes, tradeRes] = await Promise.all([
+                      supabase.from("positions").select("*"),
+                      supabase.from("trades").select("*").or("is_deleted.is.null,is_deleted.eq.false"),
+                    ]);
+                    const pos = posRes.data || [];
+                    const trades = tradeRes.data || [];
+                    // Positions CSV
+                    const posHeaders = ["Symbol","Entry Date","Entry Time","Shares","Entry Price","Current Price","Stop","Trailing Stop","Setup","Tags","Commission","Notes","Chart URL"];
+                    const posRows = [posHeaders.join(",")];
+                    pos.forEach(p => {
+                      posRows.push([p.symbol, p.entry_date, p.entry_time||"", p.shares, p.entry_price, p.current_price, p.stop_price, p.trailing_stop||"", `"${p.setup||""}"`, `"${(p.tags||[]).join("; ")}"`, p.commission!=null?p.commission:"", `"${(p.notes||"").replace(/"/g,'""')}"`, `"${p.chart_url||""}"`].join(","));
+                    });
+                    const posBlob = new Blob([posRows.join("\n")], { type: "text/csv" });
+                    const posUrl = URL.createObjectURL(posBlob);
+                    const a1 = document.createElement("a"); a1.href = posUrl;
+                    a1.download = `VIV_Positions_${new Date().toISOString().slice(0,10)}.csv`; a1.click();
+                    URL.revokeObjectURL(posUrl);
+                    // Trades CSV
+                    const trHeaders = ["Symbol","Entry Date","Entry Time","Exit Date","Exit Time","Entry Price","Exit Price","Shares","Stop","Setup","Tags","P/L %","P/L $","R-Multiple","Exit Reason","Notes","Chart URL"];
+                    const trRows = [trHeaders.join(",")];
+                    trades.forEach(t => {
+                      trRows.push([t.ticker, t.entry_date, t.entry_time||"", t.exit_date||"", t.exit_time||"", t.entry_price, t.exit_price, t.shares, t.stop_price||"", `"${t.setup||""}"`, `"${(t.tags||[]).join("; ")}"`, t.pl_pct!=null?Number(t.pl_pct).toFixed(2):"", t.pl_dollar!=null?Number(t.pl_dollar).toFixed(2):"", t.r_mult!=null?Number(t.r_mult).toFixed(2):"", `"${t.exit_reason||""}"`, `"${(t.notes||"").replace(/"/g,'""')}"`, `"${t.chart_url||""}"`].join(","));
+                    });
+                    // Small delay so browser doesn't block second download
+                    await new Promise(r => setTimeout(r, 500));
+                    const trBlob = new Blob([trRows.join("\n")], { type: "text/csv" });
+                    const trUrl = URL.createObjectURL(trBlob);
+                    const a2 = document.createElement("a"); a2.href = trUrl;
+                    a2.download = `VIV_Trades_${new Date().toISOString().slice(0,10)}.csv`; a2.click();
+                    URL.revokeObjectURL(trUrl);
+                    setBackupStatus(`CSV exported: ${pos.length} positions + ${trades.length} trades (2 files downloaded)`);
+                  } catch (err) {
+                    setBackupStatus("CSV export failed: " + err.message);
+                  }
+                }}>⤓ Export CSV (Excel)</button>
+
+                <label className="btn" style={{ cursor: "pointer" }}>
+                  ⤒ Restore from backup
+                  <input type="file" accept=".json" style={{ display: "none" }} onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      setBackupStatus("Restoring...");
+                      const text = await file.text();
+                      const backup = JSON.parse(text);
+                      if (!backup.version || !backup.positions || !backup.trades) {
+                        setBackupStatus("Invalid backup file — missing required fields.");
+                        return;
+                      }
+
+                      let restored = { positions: 0, trades: 0 };
+
+                      // Restore positions — try update by id first; if row doesn't exist, insert without id
+                      // (upsert fails because id is GENERATED ALWAYS AS IDENTITY)
+                      if (backup.positions.length > 0) {
+                        const withId = backup.positions.filter(p => p.id);
+                        const withoutId = backup.positions.filter(p => !p.id);
+                        for (const p of withId) {
+                          const { id, ...rest } = p;
+                          const { data: updated, error } = await supabase.from("positions").update(rest).eq("id", id).select("id");
+                          if (error && error.code !== 'PGRST116') { setBackupStatus("Position restore error: " + error.message); return; }
+                          // If update found 0 rows (deleted since backup), insert as new row
+                          if (!updated || updated.length === 0) {
+                            const { error: insErr } = await supabase.from("positions").insert(rest);
+                            if (insErr) { setBackupStatus("Position restore (re-insert) error: " + insErr.message); return; }
+                          }
+                        }
+                        if (withoutId.length > 0) {
+                          const inserts = withoutId.map(p => { const { id, ...rest } = p; return rest; });
+                          const { error } = await supabase.from("positions").insert(inserts);
+                          if (error) { setBackupStatus("Position restore error: " + error.message); return; }
+                        }
+                        restored.positions = backup.positions.length;
+                      }
+
+                      // Restore trades — try update by id first; if row doesn't exist, insert without id
+                      if (backup.trades.length > 0) {
+                        const withId = backup.trades.filter(t => t.id);
+                        const withoutId = backup.trades.filter(t => !t.id);
+                        for (const t of withId) {
+                          const { id, ...rest } = t;
+                          const { data: updated, error } = await supabase.from("trades").update(rest).eq("id", id).select("id");
+                          if (error && error.code !== 'PGRST116') { setBackupStatus("Trade restore error: " + error.message); return; }
+                          // If update found 0 rows (deleted since backup), insert as new row
+                          if (!updated || updated.length === 0) {
+                            const { error: insErr } = await supabase.from("trades").insert(rest);
+                            if (insErr) { setBackupStatus("Trade restore (re-insert) error: " + insErr.message); return; }
+                          }
+                        }
+                        if (withoutId.length > 0) {
+                          const { error } = await supabase.from("trades").insert(withoutId);
+                          if (error) { setBackupStatus("Trade restore error: " + error.message); return; }
+                        }
+                        restored.trades = backup.trades.length;
+                      }
+
+                      // Restore profiles — upsert by id (safe, non-destructive)
+                      if (backup.profiles && backup.profiles.length > 0) {
+                        const { error } = await supabase.from("profiles").upsert(backup.profiles, { onConflict: "id" });
+                        if (error) console.error("Profile restore error:", error.message);
+                      }
+
+                      // Restore settings — upsert (safe, non-destructive)
+                      if (backup.settings && backup.settings.length > 0) {
+                        const { error } = await supabase.from("user_settings").upsert(backup.settings, { onConflict: "user_id,setting_key" });
+                        if (error) console.error("Settings restore error:", error.message);
+                      }
+
+                      setBackupStatus(`Restored: ${restored.positions} positions, ${restored.trades} trades. Reload the page to see changes.`);
+                    } catch (err) {
+                      setBackupStatus("Restore failed: " + err.message);
+                    }
+                    e.target.value = ""; // reset file input
+                  }} />
+                </label>
+              </div>
+              <div id="backupStatus" style={{ marginTop: 12, fontSize: "0.76rem", color: backupStatus && (backupStatus.includes("fail") || backupStatus.includes("error") || backupStatus.includes("Invalid")) ? "#fda4a4" : "var(--faint)" }}>{backupStatus}</div>
+            </div>
+          </div>
+        );
+  const mobileSignOut = isMobile && (
+          confirmSignOut ? (
+            <div style={{ marginTop: 20, padding: "16px", border: "1px solid var(--border)", borderRadius: 16, background: "var(--glass)" }}>
+              <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text)", textAlign: "center", marginBottom: 12 }}>Are you sure you want to sign out?</div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => onLogout && onLogout()} style={{ flex: 1, padding: "12px", background: "rgba(239,68,68,0.14)", border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", fontFamily: "var(--font)", fontSize: "0.82rem", fontWeight: 700, borderRadius: 980, cursor: "pointer" }}>Yes</button>
+                <button onClick={() => setConfirmSignOut(false)} style={{ flex: 1, padding: "12px", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.82rem", fontWeight: 700, borderRadius: 980, cursor: "pointer" }}>No</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmSignOut(true)} style={{ marginTop: 20, width: "100%", padding: "13px 16px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.5)", color: "#fca5a5", fontFamily: "var(--font)", fontSize: "0.82rem", fontWeight: 700, borderRadius: 980, cursor: "pointer", boxShadow: "0 0 18px rgba(239,68,68,0.35)" }}>Sign out</button>
+          )
+        );
+
+  // ─── PRO-MODE LAYOUT (ported from mockups/settings-pro.html) — command header + two-column
+  //     grids, status-first IBKR, shared Owner Zone / mobile sign-out. Guided falls through below. ──
+  if (expert) return (
+    <div className={"vs expert" + (viewAsMember ? " member" : "")} ref={rootRef}>
+      <style dangerouslySetInnerHTML={{ __html: SET_CSS }} />
+      <div className="shell">
+
+        {/* NAV — identical to Guided */}
+        <div className="navbar">
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="tabs">
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+            {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          </div>
+          <div className="spacer"></div>
+          <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+            <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
+            <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
+          </div>
+          <WhatsNew />
+          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
+        </div>
+
+        {/* P1. COMMAND HEADER */}
+        <div className="cmdheader">
+          <div className="cmdleft">
+            <div className="eyebrow">Settings</div>
+            <h1 className="ch1">Account</h1>
+            <div className="cmdmeta">{userEmail || ""}</div>
+          </div>
+        </div>
+
+        {/* P2. Profile + Preferences */}
+        <div className="pgrid">
+
+          {/* Profile — existing display-name autosave handler + read-only email */}
+          <div className="card">
+            <div className="cardhead"><span className="label">Profile</span><span className="infodot" data-tip="Your display name is what shows on shared stats and in the members list. Your email is the address you signed in with and can't be changed here.">i</span></div>
+            <div className="field">
+              <label>Display name</label>
+              <input className="in" value={displayName || ""} onChange={e => onDisplayNameChange(e.target.value)} onBlur={e => onDisplayNameChange(e.target.value)} placeholder="Your name" />
+              <div className="hint">Autosaves — no need to click save.</div>
+            </div>
+            <div className="field" style={{ marginTop: 14 }}>
+              <label>Email</label>
+              <input className="in" value={userEmail || ""} disabled />
+              <div className="hint">Fixed — your login.</div>
+            </div>
+          </div>
+
+          {/* Preferences — the existing five rows relocated, same handlers */}
+          <div className="card">
+            <div className="cardhead"><span className="label">Preferences</span><span className="infodot" data-tip="Choose whether the app opens in Guided mode with explanations, or Pro mode for a clean expert view, plus your privacy, text size, and interface style defaults. These stick across your devices.">i</span></div>
+            <div className="hint" style={{ margin: "-6px 0 4px" }}>Changes save instantly.</div>
+
+            <div className="prow">
+              <span className="plabel">Default mode</span>
+              <div className="seg" id="prefMode"><button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button><button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button></div>
+            </div>
+            <div className="prow">
+              <span className="plabel">Privacy by default</span>
+              <div className="seg" id="prefPrivacy"><button className={privacyMode === "off" ? "on" : ""} onClick={() => applyPrivacy("off")}>Show $</button><button className={privacyMode === "on" ? "on" : ""} onClick={() => applyPrivacy("on")}>Show % only</button></div>
+            </div>
+            <div className="prow">
+              <span className="plabel">Text size</span>
+              <div className="prowctrl" id="prefFont">
+                {FONT_OPTS.map(o => (<button key={o.key} className={"ghostchip" + (fontSize === o.key ? " on" : "")} onClick={() => setFontSize(o.key)}>{o.label}</button>))}
+              </div>
+            </div>
+            <div className="prow">
+              <span className="plabel">Interface style</span>
+              <div className="seg" id="prefTheme"><button className={uiTheme === "classic" ? "on" : ""} onClick={() => setUiTheme("classic")}>VIV Classic</button><button className={uiTheme === "zella" ? "on" : ""} onClick={() => setUiTheme("zella")}>Zella Clean</button></div>
+            </div>
+            <div className="prow">
+              <span className="plabel">Community reminders</span>
+              <button className={"ghostchip" + (snoozeReset ? " on" : "")} onClick={resetReminders}>{snoozeReset ? "Reset ✓" : "Reset reminders"}</button>
+            </div>
+          </div>
+
+        </div>
+
+        {/* P3. INTERACTIVE BROKERS — status-first */}
+        <div className="card" style={{ marginTop: 14 }}>
+          <div className="cardhead"><span className="label">Interactive Brokers</span><span className="infodot" data-tip="Connect Interactive Brokers to pull your positions and closed trades automatically. It only ever reads your statements — it can never trade or move money.">i</span></div>
+
+          <div className="row">
+            <span className={"conn " + (isIbkrMode ? "yes" : "no")}><span className="d"></span>{isIbkrMode ? "Auto-sync · ON" : "Auto-sync · PAUSED"}</span>
+            <span className="ibkrmeta">{isIbkrMode
+              ? (ibkrSyncInfo?.last_synced_at ? `Last synced ${new Date(ibkrSyncInfo.last_synced_at).toLocaleString()}` : "No sync has run yet")
+              : (ibkrConnected ? "Paused — switched to manual entry" : "Not connected")}</span>
+            <div className="spacer"></div>
+            {onSetSyncMode && (isIbkrMode
+              ? <>{onIbkrSync && <button className="btn gold" disabled={syncModeBusy} onClick={() => onIbkrSync()} title="Pull your latest IBKR statement right now">Sync now</button>}
+                  <button className="btn" disabled={syncModeBusy} onClick={() => toggleSyncMode("manual")} title="Stop auto-sync and return to manual entry">{syncModeBusy ? "…" : "Pause auto-sync"}</button></>
+              : <button className="btn gold" disabled={syncModeBusy || !ibkrConnected} onClick={() => toggleSyncMode("ibkr")} title={ibkrConnected ? "Start auto-sync (backfills the last 30 days)" : "Connect your IBKR account first"}>{syncModeBusy ? "…" : "Turn on auto-sync"}</button>)}
+          </div>
+
+          <div className="alert caution" style={{ marginTop: 14 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v5M12 16h.01" /></svg><div>Read-only connection — it can pull statements but can never trade or move money.</div></div>
+
+          {/* Edit connection — collapsed expander with the existing Flex Query ID / token fields + Save connection */}
+          <div className="expander">
+            <div className={"exhead" + (connEditOpen ? " open" : "")} onClick={() => setConnEditOpen(o => !o)}>Edit connection <span className="chev">▾</span></div>
+            <div className={"exbody" + (connEditOpen ? " open" : "")}>
+              <div className="grid2">
+                <div className="field"><label>Flex Query ID</label><input className="in" value={ibkrQueryId} onChange={e => { setIbkrQueryId(e.target.value); setIbkrConnError(""); }} placeholder="e.g. 1519726" />
+                  {ibkrQueryId.trim() && !/^\d{1,12}$/.test(ibkrQueryId.replace(/["'\s]/g, ""))
+                    ? <div className="hint" style={{ color: "#ff8f8f" }}>⚠ This should be a short NUMBER (e.g. 1519726) — not your email or username.</div>
+                    : <div className="hint">From your IBKR Flex Queries list.</div>}</div>
+                <div className="field"><label>Flex Web Service token</label><input className="in" type="password" autoComplete="off" value={ibkrToken} onChange={e => { setIbkrToken(e.target.value); setIbkrConnError(""); }} placeholder="paste your token" /><div className="hint">Read-only — like a password.</div></div>
+              </div>
+              <div className="row" style={{ marginTop: 14 }}>
+                <button className={"btn gold" + (ibkrConnStatus === "saved" ? " ok" : "")} onClick={saveIbkrConn} disabled={ibkrConnStatus === "saving"}>{ibkrConnStatus === "saving" ? "Saving…" : ibkrConnStatus === "saved" ? "Saved ✓" : ibkrConnStatus === "error" ? "Failed" : "Save connection"}</button>
+                {ibkrLoaded && <span className={"conn " + (ibkrConnected ? "yes" : "no")}><span className="d"></span>{ibkrConnected ? "Connected ✓" : "Not connected"}</span>}
+              </div>
+              {ibkrConnError && <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,107,107,0.35)", background: "rgba(255,107,107,0.08)", color: "#ff9f9f", fontSize: 13, lineHeight: 1.5, maxWidth: 640 }}>⚠ {ibkrConnError}</div>}
+            </div>
+          </div>
+
+          {/* Setup guide — the existing 8-step tutorial behind a link-style toggle (reuses ibkrTutOpenM) */}
+          <div className="expander" style={{ marginTop: 13 }}>
+            <div className={"exhead" + (ibkrTutOpenM ? " open" : "")} onClick={() => setIbkrTutOpenM(o => !o)}>Setup guide <span className="chev">▾</span></div>
+            <div className={"exbody" + (ibkrTutOpenM ? " open" : "")}>
+              <div className="steps">
+                <div className="step"><span className="sn">Step 1 · Log in on a computer</span><b>Open the IBKR Client Portal</b><p>Go to interactivebrokers.com → Client Portal (web, not the app). Top menu: <b>Performance &amp; Reports → Flex Queries</b>.</p></div>
+                <div className="step"><span className="sn">Step 2 · Create the query</span><b>New Activity Flex Query</b><p>Click the blue <b>+</b> next to "Activity Flex Query". In <b>Query Name</b> type <code>VIV</code>.</p></div>
+                <div className="step"><span className="sn">Step 3 · Tick two sections</span><b>Open Positions &amp; Trades</b><p>Under <b>Open Positions</b> click <b>Select All</b>. Under <b>Trades</b> click <b>Select All</b>. Leave everything else unticked.</p></div>
+                <div className="step"><span className="sn">Step 4 · Delivery settings</span><b>XML, last 365 days</b><p>Format = <code>XML</code>, Period = <b>Last 365 Calendar Days</b>. (Auto-sync only logs trades from your start date forward, so older history won't flood your journal.)</p></div>
+                <div className="step"><span className="sn">Step 5 · General settings</span><b>Leave the defaults</b><p>Date <code>yyyyMMdd</code>, Time <code>HHmmss</code>, Separator <code>;</code>, all Yes/No = No. Click <b>Continue → Create</b>.</p></div>
+                <div className="step"><span className="sn">Step 6 · Copy the Query ID</span><b>Write down the number</b><p>The query now shows a <b>Query ID</b> on the list. Copy it.</p></div>
+                <div className="step"><span className="sn">Step 7 · Get a token</span><b>Flex Web Service</b><p>Find <b>Flex Web Service Configuration</b>, switch <b>Status</b> to <b>on</b>, click <b>Generate New Token</b> (longest expiry), and copy it. <span style={{ color: "var(--goldBright)" }}>Treat it like a password.</span></p></div>
+                <div className="step"><span className="sn">Step 8 · Paste &amp; save</span><b>Link your account</b><p>Paste the <b>Query ID</b> and <b>token</b> into the fields above and click <b>Save connection</b>. Then click <b>Turn on auto-sync</b> just below. Done — privately linked to you.</p></div>
+              </div>
+              <div className="alert ok" style={{ marginTop: 14 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6 9 17l-5-5" /></svg><div><b>Good to know:</b> once auto-sync is on, each closed trade is logged <b>automatically</b> a few minutes after it closes — you never re-type it. The figures come straight from IBKR; you just add your <b>stop</b> (R-multiple stays blank until you do). It's <b>read-only</b> and only ever adds your own broker trades — it never edits or deletes anything else. The dot next to each ticker shows the source: <SourceDot source="manual" /> manual · <SourceDot source="ibkr" /> auto-synced.</div></div>
+            </div>
+          </div>
+        </div>
+
+        {/* P4. Data Integrity + Lists & Labels */}
+        <div className="pgrid" style={{ marginTop: 14 }}>
+
+          {/* Data integrity — existing status + Run check handler */}
+          <div className="card">
+            <div className="cardhead"><span className="label">Data Integrity</span><span className="infodot" data-tip="Scans your trades and positions for duplicates, orphaned trades, and sign errors. Read-only — it never changes anything.">i</span></div>
+            <div className="row">
+              <span className={"conn " + (integ ? (integ.counts.critical > 0 ? "no" : "yes") : "yes")} style={integ && integ.counts.critical > 0 ? { background: "rgba(239,68,68,0.12)", color: "#fda4a4" } : undefined}><span className="d"></span>{integ ? (integ.counts.critical > 0 ? `${integ.counts.critical} critical${integ.counts.warn > 0 ? ` · ${integ.counts.warn} warn` : ""}` : "All clean ✓") : "Auto-checked on every sync"}</span>
+              <span className="ibkrmeta">Auto-runs on every sync</span>
+              <div className="spacer"></div>
+              {onRunIntegrity && <button className="ghostchip" onClick={onRunIntegrity} disabled={integrityRunning}>{integrityRunning ? "Scanning…" : (integ ? "↻ Re-run check" : "Run check")}</button>}
+            </div>
+          </div>
+
+          {/* Lists & labels — the three existing chip managers as three compact columns */}
+          <div className="card">
+            <div className="cardhead"><span className="label">Lists &amp; Labels</span><span className="infodot" data-tip="The options that appear in the Setup, Tags, and Exit Reason dropdowns across your positions and journal.">i</span></div>
+            <div className="llgrid">
+              {[
+                { label: "Setup Types", items: setupTypes, onAdd: () => addItem(setupTypes, setSetupTypes, newSetup, setNewSetup), onRemove: v => removeItem(setupTypes, setSetupTypes, v), val: newSetup, setVal: setNewSetup, ph: "e.g. Flag Breakout" },
+                { label: "Tags", items: tags, onAdd: () => addItem(tags, setTags, newTag, setNewTag), onRemove: v => removeItem(tags, setTags, v), val: newTag, setVal: setNewTag, ph: "e.g. Pre-Earnings" },
+                { label: "Exit Reasons", items: exitReasons, onAdd: () => addItem(exitReasons, setExitReasons, newReason, setNewReason), onRemove: v => removeItem(exitReasons, setExitReasons, v), val: newReason, setVal: setNewReason, ph: "e.g. Gap Down" },
+              ].map(col => (
+                <div className="llcol" key={col.label}>
+                  <div className="label">{col.label}</div>
+                  <div className="chips">{col.items.map(item => (
+                    <span key={item} className="chip">{item}<span className="cx" onClick={() => col.onRemove(item)}>&times;</span></span>
+                  ))}</div>
+                  <div className="llrow"><input className="in" value={col.val} onChange={e => col.setVal(e.target.value)} onKeyDown={e => { if (e.key === "Enter") col.onAdd(); }} placeholder={col.ph} /><button className="ghostchip" onClick={col.onAdd}>Add</button></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Admin Owner Zone — rendered unchanged in Pro (shared const) */}
+        {ownerZone}
+
+        {/* Mobile-only sign out — rendered unchanged in Pro (shared const) */}
+        {mobileSignOut}
+
+      </div>
+    </div>
+  );
 
   return (
     <div className={"vs" + (expert ? " expert" : "") + (viewAsMember ? " member" : "")} ref={rootRef}>
@@ -10870,222 +11401,10 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
         </div>
 
         {/* ===== OWNER-ONLY ZONE ===== */}
-        {isAdmin && (
-          <div className="ownerzone">
-            <div className="ownerhead">
-              <span className="ownerbadge">● Owner only</span>
-              <div style={{ flex: 1 }}><div className="cardtitle" style={{ fontSize: "0.98rem" }}>Access management &amp; data protection</div><div className="carddesc" style={{ marginTop: 2 }}>Members never see this section. Manage who can register and back up everyone's data.</div></div>
-              <div className="seg" id="viewAs" title="Preview what a normal member sees"><button className={!viewAsMember ? "on" : ""} onClick={() => setViewAsMember(false)}>View as owner</button><button className={viewAsMember ? "on" : ""} onClick={() => setViewAsMember(true)}>View as member</button></div>
-            </div>
-            <div className="membernote">A regular member sees <b>none</b> of this — the entire owner zone is hidden for non-admins. Switch back to <b>View as owner</b> to manage codes, members, and backups.</div>
-
-            {/* access code */}
-            <div className={"card guide" + gactive("code")} onMouseEnter={guideEnter("code", "Registration code", "The code new members need to create an account. Share it in your community. Set a new one and the old code stops working immediately, so you can rotate it whenever you want.", "/audio/settings-code.mp3")} onMouseLeave={guideLeave("code")}>
-              <div className="cardtitle" style={{ fontSize: "0.95rem" }}>Active registration code</div>
-              <div className="carddesc">New members need this to sign up. Share it in your Skool community. Setting a new one deactivates the old one immediately.</div>
-              <div className="row" style={{ marginTop: 14, gap: 14 }}><span className="codeshow">{activeCode ? activeCode.code : "— none —"}</span>
-                <button className={"btn" + (codeCopied ? " ok" : "")} onClick={() => { if (activeCode) { try { navigator.clipboard.writeText(activeCode.code); } catch {} setCodeCopied(true); setTimeout(() => setCodeCopied(false), 1500); } }} disabled={!activeCode}>{codeCopied ? "Copied ✓" : "Copy"}</button>
-                <button className="btn red" onClick={() => activeCode && handleDeactivateCode(activeCode.id)} disabled={!activeCode}>Deactivate</button></div>
-              <div className="row" style={{ marginTop: 16, alignItems: "flex-end" }}>
-                <div className="field" style={{ flex: 1, minWidth: 220 }}><label>Set a new code</label><input className="in" value={newCode} onChange={e => setNewCode(e.target.value.toUpperCase())} onKeyDown={e => { if (e.key === "Enter") handleCreateCode(); }} placeholder="e.g. VIV-JUN-2026" style={{ fontFamily: "ui-monospace,SFMono-Regular,Menlo,monospace", letterSpacing: "0.06em" }} /></div>
-                <button className="btn gold" onClick={handleCreateCode} disabled={codeLoading}>{codeLoading ? "Saving…" : "Set new code"}</button>
-              </div>
-            </div>
-
-            {/* members */}
-            <div className="card">
-              <div className="cardtitle" style={{ fontSize: "0.95rem" }}>Registered members <span style={{ color: "var(--faint)", fontWeight: 600, fontSize: "0.8rem" }}>· {allMembers.length} total</span></div>
-              <div style={{ marginTop: 12, maxHeight: 340, overflowY: "auto" }}>
-                {allMembers.map(m => (
-                  <div className="memrow" key={m.id}>
-                    <div><div className="mn">{m.display_name || (m.email ? m.email.split("@")[0] : "Member")}</div><div className="me">{m.email}</div></div>
-                    {m.is_admin && <span className="adm">Admin</span>}
-                    <span className="jd">Joined {m.created_at ? new Date(m.created_at).toLocaleDateString() : "—"}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* backup & restore — handlers copied verbatim from the existing render (write to Supabase) */}
-            <div className="card">
-              <div className="cardtitle" style={{ fontSize: "0.95rem" }}>Backup &amp; restore</div>
-              <div className="carddesc">Export all member data (positions, trades, profiles, settings). <b>Run a backup before every deploy.</b> Restore is non-destructive — it only adds or updates, never deletes.</div>
-              <div className="row" style={{ marginTop: 16, gap: 10 }}>
-                <button className="btn green" onClick={async () => {
-                  try {
-                    setBackupStatus("Exporting...");
-                    // Fetch ALL data from ALL tables
-                    const [posRes, tradeRes, profRes, settRes] = await Promise.all([
-                      supabase.from("positions").select("*"),
-                      supabase.from("trades").select("*").or("is_deleted.is.null,is_deleted.eq.false"),
-                      supabase.from("profiles").select("*"),
-                      supabase.from("user_settings").select("*"),
-                    ]);
-                    const backup = {
-                      exported_at: new Date().toISOString(),
-                      version: "1.0",
-                      counts: {
-                        positions: (posRes.data || []).length,
-                        trades: (tradeRes.data || []).length,
-                        profiles: (profRes.data || []).length,
-                        settings: (settRes.data || []).length,
-                      },
-                      positions: posRes.data || [],
-                      trades: tradeRes.data || [],
-                      profiles: profRes.data || [],
-                      settings: settRes.data || [],
-                    };
-                    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `VIV_Backup_${new Date().toISOString().slice(0,10)}_${new Date().toISOString().slice(11,16).replace(":","")}.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    setBackupStatus(`Exported: ${backup.counts.positions} positions, ${backup.counts.trades} trades, ${backup.counts.profiles} profiles`);
-                  } catch (err) {
-                    setBackupStatus("Export failed: " + err.message);
-                  }
-                }}>⤓ Export full backup (JSON)</button>
-
-                <button className="btn gold" onClick={async () => {
-                  try {
-                    setBackupStatus("Exporting CSV...");
-                    const [posRes, tradeRes] = await Promise.all([
-                      supabase.from("positions").select("*"),
-                      supabase.from("trades").select("*").or("is_deleted.is.null,is_deleted.eq.false"),
-                    ]);
-                    const pos = posRes.data || [];
-                    const trades = tradeRes.data || [];
-                    // Positions CSV
-                    const posHeaders = ["Symbol","Entry Date","Entry Time","Shares","Entry Price","Current Price","Stop","Trailing Stop","Setup","Tags","Commission","Notes","Chart URL"];
-                    const posRows = [posHeaders.join(",")];
-                    pos.forEach(p => {
-                      posRows.push([p.symbol, p.entry_date, p.entry_time||"", p.shares, p.entry_price, p.current_price, p.stop_price, p.trailing_stop||"", `"${p.setup||""}"`, `"${(p.tags||[]).join("; ")}"`, p.commission!=null?p.commission:"", `"${(p.notes||"").replace(/"/g,'""')}"`, `"${p.chart_url||""}"`].join(","));
-                    });
-                    const posBlob = new Blob([posRows.join("\n")], { type: "text/csv" });
-                    const posUrl = URL.createObjectURL(posBlob);
-                    const a1 = document.createElement("a"); a1.href = posUrl;
-                    a1.download = `VIV_Positions_${new Date().toISOString().slice(0,10)}.csv`; a1.click();
-                    URL.revokeObjectURL(posUrl);
-                    // Trades CSV
-                    const trHeaders = ["Symbol","Entry Date","Entry Time","Exit Date","Exit Time","Entry Price","Exit Price","Shares","Stop","Setup","Tags","P/L %","P/L $","R-Multiple","Exit Reason","Notes","Chart URL"];
-                    const trRows = [trHeaders.join(",")];
-                    trades.forEach(t => {
-                      trRows.push([t.ticker, t.entry_date, t.entry_time||"", t.exit_date||"", t.exit_time||"", t.entry_price, t.exit_price, t.shares, t.stop_price||"", `"${t.setup||""}"`, `"${(t.tags||[]).join("; ")}"`, t.pl_pct!=null?Number(t.pl_pct).toFixed(2):"", t.pl_dollar!=null?Number(t.pl_dollar).toFixed(2):"", t.r_mult!=null?Number(t.r_mult).toFixed(2):"", `"${t.exit_reason||""}"`, `"${(t.notes||"").replace(/"/g,'""')}"`, `"${t.chart_url||""}"`].join(","));
-                    });
-                    // Small delay so browser doesn't block second download
-                    await new Promise(r => setTimeout(r, 500));
-                    const trBlob = new Blob([trRows.join("\n")], { type: "text/csv" });
-                    const trUrl = URL.createObjectURL(trBlob);
-                    const a2 = document.createElement("a"); a2.href = trUrl;
-                    a2.download = `VIV_Trades_${new Date().toISOString().slice(0,10)}.csv`; a2.click();
-                    URL.revokeObjectURL(trUrl);
-                    setBackupStatus(`CSV exported: ${pos.length} positions + ${trades.length} trades (2 files downloaded)`);
-                  } catch (err) {
-                    setBackupStatus("CSV export failed: " + err.message);
-                  }
-                }}>⤓ Export CSV (Excel)</button>
-
-                <label className="btn" style={{ cursor: "pointer" }}>
-                  ⤒ Restore from backup
-                  <input type="file" accept=".json" style={{ display: "none" }} onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    try {
-                      setBackupStatus("Restoring...");
-                      const text = await file.text();
-                      const backup = JSON.parse(text);
-                      if (!backup.version || !backup.positions || !backup.trades) {
-                        setBackupStatus("Invalid backup file — missing required fields.");
-                        return;
-                      }
-
-                      let restored = { positions: 0, trades: 0 };
-
-                      // Restore positions — try update by id first; if row doesn't exist, insert without id
-                      // (upsert fails because id is GENERATED ALWAYS AS IDENTITY)
-                      if (backup.positions.length > 0) {
-                        const withId = backup.positions.filter(p => p.id);
-                        const withoutId = backup.positions.filter(p => !p.id);
-                        for (const p of withId) {
-                          const { id, ...rest } = p;
-                          const { data: updated, error } = await supabase.from("positions").update(rest).eq("id", id).select("id");
-                          if (error && error.code !== 'PGRST116') { setBackupStatus("Position restore error: " + error.message); return; }
-                          // If update found 0 rows (deleted since backup), insert as new row
-                          if (!updated || updated.length === 0) {
-                            const { error: insErr } = await supabase.from("positions").insert(rest);
-                            if (insErr) { setBackupStatus("Position restore (re-insert) error: " + insErr.message); return; }
-                          }
-                        }
-                        if (withoutId.length > 0) {
-                          const inserts = withoutId.map(p => { const { id, ...rest } = p; return rest; });
-                          const { error } = await supabase.from("positions").insert(inserts);
-                          if (error) { setBackupStatus("Position restore error: " + error.message); return; }
-                        }
-                        restored.positions = backup.positions.length;
-                      }
-
-                      // Restore trades — try update by id first; if row doesn't exist, insert without id
-                      if (backup.trades.length > 0) {
-                        const withId = backup.trades.filter(t => t.id);
-                        const withoutId = backup.trades.filter(t => !t.id);
-                        for (const t of withId) {
-                          const { id, ...rest } = t;
-                          const { data: updated, error } = await supabase.from("trades").update(rest).eq("id", id).select("id");
-                          if (error && error.code !== 'PGRST116') { setBackupStatus("Trade restore error: " + error.message); return; }
-                          // If update found 0 rows (deleted since backup), insert as new row
-                          if (!updated || updated.length === 0) {
-                            const { error: insErr } = await supabase.from("trades").insert(rest);
-                            if (insErr) { setBackupStatus("Trade restore (re-insert) error: " + insErr.message); return; }
-                          }
-                        }
-                        if (withoutId.length > 0) {
-                          const { error } = await supabase.from("trades").insert(withoutId);
-                          if (error) { setBackupStatus("Trade restore error: " + error.message); return; }
-                        }
-                        restored.trades = backup.trades.length;
-                      }
-
-                      // Restore profiles — upsert by id (safe, non-destructive)
-                      if (backup.profiles && backup.profiles.length > 0) {
-                        const { error } = await supabase.from("profiles").upsert(backup.profiles, { onConflict: "id" });
-                        if (error) console.error("Profile restore error:", error.message);
-                      }
-
-                      // Restore settings — upsert (safe, non-destructive)
-                      if (backup.settings && backup.settings.length > 0) {
-                        const { error } = await supabase.from("user_settings").upsert(backup.settings, { onConflict: "user_id,setting_key" });
-                        if (error) console.error("Settings restore error:", error.message);
-                      }
-
-                      setBackupStatus(`Restored: ${restored.positions} positions, ${restored.trades} trades. Reload the page to see changes.`);
-                    } catch (err) {
-                      setBackupStatus("Restore failed: " + err.message);
-                    }
-                    e.target.value = ""; // reset file input
-                  }} />
-                </label>
-              </div>
-              <div id="backupStatus" style={{ marginTop: 12, fontSize: "0.76rem", color: backupStatus && (backupStatus.includes("fail") || backupStatus.includes("error") || backupStatus.includes("Invalid")) ? "#fda4a4" : "var(--faint)" }}>{backupStatus}</div>
-            </div>
-          </div>
-        )}
+        {ownerZone}
 
         {/* Mobile-only sign out — the mobile top bar no longer carries it, so this is the phone logout path. Two-step Yes/No confirm. */}
-        {isMobile && (
-          confirmSignOut ? (
-            <div style={{ marginTop: 20, padding: "16px", border: "1px solid var(--border)", borderRadius: 16, background: "var(--glass)" }}>
-              <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text)", textAlign: "center", marginBottom: 12 }}>Are you sure you want to sign out?</div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => onLogout && onLogout()} style={{ flex: 1, padding: "12px", background: "rgba(239,68,68,0.14)", border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", fontFamily: "var(--font)", fontSize: "0.82rem", fontWeight: 700, borderRadius: 980, cursor: "pointer" }}>Yes</button>
-                <button onClick={() => setConfirmSignOut(false)} style={{ flex: 1, padding: "12px", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.82rem", fontWeight: 700, borderRadius: 980, cursor: "pointer" }}>No</button>
-              </div>
-            </div>
-          ) : (
-            <button onClick={() => setConfirmSignOut(true)} style={{ marginTop: 20, width: "100%", padding: "13px 16px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.5)", color: "#fca5a5", fontFamily: "var(--font)", fontSize: "0.82rem", fontWeight: 700, borderRadius: 980, cursor: "pointer", boxShadow: "0 0 18px rgba(239,68,68,0.35)" }}>Sign out</button>
-          )
-        )}
+        {mobileSignOut}
 
         {/* guide assistant */}
         <div className={"guidepanel" + (speaking ? " speaking" : "")} aria-live="polite">
