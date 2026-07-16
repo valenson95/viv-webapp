@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIV — Model Book (Pro layout)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     VIV brand tokens — copied verbatim from dashboard-pro.html
+     ============================================================ */
+  :root{
+    --bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
+    --text:rgba(255,255,255,0.92);
+    --muted:rgba(255,255,255,0.70);
+    --faint:rgba(255,255,255,0.45);
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:var(--font); line-height:1.5; font-size:16px;
+    -webkit-font-smoothing:antialiased; padding:0; min-height:100vh;
+  }
+
+  /* ===== SHELL ===== */
+  .shell{width:100%; max-width:1400px; margin:0 auto; padding:22px 24px 80px}
+  @media(min-width:2000px){ .shell{max-width:1680px} }
+
+  /* ===== NAV — copied verbatim from dashboard-pro.html (no Guided/Pro toggle: Model Book has none) ===== */
+  .navbar{display:flex; align-items:center; gap:16px; margin-bottom:22px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem}
+  .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
+  .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
+  .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+  .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
+  .tabs a:hover:not(.on){color:var(--text)}
+  .spacer{flex:1}
+
+  /* ===== SHARED CARD CHROME — uniform across Pro pages ===== */
+  .card{
+    position:relative; background:var(--glass);
+    border:1px solid var(--border); border-radius:16px;
+    backdrop-filter:blur(24px) saturate(150%);
+    -webkit-backdrop-filter:blur(24px) saturate(150%);
+    padding:18px 20px; overflow:visible;
+  }
+  .card::before{
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%);
+   border-radius:inherit;}
+  .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+  .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+  .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+  .cardhead .label{flex:1}
+  .infodot{width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex;
+    align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic;
+    color:var(--faint); cursor:help; flex:none}
+  .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+  /* shared tooltip — exact, so all Pro pages match */
+  .infodot{position:relative; cursor:help}
+  .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+  .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+    font-size:0.62rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em}
+  .ghostchip:hover{color:var(--text); border-color:var(--borderGold)}
+  .btn{
+    border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text);
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:8px 16px;
+    border-radius:980px; cursor:pointer;
+  }
+  .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+  .tag{display:inline-block; font-size:0.64rem; font-weight:600; color:var(--muted); background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; padding:2px 7px}
+  .gradewrap{display:inline-flex; align-items:center; gap:6px}
+  .gradebadge{display:inline-flex; width:21px; height:21px; border-radius:6px; align-items:center; justify-content:center; font-weight:800; font-size:0.66rem; flex:none}
+  .gradebadge.a{background:rgba(34,197,94,0.15); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+  .gradebadge.b{background:var(--goldDim); color:var(--goldBright); border:1px solid var(--borderGold)}
+  .gradebadge.c{background:rgba(239,68,68,0.12); color:#fca5a5; border:1px solid rgba(239,68,68,0.3)}
+
+  /* ===== COMMAND HEADER — copied verbatim from dashboard-pro.html ===== */
+  .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
+  .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+  .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px}
+  .cmdactions{display:flex; gap:10px; flex-wrap:wrap}
+
+  /* ===== LEGEND — micro-labels + info dots explaining the concepts behind the filters below,
+       same pattern dashboard-pro.html uses on every cardhead. ===== */
+  .mblegend{display:flex; gap:20px; flex-wrap:wrap; margin:0 0 12px}
+  .flabel{display:inline-flex; align-items:center; gap:6px; font-size:0.62rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted)}
+
+  /* ===== FILTER ROW — mirrors ModelBook.jsx's own chip(active) pill buttons, divided into
+       scope / pattern / star-tier groups exactly like the live component's toolbar. These are
+       REAL filters (buttons, not links) that combine with AND across groups. ===== */
+  .mbfilters{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 20px}
+  .fchip{display:inline-flex; align-items:center; gap:5px; font-family:var(--font); font-size:0.72rem; font-weight:700;
+    padding:7px 15px; border-radius:980px; cursor:pointer; border:1px solid var(--border); background:rgba(255,255,255,0.03);
+    color:var(--muted); text-decoration:none; transition:all .14s; white-space:nowrap}
+  .fchip:hover{color:var(--text); border-color:var(--borderGold)}
+  .fchip.on{background:linear-gradient(135deg,var(--goldBright),var(--goldMid)); color:#08080e; border-color:var(--goldBright)}
+  .fdivider{width:1px; align-self:stretch; background:var(--border); margin:0 3px}
+
+  /* ===== CARD GALLERY ===== */
+  .mbgrid{display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:16px; margin-top:4px}
+  .mbcard{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:16px;
+    overflow:hidden; cursor:pointer; transition:transform .15s ease, border-color .15s ease}
+  .mbcard:hover{transform:translateY(-3px); border-color:var(--borderGold)}
+  .mbcard.elite{border-color:rgba(126,240,160,0.32)}
+  .mbcard.elite:hover{border-color:rgba(126,240,160,0.55)}
+  .mbempty{display:none; align-items:center; justify-content:center; gap:14px; color:var(--muted); font-size:0.86rem; padding:60px 0; flex-wrap:wrap; text-align:center}
+  .mbempty.show{display:flex}
+
+  /* chart placeholder — styled gradient + faint grid, deliberately NOT a real chart.
+     Background is shared with .mboverlaychart, declared once further down. */
+  .mbchart{position:relative; height:160px; overflow:hidden; border-bottom:1px solid var(--border)}
+  .mbwatermark{position:absolute; left:12px; bottom:4px; font-size:2.6rem; font-weight:800; letter-spacing:-0.02em;
+    color:rgba(255,255,255,0.05); pointer-events:none; user-select:none; line-height:1}
+  .mbsweep{position:absolute; inset:0; width:100%; height:100%}
+  .eliteribbon{position:absolute; top:12px; right:12px; z-index:2; font-size:0.6rem; font-weight:800; letter-spacing:0.05em;
+    padding:5px 12px; border-radius:980px; background:rgba(126,240,160,0.16); border:1px solid rgba(126,240,160,0.45);
+    color:#7ef0a0; box-shadow:0 0 16px rgba(126,240,160,0.25); backdrop-filter:blur(4px); text-transform:uppercase}
+
+  .mbbody{padding:14px 16px 16px}
+  .mbtoprow{display:flex; align-items:baseline; justify-content:space-between; gap:8px}
+  .mbticker{font-size:1.05rem; font-weight:800; color:var(--white); letter-spacing:-0.01em}
+  .mbdate{font-size:0.64rem; color:var(--faint); white-space:nowrap}
+  .mbtags{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:9px}
+  .patterntag{font-size:0.62rem; font-weight:800; color:var(--gold); background:var(--goldDim); border:1px solid var(--borderGold);
+    padding:2px 9px; border-radius:980px}
+  .mbscope{font-size:0.58rem; font-weight:800; padding:2px 9px; border-radius:980px; white-space:nowrap}
+  .mbscope.official{color:var(--goldBright); background:var(--goldDim); border:1px solid var(--borderGold)}
+  .mbscope.personal{color:#8ab4f8; border:1px solid rgba(138,180,248,0.35)}
+  .mbscope.draft{color:var(--muted); border:1px solid var(--border)}
+  .mboutcome{font-size:0.6rem; font-weight:800; padding:3px 10px; border-radius:980px; border:1px solid var(--border);
+    white-space:nowrap; margin-left:auto}
+  .mboutcome.huge{color:#7ef0a0; border-color:rgba(126,240,160,0.35); background:rgba(126,240,160,0.08)}
+  .mboutcome.winner{color:var(--green); border-color:rgba(34,197,94,0.3); background:rgba(34,197,94,0.08)}
+  .mboutcome.subpar{color:var(--muted); background:rgba(255,255,255,0.03)}
+  .mboutcome.loser{color:var(--red); border-color:rgba(239,68,68,0.3); background:rgba(239,68,68,0.08)}
+
+  .mbgraderow{display:flex; align-items:center; gap:10px; margin-top:11px; padding-top:11px; border-top:1px solid var(--border)}
+  .stars{font-size:0.82rem; letter-spacing:1.5px; white-space:nowrap; color:var(--goldBright); text-shadow:0 0 8px rgba(240,192,80,0.35)}
+  .stars .dim{color:rgba(255,255,255,0.14); text-shadow:none}
+  .stars .grn{color:#7ef0a0; text-shadow:0 0 8px rgba(126,240,160,0.45)}
+  .tierlabel{font-size:0.66rem; font-weight:800; color:var(--muted)}
+  .tierlabel.elitetxt{color:#7ef0a0}
+  .mbr{margin-left:auto; font-size:0.84rem; font-weight:800}
+  .mbr.up{color:var(--green)} .mbr.dn{color:var(--red)}
+  .mblesson{font-size:0.74rem; color:var(--muted); line-height:1.5; margin-top:10px;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+
+  /* ===== DETAIL OVERLAY — dimmed backdrop + larger chart + full lesson text, opens on card click ===== */
+  .mboverlay{position:fixed; inset:0; z-index:200; background:rgba(4,4,8,0.72); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto;
+    opacity:0; pointer-events:none; transition:opacity .15s ease}
+  .mboverlay.open{opacity:1; pointer-events:auto}
+  .mboverlaycard{position:relative; width:min(640px,100%); background:linear-gradient(180deg, rgba(18,18,26,0.95), rgba(8,8,14,0.98));
+    border:1px solid var(--borderGold); border-radius:20px; overflow:hidden; box-shadow:0 40px 100px rgba(0,0,0,0.72)}
+  .mboverlayclose{position:absolute; top:14px; right:14px; z-index:3; background:rgba(255,255,255,0.08); border:1px solid var(--border);
+    color:var(--white); width:34px; height:34px; border-radius:10px; font-size:1.2rem; cursor:pointer; line-height:1}
+  .mboverlayclose:hover{border-color:var(--borderGold)}
+  .mboverlaychart{position:relative; height:240px; overflow:hidden; border-bottom:1px solid var(--border)}
+  .mbchart, .mboverlaychart{
+    background:
+      linear-gradient(180deg, rgba(201,152,42,0.10), rgba(201,152,42,0) 55%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 28px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 28px),
+      #0d0d16;
+  }
+  .mboverlaybody{padding:18px 22px 22px}
+  .mboverlaylesson{font-size:0.88rem; color:var(--text); line-height:1.65; margin-top:14px; padding-top:14px; border-top:1px solid var(--border)}
+
+  /* ===== TOAST — brief demo feedback (e.g. "+ Add Entry") ===== */
+  .toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(10px); background:#13131c;
+    border:1px solid var(--borderGold); color:var(--text); font-size:0.78rem; font-weight:600; padding:12px 20px;
+    border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,0.5); opacity:0; pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease; z-index:300; white-space:nowrap}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+  @media(max-width:760px){
+    .navbar .spacer{display:none}
+    .tabs{overflow-x:auto; max-width:100%; scrollbar-width:none} .tabs::-webkit-scrollbar{display:none} .tabs a{white-space:nowrap}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- NAV -->
+  <div class="navbar">
+    <div class="brand"><img class="vmark" src="../public/logo-mark.png" alt="VIV" style="background:none; object-fit:contain"> Valen Insiders Vault</div>
+    <div class="tabs">
+      <a href="dashboard-pro.html">Dashboard</a>
+      <a href="journal-pro.html">Journal</a>
+      <a href="premium-pro.html">Premium tools</a>
+      <a href="daily-setups.html">Daily Setups</a>
+      <a href="model-book.html" class="on">Model Book</a>
+      <a href="studies.html">Studies</a>
+      <a href="quant.html">Quant</a>
+      <a href="settings-pro.html">Settings</a>
+    </div>
+    <div class="spacer"></div>
+    <!-- Model Book has no Guided/Pro toggle in the live app — this is its only layout. -->
+  </div>
+
+  <!-- COMMAND HEADER -->
+  <div class="cmdheader">
+    <div class="cmdleft">
+      <div class="eyebrow">Model Book</div>
+      <h1 class="ch1">The Pattern Library</h1>
+      <div class="cmdmeta">6 entries &middot; the best setups, kept for study &mdash; before &rarr; factors &rarr; after</div>
+    </div>
+    <div class="cmdactions">
+      <button class="btn gold">+ Add Entry</button>
+    </div>
+  </div>
+
+  <!-- ADMIN: MBEditor inline form slot. When "+ Add Entry" (or a card's "Edit") is clicked, the
+       live app renders the full entry editor here: ticker/pattern/theme/entry & exit dates, the
+       16-item Setup Grader checklist the stars are objectively computed from, the 5-factor Elite
+       layer, before/after chart upload (drag or paste), thesis + lesson fields, and a
+       "Published to members" toggle for admins. Not built in this static mockup. -->
+
+  <!-- LEGEND — the concepts behind the filters below, sourced from ModelBook.jsx -->
+  <div class="mblegend">
+    <span class="flabel">Scope<span class="infodot" data-tip="⭐ VIV Official — curated by the team, read-only. 🔒 My Book — your own private collection, visible only to you.">i</span></span>
+    <span class="flabel">Star tier<span class="infodot" data-tip="Stars are computed from the same 16-item Setup Grader checklist — never hand-assigned. 5★ is the base cap (the 5th star needs full ★-maker confluence). 6★ Elite unlocks with 2+ of the 5 Elite factors ticked; 7★ Generational needs all 4+ Elite factors on top of a perfect 5★ base.">i</span></span>
+    <span class="flabel">Outcome<span class="infodot" data-tip="Auto-classified from the R-multiple, never by feel: Huge Winner ≥5R · Winner 2–5R · Subpar −0.5R…2R (didn't pay for the risk taken) · Loser ≤−0.5R.">i</span></span>
+  </div>
+
+  <!-- FILTER ROW — scope / pattern / star-tier, mirrors ModelBook.jsx's fScope / fPattern / fTier.
+       Real filters: each group is single-select, groups combine with AND. -->
+  <div class="mbfilters" id="mbFilters">
+    <button type="button" class="fchip on" data-fgroup="scope" data-value="All">All</button>
+    <button type="button" class="fchip" data-fgroup="scope" data-value="official">&#11088; VIV Official</button>
+    <button type="button" class="fchip" data-fgroup="scope" data-value="mine">&#128274; My Book</button>
+    <span class="fdivider"></span>
+    <button type="button" class="fchip on" data-fgroup="pattern" data-value="All">All</button>
+    <button type="button" class="fchip" data-fgroup="pattern" data-value="Trendline Breakout">Trendline Breakout</button>
+    <button type="button" class="fchip" data-fgroup="pattern" data-value="Pullback Buy">Pullback Buy</button>
+    <button type="button" class="fchip" data-fgroup="pattern" data-value="Episodic Pivot">Episodic Pivot</button>
+    <button type="button" class="fchip" data-fgroup="pattern" data-value="VCP">VCP</button>
+    <span class="fdivider"></span>
+    <button type="button" class="fchip on" data-fgroup="tier" data-value="All">Any grade</button>
+    <button type="button" class="fchip" data-fgroup="tier" data-value="7">7&#9733;</button>
+    <button type="button" class="fchip" data-fgroup="tier" data-value="6">6&#9733;</button>
+    <button type="button" class="fchip" data-fgroup="tier" data-value="5">5&#9733;</button>
+    <span class="fdivider"></span>
+    <!-- Deep link — in the live app this chip is admin-only and toggles an in-page "Studies" wing
+         of My Book; per the live nav it's always reachable from Model Book, so here it's a direct
+         link out to the standalone Studies page (not part of the filter groups above). -->
+    <a href="studies.html" class="fchip">&#128218; Studies</a>
+  </div>
+
+  <!-- CARD GALLERY -->
+  <div class="mbgrid" id="mbGrid">
+
+    <!-- NVDA — 7★ Generational (5 base stars + 4 elite factors) -->
+    <div class="mbcard elite" data-scope="official" data-pattern="VCP" data-tier="7">
+      <span class="eliteribbon">&#11088; Elite</span>
+      <div class="mbchart">
+        <span class="mbwatermark">NVDA</span>
+        <svg class="mbsweep" viewBox="0 0 300 160" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0,138 C50,132 80,120 110,96 C150,64 170,70 200,44 C230,20 260,26 300,8" fill="none" stroke="rgba(126,240,160,0.55)" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="mbbody">
+        <div class="mbtoprow">
+          <span class="mbticker">NVDA</span>
+          <span class="mbdate">Feb 18 &rarr; Apr 30, 2025</span>
+        </div>
+        <div class="mbtags">
+          <span class="patterntag">VCP</span>
+          <span class="mbscope official">&#11088; VIV</span>
+          <span class="mboutcome huge">Huge Winner</span>
+        </div>
+        <div class="mbgraderow">
+          <span class="gradewrap">
+            <span class="gradebadge a">A+</span>
+            <span class="stars">★★★★★<span class="grn">★★</span></span>
+          </span>
+          <span class="tierlabel elitetxt">7★ &middot; Generational</span>
+          <span class="mbr up">+8.4R</span>
+        </div>
+        <div class="mblesson">Waited six full weeks for the tightest VCP contraction of the cycle — no chasing the first push, no FOMO on day one.</div>
+      </div>
+    </div>
+
+    <!-- PANW — 5★, Episodic Pivot, Winner -->
+    <div class="mbcard" data-scope="official" data-pattern="Episodic Pivot" data-tier="5">
+      <div class="mbchart">
+        <span class="mbwatermark">PANW</span>
+        <svg class="mbsweep" viewBox="0 0 300 160" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0,132 C60,128 90,110 120,100 C160,86 180,58 220,50 C250,44 270,36 300,26" fill="none" stroke="rgba(34,197,94,0.5)" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="mbbody">
+        <div class="mbtoprow">
+          <span class="mbticker">PANW</span>
+          <span class="mbdate">May 5 &rarr; Jun 2, 2025</span>
+        </div>
+        <div class="mbtags">
+          <span class="patterntag">Episodic Pivot</span>
+          <span class="mbscope official">&#11088; VIV</span>
+          <span class="mboutcome winner">Winner</span>
+        </div>
+        <div class="mbgraderow">
+          <span class="gradewrap">
+            <span class="gradebadge a">A+</span>
+            <span class="stars">★★★★★</span>
+          </span>
+          <span class="tierlabel">5★</span>
+          <span class="mbr up">+3.6R</span>
+        </div>
+        <div class="mblesson">Earnings gap above a clean 8-week base — the catalyst confirmed what the chart had already been signaling.</div>
+      </div>
+    </div>
+
+    <!-- SMCI — 4★, Trendline Breakout, Winner, personal book -->
+    <div class="mbcard" data-scope="mine" data-pattern="Trendline Breakout" data-tier="4">
+      <div class="mbchart">
+        <span class="mbwatermark">SMCI</span>
+        <svg class="mbsweep" viewBox="0 0 300 160" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0,130 C50,126 90,118 130,104 C170,90 190,72 230,60 C260,52 280,46 300,38" fill="none" stroke="rgba(34,197,94,0.5)" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="mbbody">
+        <div class="mbtoprow">
+          <span class="mbticker">SMCI</span>
+          <span class="mbdate">Jan 13 &rarr; Feb 7, 2025</span>
+        </div>
+        <div class="mbtags">
+          <span class="patterntag">Trendline Breakout</span>
+          <span class="mbscope personal">&#128274; PERSONAL</span>
+          <span class="mboutcome winner">Winner</span>
+        </div>
+        <div class="mbgraderow">
+          <span class="gradewrap">
+            <span class="gradebadge a">A</span>
+            <span class="stars">★★★★<span class="dim">★</span></span>
+          </span>
+          <span class="tierlabel">4★</span>
+          <span class="mbr up">+2.8R</span>
+        </div>
+        <div class="mblesson">Textbook trendline breakout on expanding volume, but trimmed a full point early — patience on partials is the one fix.</div>
+      </div>
+    </div>
+
+    <!-- VRTX — 5★, VCP, Huge Winner -->
+    <div class="mbcard" data-scope="official" data-pattern="VCP" data-tier="5">
+      <div class="mbchart">
+        <span class="mbwatermark">VRTX</span>
+        <svg class="mbsweep" viewBox="0 0 300 160" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0,140 C60,134 100,122 130,102 C170,76 190,58 220,42 C250,28 270,22 300,12" fill="none" stroke="rgba(126,240,160,0.5)" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="mbbody">
+        <div class="mbtoprow">
+          <span class="mbticker">VRTX</span>
+          <span class="mbdate">Mar 10 &rarr; May 1, 2025</span>
+        </div>
+        <div class="mbtags">
+          <span class="patterntag">VCP</span>
+          <span class="mbscope official">&#11088; VIV</span>
+          <span class="mboutcome huge">Huge Winner</span>
+        </div>
+        <div class="mbgraderow">
+          <span class="gradewrap">
+            <span class="gradebadge a">A+</span>
+            <span class="stars">★★★★★</span>
+          </span>
+          <span class="tierlabel">5★</span>
+          <span class="mbr up">+6.1R</span>
+        </div>
+        <div class="mblesson">Genomics theme leadership plus a flawless VCP — the base did all the talking before the biotech catalyst even printed.</div>
+      </div>
+    </div>
+
+    <!-- AVGO — 3★, Pullback Buy, Subpar, draft (admin unpublished) -->
+    <div class="mbcard" data-scope="mine" data-pattern="Pullback Buy" data-tier="3">
+      <div class="mbchart">
+        <span class="mbwatermark">AVGO</span>
+        <svg class="mbsweep" viewBox="0 0 300 160" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0,110 C50,104 90,112 130,100 C170,88 190,96 230,84 C260,76 280,80 300,70" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="mbbody">
+        <div class="mbtoprow">
+          <span class="mbticker">AVGO</span>
+          <span class="mbdate">Jun 16 &rarr; Jun 24, 2025</span>
+        </div>
+        <div class="mbtags">
+          <span class="patterntag">Pullback Buy</span>
+          <span class="mbscope draft">DRAFT</span>
+          <span class="mboutcome subpar">Subpar</span>
+        </div>
+        <div class="mbgraderow">
+          <span class="gradewrap">
+            <span class="gradebadge b">B</span>
+            <span class="stars">★★★<span class="dim">★★</span></span>
+          </span>
+          <span class="tierlabel">3★</span>
+          <span class="mbr up">+0.8R</span>
+        </div>
+        <div class="mblesson">Bought the pullback a day ahead of the 21-EMA reclaim — the checklist would have flagged this as a premature entry.</div>
+      </div>
+    </div>
+
+    <!-- MSTR — 2★, Trendline Breakout, Loser, personal book -->
+    <div class="mbcard" data-scope="mine" data-pattern="Trendline Breakout" data-tier="2">
+      <div class="mbchart">
+        <span class="mbwatermark">MSTR</span>
+        <svg class="mbsweep" viewBox="0 0 300 160" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0,60 C50,54 90,62 130,74 C170,86 190,100 230,112 C260,120 280,126 300,134" fill="none" stroke="rgba(239,68,68,0.55)" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="mbbody">
+        <div class="mbtoprow">
+          <span class="mbticker">MSTR</span>
+          <span class="mbdate">Apr 2 &rarr; Apr 9, 2025</span>
+        </div>
+        <div class="mbtags">
+          <span class="patterntag">Trendline Breakout</span>
+          <span class="mbscope personal">&#128274; PERSONAL</span>
+          <span class="mboutcome loser">Loser</span>
+        </div>
+        <div class="mbgraderow">
+          <span class="gradewrap">
+            <span class="gradebadge c">C</span>
+            <span class="stars">★★<span class="dim">★★★</span></span>
+          </span>
+          <span class="tierlabel">2★</span>
+          <span class="mbr dn">&minus;0.6R</span>
+        </div>
+        <div class="mblesson">Chased an extended move with a stop nearly 2&times; ADR — a reminder to walk away when the risk math doesn't work.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Empty state — shown when the three filter groups combine to match nothing -->
+  <div class="mbempty" id="mbEmpty">
+    <span>No entries match &mdash; clear a filter.</span>
+    <button type="button" class="ghostchip" id="mbClearFilters">Clear filters</button>
+  </div>
+
+  <!-- The live app also offers inline Edit/Delete for entries you own inside the overlay below,
+       plus a zoomable before/after lightbox. Not built in this static mockup. -->
+
+</div>
+
+<!-- DETAIL OVERLAY — populated from the clicked card's own markup on click; closes on × or backdrop -->
+<div class="mboverlay" id="mbOverlay" aria-hidden="true">
+  <div class="mboverlaycard" role="dialog" aria-modal="true" aria-label="Model Book entry detail">
+    <button type="button" class="mboverlayclose" id="mbOverlayClose" aria-label="Close">&times;</button>
+    <div class="mboverlaychart" id="mbOvChart"></div>
+    <div class="mboverlaybody">
+      <div class="mbtoprow">
+        <span class="mbticker" id="mbOvTicker"></span>
+        <span class="mbdate" id="mbOvDate"></span>
+      </div>
+      <div class="mbtags" id="mbOvTags"></div>
+      <div class="mbgraderow" id="mbOvGrade"></div>
+      <div class="mboverlaylesson" id="mbOvLesson"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST — brief demo feedback for "+ Add Entry" -->
+<div class="toast" id="toast">Demo &mdash; the real editor lives in the app.</div>
+
+<script>
+  // ===== Filter chips: REAL filtering — each divider-separated group (scope / pattern /
+  // star-tier) is single-select; the three groups combine with AND, exactly like ModelBook.jsx's
+  // fScope / fPattern / fTier state. Cards are hidden/shown via a plain data-attribute match; an
+  // empty-state line appears when nothing matches.
+  (function(){
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.mbcard'));
+    var emptyEl = document.getElementById('mbEmpty');
+    var state = { scope: 'All', pattern: 'All', tier: 'All' };
+
+    function applyFilters(){
+      var visible = 0;
+      cards.forEach(function(card){
+        var okScope = state.scope === 'All' || card.dataset.scope === state.scope;
+        var okPattern = state.pattern === 'All' || card.dataset.pattern === state.pattern;
+        var okTier = state.tier === 'All' || card.dataset.tier === state.tier;
+        var show = okScope && okPattern && okTier;
+        card.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+      emptyEl.classList.toggle('show', visible === 0);
+    }
+
+    function wireGroup(group){
+      var chips = Array.prototype.slice.call(document.querySelectorAll('[data-fgroup="' + group + '"]'));
+      chips.forEach(function(chip){
+        chip.addEventListener('click', function(){
+          chips.forEach(function(c){ c.classList.remove('on'); });
+          chip.classList.add('on');
+          state[group] = chip.dataset.value;
+          applyFilters();
+        });
+      });
+      return chips;
+    }
+    var scopeChips = wireGroup('scope'), patternChips = wireGroup('pattern'), tierChips = wireGroup('tier');
+
+    document.getElementById('mbClearFilters').addEventListener('click', function(){
+      [scopeChips, patternChips, tierChips].forEach(function(chips){
+        chips.forEach(function(c){ c.classList.toggle('on', c.dataset.value === 'All'); });
+      });
+      state = { scope: 'All', pattern: 'All', tier: 'All' };
+      applyFilters();
+    });
+  })();
+
+  // ===== Card click -> detail overlay. Reads straight from the clicked card's own DOM (the
+  // lesson text is only visually line-clamped by CSS — the full text is always present), so
+  // there's no separate data source to keep in sync with the card markup above.
+  (function(){
+    var overlay = document.getElementById('mbOverlay');
+    var ovChart = document.getElementById('mbOvChart');
+    var ovTicker = document.getElementById('mbOvTicker');
+    var ovDate = document.getElementById('mbOvDate');
+    var ovTags = document.getElementById('mbOvTags');
+    var ovGrade = document.getElementById('mbOvGrade');
+    var ovLesson = document.getElementById('mbOvLesson');
+
+    function openOverlay(card){
+      var chart = card.querySelector('.mbchart');
+      var ribbon = card.querySelector('.eliteribbon');
+      ovChart.innerHTML = chart.innerHTML + (ribbon ? ribbon.outerHTML : '');
+      ovTicker.textContent = card.querySelector('.mbticker').textContent;
+      ovDate.textContent = card.querySelector('.mbdate').textContent;
+      ovTags.innerHTML = card.querySelector('.mbtags').innerHTML;
+      ovGrade.innerHTML = card.querySelector('.mbgraderow').innerHTML;
+      ovLesson.textContent = card.querySelector('.mblesson').textContent;
+      overlay.classList.add('open');
+      overlay.setAttribute('aria-hidden', 'false');
+    }
+    function closeOverlay(){
+      overlay.classList.remove('open');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+
+    document.querySelectorAll('.mbcard').forEach(function(card){
+      card.addEventListener('click', function(){ openOverlay(card); });
+    });
+    document.getElementById('mbOverlayClose').addEventListener('click', closeOverlay);
+    overlay.addEventListener('click', function(e){ if (e.target === overlay) closeOverlay(); });
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeOverlay(); });
+  })();
+
+  // ===== "+ Add Entry" -> toast (the real MBEditor form is out of scope for this static mockup) =====
+  (function(){
+    var btn = document.querySelector('.cmdactions .btn.gold');
+    var toast = document.getElementById('toast');
+    var timer;
+    btn.addEventListener('click', function(){
+      toast.classList.add('show');
+      clearTimeout(timer);
+      timer = setTimeout(function(){ toast.classList.remove('show'); }, 2600);
+    });
+  })();
+</script>
+</body>
+</html>

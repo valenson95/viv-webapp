@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIV — Premium Tools (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
+    --text:rgba(255,255,255,0.92); --muted:rgba(255,255,255,0.70); --faint:rgba(255,255,255,0.45);
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:var(--font); line-height:1.58; font-size:16px; -webkit-font-smoothing:antialiased; min-height:100vh}
+  .shell{width:100%; max-width:1240px; margin:0 auto; padding:22px clamp(18px,2.4vw,40px) 90px}
+  /* 16-inch MacBook Pro (logical ~1728px) and larger external displays use more width */
+  @media(min-width:1500px){ .shell{max-width:1400px} }
+  /* external 4K / ultrawide displays */
+  @media(min-width:2000px){ .shell{max-width:1680px} }
+  .tabnum,.v,.outval,.rtable td,.tile .v{font-variant-numeric:tabular-nums}
+
+  .card{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:22px;
+    backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%); padding:24px 26px; overflow:hidden}
+  .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)}
+
+  .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+  .h1{font-size:clamp(1.55rem,3vw,2.05rem); font-weight:800; letter-spacing:-0.04em; color:var(--white)}
+  .goldname{color:var(--goldBright)}
+  .sub{font-size:0.82rem; color:var(--muted); max-width:640px; margin-top:6px}
+  /* header entrance — gated to .reveal so other .sub elements are never hidden (matches dashboard) */
+  .reveal .h1{opacity:0; transform:translateY(14px)}
+  .reveal .sub{opacity:0}
+  .reveal.in-view .h1{animation:hRise 0.42s cubic-bezier(0.22,1,0.36,1) both}
+  .reveal.in-view .sub{animation:hFade 0.48s ease-out 0.2s both}
+  @keyframes hRise{from{opacity:0; transform:translateY(14px)}to{opacity:1; transform:translateY(0)}}
+  @keyframes hFade{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion: reduce){
+    .reveal .h1,.reveal .sub{animation:none !important; opacity:1; transform:none}
+  }
+  .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+  .sech{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+  .row{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+  .spacer{flex:1}
+
+  /* nav */
+  .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; color:var(--white); font-size:0.95rem}
+  .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
+  .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
+  .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+  .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
+  .tabs a:hover:not(.on){color:var(--text)}
+
+  /* tooltip */
+  .term{border-bottom:1px dotted var(--borderGold); cursor:help; position:relative}
+  .term:hover::after{content:attr(data-tip); position:absolute; left:0; top:150%; width:250px; background:#11111b;
+    border:1px solid var(--borderGold); border-radius:12px; padding:10px 12px; font-size:0.72rem; font-weight:400;
+    letter-spacing:0; text-transform:none; color:var(--text); z-index:60; box-shadow:0 14px 40px rgba(0,0,0,0.55); line-height:1.45; white-space:pre-line}
+  .term.tipright:hover::after{left:auto; right:0}
+
+  /* seg + buttons */
+  .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
+  .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.74rem;
+    font-weight:700; padding:7px 16px; border-radius:980px; transition:all .15s}
+  .seg button.on{background:var(--goldDim); color:var(--goldBright)}
+  .btn{border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text); font-family:var(--font);
+    font-size:0.74rem; font-weight:700; padding:8px 16px; border-radius:980px; cursor:pointer}
+  .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+
+  /* welcome */
+  .welcome{display:flex; gap:14px; align-items:flex-start; margin-top:20px; background:var(--goldDim);
+    border:1px solid var(--borderGold); border-radius:16px; padding:15px 18px}
+  .welcome .wd{width:8px;height:8px;border-radius:50%;background:var(--goldBright);box-shadow:0 0 12px var(--goldBright);margin-top:6px;flex:none}
+  .welcome b{color:var(--white)} .welcome .x{margin-left:auto; color:var(--faint); cursor:pointer; font-size:1.1rem; line-height:1}
+  body.expert .welcome{display:none}
+
+  /* ===== tutorial video player (guided only) ===== */
+  .tourwrap{margin-top:20px}
+  body.expert .tourwrap{display:none}
+  .tour{position:relative; border:1px solid var(--borderGold); border-radius:20px; overflow:hidden; background:#0a0a12; aspect-ratio:16/6.5; min-height:230px}
+  .tourbg{position:absolute; inset:0; background:radial-gradient(680px 320px at 50% -10%, rgba(201,152,42,0.14), transparent 70%)}
+  .tourstage{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:34px 40px 56px; gap:12px}
+  .tourchip{font-size:0.6rem; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold)}
+  .tourtitle{font-size:clamp(1.3rem,3.2vw,1.9rem); font-weight:800; letter-spacing:-0.03em; color:var(--white)}
+  .tourcap{font-size:0.9rem; color:var(--muted); max-width:560px; line-height:1.55}
+  .tourdots{display:flex; gap:7px; margin-top:6px}
+  .tourdots i{width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.18); transition:all .25s}
+  .tourdots i.on{background:var(--goldBright); width:22px; border-radius:5px}
+  /* poster overlay */
+  .tourposter{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    background:rgba(8,8,14,0.55); backdrop-filter:blur(2px); cursor:pointer; z-index:3}
+  .tourposter.hidden{display:none}
+  .playbig{width:74px; height:74px; border-radius:50%; background:linear-gradient(135deg,var(--goldBright),var(--goldMid));
+    display:flex; align-items:center; justify-content:center; box-shadow:0 12px 40px rgba(201,152,42,0.4); transition:transform .15s}
+  .tourposter:hover .playbig{transform:scale(1.07)}
+  .playbig svg{width:30px; height:30px; color:#0a0a0a; margin-left:4px}
+  .postertitle{font-size:1.05rem; font-weight:800; color:var(--white)}
+  .postersub{font-size:0.78rem; color:var(--muted)}
+  /* control bar */
+  .tourbar{position:absolute; left:0; right:0; bottom:0; display:flex; align-items:center; gap:12px; padding:12px 16px;
+    background:linear-gradient(0deg, rgba(8,8,14,0.92), transparent); z-index:4}
+  .tourbtn{background:rgba(255,255,255,0.1); border:none; width:34px; height:34px; border-radius:50%; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; color:var(--white); flex:none}
+  .tourbtn:hover{background:rgba(255,255,255,0.18)} .tourbtn svg{width:15px; height:15px}
+  .tourprog{flex:1; height:5px; background:rgba(255,255,255,0.14); border-radius:980px; overflow:hidden; cursor:default}
+  .tourprog .fill{height:100%; width:0%; background:linear-gradient(90deg,var(--goldMid),var(--goldBright)); transition:width .2s linear}
+  .tourtime{font-size:0.68rem; color:var(--muted); font-variant-numeric:tabular-nums; flex:none; min-width:34px; text-align:right}
+
+  /* ===== tool tabs ===== */
+  .tooltabs{display:flex; gap:4px; flex-wrap:wrap; margin:26px 0 20px; border-bottom:1px solid var(--border)}
+  .tooltab{background:transparent; border:none; border-bottom:2px solid transparent; color:var(--muted); font-family:var(--font);
+    font-size:0.85rem; font-weight:700; padding:11px 15px; cursor:pointer; margin-bottom:-1px; white-space:nowrap}
+  .tooltab.on{color:var(--goldBright); border-bottom-color:var(--goldBright)}
+  .tooltab:hover:not(.on){color:var(--text)}
+  .toolpanel{display:none} .toolpanel.on{display:block}
+
+  /* intro / explainer */
+  .intro{display:flex; gap:13px; align-items:flex-start; margin-bottom:18px; background:rgba(255,255,255,0.025);
+    border:1px solid var(--border); border-radius:16px; padding:15px 18px}
+  .intro .ico{flex:none; width:38px; height:38px; border-radius:11px; background:var(--goldDim); border:1px solid var(--borderGold);
+    display:flex; align-items:center; justify-content:center; color:var(--goldBright)}
+  .intro .ico svg{width:19px; height:19px}
+  .intro h3{font-size:0.98rem; font-weight:800; color:var(--white); letter-spacing:-0.02em; margin-bottom:3px}
+  .intro p{font-size:0.82rem; color:var(--muted); line-height:1.55}
+  body:not(.expert) .guide{transition:box-shadow .2s; border-radius:16px}
+  body:not(.expert) .guide.guide-active{box-shadow:0 0 0 1px var(--borderGold), 0 0 50px rgba(201,152,42,0.13)}
+
+  /* io layout */
+  .io{display:grid; grid-template-columns:0.92fr 1.08fr; gap:20px; align-items:start}
+  .panelhead{font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold); margin-bottom:14px}
+  .iogrid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  .field{display:flex; flex-direction:column; gap:6px}
+  .field.full{grid-column:1/-1}
+  .field label{font-size:0.64rem; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--muted)}
+  .in{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--text);
+    font-family:var(--font); font-size:0.95rem; font-weight:600; padding:10px 12px; outline:none; width:100%; font-variant-numeric:tabular-nums}
+  .in:focus{border-color:var(--gold)}
+  .field .hint{font-size:0.7rem; color:var(--faint); line-height:1.4}
+  body.expert .field .hint{display:none}
+  .miniseg{display:inline-flex; border:1px solid var(--border); border-radius:9px; overflow:hidden}
+  .miniseg button{border:none; background:transparent; color:var(--muted); font-family:var(--font); font-size:0.78rem; font-weight:700; padding:9px 14px; cursor:pointer}
+  .miniseg button.on{background:var(--goldDim); color:var(--goldBright)}
+
+  /* outputs */
+  .results{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px}
+  .tile{background:var(--glass); border:1px solid var(--border); border-radius:14px; padding:14px 16px}
+  .tile .label{margin-bottom:8px}
+  .tile .v{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em}
+  .tile .v.green{color:var(--green)} .tile .v.red{color:var(--red)} .tile .v.gold{color:var(--goldBright)}
+  .tile .vsub{font-size:0.68rem; color:var(--faint); margin-top:4px}
+  .big-emph{border-color:var(--borderGold); background:linear-gradient(140deg, rgba(201,152,42,0.10), transparent 75%)}
+
+  .interp{display:flex; gap:11px; align-items:flex-start; margin-top:16px; background:var(--goldDim); border:1px solid var(--borderGold);
+    border-radius:14px; padding:13px 16px; font-size:0.82rem; color:var(--text); line-height:1.55}
+  .interp b{color:var(--goldBright)} .interp .green{color:#86efac} .interp .red{color:#fda4a4}
+  .interp .ic{flex:none; width:17px;height:17px; color:var(--goldBright); margin-top:2px}
+  body.expert .interp{display:none}
+
+  .alert{display:flex; gap:9px; align-items:flex-start; margin-top:14px; border-radius:12px; padding:11px 14px; font-size:0.78rem; line-height:1.45}
+  .alert svg{width:15px;height:15px;flex:none;margin-top:1px}
+  .alert.warn{background:rgba(239,68,68,0.10); border:1px solid rgba(239,68,68,0.3); color:#fda4a4}
+  .alert.caution{background:rgba(201,152,42,0.12); border:1px solid var(--borderGold); color:var(--goldBright)}
+  .alert.ok{background:rgba(34,197,94,0.10); border:1px solid rgba(34,197,94,0.3); color:#86efac}
+
+  .rtable{width:100%; border-collapse:collapse; margin-top:16px}
+  .rtable th{font-size:0.58rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); text-align:right; padding:8px 9px; border-bottom:1px solid var(--border)}
+  .rtable th:first-child, .rtable td:first-child{text-align:left}
+  .rtable td{font-size:0.81rem; padding:9px 9px; border-bottom:1px solid rgba(255,255,255,0.05); text-align:right; font-variant-numeric:tabular-nums}
+  .rtable td.green{color:#86efac} .rtable td.red{color:#fda4a4} .rtable td.gold{color:var(--goldBright)}
+  .rtable .rhead td{color:var(--gold); font-weight:700; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.06em}
+
+  .badge{display:inline-flex; align-items:center; gap:7px; font-size:0.7rem; font-weight:700; padding:6px 13px; border-radius:980px}
+  .badge .d{width:7px;height:7px;border-radius:50%}
+  .badge.pos{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)} .badge.pos .d{background:var(--green)}
+  .badge.neg{background:rgba(239,68,68,0.12); color:#fda4a4; border:1px solid rgba(239,68,68,0.3)} .badge.neg .d{background:var(--red)}
+
+  /* equity curve */
+  .eqbox{margin-top:18px}
+  .eqwrap{display:flex; gap:12px}
+  .eqy{display:flex; flex-direction:column; justify-content:space-between; font-size:0.62rem; color:var(--faint); min-width:46px; text-align:right; padding:2px 0; font-variant-numeric:tabular-nums}
+  .eqplot{flex:1; position:relative; height:180px}
+  .eqsvg{width:100%; height:100%; display:block}
+  .eqsvg .grid{stroke:rgba(255,255,255,0.06); stroke-width:1}
+
+  /* range bar (expected move) */
+  .rangebar{position:relative; height:46px; margin:26px 0 8px; border-radius:980px;
+    background:linear-gradient(90deg, rgba(239,68,68,0.5), rgba(201,152,42,0.5) 50%, rgba(34,197,94,0.5)); border:1px solid var(--border)}
+  .rangebar .mid{position:absolute; left:50%; top:-7px; bottom:-7px; width:2px; background:var(--goldBright); transform:translateX(-50%)}
+  .rangebar .cap{position:absolute; top:-22px; font-size:0.66rem; font-weight:700; transform:translateX(-50%); white-space:nowrap}
+  .rangelabels{display:flex; justify-content:space-between; font-size:0.72rem; margin-top:6px}
+
+  .framebox{margin-top:18px; border:1px solid var(--border); border-radius:14px; overflow:hidden}
+  .framerow{display:grid; grid-template-columns:88px 1fr; gap:0; border-bottom:1px solid var(--border); font-size:0.8rem}
+  .framerow:last-child{border-bottom:none}
+  .frametag{padding:13px 14px; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:0.78rem; letter-spacing:0.04em}
+  .frametag.hold{background:rgba(34,197,94,0.12); color:#86efac} .frametag.trim{background:var(--goldDim); color:var(--goldBright)} .frametag.exit{background:rgba(239,68,68,0.12); color:#fda4a4}
+  .framerow div:last-child{padding:13px 16px; color:var(--muted); line-height:1.5}
+  body.expert .framebox, body.expert .lossrec{display:none}
+
+  .lossrec{margin-top:16px}
+  .scencompare{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:16px}
+  .scencard{border:1px solid var(--borderGold); border-radius:14px; padding:13px 15px; background:rgba(201,152,42,0.05)}
+  .scencard .n{font-size:0.6rem; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold)}
+
+  /* guide panel */
+  .guidepanel{position:fixed; right:24px; bottom:24px; width:330px; max-width:calc(100vw - 40px); z-index:200;
+    background:#11111b; border:1px solid var(--borderGold); border-radius:16px; padding:15px 17px; box-shadow:0 22px 60px rgba(0,0,0,0.6); display:none}
+  body:not(.expert) .guidepanel{display:block}
+  .guidepanel.speaking{border-color:var(--goldBright); box-shadow:0 0 0 1px var(--goldBright), 0 22px 60px rgba(0,0,0,0.6)}
+  .gp-head{display:flex; align-items:center; gap:9px; margin-bottom:7px}
+  .gp-dot{width:8px; height:8px; border-radius:50%; background:var(--goldBright); flex:none}
+  .guidepanel.speaking .gp-dot{animation:gppulse 1s ease-in-out infinite}
+  @keyframes gppulse{0%,100%{opacity:1; transform:scale(1)}50%{opacity:0.35; transform:scale(1.6)}}
+  .gp-title{font-size:0.82rem; font-weight:800; color:var(--goldBright); flex:1}
+  .gp-mute{background:transparent; border:none; cursor:pointer; color:var(--muted); padding:3px; line-height:0; display:flex}
+  .gp-mute:hover{color:var(--text)} .gp-mute svg{width:18px; height:18px}
+  .gp-body{font-size:0.78rem; color:var(--text); line-height:1.55} .gp-body b{color:var(--goldBright)}
+  body.expert .term{border-bottom:none; cursor:default} body.expert .term:hover::after{content:none}
+
+  @media(max-width:820px){ .io{grid-template-columns:1fr} .iogrid{grid-template-columns:1fr 1fr} .navbar{flex-wrap:wrap} }
+  @media(max-width:520px){ .iogrid{grid-template-columns:1fr} }
+  /* ===== phones (iPhone 15 Pro 393px and up) ===== */
+  @media(max-width:600px){
+    .navbar{flex-wrap:wrap; gap:10px} .navbar .spacer{display:none}
+    .tabs{overflow-x:auto; max-width:100%; scrollbar-width:none} .tabs::-webkit-scrollbar{display:none} .tabs a{white-space:nowrap}
+    .tour{aspect-ratio:auto; height:300px; min-height:0}     /* fixed height avoids the aspect-ratio min-width blowout */
+    .tourstage{padding:20px 16px 54px} .tourtitle{font-size:1.1rem} .tourcap{font-size:0.8rem}
+    .tooltabs{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none} .tooltabs::-webkit-scrollbar{display:none} .tooltab{white-space:nowrap; padding:11px 12px}
+    .results{grid-template-columns:1fr 1fr}
+    .card{padding:18px 16px} .intro{flex-direction:column}
+    .rtable th, .rtable td{padding:8px 5px; font-size:0.74rem}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- NAV -->
+  <div class="navbar">
+    <div class="brand"><img class="vmark" src="../public/logo-mark.png" alt="VIV" style="background:none; object-fit:contain"> Valen Insiders Vault</div>
+    <div class="tabs">
+      <a href="dashboard-recommended.html">Dashboard</a>
+      <a href="journal-recommended.html">Journal</a>
+      <a href="premium-recommended.html" class="on">Premium tools</a>
+      <a href="daily-setups.html">Daily Setups</a>
+      <a href="model-book.html">Model Book</a>
+      <a href="studies.html" title="Admin-only tab">Studies</a>
+      <a href="quant.html" title="Admin-only tab">Quant</a>
+      <a href="settings-recommended.html">Settings</a>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+      <button class="on" data-mode="guided">Guided</button>
+      <button data-mode="pro" onclick="location.href='premium-pro.html'">Pro</button>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <div class="reveal">
+    <div class="eyebrow">Premium tools</div>
+    <div class="h1" style="margin-top:6px">Your trading toolkit, <span class="goldname">Valen</span></div>
+    <div class="sub guide" data-gtitle="Premium tools" data-gaudio="audio/premium-intro.mp3" data-gbody="Welcome to your Premium Tools — five calculators that turn trading questions into clear numbers. Hover anything for a plain-English explanation, or press play on the tour for a one-minute walkthrough of what each tool does.">Five calculators that answer the big money questions <i>before</i> you place a trade. Hover any underlined word for a plain-English definition.</div>
+  </div>
+
+  <!-- WELCOME (guided) -->
+  <div class="welcome">
+    <span class="wd"></span>
+    <div><b>New to these tools?</b> Press play on the tour below for a 1-minute walkthrough — or just hover any field and the guide in the corner explains it <b>out loud</b>. Switch to <b>Pro</b> (top-right) once you know your way around.</div>
+    <span class="x" onclick="this.closest('.welcome').style.display='none'">&times;</span>
+  </div>
+
+  <!-- TUTORIAL VIDEO (guided only) -->
+  <div class="tourwrap">
+    <div class="tour" id="tour">
+      <div class="tourbg"></div>
+      <div class="tourstage">
+        <div class="tourchip" id="tourChip">Guided tour</div>
+        <div class="tourtitle" id="tourTitle">A quick tour of your tools</div>
+        <div class="tourcap" id="tourCap">Press play and I'll walk you through what each of the five tools does, in about a minute.</div>
+        <div class="tourdots" id="tourDots"></div>
+      </div>
+      <div class="tourposter" id="tourPoster">
+        <div class="playbig"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+        <div class="postertitle">Watch the 1-minute tour</div>
+        <div class="postersub">What this page is, and what each tool does</div>
+      </div>
+      <div class="tourbar">
+        <button class="tourbtn" id="tourPlay" aria-label="Play / pause"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+        <div class="tourprog"><div class="fill" id="tourFill"></div></div>
+        <div class="tourtime" id="tourTime">0 / 6</div>
+        <button class="tourbtn" id="tourReplay" aria-label="Replay" title="Replay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOOL TABS -->
+  <div class="tooltabs" id="toolTabs">
+    <button class="tooltab on" data-tool="sim">Return Simulator</button>
+    <button class="tooltab" data-tool="risk">Position Risk</button>
+    <button class="tooltab" data-tool="exp">Expectancy</button>
+    <button class="tooltab" data-tool="fin">Risk Finance</button>
+    <button class="tooltab" data-tool="move">Expected Move</button>
+  </div>
+
+  <!-- ============ TOOL 1: RETURN SIMULATOR ============ -->
+  <div class="toolpanel on" id="panel-sim">
+    <div class="intro guide" data-gtitle="Return Simulator" data-gaudio="audio/premium-sim.mp3" data-gbody="This shows the power of compounding. Tell it your typical win rate, your average loss, and how big your winners are, and it projects what your account could grow to over many trades. Save scenarios to compare a careful plan against an aggressive one.">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M19 9l-5 5-4-4-3 3"/></svg></div>
+      <div><h3>What is the Return Simulator?</h3><p>It plays your trading style forward over many trades to show how your account could <b>compound</b>. You set how often you win, how big the losers and winners are — and it projects your ending balance. Great for seeing why a few big winners matter so much.</p></div>
+    </div>
+    <div class="card">
+      <div class="io">
+        <div>
+          <div class="panelhead">Your assumptions</div>
+          <div class="iogrid">
+            <div class="field"><label><span class="term" data-tip="The money you started the account with. Your total return is measured against this.">Starting capital</span></label><input class="in" id="s_start" value="100000"><div class="hint">What you began with.</div></div>
+            <div class="field"><label><span class="term" data-tip="The money you have now. Compounding starts from here.">Current capital</span></label><input class="in" id="s_cur" value="100000"><div class="hint">What you have today.</div></div>
+            <div class="field"><label><span class="term" data-tip="How much of your account goes into each trade, as a percent. Bigger size compounds faster but loses faster too.">Position size %</span></label><input class="in" id="s_ps" value="12"><div class="hint">% of account per trade.</div></div>
+            <div class="field"><label><span class="term" data-tip="The typical percent you lose on a losing trade (a positive number, e.g. 5 means −5%).">Avg loss %</span></label><input class="in" id="s_al" value="5"><div class="hint">Typical losing trade.</div></div>
+            <div class="field"><label><span class="term" data-tip="How you describe your losers: enter a raw count of losing trades, or a win rate % and we work out the losers for you.">Losers</span></label>
+              <div class="miniseg" id="s_lossmode"><button class="on" data-m="count">By count</button><button data-m="rate">By win rate</button></div>
+            </div>
+            <div class="field" id="s_losersWrap"><label><span class="term" data-tip="Total number of losing trades over the run.">Losing trades</span></label><input class="in" id="s_losers" value="150"><div class="hint">How many losers.</div></div>
+            <div class="field" id="s_wrWrap" style="display:none"><label><span class="term" data-tip="The percent of your trades that win. We derive the number of losers from this and your winners.">Win rate %</span></label><input class="in" id="s_wr" value="40"><div class="hint">% of trades that win.</div></div>
+          </div>
+          <div class="panelhead" style="margin-top:18px">Your winners <span style="color:var(--faint);text-transform:none;letter-spacing:0;font-weight:500">— group them by size</span></div>
+          <table class="rtable" style="margin-top:6px">
+            <thead><tr><th>Winner size %</th><th>How many</th></tr></thead>
+            <tbody id="s_tiers">
+              <tr><td style="text-align:left"><input class="in" data-tg style="max-width:120px" value="5"></td><td><input class="in" data-tc style="max-width:120px;margin-left:auto" value="80"></td></tr>
+              <tr><td style="text-align:left"><input class="in" data-tg style="max-width:120px" value="50"></td><td><input class="in" data-tc style="max-width:120px;margin-left:auto" value="10"></td></tr>
+              <tr><td style="text-align:left"><input class="in" data-tg style="max-width:120px" value="100"></td><td><input class="in" data-tc style="max-width:120px;margin-left:auto" value="10"></td></tr>
+            </tbody>
+          </table>
+          <div class="hint" style="margin-top:8px">Most wins are small; a few are huge. That mix is what drives compounding.</div>
+          <button class="btn" id="s_save" style="margin-top:14px">＋ Save as scenario to compare</button>
+        </div>
+        <div>
+          <div class="panelhead">What you'd end up with</div>
+          <div class="results">
+            <div class="tile big-emph"><div class="label"><span class="term" data-tip="Your percent gain from current capital to the projected ending balance, after all the wins and losses compound.">Total return</span></div><div class="v gold" id="o_ret">—</div><div class="vsub">from current capital</div></div>
+            <div class="tile big-emph"><div class="label"><span class="term" data-tip="The projected size of your account after the full run of trades.">Ending balance</span></div><div class="v gold" id="o_end">—</div><div class="vsub" id="o_endsub">projected</div></div>
+            <div class="tile"><div class="label"><span class="term" data-tip="Share of trades that win, given your winners and losers.">Win rate</span></div><div class="v" id="o_wr">—</div><div class="vsub" id="o_wrsub">W / L</div></div>
+            <div class="tile"><div class="label"><span class="term" data-tip="How much your losing trades shrink the account before winners are applied. Closer to ×1.00 is better.">Loss drag</span></div><div class="v red" id="o_drag">—</div><div class="vsub">from all losers</div></div>
+          </div>
+          <div class="eqbox">
+            <div class="label" style="margin-bottom:10px">Projected equity curve</div>
+            <div class="eqwrap">
+              <div class="eqy" id="s_eqy"></div>
+              <div class="eqplot"><svg viewBox="0 0 600 180" preserveAspectRatio="none" class="eqsvg">
+                <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(201,152,42,0.30)"/><stop offset="100%" stop-color="rgba(201,152,42,0)"/></linearGradient></defs>
+                <line x1="0" y1="45" x2="600" y2="45" class="grid"/><line x1="0" y1="90" x2="600" y2="90" class="grid"/><line x1="0" y1="135" x2="600" y2="135" class="grid"/>
+                <path id="s_area" d="" fill="url(#sg)"/><path id="s_line" d="" fill="none" stroke="var(--goldBright)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+              </svg></div>
+            </div>
+          </div>
+          <div class="interp"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div id="o_interp">—</div></div>
+          <div id="s_scen"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TOOL 2: POSITION RISK ============ -->
+  <div class="toolpanel" id="panel-risk">
+    <div class="intro guide" data-gtitle="Position Risk" data-gaudio="audio/premium-risk.mp3" data-gbody="Before you buy, this tells you exactly how many shares to take so that hitting your stop only costs a small, planned slice of your account — usually one to two percent. It also maps out your profit targets in R, your unit of risk.">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <div><h3>What is Position Risk?</h3><p>The #1 rule is to never lose much on one trade. Enter a stock's price, where you'd sell if wrong (your <b>stop</b>), and how much of your account to commit — and it tells you <b>exactly how many shares to buy</b> so a stop-out only costs a small, planned amount.</p></div>
+    </div>
+    <div class="card">
+      <div class="io">
+        <div>
+          <div class="panelhead">Your trade</div>
+          <div class="iogrid">
+            <div class="field"><label>Symbol</label><input class="in" id="r_sym" value="NVDA"><div class="hint">Just a label.</div></div>
+            <div class="field"><label><span class="term" data-tip="The price you'd pay per share right now.">Share price $</span></label><input class="in" id="r_price" value="142.50"><div class="hint">Price per share.</div></div>
+            <div class="field"><label><span class="term" data-tip="How much of your whole account to put into this one position, as a percent.">Position size %</span></label><input class="in" id="r_ps" value="20"><div class="hint">% of account in this trade.</div></div>
+            <div class="field"><label><span class="term" data-tip="Your total trading capital.">Portfolio $</span></label><input class="in" id="r_port" value="500000"><div class="hint">Total account size.</div></div>
+            <div class="field full"><label><span class="term" data-tip="Your stop is where you'll sell if the trade goes against you. Enter it as a percent below entry, or as a dollar amount below entry.">Stop</span> — how it's measured</label>
+              <div class="miniseg" id="r_mode"><button class="on" data-m="%">% below entry</button><button data-m="$">$ below entry</button></div>
+            </div>
+            <div class="field full"><label><span id="r_stoplabel">Stop (% below entry)</span></label><input class="in" id="r_stop" value="6.11"><div class="hint">How far you'll let it drop before selling.</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="panelhead">Your plan</div>
+          <div class="results">
+            <div class="tile big-emph"><div class="label"><span class="term" data-tip="How many shares to buy so the position equals your chosen % of the account.">Shares to buy</span></div><div class="v gold" id="ro_shares">—</div><div class="vsub" id="ro_posval">—</div></div>
+            <div class="tile big-emph"><div class="label"><span class="term" data-tip="If your stop is hit, this is the loss as a percent of your whole account. Keep it at or under 2%.">Account risk</span></div><div class="v" id="ro_riskpct">—</div><div class="vsub" id="ro_riskdollar">if stopped out</div></div>
+            <div class="tile"><div class="label"><span class="term" data-tip="The price your stop sits at.">Stop price</span></div><div class="v" id="ro_stopprice">—</div><div class="vsub">sell-if-wrong level</div></div>
+          </div>
+          <div class="label" style="margin-top:18px"><span class="term" data-tip="R is your risk on the trade — one unit of what you'd lose if stopped. A 3R winner makes three times what you risked. Pros think in R, not dollars.">Profit targets in R (your unit of risk)</span></div>
+          <table class="rtable">
+            <thead><tr><th>Target</th><th>Price</th><th>% gain</th><th>$ profit</th></tr></thead>
+            <tbody id="ro_rtable"></tbody>
+          </table>
+          <div class="interp"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div id="ro_interp">—</div></div>
+          <div id="ro_alert"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TOOL 3: EXPECTANCY ============ -->
+  <div class="toolpanel" id="panel-exp">
+    <div class="intro guide" data-gtitle="Expectancy" data-gaudio="audio/premium-expectancy.mp3" data-gbody="This answers the most important question: does your system make money over time? It combines your win rate with your average win and loss into an edge per trade, and estimates how many trades it takes to reach your goal.">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="14" y="6" width="3" height="11"/></svg></div>
+      <div><h3>What is Expectancy?</h3><p>Does your strategy actually make money? This blends your <b>win rate</b> with your <b>average win and loss</b> to give your <b>edge per trade</b>. Above zero means you make money over time. It also shows how many trades it takes to hit your goal.</p></div>
+    </div>
+    <div class="card">
+      <div class="io">
+        <div>
+          <div class="panelhead">Your numbers</div>
+          <div class="iogrid">
+            <div class="field"><label><span class="term" data-tip="Your total trading capital.">Portfolio $</span></label><input class="in" id="e_port" value="500000"></div>
+            <div class="field"><label><span class="term" data-tip="How much of the account goes into each trade, as a percent.">Position size %</span></label><input class="in" id="e_ps" value="20"></div>
+            <div class="field"><label><span class="term" data-tip="The total percent gain you're aiming for on the account.">Desired return %</span></label><input class="in" id="e_dr" value="15"></div>
+            <div class="field"><label><span class="term" data-tip="Your average percent gain on a winning trade.">Avg gain %</span></label><input class="in" id="e_ag" value="12.5"></div>
+            <div class="field"><label><span class="term" data-tip="Your average percent loss on a losing trade (positive number).">Avg loss %</span></label><input class="in" id="e_al" value="5.8"></div>
+            <div class="field"><label><span class="term" data-tip="The percent of your trades that finish profitable.">Win rate %</span></label><input class="in" id="e_wr" value="52"></div>
+          </div>
+          <div style="margin-top:16px" id="e_badge"></div>
+        </div>
+        <div>
+          <div class="panelhead">Your edge</div>
+          <div class="results">
+            <div class="tile big-emph"><div class="label"><span class="term" data-tip="Your average result per trade as a percent of the position — win rate × avg gain minus loss rate × avg loss. Above 0 = a real edge.">Edge per trade</span></div><div class="v" id="eo_ev">—</div><div class="vsub" id="eo_evd">avg $ per trade</div></div>
+            <div class="tile"><div class="label"><span class="term" data-tip="Average win ÷ average loss. 2 means winners are twice the size of losers. Aim for 2 or more.">Gain/Loss ratio</span></div><div class="v" id="eo_gl">—</div><div class="vsub">winners vs losers</div></div>
+            <div class="tile"><div class="label"><span class="term" data-tip="Estimated number of trades to reach your desired return, at this edge.">Trades to goal</span></div><div class="v gold" id="eo_ttg">—</div><div class="vsub" id="eo_ttgsub">to hit target</div></div>
+          </div>
+          <table class="rtable">
+            <tbody>
+              <tr><td><span class="term" data-tip="The win rate that adjusts your gain/loss ratio for how often you win. Above 1 = profitable.">Adjusted G/L ratio</span></td><td class="gold" id="eo_gladj">—</td></tr>
+              <tr><td><span class="term" data-tip="The lowest win rate you could have and still break even, given your average win and loss.">Breakeven win rate</span></td><td id="eo_be">—</td></tr>
+              <tr><td><span class="term" data-tip="The Kelly criterion — the mathematically 'optimal' fraction of capital to bet for fastest growth. Most traders use a fraction of this; treat it as a ceiling, not a target.">Optimal position size (Kelly)</span></td><td id="eo_kelly">—</td></tr>
+              <tr><td><span class="term" data-tip="The dollar amount of one position at your size.">$ per position</span></td><td id="eo_dps">—</td></tr>
+            </tbody>
+          </table>
+          <div class="interp"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div id="eo_interp">—</div></div>
+          <div id="eo_alert"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TOOL 4: RISK FINANCE ============ -->
+  <div class="toolpanel" id="panel-fin">
+    <div class="intro guide" data-gtitle="Risk Finance" data-gaudio="audio/premium-finance.mp3" data-gbody="Once a trade is in profit, this shows how many shares to sell to make the rest of the position risk-free — so a pullback can't turn a winner into a loser. Selling to break-even lets your remaining shares run on house money.">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+      <div><h3>What is Risk Finance?</h3><p>You're up on a trade — now protect it. This shows how many shares to <b>sell</b> so that even if the rest gets stopped out, you can't lose money. Selling to break-even means the shares you keep are riding on <b>house money</b>.</p></div>
+    </div>
+    <div class="card">
+      <div class="io">
+        <div>
+          <div class="panelhead">Your open position</div>
+          <div class="iogrid">
+            <div class="field"><label><span class="term" data-tip="The price you bought at.">Buy price $</span></label><input class="in" id="f_buy" value="142.50"></div>
+            <div class="field"><label><span class="term" data-tip="How many shares you hold.">Shares held</span></label><input class="in" id="f_sh" value="575"></div>
+            <div class="field"><label><span class="term" data-tip="Where you'll sell if it turns against you. Linked to the percent field.">Stop price $</span></label><input class="in" id="f_stop" value="133.80"></div>
+            <div class="field"><label><span class="term" data-tip="Your stop as a percent below the buy price. Linked to the stop price field.">Stop %</span></label><input class="in" id="f_stoppct" value="6.11"></div>
+            <div class="field full"><label><span class="term" data-tip="The stock's price right now. Risk financing only works when this is above your buy price.">Current price $</span></label><input class="in" id="f_cur" value="168.30"></div>
+          </div>
+        </div>
+        <div>
+          <div class="panelhead">Where you stand</div>
+          <div class="results">
+            <div class="tile"><div class="label">Stop</div><div class="v" id="fo_stop">—</div><div class="vsub">below entry</div></div>
+            <div class="tile"><div class="label"><span class="term" data-tip="Your unrealized gain or loss right now, as a percent of entry.">Current P/L</span></div><div class="v" id="fo_pl">—</div><div class="vsub" id="fo_pld">unrealized</div></div>
+            <div class="tile big-emph"><div class="label"><span class="term" data-tip="How many times your initial risk you're now up. 2R means you've made twice what you put at risk.">R-multiple</span></div><div class="v gold" id="fo_r">—</div><div class="vsub">profit ÷ risk</div></div>
+          </div>
+          <div class="label" style="margin-top:18px"><span class="term" data-tip="Sell this many shares now and, even if the rest is stopped out, your net result is the 'effective stop' shown — at 100% you're fully break-even (risk-free).">Sell shares to lock in safety</span></div>
+          <table class="rtable">
+            <thead><tr><th>Protect</th><th>Shares to sell</th><th>Worst case now</th></tr></thead>
+            <tbody id="fo_table"></tbody>
+          </table>
+          <div class="alert ok" id="fo_action" style="display:none"></div>
+          <div class="interp"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div id="fo_interp">—</div></div>
+          <div id="fo_alert"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TOOL 5: EXPECTED MOVE ============ -->
+  <div class="toolpanel" id="panel-move">
+    <div class="intro guide" data-gtitle="Expected Move" data-gaudio="audio/premium-move.mp3" data-gbody="Before an earnings report, the options market prices in how far the stock is expected to swing. Add the at-the-money call and put prices, and this shows that expected range, so you can decide whether to hold through, trim, or step aside.">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l3 8 4-16 3 8h4"/></svg></div>
+      <div><h3>What is Expected Move?</h3><p>Before earnings, the options market is basically betting on how far a stock will jump. This reads that bet: add the <b>call</b> and <b>put</b> prices at the current price, and it shows the <b>expected swing</b> — so you can decide whether to hold through the report, trim, or step aside.</p></div>
+    </div>
+    <div class="card">
+      <div class="io">
+        <div>
+          <div class="panelhead">From your broker's option chain</div>
+          <div class="iogrid">
+            <div class="field"><label>Symbol</label><input class="in" id="m_sym" value="CRWD"><div class="hint">Just a label.</div></div>
+            <div class="field"><label><span class="term" data-tip="The stock's current price.">Stock price $</span></label><input class="in" id="m_price" value="34.11"><div class="hint">Price now.</div></div>
+            <div class="field"><label><span class="term" data-tip="Mid price of the call option at the strike closest to the current price (at-the-money), for the expiration just after earnings.">ATM call $</span></label><input class="in" id="m_call" value="2.30"><div class="hint">At-the-money call (mid).</div></div>
+            <div class="field"><label><span class="term" data-tip="Mid price of the put option at the strike closest to the current price (at-the-money), for the expiration just after earnings.">ATM put $</span></label><input class="in" id="m_put" value="2.20"><div class="hint">At-the-money put (mid).</div></div>
+          </div>
+          <div class="alert caution" style="margin-top:16px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg><div><b>Where to find these:</b> open the option chain in your broker, pick the expiration just after the earnings date, find the strike nearest the current price, and read the call &amp; put mid prices.</div></div>
+        </div>
+        <div>
+          <div class="panelhead">The expected swing</div>
+          <div class="results">
+            <div class="tile big-emph"><div class="label"><span class="term" data-tip="How far the market expects the stock to move, up OR down, by the expiration — as a percent of the price.">Expected move</span></div><div class="v gold" id="mo_pct">—</div><div class="vsub" id="mo_dollar">per share</div></div>
+            <div class="tile"><div class="label"><span class="term" data-tip="Call price + put price. This dollar amount is the expected move per share.">Straddle price</span></div><div class="v" id="mo_straddle">—</div><div class="vsub">call + put</div></div>
+          </div>
+          <div class="rangebar" id="mo_bar">
+            <div class="cap" id="mo_caplow" style="left:8%;color:#fda4a4">—</div>
+            <div class="mid"></div>
+            <div class="cap" id="mo_caphigh" style="left:92%;color:#86efac">—</div>
+          </div>
+          <div class="rangelabels"><span style="color:#fda4a4" id="mo_low">—</span><span style="color:var(--muted)" id="mo_now">now</span><span style="color:#86efac" id="mo_high">—</span></div>
+          <div class="interp"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div id="mo_interp">—</div></div>
+          <div class="label" style="margin-top:20px"><span class="term" data-tip="A simple rule of thumb for whether to hold a position through an earnings report, based on how your unrealized profit compares to the expected move.">Earnings decision — hold, trim, or exit?</span></div>
+          <div class="framebox">
+            <div class="framerow"><div class="frametag hold">HOLD</div><div>Your unrealized profit is <b>bigger than the expected move</b> and your stop is above entry (risk-free). You can afford the swing — hold through.</div></div>
+            <div class="framerow"><div class="frametag trim">TRIM</div><div>Sell enough shares to make the position risk-free (see Risk Finance), then let the rest ride through earnings on house money.</div></div>
+            <div class="framerow"><div class="frametag exit">EXIT</div><div>Your profit is <b>smaller than the expected move</b> and your stop is below entry. You'd be gambling on the report — step aside.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- guide assistant -->
+  <div class="guidepanel" id="guidePanel" aria-live="polite">
+    <div class="gp-head"><span class="gp-dot"></span><span class="gp-title" id="gpTitle">Guided walkthrough</span><button class="gp-mute" id="gpMute" title="Mute voiceover" aria-label="Toggle voiceover"></button></div>
+    <div class="gp-body" id="gpBody">Hover any tool or field and I'll explain it — out loud. Or press play on the tour. Switch to <b>Pro</b> (top-right) to turn this off.</div>
+  </div>
+
+</div>
+
+<script>
+  var $=function(id){return document.getElementById(id);};
+  function num(id){ return parseFloat(String($(id).value).replace(/[^0-9.\-]/g,''))||0; }
+  function f2(n){ return (isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function f0(n){ return Math.round(isFinite(n)?n:0).toLocaleString('en-US'); }
+  function money(n){ return (n<0?'−$':'$')+f2(Math.abs(n)); }
+  function sgnPct(n){ return (n>=0?'+':'−')+Math.abs(n).toFixed(2)+'%'; }
+  function setCls(el,base,c){ el.className=base+(c?(' '+c):''); }
+
+  /* ============ persisted Guided/Pro (shared across pages & sessions) ============ */
+  function setMode(mode, persist){
+    document.querySelectorAll('#modeSeg button').forEach(function(x){ x.classList.toggle('on', x.dataset.mode===mode); });
+    document.body.classList.toggle('expert', mode==='pro');
+    if(persist!==false){ try{ localStorage.setItem('viv-mode', mode); }catch(e){} }
+  }
+  document.querySelectorAll('#modeSeg button').forEach(function(b){
+    b.addEventListener('click', function(){ setMode(b.dataset.mode, true); if(b.dataset.mode==='pro') stopGuide(); });
+  });
+  /* mode is page-based now: guided page always shows Guided active */
+
+  /* ============ tool tab switching ============ */
+  document.querySelectorAll('#toolTabs .tooltab').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#toolTabs .tooltab').forEach(function(x){x.classList.remove('on')}); b.classList.add('on');
+      document.querySelectorAll('.toolpanel').forEach(function(p){p.classList.remove('on')});
+      $('panel-'+b.dataset.tool).classList.add('on');
+    });
+  });
+
+  /* ============ TOOL 1: RETURN SIMULATOR ============ */
+  var lossMode='count';
+  document.querySelectorAll('#s_lossmode button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#s_lossmode button').forEach(function(x){x.classList.remove('on')}); b.classList.add('on');
+      lossMode=b.dataset.m;
+      $('s_losersWrap').style.display = lossMode==='count'?'':'none';
+      $('s_wrWrap').style.display = lossMode==='rate'?'':'none';
+      renderSim();
+    });
+  });
+  function renderSim(){
+    var start=num('s_start'), cur=num('s_cur')||start, ps=num('s_ps')/100, al=num('s_al')/100;
+    var tiers=[]; document.querySelectorAll('#s_tiers tr').forEach(function(tr){
+      var g=parseFloat(tr.querySelector('[data-tg]').value)||0, c=Math.max(0,Math.floor(parseFloat(tr.querySelector('[data-tc]').value)||0));
+      if(c>0) tiers.push({gain:g/100, count:c});
+    });
+    var winners=tiers.reduce(function(s,t){return s+t.count;},0), losers;
+    if(lossMode==='rate'){ var r=num('s_wr')/100; losers=(r>0&&r<1&&winners>0)?Math.round(winners*(1-r)/r):0; }
+    else losers=Math.max(0,Math.floor(num('s_losers')));
+    var total=winners+losers;
+    var lossMult=1-ps*al, lossDrag=Math.pow(Math.max(lossMult,0),losers);
+    var tierStats=tiers.map(function(t){ var per=1+ps*t.gain; return {gain:t.gain,count:t.count,per:per,mult:Math.pow(per,t.count),log:t.count*Math.log(per>0?per:1e-9)}; });
+    var winMult=tierStats.reduce(function(m,t){return m*t.mult;},1);
+    var base=cur, endEq=base*lossDrag*winMult;
+    var totalReturn=base>0?(endEq/base-1)*100:0, winRate=total>0?winners/total*100:0;
+    var fromStart=start>0?(endEq/start-1)*100:totalReturn;
+    // tiles
+    $('o_ret').textContent=sgnPct(totalReturn); setCls($('o_ret'),'v',totalReturn>=0?'gold':'red');
+    $('o_end').textContent=money(endEq);
+    $('o_endsub').textContent=(fromStart>=0?'+':'−')+Math.abs(fromStart).toFixed(1)+'% from start';
+    $('o_wr').textContent=winRate.toFixed(1)+'%'; $('o_wrsub').textContent=f0(winners)+' W / '+f0(losers)+' L';
+    $('o_drag').textContent='×'+lossDrag.toFixed(2);
+    // equity curve: interleave winners & losers evenly
+    var seq=[], wq=[]; tiers.forEach(function(t){ for(var i=0;i<t.count;i++) wq.push(t.gain); });
+    var nL=losers, nW=wq.length, totN=nW+nL, wi=0, li=0;
+    for(var k=0;k<totN;k++){ if(li/Math.max(1,nL) <= wi/Math.max(1,nW) && li<nL){ seq.push(-al); li++; } else if(wi<nW){ seq.push(wq[wi++]); } else if(li<nL){ seq.push(-al); li++; } }
+    var step=Math.max(1,Math.ceil(seq.length/400)); var eq=base, pts=[base];
+    for(var j=0;j<seq.length;j++){ eq*=(1+ps*seq[j]); if(j%step===0||j===seq.length-1) pts.push(eq); }
+    var lo=Math.min.apply(null,pts), hi=Math.max.apply(null,pts); if(hi===lo) hi=lo+1;
+    var W=600,H=180,pad=10,h=H-2*pad;
+    var line='M'+pts.map(function(v,i){ var x=pts.length>1?(i/(pts.length-1))*W:0; var y=pad+(1-(v-lo)/(hi-lo))*h; return x.toFixed(1)+','+y.toFixed(1); }).join(' L');
+    $('s_line').setAttribute('d',line); $('s_area').setAttribute('d',line+' L600,180 L0,180 Z');
+    $('s_eqy').innerHTML=[hi,lo+(hi-lo)*0.5,lo].map(function(v){return '<span>$'+f0(v/1000)+'k</span>';}).join('');
+    // interp
+    var bigTier=tierStats.slice().sort(function(a,b){return b.log-a.log;})[0];
+    $('o_interp').innerHTML = total>0
+      ? 'Across <b>'+f0(total)+' trades</b> at a <b>'+winRate.toFixed(0)+'% win rate</b>, your '+money(base)+' could become <b>'+money(endEq)+'</b> — a <b class="'+(totalReturn>=0?'green':'red')+'">'+sgnPct(totalReturn)+'</b> change. '+(bigTier?'Most of the growth comes from the <b>+'+(bigTier.gain*100).toFixed(0)+'%</b> winners.':'')
+      : 'Add at least one winner tier to run the projection.';
+    renderScen();
+  }
+  // scenarios
+  var scenarios=[];
+  $('s_save').addEventListener('click', function(){
+    var ret=$('o_ret').textContent, end=$('o_end').textContent;
+    scenarios.unshift({ret:ret, end:end, ps:$('s_ps').value, wr:$('o_wr').textContent});
+    if(scenarios.length>3) scenarios.pop(); renderScen();
+  });
+  function renderScen(){
+    if(!scenarios.length){ $('s_scen').innerHTML=''; return; }
+    $('s_scen').innerHTML='<div class="label" style="margin-top:18px;margin-bottom:4px">Saved scenarios</div><div class="scencompare">'+
+      scenarios.map(function(s,i){return '<div class="scencard"><div class="n">Scenario '+(scenarios.length-i)+'</div><div class="v gold" style="font-size:1.25rem;font-weight:800;margin:4px 0">'+s.ret+'</div><div style="font-size:0.78rem;color:var(--muted)">'+s.end+'</div><div style="font-size:0.7rem;color:var(--faint);margin-top:4px">size '+s.ps+'% · '+s.wr+' win</div></div>';}).join('')+'</div>';
+  }
+  ['s_start','s_cur','s_ps','s_al','s_losers','s_wr'].forEach(function(id){ $(id).addEventListener('input',renderSim); });
+  document.querySelectorAll('#s_tiers input').forEach(function(i){ i.addEventListener('input',renderSim); });
+
+  /* ============ TOOL 2: POSITION RISK ============ */
+  var riskMode='%';
+  document.querySelectorAll('#r_mode button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#r_mode button').forEach(function(x){x.classList.remove('on')}); b.classList.add('on');
+      riskMode=b.dataset.m; $('r_stoplabel').textContent = riskMode==='%'?'Stop (% below entry)':'Stop ($ below entry)';
+      renderRisk();
+    });
+  });
+  function renderRisk(){
+    var sp=num('r_price'), psPct=num('r_ps'), p=num('r_port'), sv=num('r_stop');
+    var stopPct=riskMode==='%'?sv:(sp>0?(sv/sp)*100:0);
+    var stopPrice=riskMode==='%'?sp*(1-sv/100):sp-sv;
+    var posValue=p*(psPct/100), shares=sp>0?Math.floor(posValue/sp):0;
+    var riskPerShare=sp-stopPrice, totalRisk=shares*riskPerShare, riskPctEq=p>0?(totalRisk/p)*100:0;
+    $('ro_shares').textContent=f0(shares); $('ro_posval').textContent=money(posValue)+' position';
+    $('ro_riskpct').textContent=riskPctEq.toFixed(2)+'%'; setCls($('ro_riskpct'),'v',riskPctEq>2?'red':(riskPctEq>1.5?'gold':''));
+    $('ro_riskdollar').textContent='= '+money(totalRisk)+' at risk';
+    $('ro_stopprice').textContent='$'+f2(stopPrice);
+    var rows=[1,2,3,4,5,6].map(function(n){ var dr=riskPerShare*n; return {n:n,price:sp+dr,pct:sp>0?(dr/sp)*100:0,dollar:dr*shares}; });
+    $('ro_rtable').innerHTML=rows.map(function(t){ return '<tr><td>'+(t.n===1?'1R (your risk)':(t.n+'R'))+'</td><td>$'+f2(t.price)+'</td><td class="green">+'+t.pct.toFixed(2)+'%</td><td class="'+(t.n===1?'red':'green')+'">'+(t.n===1?'−':'+')+'$'+f0(Math.abs(t.dollar))+'</td></tr>'; }).join('');
+    $('ro_interp').innerHTML='Buy <b>'+f0(shares)+' shares</b> ('+money(posValue)+'). If your stop at <b>$'+f2(stopPrice)+'</b> is hit you lose <b class="red">'+money(totalRisk)+'</b> — just <b>'+riskPctEq.toFixed(2)+'%</b> of your account. A <b>3R</b> winner would make <b class="green">+$'+f0(riskPerShare*3*shares)+'</b>.';
+    var al=''; if(stopPct>10) al+='<div class="alert warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg><div>Your stop is <b>'+stopPct.toFixed(1)+'%</b> wide — over 10%. Consider a tighter entry or a closer stop.</div></div>';
+    if(riskPctEq>2) al+='<div class="alert warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg><div>This risks <b>'+riskPctEq.toFixed(2)+'%</b> of your account — above the 2% safety rule. Buy fewer shares or tighten the stop.</div></div>';
+    if(!al && riskPctEq>0) al='<div class="alert ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg><div>Risk is within the safe zone (≤2% of account). Good to go.</div></div>';
+    $('ro_alert').innerHTML=al;
+  }
+  ['r_price','r_ps','r_port','r_stop'].forEach(function(id){ $(id).addEventListener('input',renderRisk); });
+
+  /* ============ TOOL 3: EXPECTANCY ============ */
+  function renderExp(){
+    var ag=num('e_ag'), al=num('e_al'), wr=num('e_wr'), ps=num('e_ps'), dr=num('e_dr'), pf=num('e_port');
+    var wrd=wr/100, lrd=1-wrd;
+    var glRatio=al>0?ag/al:0;
+    var ev=wrd*ag-lrd*al;
+    var dps=pf*(ps/100), avgDG=dps*(ag/100), avgDL=dps*(al/100), expDR=dps*(ev/100), dollarGoal=pf*(dr/100);
+    var ttg=0,winT=0,loseT=0; if(ev>0&&dr>0){ ttg=Math.ceil(dollarGoal/expDR); winT=Math.round(ttg*wrd); loseT=Math.round(ttg*lrd); }
+    var glAdj=lrd>0?glRatio*wrd/lrd:0;
+    var be=(ag+al)>0?(al/(ag+al))*100:0;
+    var kelly=Math.max(0,wrd-(glRatio>0?lrd/glRatio:1))*100;
+    $('eo_ev').textContent=sgnPct(ev); setCls($('eo_ev'),'v',ev>=0?'green':'red');
+    $('eo_evd').textContent=(expDR>=0?'+':'−')+money(Math.abs(expDR)).replace('$','$')+' per trade';
+    $('eo_gl').textContent=glRatio.toFixed(2); setCls($('eo_gl'),'v',glRatio>=2?'green':(glRatio>=1?'gold':'red'));
+    $('eo_ttg').textContent=ttg>0?f0(ttg):'—'; $('eo_ttgsub').textContent=ttg>0?(f0(winT)+' W / '+f0(loseT)+' L'):'need positive edge';
+    $('eo_gladj').textContent=glAdj.toFixed(2); $('eo_gladj').className=glAdj>=1?'gold':'red';
+    $('eo_be').textContent=be.toFixed(1)+'%';
+    $('eo_kelly').textContent=kelly.toFixed(1)+'%';
+    $('eo_dps').textContent=money(dps);
+    $('e_badge').innerHTML='<span class="badge '+(ev>=0?'pos':'neg')+'"><span class="d"></span>'+(ev>=0?'Positive expectancy — this makes money over time':'Negative expectancy — this loses money over time')+'</span>';
+    $('eo_interp').innerHTML = ev>=0
+      ? 'You make about <b class="green">'+money(expDR)+'</b> on an average trade. At this rate it takes roughly <b>'+f0(ttg)+' trades</b> to grow the account <b>'+dr.toFixed(0)+'%</b> ('+money(dollarGoal)+'). Your winners are <b>'+glRatio.toFixed(1)+'×</b> your losers.'
+      : 'This setup <b class="red">loses money</b> over time — the average trade returns '+money(expDR)+'. Raise your win rate above <b>'+be.toFixed(0)+'%</b>, or make winners bigger vs losers.';
+    var alr=''; if(glRatio<1) alr='<div class="alert warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg><div>Your winners are smaller than your losers. Cut losses faster or let winners run longer.</div></div>';
+    else if(glRatio<2) alr='<div class="alert caution"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg><div>Gain/Loss is below 2:1. Aim for winners around 3× your losers for a sturdier edge.</div></div>';
+    $('eo_alert').innerHTML=alr;
+  }
+  ['e_port','e_ps','e_dr','e_ag','e_al','e_wr'].forEach(function(id){ $(id).addEventListener('input',renderExp); });
+
+  /* ============ TOOL 4: RISK FINANCE ============ */
+  var finLink=true;
+  $('f_stop').addEventListener('input', function(){ var bp=num('f_buy'); if(bp&&num('f_stop')) $('f_stoppct').value=((bp-num('f_stop'))/bp*100).toFixed(2); renderFin(); });
+  $('f_stoppct').addEventListener('input', function(){ var bp=num('f_buy'); if(bp) $('f_stop').value=(bp*(1-num('f_stoppct')/100)).toFixed(2); renderFin(); });
+  function renderFin(){
+    var bp=num('f_buy'), sh=num('f_sh'), st=num('f_stop'), cp=num('f_cur');
+    var initRisk=bp>0?(bp-st)/bp*100:0, plPct=bp>0?(cp-bp)/bp*100:0, rMult=initRisk>0?plPct/initRisk:0, plDollar=(cp-bp)*sh;
+    var riskPerShare=bp-st, profitPerShare=cp-bp, canFinance=cp>st&&profitPerShare>0;
+    $('fo_stop').textContent=initRisk.toFixed(2)+'%';
+    $('fo_pl').textContent=sgnPct(plPct); setCls($('fo_pl'),'v',plPct>=0?'green':'red'); $('fo_pld').textContent=(plDollar>=0?'+':'−')+money(Math.abs(plDollar)).replace('$','$');
+    $('fo_r').textContent=rMult.toFixed(2)+'R'; setCls($('fo_r'),'v',rMult>=3?'green':(rMult>=1?'gold':(rMult<0?'red':'')));
+    var rows=[{l:'Fully (break-even)',p:100},{l:'75% of risk',p:75},{l:'50% of risk',p:50},{l:'25% of risk',p:25}];
+    $('fo_table').innerHTML=rows.map(function(r){
+      if(!canFinance) return '<tr><td>'+r.l+'</td><td>—</td><td>—</td></tr>';
+      var x=sh*riskPerShare*(r.p/100)/(cp-st); var netPL=x*profitPerShare+(sh-x)*(st-bp); var eff=bp*sh>0?(netPL/(bp*sh))*100:0;
+      return '<tr><td>'+r.l+'</td><td class="gold">'+f0(x)+' sh</td><td class="'+(r.p===100?'green':'')+'">'+(eff>=0?'+':'−')+Math.abs(eff).toFixed(2)+'%</td></tr>';
+    }).join('');
+    var sbe=canFinance?sh*riskPerShare/(cp-st):0;
+    var action = rMult<1?('Hold your stop at $'+f2(st)+'.') : rMult<2?'Approaching 2R — monitor closely.' : rMult<3?('Move your stop up to break-even ($'+f2(bp)+').') : 'Protect the gains — stop at break-even minimum.';
+    $('fo_action').style.display=canFinance?'':'none';
+    $('fo_action').className='alert '+(rMult>=3?'ok':(rMult>=2?'caution':'ok'));
+    $('fo_action').innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><div><b>Suggested action:</b> '+action+'</div>';
+    if(canFinance){
+      $('fo_interp').innerHTML='You\'re up <b class="green">'+sgnPct(plPct)+'</b> ('+rMult.toFixed(1)+'R). Sell about <b>'+f0(sbe)+' shares</b> now and the rest of the position becomes <b>risk-free</b> — even a full stop-out can\'t lose you money. The shares you keep ride on house money.';
+      $('fo_alert').innerHTML='';
+    } else {
+      $('fo_interp').innerHTML='Risk financing needs the position to be in profit (current price above your buy price).';
+      $('fo_alert').innerHTML='<div class="alert warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg><div>This position is at or below your entry — there\'s no profit to finance yet. Manage it with your stop.</div></div>';
+    }
+  }
+  ['f_buy','f_sh','f_cur'].forEach(function(id){ $(id).addEventListener('input',renderFin); });
+
+  /* ============ TOOL 5: EXPECTED MOVE ============ */
+  function renderMove(){
+    var sp=num('m_price'), cp=num('m_call'), pp=num('m_put');
+    var straddle=cp+pp, emPct=sp>0?(straddle/sp)*100:0, up=sp+straddle, low=sp-straddle;
+    $('mo_pct').textContent='±'+emPct.toFixed(2)+'%'; $('mo_dollar').textContent='±$'+f2(straddle)+' per share';
+    $('mo_straddle').textContent='$'+f2(straddle);
+    $('mo_caplow').textContent='$'+f2(low); $('mo_caphigh').textContent='$'+f2(up);
+    $('mo_low').textContent='$'+f2(low)+' (−'+emPct.toFixed(1)+'%)'; $('mo_now').textContent='$'+f2(sp)+' now'; $('mo_high').textContent='$'+f2(up)+' (+'+emPct.toFixed(1)+'%)';
+    $('mo_interp').innerHTML='The market expects <b>'+($('m_sym').value||'this stock')+'</b> to swing about <b class="">±'+emPct.toFixed(1)+'%</b> — roughly between <b class="red">$'+f2(low)+'</b> and <b class="green">$'+f2(up)+'</b> — by expiration. Only hold through earnings if your cushion is bigger than this move.';
+  }
+  ['m_price','m_call','m_put','m_sym'].forEach(function(id){ $(id).addEventListener('input',renderMove); });
+
+  /* ============ TUTORIAL VIDEO (sequential narrated chapters) ============ */
+  var TOUR=[
+    {chip:'Guided tour · 1 of 6', t:'Welcome to Premium Tools', c:'Five calculators that answer the big money questions before you trade. Each one explains itself — let\'s take a quick tour.', a:'audio/premium-tour-0.mp3'},
+    {chip:'Tool 1 · Return Simulator', t:'Return Simulator', c:'See what your account could grow to from your win rate, average loss, and winner sizes. Compounding, made visual.', a:'audio/premium-tour-1.mp3'},
+    {chip:'Tool 2 · Position Risk', t:'Position Risk', c:'Get the exact number of shares to buy so a stop-out only costs a small, planned amount of your account.', a:'audio/premium-tour-2.mp3'},
+    {chip:'Tool 3 · Expectancy', t:'Expectancy', c:'Find out whether your system actually makes money — your edge per trade, and the trades needed to hit your goal.', a:'audio/premium-tour-3.mp3'},
+    {chip:'Tool 4 · Risk Finance', t:'Risk Finance', c:'Once a trade is up, see how many shares to sell to make it risk-free and let the rest run on house money.', a:'audio/premium-tour-4.mp3'},
+    {chip:'Tool 5 · Expected Move', t:'Expected Move', c:'Before earnings, estimate how far a stock could swing so you can decide to hold, trim, or step aside.', a:'audio/premium-tour-5.mp3'}
+  ];
+  (function(){
+    var i=0, playing=false, audio=new Audio(); audio.preload='auto';
+    var stage={chip:$('tourChip'),t:$('tourTitle'),c:$('tourCap')}, dots=$('tourDots'), fill=$('tourFill'), time=$('tourTime'),
+        poster=$('tourPoster'), playBtn=$('tourPlay'), replay=$('tourReplay');
+    var PLAY='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+        PAUSE='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>';
+    dots.innerHTML=TOUR.map(function(_,k){return '<i'+(k===0?' class="on"':'')+'></i>';}).join('');
+    function render(){ var ch=TOUR[i]; stage.chip.textContent=ch.chip; stage.t.textContent=ch.t; stage.c.textContent=ch.c;
+      dots.querySelectorAll('i').forEach(function(d,k){ d.classList.toggle('on',k===i); }); time.textContent=(i+1)+' / '+TOUR.length; }
+    var fb=null;
+    function playChapter(){ render(); audio.src=TOUR[i].a; audio.currentTime=0; audio.play().catch(function(){});
+      clearTimeout(fb); fb=setTimeout(function(){ if(playing) next(); }, 14000); }   // fallback if a clip can't load
+    function next(){ clearTimeout(fb); if(i<TOUR.length-1){ i++; playChapter(); } else stop(true); }
+    function start(){ poster.classList.add('hidden'); playing=true; playBtn.innerHTML=PAUSE; stopGuide(); playChapter(); }   // video wins: silence hover voice
+    function pause(){ playing=false; playBtn.innerHTML=PLAY; try{audio.pause();}catch(e){} clearTimeout(fb); }
+    function stop(done){ playing=false; playBtn.innerHTML=PLAY; try{audio.pause();}catch(e){} clearTimeout(fb);
+      if(done){ fill.style.width='100%'; } }
+    audio.addEventListener('ended', next);
+    audio.addEventListener('timeupdate', function(){ var d=audio.duration||0, fr=d?audio.currentTime/d:0; fill.style.width=Math.min(100,(i+fr)/TOUR.length*100)+'%'; });
+    poster.addEventListener('click', function(){ i=0; fill.style.width='0%'; start(); });
+    playBtn.addEventListener('click', function(){ if(playing) pause(); else { if(poster.classList.contains('hidden')) start_resume(); else { i=0; fill.style.width='0%'; start(); } } });
+    function start_resume(){ playing=true; playBtn.innerHTML=PAUSE; stopGuide(); if(audio.src){ audio.play().catch(function(){}); clearTimeout(fb); fb=setTimeout(function(){ if(playing) next(); },14000); } else playChapter(); }
+    replay.addEventListener('click', function(){ i=0; fill.style.width='0%'; poster.classList.add('hidden'); start(); });
+    window.__tourStop=function(){ pause(); };
+    window.__tourPlaying=function(){ return playing; };     // true while the tutorial video is running
+    render();
+  })();
+
+  /* ============ guided voiceover assistant (hover -> explain + speak) ============ */
+  var stopGuide=function(){};
+  (function(){
+    var panel=$('guidePanel'), gpTitle=$('gpTitle'), gpBody=$('gpBody'), gpMute=$('gpMute');
+    var SPK_ON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>';
+    var SPK_OFF='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>';
+    gpMute.innerHTML=SPK_ON;
+    var voiceOn=true, synth=window.speechSynthesis||null, audio=new Audio(); audio.preload='auto';
+    audio.addEventListener('playing', function(){panel.classList.add('speaking')});
+    audio.addEventListener('ended', function(){panel.classList.remove('speaking')});
+    audio.addEventListener('pause', function(){panel.classList.remove('speaking')});
+    function stopAll(){ try{audio.pause();}catch(e){} if(synth) synth.cancel(); }
+    stopGuide=stopAll;
+    var primed=false;
+    function prime(){ if(primed)return; primed=true; audio.muted=true;
+      audio.play().then(function(){audio.pause();audio.currentTime=0;audio.muted=false;}).catch(function(){audio.muted=false;}); }
+    document.addEventListener('pointerdown', prime, {once:true});
+    document.addEventListener('keydown', prime, {once:true});
+    function narrate(el){ if(!voiceOn) return;
+      if(window.__tourPlaying && window.__tourPlaying()) return;   // video has priority — keep hover voice muted while it plays
+      var src=el.getAttribute('data-gaudio');
+      if(src){ try{audio.pause();}catch(e){} audio.src=src; audio.currentTime=0; audio.play().catch(function(){}); }
+      else if(synth){ synth.cancel(); var u=new SpeechSynthesisUtterance((el.getAttribute('data-gtitle')||'')+'. '+(el.getAttribute('data-gbody')||''));
+        u.onstart=function(){panel.classList.add('speaking')}; u.onend=function(){panel.classList.remove('speaking')}; synth.speak(u); }
+    }
+    gpMute.addEventListener('click', function(){ voiceOn=!voiceOn; if(!voiceOn) stopAll();
+      gpMute.innerHTML=voiceOn?SPK_ON:SPK_OFF; gpMute.title=voiceOn?'Mute voiceover':'Unmute voiceover'; });
+    document.querySelectorAll('.guide').forEach(function(el){
+      el.addEventListener('mouseenter', function(){
+        if(document.body.classList.contains('expert')) return;
+        document.querySelectorAll('.guide-active').forEach(function(x){x.classList.remove('guide-active')});
+        el.classList.add('guide-active');
+        gpTitle.textContent=el.getAttribute('data-gtitle')||''; gpBody.textContent=el.getAttribute('data-gbody')||'';
+        narrate(el);
+      });
+      el.addEventListener('mouseleave', function(){ el.classList.remove('guide-active'); });
+    });
+  })();
+
+  /* initial paint */
+  renderSim(); renderRisk(); renderExp(); renderFin(); renderMove();
+
+  /* ===== scroll-reveal: header entrance starts only when it scrolls into view ===== */
+  (function(){
+    var els=document.querySelectorAll('.reveal');
+    if(!els.length) return;
+    if(!('IntersectionObserver' in window)){ els.forEach(function(e){e.classList.add('in-view');}); return; }
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in-view'); io.unobserve(en.target); } });
+    }, {threshold:0.18, rootMargin:'0px 0px -8% 0px'});
+    els.forEach(function(e){ io.observe(e); });
+  })();
+</script>
+</body>
+</html>

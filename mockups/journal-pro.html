@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIV — Journal (Pro layout)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     VIV brand tokens — copied verbatim from dashboard-pro.html
+     ============================================================ */
+  :root{
+    --bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
+    --text:rgba(255,255,255,0.92);
+    --muted:rgba(255,255,255,0.70);
+    --faint:rgba(255,255,255,0.45);
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:var(--font); line-height:1.5; font-size:16px;
+    -webkit-font-smoothing:antialiased; padding:0; min-height:100vh;
+  }
+  .big,.val,.kpinum,.metricval,.pl,tbody td,.dsv,.edgerowr,.emcell{font-variant-numeric:tabular-nums}
+
+  /* ===== SHELL ===== */
+  .shell{width:100%; max-width:1400px; margin:0 auto; padding:22px 24px 80px}
+  @media(min-width:2000px){ .shell{max-width:1680px} }
+
+  /* ===== P0. NAV ===== */
+  .navbar{display:flex; align-items:center; gap:16px; margin-bottom:22px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem}
+  .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
+  .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
+  .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+  .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
+  .tabs a:hover:not(.on){color:var(--text)}
+  .spacer{flex:1}
+  .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
+  .seg button, .seg a{
+    border:none; background:transparent; color:var(--muted); cursor:pointer; text-decoration:none;
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:7px 16px; border-radius:980px;
+    letter-spacing:0.02em; transition:all .15s; display:inline-block;
+  }
+  .seg button.on, .seg a.on{background:var(--goldDim); color:var(--goldBright)}
+  .seg button:hover:not(.on), .seg a:hover:not(.on){color:var(--text)}
+  .seg.mini button{padding:5px 11px; font-size:0.66rem}
+
+  /* ===== SHARED CARD CHROME — uniform across every section ===== */
+  .card{
+    position:relative; background:var(--glass);
+    border:1px solid var(--border); border-radius:16px;
+    backdrop-filter:blur(24px) saturate(150%);
+    -webkit-backdrop-filter:blur(24px) saturate(150%);
+    padding:18px 20px;
+    /* no overflow:hidden here — infodot tooltips and the Win Rate hover panel are absolutely positioned
+       descendants that need to escape the card's box; the ::before overlay below self-rounds instead. */
+  }
+  .card::before{
+    content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+    background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%);
+  }
+  .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+  .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+  .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+  .cardhead .label{flex:1}
+  .infodot{width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex;
+    align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic;
+    color:var(--faint); cursor:help; flex:none}
+  .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+  /* ----- shared tooltip CSS (exact — matches the pattern used across pages) ----- */
+  .infodot{position:relative; cursor:help}
+  .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+  .eyebrow-row{display:flex; align-items:center; gap:8px}
+  .eyebrow-row .eyebrow{flex:1}
+  .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+    font-size:0.62rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em;
+    text-decoration:none; display:inline-block}
+  .ghostchip:hover{color:var(--text); border-color:var(--borderGold)}
+  .btn{
+    border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text);
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:8px 16px;
+    border-radius:980px; cursor:pointer;
+  }
+  .btn.ghost{background:transparent}
+  .btn.ghost:hover{border-color:var(--borderGold); color:var(--text)}
+  .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+
+  /* status pills (Result column + Playbook verdict) — copied from dashboard-pro / journal-recommended */
+  .status{display:inline-flex; align-items:center; gap:6px; font-size:0.66rem; font-weight:700; padding:5px 10px; border-radius:980px; letter-spacing:0.02em}
+  .status .d{width:6px;height:6px;border-radius:50%}
+  .st-win{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)} .st-win .d{background:var(--green)}
+  .st-loss{background:rgba(239,68,68,0.12); color:#fda4a4; border:1px solid rgba(239,68,68,0.3)} .st-loss .d{background:var(--red)}
+  .st-free{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)} .st-free .d{background:var(--green)}
+  .tag{display:inline-block; font-size:0.64rem; font-weight:600; color:var(--muted); background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; padding:2px 7px}
+  .pl.up{color:var(--green); font-weight:700} .pl.dn{color:var(--red); font-weight:700}
+  .pl .pct{display:block; font-size:0.66rem; color:var(--muted); font-weight:500; margin-top:1px}
+  .srcdot{width:6px;height:6px;border-radius:50%}
+  .srcdot.ibkr{background:var(--goldBright); box-shadow:0 0 7px var(--goldBright)}
+  .srcdot.man{background:rgba(255,255,255,0.28)}
+  .tick{font-weight:800; letter-spacing:-0.01em; font-size:0.86rem; display:flex; align-items:center; gap:8px}
+
+  /* ===== P1. COMMAND HEADER ===== */
+  .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
+  .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+  .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px}
+  .cmdactions{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  #privacyBtn.on{background:var(--goldDim); border-color:var(--borderGold); color:var(--goldBright)}
+
+  /* ===== ADMIN-ONLY SLOT (before P2) ===== */
+  /* Jarvis / CoachHero admin strip renders here for admin accounts only — not part of this mockup. */
+
+  /* ===== P2. KPI STRIP ===== */
+  .kpistrip{display:grid; grid-template-columns:repeat(5,1fr); gap:14px}
+  .kpi{height:112px; padding:14px 18px; display:flex; flex-direction:column}
+  .kpi .cardhead{padding-bottom:8px; margin-bottom:10px}
+  .kpibody{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-height:0}
+  .kpibody.stack{flex-direction:column; align-items:flex-start; justify-content:center; gap:5px}
+  .kpimain{min-width:0}
+  .kpinum{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; line-height:1.05; white-space:nowrap}
+  .kpinum.green{color:var(--green)} .kpinum.red{color:var(--red)} .kpinum.gold{color:var(--goldBright)}
+  .kpisub{font-size:0.68rem; color:var(--muted); margin-top:4px; white-space:nowrap}
+  .kpiviz{flex:none; width:70px; height:40px}
+  .kpiviz svg{width:100%; height:100%; display:block; overflow:visible}
+  /* Win Rate donut: hover a zone for its count — green arc = wins, red track = losses */
+  .wrviz{position:relative}
+  .wrviz .wrzone{pointer-events:stroke; cursor:help}
+  .wrtip{display:none; position:absolute; top:calc(100% + 8px); right:-6px; z-index:60;
+    background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:8px 12px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.55); font-size:0.74rem; font-weight:700; white-space:nowrap}
+  .wrtip.show{display:block}
+  .wrtip.win{color:#86efac} .wrtip.loss{color:#fca5a5}
+  .wlbar{display:flex; height:6px; width:100%; border-radius:980px; overflow:hidden; background:rgba(255,255,255,0.08)}
+  .wlbar .win{background:var(--green)} .wlbar .loss{background:var(--red)}
+  @media(max-width:1200px){ .kpistrip{grid-template-columns:repeat(3,1fr)} }
+  @media(max-width:760px){ .kpistrip{grid-template-columns:repeat(2,1fr)} .kpi{height:auto; min-height:112px} }
+
+  /* ===== P3. FILTER BAR ===== */
+  .filterbar{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px;
+    border:1px solid var(--border); border-radius:14px; padding:9px 14px; background:rgba(255,255,255,0.025)}
+  .filterbar .flabel{display:inline-flex; align-items:center; gap:6px; color:var(--goldBright); font-weight:800;
+    font-size:0.68rem; text-transform:uppercase; letter-spacing:0.08em}
+  .fctl{display:inline-flex; align-items:center; gap:7px; color:var(--muted); font-size:0.66rem;
+    text-transform:uppercase; letter-spacing:0.05em; font-weight:700}
+  .filtsel{font-family:var(--font); font-size:0.78rem; font-weight:700; color:var(--text); text-transform:none;
+    letter-spacing:0; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:980px;
+    padding:6px 12px; cursor:pointer; transition:all .15s}
+  .filtsel:hover{border-color:var(--borderGold)}
+  .filtsel.active{border-color:var(--borderGold); color:var(--goldBright); background:var(--goldDim)}
+  .fcount{color:var(--muted); font-size:0.72rem; font-weight:600}
+
+  /* ===== P4. CHARTS ROW ===== */
+  .chartrow{display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-top:14px; align-items:start}
+  @media(max-width:1000px){ .chartrow{grid-template-columns:1fr} }
+  .chartwrap{display:flex; gap:12px; margin-top:6px}
+  .yaxis{display:flex; flex-direction:column; justify-content:space-between; font-size:0.6rem; color:var(--faint);
+    min-width:38px; text-align:right; padding:2px 0}
+  .plot{flex:1; height:190px}
+  .eqsvg{width:100%; height:100%; display:block}
+  .grid{stroke:rgba(255,255,255,0.06); stroke-width:1}
+  .xaxis{display:flex; justify-content:space-between; font-size:0.58rem; color:var(--faint); margin-top:7px; padding-left:46px}
+  .charthint{font-size:0.7rem; color:var(--muted); margin-top:11px; line-height:1.5}
+  .charthint .g{color:var(--goldBright); font-weight:700} .charthint .rd{color:var(--red); font-weight:700}
+  .bars{position:relative; display:flex; gap:8px; height:150px; margin-top:14px; align-items:stretch}
+  .zeroline{position:absolute; left:0; right:0; top:50%; border-top:1px dashed var(--border)}
+  .barcol{flex:1; display:flex; flex-direction:column}
+  .barcol .up{flex:1; display:flex; align-items:flex-end; justify-content:center}
+  .barcol .down{flex:1; display:flex; align-items:flex-start; justify-content:center}
+  .bar{width:64%; min-width:6px; max-width:30px}
+  .bar.pos{background:linear-gradient(180deg,var(--green),rgba(34,197,94,0.45)); border-radius:4px 4px 0 0}
+  .bar.neg{background:linear-gradient(180deg,rgba(239,68,68,0.45),var(--red)); border-radius:0 0 4px 4px}
+  .distx{display:flex; justify-content:space-between; font-size:0.58rem; color:var(--faint); margin-top:7px}
+  .disthead{display:flex; align-items:center; gap:9px; flex-wrap:wrap}
+  .disthint2{font-size:0.62rem; color:var(--goldBright); font-weight:700}
+  .distbtn{font-family:var(--font); font-size:0.62rem; font-weight:700; color:var(--muted); cursor:pointer;
+    background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:8px; padding:6px 12px}
+  .distbtn.on,.distbtn:hover{color:var(--gold); border-color:var(--borderGold); background:var(--goldDim)}
+  .distpanel{display:grid; grid-template-rows:0fr; opacity:0; margin-top:0; overflow:hidden;
+    transition:grid-template-rows .5s cubic-bezier(0.22,1,0.36,1), opacity .35s ease, margin-top .5s ease}
+  .distpanel.open{grid-template-rows:1fr; opacity:1; margin-top:13px}
+  .distpanel-inner{overflow:hidden; min-height:0; padding-top:13px; border-top:1px solid var(--border)}
+  .disttable{width:100%; border-collapse:collapse; font-size:0.68rem}
+  .disttable th{text-align:right; padding:6px 7px; font-size:0.52rem; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--muted); font-weight:700; border-bottom:1px solid var(--border)}
+  .disttable th:first-child{text-align:left}
+  .disttable td{padding:5px 7px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.04)}
+  .disttable td:first-child{text-align:left; color:var(--text); font-weight:600}
+  .disttable td.g{color:var(--green); font-weight:700} .disttable td.r{color:var(--red); font-weight:700}
+
+  /* ===== P5. CALENDAR + KEY METRICS ROW ===== */
+  .calmetrow{display:grid; grid-template-columns:1.2fr 1fr; gap:14px; margin-top:14px; align-items:stretch}
+  @media(max-width:1000px){ .calmetrow{grid-template-columns:1fr} }
+  .calwkhdr{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px}
+  .calwkhdr span{font-size:0.56rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--faint); text-align:center; font-weight:700}
+  .calgrid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px}
+  .calcell{border:1px solid var(--border); border-radius:8px; padding:6px 7px; min-height:50px;
+    display:flex; flex-direction:column; justify-content:space-between; background:rgba(255,255,255,0.02)}
+  .calcell.empty{visibility:hidden}
+  .calcell .cd{font-size:0.6rem; color:var(--faint); font-weight:700}
+  .calcell .cpl{font-size:0.64rem; font-weight:800}
+  .calcell .cpl.green{color:#86efac} .calcell .cpl.red{color:#fca5a5}
+  .calcell .cn{font-size:0.54rem; color:var(--muted)}
+  .calnote{font-size:0.66rem; color:var(--faint); margin-top:10px}
+
+  .metricsmini{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+  .mmtile{background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:10px; padding:9px 10px}
+  .mmtile .mmk{font-size:0.56rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--faint); font-weight:700}
+  .mmtile .mmv{font-size:0.72rem; font-weight:800; margin-top:4px; letter-spacing:-0.01em}
+  .mmtile .mmv.green{color:var(--green)} .mmtile .mmv.red{color:var(--red)} .mmtile .mmv.gold{color:var(--goldBright)}
+
+  /* ===== P5b. PLAYBOOK TRACKER STRIP ===== */
+  .playbookstrip{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:14px; padding:14px 18px}
+  .playbookstrip .pbtxt{flex:1; min-width:220px; font-size:0.78rem; color:var(--text); line-height:1.5}
+  .playbookstrip .pbtxt b{color:var(--goldBright); font-weight:700}
+
+  /* ===== P6. OBJECTIVE EDGE + EDGE MATRIX (two cards, side by side) ===== */
+  .edgegrid{display:grid; grid-template-columns:1.1fr 1fr; gap:14px; margin-top:14px; align-items:start}
+  @media(max-width:1000px){ .edgegrid{grid-template-columns:1fr} }
+  .edgerows{display:flex; flex-direction:column; gap:10px}
+  .edgerowgrp{display:flex; flex-direction:column; gap:7px}
+  .edgerowgrp > .grouplabel{font-size:0.64rem; font-weight:800; color:var(--text); margin-bottom:1px}
+  .edgerow2{display:grid; grid-template-columns:120px 1fr 46px 64px 66px; align-items:center; gap:10px}
+  .edgerowlabel{font-size:0.72rem; color:var(--muted); font-weight:600}
+  .edgebar{height:7px; border-radius:980px; background:rgba(255,255,255,0.07); overflow:hidden}
+  .edgebarfill{height:100%; background:linear-gradient(90deg,var(--goldMid),var(--goldBright))}
+  .edgerowwr{font-size:0.68rem; color:var(--text); font-weight:700; text-align:right}
+  .edgerowr{font-size:0.72rem; font-weight:800; text-align:right}
+  .edgerowr.green{color:var(--green)} .edgerowr.red{color:var(--red)}
+  .edgerowct{font-size:0.64rem; color:var(--faint); text-align:right; white-space:nowrap}
+  table.edgematrix{width:100%; border-collapse:collapse; font-size:0.74rem}
+  table.edgematrix th{font-size:0.56rem; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted);
+    font-weight:700; padding:7px 9px; text-align:center; border-bottom:1px solid var(--border)}
+  table.edgematrix th:first-child{text-align:left}
+  table.edgematrix td{padding:9px; text-align:center; border-bottom:1px solid rgba(255,255,255,0.05)}
+  table.edgematrix td.emrow{text-align:left; color:var(--text); font-weight:700; font-size:0.72rem}
+  table.edgematrix td.edgecell{background:transparent; transition:background .15s; border-radius:8px; font-weight:700}
+  table.edgematrix.heatmap td.edgecell{background:var(--hcolor)}
+
+  /* ===== P7. ANALYTICS ROW ===== */
+  .vagrid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:14px}
+  @media(max-width:1100px){ .vagrid{grid-template-columns:repeat(2,1fr)} }
+  @media(max-width:600px){ .vagrid{grid-template-columns:1fr} }
+  .vacard{padding:16px 17px}
+  .varecap{display:flex; flex-direction:column; gap:9px; margin-top:11px}
+  .vastat{background:rgba(255,255,255,0.035); border:1px solid var(--border); border-radius:11px; padding:9px 11px}
+  .vak{font-size:0.56rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); font-weight:700}
+  .vav{font-size:1.05rem; font-weight:800; letter-spacing:-0.02em; margin-top:4px}
+  .vav.green{color:var(--green)} .vav.red{color:var(--red)} .vav.gold{color:var(--goldBright)}
+  .vasub{font-size:0.62rem; color:var(--muted); margin-top:2px}
+  .vacommentary{font-size:0.76rem; line-height:1.5; color:var(--text); margin-top:12px; padding:10px 12px;
+    background:rgba(201,152,42,0.06); border-left:2px solid var(--gold); border-radius:0 8px 8px 0}
+  .vacommentary b{color:var(--goldBright); font-weight:700}
+  .vatagline{margin-top:12px} .vatags{display:flex; flex-wrap:wrap; gap:6px; margin-top:7px}
+  .vatag{font-size:0.64rem; font-weight:700; color:var(--text); background:rgba(255,255,255,0.05);
+    border:1px solid var(--border); border-radius:980px; padding:3px 9px}
+  .vatag b{color:var(--goldBright); font-weight:800; margin-left:4px}
+  .valist{list-style:none; margin:11px 0 0; padding:0; display:flex; flex-direction:column; gap:9px}
+  .valist li{display:flex; gap:9px; font-size:0.76rem; line-height:1.45; color:var(--text)}
+  .valist li .ic{flex:none; width:19px; height:19px; border-radius:6px; display:flex; align-items:center; justify-content:center;
+    font-size:0.68rem; font-weight:800; margin-top:1px}
+  .valist li .ic.pos{background:rgba(34,197,94,0.16); color:#86efac}
+  .valist li .ic.neg{background:rgba(239,68,68,0.16); color:#fca5a5}
+  .valist li .ic.tip{background:var(--goldDim); color:var(--goldBright)}
+  .valist li b{color:var(--goldBright); font-weight:700}
+  .vatrades{display:flex; flex-direction:column; gap:7px; margin-top:11px}
+  .varow{display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:10px;
+    background:rgba(255,255,255,0.035); border:1px solid var(--border)}
+  .varow .vtk{font-weight:800; font-size:0.8rem; min-width:46px}
+  .varow .vsetup{font-size:0.64rem; color:var(--muted); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .varow .vret{font-weight:800; font-size:0.74rem; text-align:right; min-width:58px}
+  .varow .vpl{font-weight:800; font-size:0.74rem; text-align:right; min-width:82px}
+  .varow.win{border-left:3px solid var(--green)} .varow.loss{border-left:3px solid var(--red)}
+  .varow .green{color:var(--green)} .varow .red{color:var(--red)}
+  /* clicking a winner/loser row jumps to its row in Closed Trades below (flash-highlight + Trade Preview) */
+  .varow.clickable{cursor:pointer; transition:border-color .15s, background .15s}
+  .varow.clickable:hover{border-color:var(--borderGold); background:rgba(255,255,255,0.06)}
+  /* ticker mentions inside Recap / Insights that jump to the same row */
+  .tickerlink{color:var(--goldBright); font-weight:700; cursor:pointer; border-bottom:1px dotted var(--borderGold)}
+  .tickerlink:hover{color:var(--white); border-bottom-color:var(--goldBright)}
+
+  /* ===== FX MIS-PRICING ALERT SLOT (before P8) ===== */
+  /* A conditional banner warns here when a closed trade's stored FX-converted price looks mis-priced vs the live rate — not part of this mockup. */
+
+  /* ===== P8. CLOSED TRADES TABLE ===== */
+  .tradehead h2{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+  .countchip{background:var(--goldDim); color:var(--goldBright); font-size:0.66rem; font-weight:800; padding:3px 10px; border-radius:980px}
+  .tradenote{font-size:0.68rem; color:var(--faint); margin:-4px 0 12px}
+  .tablewrap{overflow-x:auto}
+  table.dense{width:100%; border-collapse:collapse; min-width:1240px}
+  table.dense thead th{
+    position:sticky; top:0; z-index:2; background:rgba(9,9,15,0.94); backdrop-filter:blur(6px);
+    font-size:0.58rem; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;
+    color:var(--muted); text-align:right; padding:9px 10px; border-bottom:1px solid var(--border); white-space:nowrap; cursor:help;
+  }
+  table.dense thead th:first-child, table.dense thead th:nth-child(2){text-align:left}
+  table.dense thead th.sortable{cursor:pointer; user-select:none}
+  table.dense thead th.sortable:hover{color:var(--text)}
+  table.dense thead th.sortable.sorted{color:var(--gold)}
+  table.dense thead th.sortable.sorted::after{content:" " attr(data-dir)}
+  table.dense tbody td{padding:8px 10px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.74rem}
+  table.dense tbody td:first-child, table.dense tbody td:nth-child(2){text-align:left}
+  table.dense tbody tr:hover{background:rgba(255,255,255,0.025)}
+  .pro-only{display:none}
+  body.pro .pro-only{display:table-cell}
+  body.pro thead .pro-only{display:table-cell}
+  .revcell{text-align:right; white-space:nowrap}
+  .revbtn{background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+    font-size:0.66rem; font-weight:700; padding:5px 12px; border-radius:980px; cursor:pointer}
+  .revbtn:hover{color:var(--text); border-color:var(--borderGold)}
+  .traderow.view-open .revbtn{background:var(--goldDim); color:var(--goldBright); border-color:var(--borderGold)}
+  /* flash-highlight when jumped to from Best winners / Worst losers / Recap / Insights */
+  @keyframes jumpFlash{
+    0%{background:rgba(201,152,42,0.34); box-shadow:inset 3px 0 0 0 var(--goldBright), inset 0 0 0 1px var(--borderGold)}
+    55%{background:rgba(201,152,42,0.16); box-shadow:inset 3px 0 0 0 var(--goldBright), inset 0 0 0 1px transparent}
+    100%{background:transparent; box-shadow:inset 0 0 0 0 transparent}
+  }
+  .traderow.jumphl{animation:jumpFlash 1.5s cubic-bezier(0.22,1,0.36,1) both}
+  @media(prefers-reduced-motion:reduce){ .traderow.jumphl{animation:none; background:rgba(201,152,42,0.16)} }
+
+  /* ===== slide-in Trade Preview panel ===== */
+  .tradepanel{position:fixed; top:0; right:0; bottom:0; width:380px; max-width:92vw; z-index:250;
+    background:#0c0c14; border-left:1px solid var(--borderGold); box-shadow:-24px 0 60px rgba(0,0,0,0.5);
+    transform:translateX(100%); transition:transform .28s cubic-bezier(0.22,1,0.36,1);
+    display:flex; flex-direction:column; overflow:hidden}
+  .tradepanel.open{transform:translateX(0)}
+  .tphead{flex:none; display:flex; align-items:center; gap:12px; padding:20px 22px 14px; border-bottom:1px solid var(--border)}
+  .tpbody{flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:6px 22px 10px}
+  .tptick{font-size:1.05rem; font-weight:800; color:var(--white)}
+  .tpclose{margin-left:auto; background:transparent; border:none; color:var(--faint); font-size:1.3rem; line-height:1; cursor:pointer; min-width:44px; min-height:44px; margin-right:-14px}
+  .tpclose:hover{color:var(--text)}
+  .tpr{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.78rem}
+  .tpr span{color:var(--muted)} .tpr b{color:var(--text); font-weight:700}
+  .tpr b.green{color:var(--green)} .tpr b.red{color:var(--red)} .tpr b.gold{color:var(--goldBright)}
+  .tpfoot{flex:none; padding:14px 22px 18px; border-top:1px solid var(--border); background:#0c0c14}
+  .tpfoot .btn{width:100%; min-height:44px}
+  .tpoverlay{position:fixed; inset:0; z-index:240; background:rgba(8,8,14,0.5); display:none}
+  .tpoverlay.open{display:block}
+
+  @media(max-width:760px){
+    .navbar .spacer{display:none}
+    .tabs{overflow-x:auto; max-width:100%; scrollbar-width:none} .tabs::-webkit-scrollbar{display:none} .tabs a{white-space:nowrap}
+  }
+</style>
+</head>
+<body class="pro">
+<div class="shell">
+
+  <!-- P0. NAV -->
+  <div class="navbar">
+    <div class="brand"><img class="vmark" src="../public/logo-mark.png" alt="VIV" style="background:none; object-fit:contain"> Valen Insiders Vault</div>
+    <div class="tabs">
+      <a href="dashboard-pro.html">Dashboard</a>
+      <a href="journal-pro.html" class="on">Journal</a>
+      <a href="premium-pro.html">Premium tools</a>
+      <!-- Live nav (commit 1353d7a) also has: Daily Setups + Model Book (members), Studies + Quant (admin-only). No Pro variants needed - those pages have no Guided/Pro toggle. -->
+      <a href="daily-setups.html">Daily Setups</a>
+      <a href="model-book.html">Model Book</a>
+      <a href="studies.html" title="Admin-only tab">Studies</a>
+      <a href="quant.html" title="Admin-only tab">Quant</a>
+      <a href="settings-pro.html">Settings</a>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+      <a href="journal-recommended.html" data-mode="guided">Guided</a>
+      <a href="journal-pro.html" class="on" data-mode="pro">Pro</a>
+    </div>
+  </div>
+
+  <!-- P1. COMMAND HEADER -->
+  <div class="cmdheader">
+    <div class="cmdleft">
+      <div class="eyebrow">Journal</div>
+      <h1 class="ch1">Track Record</h1>
+      <div class="cmdmeta">12 closed trades &middot; last import Jul 14</div>
+    </div>
+    <div class="cmdactions">
+      <button class="btn ghost" id="privacyBtn" title="Show percentages instead of dollar amounts">$ / %</button>
+      <button class="btn ghost" id="shareBtn" title="Capture a branded image of your stats to share">Share stats</button>
+      <button class="btn ghost" id="exportBtn" title="Download your closed trades as a CSV file">Export CSV</button>
+      <button class="btn gold" id="importBtn" title="Import trades from a CSV file">Import CSV</button>
+      <input type="file" id="importFile" accept=".csv" style="display:none">
+    </div>
+  </div>
+
+  <!-- Admin-only Jarvis / CoachHero performance-coaching block renders here for admin accounts — not part of this mockup. -->
+
+  <!-- P2. KPI STRIP -->
+  <div class="kpistrip">
+
+    <!-- K1: Net Realized P/L -->
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Net Realized P/L</span><span class="infodot" data-tip="Your complete trading history in one number — total realized profit or loss banked across every closed trade, not still-open paper gains.">i</span></div>
+      <div class="kpibody">
+        <div class="kpimain">
+          <div class="kpinum green money" id="kpiNet" data-real="+$27,021.00" data-pct="+18.01%">+$27,021.00</div>
+          <div class="kpisub">+18.01% &middot; 12 trades</div>
+        </div>
+        <div class="kpiviz">
+          <svg viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Cumulative P/L trending up">
+            <defs>
+              <linearGradient id="netSpark" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="rgba(34,197,94,0.34)"/>
+                <stop offset="100%" stop-color="rgba(34,197,94,0)"/>
+              </linearGradient>
+            </defs>
+            <path d="M0,41.5 L26.7,44.0 L53.3,41.7 L80.0,43.0 L106.7,31.9 L133.3,35.7 L160.0,31.1 L186.7,31.4 L213.3,26.7 L240.0,28.8 L266.7,23.6 L293.3,16.4 L320.0,6.0 L320,56 L0,56 Z" fill="url(#netSpark)"/>
+            <path d="M0,41.5 L26.7,44.0 L53.3,41.7 L80.0,43.0 L106.7,31.9 L133.3,35.7 L160.0,31.1 L186.7,31.4 L213.3,26.7 L240.0,28.8 L266.7,23.6 L293.3,16.4 L320.0,6.0" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- K2: Win Rate -->
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Win Rate</span><span class="infodot" data-tip="Percentage of your closed trades that finished profitable.">i</span></div>
+      <div class="kpibody">
+        <div class="kpimain">
+          <div class="kpinum green">58%</div>
+          <div class="kpisub">7 W / 5 L</div>
+        </div>
+        <div class="kpiviz wrviz">
+          <svg viewBox="0 0 40 40" role="img" aria-label="58% win rate">
+            <circle class="wrzone loss" cx="20" cy="20" r="15" fill="none" stroke="rgba(239,68,68,0.30)" stroke-width="6"/>
+            <circle class="wrzone win" cx="20" cy="20" r="15" fill="none" stroke="var(--green)" stroke-width="6" stroke-linecap="round" stroke-dasharray="55.0 94.2" transform="rotate(-90 20 20)"/>
+          </svg>
+          <div class="wrtip" id="wrTip"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- K3: Profit Factor -->
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Profit Factor</span><span class="infodot" data-tip="Total profit from all winners divided by total loss from all losers — frequency is baked in, unlike the Win/Loss ratio which only compares average sizes. Above 1.0 means the system makes money.">i</span></div>
+      <div class="kpibody">
+        <div class="kpimain">
+          <div class="kpinum gold">4.5</div>
+          <div class="kpisub">gross win &divide; loss</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- K4: Expectancy / trade -->
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Expectancy</span><span class="infodot" data-tip="Your average dollar result per trade — total realized P/L divided by number of trades. Above zero is a positive edge.">i</span></div>
+      <div class="kpibody">
+        <div class="kpimain">
+          <div class="kpinum green money" data-real="+$2,251.75" data-pct="+0.91R">+$2,251.75</div>
+          <div class="kpisub">per trade</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- K5: Avg Win/Loss ratio -->
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Avg Win/Loss</span><span class="infodot" data-tip="Average win ÷ average loss — how much bigger a typical winner is than a typical loser.">i</span></div>
+      <div class="kpibody stack">
+        <div class="kpinum gold">2.8</div>
+        <div class="wlbar"><div class="win" style="width:73.78%"></div><div class="loss" style="width:26.22%"></div></div>
+        <div class="kpisub">+12.94% win vs &minus;4.60% loss</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- P3. FILTER BAR -->
+  <div class="filterbar">
+    <span class="flabel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      Filter
+    </span>
+    <label class="fctl">Ticker
+      <select id="fTicker" class="filtsel">
+        <option>All</option><option>SMCI</option><option>NVDA</option><option>AVGO</option><option>PANW</option>
+        <option>META</option><option>CRWD</option><option>ANET</option><option>NFLX</option><option>DDOG</option>
+        <option>TSLA</option><option>SNOW</option><option>KLAC</option>
+      </select>
+    </label>
+    <label class="fctl">Setup
+      <select id="fSetup" class="filtsel">
+        <option>All</option><option>VCP</option><option>Pivot</option><option>Power Play</option><option>Low-Risk Entry</option><option>Base Breakout</option>
+      </select>
+    </label>
+    <label class="fctl">Tag
+      <select id="fTag" class="filtsel">
+        <option>All</option><option>Breakout</option><option>Earnings</option><option>Momentum</option><option>Sector Leader</option><option>High Volume</option><option>Gap Up</option><option>Follow-Through Day</option>
+      </select>
+    </label>
+    <label class="fctl">Dates
+      <select id="fDates" class="filtsel">
+        <option value="all">All time</option>
+        <option value="mtd">This month</option>
+        <option value="qtd">This quarter</option>
+        <option value="ytd">Year to date</option>
+        <option value="30">Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="custom">Custom range&hellip;</option>
+      </select>
+    </label>
+    <span class="spacer"></span>
+    <span class="fcount" id="fCount">All 12 trades</span>
+    <button class="ghostchip" id="fClear" style="display:none">Clear filters</button>
+  </div>
+
+  <!-- P4. CHARTS ROW -->
+  <div class="chartrow">
+
+    <!-- Equity Curve -->
+    <div class="card">
+      <div class="cardhead">
+        <span class="label" style="flex:none">Equity Curve</span>
+        <span class="infodot" data-tip="Your account value over time. A line climbing left to right means your account is growing — toggle dollars / percent, or trades / months.">i</span>
+        <span class="spacer"></span>
+        <div class="seg mini" id="eqSeg"><button class="on" data-eq="dollar">$</button><button data-eq="pct">%</button></div>
+        <div class="seg mini" id="eqXSeg"><button class="on" data-x="trade">Trades</button><button data-x="month">Months</button></div>
+      </div>
+      <div class="chartwrap">
+        <div class="yaxis" id="eqYaxis"><span>$177k</span><span>$167k</span><span>$158k</span><span>$148k</span></div>
+        <div class="plot">
+          <svg viewBox="0 0 600 210" preserveAspectRatio="none" class="eqsvg" role="img" aria-label="Equity curve dipping early then climbing from 150k to 177k">
+            <defs>
+              <linearGradient id="eqgPos" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(34,197,94,0.32)"/><stop offset="100%" stop-color="rgba(34,197,94,0)"/></linearGradient>
+              <linearGradient id="eqgNeg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(239,68,68,0.30)"/><stop offset="100%" stop-color="rgba(239,68,68,0)"/></linearGradient>
+            </defs>
+            <line x1="0" y1="60" x2="600" y2="60" class="grid"/><line x1="0" y1="110" x2="600" y2="110" class="grid"/><line x1="0" y1="160" x2="600" y2="160" class="grid"/>
+            <line x1="0" y1="185.8" x2="600" y2="185.8" stroke="rgba(255,255,255,0.22)" stroke-width="1" stroke-dasharray="4 4"/>
+            <path d="M0,185.8 L0,185.8 L50,198.0 L100,186.6 L150,192.9 L156.5,185.8 L156.5,185.8 Z" fill="url(#eqgNeg)"/>
+            <path d="M156.5,185.8 L156.5,185.8 L200,138.8 L250,157.5 L300,134.8 L350,136.4 L400,113.3 L450,123.8 L500,98.2 L550,62.8 L600,12.0 L600,185.8 Z" fill="url(#eqgPos)"/>
+            <path d="M0,185.8 L50,198.0 L100,186.6 L150,192.9 L156.5,185.8" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+            <path d="M156.5,185.8 L200,138.8 L250,157.5 L300,134.8 L350,136.4 L400,113.3 L450,123.8 L500,98.2 L550,62.8 L600,12.0" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+          </svg>
+        </div>
+      </div>
+      <div class="xaxis"><span>T1</span><span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>T8</span><span>T9</span><span>T10</span><span>T11</span><span>T12</span></div>
+      <div class="charthint">Account grew <span class="g">+$27,021.00 (+18.01%)</span> across 12 closed trades, with a brief early dip before compounding higher.</div>
+    </div>
+
+    <!-- Return Distribution -->
+    <div class="card">
+      <div class="disthead">
+        <span class="label" style="flex:none;margin:0">Return Distribution</span>
+        <span class="infodot" data-tip="The size of your wins and losses. Losses sit left in red, wins right in green — healthy trading keeps losses small and lets a few big winners carry the return.">i</span>
+        <span class="disthint2" id="distRpt" style="margin-left:auto">Return/trade +5.83%</span>
+        <button class="distbtn" id="distOpenBtn" type="button" title="View the bucket breakdown">View bucket data &#9662;</button>
+      </div>
+      <div class="bars" id="distBars">
+        <div class="zeroline"></div>
+        <div class="barcol" title="&minus;6% or worse: 1 trade"><div class="up"></div><div class="down"><div class="bar neg" style="height:45%"></div></div></div>
+        <div class="barcol" title="&minus;6% to &minus;4%: 2 trades"><div class="up"></div><div class="down"><div class="bar neg" style="height:90%"></div></div></div>
+        <div class="barcol" title="&minus;4% to &minus;2%: 1 trade"><div class="up"></div><div class="down"><div class="bar neg" style="height:45%"></div></div></div>
+        <div class="barcol" title="&minus;2% to 0%: 1 trade"><div class="up"></div><div class="down"><div class="bar neg" style="height:45%"></div></div></div>
+        <div class="barcol" title="0% to +4%: 0 trades"><div class="up"></div><div class="down"></div></div>
+        <div class="barcol" title="+4% to +8%: 2 trades"><div class="up"><div class="bar pos" style="height:90%"></div></div><div class="down"></div></div>
+        <div class="barcol" title="+8% to +12%: 1 trade"><div class="up"><div class="bar pos" style="height:45%"></div></div><div class="down"></div></div>
+        <div class="barcol" title="+12% to +16%: 2 trades"><div class="up"><div class="bar pos" style="height:90%"></div></div><div class="down"></div></div>
+        <div class="barcol" title="+16% to +20%: 1 trade"><div class="up"><div class="bar pos" style="height:45%"></div></div><div class="down"></div></div>
+        <div class="barcol" title="+20% or more: 1 trade"><div class="up"><div class="bar pos" style="height:45%"></div></div><div class="down"></div></div>
+      </div>
+      <div class="distx"><span>&minus;8%</span><span>&minus;4%</span><span>0%</span><span>+8%</span><span>+12%</span><span>+20%+</span></div>
+      <div class="charthint">Wins cluster <span class="g">+6% to +18%</span>, led by SMCI at <span class="g">+22.50%</span>, while losses stay shallow (worst <span class="rd">&minus;8.10%</span>). That right-skew is what an edge looks like.</div>
+
+      <div class="distpanel" id="distPanel">
+        <div class="distpanel-inner">
+          <table class="disttable">
+            <thead><tr><th>Return bucket</th><th>Side</th><th># Trades</th><th>Midpoint</th><th>Contribution</th></tr></thead>
+            <tbody>
+              <tr><td>&minus;6% or worse</td><td style="color:var(--red)">Loss</td><td>1</td><td>&minus;8%</td><td class="r">&minus;0.67%</td></tr>
+              <tr><td>&minus;6% to &minus;4%</td><td style="color:var(--red)">Loss</td><td>2</td><td>&minus;5%</td><td class="r">&minus;0.83%</td></tr>
+              <tr><td>&minus;4% to &minus;2%</td><td style="color:var(--red)">Loss</td><td>1</td><td>&minus;3%</td><td class="r">&minus;0.25%</td></tr>
+              <tr><td>&minus;2% to 0%</td><td style="color:var(--red)">Loss</td><td>1</td><td>&minus;1%</td><td class="r">&minus;0.08%</td></tr>
+              <tr><td>0% to +4%</td><td style="color:var(--green)">Win</td><td>0</td><td>+2%</td><td class="g">0.00%</td></tr>
+              <tr><td>+4% to +8%</td><td style="color:var(--green)">Win</td><td>2</td><td>+6%</td><td class="g">+1.00%</td></tr>
+              <tr><td>+8% to +12%</td><td style="color:var(--green)">Win</td><td>1</td><td>+10%</td><td class="g">+0.83%</td></tr>
+              <tr><td>+12% to +16%</td><td style="color:var(--green)">Win</td><td>2</td><td>+14%</td><td class="g">+2.33%</td></tr>
+              <tr><td>+16% to +20%</td><td style="color:var(--green)">Win</td><td>1</td><td>+18%</td><td class="g">+1.50%</td></tr>
+              <tr><td>+20% or more</td><td style="color:var(--green)">Win</td><td>1</td><td>+24%</td><td class="g">+2.00%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- P5. CALENDAR + KEY METRICS ROW -->
+  <div class="calmetrow">
+
+    <!-- Performance Calendar -->
+    <div class="card">
+      <div class="cardhead"><span class="label">Performance Calendar</span><span class="infodot" data-tip="Daily realized P/L, booked on each trade's exit date. Static demo month for this mockup — the live calendar also offers monthly and yearly views.">i</span></div>
+      <div class="calwkhdr"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+      <div class="calgrid" id="calGrid"></div>
+      <div class="calnote">May 2026 shown as a static demo month. Days outside your closed-trade set carry illustrative demo values.</div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="card">
+      <div class="cardhead"><span class="label">Key Metrics</span><span class="infodot" data-tip="These numbers tell you whether your trading works. Win rate is how often you win; Expectancy is your average dollar result per trade; Avg R-multiple is that same edge measured in units of risk.">i</span></div>
+      <!-- The live app supports drag-reorder of these metric tiles (see journal-recommended.html's drag-to-reorder block); omitted here for the static Pro mockup. -->
+      <div class="metricsmini">
+        <div class="mmtile"><div class="mmk">Win rate</div><div class="mmv green">58%</div></div>
+        <div class="mmtile"><div class="mmk">Avg gain</div><div class="mmv green">+12.94%</div></div>
+        <div class="mmtile"><div class="mmk">Avg loss</div><div class="mmv red">&minus;4.60%</div></div>
+        <div class="mmtile"><div class="mmk">Win/Loss ratio</div><div class="mmv gold">2.8</div></div>
+        <div class="mmtile"><div class="mmk">Expectancy</div><div class="mmv green">+$2,251.75</div></div>
+        <div class="mmtile"><div class="mmk">Profit factor</div><div class="mmv gold">4.5</div></div>
+        <div class="mmtile"><div class="mmk">Largest win</div><div class="mmv green">+22.50%</div></div>
+        <div class="mmtile"><div class="mmk">Largest loss</div><div class="mmv red">&minus;8.10%</div></div>
+        <div class="mmtile"><div class="mmk">Adj. W/L ratio</div><div class="mmv gold">3.9</div></div>
+        <div class="mmtile"><div class="mmk">Avg R-mult</div><div class="mmv green">+0.9R</div></div>
+        <div class="mmtile"><div class="mmk">Avg hold (win)</div><div class="mmv green">14d</div></div>
+        <div class="mmtile"><div class="mmk">Avg hold (lose)</div><div class="mmv red">6d</div></div>
+        <div class="mmtile"><div class="mmk">Hold ratio (W/L)</div><div class="mmv gold">2.4</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- P5b. PLAYBOOK TRACKER STRIP -->
+  <div class="card playbookstrip">
+    <span class="status st-free"><span class="d"></span>On track</span>
+    <span class="infodot" data-tip="Your live trading measured against the system you designed in the Return Simulator — one verdict (on track, drifting, or off track) plus a scoreboard of design vs. live win rate, average loss, payoff and homerun share.">i</span>
+    <div class="pbtxt">Live trading is tracking within <b>8%</b> of your VCP / Pivot playbook's designed win rate and R-multiple targets over the trailing 30 days.</div>
+    <a class="ghostchip" href="#" id="openTracker">Open tracker &rsaquo;</a>
+  </div>
+
+  <!-- P6. OBJECTIVE EDGE + EDGE MATRIX -->
+  <div class="edgegrid">
+
+    <!-- Objective Edge -->
+    <div class="card">
+      <div class="cardhead"><span class="label">Objective Edge</span><span class="infodot" data-tip="Connects your process to your results across three dimensions judged at entry: the setup grade you gave the trade, whether its sector was in-theme, and the market context — SPY trending, choppy, or in a downtrend versus its 21-day EMA.">i</span></div>
+      <div class="seg mini" id="edgeGroupSeg" style="margin-bottom:14px">
+        <button class="on" type="button" data-eg="grade">By setup grade</button>
+        <button type="button" data-eg="theme">By theme fit</button>
+        <button type="button" data-eg="context">By market context</button>
+      </div>
+      <div class="edgerows">
+
+        <div class="edgerowgrp" data-eg-group="grade">
+          <div class="grouplabel">By setup grade</div>
+          <div class="edgerow2"><span class="edgerowlabel">Grade A</span><div class="edgebar"><div class="edgebarfill" style="width:100%"></div></div><span class="edgerowwr">100%</span><span class="edgerowr green">+2.68R</span><span class="edgerowct">4 trades</span></div>
+          <div class="edgerow2"><span class="edgerowlabel">Grade B</span><div class="edgebar"><div class="edgebarfill" style="width:100%"></div></div><span class="edgerowwr">100%</span><span class="edgerowr green">+1.50R</span><span class="edgerowct">3 trades</span></div>
+          <div class="edgerow2"><span class="edgerowlabel">Grade C</span><div class="edgebar"><div class="edgebarfill" style="width:0%"></div></div><span class="edgerowwr">0%</span><span class="edgerowr red">&minus;0.86R</span><span class="edgerowct">5 trades</span></div>
+        </div>
+
+        <div class="edgerowgrp" data-eg-group="theme" style="display:none">
+          <div class="grouplabel">By theme fit</div>
+          <div class="edgerow2"><span class="edgerowlabel">In theme</span><div class="edgebar"><div class="edgebarfill" style="width:100%"></div></div><span class="edgerowwr">100%</span><span class="edgerowr green">+2.30R</span><span class="edgerowct">2 trades</span></div>
+          <div class="edgerow2"><span class="edgerowlabel">Off theme</span><div class="edgebar"><div class="edgebarfill" style="width:50%"></div></div><span class="edgerowwr">50%</span><span class="edgerowr green">+0.63R</span><span class="edgerowct">10 trades</span></div>
+        </div>
+
+        <div class="edgerowgrp" data-eg-group="context" style="display:none">
+          <div class="grouplabel">By market context</div>
+          <div class="edgerow2"><span class="edgerowlabel">Uptrend (May)</span><div class="edgebar"><div class="edgebarfill" style="width:75%"></div></div><span class="edgerowwr">75%</span><span class="edgerowr green">+1.70R</span><span class="edgerowct">4 trades</span></div>
+          <div class="edgerow2"><span class="edgerowlabel">Chop (Mar&ndash;Apr)</span><div class="edgebar"><div class="edgebarfill" style="width:50%"></div></div><span class="edgerowwr">50%</span><span class="edgerowr green">+0.51R</span><span class="edgerowct">8 trades</span></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Edge Matrix -->
+    <div class="card">
+      <div class="cardhead">
+        <span class="label">Edge Matrix</span>
+        <span class="infodot" data-tip="Grade × market context crossed in one table so you can see exactly which combination your edge lives in. The live app adds a third dimension (theme fit) and a color-coded heatmap view.">i</span>
+        <span class="spacer"></span>
+        <div class="seg mini" id="edgeMatrixSeg"><button class="on" type="button" data-em="table">Table</button><button type="button" data-em="heatmap">Heatmap</button></div>
+      </div>
+      <table class="edgematrix" id="edgeMatrixTable">
+        <thead><tr><th></th><th>Uptrend (May)</th><th>Chop (Mar&ndash;Apr)</th></tr></thead>
+        <tbody>
+          <tr><td class="emrow">Grade A</td><td class="edgecell" style="--hcolor:rgba(34,197,94,0.30)">+2.60R &middot; 3</td><td class="edgecell" style="--hcolor:rgba(34,197,94,0.22)">+2.90R &middot; 1</td></tr>
+          <tr><td class="emrow">Grade B</td><td class="edgecell" style="--hcolor:rgba(255,255,255,0.05)">&mdash;</td><td class="edgecell" style="--hcolor:rgba(34,197,94,0.18)">+1.50R &middot; 3</td></tr>
+          <tr><td class="emrow">Grade C</td><td class="edgecell" style="--hcolor:rgba(239,68,68,0.22)">&minus;1.00R &middot; 1</td><td class="edgecell" style="--hcolor:rgba(239,68,68,0.20)">&minus;0.83R &middot; 4</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- P7. ANALYTICS ROW -->
+  <div class="vagrid">
+
+    <!-- RECAP -->
+    <div class="card vacard">
+      <div class="eyebrow-row"><span class="eyebrow">Recap</span><span class="infodot" data-tip="A snapshot of how you traded in this window — net P/L, win rate, the outlier trades that drove results, and the tags you leaned on.">i</span></div>
+      <div class="varecap">
+        <div class="vastat"><div class="vak">Net P/L &middot; all time</div><div class="vav green">+$27,021.00</div><div class="vasub">12 trades</div></div>
+        <div class="vastat"><div class="vak">Win rate</div><div class="vav green">58%</div><div class="vasub">7W / 5L</div></div>
+        <div class="vastat"><div class="vak">Outlier trades</div><div class="vav gold">3</div><div class="vasub">|R| &ge; 2.5 &middot; <span class="tickerlink" data-ticker="SMCI">SMCI</span> &middot; <span class="tickerlink" data-ticker="NVDA">NVDA</span> &middot; <span class="tickerlink" data-ticker="PANW">PANW</span></div></div>
+      </div>
+      <div class="vacommentary">You closed <b>12</b> trades for <b>+$27,021.00</b> at a <b>58%</b> win rate, led by <b><span class="tickerlink" data-ticker="SMCI">SMCI</span></b> (+22.50%). Expectancy held positive at <b>+0.91R</b>/trade &mdash; keep doing more of the same.</div>
+      <div class="vatagline"><span class="vak">Most-traded tags</span>
+        <div class="vatags">
+          <span class="vatag">Breakout<b>4</b></span><span class="vatag">Momentum<b>4</b></span><span class="vatag">Sector Leader<b>3</b></span><span class="vatag">High Volume<b>3</b></span><span class="vatag">Earnings<b>3</b></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- INSIGHTS -->
+    <div class="card vacard">
+      <div class="eyebrow-row"><span class="eyebrow">Insights</span><span class="infodot" data-tip="Plain-language takeaways pulled from your numbers — what's working, what's leaking money, and the one habit worth fixing next.">i</span></div>
+      <ul class="valist">
+        <li><span class="ic pos">&#9650;</span><span>Strongest setup is <b>Pivot</b> (<span class="tickerlink" data-ticker="PANW">PANW</span>, <span class="tickerlink" data-ticker="SNOW">SNOW</span>) at <b>+1.20R</b> avg over 2 trades.</span></li>
+        <li><span class="ic neg">&#9660;</span><span><b>Low-Risk Entry</b> (<span class="tickerlink" data-ticker="ANET">ANET</span>, <span class="tickerlink" data-ticker="KLAC">KLAC</span>) is lagging at <b>+0.50R</b> avg &mdash; review entries or size it down.</span></li>
+        <li><span class="ic tip">&#9670;</span><span>Winners are held <b>14d</b> vs <b>6d</b> for losers &mdash; you let winners run.</span></li>
+        <li><span class="ic pos">&#9733;</span><span><b>3</b> outlier trades (|R| &ge; 2.5) &mdash; <span class="tickerlink" data-ticker="SMCI">SMCI</span>, <span class="tickerlink" data-ticker="NVDA">NVDA</span>, <span class="tickerlink" data-ticker="PANW">PANW</span> &mdash; carried much of the result &mdash; concentration is doing the work.</span></li>
+      </ul>
+    </div>
+
+    <!-- BEST WINNERS -->
+    <div class="card vacard">
+      <div class="eyebrow-row"><span class="eyebrow" style="color:var(--green)">&#9650; Best winners of the month</span><span class="infodot" data-tip="Your biggest winning trades in this window. Study what they had in common — these are the setups to size up.">i</span></div>
+      <div class="vatrades">
+        <div class="varow win clickable" data-ticker="SMCI" title="Jump to this trade in Closed Trades"><span class="vtk">SMCI</span><span class="vsetup">Power Play</span><span class="vret green">+22.50%</span><span class="vpl green">+$8,400.00</span></div>
+        <div class="varow win clickable" data-ticker="NVDA" title="Jump to this trade in Closed Trades"><span class="vtk">NVDA</span><span class="vsetup">VCP</span><span class="vret green">+18.40%</span><span class="vpl green">+$7,900.00</span></div>
+        <div class="varow win clickable" data-ticker="AVGO" title="Jump to this trade in Closed Trades"><span class="vtk">AVGO</span><span class="vsetup">Base Breakout</span><span class="vret green">+12.80%</span><span class="vpl green">+$5,500.00</span></div>
+      </div>
+    </div>
+
+    <!-- WORST LOSERS -->
+    <div class="card vacard">
+      <div class="eyebrow-row"><span class="eyebrow" style="color:var(--red)">&#9660; Worst losers of the month</span><span class="infodot" data-tip="Your biggest losing trades in this window. Look for the shared mistake — that's the leak to plug.">i</span></div>
+      <div class="vatrades">
+        <div class="varow loss clickable" data-ticker="NFLX" title="Jump to this trade in Closed Trades"><span class="vtk">NFLX</span><span class="vsetup">VCP</span><span class="vret red">&minus;8.10%</span><span class="vpl red">&minus;$2,910.00</span></div>
+        <div class="varow loss clickable" data-ticker="DDOG" title="Jump to this trade in Closed Trades"><span class="vtk">DDOG</span><span class="vsetup">Power Play</span><span class="vret red">&minus;5.50%</span><span class="vpl red">&minus;$1,895.00</span></div>
+        <div class="varow loss clickable" data-ticker="TSLA" title="Jump to this trade in Closed Trades"><span class="vtk">TSLA</span><span class="vsetup">Base Breakout</span><span class="vret red">&minus;4.80%</span><span class="vpl red">&minus;$1,640.00</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- A conditional FX mis-pricing alert renders here when a closed trade's converted price diverges from the live FX rate — not part of this mockup. -->
+
+  <!-- P8. CLOSED TRADES TABLE -->
+  <div class="card" style="margin-top:14px; padding:16px 16px 18px">
+    <div class="cardhead tradehead">
+      <h2>Closed Trades</h2>
+      <span class="countchip">12</span>
+      <span class="infodot" data-tip="Every closed trade. Click View on any row for a quick overview, its chart, and your review — what went right, what went wrong, and the lesson learned. Reused 12-trade demo dataset — the command header's 214 reflects your full account history.">i</span>
+      <div class="spacer"></div>
+      <div class="seg" id="viewSeg">
+        <button data-view="simple">Simple</button>
+        <button class="on" data-view="pro">Pro &middot; all columns</button>
+      </div>
+    </div>
+    <div class="tradenote">Pro shows every column &mdash; entry/exit price, shares, stop, theme, hold time and R. Switch to Simple for just the essentials.</div>
+
+    <div class="tablewrap">
+    <table class="dense" id="tradeTable">
+      <thead>
+        <tr>
+          <th title="Win or loss.">Result</th>
+          <th class="sortable" data-col="symbol" title="Sort by Symbol">Symbol</th>
+          <th class="pro-only sortable" data-col="entryd" title="Sort by Entry date">Entry date</th>
+          <th class="sortable" data-col="exitd" title="Sort by Exit date">Exit date</th>
+          <th class="pro-only sortable" data-col="entry" title="Sort by Entry $">Entry $</th>
+          <th class="pro-only sortable" data-col="exit" title="Sort by Exit $">Exit $</th>
+          <th class="pro-only sortable" data-col="shares" title="Sort by Shares">Shares</th>
+          <th class="pro-only sortable" data-col="theme" title="Sort by Theme">Theme</th>
+          <th class="pro-only sortable" data-col="stop" title="Sort by Stop">Stop</th>
+          <th class="pro-only sortable" data-col="hold" title="Sort by Hold">Hold</th>
+          <th class="sortable" data-col="return" title="Sort by Return">Return</th>
+          <th class="sortable sorted" data-col="pl" data-dir="&#9660;" title="Sort by P/L">P/L</th>
+          <th class="pro-only sortable" data-col="r" title="Sort by R">R</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tradeBody"></tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Link Historical Trades modal renders here (see journal-recommended.html for the full ticker/entry/exit matching UI) — not part of this mockup. -->
+
+</div>
+
+<!-- slide-in Trade Preview panel -->
+<div class="tpoverlay" id="tpOverlay"></div>
+<div class="tradepanel" id="tradePanel">
+  <div class="tphead">
+    <span class="status" id="tpResult"><span class="d"></span><span id="tpResultTxt"></span></span>
+    <span class="tptick" id="tpTicker"></span>
+    <button class="tpclose" id="tpClose" aria-label="Close">&times;</button>
+  </div>
+  <div class="tpbody">
+  <div class="tpr"><span>Entry price</span><b id="tpEntry"></b></div>
+  <div class="tpr"><span>Exit price</span><b id="tpExit"></b></div>
+  <div class="tpr"><span>Shares</span><b id="tpShares"></b></div>
+  <div class="tpr"><span>Entry date</span><b id="tpEntryd"></b></div>
+  <div class="tpr"><span>Exit date</span><b id="tpExitd"></b></div>
+  <div class="tpr"><span>Hold time</span><b id="tpHold"></b></div>
+  <div class="tpr"><span>Stop</span><b id="tpStop"></b></div>
+  <div class="tpr"><span>Theme</span><b id="tpTheme"></b></div>
+  <div class="tpr"><span>Setup</span><b id="tpSetup"></b></div>
+  <div class="tpr"><span>Return</span><b id="tpRet"></b></div>
+  <div class="tpr"><span>P/L</span><b id="tpPl"></b></div>
+  <div class="tpr"><span>R-multiple</span><b id="tpR"></b></div>
+  </div>
+  <div class="tpfoot"><button class="btn gold" id="tpGoto">Go to trade details &rsaquo;</button></div>
+</div>
+
+<script>
+  // ---------- closed trades: reused from journal-recommended.html's TRADES demo dataset, ----------
+  // extended with entry date, theme and setup grade for the Pro column set and Objective Edge section.
+  // Pre-sorted by P/L descending to match the default "P/L ▼" sort state (sort clicks are demo-only, see below).
+  var TRADES=[
+    {t:"SMCI",src:"ibkr",res:"Win",entry:"$712.00",exit:"$872.20",sh:52,entryd:"Mar 20",exitd:"Apr 5",theme:"AI Semis",stop:"$668.00",hold:"16d",ret:"+22.50%",pl:"+$8,400.00",r:"+2.9R",setup:"Power Play"},
+    {t:"NVDA",src:"ibkr",res:"Win",entry:"$108.50",exit:"$128.46",sh:396,entryd:"May 14",exitd:"May 28",theme:"AI Semis",stop:"$103.00",hold:"14d",ret:"+18.40%",pl:"+$7,900.00",r:"+2.6R",setup:"VCP"},
+    {t:"AVGO",src:"ibkr",res:"Win",entry:"$162.00",exit:"$182.74",sh:265,entryd:"May 11",exitd:"May 20",theme:"AI Semis",stop:"$156.00",hold:"9d",ret:"+12.80%",pl:"+$5,500.00",r:"+2.1R",setup:"Base Breakout"},
+    {t:"PANW",src:"man",res:"Win",entry:"$188.20",exit:"$214.55",sh:151,entryd:"Apr 21",exitd:"May 12",theme:"Cyber",stop:"$180.00",hold:"21d",ret:"+14.00%",pl:"+$3,980.00",r:"+3.1R",setup:"Pivot"},
+    {t:"META",src:"ibkr",res:"Win",entry:"$478.00",exit:"$522.00",sh:82,entryd:"Apr 18",exitd:"Apr 30",theme:"MegaCap Tech",stop:"$462.00",hold:"12d",ret:"+9.20%",pl:"+$3,600.00",r:"+1.8R",setup:"VCP"},
+    {t:"CRWD",src:"ibkr",res:"Win",entry:"$322.00",exit:"$346.47",sh:104,entryd:"Apr 11",exitd:"Apr 18",theme:"Cyber",stop:"$312.00",hold:"7d",ret:"+7.60%",pl:"+$3,540.00",r:"+1.5R",setup:"Base Breakout"},
+    {t:"ANET",src:"man",res:"Win",entry:"$96.40",exit:"$102.28",sh:248,entryd:"Mar 4",exitd:"Mar 22",theme:"Networking",stop:"$92.00",hold:"18d",ret:"+6.10%",pl:"+$1,780.00",r:"+1.2R",setup:"Low-Risk Entry"},
+    {t:"KLAC",src:"ibkr",res:"Loss",entry:"$610.00",exit:"$601.53",sh:30,entryd:"Apr 21",exitd:"Apr 24",theme:"Chip Equip",stop:"$572.00",hold:"3d",ret:"&minus;1.40%",pl:"&minus;$254.00",r:"&minus;0.2R",setup:"Low-Risk Entry"},
+    {t:"SNOW",src:"man",res:"Loss",entry:"$168.00",exit:"$162.62",sh:182,entryd:"Mar 23",exitd:"Mar 28",theme:"Cloud/Software",stop:"$158.00",hold:"5d",ret:"&minus;3.20%",pl:"&minus;$980.00",r:"&minus;0.7R",setup:"Pivot"},
+    {t:"TSLA",src:"ibkr",res:"Loss",entry:"$248.00",exit:"$236.10",sh:138,entryd:"Apr 28",exitd:"May 2",theme:"EV",stop:"$236.00",hold:"4d",ret:"&minus;4.80%",pl:"&minus;$1,640.00",r:"&minus;1.0R",setup:"Base Breakout"},
+    {t:"DDOG",src:"ibkr",res:"Loss",entry:"$132.00",exit:"$124.74",sh:238,entryd:"Mar 9",exitd:"Mar 15",theme:"Cloud/Software",stop:"$125.00",hold:"6d",ret:"&minus;5.50%",pl:"&minus;$1,895.00",r:"&minus;1.1R",setup:"Power Play"},
+    {t:"NFLX",src:"ibkr",res:"Loss",entry:"$640.00",exit:"$588.16",sh:56,entryd:"Mar 29",exitd:"Apr 9",theme:"Streaming",stop:"$600.00",hold:"11d",ret:"&minus;8.10%",pl:"&minus;$2,910.00",r:"&minus;1.3R",setup:"VCP"}
+  ];
+
+  var tbody=document.getElementById('tradeBody');
+  TRADES.forEach(function(t,i){
+    var up=t.res==='Win', cls=up?'st-win':'st-loss', plc=up?'pl up':'pl dn';
+    var tr=document.createElement('tr');
+    tr.className='traderow'; tr.dataset.i=i; tr.dataset.ticker=t.t;
+    tr.innerHTML=
+      '<td data-l="Result"><span class="status '+cls+'"><span class="d"></span>'+t.res+'</span></td>'+
+      '<td data-l="Symbol"><span class="tick"><span class="srcdot '+t.src+'"></span>'+t.t+'</span></td>'+
+      '<td class="pro-only" data-l="Entry date">'+t.entryd+'</td>'+
+      '<td data-l="Exit date">'+t.exitd+'</td>'+
+      '<td class="pro-only" data-l="Entry $">'+t.entry+'</td>'+
+      '<td class="pro-only" data-l="Exit $">'+t.exit+'</td>'+
+      '<td class="pro-only" data-l="Shares">'+t.sh+'</td>'+
+      '<td class="pro-only" data-l="Theme"><span class="tag">'+t.theme+'</span></td>'+
+      '<td class="pro-only" data-l="Stop">'+t.stop+'</td>'+
+      '<td class="pro-only" data-l="Hold">'+t.hold+'</td>'+
+      '<td data-l="Return"><span class="'+plc+'">'+t.ret+'</span></td>'+
+      '<td data-l="P/L"><span class="'+plc+' money" data-real="'+t.pl+'" data-pct="'+t.ret+'">'+t.pl+'</span></td>'+
+      '<td class="pro-only" data-l="R"><span class="'+plc+'">'+t.r+'</span></td>'+
+      '<td class="revcell" data-l=""><button class="revbtn">View &rsaquo;</button></td>';
+    tbody.appendChild(tr);
+  });
+
+  // ===== Simple <-> Pro column toggle (independent of the navbar Guided/Pro switch) =====
+  function setView(view){
+    document.querySelectorAll('#viewSeg button').forEach(function(x){ x.classList.toggle('on', x.dataset.view===view); });
+    document.body.classList.toggle('pro', view==='pro');
+  }
+  document.querySelectorAll('#viewSeg button').forEach(function(b){
+    b.addEventListener('click', function(){ setView(b.dataset.view); });
+  });
+  setView('pro');   // Pro preselected on this layout
+
+  // ===== Closed trades table: sortable column headers (design mockup only) =====
+  // Real sorting lives in App.jsx. This mockup just moves the gold "active sort" styling and
+  // flips the ▲/▼ direction indicator — it never reorders the demo rows (same pattern as dashboard-pro.html).
+  document.querySelectorAll('#tradeTable thead th.sortable').forEach(function(th){
+    th.addEventListener('click', function(){
+      var wasSorted = th.classList.contains('sorted');
+      var nextDir = wasSorted ? (th.dataset.dir==='▼' ? '▲' : '▼') : '▼';
+      document.querySelectorAll('#tradeTable thead th.sortable').forEach(function(x){
+        x.classList.remove('sorted'); x.removeAttribute('data-dir');
+      });
+      th.classList.add('sorted');
+      th.dataset.dir = nextDir;
+    });
+  });
+
+  // ===== slide-in Trade Preview panel =====
+  (function(){
+    var panel=document.getElementById('tradePanel'), overlay=document.getElementById('tpOverlay');
+    function setColor(id,val){ var el=document.getElementById(id); el.textContent=val; el.classList.remove('green','red');
+      if(/^-|^−|^&minus;/.test(val)) el.classList.add('red'); else if(val.indexOf('+')===0) el.classList.add('green'); }
+    function open(t){
+      var up=t.res==='Win';
+      document.getElementById('tpResult').className='status '+(up?'st-win':'st-loss');
+      document.getElementById('tpResultTxt').textContent=t.res;
+      document.getElementById('tpTicker').textContent=t.t;
+      document.getElementById('tpEntry').textContent=t.entry;
+      document.getElementById('tpExit').textContent=t.exit;
+      document.getElementById('tpShares').textContent=t.sh;
+      document.getElementById('tpEntryd').textContent=t.entryd;
+      document.getElementById('tpExitd').textContent=t.exitd;
+      document.getElementById('tpHold').textContent=t.hold;
+      document.getElementById('tpStop').textContent=t.stop;
+      document.getElementById('tpTheme').textContent=t.theme;
+      document.getElementById('tpSetup').textContent=t.setup;
+      setColor('tpRet', t.ret.replace(/&minus;/g,'−'));
+      setColor('tpPl', t.pl.replace(/&minus;/g,'−'));
+      setColor('tpR', t.r.replace(/&minus;/g,'−'));
+      panel.classList.add('open'); overlay.classList.add('open');
+      document.querySelectorAll('.traderow').forEach(function(r){r.classList.remove('view-open')});
+      document.querySelector('.traderow[data-i="'+t.__i+'"]').classList.add('view-open');
+    }
+    function close(){ panel.classList.remove('open'); overlay.classList.remove('open');
+      document.querySelectorAll('.traderow').forEach(function(r){r.classList.remove('view-open')}); }
+    document.querySelectorAll('.traderow').forEach(function(row){
+      row.querySelector('.revbtn').addEventListener('click', function(){
+        var t=TRADES[+row.dataset.i]; t.__i=row.dataset.i; open(t);
+      });
+    });
+    document.getElementById('tpClose').addEventListener('click', close);
+    overlay.addEventListener('click', close);
+    document.getElementById('tpGoto').addEventListener('click', function(){
+      var tk=document.getElementById('tpTicker').textContent;
+      console.log('Demo: would navigate to full trade details for '+tk+'.');
+      alert('Demo: would open the full trade details view for '+tk+'.');
+    });
+    // exposed so Best winners / Worst losers / Recap / Insights ticker links can open the same panel (see jumpToTrade below)
+    window.openTradePanel = function(t){ t.__i=t.__row.dataset.i; open(t); };
+  })();
+
+  // ===== jumpToTrade: click-through from Best winners / Worst losers / Recap outliers / Insights tickers =====
+  // Scrolls the ticker's row into view in Closed Trades, flash-highlights it gold (~1.5s), then opens
+  // its Trade Preview panel — mirrors the live app's jumpToTrade() in TradeJournalPage (src/App.jsx).
+  function jumpToTrade(ticker){
+    var row=document.querySelector('.traderow[data-ticker="'+ticker+'"]');
+    if(!row) return;
+    row.scrollIntoView({behavior:'smooth', block:'center'});
+    row.classList.remove('jumphl'); void row.offsetWidth; row.classList.add('jumphl');
+    setTimeout(function(){ row.classList.remove('jumphl'); }, 1500);
+    var t=TRADES[+row.dataset.i]; t.__row=row;
+    setTimeout(function(){ window.openTradePanel(t); }, 420);
+  }
+  document.querySelectorAll('.varow.clickable[data-ticker], .tickerlink[data-ticker]').forEach(function(el){
+    el.addEventListener('click', function(){ jumpToTrade(el.dataset.ticker); });
+  });
+
+  // ===== Privacy ($ / %) toggle — swaps every .money figure between $ and % (demo, header + KPI strip only) =====
+  (function(){
+    var on=false, btn=document.getElementById('privacyBtn');
+    btn.addEventListener('click', function(){
+      on=!on; btn.classList.toggle('on', on);
+      document.querySelectorAll('.money').forEach(function(el){
+        el.textContent = on ? el.dataset.pct : el.dataset.real;
+      });
+    });
+  })();
+
+  // Share stats / Export / Import — light demo feedback only, matching dashboard-pro's demo-level chrome
+  document.getElementById('shareBtn').addEventListener('click', function(){
+    alert('Demo: would capture a branded stats image for sharing.');
+  });
+  document.getElementById('exportBtn').addEventListener('click', function(){
+    var head=['Result','Ticker','EntryDate','ExitDate','Entry','Exit','Shares','Theme','Stop','Hold','Return','PL','R'];
+    var rows=TRADES.map(function(t){ return [t.res,t.t,t.entryd,t.exitd,t.entry,t.exit,t.sh,t.theme,t.stop,t.hold,t.ret,t.pl,t.r]; });
+    var csv=[head].concat(rows).map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/&minus;/g,'-').replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+    var url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    var a=document.createElement('a'); a.href=url; a.download='viv-closed-trades.csv'; a.click(); URL.revokeObjectURL(url);
+  });
+  var importFile=document.getElementById('importFile');
+  document.getElementById('importBtn').addEventListener('click', function(){ importFile.click(); });
+  importFile.addEventListener('change', function(){
+    if(this.files[0]) alert('Demo: would import trades from "'+this.files[0].name+'".');
+    this.value='';
+  });
+  document.getElementById('openTracker').addEventListener('click', function(e){
+    e.preventDefault();
+    alert('Demo: would open the Playbook Tracker.');
+  });
+
+  // ===== Equity Curve: $ / % toggle — genuinely swaps the y-axis labels using the real computed curve =====
+  (function(){
+    var dollarLabels=['$177k','$167k','$158k','$148k'];
+    var pctLabels=['+18.01%','+11.59%','+5.16%','&minus;1.26%'];
+    var yaxis=document.getElementById('eqYaxis');
+    document.querySelectorAll('#eqSeg button').forEach(function(b){
+      b.addEventListener('click', function(){
+        document.querySelectorAll('#eqSeg button').forEach(function(x){x.classList.remove('on')}); b.classList.add('on');
+        var labels = b.dataset.eq==='pct' ? pctLabels : dollarLabels;
+        yaxis.innerHTML = labels.map(function(l){return '<span>'+l+'</span>';}).join('');
+      });
+    });
+    // Trades / Months is demo-only chrome (visual state only) — matches the mockup convention of
+    // demo-only toggles elsewhere on this page (e.g. the sortable trade-table headers above).
+    document.querySelectorAll('#eqXSeg button').forEach(function(b){
+      b.addEventListener('click', function(){
+        document.querySelectorAll('#eqXSeg button').forEach(function(x){x.classList.remove('on')}); b.classList.add('on');
+      });
+    });
+  })();
+
+  // ===== Return Distribution: view bucket data toggle =====
+  (function(){
+    var btn=document.getElementById('distOpenBtn'), panel=document.getElementById('distPanel');
+    btn.addEventListener('click', function(){
+      var open=panel.classList.toggle('open');
+      btn.classList.toggle('on', open);
+      btn.innerHTML = open ? 'Hide bucket data &#9652;' : 'View bucket data &#9662;';
+    });
+  })();
+
+  // ===== Objective Edge: 3-way group seg (By setup grade / By theme fit / By market context) =====
+  // Shows one .edgerowgrp at a time; plain <button> click handlers only, so there is no page scroll jump.
+  document.querySelectorAll('#edgeGroupSeg button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#edgeGroupSeg button').forEach(function(x){x.classList.remove('on')}); b.classList.add('on');
+      document.querySelectorAll('.edgerowgrp').forEach(function(g){ g.style.display = (g.dataset.egGroup===b.dataset.eg) ? '' : 'none'; });
+    });
+  });
+
+  // ===== Edge Matrix: Table / Heatmap seg toggle (demo only — precomputed --hcolor per cell) =====
+  document.querySelectorAll('#edgeMatrixSeg button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#edgeMatrixSeg button').forEach(function(x){x.classList.remove('on')}); b.classList.add('on');
+      document.getElementById('edgeMatrixTable').classList.toggle('heatmap', b.dataset.em==='heatmap');
+    });
+  });
+
+  // ===== Filter bar: lightweight demo state (active pill styling + count), no full recompute =====
+  (function(){
+    var sels=['fTicker','fSetup','fTag','fDates'].map(function(id){return document.getElementById(id);});
+    var clearBtn=document.getElementById('fClear'), countEl=document.getElementById('fCount');
+    function anyActive(){ return sels.some(function(s){ return s.value!=='All' && s.value!=='all'; }); }
+    function refresh(){
+      sels.forEach(function(s){ s.classList.toggle('active', s.value!=='All' && s.value!=='all'); });
+      var active=anyActive();
+      clearBtn.style.display = active ? '' : 'none';
+      countEl.textContent = active ? 'Filtered view (demo)' : 'All 12 trades';
+    }
+    sels.forEach(function(s){ s.addEventListener('change', refresh); });
+    clearBtn.addEventListener('click', function(){
+      sels.forEach(function(s){ s.selectedIndex=0; }); refresh();
+    });
+  })();
+
+  // ===== Performance Calendar: static demo month (May 2026), generated from a small day->P/L map =====
+  // Days matching this mockup's 12-trade dataset (May 2, 12, 20, 28) carry real figures; the remaining
+  // marked days carry illustrative demo values so the heatmap reads as a full month, per the brief's
+  // "static demo month" instruction — these extra days are not part of the reused 12-trade dataset.
+  (function(){
+    var CAL_DATA={
+      2:{pl:-1640.00,n:1}, 5:{pl:420.00,n:1}, 6:{pl:-180.00,n:1}, 8:{pl:610.00,n:1},
+      12:{pl:3980.00,n:1}, 15:{pl:-95.00,n:1}, 19:{pl:730.00,n:1}, 20:{pl:5500.00,n:1},
+      21:{pl:-310.00,n:1}, 26:{pl:540.00,n:1}, 27:{pl:180.00,n:1}, 28:{pl:7900.00,n:1}, 29:{pl:-220.00,n:1}
+    };
+    var OFFSET=5, DAYS=31;   // May 1, 2026 is a Friday
+    var grid=document.getElementById('calGrid'), html='';
+    for(var i=0;i<OFFSET;i++) html+='<div class="calcell empty"></div>';
+    for(var d=1; d<=DAYS; d++){
+      var e=CAL_DATA[d];
+      if(e){
+        var cls=e.pl>=0?'green':'red', sign=e.pl>=0?'+':'&minus;';
+        html+='<div class="calcell"><span class="cd">'+d+'</span><span class="cpl '+cls+'">'+sign+'$'+Math.abs(e.pl).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+'</span><span class="cn">'+e.n+' trade'+(e.n===1?'':'s')+'</span></div>';
+      } else {
+        html+='<div class="calcell"><span class="cd">'+d+'</span></div>';
+      }
+    }
+    var total=OFFSET+DAYS, trailing=(7-(total%7))%7;
+    for(var j=0;j<trailing;j++) html+='<div class="calcell empty"></div>';
+    grid.innerHTML=html;
+  })();
+
+  // Win Rate donut: hovering a zone shows just its count (green = wins, red = losses)
+  (function(){
+    var tip=document.getElementById('wrTip');
+    if(!tip) return;
+    document.querySelectorAll('.wrviz .wrzone').forEach(function(z){
+      var win=z.classList.contains('win');
+      z.addEventListener('mouseenter', function(){ tip.textContent=win?'7 wins':'5 losses'; tip.className='wrtip show '+(win?'win':'loss'); });
+      z.addEventListener('mouseleave', function(){ tip.className='wrtip'; });
+    });
+  })();
+</script>
+</body>
+</html>

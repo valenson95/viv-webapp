@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIV — Settings (Pro layout)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     VIV brand tokens — copied verbatim from dashboard-pro.html
+     ============================================================ */
+  :root{
+    --bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
+    --text:rgba(255,255,255,0.92);
+    --muted:rgba(255,255,255,0.70);
+    --faint:rgba(255,255,255,0.45);
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:var(--font); line-height:1.5; font-size:16px;
+    -webkit-font-smoothing:antialiased; padding:0; min-height:100vh;
+  }
+
+  /* ===== SHELL ===== */
+  .shell{width:100%; max-width:1400px; margin:0 auto; padding:22px 24px 80px}
+  @media(min-width:2000px){ .shell{max-width:1680px} }
+
+  /* ===== P0. NAV ===== */
+  .navbar{display:flex; align-items:center; gap:16px; margin-bottom:22px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem}
+  .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
+  .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
+  .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+  .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
+  .tabs a:hover:not(.on){color:var(--text)}
+  .spacer{flex:1}
+  .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
+  .seg button, .seg a{
+    border:none; background:transparent; color:var(--muted); cursor:pointer; text-decoration:none;
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:7px 16px; border-radius:980px;
+    letter-spacing:0.02em; transition:all .15s; display:inline-block;
+  }
+  .seg button.on, .seg a.on{background:var(--goldDim); color:var(--goldBright)}
+  .seg button:hover:not(.on), .seg a:hover:not(.on){color:var(--text)}
+  .row{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+
+  /* ===== SHARED CARD CHROME — uniform across every card on this page ===== */
+  .card{
+    position:relative; background:var(--glass);
+    border:1px solid var(--border); border-radius:16px;
+    backdrop-filter:blur(24px) saturate(150%);
+    -webkit-backdrop-filter:blur(24px) saturate(150%);
+    padding:18px 20px; overflow:visible;
+  }
+  .card::before{
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%);
+   border-radius:inherit;}
+  .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+  .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+  /* identical header on every card: label + info dot, divided from the body */
+  .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+  .cardhead .label{flex:1}
+  .infodot{width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex;
+    align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic;
+    color:var(--faint); cursor:help; flex:none; position:relative}
+  .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+  .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+  .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+    font-size:0.62rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em; text-decoration:none; display:inline-block}
+  .ghostchip:hover{color:var(--text); border-color:var(--borderGold)}
+  .ghostchip.on{background:var(--goldDim); color:var(--goldBright); border-color:var(--borderGold)}
+  .ghostchip:disabled{opacity:0.6; cursor:default}
+  .btn{
+    border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text);
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:8px 16px;
+    border-radius:980px; cursor:pointer;
+  }
+  .btn.ghost{background:transparent}
+  .btn.ghost:hover{border-color:var(--borderGold); color:var(--text)}
+  .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+  .btn.gold.ok{background:rgba(34,197,94,0.85); color:#0a0a0a; box-shadow:none}
+  .btn:disabled{opacity:0.6; cursor:default}
+
+  /* ===== P1. COMMAND HEADER ===== */
+  .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
+  .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+  .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px}
+
+  /* ===== P2 / P4. TWO-COLUMN PAGE GRID ===== */
+  .pgrid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media(max-width:900px){ .pgrid{grid-template-columns:1fr} }
+
+  /* ===== form controls (field pairs — reused from settings-recommended.html) ===== */
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media(max-width:600px){ .grid2{grid-template-columns:1fr} }
+  .field{display:flex; flex-direction:column; gap:6px}
+  .field label{font-size:0.62rem; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--muted)}
+  .in{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--text);
+    font-family:var(--font); font-size:0.88rem; font-weight:600; padding:9px 12px; outline:none; width:100%}
+  .in:focus{border-color:var(--gold)} .in:disabled{color:var(--faint); cursor:not-allowed}
+  .field .hint{font-size:0.68rem; color:var(--faint); line-height:1.4}
+
+  /* ===== P2. Preferences — dense rows, label left / control right ===== */
+  .prow{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:11px 0; border-bottom:1px solid rgba(255,255,255,0.06); flex-wrap:wrap}
+  .prow:last-child{border-bottom:none}
+  .prow .plabel{font-size:0.8rem; font-weight:700; color:var(--text)}
+  .prowctrl{display:flex; gap:6px; flex-wrap:wrap}
+
+  /* ===== status pill (reused from settings-recommended.html's .conn) ===== */
+  .conn{display:inline-flex; align-items:center; gap:6px; font-size:0.68rem; font-weight:700; padding:4px 11px; border-radius:980px; white-space:nowrap}
+  .conn.yes{background:rgba(34,197,94,0.12); color:#86efac} .conn.no{background:rgba(255,255,255,0.06); color:var(--muted)}
+  .conn .d{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .ibkrmeta{font-size:0.72rem; color:var(--faint)}
+
+  /* ===== caution alert (reused from settings-recommended.html) ===== */
+  .alert{display:flex; gap:9px; align-items:flex-start; margin-top:14px; border-radius:12px; padding:10px 14px; font-size:0.76rem; line-height:1.45}
+  .alert svg{width:14px;height:14px;flex:none;margin-top:1px}
+  .alert.caution{background:rgba(201,152,42,0.12); border:1px solid var(--borderGold); color:var(--goldBright)}
+
+  /* ===== P3. "Edit connection" expander (reused from settings-recommended.html) ===== */
+  .expander{margin-top:14px; border-top:1px solid var(--border); padding-top:13px}
+  .exhead{display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--goldBright); font-weight:700; font-size:0.8rem}
+  .exhead .chev{margin-left:6px; transition:transform .2s; font-size:0.7rem} .exhead.open .chev{transform:rotate(180deg)}
+  .exbody{display:none; margin-top:14px} .exbody.open{display:block}
+
+  /* ===== P4. Lists & Labels — three compact columns in one card ===== */
+  .llgrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0}
+  .llcol{padding:0 20px; border-left:1px solid var(--border)}
+  .llcol:first-child{padding-left:0; border-left:none}
+  .llcol:last-child{padding-right:0}
+  .chips{display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 10px; min-height:24px}
+  .chip{display:inline-flex; align-items:center; gap:5px; font-size:0.7rem; font-weight:600;
+    background:var(--goldDim); border:1px solid var(--borderGold); color:var(--gold); border-radius:8px; padding:4px 9px}
+  .chip .cx{cursor:pointer; opacity:0.55; font-size:0.85em; line-height:1}
+  .chip .cx:hover{opacity:1}
+  .llrow{display:flex; gap:6px; align-items:center}
+  .llrow .in{padding:7px 10px; font-size:0.76rem}
+  @media(max-width:760px){
+    .llgrid{grid-template-columns:1fr}
+    .llcol{padding:16px 0 0; border-left:none; border-top:1px solid var(--border)}
+    .llcol:first-child{padding-top:0; border-top:none}
+  }
+
+  @media(max-width:760px){
+    .navbar .spacer{display:none}
+    .tabs{overflow-x:auto; max-width:100%; scrollbar-width:none} .tabs::-webkit-scrollbar{display:none} .tabs a{white-space:nowrap}
+    .card{padding:16px}
+    .prow{flex-direction:column; align-items:flex-start; gap:8px}
+  }
+</style>
+</head>
+<body class="pro">
+<div class="shell">
+
+  <!-- P0. NAV -->
+  <div class="navbar">
+    <div class="brand"><img class="vmark" src="../public/logo-mark.png" alt="VIV" style="background:none; object-fit:contain"> Valen Insiders Vault</div>
+    <div class="tabs">
+      <a href="dashboard-pro.html">Dashboard</a>
+      <a href="journal-pro.html">Journal</a>
+      <a href="premium-pro.html">Premium tools</a>
+      <!-- Live nav (commit 1353d7a) also has: Daily Setups + Model Book (members), Studies + Quant (admin-only). No Pro variants needed - those pages have no Guided/Pro toggle. -->
+      <a href="daily-setups.html">Daily Setups</a>
+      <a href="model-book.html">Model Book</a>
+      <a href="studies.html" title="Admin-only tab">Studies</a>
+      <a href="quant.html" title="Admin-only tab">Quant</a>
+      <a href="settings-pro.html" class="on">Settings</a>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+      <a href="settings-recommended.html" data-mode="guided">Guided</a>
+      <a href="settings-pro.html" class="on" data-mode="pro">Pro</a>
+    </div>
+  </div>
+
+  <!-- P1. COMMAND HEADER -->
+  <div class="cmdheader">
+    <div class="cmdleft">
+      <div class="eyebrow">Settings</div>
+      <h1 class="ch1">Account</h1>
+      <div class="cmdmeta">valen@valensontrades.com</div>
+    </div>
+  </div>
+
+  <!-- P2. TWO-COLUMN GRID: Profile + Preferences -->
+  <div class="pgrid">
+
+    <!-- Profile -->
+    <div class="card">
+      <div class="cardhead"><span class="label">Profile</span><span class="infodot" data-tip="Your display name is what shows on shared stats and in the members list. Your email is the address you signed in with and can't be changed here.">i</span></div>
+      <div class="field">
+        <label>Display name</label>
+        <input class="in" id="dispName" value="Valen">
+        <div class="hint">Autosaves — no need to click save.</div>
+      </div>
+      <div class="field" style="margin-top:14px">
+        <label>Email</label>
+        <input class="in" value="valen@valensontrades.com" disabled>
+        <div class="hint">Fixed — your login.</div>
+      </div>
+    </div>
+
+    <!-- Preferences -->
+    <div class="card">
+      <div class="cardhead"><span class="label">Preferences</span><span class="infodot" data-tip="Choose whether the app opens in Guided mode with explanations, or Pro mode for a clean expert view, plus your privacy, text size, and interface style defaults. These stick across your devices.">i</span></div>
+      <div class="hint" style="margin:-6px 0 4px">Changes save instantly.</div>
+
+      <div class="prow">
+        <span class="plabel">Default mode</span>
+        <div class="seg" id="prefMode"><button data-mode="guided">Guided</button><button class="on" data-mode="pro">Pro</button></div>
+      </div>
+      <div class="prow">
+        <span class="plabel">Privacy by default</span>
+        <div class="seg" id="prefPrivacy"><button class="on" data-priv="off">Show $</button><button data-priv="on">Show % only</button></div>
+      </div>
+      <div class="prow">
+        <span class="plabel">Text size</span>
+        <div class="prowctrl" id="prefFont">
+          <button class="ghostchip" data-font="small">Small</button>
+          <button class="ghostchip on" data-font="standard">Standard</button>
+          <button class="ghostchip" data-font="large">Large</button>
+        </div>
+      </div>
+      <div class="prow">
+        <span class="plabel">Interface style</span>
+        <div class="seg" id="prefTheme"><button class="on" data-theme="classic">VIV Classic</button><button data-theme="zella">Zella Clean</button></div>
+      </div>
+      <div class="prow">
+        <span class="plabel">Community reminders</span>
+        <button class="ghostchip" id="resetSnooze">Reset reminders</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- P3. INTERACTIVE BROKERS -->
+  <div class="card" style="margin-top:14px">
+    <div class="cardhead"><span class="label">Interactive Brokers</span><span class="infodot" data-tip="Connect Interactive Brokers to pull your positions and closed trades automatically. It only ever reads your statements — it can never trade or move money.">i</span></div>
+
+    <div class="row">
+      <span class="conn yes" id="syncPill"><span class="d"></span>Auto-sync · ON</span>
+      <span class="ibkrmeta" id="syncMeta">Last synced today 21:30</span>
+      <div class="spacer"></div>
+      <button class="btn gold" id="btnSyncNow">Sync now</button>
+      <button class="btn ghost" id="btnPauseSync">Pause auto-sync</button>
+    </div>
+
+    <div class="alert caution"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg><div>Read-only connection — it can pull statements but can never trade or move money.</div></div>
+
+    <!-- the 8-step written tutorial + video walkthrough for connecting IBKR lives in the Guided layout (settings-recommended.html); Pro replaces it with the "Setup guide" link below -->
+    <div class="expander">
+      <div class="exhead" id="connHead">Edit connection <span class="chev">▾</span></div>
+      <div class="exbody" id="connBody">
+        <div class="grid2">
+          <div class="field"><label>Flex Query ID</label><input class="in" id="ibkrQid" placeholder="e.g. 1519726"><div class="hint">From your IBKR Flex Queries list.</div></div>
+          <div class="field"><label>Flex Web Service token</label><input class="in" id="ibkrTok" type="password" placeholder="paste your token"><div class="hint">Read-only — like a password.</div></div>
+        </div>
+        <div class="row" style="margin-top:14px"><button class="btn gold" id="saveConn">Save connection</button></div>
+      </div>
+    </div>
+
+    <a class="ghostchip" href="settings-recommended.html" style="margin-top:14px">Setup guide ›</a>
+  </div>
+
+  <!-- P4. TWO-COLUMN GRID: Data integrity + Lists & labels -->
+  <div class="pgrid" style="margin-top:14px">
+
+    <!-- Data integrity -->
+    <div class="card">
+      <div class="cardhead"><span class="label">Data Integrity</span><span class="infodot" data-tip="Scans your trades and positions for duplicates, orphaned trades, and sign errors. Read-only — it never changes anything.">i</span></div>
+      <div class="row">
+        <span class="conn yes" id="integPill"><span class="d"></span>All clean ✓</span>
+        <span class="ibkrmeta" id="integMeta">Last checked today 21:30 · auto-runs on every sync</span>
+        <div class="spacer"></div>
+        <button class="ghostchip" id="btnRunCheck">Run check</button>
+      </div>
+    </div>
+
+    <!-- Lists & labels -->
+    <div class="card">
+      <div class="cardhead"><span class="label">Lists &amp; Labels</span><span class="infodot" data-tip="The options that appear in the Setup, Tags, and Exit Reason dropdowns across your positions and journal.">i</span></div>
+      <div class="llgrid">
+        <div class="llcol">
+          <div class="label">Setup Types</div>
+          <div class="chips" id="chipsSetup"></div>
+          <div class="llrow"><input class="in" id="inSetup" placeholder="e.g. Flag Breakout"><button class="ghostchip" id="addSetup">Add</button></div>
+        </div>
+        <div class="llcol">
+          <div class="label">Tags</div>
+          <div class="chips" id="chipsTags"></div>
+          <div class="llrow"><input class="in" id="inTags" placeholder="e.g. Pre-Earnings"><button class="ghostchip" id="addTags">Add</button></div>
+        </div>
+        <div class="llcol">
+          <div class="label">Exit Reasons</div>
+          <div class="chips" id="chipsExit"></div>
+          <div class="llrow"><input class="in" id="inExit" placeholder="e.g. Gap Down"><button class="ghostchip" id="addExit">Add</button></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Admin-only Owner Zone (registration access code / registered members / backup & restore) renders here for
+       admin accounts — see App.jsx SettingsPage isAdmin block (~line 10088). Omitted from this member-view mockup. -->
+
+  <!-- Mobile-only "Sign out" button (full-width, red) renders below Lists & Labels on small screens — see App.jsx
+       SettingsPage isMobile block (~line 10291); the desktop nav's Sign out is hidden on phone via CSS. This
+       mockup is a desktop Pro layout, so it's omitted here. -->
+
+</div>
+
+<script>
+  var $=function(id){return document.getElementById(id);};
+
+  /* ===== toast (reused pattern from settings-recommended.html) ===== */
+  var toastEl=null;
+  function toast(m){
+    if(!toastEl){ toastEl=document.createElement('div'); toastEl.style.cssText='position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);z-index:400;background:#11111b;border:1px solid var(--borderGold);border-radius:12px;padding:12px 18px;font-size:0.8rem;color:var(--text);box-shadow:0 14px 40px rgba(0,0,0,0.6);opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;max-width:90vw'; document.body.appendChild(toastEl); }
+    toastEl.textContent=m; toastEl.style.opacity='1'; toastEl.style.transform='translateX(-50%) translateY(0)';
+    clearTimeout(window.__t); window.__t=setTimeout(function(){ toastEl.style.opacity='0'; toastEl.style.transform='translateX(-50%) translateY(20px)'; },2600);
+  }
+  function flashOk(btn, txt){ var o=btn.textContent; btn.textContent=txt||'Saved ✓'; btn.classList.add('ok'); setTimeout(function(){btn.textContent=o; btn.classList.remove('ok');},1500); }
+
+  /* ===== Preferences — all demo-only, no real navigation or persistence ===== */
+  function wireSeg(id, attr, msgPrefix){
+    document.querySelectorAll('#'+id+' button').forEach(function(b){
+      b.addEventListener('click', function(){
+        document.querySelectorAll('#'+id+' button').forEach(function(x){x.classList.remove('on');});
+        b.classList.add('on');
+        toast(msgPrefix+': '+b.textContent);
+      });
+    });
+  }
+  wireSeg('prefMode','data-mode','Default mode');
+  wireSeg('prefPrivacy','data-priv','Privacy by default');
+  wireSeg('prefTheme','data-theme','Interface style');
+  document.querySelectorAll('#prefFont button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#prefFont button').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on');
+      toast('Text size: '+b.textContent);
+    });
+  });
+  $('resetSnooze').addEventListener('click', function(){
+    flashOk(this,'Reset ✓');
+    toast('Community reminders reset — they\'ll show again on the Journal.');
+  });
+
+  /* ===== Profile — "autosaves" is a claim, so back it with a real save-on-blur response ===== */
+  var dispNameLast=$('dispName').value;
+  $('dispName').addEventListener('blur', function(){
+    if(this.value.trim() && this.value !== dispNameLast){ dispNameLast=this.value; toast('Display name saved.'); }
+  });
+
+  /* ===== Interactive Brokers ===== */
+  var syncOn=true;
+  $('btnSyncNow').addEventListener('click', function(){
+    var b=this, orig=b.textContent;
+    b.textContent='Syncing…'; b.disabled=true; $('btnPauseSync').disabled=true;
+    setTimeout(function(){
+      b.textContent=orig; b.disabled=false; $('btnPauseSync').disabled=!syncOn;
+      $('syncMeta').textContent='Last synced just now';
+      toast('Synced with Interactive Brokers.');
+    }, 1000);
+  });
+  $('btnPauseSync').addEventListener('click', function(){
+    syncOn=!syncOn;
+    var pill=$('syncPill');
+    if(syncOn){
+      pill.className='conn yes'; pill.innerHTML='<span class="d"></span>Auto-sync · ON';
+      $('syncMeta').textContent='Last synced today 21:30';
+      this.textContent='Pause auto-sync';
+      $('btnSyncNow').disabled=false;
+      toast('Auto-sync resumed.');
+    } else {
+      pill.className='conn no'; pill.innerHTML='<span class="d"></span>Auto-sync · PAUSED';
+      $('syncMeta').textContent='Paused — switched to manual entry';
+      this.textContent='Turn on auto-sync';
+      $('btnSyncNow').disabled=true;
+      toast('Auto-sync paused. You\'re on manual entry.');
+    }
+  });
+  $('connHead').addEventListener('click', function(){
+    this.classList.toggle('open');
+    $('connBody').classList.toggle('open');
+  });
+  $('saveConn').addEventListener('click', function(){
+    flashOk(this,'Saved ✓');
+    toast('IBKR connection saved (private to you).');
+  });
+
+  /* ===== Data integrity ===== */
+  $('btnRunCheck').addEventListener('click', function(){
+    var b=this, orig=b.textContent, pill=$('integPill');
+    b.textContent='Scanning…'; b.disabled=true;
+    pill.className='conn no'; pill.innerHTML='<span class="d"></span>Scanning…';
+    setTimeout(function(){
+      b.textContent=orig; b.disabled=false;
+      pill.className='conn yes'; pill.innerHTML='<span class="d"></span>All clean ✓';
+      $('integMeta').textContent='Last checked just now · auto-runs on every sync';
+      toast('Data integrity check complete — all clean.');
+    }, 900);
+  });
+
+  /* ===== Lists & labels — Setup Types / Tags / Exit Reasons (demo state, mirrors App.jsx defaults) ===== */
+  var LISTS={
+    setup:{ items:["VCP","Pivot","Power Play","Low-Risk Entry","Base Breakout"], chipsId:'chipsSetup', inputId:'inSetup', addId:'addSetup' },
+    tags:{ items:["Breakout","Earnings","Momentum","Sector Leader","High Volume","Gap Up","Follow-Through Day"], chipsId:'chipsTags', inputId:'inTags', addId:'addTags' },
+    exit:{ items:["Sold Into Strength","Hit Initial Stop","Hit Trailing Stop","Time Stop","Risk Reduction","Changed Thesis"], chipsId:'chipsExit', inputId:'inExit', addId:'addExit' }
+  };
+  function renderList(key){
+    var L=LISTS[key];
+    $(L.chipsId).innerHTML=L.items.map(function(item){
+      return '<span class="chip">'+item+'<span class="cx" data-key="'+key+'" data-val="'+item.replace(/"/g,'&quot;')+'">&times;</span></span>';
+    }).join('');
+  }
+  function addToList(key){
+    var L=LISTS[key], input=$(L.inputId), v=input.value.trim();
+    if(!v || L.items.indexOf(v)!==-1) return;
+    L.items.push(v); input.value=''; renderList(key);
+  }
+  Object.keys(LISTS).forEach(function(key){
+    renderList(key);
+    var L=LISTS[key];
+    $(L.addId).addEventListener('click', function(){ addToList(key); });
+    $(L.inputId).addEventListener('keydown', function(e){ if(e.key==='Enter') addToList(key); });
+    $(L.chipsId).addEventListener('click', function(e){
+      var t=e.target;
+      if(t.classList.contains('cx')){
+        var k=t.getAttribute('data-key'), val=t.getAttribute('data-val');
+        LISTS[k].items=LISTS[k].items.filter(function(x){return x!==val;});
+        renderList(k);
+      }
+    });
+  });
+</script>
+</body>
+</html>

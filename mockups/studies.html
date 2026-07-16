@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIV — Studies (Study Book)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     VIV brand tokens — copied verbatim from dashboard-pro.html
+     ============================================================ */
+  :root{
+    --bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
+    --text:rgba(255,255,255,0.92);
+    --muted:rgba(255,255,255,0.70);
+    --faint:rgba(255,255,255,0.45);
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:var(--font); line-height:1.5; font-size:16px;
+    -webkit-font-smoothing:antialiased; padding:0; min-height:100vh;
+  }
+  .big,.statbox b,.liftpct,.liftmult{font-variant-numeric:tabular-nums}
+
+  /* ===== SHELL ===== */
+  .shell{width:100%; max-width:1400px; margin:0 auto; padding:22px 24px 80px}
+  @media(min-width:2000px){ .shell{max-width:1680px} }
+
+  /* ===== NAV ===== */
+  .navbar{display:flex; align-items:center; gap:16px; margin-bottom:22px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem}
+  .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
+  .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
+  .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+  .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
+  .tabs a:hover:not(.on){color:var(--text)}
+  .spacer{flex:1}
+
+  /* ===== SHARED CARD CHROME — uniform across all sections ===== */
+  .card{
+    position:relative; background:var(--glass);
+    border:1px solid var(--border); border-radius:16px;
+    backdrop-filter:blur(24px) saturate(150%);
+    -webkit-backdrop-filter:blur(24px) saturate(150%);
+    padding:18px 20px; overflow:visible;
+  }
+  .card::before{
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%);
+   border-radius:inherit;}
+  .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+  .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+  .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+  .cardhead .label{flex:1}
+  .infodot{width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex;
+    align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic;
+    color:var(--faint); cursor:help; flex:none}
+  .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+  .infodot{position:relative; cursor:help}
+  .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+  /* .tt — identical tooltip bubble, for hover targets that aren't "i" dots (lift rows, data flags, quality stars) */
+  .tt{position:relative; cursor:help}
+  .tt:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+  .btn{
+    border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text);
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:8px 16px;
+    border-radius:980px; cursor:pointer;
+  }
+  .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+
+  /* ===== COMMAND HEADER ===== */
+  .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
+  .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+  .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px}
+  .cmdactions{display:flex; gap:10px; flex-wrap:wrap}
+  .admchip{display:inline-block; vertical-align:middle; margin-left:10px; font-size:0.56rem; font-weight:800;
+    letter-spacing:0.1em; text-transform:uppercase; padding:4px 10px; border-radius:980px;
+    background:var(--goldDim); color:var(--goldBright); border:1px solid var(--borderGold)}
+
+  /* ===== SCOREBOARD ===== */
+  .statrow{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px}
+  .statbox{background:rgba(0,0,0,0.25); border:1px solid var(--border); border-radius:10px; padding:12px 16px; flex:1; min-width:140px}
+  .statbox b{font-size:1.3rem; font-weight:800; color:var(--white); display:block; line-height:1.1}
+  .statbox span{font-size:0.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em}
+
+  .subhead{font-size:0.6rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--goldBright); margin:16px 0 10px}
+  .subhead:first-of-type{margin-top:0}
+
+  .glossary{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:8px; margin-bottom:6px}
+  .gloss{border:1px solid var(--border); border-radius:10px; padding:9px 12px; font-size:0.72rem; color:var(--muted); line-height:1.5}
+  .gloss b{color:var(--goldBright); display:block; margin-bottom:3px; font-size:0.76rem}
+
+  .liftnote{font-size:0.72rem; color:#e0a955; margin:14px 0 10px; padding:9px 12px;
+    background:rgba(224,169,85,0.08); border:1px solid rgba(224,169,85,0.25); border-radius:8px; line-height:1.5}
+  .liftlist{max-height:280px; overflow-y:auto; padding-top:2px}
+  .liftrow{display:flex; align-items:center; gap:10px; padding:7px 2px; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.74rem}
+  .liftrow:last-child{border-bottom:none}
+  .lifttag{width:170px; flex:none; color:var(--muted); font-size:0.66rem}
+  .liftlabel{flex:1; color:var(--text)}
+  .liftpct{color:var(--muted); font-size:0.68rem; width:118px; text-align:right; flex:none; white-space:nowrap}
+  .liftmult{width:56px; text-align:right; font-weight:800; flex:none}
+  .liftmult.hi{color:#7ef0a0} .liftmult.lo{color:#e05555} .liftmult.mid{color:var(--muted)}
+
+  /* ===== BEFORE / AFTER GALLERY ===== */
+  .studygrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px}
+  .studycard{border:1px solid var(--border); border-radius:12px; padding:14px; background:rgba(255,255,255,0.015);
+    cursor:pointer; transition:border-color .15s, box-shadow .15s}
+  .studycard:hover, .studycard:focus-visible{border-color:var(--borderGold); box-shadow:0 0 0 1px var(--borderGold) inset; outline:none}
+  .studyhead{display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap}
+  .studytick{font-weight:800; font-size:0.9rem; color:var(--white); letter-spacing:-0.01em}
+  .studysetup{font-size:0.66rem; color:var(--muted)}
+  .dirchip{font-size:0.58rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; border-radius:6px; padding:2px 7px}
+  .dirchip.long{color:var(--green); border:1px solid rgba(34,197,94,0.3)}
+  .dirchip.short{color:#fca5a5; border:1px solid rgba(239,68,68,0.3)}
+  .studydate{margin-left:auto; font-size:0.66rem; color:var(--faint)}
+  .pairwrap{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:11px}
+  .chartslot{position:relative; height:150px; border-radius:10px; border:1px solid var(--border); overflow:hidden; background:#0e0e18}
+  .chartslot svg{width:100%; height:100%; display:block}
+  .chartbadge{position:absolute; top:8px; left:8px; font-size:0.56rem; font-weight:800; letter-spacing:0.1em;
+    text-transform:uppercase; padding:3px 9px; border-radius:980px; background:rgba(4,4,8,0.65); backdrop-filter:blur(4px)}
+  .chartbadge.before{color:var(--muted); border:1px solid var(--border)}
+  .chartbadge.after{color:#86efac; border:1px solid rgba(34,197,94,0.35)}
+  .chartbadge.after.down{color:#fca5a5; border:1px solid rgba(239,68,68,0.35)}
+  .studynote{font-size:0.74rem; color:var(--muted); line-height:1.55}
+  .studynote b{color:var(--text)}
+
+  /* ===== ENTRIES TABLE ===== */
+  .filterbar{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px}
+  .filterchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+    font-size:0.68rem; font-weight:700; padding:6px 14px; border-radius:980px; cursor:pointer}
+  .filterchip.on{background:var(--goldDim); color:var(--goldBright); border-color:var(--borderGold)}
+  .filterchip:hover:not(.on){color:var(--text); border-color:var(--borderGold)}
+  .countchip{background:var(--goldDim); color:var(--goldBright); font-size:0.66rem; font-weight:800; padding:3px 10px; border-radius:980px}
+
+  .tablewrap{overflow-x:auto}
+  table.dense{width:100%; border-collapse:collapse; min-width:980px}
+  table.dense thead th{
+    font-size:0.58rem; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;
+    color:var(--muted); text-align:left; padding:9px 10px; border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  table.dense tbody td{padding:9px 10px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.76rem; vertical-align:middle}
+  table.dense tbody tr{cursor:pointer}
+  table.dense tbody tr:hover{background:rgba(255,255,255,0.025)}
+  @keyframes rowFlash{
+    0%{ box-shadow:inset 0 0 0 2px var(--goldBright); background:rgba(240,192,80,0.16); }
+    100%{ box-shadow:inset 0 0 0 2px rgba(240,192,80,0); background:rgba(240,192,80,0); }
+  }
+  tr.flash{animation:rowFlash 1.5s ease-out}
+
+  /* ===== TOAST ===== */
+  .toast{position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(10px);
+    background:#13131c; border:1px solid var(--borderGold); border-radius:10px; padding:12px 20px;
+    font-size:0.78rem; font-weight:600; color:var(--text); box-shadow:0 10px 30px rgba(0,0,0,0.55);
+    opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:80}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  .tick{font-weight:800; letter-spacing:-0.01em; font-size:0.84rem; color:var(--white)}
+  .subchip{font-size:0.64rem; font-weight:700; padding:3px 9px; border-radius:980px; background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); white-space:nowrap}
+
+  .flagset{display:flex; gap:5px; flex-wrap:wrap}
+  .flag{display:inline-flex; align-items:center; gap:4px; font-size:0.58rem; font-weight:700; padding:2px 8px; border-radius:980px; border:1px solid var(--border); color:var(--faint)}
+  .flag.on{color:#86efac; border-color:rgba(34,197,94,0.3); background:rgba(34,197,94,0.08)}
+  .flag .d{width:5px; height:5px; border-radius:50%; background:currentColor; flex:none}
+
+  .gradewrap{display:inline-flex; align-items:center; gap:6px}
+  .gradebadge{display:inline-flex; width:19px; height:19px; border-radius:6px; align-items:center; justify-content:center; font-weight:800; font-size:0.64rem; flex:none}
+  .gradebadge.a{background:rgba(34,197,94,0.15); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+  .gradebadge.b{background:var(--goldDim); color:var(--goldBright); border:1px solid var(--borderGold)}
+  .gradebadge.c{background:rgba(239,68,68,0.12); color:#fca5a5; border:1px solid rgba(239,68,68,0.3)}
+  .qmeta{display:flex; flex-direction:column; gap:1px}
+  .stars{color:var(--gold); font-size:0.58rem; letter-spacing:1px}
+  .qon{font-size:0.6rem; color:var(--faint)}
+
+  .outcls{display:inline-flex; align-items:center; gap:5px; font-size:0.64rem; font-weight:800; padding:5px 10px; border-radius:980px; letter-spacing:0.01em; white-space:nowrap}
+  .outcls.monster{background:linear-gradient(120deg,var(--goldMid),var(--goldBright)); color:#0a0a0a}
+  .outcls.big{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+  .outcls.small{background:var(--goldDim); color:var(--goldBright); border:1px solid var(--borderGold)}
+  .outcls.fail{background:rgba(239,68,68,0.12); color:#fca5a5; border:1px solid rgba(239,68,68,0.3)}
+
+  .mktcond{font-size:0.6rem; font-weight:700; padding:3px 9px; border-radius:980px; letter-spacing:0.02em; display:inline-block; white-space:nowrap}
+  .mktcond.up{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+  .mktcond.chop{background:var(--goldDim); color:var(--goldBright); border:1px solid var(--borderGold)}
+  .mktcond.down{background:rgba(239,68,68,0.12); color:#fca5a5; border:1px solid rgba(239,68,68,0.3)}
+
+  @media(max-width:760px){
+    .navbar .spacer{display:none}
+    .tabs{overflow-x:auto; max-width:100%; scrollbar-width:none} .tabs::-webkit-scrollbar{display:none} .tabs a{white-space:nowrap}
+    .pairwrap{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- NAV — full 8-tab bar; Studies + Quant are admin-only (visible because this account is admin).
+       No Guided/Pro toggle on this page — Study Book has no member-facing simplified mode. -->
+  <div class="navbar">
+    <div class="brand"><img class="vmark" src="../public/logo-mark.png" alt="VIV" style="background:none; object-fit:contain"> Valen Insiders Vault</div>
+    <div class="tabs">
+      <a href="dashboard-pro.html">Dashboard</a>
+      <a href="journal-pro.html">Journal</a>
+      <a href="premium-pro.html">Premium tools</a>
+      <a href="daily-setups.html">Daily Setups</a>
+      <a href="model-book.html">Model Book</a>
+      <a href="studies.html" class="on">Studies</a>
+      <a href="quant.html">Quant</a>
+      <a href="settings-pro.html">Settings</a>
+    </div>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- COMMAND HEADER -->
+  <div class="cmdheader">
+    <div class="cmdleft">
+      <div class="eyebrow">Studies</div>
+      <h1 class="ch1">Study Book <span class="admchip">Admin</span></h1>
+      <div class="cmdmeta">22 studies logged &middot; 3 setups tracked &middot; last added 3d ago</div>
+    </div>
+    <div class="cmdactions">
+      <button class="btn gold" id="btnNew">+ New Study</button>
+    </div>
+  </div>
+
+  <!-- STUDY SCOREBOARD — counts, outcome-class glossary, factor lift table.
+       Mirrors StudyScoreboard() in src/StudyBook.jsx: study counts by setup, resolved W/F,
+       the pre-registered outcome-class glossary, then liftTable() sorted by lift descending. -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="cardhead"><span class="label">Study Scoreboard</span><span class="infodot" data-tip="Historical EXERCISE mode: fixed factor + metric cards on past winners so commonality emerges from the counts, never from memory.">i</span></div>
+
+    <div class="statrow">
+      <div class="statbox"><b id="statTotal">22</b><span>Studies</span></div>
+      <div class="statbox"><b>11</b><span>Momentum Breakout</span></div>
+      <div class="statbox"><b>7</b><span>Episodic Pivot</span></div>
+      <div class="statbox"><b>4</b><span>Parabolic</span></div>
+      <div class="statbox"><b>12W / 7F</b><span>Resolved Classes</span></div>
+    </div>
+
+    <!-- Outcome-class glossary — pre-registered definitions (winner-dna.md), measured from the
+         trigger day's 5-min-ORH entry, never redefined after seeing the data. Direction-aware. -->
+    <div class="subhead">Outcome-class glossary</div>
+    <div class="glossary">
+      <div class="gloss"><b>&#129430; Monster</b>Ran +20% or more within 20 sessions of the trigger — the campaign class the whole study hunts.</div>
+      <div class="gloss"><b>&#127942; Big winner</b>Ran +8% or more within 5 sessions — a real burst (the 8&ndash;40% class).</div>
+      <div class="gloss"><b>&#127793; Works small</b>Only +4&ndash;8% in 5 sessions — the idea worked but paid little; partials matter here.</div>
+      <div class="gloss"><b>&#128128; Failure</b>Under +4% in 5 sessions, or broke the trigger-day low before ever reaching +4% — the control group that makes lift math possible.</div>
+    </div>
+
+    <!-- Factor lift: P(factor | winner) / P(factor | failure). 👁 = Valen's chart-readable ticks,
+         📊 = data-derived flags (DATA_FLAGS) computed from auto-pulled metrics, no tick needed. -->
+    <div class="subhead">Factor lift</div>
+    <div class="liftnote">&#9888; n=22 &mdash; early read, believe nothing before n&ge;30 per class (promote at n&ge;50). Add FAILURES too &mdash; without them lift can't be computed (winners-only = survivor bias).</div>
+    <div class="liftlist">
+      <div class="liftrow"><span class="lifttag">&#128065; Momentum Breakout</span><span class="liftlabel">Tightening series — &ge;3 visibly narrow-range days pre-trigger</span><span class="liftpct">91%W &middot; 43%F</span><span class="liftmult hi tt" data-tip="&times;lift = % of winners with this factor &divide; % of failures with it. &ge;2&times; = edge candidate &middot; ~1&times; = noise &middot; &lt;0.7&times; = works against you. Believe nothing under n&ge;30 per class.">2.12&times;</span></div>
+      <div class="liftrow"><span class="lifttag">&#128202; Data</span><span class="liftlabel">AS &ge; 98 (data)</span><span class="liftpct">82%W &middot; 40%F</span><span class="liftmult hi tt" data-tip="&times;lift = % of winners with this factor &divide; % of failures with it. &ge;2&times; = edge candidate &middot; ~1&times; = noise &middot; &lt;0.7&times; = works against you. Believe nothing under n&ge;30 per class.">2.05&times;</span></div>
+      <div class="liftrow"><span class="lifttag">&#128065; Episodic Pivot</span><span class="liftlabel">Held the gap — closed in the upper part of the day's range</span><span class="liftpct">100%W &middot; 57%F</span><span class="liftmult mid tt" data-tip="&times;lift = % of winners with this factor &divide; % of failures with it. &ge;2&times; = edge candidate &middot; ~1&times; = noise &middot; &lt;0.7&times; = works against you. Believe nothing under n&ge;30 per class.">1.75&times;</span></div>
+      <div class="liftrow"><span class="lifttag">&#128202; Data</span><span class="liftlabel">ADR20 &ge; 4% (data)</span><span class="liftpct">78%W &middot; 46%F</span><span class="liftmult mid tt" data-tip="&times;lift = % of winners with this factor &divide; % of failures with it. &ge;2&times; = edge candidate &middot; ~1&times; = noise &middot; &lt;0.7&times; = works against you. Believe nothing under n&ge;30 per class.">1.70&times;</span></div>
+      <div class="liftrow"><span class="lifttag">&#128065; Momentum Breakout</span><span class="liftlabel">Young trend — 1st&ndash;3rd breakout &mdash; 1st leg</span><span class="liftpct">88%W &middot; 61%F</span><span class="liftmult mid tt" data-tip="&times;lift = % of winners with this factor &divide; % of failures with it. &ge;2&times; = edge candidate &middot; ~1&times; = noise &middot; &lt;0.7&times; = works against you. Believe nothing under n&ge;30 per class.">1.44&times;</span></div>
+      <div class="liftrow"><span class="lifttag">&#128202; Data</span><span class="liftlabel">RVol 50d &ge; 1.5 (data)</span><span class="liftpct">85%W &middot; 64%F</span><span class="liftmult mid tt" data-tip="&times;lift = % of winners with this factor &divide; % of failures with it. &ge;2&times; = edge candidate &middot; ~1&times; = noise &middot; &lt;0.7&times; = works against you. Believe nothing under n&ge;30 per class.">1.33&times;</span></div>
+      <div class="liftrow"><span class="lifttag">&#128065; Momentum Breakout</span><span class="liftlabel">Day-1 range expansion &ge;4% — bar visibly bigger than last 5&ndash;10</span><span class="liftpct">73%W &middot; 61%F</span><span class="liftmult mid tt" data-tip="&times;lift = % of winners with this factor &divide; % of failures with it. &ge;2&times; = edge candidate &middot; ~1&times; = noise &middot; &lt;0.7&times; = works against you. Believe nothing under n&ge;30 per class.">1.20&times;</span></div>
+      <div class="liftrow"><span class="lifttag">&#128065; Parabolic</span><span class="liftlabel">Vertical — +50&ndash;100% (large) / +300%+ (small) in days&ndash;weeks</span><span class="liftpct">67%W &middot; 71%F</span><span class="liftmult mid tt" data-tip="&times;lift = % of winners with this factor &divide; % of failures with it. &ge;2&times; = edge candidate &middot; ~1&times; = noise &middot; &lt;0.7&times; = works against you. Believe nothing under n&ge;30 per class.">0.94&times;</span></div>
+      <div class="liftrow"><span class="lifttag">&#128202; Data</span><span class="liftlabel">Stop &le; 1&times; ADR (data)</span><span class="liftpct">45%W &middot; 68%F</span><span class="liftmult lo tt" data-tip="&times;lift = % of winners with this factor &divide; % of failures with it. &ge;2&times; = edge candidate &middot; ~1&times; = noise &middot; &lt;0.7&times; = works against you. Believe nothing under n&ge;30 per class.">0.66&times;</span></div>
+    </div>
+  </div>
+
+  <!-- BEFORE/AFTER PATTERN RECOGNITION — two charts per study, same as StudyEditor's chart slots
+       (before_img = "BEFORE — the setup", outcome_img = "AFTER — the outcome"). The right edge of
+       BEFORE is the trigger day; AFTER is the same chart weeks later — the pattern-recognition rep. -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="cardhead"><span class="label">Pattern Recognition — Before / After</span><span class="infodot" data-tip="BEFORE = exactly what your eyes saw at the trigger day. AFTER = the same chart weeks later — what the setup became.">i</span></div>
+    <div class="studygrid">
+
+      <div class="studycard" data-ticker="NVDA" tabindex="0" role="button" aria-label="Jump to NVDA in the Study Entries table">
+        <div class="studyhead">
+          <span class="studytick">NVDA</span>
+          <span class="studysetup">Momentum Breakout</span>
+          <span class="dirchip long">Long</span>
+          <span class="studydate">2026-03-04</span>
+        </div>
+        <div class="pairwrap">
+          <div class="chartslot"><span class="chartbadge before">Before</span>
+            <svg viewBox="0 0 300 140" preserveAspectRatio="none"><defs><linearGradient id="g-nvda-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(255,255,255,0.12)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient></defs>
+              <path d="M0,95 L35,90 L70,98 L105,88 L140,93 L175,86 L210,91 L245,84 L280,88 L300,85 L300,140 L0,140 Z" fill="url(#g-nvda-b)"/>
+              <path d="M0,95 L35,90 L70,98 L105,88 L140,93 L175,86 L210,91 L245,84 L280,88 L300,85" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="chartslot"><span class="chartbadge after">After</span>
+            <svg viewBox="0 0 300 140" preserveAspectRatio="none"><defs><linearGradient id="g-nvda-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(34,197,94,0.32)"/><stop offset="100%" stop-color="rgba(34,197,94,0)"/></linearGradient></defs>
+              <path d="M0,92 L30,90 L60,74 L90,58 L120,44 L150,34 L180,26 L210,20 L240,14 L270,9 L300,6 L300,140 L0,140 Z" fill="url(#g-nvda-a)"/>
+              <path d="M0,92 L30,90 L60,74 L90,58 L120,44 L150,34 L180,26 L210,20 L240,14 L270,9 L300,6" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        </div>
+        <div class="studynote"><b>What to notice:</b> tightening series into the pivot — three narrow-range days on drying volume, higher lows right up to the line. Cleared on 4&times; volume and never gave the base back; +34% in 14 sessions before the first real pullback.</div>
+      </div>
+
+      <div class="studycard" data-ticker="MSTR" tabindex="0" role="button" aria-label="Jump to MSTR in the Study Entries table">
+        <div class="studyhead">
+          <span class="studytick">MSTR</span>
+          <span class="studysetup">Episodic Pivot</span>
+          <span class="dirchip long">Long</span>
+          <span class="studydate">2026-02-18</span>
+        </div>
+        <div class="pairwrap">
+          <div class="chartslot"><span class="chartbadge before">Before</span>
+            <svg viewBox="0 0 300 140" preserveAspectRatio="none"><defs><linearGradient id="g-mstr-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(255,255,255,0.12)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient></defs>
+              <path d="M0,110 L50,112 L100,109 L150,111 L200,110 L250,112 L300,109 L300,140 L0,140 Z" fill="url(#g-mstr-b)"/>
+              <path d="M0,110 L50,112 L100,109 L150,111 L200,110 L250,112 L300,109" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="chartslot"><span class="chartbadge after">After</span>
+            <svg viewBox="0 0 300 140" preserveAspectRatio="none"><defs><linearGradient id="g-mstr-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(34,197,94,0.32)"/><stop offset="100%" stop-color="rgba(34,197,94,0)"/></linearGradient></defs>
+              <path d="M0,110 L40,109 L80,111 L120,108 L150,110 L160,60 L190,42 L220,30 L260,18 L300,10 L300,140 L0,140 Z" fill="url(#g-mstr-a)"/>
+              <path d="M0,110 L40,109 L80,111 L120,108 L150,110 L160,60 L190,42 L220,30 L260,18 L300,10" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        </div>
+        <div class="studynote"><b>What to notice:</b> flat and neglected for three months, no prior EP gap on the chart, orderly base below resistance. Gapped 14% on 6&times; average volume and held the gap all day — the "neglected &rarr; surprise" shape ran to +26% by day 5.</div>
+      </div>
+
+      <div class="studycard" data-ticker="PANW" tabindex="0" role="button" aria-label="Jump to PANW in the Study Entries table">
+        <div class="studyhead">
+          <span class="studytick">PANW</span>
+          <span class="studysetup">Parabolic</span>
+          <span class="dirchip short">Short</span>
+          <span class="studydate">2026-04-02</span>
+        </div>
+        <div class="pairwrap">
+          <div class="chartslot"><span class="chartbadge before">Before</span>
+            <svg viewBox="0 0 300 140" preserveAspectRatio="none"><defs><linearGradient id="g-panw-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(240,192,80,0.28)"/><stop offset="100%" stop-color="rgba(240,192,80,0)"/></linearGradient></defs>
+              <path d="M0,130 L40,112 L80,92 L120,68 L160,46 L200,28 L240,14 L270,6 L300,3 L300,140 L0,140 Z" fill="url(#g-panw-b)"/>
+              <path d="M0,130 L40,112 L80,92 L120,68 L160,46 L200,28 L240,14 L270,6 L300,3" fill="none" stroke="var(--goldBright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="chartslot"><span class="chartbadge after down">After</span>
+            <svg viewBox="0 0 300 140" preserveAspectRatio="none"><defs><linearGradient id="g-panw-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(239,68,68,0.30)"/><stop offset="100%" stop-color="rgba(239,68,68,0)"/></linearGradient></defs>
+              <path d="M0,8 L30,14 L60,28 L90,48 L120,62 L150,80 L190,98 L230,112 L270,124 L300,132 L300,140 L0,140 Z" fill="url(#g-panw-a)"/>
+              <path d="M0,8 L30,14 L60,28 L90,48 L120,62 L150,80 L190,98 L230,112 L270,124 L300,132" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        </div>
+        <div class="studynote"><b>What to notice:</b> five straight up days, stretched far above every rising MA — visibly climactic, no base left to buy. First red bar broke the opening range and the stock never got the high back; the vertical stretch was the whole signal.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- STUDY ENTRIES — real fields from StudyBook.jsx: setup, direction, SUBCATS sub-category,
+       DATA_FLAGS, studyQuality() letter/stars, outcomeClass() badge, regime_tag market condition. -->
+  <div class="card">
+    <div class="cardhead">
+      <span class="label">Study Entries</span>
+      <span class="countchip" id="entryCount">6</span>
+      <span class="infodot" data-tip="Every logged study. Rows are normal Model Book rows with the payload under metrics.study — is_published stays false until promoted through the normal editor.">i</span>
+    </div>
+    <div class="filterbar" id="setupFilter">
+      <button class="filterchip on" data-setup="all">All (6)</button>
+      <button class="filterchip" data-setup="Momentum Breakout">Momentum Breakout (3)</button>
+      <button class="filterchip" data-setup="Episodic Pivot">Episodic Pivot (2)</button>
+      <button class="filterchip" data-setup="Parabolic">Parabolic (1)</button>
+    </div>
+    <div class="tablewrap">
+    <table class="dense" id="entryTable">
+      <thead>
+        <tr>
+          <th>Ticker</th><th>Trigger</th><th>Setup</th><th>Dir</th><th>Sub-category</th>
+          <th>Data flags</th><th>Quality</th><th>Outcome class</th><th>Market</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr data-setup="Momentum Breakout" data-ticker="NVDA">
+          <td><span class="tick">NVDA</span></td>
+          <td>2026-03-04</td>
+          <td>Momentum Breakout</td>
+          <td><span class="dirchip long">Long</span></td>
+          <td><span class="subchip">1st leg</span></td>
+          <td><span class="flagset"><span class="flag on tt" data-tip="ADR20 &ge; 4% (data) &mdash; DATA_FLAGS threshold from the auto-pulled ADR20 metric; no tick needed."><span class="d"></span>ADR&ge;4</span><span class="flag on tt" data-tip="RVol 50d &ge; 1.5 (data) &mdash; DATA_FLAGS threshold on trigger-day relative volume vs the 50-day average."><span class="d"></span>RVol&ge;1.5</span><span class="flag on tt" data-tip="AS/RS rank &ge; 98 (data) &mdash; DATA_FLAGS leadership threshold."><span class="d"></span>AS&ge;98</span></span></td>
+          <td><span class="gradewrap tt" data-tip="Quality is auto-computed from ticks, never typed by hand: stars = round(ticks-on &divide; scored-total &times; 5) &rarr; letter (5&#9733;=A+, 4&#9733;=A, 3&#9733;=B, else C). Bonus ticks are tracked but don't count toward the score."><span class="gradebadge a">A+</span><span class="qmeta"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span><span class="qon">13/14</span></span></span></td>
+          <td><span class="outcls monster">&#129430; Monster</span></td>
+          <td><span class="mktcond up">Uptrend</span></td>
+        </tr>
+        <tr data-setup="Episodic Pivot" data-ticker="MSTR">
+          <td><span class="tick">MSTR</span></td>
+          <td>2026-02-18</td>
+          <td>Episodic Pivot</td>
+          <td><span class="dirchip long">Long</span></td>
+          <td><span class="subchip">&mdash;</span></td>
+          <td><span class="flagset"><span class="flag on tt" data-tip="ADR20 &ge; 4% (data) &mdash; DATA_FLAGS threshold from the auto-pulled ADR20 metric; no tick needed."><span class="d"></span>ADR&ge;4</span><span class="flag on tt" data-tip="RVol 50d &ge; 1.5 (data) &mdash; DATA_FLAGS threshold on trigger-day relative volume vs the 50-day average."><span class="d"></span>RVol&ge;1.5</span><span class="flag tt" data-tip="AS/RS rank &ge; 98 (data) &mdash; not met, or not yet measured. Blank = excluded from this flag, never counted as a fail."><span class="d"></span>AS&ge;98</span></span></td>
+          <td><span class="gradewrap tt" data-tip="Quality is auto-computed from ticks, never typed by hand: stars = round(ticks-on &divide; scored-total &times; 5) &rarr; letter (5&#9733;=A+, 4&#9733;=A, 3&#9733;=B, else C). Bonus ticks are tracked but don't count toward the score."><span class="gradebadge a">A</span><span class="qmeta"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9734;</span><span class="qon">7/8</span></span></span></td>
+          <td><span class="outcls big">&#127942; Big winner</span></td>
+          <td><span class="mktcond up">Uptrend</span></td>
+        </tr>
+        <tr data-setup="Momentum Breakout" data-ticker="AVGO">
+          <td><span class="tick">AVGO</span></td>
+          <td>2026-01-22</td>
+          <td>Momentum Breakout</td>
+          <td><span class="dirchip long">Long</span></td>
+          <td><span class="subchip">2nd leg</span></td>
+          <td><span class="flagset"><span class="flag on tt" data-tip="ADR20 &ge; 4% (data) &mdash; DATA_FLAGS threshold from the auto-pulled ADR20 metric; no tick needed."><span class="d"></span>ADR&ge;4</span><span class="flag tt" data-tip="RVol 50d &ge; 1.5 (data) &mdash; not met, or not yet measured. Blank = excluded from this flag, never counted as a fail."><span class="d"></span>RVol&ge;1.5</span><span class="flag tt" data-tip="AS/RS rank &ge; 98 (data) &mdash; not met, or not yet measured. Blank = excluded from this flag, never counted as a fail."><span class="d"></span>AS&ge;98</span></span></td>
+          <td><span class="gradewrap tt" data-tip="Quality is auto-computed from ticks, never typed by hand: stars = round(ticks-on &divide; scored-total &times; 5) &rarr; letter (5&#9733;=A+, 4&#9733;=A, 3&#9733;=B, else C). Bonus ticks are tracked but don't count toward the score."><span class="gradebadge b">B</span><span class="qmeta"><span class="stars">&#9733;&#9733;&#9733;&#9734;&#9734;</span><span class="qon">9/14</span></span></span></td>
+          <td><span class="outcls small">&#127793; Works small</span></td>
+          <td><span class="mktcond chop">Chop</span></td>
+        </tr>
+        <tr data-setup="Momentum Breakout" data-ticker="KLAC">
+          <td><span class="tick">KLAC</span></td>
+          <td>2025-12-09</td>
+          <td>Momentum Breakout</td>
+          <td><span class="dirchip long">Long</span></td>
+          <td><span class="subchip">3rd leg</span></td>
+          <td><span class="flagset"><span class="flag tt" data-tip="ADR20 &ge; 4% (data) &mdash; not met, or not yet measured. Blank = excluded from this flag, never counted as a fail."><span class="d"></span>ADR&ge;4</span><span class="flag tt" data-tip="RVol 50d &ge; 1.5 (data) &mdash; not met, or not yet measured. Blank = excluded from this flag, never counted as a fail."><span class="d"></span>RVol&ge;1.5</span><span class="flag tt" data-tip="AS/RS rank &ge; 98 (data) &mdash; not met, or not yet measured. Blank = excluded from this flag, never counted as a fail."><span class="d"></span>AS&ge;98</span></span></td>
+          <td><span class="gradewrap tt" data-tip="Quality is auto-computed from ticks, never typed by hand: stars = round(ticks-on &divide; scored-total &times; 5) &rarr; letter (5&#9733;=A+, 4&#9733;=A, 3&#9733;=B, else C). Bonus ticks are tracked but don't count toward the score."><span class="gradebadge c">C</span><span class="qmeta"><span class="stars">&#9733;&#9733;&#9734;&#9734;&#9734;</span><span class="qon">5/14</span></span></span></td>
+          <td><span class="outcls fail">&#128128; Failure</span></td>
+          <td><span class="mktcond down">Downtrend</span></td>
+        </tr>
+        <tr data-setup="Parabolic" data-ticker="PANW">
+          <td><span class="tick">PANW</span></td>
+          <td>2026-04-02</td>
+          <td>Parabolic</td>
+          <td><span class="dirchip short">Short</span></td>
+          <td><span class="subchip">&mdash;</span></td>
+          <td><span class="flagset"><span class="flag on tt" data-tip="ADR20 &ge; 4% (data) &mdash; DATA_FLAGS threshold from the auto-pulled ADR20 metric; no tick needed."><span class="d"></span>ADR&ge;4</span><span class="flag on tt" data-tip="RVol 50d &ge; 1.5 (data) &mdash; DATA_FLAGS threshold on trigger-day relative volume vs the 50-day average."><span class="d"></span>RVol&ge;1.5</span><span class="flag on tt" data-tip="AS/RS rank &ge; 98 (data) &mdash; DATA_FLAGS leadership threshold."><span class="d"></span>AS&ge;98</span></span></td>
+          <td><span class="gradewrap tt" data-tip="Quality is auto-computed from ticks, never typed by hand: stars = round(ticks-on &divide; scored-total &times; 5) &rarr; letter (5&#9733;=A+, 4&#9733;=A, 3&#9733;=B, else C). Bonus ticks are tracked but don't count toward the score."><span class="gradebadge a">A</span><span class="qmeta"><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9734;</span><span class="qon">6/7</span></span></span></td>
+          <td><span class="outcls big">&#127942; Big winner</span></td>
+          <td><span class="mktcond chop">Chop</span></td>
+        </tr>
+        <tr data-setup="Episodic Pivot" data-ticker="FTNT">
+          <td><span class="tick">FTNT</span></td>
+          <td>2026-05-11</td>
+          <td>Episodic Pivot</td>
+          <td><span class="dirchip long">Long</span></td>
+          <td><span class="subchip">&mdash;</span></td>
+          <td><span class="flagset"><span class="flag tt" data-tip="ADR20 &ge; 4% (data) &mdash; not met, or not yet measured. Blank = excluded from this flag, never counted as a fail."><span class="d"></span>ADR&ge;4</span><span class="flag tt" data-tip="RVol 50d &ge; 1.5 (data) &mdash; not met, or not yet measured. Blank = excluded from this flag, never counted as a fail."><span class="d"></span>RVol&ge;1.5</span><span class="flag tt" data-tip="AS/RS rank &ge; 98 (data) &mdash; not met, or not yet measured. Blank = excluded from this flag, never counted as a fail."><span class="d"></span>AS&ge;98</span></span></td>
+          <td><span class="gradewrap tt" data-tip="Quality is auto-computed from ticks, never typed by hand: stars = round(ticks-on &divide; scored-total &times; 5) &rarr; letter (5&#9733;=A+, 4&#9733;=A, 3&#9733;=B, else C). Bonus ticks are tracked but don't count toward the score."><span class="gradebadge c">C</span><span class="qmeta"><span class="stars">&#9733;&#9733;&#9734;&#9734;&#9734;</span><span class="qon">3/8</span></span></span></td>
+          <td><span class="outcls fail">&#128128; Failure</span></td>
+          <td><span class="mktcond down">Downtrend</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- StudyEditor slot — real inline editor renders here when "+ New Study" or a row is opened for
+       edit (src/StudyBook.jsx StudyEditor, ~line 272). Not built out in this static mockup:
+       ticker/trigger-date/setup-select/direction/market-condition + auto quality readout;
+       three chart upload slots (Context—HTF, BEFORE—the setup, AFTER—the outcome) with the
+       click-to-zoom lightbox (←/→ cycles, Esc closes); the 👁 tick checklist in the setup's
+       3 buckets (with young-leg / gap-band sub-category pills); the 📊 auto-pulled metrics grid
+       (study-fill.mjs fills, Valen only corrects); the Outcome anatomy metrics grid (MFE/MAE/
+       burst/trail-R/sim-R); the ★/☆ "add to Model Book" toggle; and the Lesson section
+       (REFUSE-IF one-liner + free-text observation). -->
+
+</div>
+<div class="toast" id="toast"></div>
+<script>
+  // Shared toast helper — "+ New Study" and Study Entries row clicks both stand in for opening
+  // the real StudyEditor in the app.
+  var toastEl = document.getElementById('toast');
+  var toastTimer = null;
+  function showToast(msg){
+    if (!toastEl) return;
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2200);
+  }
+
+  // Setup filter chips — client-side row show/hide only, no live data. Chip labels carry fixed
+  // counts for this static demo set; the countchip mirrors however many rows are shown right now.
+  var filterBar = document.getElementById('setupFilter');
+  var rows = document.querySelectorAll('#entryTable tbody tr');
+  var entryCount = document.getElementById('entryCount');
+  filterBar.addEventListener('click', function(e){
+    var btn = e.target.closest('.filterchip');
+    if (!btn) return;
+    filterBar.querySelectorAll('.filterchip').forEach(function(b){ b.classList.remove('on'); });
+    btn.classList.add('on');
+    var setup = btn.dataset.setup, shown = 0;
+    rows.forEach(function(r){
+      var match = setup === 'all' || r.dataset.setup === setup;
+      r.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    entryCount.textContent = shown;
+  });
+
+  // Study Entries rows — click anywhere on a row: in the real app this opens that study in
+  // StudyEditor for editing.
+  document.querySelector('#entryTable tbody').addEventListener('click', function(){
+    showToast('Demo — the real StudyEditor lives in the app.');
+  });
+
+  // BEFORE/AFTER cards — click (or Enter/Space, since they're keyboard-focusable) scrolls to and
+  // flash-highlights the matching row below, even if the row is currently filtered out.
+  function jumpToRow(ticker){
+    var row = document.querySelector('#entryTable tbody tr[data-ticker="' + ticker + '"]');
+    if (!row) return;
+    if (row.style.display === 'none') {
+      var allBtn = filterBar.querySelector('[data-setup="all"]');
+      if (allBtn) allBtn.click();
+    }
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.remove('flash');
+    void row.offsetWidth; // restart the animation if the same card is clicked again
+    row.classList.add('flash');
+  }
+  document.querySelectorAll('.studycard').forEach(function(card){
+    card.addEventListener('click', function(){ jumpToRow(card.dataset.ticker); });
+    card.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jumpToRow(card.dataset.ticker); }
+    });
+  });
+
+  document.getElementById('btnNew').addEventListener('click', function(){
+    showToast('Demo — the real StudyEditor lives in the app.');
+  });
+
+  // Total studies count-up on load (same easing as dashboard-pro.html — the only motion here
+  // besides hover states, the row flash, and toasts).
+  (function(){
+    var el = document.getElementById('statTotal');
+    if (!el) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var final = parseInt(el.textContent, 10) || 0, start = null, dur = 900;
+    function ease(t){ return 1 - Math.pow(1 - t, 3); }
+    function frame(now){
+      if (start === null) start = now;
+      var t = Math.min(1, (now - start) / dur);
+      el.textContent = Math.round(final * ease(t));
+      if (t < 1) requestAnimationFrame(frame); else el.textContent = final;
+    }
+    el.textContent = '0';
+    requestAnimationFrame(frame);
+  })();
+</script>
+</body>
+</html>

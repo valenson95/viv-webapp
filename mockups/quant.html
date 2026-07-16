@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIV — Quant Analysis (Pro layout)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<!--
+  Quant Analysis — ADMIN-ONLY research bench. Live component: src/QuantAnalysis.jsx.
+  Data source (read-only): supabase.claude_insights.payload.edge_ledger, built from
+  the `trades` table by scripts/edge-ledger.mjs. This page never writes to the DB —
+  it is a downstream analytics view, same read-only posture as everything in api/.
+  Members never see this page; gated to a single admin email in the live app.
+  This file is a STATIC design mockup only — all numbers below are demo data.
+-->
+<style>
+  /* ============================================================
+     VIV brand tokens — copied verbatim from dashboard-pro.html
+     ============================================================ */
+  :root{
+    --bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
+    --text:rgba(255,255,255,0.92);
+    --muted:rgba(255,255,255,0.70);
+    --faint:rgba(255,255,255,0.45);
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:var(--font); line-height:1.5; font-size:16px;
+    -webkit-font-smoothing:antialiased; padding:0; min-height:100vh;
+  }
+  .kpinum,.donutctr,.benchlive,.benchtarget,.moneyval,.rulen,.eqstatnum,.mcnum,table.dense tbody td,.tourneytable .tval{font-variant-numeric:tabular-nums}
+
+  /* ===== SHELL ===== */
+  .shell{width:100%; max-width:1400px; margin:0 auto; padding:22px 24px 80px}
+  @media(min-width:2000px){ .shell{max-width:1680px} }
+
+  /* ===== NAV ===== */
+  .navbar{display:flex; align-items:center; gap:16px; margin-bottom:22px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem}
+  .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
+  .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
+  .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+  .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
+  .tabs a:hover:not(.on){color:var(--text)}
+  .spacer{flex:1}
+
+  /* ===== SHARED CARD CHROME ===== */
+  .card{
+    position:relative; background:var(--glass);
+    border:1px solid var(--border); border-radius:16px;
+    backdrop-filter:blur(24px) saturate(150%);
+    -webkit-backdrop-filter:blur(24px) saturate(150%);
+    padding:18px 20px; overflow:visible; margin-top:14px;
+  }
+  .card::before{
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%);
+   border-radius:inherit;}
+  .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+  .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+  .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+  .cardhead .label{flex:1}
+  .infodot{width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex;
+    align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic;
+    color:var(--faint); cursor:help; flex:none}
+  .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+  /* ===== TOOLTIPS — info-dot hover explanations (shared pattern, exact per spec) ===== */
+  .infodot{position:relative; cursor:help}
+  .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+  .cardmeta{font-size:0.66rem; color:var(--faint)}
+  .btn{
+    border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text);
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:8px 16px;
+    border-radius:980px; cursor:pointer;
+  }
+  .btn.ghost{background:transparent}
+  .btn.ghost:hover{border-color:var(--borderGold); color:var(--text)}
+  .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+  .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
+  .seg button{
+    border:none; background:transparent; color:var(--muted); cursor:pointer;
+    font-family:var(--font); font-size:0.7rem; font-weight:700; padding:6px 14px; border-radius:980px;
+    letter-spacing:0.02em; transition:all .15s;
+  }
+  .seg button.on{background:var(--goldDim); color:var(--goldBright)}
+  .seg button:hover:not(.on){color:var(--text)}
+  .chevbtn{background:transparent; border:none; color:var(--faint); cursor:pointer; font-size:0.7rem; padding:2px 4px}
+  .chevbtn:hover{color:var(--gold)}
+
+  /* ===== COMMAND HEADER ===== */
+  .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
+  .cmdleft .ch1row{display:flex; align-items:center; gap:10px; margin-top:5px; flex-wrap:wrap}
+  .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white)}
+  .admchip{font-size:0.6rem; font-weight:800; letter-spacing:0.08em; padding:3px 10px; border-radius:980px;
+    background:var(--goldDim); color:var(--goldBright); border:1px solid var(--borderGold)}
+  .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px}
+  .cmdactions{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
+  .vbadge{display:inline-flex; align-items:center; gap:7px; font-size:0.66rem; font-weight:800; letter-spacing:0.08em;
+    padding:6px 14px; border-radius:980px; white-space:nowrap}
+  .vbadge .d{width:7px;height:7px;border-radius:50%}
+  .vbadge.on{background:rgba(34,197,94,0.10); color:#86efac; border:1px solid rgba(34,197,94,0.35)}
+  .vbadge.on .d{background:var(--green)}
+  .vbadge.drift{background:var(--goldDim); color:var(--goldBright); border:1px solid var(--borderGold)}
+  .vbadge.drift .d{background:var(--goldBright)}
+  .vbadge.off{background:rgba(239,68,68,0.10); color:#fca5a5; border:1px solid rgba(239,68,68,0.35)}
+  .vbadge.off .d{background:var(--red)}
+  .asof{font-size:0.66rem; color:var(--faint)}
+
+  /* ===== KPI STRIP ===== */
+  .kpistrip{display:grid; grid-template-columns:repeat(auto-fit, minmax(158px,1fr)); gap:14px}
+  .kpi{min-height:112px; padding:14px 18px; display:flex; flex-direction:column}
+  .kpi .cardhead{padding-bottom:8px; margin-bottom:10px}
+  .kpibody{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-height:0}
+  .kpimain{min-width:0}
+  .kpinum{font-size:1.4rem; font-weight:800; letter-spacing:-0.03em; line-height:1.05; white-space:nowrap}
+  .kpinum.green{color:var(--green)} .kpinum.red{color:var(--red)} .kpinum.gold{color:var(--goldBright)}
+  .kpisub{font-size:0.66rem; color:var(--muted); margin-top:4px; line-height:1.4}
+  .kpisub b{color:inherit; font-weight:700}
+  .donutctr{fill:var(--white); font-size:12.5px; font-weight:800}
+  .donutwrap{display:flex; align-items:center; gap:10px}
+  .donutwrap svg{flex:none; width:56px; height:56px}
+  @media(max-width:760px){ .kpistrip{grid-template-columns:repeat(2,1fr)} }
+
+  /* ===== SCOREBOARD ===== */
+  .sb-banner{display:flex; align-items:baseline; flex-wrap:wrap; gap:6px 14px; padding:12px 16px; border-radius:12px; margin-bottom:12px}
+  .sb-banner.drift{background:var(--goldDim); border:1px solid var(--borderGold)}
+  .sb-banner .word{font-size:0.95rem; font-weight:800; letter-spacing:0.04em; color:var(--goldBright); white-space:nowrap}
+  .sb-banner .sub{font-size:0.72rem; color:var(--muted); flex:1 1 220px; min-width:0; line-height:1.5}
+  .sb-ring{display:inline-flex; align-items:center; gap:8px}
+  .sb-n{font-size:0.64rem; color:var(--faint)}
+  .benchhead,.benchrow{display:grid; grid-template-columns:minmax(170px,1.6fr) minmax(120px,1fr) 92px 84px; gap:0 10px; align-items:center}
+  .benchhead{padding:2px 6px 8px; font-size:0.58rem; font-weight:700; letter-spacing:0.09em; text-transform:uppercase; color:var(--muted)}
+  .benchrow{padding:9px 6px; border-top:1px solid var(--border); font-size:0.76rem}
+  .benchlabel{font-weight:700}
+  .benchlive{font-weight:700}
+  .benchtarget{color:var(--muted)}
+  .chip{display:inline-flex; align-items:center; gap:4px; font-size:0.62rem; font-weight:800; letter-spacing:0.02em;
+    padding:3px 10px; border-radius:980px; justify-self:end; white-space:nowrap}
+  .chip.pass{background:rgba(34,197,94,0.10); color:#86efac; border:1px solid rgba(34,197,94,0.32)}
+  .chip.miss{background:rgba(239,68,68,0.10); color:#fca5a5; border:1px solid rgba(239,68,68,0.32)}
+  .sb-foot{font-size:0.64rem; color:var(--faint); margin-top:10px; line-height:1.5}
+
+  /* ===== SAY BOX ("what it says now") ===== */
+  .saybox{margin:0 0 14px; padding:10px 14px; border-left:3px solid var(--gold); background:rgba(201,152,42,0.05);
+    border-radius:0 10px 10px 0; font-size:0.76rem; line-height:1.6; color:var(--text)}
+  .saybox .saytag{font-size:0.56rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); display:block; margin-bottom:5px}
+  .sayrow{display:flex; gap:9px; padding:2px 0}
+  .sayrow .dash{color:var(--gold); flex:none}
+
+  /* ===== TWO-UP ROW (Money came from / Result shape) ===== */
+  .halfgrid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px}
+  @media(max-width:1000px){ .halfgrid{grid-template-columns:1fr} }
+
+  /* ===== MONEY BARS ===== */
+  .moneygrid{display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:18px}
+  .moneylabel{font-size:0.56rem; font-weight:800; letter-spacing:0.1em; color:var(--faint); margin-bottom:8px}
+  .moneyrow{display:flex; align-items:center; gap:10px; padding:4px 0}
+  .moneytick{min-width:52px; font-size:0.76rem; font-weight:800}
+  .moneytrack{flex:1; height:12px; border-radius:6px; background:rgba(255,255,255,0.04); overflow:hidden}
+  .moneyfill{height:100%; opacity:0.65}
+  .moneyfill.g{background:var(--green)} .moneyfill.r{background:var(--red)}
+  .moneyval{min-width:78px; text-align:right; font-size:0.74rem; font-weight:700}
+  .moneyval.g{color:var(--green)} .moneyval.r{color:var(--red)}
+
+  /* ===== R-DISTRIBUTION BARS ===== */
+  .rdist{display:flex; align-items:flex-end; gap:5px; height:180px; padding:0 4px 30px; position:relative}
+  .rdist::before{content:''; position:absolute; left:0; right:0; bottom:30px; border-top:1px solid var(--border)}
+  .rbar-col{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; position:relative}
+  .rbar-n{font-size:0.62rem; color:var(--muted); font-weight:700; margin-bottom:4px}
+  .rbar{width:100%; max-width:28px; border-radius:4px 4px 0 0}
+  .rbar.g{background:var(--green); opacity:0.75} .rbar.r{background:var(--red); opacity:0.75} .rbar.n{background:rgba(255,255,255,0.28)}
+  .rbar-lab{position:absolute; bottom:-28px; font-size:0.56rem; color:var(--faint); white-space:nowrap; transform:rotate(-32deg); transform-origin:top left}
+
+  /* ===== RULE CARDS (Entry Refinements) ===== */
+  .rulegrid{display:grid; grid-template-columns:repeat(auto-fit, minmax(310px,1fr)); gap:12px}
+  .rulecard{border:1px solid var(--border); border-radius:12px; padding:13px 15px; background:rgba(255,255,255,0.015)}
+  .ruletitle{font-size:0.58rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); margin-bottom:8px}
+  .rulesub{font-size:0.64rem; color:var(--muted); line-height:1.55; margin:6px 0}
+  .rulerow{display:flex; align-items:baseline; gap:9px; padding:6px 2px; border-top:1px solid rgba(255,255,255,0.06); font-size:0.73rem}
+  .rulerow .rlab{flex:1 1 auto; font-weight:600; color:var(--text)}
+  .rulerow .rn{color:var(--faint); font-size:0.62rem; white-space:nowrap}
+  .rulen{font-weight:700; white-space:nowrap}
+  .rulen.green{color:var(--green)} .rulen.red{color:var(--red)}
+
+  /* ===== EXITS SCATTER ===== */
+  .scatterwrap{width:100%; max-width:520px}
+
+  /* ===== TRIM TOURNAMENT ===== */
+  .tourneytable{width:100%; overflow-x:auto}
+  .tourneyhead,.tourneyrow{display:grid; grid-template-columns:minmax(190px,1.6fr) 56px 90px 90px 90px 120px; gap:0 10px; align-items:center; min-width:640px}
+  .tourneyhead{padding:2px 6px 8px; font-size:0.56rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted)}
+  .tourneyrow{padding:9px 6px; border-top:1px solid var(--border); font-size:0.76rem}
+  .tourneyrow.best{background:rgba(201,152,42,0.06); border-radius:8px}
+  .tval{text-align:right}
+  .tval.pos{color:var(--green); font-weight:700}
+  .tbadge{color:var(--goldBright); font-size:0.58rem; font-weight:800; margin-left:8px}
+
+  /* ===== EQUITY / MC SVG CHARTS ===== */
+  .chartcard-top{display:flex; align-items:center; flex-wrap:wrap; gap:10px 16px; margin-bottom:12px}
+  .eqstat{font-size:0.7rem; color:var(--muted); line-height:1.6}
+  .eqstat b{color:var(--text)}
+  .eqstatnum{font-variant-numeric:tabular-nums}
+  .pulselabel{font-size:0.56rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--faint); margin:14px 0 6px}
+
+  /* ===== TABLES (Open Campaigns / Audit) ===== */
+  .tablewrap{overflow-x:auto}
+  table.dense{width:100%; border-collapse:collapse; min-width:760px}
+  table.dense thead th{
+    font-size:0.58rem; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;
+    color:var(--muted); text-align:right; padding:8px 10px; border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  table.dense thead th:first-child{text-align:left}
+  table.dense tbody td{padding:8px 10px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.74rem}
+  table.dense tbody td:first-child{text-align:left; font-weight:700}
+  table.dense tbody tr:hover{background:rgba(255,255,255,0.025)}
+  .up{color:var(--green)} .dn{color:var(--red)}
+  .status{display:inline-flex; align-items:center; gap:6px; font-size:0.64rem; font-weight:700; padding:4px 9px; border-radius:980px}
+  .status .d{width:6px;height:6px;border-radius:50%}
+  .st-free{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+  .st-free .d{background:var(--green)}
+  .st-risk{background:rgba(239,68,68,0.12); color:#fda4a4; border:1px solid rgba(239,68,68,0.3)}
+  .st-risk .d{background:var(--red)}
+  .tablenote{font-size:0.64rem; color:var(--faint); margin-top:8px}
+
+  /* ===== METHODOLOGY DEF LIST ===== */
+  .deflist{display:flex; flex-direction:column}
+  .defrow{display:grid; grid-template-columns:150px 1fr; gap:14px; padding:9px 2px; border-top:1px solid var(--border); font-size:0.72rem}
+  .defrow:first-child{border-top:none}
+  .defkey{font-size:0.6rem; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:var(--gold)}
+  .defval{color:var(--muted); line-height:1.6}
+
+  .collapsed .collapsebody{display:none}
+  .collapsible-head{cursor:pointer}
+
+  /* ===== INTERACTIVITY — scoreboard / money-bar deep links + flash highlight + toast ===== */
+  .benchrow.clickable{cursor:pointer; border-radius:8px; transition:background .15s}
+  .benchrow.clickable:hover{background:rgba(255,255,255,0.035)}
+  .moneyrow{padding:4px 6px; margin:0 -6px; border-radius:8px; cursor:pointer; transition:background .15s}
+  .moneyrow:hover{background:rgba(255,255,255,0.035)}
+  @keyframes qFlash{
+    0%{background-color:rgba(201,152,42,0.22); box-shadow:inset 0 0 0 1px rgba(240,192,80,0.55)}
+    100%{background-color:transparent; box-shadow:inset 0 0 0 1px rgba(240,192,80,0)}
+  }
+  .flashhi{animation:qFlash 1.6s ease-out}
+  #toast{position:fixed; left:50%; bottom:28px; transform:translate(-50%,12px); background:#13131c;
+    border:1px solid rgba(255,255,255,0.14); border-radius:980px; padding:10px 18px; font-size:0.76rem;
+    font-weight:700; color:var(--text); box-shadow:0 10px 30px rgba(0,0,0,0.55); opacity:0; pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease; z-index:90; white-space:nowrap}
+  #toast.show{opacity:1; transform:translate(-50%,0)}
+
+  @media(max-width:900px){
+    .benchhead,.benchrow{grid-template-columns:minmax(140px,1.4fr) minmax(90px,1fr) 70px 66px}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- NAV — full 8-tab bar, admin-only tabs included, no Guided/Pro toggle on this page -->
+  <div class="navbar">
+    <div class="brand"><img class="vmark" src="../public/logo-mark.png" alt="VIV" style="background:none; object-fit:contain"> Valen Insiders Vault</div>
+    <div class="tabs">
+      <a href="dashboard-pro.html">Dashboard</a>
+      <a href="journal-pro.html">Journal</a>
+      <a href="premium-pro.html">Premium tools</a>
+      <a href="daily-setups.html">Daily Setups</a>
+      <a href="model-book.html">Model Book</a>
+      <a href="studies.html">Studies</a>
+      <a href="quant.html" class="on">Quant</a>
+      <a href="settings-pro.html">Settings</a>
+    </div>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- COMMAND HEADER -->
+  <div class="cmdheader">
+    <div class="cmdleft">
+      <div class="eyebrow">Quant</div>
+      <div class="ch1row">
+        <h1 class="ch1">Quant Analysis</h1>
+        <div class="seg" id="cohortSeg" title="Same population as the journal, two cuts — the toggle IS the reconciliation">
+          <button type="button" class="on" data-cohort="sys">System cohort</button>
+          <button type="button" data-cohort="all">Stress-test (full)</button>
+        </div>
+        <span class="admchip" title="Admin-only research bench — never shown to members">ADMIN</span>
+      </div>
+      <div class="cmdmeta" id="chMeta">System cohort &middot; entered &ge; 2026-06-26 &middot; N=34 closed campaigns &middot; the journal records your trades, this page judges the system behind them</div>
+    </div>
+    <div class="cmdactions">
+      <span class="vbadge drift" id="verdictBadge"><span class="d"></span>DRIFTING</span>
+      <span class="asof">2026-07-16 09:14 UTC</span>
+    </div>
+  </div>
+
+  <!-- KPI STRIP — campaign-level R analytics -->
+  <div class="kpistrip">
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Net P&amp;L</span><span class="infodot" data-tip="Realized $ across this cohort's closed campaigns. No direct lever — it follows expectancy &times; trades &times; sizing.">i</span></div>
+      <div class="kpibody"><div class="kpimain">
+        <div class="kpinum green">+$18,420</div>
+        <div class="kpisub">closed campaigns only, this cohort</div>
+      </div></div>
+    </div>
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Expectancy</span><span class="infodot" data-tip="Average R per closed campaign — the edge itself. Lever 1: stop losses at the design cap. Lever 2: bank more of what winners offer.">i</span></div>
+      <div class="kpibody"><div class="kpimain">
+        <div class="kpinum gold">+0.34R</div>
+        <div class="kpisub">last 10: <b class="up">+0.41R &#9650; improving</b></div>
+      </div></div>
+    </div>
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Win Rate</span><span class="infodot" data-tip="Share of campaigns that closed positive. Design only needs ~40% — don't chase it, that shrinks the winners that pay for everything.">i</span></div>
+      <div class="kpibody">
+        <div class="donutwrap">
+          <svg viewBox="0 0 64 64" role="img" aria-label="47% win rate">
+            <circle cx="32" cy="32" r="25" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6"/>
+            <circle cx="32" cy="32" r="25" fill="none" stroke="var(--gold)" stroke-width="6" stroke-dasharray="73.8 157.1" stroke-linecap="round" transform="rotate(-90 32 32)"/>
+            <text x="32" y="37" text-anchor="middle" class="donutctr">47%</text>
+          </svg>
+          <div class="kpisub">16W / 18L<br>last 10: <b class="up">50% &#9650;</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Payoff ($)</span><span class="infodot" data-tip="Average $ win &divide; average $ loss. Ring fills at 3.0 — comfortable homerun-system level.">i</span></div>
+      <div class="kpibody">
+        <div class="donutwrap">
+          <svg viewBox="0 0 64 64" role="img" aria-label="payoff ratio 2.1, ring full at 3.0">
+            <circle cx="32" cy="32" r="25" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6"/>
+            <circle cx="32" cy="32" r="25" fill="none" stroke="var(--goldBright)" stroke-width="6" stroke-dasharray="110.0 157.1" stroke-linecap="round" transform="rotate(-90 32 32)"/>
+            <text x="32" y="37" text-anchor="middle" class="donutctr">2.1</text>
+          </svg>
+          <div class="kpisub">breakeven needs 1.13<br>ring full at 3.0</div>
+        </div>
+      </div>
+    </div>
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Profit Factor</span><span class="infodot" data-tip="Total $ won &divide; total $ lost, frequency included. 1.0 = breakeven, 1.3+ worth pressing.">i</span></div>
+      <div class="kpibody"><div class="kpimain">
+        <div class="kpinum">1.42</div>
+        <div class="kpisub">gross won &divide; gross lost</div>
+      </div></div>
+    </div>
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">SQN</span><span class="infodot" data-tip="System Quality Number (Tharp): mean R &divide; spread &times; &radic;n. Rewards consistency. Scale: &lt;1.6 hard to trade &middot; 2&ndash;3 good &middot; 3+ excellent.">i</span></div>
+      <div class="kpibody"><div class="kpimain">
+        <div class="kpinum">1.8</div>
+        <div class="kpisub">Tharp scale &middot; 2+ good</div>
+      </div></div>
+    </div>
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Sample</span><span class="infodot" data-tip="Closed campaigns in this cohort. Under 30, judge adherence not outcome. At 30 the edge's sign is readable. At 50, Monte Carlo is calibrated.">i</span></div>
+      <div class="kpibody"><div class="kpimain">
+        <div class="kpinum">34 / 50</div>
+        <div class="kpisub">outcome readable at 30</div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- SYSTEM SCOREBOARD — the religious tracker, fixed targets, pass/fail -->
+  <div class="card">
+    <div class="cardhead"><span class="label">System Scoreboard — is the system doing its job?</span><span class="infodot" data-tip="Ten fixed targets the system was designed to hold. This is the whole page in one table — every section below only explains the misses.">i</span></div>
+    <div class="sb-banner drift">
+      <span class="word">DRIFTING</span>
+      <span class="sub">9 of 10 benchmarks passing &mdash; near-miss losers</span>
+      <span class="sb-ring">
+        <svg width="40" height="40" viewBox="0 0 40 40" role="img" aria-label="9 of 10 benchmarks passing">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+          <circle cx="20" cy="20" r="15" fill="none" stroke="var(--goldBright)" stroke-width="4" stroke-dasharray="84.8 94.2" stroke-linecap="round" transform="rotate(-90 20 20)"/>
+          <text x="20" y="24" text-anchor="middle" fill="#fff" font-size="10" font-weight="800">9/10</text>
+        </svg>
+        <span class="sb-n">34 campaigns &middot; 2026-06-26 &rarr; 2026-07-15</span>
+      </span>
+    </div>
+    <div class="benchhead"><span>Benchmark metric</span><span>Live</span><span>Target</span><span style="text-align:right">Verdict</span></div>
+    <div class="benchrow clickable" data-target="system-health" title="Click to jump to System Health"><span class="benchlabel" title="Mean R per closed campaign — the edge itself.">Expectancy / trade</span><span class="benchlive">+0.34R</span><span class="benchtarget">&ge; +0.25R</span><span class="chip pass">PASS</span></div>
+    <div class="benchrow"><span class="benchlabel" title="Gross $ won &divide; gross $ lost.">Profit factor ($)</span><span class="benchlive">1.42</span><span class="benchtarget">&ge; 1.30</span><span class="chip pass">PASS</span></div>
+    <div class="benchrow"><span class="benchlabel" title="Actual payoff &divide; the payoff your win rate requires to break even.">Edge ratio</span><span class="benchlive">1.35</span><span class="benchtarget">&ge; 1.20</span><span class="chip pass">PASS</span></div>
+    <div class="benchrow"><span class="benchlabel" title="System Quality Number (Tharp scale).">SQN (Tharp)</span><span class="benchlive">1.8</span><span class="benchtarget">&ge; 1.6</span><span class="chip pass">PASS</span></div>
+    <div class="benchrow clickable" data-target="rule-3stop" title="Click to jump to Rule · 3-Stop Structure"><span class="benchlabel" title="3-stop rule live 2026-07-10 — only losers entered from that date judged against the &minus;0.67R design cap.">Avg loss &mdash; 3-stop era</span><span class="benchlive">&minus;0.61R (n=9)</span><span class="benchtarget">&ge; &minus;0.75R</span><span class="chip pass">PASS</span></div>
+    <div class="benchrow clickable" data-target="rule-3stop" title="Click to jump to Rule · 3-Stop Structure"><span class="benchlabel" title="A breach = loss beyond that trade's own era cap + slippage allowance.">Deep losses (beyond design cap)</span><span class="benchlive">2 (10% of losers)</span><span class="benchtarget">&le; 10%</span><span class="chip pass">PASS</span></div>
+    <div class="benchrow clickable" data-target="exits-capture" title="Click to jump to Exits — Winner Capture"><span class="benchlabel" title="Banked R &divide; best R the trade offered (its peak), winners only.">Winner capture (median)</span><span class="benchlive">0.54</span><span class="benchtarget">&ge; 0.50</span><span class="chip pass">PASS</span></div>
+    <div class="benchrow clickable" data-target="exits-capture" title="Click to jump to Exits — Winner Capture"><span class="benchlabel" title="Losers that saw &ge; +1R open profit before dying red — the trim window exists to convert these.">Near-miss losers</span><span class="benchlive">3 (17% of losers)</span><span class="benchtarget">&le; 15%</span><span class="chip miss">MISS</span></div>
+    <div class="benchrow clickable" data-target="trim-tournament" title="Click to jump to Trim Tournament"><span class="benchlabel" title="Share of trimmed system campaigns whose first trim landed on day 3&ndash;5.">T+3&ndash;5 trim adherence</span><span class="benchlive">82%</span><span class="benchtarget">&ge; 80%</span><span class="chip pass">PASS</span></div>
+    <div class="benchrow clickable" data-target="system-health" title="Click to jump to System Health"><span class="benchlabel" title="Trade your own equity curve like a stock. Below its MA = real drawdown, not noise.">Equity vs its 10-MA</span><span class="benchlive">above +1.8R</span><span class="benchtarget">above</span><span class="chip pass">PASS</span></div>
+    <div class="sb-foot">Benchmarks are fixed system targets, not aspirations — a MISS names the exact section below that explains it. Rows with a matching section are clickable — click one to jump to it. Judge adherence (not outcome) until n &ge; 30; outcome readable at 30; Monte Carlo calibrated at 50.</div>
+  </div>
+
+  <!-- WHERE THE MONEY CAME FROM + RESULT SHAPE — side-by-side row, stacks below ~1000px -->
+  <div class="halfgrid">
+
+    <!-- WHERE THE MONEY CAME FROM -->
+    <div class="card" style="margin-top:0">
+    <div class="cardhead"><span class="label">Where the Money Came From — by Ticker</span><span class="infodot" data-tip="Each bar = one ticker's total closed P&amp;L in this cohort (all its campaigns summed).">i</span></div>
+    <div class="saybox">
+      <span class="saytag">What it says now</span>
+      <div class="sayrow"><span class="dash">&middot;</span><span><b>NVDA</b> is your biggest earner at <b class="up">+$3,240</b>; <b>KLAC</b> cost the most at <b class="dn">&minus;$1,340</b>.</span></div>
+    </div>
+    <div class="moneygrid">
+      <div>
+        <div class="moneylabel">TOP EARNERS</div>
+        <div class="moneyrow" data-ticker="NVDA"><span class="moneytick">NVDA</span><span class="moneytrack"><span class="moneyfill g" style="width:100%"></span></span><span class="moneyval g">+$3,240</span></div>
+        <div class="moneyrow" data-ticker="VRTX"><span class="moneytick">VRTX</span><span class="moneytrack"><span class="moneyfill g" style="width:89%"></span></span><span class="moneyval g">+$2,890</span></div>
+        <div class="moneyrow" data-ticker="PANW"><span class="moneytick">PANW</span><span class="moneytrack"><span class="moneyfill g" style="width:77%"></span></span><span class="moneyval g">+$2,510</span></div>
+        <div class="moneyrow" data-ticker="AVGO"><span class="moneytick">AVGO</span><span class="moneytrack"><span class="moneyfill g" style="width:60%"></span></span><span class="moneyval g">+$1,940</span></div>
+        <div class="moneyrow" data-ticker="FTNT"><span class="moneytick">FTNT</span><span class="moneytrack"><span class="moneyfill g" style="width:35%"></span></span><span class="moneyval g">+$1,120</span></div>
+        <div class="moneyrow" data-ticker="MSTR"><span class="moneytick">MSTR</span><span class="moneytrack"><span class="moneyfill g" style="width:27%"></span></span><span class="moneyval g">+$860</span></div>
+      </div>
+      <div>
+        <div class="moneylabel">BIGGEST COSTS</div>
+        <div class="moneyrow" data-ticker="KLAC"><span class="moneytick">KLAC</span><span class="moneytrack"><span class="moneyfill r" style="width:100%"></span></span><span class="moneyval r">&minus;$1,340</span></div>
+        <div class="moneyrow" data-ticker="XOM"><span class="moneytick">XOM</span><span class="moneytrack"><span class="moneyfill r" style="width:73%"></span></span><span class="moneyval r">&minus;$980</span></div>
+        <div class="moneyrow" data-ticker="SOFI"><span class="moneytick">SOFI</span><span class="moneytrack"><span class="moneyfill r" style="width:54%"></span></span><span class="moneyval r">&minus;$720</span></div>
+        <div class="moneyrow" data-ticker="MRNA"><span class="moneytick">MRNA</span><span class="moneytrack"><span class="moneyfill r" style="width:48%"></span></span><span class="moneyval r">&minus;$640</span></div>
+        <div class="moneyrow" data-ticker="AMD"><span class="moneytick">AMD</span><span class="moneytrack"><span class="moneyfill r" style="width:31%"></span></span><span class="moneyval r">&minus;$410</span></div>
+      </div>
+    </div>
+  </div>
+
+    <!-- RESULT SHAPE — R-DISTRIBUTION -->
+    <div class="card" style="margin-top:0">
+    <div class="cardhead"><span class="label">Result Shape — Where Do Trades Finish?</span><span class="infodot" data-tip="R = profit in units of what you risked. Risk $1,000, make $3,000 = +3R. Healthy shape: losses walled at -1R, real tail of +3R/+5R winners on the right.">i</span></div>
+    <div class="saybox">
+      <span class="saytag">What it says now</span>
+      <div class="sayrow"><span class="dash">&middot;</span><span>The loss wall is holding — no loser finished beyond &minus;1R.</span></div>
+      <div class="sayrow"><span class="dash">&middot;</span><span>Right tail: <b>8</b> trades at +2R or better — the tail exists; protect it before optimizing anything else.</span></div>
+    </div>
+    <div class="rdist">
+      <div class="rbar-col"><span class="rbar-n">1</span><div class="rbar r" style="height:14%"></div><span class="rbar-lab">&le; &minus;2R</span></div>
+      <div class="rbar-col"><span class="rbar-n">2</span><div class="rbar r" style="height:28%"></div><span class="rbar-lab">&minus;2 to &minus;1</span></div>
+      <div class="rbar-col"><span class="rbar-n">3</span><div class="rbar r" style="height:42%"></div><span class="rbar-lab">&minus;1 to &minus;0.5</span></div>
+      <div class="rbar-col"><span class="rbar-n">4</span><div class="rbar r" style="height:56%"></div><span class="rbar-lab">&minus;0.5 to 0</span></div>
+      <div class="rbar-col"><span class="rbar-n">2</span><div class="rbar n" style="height:28%"></div><span class="rbar-lab">scratch</span></div>
+      <div class="rbar-col"><span class="rbar-n">5</span><div class="rbar g" style="height:70%"></div><span class="rbar-lab">0 to 1</span></div>
+      <div class="rbar-col"><span class="rbar-n">7</span><div class="rbar g" style="height:100%"></div><span class="rbar-lab">1 to 2</span></div>
+      <div class="rbar-col"><span class="rbar-n">4</span><div class="rbar g" style="height:56%"></div><span class="rbar-lab">2 to 3</span></div>
+      <div class="rbar-col"><span class="rbar-n">3</span><div class="rbar g" style="height:42%"></div><span class="rbar-lab">3 to 5</span></div>
+      <div class="rbar-col"><span class="rbar-n">1</span><div class="rbar g" style="height:14%"></div><span class="rbar-lab">5R+</span></div>
+    </div>
+    <div class="tablenote">n=32 scored campaigns (2 without a recorded original stop are excluded from R metrics).</div>
+    </div>
+
+  </div>
+
+  <!-- ENTRY REFINEMENTS -->
+  <div class="card">
+    <div class="cardhead"><span class="label">Entry Refinements — Do Your Entry Rules Make Money?</span><span class="infodot" data-tip="Each card is one rule, tested on its own. A gate that doesn't separate expectancy is theatre; a gate you violate profitably is mis-calibrated.">i</span></div>
+    <div class="saybox">
+      <span class="saytag">What it says now</span>
+      <div class="sayrow"><span class="dash">&middot;</span><span>DEFENCE — <b class="up">working</b>: only 2 of 20 losers exceeded their own era's cap (target &le;10%); the stop discipline is doing its job.</span></div>
+      <div class="sayrow"><span class="dash">&middot;</span><span>OFFENCE — the &le;4&times; freshness gate is earning its keep (+0.41R separation); LoD-distance shows the same pattern.</span></div>
+    </div>
+    <div class="rulegrid">
+      <div class="rulecard" id="rule-3stop">
+        <div class="ruletitle">Rule &middot; 3-Stop Structure — how deep do winners dip?</div>
+        <div class="chip pass" style="justify-self:start">3-STOP WOULD HAVE HELPED</div>
+        <div class="rulesub">Replaying 28 campaigns: 3-stop <b class="up">+0.31R</b>/trade vs one full stop <b>+0.13R</b>/trade &rarr; difference <b class="up">+0.18R</b> per trade.</div>
+        <div class="rulerow"><span class="rlab">through rung 1 (&minus;0.33R)</span><span class="rulen">68% of winners</span></div>
+        <div class="rulerow"><span class="rlab">through rung 2 (&minus;0.67R)</span><span class="rulen">22% of winners</span></div>
+        <div class="rulerow"><span class="rlab">through full stop (&minus;1.00R)</span><span class="rulen">4% of winners</span></div>
+        <div class="rulesub">avg loss <b>&minus;0.58R</b> &middot; worst <b class="red">&minus;1.85R</b></div>
+      </div>
+      <div class="rulecard">
+        <div class="ruletitle">Rule &middot; Extension &le; 4&times; from the 50MA</div>
+        <div class="chip pass" style="justify-self:start">GATE EARNS ITS KEEP</div>
+        <div class="rulesub">PURPOSE: loss-side — a fresh entry sits near support, so failures cost less; chases snap back through wide stops.</div>
+        <div class="rulerow"><span class="rlab">Extension &le; 4&times; at entry</span><span class="rn">n=19</span><span class="rulen green">+0.52R</span></div>
+        <div class="rulerow"><span class="rlab">Extension &gt; 4&times; at entry</span><span class="rn">n=11</span><span class="rulen">+0.11R</span></div>
+      </div>
+      <div class="rulecard">
+        <div class="ruletitle">Rule &middot; LoD-Distance &le; 60% of ATR</div>
+        <div class="chip pass" style="justify-self:start">GATE EARNS ITS KEEP</div>
+        <div class="rulesub">PURPOSE: win-side — a tight D means the same move pays MORE R per trade (losses capped at &minus;1R either way).</div>
+        <div class="rulerow"><span class="rlab">LoD-dist &le; 0.6 ATR</span><span class="rn">n=21</span><span class="rulen green">+0.61R</span></div>
+        <div class="rulerow"><span class="rlab">LoD-dist &gt; 0.6 ATR</span><span class="rn">n=9</span><span class="rulen">+0.08R</span></div>
+      </div>
+      <div class="rulecard">
+        <div class="ruletitle">Context &middot; Setup Grade at Entry</div>
+        <div class="chip pass" style="justify-self:start">A-GRADES OUTPERFORM</div>
+        <div class="rulesub">PURPOSE: both sides — a better base should win more often AND run further when it works.</div>
+        <div class="rulerow"><span class="rlab">A-grade setups</span><span class="rn">n=14</span><span class="rulen green">+0.71R</span></div>
+        <div class="rulerow"><span class="rlab">B-grade setups</span><span class="rn">n=12</span><span class="rulen">+0.29R</span></div>
+        <div class="rulerow"><span class="rlab">Ungraded</span><span class="rn">n=8</span><span class="rulen">+0.12R</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXITS + RESULT SHAPE row -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(430px,1fr)); gap:14px; margin-top:14px">
+
+    <!-- EXITS — WINNER CAPTURE -->
+    <div class="card" style="margin-top:0" id="exits-capture">
+      <div class="cardhead"><span class="label">Exits — How Much of Each Winner Do You Keep?</span><span class="infodot" data-tip="Across = the best your rule could have banked (system-max). Up = what you actually banked. A dot ON the gold dashed line executed the system perfectly.">i</span></div>
+      <div class="saybox">
+        <span class="saytag">What it says now</span>
+        <div class="sayrow"><span class="dash">&middot;</span><span>You bank <b>54%</b> of what your own system could have delivered (target &ge; 50%) — exits are doing their job.</span></div>
+        <div class="sayrow"><span class="dash">&middot;</span><span><b class="dn">3 losers</b> had &ge; +1R open and died red — the trades the trim window exists to bank.</span></div>
+      </div>
+      <div class="scatterwrap">
+        <svg viewBox="0 0 400 260" width="100%" role="img" aria-label="System-max R vs banked R, winners and near-miss losers">
+          <line x1="40" y1="20" x2="40" y2="235" stroke="rgba(255,255,255,0.12)"/>
+          <line x1="40" y1="192" x2="380" y2="192" stroke="rgba(255,255,255,0.12)"/>
+          <line x1="40" y1="192" x2="365" y2="30" stroke="var(--gold)" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.55"/>
+          <text x="368" y="26" fill="var(--gold)" font-size="9" opacity="0.7">kept it all</text>
+          <text x="10" y="24" fill="rgba(255,255,255,0.35)" font-size="9">5R</text>
+          <text x="10" y="196" fill="rgba(255,255,255,0.35)" font-size="9">0</text>
+          <text x="370" y="248" fill="rgba(255,255,255,0.35)" font-size="9">5R</text>
+          <!-- winners: system-max (x) vs banked (y) -->
+          <circle cx="82" cy="170" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <circle cx="120" cy="150" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <circle cx="150" cy="120" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <circle cx="168" cy="108" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <circle cx="198" cy="132" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <circle cx="222" cy="98" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <circle cx="248" cy="150" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <circle cx="262" cy="80" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <circle cx="290" cy="118" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <circle cx="305" cy="62" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <circle cx="330" cy="96" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <circle cx="352" cy="45" r="4.2" fill="var(--green)" opacity="0.85"/>
+          <!-- near-miss losers: mfe > 0 but died red (banked at/below zero) -->
+          <circle cx="128" cy="200" r="4.2" fill="var(--red)" opacity="0.85"/>
+          <circle cx="176" cy="206" r="4.2" fill="var(--red)" opacity="0.85"/>
+          <circle cx="214" cy="212" r="4.2" fill="var(--red)" opacity="0.85"/>
+        </svg>
+      </div>
+      <div class="tablenote">n=27 winners with system-max + banked R &middot; median capture 0.54</div>
+    </div>
+
+    <!-- SYSTEM HEALTH — EQUITY CURVE -->
+    <div class="card" style="margin-top:0" id="system-health">
+      <div class="cardhead"><span class="label">System Health — Equity Traded Like a Stock</span><span class="infodot" data-tip="Gold line = cumulative R, one step per closed campaign. Dashed = its own moving average. Above the MA = in gear, full unit risk. Below = halve new-position risk.">i</span></div>
+      <div class="saybox">
+        <span class="saytag">What it says now</span>
+        <div class="sayrow"><span class="dash">&middot;</span><span>The system is <b class="up">IN GEAR</b> — equity sits +1.8R above its own 10-trade average. Rule: full unit risk is allowed.</span></div>
+      </div>
+      <div class="chartcard-top">
+        <span class="vbadge on"><span class="d"></span>IN GEAR &middot; FULL RISK</span>
+        <span class="eqstat">Equity <b class="eqstatnum">11.6R</b> is <b class="up eqstatnum">+1.8R</b> above its 10-MA (<b class="eqstatnum">9.8R</b>) &middot; max DD <b class="eqstatnum">&minus;3.2R</b> &middot; 5W/3L longest streaks &middot; 3 wins running</span>
+        <span class="seg" id="maSeg" style="margin-left:auto">
+          <button type="button" data-ma="5">5-MA</button><button type="button" class="on" data-ma="10">10-MA</button><button type="button" data-ma="20">20-MA</button>
+        </span>
+      </div>
+      <svg viewBox="0 0 400 170" width="100%" role="img" aria-label="Cumulative R equity curve trending up, above its moving average">
+        <defs>
+          <linearGradient id="eqFillQ" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--gold)" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="var(--gold)" stop-opacity="0.01"/>
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="132" x2="400" y2="132" stroke="rgba(255,255,255,0.10)"/>
+        <path d="M0,150 L20,146 L40,148 L60,138 L80,140 L100,125 L120,130 L140,110 L160,118 L180,100 L200,108 L220,88 L240,96 L260,78 L280,86 L300,64 L320,72 L340,52 L360,58 L380,38 L400,30 L400,170 L0,170 Z" fill="url(#eqFillQ)"/>
+        <path d="M0,150 L20,146 L40,148 L60,138 L80,140 L100,125 L120,130 L140,110 L160,118 L180,100 L200,108 L220,88 L240,96 L260,78 L280,86 L300,64 L320,72 L340,52 L360,58 L380,38 L400,30" fill="none" stroke="var(--gold)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M0,152 L40,148 L80,144 L120,136 L160,124 L200,112 L240,100 L280,88 L320,74 L360,60 L400,48" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="1.3" stroke-dasharray="5 4"/>
+        <circle cx="60" cy="138" r="2.6" fill="var(--red)"/>
+        <circle cx="180" cy="100" r="2.6" fill="var(--red)"/>
+        <circle cx="400" cy="30" r="3.4" fill="var(--gold)"/>
+      </svg>
+      <div class="pulselabel">The Pulse — Rolling-10 Expectancy vs +0.25R Target</div>
+      <svg viewBox="0 0 400 60" width="100%" role="img" aria-label="Rolling 10-trade expectancy, currently above the 0.25R target line">
+        <line x1="0" y1="46" x2="400" y2="46" stroke="rgba(239,68,68,0.35)" stroke-dasharray="4 4"/>
+        <line x1="0" y1="26" x2="400" y2="26" stroke="rgba(34,197,94,0.4)" stroke-dasharray="4 4"/>
+        <text x="4" y="20" fill="rgba(255,255,255,0.4)" font-size="8">+0.25R</text>
+        <path d="M0,38 L40,42 L80,30 L120,34 L160,20 L200,24 L240,16 L280,22 L320,14 L360,18 L400,12" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- TRIM TOURNAMENT — counterfactual comparison -->
+  <div class="card" id="trim-tournament">
+    <div class="cardhead"><span class="label">Trim Tournament — Which 50% Derisk Combo Wins?</span><span class="infodot" data-tip="Every closed campaign is replayed under each combo on the same end-of-day closes — apples to apples. The runner (remaining 50%) always rides to the final exit close.">i</span></div>
+    <div class="saybox">
+      <span class="saytag">What it says now</span>
+      <div class="sayrow"><span class="dash">&middot;</span><span>Across these 28 campaigns, <b style="color:var(--goldBright)">Ladder &middot; 25% @ +3R, 25% @ +5R</b> comes out best at <b class="up">+0.58R</b> per trade vs <b>+0.41R</b> for never trimming — the trim earns its keep.</span></div>
+    </div>
+    <div class="tourneytable">
+      <div class="tourneyhead"><span>Strategy</span><span>n</span><span style="text-align:right">Mean R</span><span style="text-align:right">Median R</span><span style="text-align:right">Total R</span><span style="text-align:right">Beats holding</span></div>
+      <div class="tourneyrow"><span>One trim &middot; 50% @ +3R</span><span style="color:var(--muted)">28</span><span class="tval pos">+0.44R</span><span class="tval">+0.31R</span><span class="tval">12.3R</span><span class="tval" style="color:var(--muted)">61%</span></div>
+      <div class="tourneyrow"><span>One trim &middot; 50% @ +4R</span><span style="color:var(--muted)">28</span><span class="tval pos">+0.49R</span><span class="tval">+0.33R</span><span class="tval">13.7R</span><span class="tval" style="color:var(--muted)">64%</span></div>
+      <div class="tourneyrow"><span>One trim &middot; 50% @ +5R</span><span style="color:var(--muted)">28</span><span class="tval pos">+0.52R</span><span class="tval">+0.35R</span><span class="tval">14.6R</span><span class="tval" style="color:var(--muted)">68%</span></div>
+      <div class="tourneyrow"><span>Ladder &middot; 20% @ +3R, 30% @ +5R</span><span style="color:var(--muted)">28</span><span class="tval pos">+0.55R</span><span class="tval">+0.36R</span><span class="tval">15.4R</span><span class="tval" style="color:var(--muted)">71%</span></div>
+      <div class="tourneyrow best"><span>Ladder &middot; 25% @ +3R, 25% @ +5R<span class="tbadge">&#9668; BEST</span></span><span style="color:var(--muted)">28</span><span class="tval pos">+0.58R</span><span class="tval">+0.38R</span><span class="tval">16.2R</span><span class="tval" style="color:var(--muted)">75%</span></div>
+      <div class="tourneyrow"><span>Ladder &middot; 30% @ +3R, 20% @ +5R</span><span style="color:var(--muted)">28</span><span class="tval pos">+0.53R</span><span class="tval">+0.34R</span><span class="tval">14.8R</span><span class="tval" style="color:var(--muted)">68%</span></div>
+      <div class="tourneyrow"><span>Never trim (hold all)</span><span style="color:var(--muted)">28</span><span class="tval pos">+0.41R</span><span class="tval">+0.22R</span><span class="tval">11.5R</span><span class="tval" style="color:var(--muted)">&mdash;</span></div>
+    </div>
+    <div class="tablenote">When the level trims actually fill: +3R printed on 21 of 28 trades (median day 3) &middot; +5R on 12 of 28 (median day 4).</div>
+  </div>
+
+  <!-- OPEN CAMPAIGNS -->
+  <div class="card" id="open-campaigns">
+    <div class="cardhead"><span class="label">Open Campaigns — Realized + Marked</span><span class="infodot" data-tip="Floor = realized to date plus what the remaining shares lock in at the current stop or trail — the campaign's guaranteed outcome. A trimmed campaign is never read as finished.">i</span></div>
+    <div class="tablewrap">
+      <table class="dense">
+        <thead><tr><th>Symbol</th><th>Shares</th><th>Entry</th><th>Stop / Trail</th><th>Ext</th><th>Realized</th><th>Unrealized</th><th>Floor</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr data-ticker="NVDA"><td>NVDA</td><td>120</td><td>118.40</td><td>112.00 / &mdash;</td><td>2.1&times;</td><td class="up">+$0</td><td class="up">+$1,344 <span style="color:var(--faint)">+1.8R</span></td><td class="dn">&minus;$768</td><td><span class="status st-risk"><span class="d"></span>At risk</span></td></tr>
+          <tr data-ticker="AVGO"><td>AVGO</td><td>45</td><td>172.10</td><td>172.10 / 176.00</td><td>1.6&times;</td><td class="up">+$0</td><td class="up">+$988 <span style="color:var(--faint)">+2.4R</span></td><td class="up">+$792</td><td><span class="status st-free"><span class="d"></span>Risk-free</span></td></tr>
+          <tr data-ticker="KLAC"><td>KLAC</td><td>30</td><td>610.00</td><td>572.00 / &mdash;</td><td>3.4&times;</td><td class="up">+$0</td><td class="dn">&minus;$254 <span style="color:var(--faint)">&minus;0.2R</span></td><td class="dn">&minus;$1,152</td><td><span class="status st-risk"><span class="d"></span>At risk</span></td></tr>
+          <tr data-ticker="MSTR"><td>MSTR</td><td>15</td><td>402.50</td><td>378.00 / &mdash;</td><td>2.9&times;</td><td class="up">+$0</td><td class="up">+$535 <span style="color:var(--faint)">+1.5R</span></td><td class="dn">&minus;$338</td><td><span class="status st-risk"><span class="d"></span>At risk</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MONTE CARLO -->
+  <div class="card">
+    <div class="cardhead"><span class="label">What Can the Next 100 Trades Look Like?</span><span class="infodot" data-tip="10,000 simulated paths, resampled with replacement from this cohort's real R results. The shaded band holds 9 of 10 futures — only results outside it mean something actually changed.">i</span></div>
+    <div class="saybox">
+      <span class="saytag">What it says now</span>
+      <div class="sayrow"><span class="dash">&middot;</span><span>Same trading, shuffled 10,000 ways: the middle path makes <b>+14.2%</b> per 100 trades, and 9 in 10 futures land between <b>+2.1%</b> and <b>+29.8%</b>.</span></div>
+      <div class="sayrow"><span class="dash">&middot;</span><span>Your circuit-breaker: a drawdown beyond <b class="dn">&minus;19.6%</b> means something CHANGED — stop and diagnose, don't push through.</span></div>
+    </div>
+    <div class="kpistrip" style="margin-bottom:16px">
+      <div class="card kpi" style="margin-top:0">
+        <div class="cardhead"><span class="label">Median Path</span><span class="infodot" data-tip="100 more trades like your past ones: half the futures make MORE than this, half less. The honest 'what to expect' number. Improve via expectancy: cut deep losses, let big winners finish.">i</span></div>
+        <div class="kpibody"><div class="kpimain"><div class="kpinum green">+14.2%</div><div class="kpisub">realistic base case</div></div></div>
+      </div>
+      <div class="card kpi" style="margin-top:0">
+        <div class="cardhead"><span class="label">5th Percentile</span><span class="infodot" data-tip="The bottom 5% of futures — same skill, worst luck in trade order. Still positive = an unlucky streak can't sink the system. Improve with consistency (smaller loss tail), not more trades.">i</span></div>
+        <div class="kpibody"><div class="kpimain"><div class="kpinum">+2.1%</div><div class="kpisub">unlucky, same skill</div></div></div>
+      </div>
+      <div class="card kpi" style="margin-top:0">
+        <div class="cardhead"><span class="label">95th Percentile</span><span class="infodot" data-tip="The luckiest 5% of futures. Exists to stop you extrapolating a hot streak. Live results tracking this line = luck, not a new normal.">i</span></div>
+        <div class="kpibody"><div class="kpimain"><div class="kpinum">+29.8%</div><div class="kpisub">do not extrapolate</div></div></div>
+      </div>
+      <div class="card kpi" style="margin-top:0">
+        <div class="cardhead"><span class="label">Median Max DD</span><span class="infodot" data-tip="The typical worst dip inside 100 trades. This much pain is NORMAL — not a signal to change anything. Shrinks if you cut risk per trade or tighten the loss tail.">i</span></div>
+        <div class="kpibody"><div class="kpimain"><div class="kpinum">&minus;8.4%</div><div class="kpisub">expected breathing</div></div></div>
+      </div>
+      <div class="card kpi" style="margin-top:0">
+        <div class="cardhead"><span class="label">95th Pct Max DD</span><span class="infodot" data-tip="Only 5% of futures ever dip deeper than this. A REAL drawdown beyond it means something CHANGED — halt new risk and diagnose. Your pre-agreed stop-trading line.">i</span></div>
+        <div class="kpibody"><div class="kpimain"><div class="kpinum red">&minus;19.6%</div><div class="kpisub">circuit-breaker line</div></div></div>
+      </div>
+      <div class="card kpi" style="margin-top:0">
+        <div class="cardhead"><span class="label">P(negative)</span><span class="infodot" data-tip="Share of 100-trade futures that end below breakeven. Near zero = the edge survives bad ordering. Creeping up = expectancy thinning — check the scoreboard misses.">i</span></div>
+        <div class="kpibody"><div class="kpimain"><div class="kpinum">4.2%</div><div class="kpisub">100-trade path ends red</div></div></div>
+      </div>
+    </div>
+    <div class="pulselabel">Distribution of the 10,000 Endings (% Return After 100 Trades)</div>
+    <svg viewBox="0 0 400 140" width="100%" role="img" aria-label="Bell-shaped distribution of 10,000 simulated 100-trade return paths, with 5th, median and 95th percentile markers">
+      <defs>
+        <linearGradient id="mcFillQ" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--gold)" stop-opacity="0.28"/>
+          <stop offset="100%" stop-color="var(--gold)" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      <rect x="108" y="6" width="222" height="118" fill="var(--gold)" opacity="0.05"/>
+      <path d="M0,126 L40,122 L70,110 L100,86 L130,52 L160,26 L190,12 L220,10 L250,20 L280,42 L310,72 L340,100 L370,118 L400,126 L400,140 L0,140 Z" fill="url(#mcFillQ)"/>
+      <path d="M0,126 L40,122 L70,110 L100,86 L130,52 L160,26 L190,12 L220,10 L250,20 L280,42 L310,72 L340,100 L370,118 L400,126" fill="none" stroke="var(--gold)" stroke-width="1.6"/>
+      <line x1="108" y1="6" x2="108" y2="124" stroke="var(--red)" stroke-dasharray="4 4" opacity="0.7"/>
+      <text x="80" y="12" fill="var(--red)" font-size="8">unlucky 5%</text>
+      <line x1="205" y1="6" x2="205" y2="124" stroke="var(--goldBright)" stroke-dasharray="4 4"/>
+      <text x="188" y="128" fill="var(--goldBright)" font-size="8">median</text>
+      <line x1="330" y1="6" x2="330" y2="124" stroke="rgba(255,255,255,0.5)" stroke-dasharray="4 4"/>
+      <text x="322" y="12" fill="rgba(255,255,255,0.6)" font-size="8">P95</text>
+    </svg>
+  </div>
+
+  <!-- CLOSED CAMPAIGNS — AUDIT (collapsed by default) -->
+  <div class="card collapsed" id="auditCard">
+    <div class="cardhead collapsible-head" data-target="auditCard"><span class="label">Closed Campaigns — Audit</span><span class="infodot" data-tip="Every closed campaign in this cohort, one row each — ticker, entry, grade, extension at entry, P&amp;L, R, winner capture, and trim day. Every KPI and chart on this page traces back to these rows.">i</span><span class="cardmeta">34 rows &middot; click a column to sort in the live app</span><button type="button" class="chevbtn">&#9662;</button></div>
+    <div class="collapsebody">
+      <div class="tablewrap">
+        <table class="dense">
+          <thead><tr><th>Ticker</th><th>Entry</th><th>Grade</th><th>Ext@E</th><th>P&amp;L</th><th>R</th><th>Capture</th><th>Trim day</th></tr></thead>
+          <tbody>
+            <tr><td>NVDA</td><td>2026-06-27</td><td>A</td><td>2.1&times;</td><td class="up">+$1,344</td><td class="up">+1.80</td><td>0.61</td><td>4</td></tr>
+            <tr><td>VRTX</td><td>2026-06-28</td><td>A</td><td>1.4&times;</td><td class="up">+$1,066</td><td class="up">+2.00</td><td>0.58</td><td>3</td></tr>
+            <tr><td>PANW</td><td>2026-06-30</td><td>A</td><td>2.6&times;</td><td class="up">+$2,104</td><td class="up">+3.10</td><td>0.66</td><td>5</td></tr>
+            <tr><td>KLAC</td><td>2026-07-02</td><td>C</td><td>3.4&times;</td><td class="dn">&minus;$254</td><td class="dn">&minus;0.20</td><td>&mdash;</td><td>&mdash;</td></tr>
+            <tr><td>SOFI</td><td>2026-07-10</td><td>B</td><td>3.9&times;</td><td class="dn">&minus;$720</td><td class="dn">&minus;0.67</td><td>&mdash;</td><td>&mdash;</td></tr>
+            <tr><td>MRNA</td><td>2026-07-11</td><td>B</td><td>1.1&times;</td><td class="dn">&minus;$640</td><td class="dn">&minus;0.58</td><td>&mdash;</td><td>&mdash;</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tablenote">Showing 6 of 34 rows in this mockup — full sortable audit table in the live app.</div>
+    </div>
+  </div>
+
+  <!-- METHODOLOGY & DEFINITIONS (collapsed by default) -->
+  <div class="card collapsed" id="methodCard">
+    <div class="cardhead collapsible-head" data-target="methodCard"><span class="label">Methodology &amp; Definitions</span><span class="infodot" data-tip="How every number on this page is computed — populations, campaign definition, R formula, and the truth hierarchy (this page is an IBKR-rebuild estimate; the trades journal is realized-P&amp;L source of truth). Read this before disputing a number.">i</span><button type="button" class="chevbtn">&#9662;</button></div>
+    <div class="collapsebody">
+      <div class="deflist">
+        <div class="defrow"><span class="defkey">Populations</span><span class="defval">System cohort = campaigns entered &ge; 2026-06-26, the live record of the 3-stop / derisk-trim book. Stress-test (full) = every verified campaign since 2026-05-01, incl. the recovered pre-system book, replayed through the new entry criteria.</span></div>
+        <div class="defrow"><span class="defkey">Campaign</span><span class="defval">position_id when present, else ticker + entry date. Partially-trimmed positions appear in Open Campaigns until the runner closes — never treated as finished.</span></div>
+        <div class="defrow"><span class="defkey">R</span><span class="defval">Banked P&amp;L &divide; (entry &minus; locked original stop) &times; initial shares. No stop &rarr; excluded from R metrics.</span></div>
+        <div class="defrow"><span class="defkey">Truth hierarchy</span><span class="defval">Equities-focused IBKR fill rebuild &mdash; an estimate. The trades journal remains realized-P&amp;L source of truth.</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  // ===== Cohort toggle (System cohort / Stress-test) — demo only, swaps header text =====
+  // Buttons are type="button" (never submit/navigate) and never anchors, so there is no
+  // browser-native jump to guard against. The swapped copy in #chMeta differs in length
+  // between the two cohorts, which can reflow the header's height; we pin the scroll
+  // position across that reflow so the click never visibly moves the page.
+  (function(){
+    var seg = document.getElementById('cohortSeg');
+    var meta = document.getElementById('chMeta');
+    var texts = {
+      sys: 'System cohort &middot; entered &ge; 2026-06-26 &middot; N=34 closed campaigns &middot; the journal records your trades, this page judges the system behind them',
+      all: 'Stress-test (full) &middot; full history since 2026-05-01, incl. recovered pre-system book &middot; N=61 closed campaigns &middot; old trades replayed through the new entry criteria'
+    };
+    seg.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click', function(e){
+        e.preventDefault();
+        var x = window.scrollX, y = window.scrollY;
+        seg.querySelectorAll('button').forEach(function(z){ z.classList.remove('on'); });
+        b.classList.add('on');
+        meta.innerHTML = texts[b.dataset.cohort] || texts.sys;
+        window.scrollTo(x, y);
+      });
+    });
+  })();
+
+  // ===== Equity chart MA-period pills — demo only, visual state change =====
+  (function(){
+    var seg = document.getElementById('maSeg');
+    if (!seg) return;
+    seg.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click', function(){
+        seg.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
+        b.classList.add('on');
+      });
+    });
+  })();
+
+  // ===== Collapsible cards (Audit, Methodology) — mirrors the live Panel component's
+  // default-collapsed state; click the header to expand/collapse =====
+  (function(){
+    document.querySelectorAll('.collapsible-head').forEach(function(head){
+      head.addEventListener('click', function(){
+        var card = document.getElementById(head.getAttribute('data-target'));
+        var chev = head.querySelector('.chevbtn');
+        var collapsed = card.classList.toggle('collapsed');
+        chev.innerHTML = collapsed ? '&#9662;' : '&#9652;';
+      });
+    });
+  })();
+
+  // ===== Shared: scroll-to + flash-highlight a target section, and a brief toast =====
+  function flashTo(el){
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.remove('flashhi');
+    void el.offsetWidth; // force reflow so the flash can retrigger on repeat clicks
+    el.classList.add('flashhi');
+    setTimeout(function(){ el.classList.remove('flashhi'); }, 1650);
+  }
+  var toastEl = document.getElementById('toast');
+  var toastTimer = null;
+  function showToast(text){
+    if (!toastEl) return;
+    toastEl.textContent = text;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2200);
+  }
+
+  // ===== Scoreboard rows -> jump to the section that explains them =====
+  // Per the scoreboard's own footnote: "a MISS names the exact section below that explains
+  // it." Wired for every row with a clear 1:1 section match on this page (3-stop structure,
+  // exits capture, trim tournament, system health); profit factor / edge ratio / SQN have no
+  // dedicated deep-dive section here beyond the KPI strip, so those rows stay plain data.
+  (function(){
+    document.querySelectorAll('.benchrow.clickable[data-target]').forEach(function(row){
+      row.addEventListener('click', function(){
+        flashTo(document.getElementById(row.getAttribute('data-target')));
+      });
+    });
+  })();
+
+  // ===== "Where the Money Came From" ticker rows -> jump to the matching open campaign,
+  // or toast that it's a closed campaign (see the audit table) =====
+  (function(){
+    var openTickers = Array.prototype.map.call(
+      document.querySelectorAll('#open-campaigns tbody tr[data-ticker]'),
+      function(tr){ return tr.getAttribute('data-ticker'); }
+    );
+    document.querySelectorAll('.moneyrow[data-ticker]').forEach(function(row){
+      row.addEventListener('click', function(){
+        var t = row.getAttribute('data-ticker');
+        if (openTickers.indexOf(t) !== -1) {
+          flashTo(document.querySelector('#open-campaigns tbody tr[data-ticker="' + t + '"]'));
+        } else {
+          showToast(t + ' — closed campaign, see audit');
+        }
+      });
+    });
+  })();
+</script>
+</body>
+</html>

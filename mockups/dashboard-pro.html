@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIV — Dashboard (Pro layout)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     VIV brand tokens — copied verbatim from dashboard-recommended.html
+     ============================================================ */
+  :root{
+    --bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
+    --text:rgba(255,255,255,0.92);
+    --muted:rgba(255,255,255,0.70);
+    --faint:rgba(255,255,255,0.45);
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:var(--font); line-height:1.5; font-size:16px;
+    -webkit-font-smoothing:antialiased; padding:0; min-height:100vh;
+  }
+  .big,.val,.kpinum,.outval,tbody td,.allocnote,.alloclegend,.stepval,.numfield,.capinput{font-variant-numeric:tabular-nums}
+
+  /* ===== 8. SHELL ===== */
+  .shell{width:100%; max-width:1400px; margin:0 auto; padding:22px 24px 80px}
+  @media(min-width:2000px){ .shell{max-width:1680px} }
+
+  /* ===== P0. NAV ===== */
+  .navbar{display:flex; align-items:center; gap:16px; margin-bottom:22px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem}
+  .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
+  .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
+  .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+  .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
+  .tabs a:hover:not(.on){color:var(--text)}
+  .spacer{flex:1}
+  .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
+  .seg button, .seg a{
+    border:none; background:transparent; color:var(--muted); cursor:pointer; text-decoration:none;
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:7px 16px; border-radius:980px;
+    letter-spacing:0.02em; transition:all .15s; display:inline-block;
+  }
+  .seg button.on, .seg a.on{background:var(--goldDim); color:var(--goldBright)}
+  .seg button:hover:not(.on), .seg a:hover:not(.on){color:var(--text)}
+
+  /* ===== SHARED CARD CHROME — uniform across P2 / P3 / P4 ===== */
+  .card{
+    position:relative; background:var(--glass);
+    border:1px solid var(--border); border-radius:16px;
+    backdrop-filter:blur(24px) saturate(150%);
+    -webkit-backdrop-filter:blur(24px) saturate(150%);
+    padding:18px 20px; overflow:visible;   /* visible (not hidden) so hover tooltips aren't clipped at the card edge */
+  }
+  .card::before{
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%);
+   border-radius:inherit;}
+  .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+  .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+  /* identical header on every card: label + info dot, divided from the body */
+  .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+  .cardhead .label{flex:1}
+  .infodot{width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex;
+    align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic;
+    color:var(--faint); cursor:help; flex:none}
+  .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+  /* shared tooltip CSS — exact, so every page matches */
+  .infodot{position:relative; cursor:help}
+  .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+  /* same tooltip pattern, reused on non-dot hover targets (sparkline, legend dots) */
+  .tipwrap{position:relative; cursor:help}
+  .tipwrap:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+  .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+    font-size:0.62rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em}
+  .ghostchip:hover{color:var(--text); border-color:var(--borderGold)}
+  .btn{
+    border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text);
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:8px 16px;
+    border-radius:980px; cursor:pointer;
+  }
+  .btn.ghost{background:transparent}
+  .btn.ghost:hover{border-color:var(--borderGold); color:var(--text)}
+  .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+  .btn.goldoutline{background:transparent; border:1px solid var(--borderGold); color:var(--goldBright)}
+  .btn.goldoutline:hover{background:var(--goldDim)}
+
+  /* ===== P1. COMMAND HEADER ===== */
+  .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
+  .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+  .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px}
+  .cmdactions{display:flex; gap:10px; flex-wrap:wrap}
+
+  /* ===== P2. KPI STRIP ===== */
+  .kpistrip{display:grid; grid-template-columns:repeat(5,1fr); gap:14px}
+  .kpi{height:112px; padding:14px 18px; display:flex; flex-direction:column}
+  .kpi .cardhead{padding-bottom:8px; margin-bottom:10px}
+  .kpibody{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-height:0}
+  .kpimain{min-width:0}
+  .kpinum{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; line-height:1.05; white-space:nowrap}
+  .kpinum.green{color:var(--green)} .kpinum.red{color:var(--red)} .kpinum.gold{color:var(--goldBright)}
+  .kpisub{font-size:0.68rem; color:var(--muted); margin-top:4px; white-space:nowrap}
+  .kpichip{display:inline-block; margin-top:7px; font-size:0.6rem; font-weight:700; padding:3px 9px; border-radius:980px;
+    background:var(--goldDim); color:var(--goldBright); letter-spacing:0.03em}
+  .kpiviz{flex:none; width:70px; height:40px}
+  .kpiviz svg{width:100%; height:100%; display:block; overflow:visible}
+  @media(max-width:1200px){ .kpistrip{grid-template-columns:repeat(3,1fr)} }
+  @media(max-width:760px){ .kpistrip{grid-template-columns:repeat(2,1fr)} .kpi{height:auto; min-height:112px} }
+
+  /* ===== P2b. CONFIG ROW ===== */
+  .cfggrid{display:grid; grid-template-columns:repeat(4,1fr); gap:0}
+  .cfgitem{padding:0 20px; border-left:1px solid var(--border)}
+  .cfgitem:first-child{padding-left:0; border-left:none}
+  .cfghint{font-size:0.68rem; color:var(--faint); margin-top:8px}
+  .editcap{display:inline-flex; align-items:center; gap:5px; cursor:pointer; border-bottom:1px dotted var(--borderGold); padding-bottom:1px}
+  .editcap .capval{color:var(--text); font-weight:700; font-size:1.05rem}
+  .editcap .pencil{font-size:0.72rem; color:var(--gold)}
+  .capinput{background:rgba(255,255,255,0.05); border:1px solid var(--gold); border-radius:7px; color:var(--white);
+    font-family:var(--font); font-size:0.9rem; font-weight:700; padding:4px 9px; width:120px; outline:none}
+  .stepper{display:inline-flex; align-items:center; border:1px solid var(--borderGold); border-radius:980px; overflow:hidden; background:rgba(255,255,255,0.03)}
+  .stepper button{border:none; background:transparent; color:var(--goldBright); font-family:var(--font); font-size:1.2rem; font-weight:700; width:38px; height:36px; cursor:pointer; line-height:1; transition:background .15s}
+  .stepper button:hover{background:var(--goldDim)}
+  .stepper .stepval{min-width:56px; text-align:center; font-size:1.05rem; font-weight:800; color:var(--white)}
+  @media(max-width:900px){ .cfggrid{grid-template-columns:1fr 1fr; gap:18px 0} .cfgitem{border-left:none; padding:0} }
+
+  /* ===== P3. CONTEXT ROW ===== */
+  .ctxrow{display:grid; grid-template-columns:1fr 1fr 1.2fr; gap:14px}
+  @media(max-width:1100px){ .ctxrow{grid-template-columns:1fr} }
+
+  /* -- Risk Allocation -- */
+  .allocbar{position:relative; height:11px; border-radius:980px; overflow:hidden; margin:4px 0 12px;
+    background:rgba(34,197,94,0.18)}
+  .allocfill{position:absolute; left:0; top:0; height:100%; border-radius:980px;
+    background:linear-gradient(90deg, #dc4646, var(--red))}
+  .alloclegend{display:flex; gap:16px; flex-wrap:wrap; font-size:0.74rem; color:var(--muted)}
+  .alloclegend b{color:var(--text); font-weight:700}
+  .leg{display:inline-flex; align-items:center}
+  .legdot{width:8px; height:8px; border-radius:50%; margin-right:7px}
+  .legdot.risk{background:var(--red)}
+  .legdot.avail{background:var(--green)}
+  .legdot.free{background:var(--blue)}
+  .allocnote{font-size:0.72rem; color:var(--faint); margin-top:12px; padding-top:12px; border-top:1px solid var(--border)}
+
+  /* -- Market Context -- */
+  .mktitem{padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.06)}
+  .mktitem:last-child{border-bottom:none; padding-bottom:0}
+  .mktrow{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .mktsym{font-weight:800; font-size:0.85rem; color:var(--white); min-width:38px}
+  .mktprice{font-size:0.78rem; color:var(--text)}
+  .mktchip{font-size:0.6rem; font-weight:700; padding:3px 8px; border-radius:980px; border:1px solid var(--border); color:var(--faint)}
+  .mktchip.up{color:#86efac; border-color:rgba(34,197,94,0.32); background:rgba(34,197,94,0.08)}
+  .regime{margin-left:auto; font-size:0.6rem; font-weight:700; padding:3px 9px; border-radius:980px; letter-spacing:0.02em}
+  .regime.up{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+  .regime.chop{background:var(--goldDim); color:var(--goldBright); border:1px solid var(--borderGold)}
+  .mktnote{font-size:0.64rem; color:var(--faint); margin-top:5px}
+
+  /* -- Theme Leaders -- */
+  .themewrap{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+  .themecol h4{font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); margin-bottom:9px}
+  .themelist{display:flex; flex-direction:column; gap:7px}
+  /* clickable: jumps to & flash-highlights any open position in this theme */
+  .themerow{display:flex; align-items:center; gap:8px; font-size:0.74rem; cursor:pointer; border-radius:7px; padding:3px 5px; margin:0 -5px; transition:background .12s}
+  .themerow:hover{background:rgba(255,255,255,0.055)}
+  .themerank{color:var(--faint); font-weight:700; width:13px; flex:none}
+  .themename{flex:1; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .themepct{color:var(--green); font-weight:700}
+
+  /* ===== P4. POSITIONS TABLE ===== */
+  .poshead h2{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+  .countchip{background:var(--goldDim); color:var(--goldBright); font-size:0.66rem; font-weight:800; padding:3px 10px; border-radius:980px}
+  .posnote{font-size:0.68rem; color:var(--faint); margin:-4px 0 12px}
+  .tablewrap{overflow-x:auto}
+  table.dense{width:100%; border-collapse:collapse; min-width:1180px}
+  table.dense thead th{
+    position:sticky; top:0; z-index:2; background:rgba(9,9,15,0.94); backdrop-filter:blur(6px);
+    font-size:0.58rem; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;
+    color:var(--muted); text-align:right; padding:9px 10px; border-bottom:1px solid var(--border); white-space:nowrap; cursor:help;
+  }
+  table.dense thead th:first-child, table.dense thead th:nth-child(2){text-align:left}
+  /* sortable column headers — clickable, active sort highlighted gold with a direction arrow */
+  table.dense thead th.sortable{cursor:pointer; user-select:none}
+  table.dense thead th.sortable:hover{color:var(--text)}
+  table.dense thead th.sortable.sorted{color:var(--gold)}
+  table.dense thead th.sortable.sorted::after{content:" " attr(data-dir)}
+  table.dense tbody td{padding:8px 10px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.74rem}
+  table.dense tbody td:first-child, table.dense tbody td:nth-child(2){text-align:left}
+  table.dense tbody tr:hover{background:rgba(255,255,255,0.025)}
+  /* flash-highlight: a Theme Leaders row jumped here — gold outline fading over ~1.5s */
+  .posrow.flash{animation:posFlash 1.5s ease-out}
+  @keyframes posFlash{
+    0%{box-shadow:inset 0 0 0 2px var(--goldBright); background:rgba(201,152,42,0.16)}
+    100%{box-shadow:inset 0 0 0 2px rgba(201,152,42,0); background:transparent}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .posrow.flash{animation:none; box-shadow:inset 0 0 0 2px var(--goldBright); background:rgba(201,152,42,0.16)}
+  }
+  .tick{font-weight:800; letter-spacing:-0.01em; font-size:0.86rem; display:flex; align-items:center; gap:8px}
+  .srcdot{width:6px;height:6px;border-radius:50%}
+  .srcdot.ibkr{background:var(--goldBright); box-shadow:0 0 7px var(--goldBright)}
+  .srcdot.man{background:rgba(255,255,255,0.28)}
+  .tag{display:inline-block; font-size:0.64rem; font-weight:600; color:var(--muted); background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:6px; padding:2px 7px}
+  .pl.up{color:var(--green); font-weight:700} .pl.dn{color:var(--red); font-weight:700}
+  .pl .pct{display:block; font-size:0.66rem; color:var(--muted); font-weight:500; margin-top:1px}
+  .status{display:inline-flex; align-items:center; gap:6px; font-size:0.66rem; font-weight:700; padding:5px 10px; border-radius:980px; letter-spacing:0.02em}
+  .status .d{width:6px;height:6px;border-radius:50%}
+  .st-risk{background:rgba(239,68,68,0.12); color:#fda4a4; border:1px solid rgba(239,68,68,0.3)}
+  .st-risk .d{background:var(--red)}
+  .st-free{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+  .st-free .d{background:var(--green)}
+  .st-lock{background:rgba(59,130,246,0.12); color:#93c5fd; border:1px solid rgba(59,130,246,0.3)}
+  .st-lock .d{background:var(--blue)}
+  .sizebar{display:inline-flex; flex-direction:column; align-items:flex-end; gap:3px}
+  .sizebar .track{width:56px;height:5px;border-radius:980px;background:rgba(255,255,255,0.1);overflow:hidden}
+  .sizebar .fill{height:100%;border-radius:980px}
+  .sizebar small{font-size:0.62rem; color:var(--muted)}
+  .themetag{display:inline-block; font-size:0.62rem; font-weight:700; padding:3px 8px; border-radius:980px; white-space:nowrap}
+  .themetag.in{background:var(--goldDim); color:var(--goldBright); border:1px solid var(--borderGold)}
+  .themetag.off{background:rgba(255,255,255,0.04); color:var(--faint); border:1px solid var(--border)}
+  .gradewrap{display:inline-flex; align-items:center; gap:5px}
+  .gradebadge{display:inline-flex; width:19px; height:19px; border-radius:6px; align-items:center; justify-content:center; font-weight:800; font-size:0.66rem; flex:none}
+  .gradebadge.a{background:rgba(34,197,94,0.15); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+  .gradebadge.b{background:var(--goldDim); color:var(--goldBright); border:1px solid var(--borderGold)}
+  .gradebadge.c{background:rgba(239,68,68,0.12); color:#fca5a5; border:1px solid rgba(239,68,68,0.3)}
+  .stars{color:var(--gold); font-size:0.6rem; letter-spacing:1px}
+
+  .pro-only{display:none}
+  body.pro .pro-only{display:table-cell}
+  body.pro thead .pro-only{display:table-cell}
+
+  .addrow{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin:12px 0 0;
+    padding:11px; border:1px dashed var(--borderGold); border-radius:12px;
+    background:transparent; color:var(--goldBright); font-family:var(--font); font-size:0.76rem; font-weight:700;
+    letter-spacing:0.02em; cursor:pointer; transition:background .15s ease, border-color .15s ease}
+  .addrow:hover{background:rgba(201,152,42,0.10); border-color:var(--goldBright)}
+
+  /* ===== shared: Manage panel + Sell form (adapted from base) ===== */
+  .mgcell{text-align:right; white-space:nowrap}
+  .mgcell .mgbtn + .mgbtn{margin-left:6px}
+  .mgbtn{background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+    font-size:0.66rem; font-weight:700; padding:5px 12px; border-radius:980px; cursor:pointer; white-space:nowrap}
+  .mgbtn:hover{color:var(--text); border-color:var(--borderGold)}
+  .mgbtn.sell{background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.32); color:#fca5a5}
+  .mgbtn.sell:hover{background:rgba(239,68,68,0.16); color:#fecaca}
+  .posrow.mg-open .mgbtn{background:var(--goldDim); color:var(--goldBright); border-color:var(--borderGold)}
+  .mgrow > td{padding:0 !important; border-bottom:1px solid rgba(255,255,255,0.06)}
+  .mgpanel{margin:2px 8px 14px; background:rgba(201,152,42,0.045); border:1px solid var(--borderGold); border-radius:14px; padding:16px 18px}
+  .mghead{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding-bottom:14px; margin-bottom:15px; border-bottom:1px solid var(--border)}
+  .mgtick{font-size:1.02rem; font-weight:800; color:var(--white); letter-spacing:-0.01em}
+  .mgls{font-size:0.58rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--green); border:1px solid rgba(34,197,94,0.3); border-radius:6px; padding:2px 7px}
+  .mgmeta{font-size:0.72rem; color:var(--muted)} .mgmeta b{color:var(--text); font-weight:700}
+  .mgclose{margin-left:auto; background:transparent; border:none; color:var(--faint); font-size:1.3rem; line-height:1; cursor:pointer}
+  .mgclose:hover{color:var(--text)}
+  .mggrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0}
+  .mgcol{padding:0 20px; border-left:1px solid var(--border)}
+  .mgcol:first-child{padding-left:0; border-left:none}
+  .mgcol:last-child{padding-right:0}
+  .mgcoltitle{font-size:0.58rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold); margin-bottom:13px}
+  .mgfield{display:flex; align-items:center; gap:8px; margin-bottom:9px}
+  .mgfield label{flex:1; font-size:0.74rem; color:var(--muted); cursor:help}
+  .mgin{width:96px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--white);
+    font-family:var(--font); font-size:0.8rem; font-weight:700; padding:6px 9px; text-align:right; outline:none}
+  .mgin:focus{border-color:var(--gold)}
+  .mgin.gold{border-color:var(--borderGold); color:var(--goldBright)}
+  .mglock{background:transparent; border:none; color:var(--faint); cursor:pointer; font-size:0.76rem; padding:2px; line-height:0}
+  .mglock:hover{color:var(--gold)}
+  .mgsave{margin-top:6px}
+  .mgacts{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px}
+  .mgact{font-size:0.68rem; padding:7px 13px}
+  .mgactlist{font-size:0.74rem; color:var(--faint); padding:8px 0; min-height:34px}
+  .mgnote{font-size:0.66rem; color:var(--faint); line-height:1.5; margin-top:6px}
+  .mgreadout{display:flex; flex-direction:column}
+  .mgr{display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.76rem}
+  .mgr span{color:var(--muted); cursor:help} .mgr b{color:var(--text); font-weight:700}
+  .mgr b.green{color:var(--green)} .mgr b.red{color:var(--red)} .mgr b.gold{color:var(--goldBright)}
+  .mgfoot{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:16px; padding-top:15px; border-top:1px solid var(--border)}
+  .mgfoot-hint{font-size:0.7rem; color:var(--faint)}
+  .mgsell{background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.32); color:#fca5a5; font-weight:700}
+  .mgsell:hover{background:rgba(239,68,68,0.16)}
+  .mgsell.open{background:rgba(239,68,68,0.18); color:#fecaca}
+  .mgsellform{margin-top:15px; padding-top:15px; border-top:1px dashed var(--borderGold)}
+  .mgsellgrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0}
+  .mgsellcol{padding:0 20px; border-left:1px solid var(--border)}
+  .mgsellcol:first-child{padding-left:0; border-left:none}
+  .mgsellcol:last-child{padding-right:0}
+  .quickrow{display:flex; align-items:center; gap:6px; margin:0 0 12px}
+  .chipbtn{background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+    font-size:0.64rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer}
+  .chipbtn:hover{color:var(--text); border-color:var(--borderGold)}
+  .mgof{font-size:0.68rem; color:var(--faint); margin-left:4px}
+  .mgsel{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--white);
+    font-family:var(--font); font-size:0.76rem; font-weight:600; padding:6px 9px; outline:none; cursor:pointer}
+  .mgsel:focus{border-color:var(--gold)}
+  .mgcheck{display:flex; align-items:center; gap:8px; font-size:0.74rem; color:var(--muted); margin-top:12px; cursor:pointer}
+  .mgcheck input{accent-color:var(--gold); width:15px; height:15px}
+  .mgoptional{color:var(--faint); font-weight:500; text-transform:none; letter-spacing:0}
+  .mgjournal{display:flex; flex-direction:column; gap:8px}
+  .mgta{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--text);
+    font-family:var(--font); font-size:0.74rem; padding:8px 10px; outline:none; resize:vertical; min-height:36px}
+  .mgta:focus{border-color:var(--gold)}
+  .mgin.wide{width:100%; text-align:left; font-weight:500}
+  .mgsellactions{display:flex; gap:10px; margin-top:14px}
+  .mgsellmsg{font-size:0.72rem; color:var(--green); margin-top:10px; min-height:18px}
+
+  /* ===== toast: brief demo feedback for click actions ===== */
+  .toast{position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(10px); z-index:300;
+    background:#13131c; border:1px solid var(--borderGold); border-radius:12px; padding:11px 18px;
+    font-size:0.78rem; font-weight:600; color:var(--text); box-shadow:0 14px 40px rgba(0,0,0,0.55);
+    opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  @media (prefers-reduced-motion: reduce){ .toast{transition:opacity .2s ease} }
+
+  @media(max-width:760px){
+    .navbar .spacer{display:none}
+    .tabs{overflow-x:auto; max-width:100%; scrollbar-width:none} .tabs::-webkit-scrollbar{display:none} .tabs a{white-space:nowrap}
+    .mggrid{grid-template-columns:1fr}
+    .mgcol{padding:16px 0 0; border-left:none; border-top:1px solid var(--border)}
+    .mgcol:first-child{padding-top:0}
+    .mgsellgrid{grid-template-columns:1fr}
+    .mgsellcol{padding:16px 0 0; border-left:none; border-top:1px solid var(--border)}
+    .mgsellcol:first-child{padding-top:0}
+  }
+</style>
+</head>
+<body class="pro">
+<div class="shell">
+
+  <!-- P0. NAV -->
+  <div class="navbar">
+    <div class="brand"><img class="vmark" src="../public/logo-mark.png" alt="VIV" style="background:none; object-fit:contain"> Valen Insiders Vault</div>
+    <div class="tabs">
+      <a href="dashboard-pro.html" class="on">Dashboard</a>
+      <a href="journal-pro.html">Journal</a>
+      <a href="premium-pro.html">Premium tools</a>
+      <!-- Live nav (commit 1353d7a) also has: Daily Setups + Model Book (members), Studies + Quant (admin-only). No Pro variants needed - those pages have no Guided/Pro toggle. -->
+      <a href="daily-setups.html">Daily Setups</a>
+      <a href="model-book.html">Model Book</a>
+      <a href="studies.html" title="Admin-only tab">Studies</a>
+      <a href="quant.html" title="Admin-only tab">Quant</a>
+      <a href="settings-pro.html">Settings</a>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+      <a href="dashboard-recommended.html" data-mode="guided">Guided</a>
+      <a href="dashboard-pro.html" class="on" data-mode="pro">Pro</a>
+    </div>
+  </div>
+
+  <!-- P1. COMMAND HEADER -->
+  <div class="cmdheader">
+    <div class="cmdleft">
+      <div class="eyebrow">Dashboard</div>
+      <h1 class="ch1">Command Center</h1>
+      <div class="cmdmeta" id="chMeta">8 open positions &middot; prices refreshed 2m ago</div>
+    </div>
+    <div class="cmdactions">
+      <button class="btn ghost" id="btnRefresh">Refresh Prices</button>
+      <button class="btn gold" id="btnSave">Save</button>
+      <button class="btn goldoutline" id="btnAddPosTop">+ Add Position</button>
+    </div>
+  </div>
+
+  <!-- P2. KPI STRIP -->
+  <div class="kpistrip">
+
+    <!-- K1: Open P/L -->
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Open P/L</span><span class="infodot" data-tip="How much your open positions are up or down right now. Green means you're in profit; the line below is your realized equity trend.">i</span></div>
+      <div class="kpibody">
+        <div class="kpimain">
+          <div class="kpinum green" id="kpiPL">+$4,182.50</div>
+          <div class="kpisub">+2.34% across 8 positions</div>
+        </div>
+        <div class="kpiviz tipwrap" data-tip="Realized P/L trend · 12 closed trades">
+          <svg class="sparkmini" viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="30-day equity trend, trending up">
+            <defs>
+              <linearGradient id="sparkgPro" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="rgba(34,197,94,0.34)"/>
+                <stop offset="100%" stop-color="rgba(34,197,94,0)"/>
+              </linearGradient>
+            </defs>
+            <path d="M0,44 L32,46 L64,40 L96,42 L128,33 L160,36 L192,26 L224,30 L256,18 L288,22 L320,9 L320,56 L0,56 Z" fill="url(#sparkgPro)"/>
+            <path d="M0,44 L32,46 L64,40 L96,42 L128,33 L160,36 L192,26 L224,30 L256,18 L288,22 L320,9" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- K2: Risk in Market -->
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Risk in Market</span><span class="infodot" data-tip="The total you'd lose if every open position hit its stop at once. Keep it inside your risk rule.">i</span></div>
+      <div class="kpibody">
+        <div class="kpimain">
+          <div class="kpinum red">$1,920</div>
+          <div class="kpisub">1.10% of equity</div>
+        </div>
+        <div class="kpiviz">
+          <svg viewBox="0 0 70 40" role="img" aria-label="55% of the ROTE cap">
+            <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="6" stroke-linecap="round"/>
+            <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="var(--goldBright)" stroke-width="6" stroke-linecap="round" stroke-dasharray="50.1 999"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- K3: Equity -->
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Equity</span><span class="infodot" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">i</span></div>
+      <div class="kpibody">
+        <div class="kpimain">
+          <div class="kpinum gold">$179,041</div>
+          <div class="kpisub">Base $150,000 + $29,041 realized</div>
+          <span class="kpichip">Trail-locked &middot; ON</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- K4: Risk Budget -->
+    <div class="card kpi">
+      <div class="cardhead">
+        <span class="label">Risk Budget</span>
+        <span class="infodot" data-tip="Your total risk budget: equity × Target ROTE. Available is what's left to deploy once current risk is subtracted.">i</span>
+        <button class="ghostchip" id="cfgToggle" title="Show sizing configuration" aria-expanded="false" aria-controls="cfgRow">&#9881; Configure</button>
+      </div>
+      <div class="kpibody">
+        <div class="kpimain">
+          <div class="kpinum gold">$3,581</div>
+          <div class="kpisub">Available $1,661</div>
+        </div>
+        <div class="kpiviz">
+          <svg viewBox="0 0 40 40" role="img" aria-label="54% of the risk budget deployed">
+            <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(34,197,94,0.35)" stroke-width="6"/>
+            <circle cx="20" cy="20" r="15" fill="none" stroke="var(--goldBright)" stroke-width="6" stroke-linecap="round" stroke-dasharray="50.9 94.2" transform="rotate(-90 20 20)"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- K5: Current ROTE -->
+    <div class="card kpi">
+      <div class="cardhead"><span class="label">Current ROTE</span><span class="infodot" data-tip="Your risk currently on the table as a percent of total equity, measured against the Target ROTE cap you've set.">i</span></div>
+      <div class="kpibody">
+        <div class="kpimain">
+          <div class="kpinum">1.07%</div>
+          <div class="kpisub">Target 2.00%</div>
+        </div>
+        <div class="kpiviz">
+          <svg viewBox="0 0 70 40" role="img" aria-label="53.5% of target ROTE">
+            <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="6" stroke-linecap="round"/>
+            <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="var(--goldBright)" stroke-width="6" stroke-linecap="round" stroke-dasharray="48.7 999"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- P2b. CONFIG ROW (hidden until "Configure" is clicked on K4) -->
+  <div class="card cfgrow" id="cfgRow" style="display:none; margin-top:14px">
+    <div class="cardhead"><span class="label">Sizing Configuration</span><span class="infodot" data-tip="Adjust the inputs that drive your risk budget and position sizing.">i</span></div>
+    <div class="cfggrid">
+      <div class="cfgitem">
+        <div class="label" style="margin-bottom:9px">Starting capital</div>
+        <span class="editcap" id="capWrap">
+          <span class="capval" id="capText">$150,000</span>
+          <span class="pencil">&#9998;</span>
+          <input class="capinput" id="capInput" type="text" value="$150,000" style="display:none" />
+        </span>
+        <div class="cfghint">+ $29,041 realized</div>
+      </div>
+      <div class="cfgitem">
+        <div class="label" style="margin-bottom:9px">Target ROTE</div>
+        <div class="stepper">
+          <button id="roteDown" aria-label="decrease target ROTE">&minus;</button>
+          <span class="stepval" id="roteVal">2.00%</span>
+          <button id="roteUp" aria-label="increase target ROTE">&plus;</button>
+        </div>
+      </div>
+      <div class="cfgitem">
+        <div class="label" style="margin-bottom:9px">Maximum positions</div>
+        <div class="stepper">
+          <button id="maxDown" aria-label="decrease max positions">&minus;</button>
+          <span class="stepval" id="maxVal">4</span>
+          <button id="maxUp" aria-label="increase max positions">&plus;</button>
+        </div>
+      </div>
+      <div class="cfgitem">
+        <div class="label" style="margin-bottom:9px">Trail-locked profit</div>
+        <div class="seg" id="tlSeg">
+          <button class="on" data-tl="on">ON</button>
+          <button data-tl="off">OFF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P3. CONTEXT ROW -->
+  <div class="ctxrow" style="margin-top:14px">
+
+    <div class="card">
+      <div class="cardhead"><span class="label">Risk Allocation</span><span class="infodot" data-tip="A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.">i</span></div>
+      <div class="allocbar"><div class="allocfill" style="width:54%"></div></div>
+      <div class="alloclegend">
+        <span class="leg tipwrap" data-tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span class="legdot risk"></span>At Risk&nbsp;<b>$1,920</b></span>
+        <span class="leg tipwrap" data-tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span class="legdot avail"></span>Available&nbsp;<b>$1,661</b></span>
+        <span class="leg tipwrap" data-tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span class="legdot free"></span>Risk-Free&nbsp;<b>4</b></span>
+      </div>
+      <div class="allocnote">$1,920 of $3,581 budget deployed</div>
+    </div>
+
+    <div class="card">
+      <div class="cardhead"><span class="label">Market Context</span><span class="infodot" data-tip="Condition anchored to the 21-day EMA over the past 10 sessions — Trending (closed above for 10+ sessions), Choppy (hovering through the line), or Downtrend (closed below for 10+ sessions). Breakouts carry the best odds in a Trending tape.">i</span></div>
+      <div class="mktitem">
+        <div class="mktrow">
+          <span class="mktsym">SPY</span>
+          <span class="mktprice">$612.40</span>
+          <span class="mktchip up">&rsaquo; 21EMA</span>
+          <span class="mktchip up">&rsaquo; 50MA</span>
+          <span class="regime up">Uptrend</span>
+        </div>
+        <div class="mktnote">ATR ext: +1.2</div>
+      </div>
+      <div class="mktitem">
+        <div class="mktrow">
+          <span class="mktsym">QQQ</span>
+          <span class="mktprice">$524.85</span>
+          <span class="mktchip up">&rsaquo; 21EMA</span>
+          <span class="mktchip">&rsaquo; 50MA</span>
+          <span class="regime chop">Chop</span>
+        </div>
+        <div class="mktnote">ATR ext: +0.6</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="cardhead"><span class="label">Theme Leaders</span><span class="infodot" data-tip="The top 5 DeepVue sector themes by return over the trailing week and month. Click a theme to jump to any open position that's in it.">i</span></div>
+      <div class="themewrap">
+        <div class="themecol">
+          <h4>1W</h4>
+          <div class="themelist">
+            <div class="themerow" data-theme="Oil &amp; Gas" title="Jump to open positions in this theme"><span class="themerank">1</span><span class="themename">Oil &amp; Gas</span><span class="themepct">+8.4%</span></div>
+            <div class="themerow" data-theme="Cyber" title="Jump to open positions in this theme"><span class="themerank">2</span><span class="themename">Cyber</span><span class="themepct">+6.9%</span></div>
+            <div class="themerow" data-theme="Bitcoin" title="Jump to open positions in this theme"><span class="themerank">3</span><span class="themename">Bitcoin</span><span class="themepct">+6.1%</span></div>
+            <div class="themerow" data-theme="ChinaNet" title="Jump to open positions in this theme"><span class="themerank">4</span><span class="themename">ChinaNet</span><span class="themepct">+5.7%</span></div>
+            <div class="themerow" data-theme="Steel" title="Jump to open positions in this theme"><span class="themerank">5</span><span class="themename">Steel</span><span class="themepct">+4.9%</span></div>
+          </div>
+        </div>
+        <div class="themecol">
+          <h4>1M</h4>
+          <div class="themelist">
+            <div class="themerow" data-theme="Genomics" title="Jump to open positions in this theme"><span class="themerank">1</span><span class="themename">Genomics</span><span class="themepct">+21.3%</span></div>
+            <div class="themerow" data-theme="Cyber" title="Jump to open positions in this theme"><span class="themerank">2</span><span class="themename">Cyber</span><span class="themepct">+18.0%</span></div>
+            <div class="themerow" data-theme="Biotech" title="Jump to open positions in this theme"><span class="themerank">3</span><span class="themename">Biotech</span><span class="themepct">+15.2%</span></div>
+            <div class="themerow" data-theme="Airlines" title="Jump to open positions in this theme"><span class="themerank">4</span><span class="themename">Airlines</span><span class="themepct">+12.8%</span></div>
+            <div class="themerow" data-theme="HealthCare" title="Jump to open positions in this theme"><span class="themerank">5</span><span class="themename">HealthCare</span><span class="themepct">+11.5%</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- P3b. Admin-only EdgeLedger strip slots here below the context row (not rendered in this mockup; visible only to admin accounts) -->
+
+  <!-- P4. POSITIONS TABLE -->
+  <div class="card" style="margin-top:14px; padding:16px 16px 18px">
+    <div class="cardhead poshead">
+      <h2>Open Positions</h2>
+      <span class="countchip">8</span>
+      <span class="infodot" data-tip="Every trade you currently hold. The colored status shows which positions are at risk.">i</span>
+      <div class="spacer"></div>
+      <div class="seg" id="viewSeg">
+        <button data-view="simple">Simple</button>
+        <button class="on" data-view="pro">Pro &middot; all columns</button>
+      </div>
+    </div>
+    <div class="posnote">Column set is controlled by this toggle — independent of the Guided/Pro mode switch in the navbar.</div>
+
+    <div class="tablewrap">
+    <table class="dense" id="posTable">
+      <thead>
+        <tr>
+          <th title="Where this position sits on risk relative to its stop. At Risk = stop below entry. Risk-Free = stop at entry. Profit Locked = stop above entry.">Status</th>
+          <th class="sortable" data-col="symbol" title="Sort by Symbol">Symbol</th>
+          <th class="pro-only sortable" data-col="days" title="Sort by Days">Days</th>
+          <th class="pro-only sortable" data-col="shares" title="Sort by Shares">Shares</th>
+          <th class="pro-only sortable" data-col="avgcost" title="Sort by Avg Cost">Avg Cost</th>
+          <th class="sortable" data-col="size" title="Sort by Position Size">Position Size</th>
+          <th class="sortable" data-col="realized" title="Sort by Realized">Realized</th>
+          <th class="sortable" data-col="rts" title="Sort by Risk to Stop">Risk to Stop</th>
+          <th class="pro-only sortable" data-col="stop" title="Sort by Stop">Stop</th>
+          <th class="pro-only sortable" data-col="r" title="Sort by R">R</th>
+          <th class="pro-only sortable" data-col="theme" title="Sort by Theme">Theme</th>
+          <th class="pro-only sortable" data-col="grade" title="Sort by Grade">Grade</th>
+          <th class="pro-only sortable" data-col="setup" title="Sort by Setup">Setup</th>
+          <th class="sortable sorted" data-col="pl" data-dir="▼" title="Sort by P/L">P/L</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="posrow" data-ticker="NVDA" data-status="At Risk" data-statusclass="st-risk" data-ls="Long" data-shares="120" data-avg="$118.40" data-cur="$129.60" data-size="$14,208" data-setup="VCP · Breakout" data-orig="$112.00" data-stop2="—" data-trail="—" data-rts="$768" data-rote="0.43%" data-r="+1.8R" data-locked="$0" data-sbe="110 of 120 sh" data-realized="$0" data-unreal="+$1,344.00 (+9.46%)" data-comm="$8.40">
+          <td data-l="Status"><span class="status st-risk"><span class="d"></span>At Risk</span></td>
+          <td data-l="Symbol"><span class="tick"><span class="srcdot ibkr"></span>NVDA</span></td>
+          <td class="pro-only" data-l="Days">18d</td>
+          <td class="pro-only" data-l="Shares">120</td>
+          <td class="pro-only" data-l="Avg Cost">$118.40</td>
+          <td data-l="Position Size">$14,208</td>
+          <td data-l="Realized"><span class="sizebar"><span class="track"><span class="fill" style="width:0%;background:var(--green)"></span></span><small>$0</small></span></td>
+          <td data-l="Risk to Stop"><span class="pl dn">$768</span></td>
+          <td class="pro-only" data-l="Stop">$112.00</td>
+          <td class="pro-only" data-l="R"><span class="pl up">+1.8R</span></td>
+          <td class="pro-only" data-l="Theme"><span class="themetag off">AI Semis</span></td>
+          <td class="pro-only" data-l="Grade"><span class="gradewrap"><span class="gradebadge a">A</span><span class="stars">★★★★★</span></span></td>
+          <td class="pro-only" data-l="Setup"><span class="tag">VCP</span></td>
+          <td data-l="P/L"><span class="pl up">+$1,344.00<span class="pct">+9.46%</span></span></td>
+          <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+        </tr>
+        <tr class="posrow" data-ticker="AVGO" data-status="Risk-Free" data-statusclass="st-free" data-ls="Long" data-shares="45" data-avg="$172.10" data-cur="$194.06" data-size="$7,744" data-setup="Breakout" data-orig="$172.10" data-stop2="—" data-trail="$176.00" data-rts="$0" data-rote="0.00%" data-r="+2.4R" data-locked="$0" data-sbe="40 of 45 sh" data-realized="$0" data-unreal="+$988.00 (+12.76%)" data-comm="$4.20">
+          <td data-l="Status"><span class="status st-free"><span class="d"></span>Risk-Free</span></td>
+          <td data-l="Symbol"><span class="tick"><span class="srcdot ibkr"></span>AVGO</span></td>
+          <td class="pro-only" data-l="Days">25d</td>
+          <td class="pro-only" data-l="Shares">45</td>
+          <td class="pro-only" data-l="Avg Cost">$172.10</td>
+          <td data-l="Position Size">$7,744</td>
+          <td data-l="Realized"><span class="sizebar"><span class="track"><span class="fill" style="width:0%;background:var(--green)"></span></span><small>$0</small></span></td>
+          <td data-l="Risk to Stop"><span class="pl up">$0</span></td>
+          <td class="pro-only" data-l="Stop">$172.10</td>
+          <td class="pro-only" data-l="R"><span class="pl up">+2.4R</span></td>
+          <td class="pro-only" data-l="Theme"><span class="themetag off">AI Semis</span></td>
+          <td class="pro-only" data-l="Grade"><span class="gradewrap"><span class="gradebadge a">A</span><span class="stars">★★★★☆</span></span></td>
+          <td class="pro-only" data-l="Setup"><span class="tag">Breakout</span></td>
+          <td data-l="P/L"><span class="pl up">+$988.00<span class="pct">+12.76%</span></span></td>
+          <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+        </tr>
+        <tr class="posrow" data-ticker="PANW" data-status="Profit Locked" data-statusclass="st-lock" data-ls="Long" data-shares="80" data-avg="$188.20" data-cur="$214.50" data-size="$15,056" data-setup="Pivot · Momentum" data-orig="$180.00" data-stop2="$188.20" data-trail="$196.00" data-rts="Locked" data-rote="0.00%" data-r="+3.1R" data-locked="$624" data-sbe="70 of 80 sh" data-realized="$0" data-unreal="+$2,104.00 (+13.97%)" data-comm="$6.00">
+          <td data-l="Status"><span class="status st-lock"><span class="d"></span>Profit Locked</span></td>
+          <td data-l="Symbol"><span class="tick"><span class="srcdot man"></span>PANW</span></td>
+          <td class="pro-only" data-l="Days">34d</td>
+          <td class="pro-only" data-l="Shares">80</td>
+          <td class="pro-only" data-l="Avg Cost">$188.20</td>
+          <td data-l="Position Size">$15,056</td>
+          <td data-l="Realized"><span class="sizebar"><span class="track"><span class="fill" style="width:0%;background:var(--green)"></span></span><small>$0</small></span></td>
+          <td data-l="Risk to Stop"><span class="pl up">locked</span></td>
+          <td class="pro-only" data-l="Stop">$196.00</td>
+          <td class="pro-only" data-l="R"><span class="pl up">+3.1R</span></td>
+          <td class="pro-only" data-l="Theme"><span class="themetag in">Cyber</span></td>
+          <td class="pro-only" data-l="Grade"><span class="gradewrap"><span class="gradebadge a">A</span><span class="stars">★★★★★</span></span></td>
+          <td class="pro-only" data-l="Setup"><span class="tag">Pivot</span></td>
+          <td data-l="P/L"><span class="pl up">+$2,104.00<span class="pct">+13.97%</span></span></td>
+          <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+        </tr>
+        <tr class="posrow" data-ticker="KLAC" data-status="At Risk" data-statusclass="st-risk" data-ls="Long" data-shares="30" data-avg="$610.00" data-cur="$601.53" data-size="$18,300" data-setup="VCP" data-orig="$572.00" data-stop2="—" data-trail="—" data-rts="$1,152" data-rote="0.64%" data-r="-0.2R" data-locked="$0" data-sbe="— underwater" data-realized="$0" data-unreal="-$254.00 (-1.37%)" data-comm="$6.00">
+          <td data-l="Status"><span class="status st-risk"><span class="d"></span>At Risk</span></td>
+          <td data-l="Symbol"><span class="tick"><span class="srcdot ibkr"></span>KLAC</span></td>
+          <td class="pro-only" data-l="Days">9d</td>
+          <td class="pro-only" data-l="Shares">30</td>
+          <td class="pro-only" data-l="Avg Cost">$610.00</td>
+          <td data-l="Position Size">$18,300</td>
+          <td data-l="Realized"><span class="sizebar"><span class="track"><span class="fill" style="width:0%;background:var(--green)"></span></span><small>$0</small></span></td>
+          <td data-l="Risk to Stop"><span class="pl dn">$1,152</span></td>
+          <td class="pro-only" data-l="Stop">$572.00</td>
+          <td class="pro-only" data-l="R"><span class="pl dn">-0.2R</span></td>
+          <td class="pro-only" data-l="Theme"><span class="themetag off">Chip Equip</span></td>
+          <td class="pro-only" data-l="Grade"><span class="gradewrap"><span class="gradebadge c">C</span><span class="stars">★★☆☆☆</span></span></td>
+          <td class="pro-only" data-l="Setup"><span class="tag">VCP</span></td>
+          <td data-l="P/L"><span class="pl dn">-$254.00<span class="pct">-1.37%</span></span></td>
+          <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+        </tr>
+        <tr class="posrow" data-ticker="MSTR" data-status="At Risk" data-statusclass="st-risk" data-ls="Long" data-shares="15" data-avg="$402.50" data-cur="$438.20" data-size="$6,038" data-setup="Momentum" data-orig="$378.00" data-stop2="—" data-trail="—" data-rts="$903" data-rote="0.50%" data-r="+1.5R" data-locked="$0" data-sbe="14 of 15 sh" data-realized="$0" data-unreal="+$535.50 (+8.87%)" data-comm="$1.05">
+          <td data-l="Status"><span class="status st-risk"><span class="d"></span>At Risk</span></td>
+          <td data-l="Symbol"><span class="tick"><span class="srcdot ibkr"></span>MSTR</span></td>
+          <td class="pro-only" data-l="Days">6d</td>
+          <td class="pro-only" data-l="Shares">15</td>
+          <td class="pro-only" data-l="Avg Cost">$402.50</td>
+          <td data-l="Position Size">$6,038</td>
+          <td data-l="Realized"><span class="sizebar"><span class="track"><span class="fill" style="width:0%;background:var(--green)"></span></span><small>$0</small></span></td>
+          <td data-l="Risk to Stop"><span class="pl dn">$903</span></td>
+          <td class="pro-only" data-l="Stop">$378.00</td>
+          <td class="pro-only" data-l="R"><span class="pl up">+1.5R</span></td>
+          <td class="pro-only" data-l="Theme"><span class="themetag in">Bitcoin</span></td>
+          <td class="pro-only" data-l="Grade"><span class="gradewrap"><span class="gradebadge b">B</span><span class="stars">★★★☆☆</span></span></td>
+          <td class="pro-only" data-l="Setup"><span class="tag">Momentum</span></td>
+          <td data-l="P/L"><span class="pl up">+$535.50<span class="pct">+8.87%</span></span></td>
+          <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+        </tr>
+        <tr class="posrow" data-ticker="FTNT" data-status="Risk-Free" data-statusclass="st-free" data-ls="Long" data-shares="60" data-avg="$92.30" data-cur="$101.85" data-size="$5,538" data-setup="Breakout" data-orig="$92.30" data-stop2="—" data-trail="$95.50" data-rts="$0" data-rote="0.00%" data-r="+2.1R" data-locked="$0" data-sbe="55 of 60 sh" data-realized="$150" data-unreal="+$573.00 (+10.35%)" data-comm="$2.10">
+          <td data-l="Status"><span class="status st-free"><span class="d"></span>Risk-Free</span></td>
+          <td data-l="Symbol"><span class="tick"><span class="srcdot man"></span>FTNT</span></td>
+          <td class="pro-only" data-l="Days">14d</td>
+          <td class="pro-only" data-l="Shares">60</td>
+          <td class="pro-only" data-l="Avg Cost">$92.30</td>
+          <td data-l="Position Size">$5,538</td>
+          <td data-l="Realized"><span class="sizebar"><span class="track"><span class="fill" style="width:21%;background:var(--green)"></span></span><small>$150</small></span></td>
+          <td data-l="Risk to Stop"><span class="pl up">$0</span></td>
+          <td class="pro-only" data-l="Stop">$92.30</td>
+          <td class="pro-only" data-l="R"><span class="pl up">+2.1R</span></td>
+          <td class="pro-only" data-l="Theme"><span class="themetag in">Cyber</span></td>
+          <td class="pro-only" data-l="Grade"><span class="gradewrap"><span class="gradebadge b">B</span><span class="stars">★★★★☆</span></span></td>
+          <td class="pro-only" data-l="Setup"><span class="tag">Breakout</span></td>
+          <td data-l="P/L"><span class="pl up">+$573.00<span class="pct">+10.35%</span></span></td>
+          <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+        </tr>
+        <tr class="posrow" data-ticker="VRTX" data-status="Profit Locked" data-statusclass="st-lock" data-ls="Long" data-shares="20" data-avg="$412.00" data-cur="$465.30" data-size="$8,240" data-setup="Pivot" data-orig="$385.00" data-stop2="$412.00" data-trail="$430.00" data-rts="Locked" data-rote="0.00%" data-r="+2.0R" data-locked="$360" data-sbe="15 of 20 sh" data-realized="$310" data-unreal="+$1,066.00 (+12.94%)" data-comm="$3.00">
+          <td data-l="Status"><span class="status st-lock"><span class="d"></span>Profit Locked</span></td>
+          <td data-l="Symbol"><span class="tick"><span class="srcdot ibkr"></span>VRTX</span></td>
+          <td class="pro-only" data-l="Days">41d</td>
+          <td class="pro-only" data-l="Shares">20</td>
+          <td class="pro-only" data-l="Avg Cost">$412.00</td>
+          <td data-l="Position Size">$8,240</td>
+          <td data-l="Realized"><span class="sizebar"><span class="track"><span class="fill" style="width:22%;background:var(--green)"></span></span><small>$310</small></span></td>
+          <td data-l="Risk to Stop"><span class="pl up">locked</span></td>
+          <td class="pro-only" data-l="Stop">$430.00</td>
+          <td class="pro-only" data-l="R"><span class="pl up">+2.0R</span></td>
+          <td class="pro-only" data-l="Theme"><span class="themetag in">Genomics</span></td>
+          <td class="pro-only" data-l="Grade"><span class="gradewrap"><span class="gradebadge a">A</span><span class="stars">★★★★★</span></span></td>
+          <td class="pro-only" data-l="Setup"><span class="tag">Pivot</span></td>
+          <td data-l="P/L"><span class="pl up">+$1,066.00<span class="pct">+12.94%</span></span></td>
+          <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+        </tr>
+        <tr class="posrow" data-ticker="XOM" data-status="At Risk" data-statusclass="st-risk" data-ls="Long" data-shares="90" data-avg="$118.75" data-cur="$115.20" data-size="$10,688" data-setup="VCP" data-orig="$112.00" data-stop2="—" data-trail="—" data-rts="$288" data-rote="0.16%" data-r="-0.5R" data-locked="$0" data-sbe="— underwater" data-realized="$0" data-unreal="-$319.50 (-2.99%)" data-comm="$6.30">
+          <td data-l="Status"><span class="status st-risk"><span class="d"></span>At Risk</span></td>
+          <td data-l="Symbol"><span class="tick"><span class="srcdot man"></span>XOM</span></td>
+          <td class="pro-only" data-l="Days">4d</td>
+          <td class="pro-only" data-l="Shares">90</td>
+          <td class="pro-only" data-l="Avg Cost">$118.75</td>
+          <td data-l="Position Size">$10,688</td>
+          <td data-l="Realized"><span class="sizebar"><span class="track"><span class="fill" style="width:0%;background:var(--green)"></span></span><small>$0</small></span></td>
+          <td data-l="Risk to Stop"><span class="pl dn">$288</span></td>
+          <td class="pro-only" data-l="Stop">$112.00</td>
+          <td class="pro-only" data-l="R"><span class="pl dn">-0.5R</span></td>
+          <td class="pro-only" data-l="Theme"><span class="themetag in">Oil &amp; Gas</span></td>
+          <td class="pro-only" data-l="Grade"><span class="gradewrap"><span class="gradebadge c">C</span><span class="stars">★★☆☆☆</span></span></td>
+          <td class="pro-only" data-l="Setup"><span class="tag">VCP</span></td>
+          <td data-l="P/L"><span class="pl dn">-$319.50<span class="pct">-2.99%</span></span></td>
+          <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+        </tr>
+
+        <!-- reusable Manage panel: populated from the clicked row, inserted beneath it -->
+        <tr id="mgRow" class="mgrow" style="display:none"><td colspan="15">
+          <div class="mgpanel">
+            <div class="mghead">
+              <span class="status" id="mgStatus"><span class="d"></span><span id="mgStatusTxt"></span></span>
+              <span class="mgtick" id="mgTicker"></span>
+              <span class="mgls" id="mgLs"></span>
+              <span class="mgmeta"><b id="mgShares"></b> sh @ <b id="mgAvg"></b></span>
+              <span class="mgmeta">Position <b id="mgSize"></b></span>
+              <span class="mgmeta">Setup <b id="mgSetup"></b></span>
+              <button class="mgclose" id="mgClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="mggrid">
+              <div class="mgcol">
+                <div class="mgcoltitle">Stops &amp; price</div>
+                <div class="mgfield"><label title="The latest market price (~15 min delayed). Drives your live P/L and how far you are from your stop.">Current price</label><input class="mgin gold" id="mgCur"></div>
+                <div class="mgfield"><label title="Your first protective stop, set when you entered. The lock keeps it from being changed by accident.">Original stop</label><input class="mgin" id="mgOrig"><button class="mglock" title="Lock this stop">&#128274;</button></div>
+                <div class="mgfield"><label title="A raised stop after the trade moved your way — often lifted up to your entry (break-even).">2nd stop</label><input class="mgin" id="mgStop2"><button class="mglock" title="Lock this stop">&#128274;</button></div>
+                <div class="mgfield"><label title="A stop that follows price upward to lock in more profit as the trade works.">Trailing stop</label><input class="mgin" id="mgTrail"></div>
+                <button class="btn gold mgsave">Save stops</button>
+              </div>
+              <div class="mgcol">
+                <div class="mgcoltitle">Activity today</div>
+                <div class="mgacts">
+                  <button class="btn mgact">Trim</button>
+                  <button class="btn mgact">Add</button>
+                  <button class="btn mgact">Nudge stop</button>
+                  <button class="btn mgact">Note</button>
+                </div>
+                <div class="mgactlist" id="mgActList">No activity logged today.</div>
+                <div class="mgnote">Calculation only &mdash; logging here doesn't change your shares, stop, or P/L. IBKR sync fills the journal overnight.</div>
+              </div>
+              <div class="mgcol">
+                <div class="mgcoltitle">Risk &amp; P/L</div>
+                <div class="mgreadout">
+                  <div class="mgr"><span title="Dollars you'd lose if price hits your stop from here. $0 or 'Locked' means no money is at risk.">Risk to stop</span><b id="mgRts"></b></div>
+                  <div class="mgr"><span title="ROTE — this position's risk as a % of your whole account. Keep the total across positions inside your limit.">Risk on equity</span><b id="mgRote"></b></div>
+                  <div class="mgr"><span title="Profit or loss in units of your initial risk. +2R = twice what you risked; -1R = a full planned loss.">R-multiple</span><b id="mgR"></b></div>
+                  <div class="mgr"><span title="Profit already secured because your stop sits above entry — you keep this even if it reverses to the stop.">Locked profit</span><b id="mgLocked"></b></div>
+                  <div class="mgr"><span title="SBE — Shares to Break-Even. How many shares to sell at the current price to recover your full cost basis. '—' means the position is underwater.">SBE &middot; Shares to Break-Even</span><b id="mgSbe"></b></div>
+                  <div class="mgr"><span title="Profit already banked from earlier partial sells of this position.">Realized</span><b id="mgRealized"></b></div>
+                  <div class="mgr"><span title="Paper profit/loss still open — it keeps changing until you sell.">Unrealized</span><b id="mgUnreal"></b></div>
+                  <div class="mgr"><span title="Broker fees paid on this position so far.">Commission</span><b id="mgComm"></b></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sell / Close + partial-sell -->
+            <div class="mgfoot">
+              <button class="btn mgsell" id="mgSellToggle">Sell / Close position</button>
+              <span class="mgfoot-hint">Logs a closed trade to your journal and reduces (or closes) this position.</span>
+            </div>
+            <div class="mgsellform" id="mgSellForm" style="display:none">
+              <div class="mgsellgrid">
+
+                <div class="mgsellcol">
+                  <div class="mgcoltitle">Sell details</div>
+                  <div class="mgfield"><label title="How many shares to sell now. Fewer than your total = partial sell (position stays open); all = full close.">Shares to sell</label><input class="mgin" id="mgSellQty"></div>
+                  <div class="quickrow">
+                    <button class="chipbtn" data-pct="25">25%</button>
+                    <button class="chipbtn" data-pct="50">50%</button>
+                    <button class="chipbtn" data-pct="75">75%</button>
+                    <button class="chipbtn" data-pct="100">All</button>
+                    <span class="mgof" id="mgSellOf"></span>
+                  </div>
+                  <div class="mgfield"><label title="The price you're selling at. Drives the realized P/L shown on the right.">Exit price</label><input class="mgin gold" id="mgSellPrice"></div>
+                  <div class="mgfield"><label title="Broker fee for this sale. Leave blank to estimate it from the position's commission.">Commission</label><input class="mgin" id="mgSellComm" placeholder="0.00"></div>
+                  <div class="mgfield"><label title="Why you're selling — saved to your journal so you can review your decisions later.">Exit reason</label>
+                    <select class="mgsel" id="mgSellReason">
+                      <option>Sold Into Strength</option>
+                      <option>Hit Initial Stop</option>
+                      <option>Hit Trailing Stop</option>
+                      <option>Time Stop</option>
+                      <option>Risk Reduction</option>
+                      <option>Changed Thesis</option>
+                    </select>
+                  </div>
+                  <label class="mgcheck"><input type="checkbox" id="mgSellJournal" checked> Add to journal</label>
+                </div>
+
+                <div class="mgsellcol">
+                  <div class="mgcoltitle">Trade review <span class="mgoptional">(optional)</span></div>
+                  <div class="mgjournal" id="mgJournalFields">
+                    <textarea class="mgta" id="mgRight" placeholder="What went right?"></textarea>
+                    <textarea class="mgta" id="mgWrong" placeholder="What went wrong?"></textarea>
+                    <textarea class="mgta" id="mgLearned" placeholder="What I learned"></textarea>
+                    <input class="mgin wide" id="mgTv" placeholder="tradingview.com/… (chart link)">
+                  </div>
+                </div>
+
+                <div class="mgsellcol">
+                  <div class="mgcoltitle">This sale</div>
+                  <div class="mgreadout">
+                    <div class="mgr"><span title="What share of this position you're selling in this order.">% of position</span><b id="sSoldPct"></b></div>
+                    <div class="mgr"><span title="Shares left open after this sale. Zero means the position closes.">Shares remaining</span><b id="sRemain"></b></div>
+                    <div class="mgr"><span title="Cash profit/loss you bank on the shares sold = (exit − average cost) × shares.">Realized P/L</span><b id="sPl"></b></div>
+                    <div class="mgr"><span title="The percentage gain or loss on the shares you're selling.">Return</span><b id="sPct"></b></div>
+                    <div class="mgr"><span title="The realized profit measured in units of your initial risk (R).">Realized R</span><b id="sR"></b></div>
+                  </div>
+                  <div class="mgsellactions">
+                    <button class="btn gold" id="mgSellConfirm">Sell</button>
+                    <button class="btn" id="mgSellCancel">Cancel</button>
+                  </div>
+                  <div class="mgsellmsg" id="mgSellMsg"></div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </td></tr>
+      </tbody>
+    </table>
+    </div>
+    <button class="addrow" type="button" id="btnAddPosBottom">+ Add Position</button>
+  </div>
+
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  // ===== Open Positions: per-row Manage panel (adapted from dashboard-recommended.html) =====
+  (function(){
+    var mgRow=document.getElementById('mgRow');
+    var curData={avg:0,price:0,shares:0,stop:0,ls:'Long',ticker:''};
+    function num(s){ return parseFloat(String(s).replace(/[^0-9.\-]/g,''))||0; }
+    function colorize(id,val){ var el=document.getElementById(id); el.textContent=val; el.classList.remove('green','red','gold');
+      if(val.indexOf('-')===0) el.classList.add('red'); else if(val.indexOf('+')===0) el.classList.add('green'); }
+    function fill(row){
+      var d=row.dataset;
+      curData={ avg:num(d.avg), price:num(d.cur), shares:num(d.shares), stop:num(d.orig), ls:d.ls, ticker:d.ticker };
+      document.getElementById('mgSellForm').style.display='none';
+      document.getElementById('mgSellToggle').classList.remove('open');
+      document.getElementById('mgSellQty').value=curData.shares;
+      document.getElementById('mgSellOf').textContent='of '+curData.shares+' shares';
+      document.getElementById('mgSellPrice').value=curData.price;
+      document.getElementById('mgSellComm').value='';
+      document.getElementById('mgSellReason').selectedIndex=0;
+      document.getElementById('mgSellJournal').checked=true;
+      document.getElementById('mgJournalFields').style.display='';
+      ['mgRight','mgWrong','mgLearned','mgTv'].forEach(function(i){document.getElementById(i).value='';});
+      document.getElementById('mgSellMsg').textContent='';
+      recomputeSell();
+      document.getElementById('mgStatus').className='status '+d.statusclass;
+      document.getElementById('mgStatusTxt').textContent=d.status;
+      document.getElementById('mgTicker').textContent=d.ticker;
+      document.getElementById('mgLs').textContent=d.ls;
+      document.getElementById('mgShares').textContent=d.shares;
+      document.getElementById('mgAvg').textContent=d.avg;
+      document.getElementById('mgSize').textContent=d.size;
+      document.getElementById('mgSetup').textContent=d.setup;
+      document.getElementById('mgCur').value=d.cur;
+      document.getElementById('mgOrig').value=d.orig;
+      document.getElementById('mgStop2').value=d.stop2;
+      document.getElementById('mgTrail').value=d.trail;
+      var rts=document.getElementById('mgRts'); rts.textContent=d.rts;
+      rts.className=(d.rts==='$0'||/locked/i.test(d.rts))?'green':'red';
+      document.getElementById('mgRote').textContent=d.rote;
+      colorize('mgR', d.r);
+      var lk=document.getElementById('mgLocked'); lk.textContent=d.locked; lk.className=(d.locked!=='$0')?'green':'';
+      document.getElementById('mgSbe').textContent=d.sbe;
+      document.getElementById('mgRealized').textContent=d.realized;
+      colorize('mgUnreal', d.unreal);
+      document.getElementById('mgComm').textContent=d.comm;
+    }
+    function fmtUsd(n){ return (n>=0?'+':'-')+'$'+Math.abs(Math.round(n)).toLocaleString('en-US'); }
+    function recomputeSell(){
+      var qty=parseFloat(document.getElementById('mgSellQty').value)||0;
+      var exit=parseFloat(document.getElementById('mgSellPrice').value)||0;
+      var sh=curData.shares, avg=curData.avg, stop=curData.stop, isShort=curData.ls==='Short';
+      var soldPct=sh>0?Math.min(100,qty/sh*100):0;
+      var remain=Math.max(0, sh-qty);
+      var pl=isShort?(avg-exit)*qty:(exit-avg)*qty;
+      var plPct=avg>0?(isShort?(avg-exit)/avg:(exit-avg)/avg)*100:0;
+      var riskFrac=avg>0?(isShort?(stop-avg):(avg-stop))/avg:0;
+      var r=riskFrac>0?(plPct/100)/riskFrac:null;
+      document.getElementById('sSoldPct').textContent=soldPct.toFixed(0)+'%';
+      document.getElementById('sRemain').textContent=remain+(remain<=0?' — closes position':'');
+      colorize('sPl', fmtUsd(pl));
+      colorize('sPct', (plPct>=0?'+':'')+plPct.toFixed(2)+'%');
+      var sR=document.getElementById('sR');
+      if(r===null){ sR.textContent='—'; sR.className=''; } else colorize('sR', (r>=0?'+':'')+r.toFixed(1)+'R');
+      var btn=document.getElementById('mgSellConfirm');
+      btn.textContent = (qty>=sh) ? 'Close position' : (qty>0 ? 'Sell '+qty+' shares' : 'Sell');
+    }
+    document.getElementById('mgSellToggle').addEventListener('click', function(){
+      var f=document.getElementById('mgSellForm'); var open=f.style.display!=='none';
+      f.style.display=open?'none':''; this.classList.toggle('open',!open);
+    });
+    document.getElementById('mgSellQty').addEventListener('input', recomputeSell);
+    document.getElementById('mgSellPrice').addEventListener('input', recomputeSell);
+    document.querySelectorAll('.quickrow .chipbtn').forEach(function(b){
+      b.addEventListener('click', function(){
+        document.getElementById('mgSellQty').value=Math.round(curData.shares*(+b.dataset.pct)/100);
+        recomputeSell();
+      });
+    });
+    document.getElementById('mgSellJournal').addEventListener('change', function(){
+      document.getElementById('mgJournalFields').style.display=this.checked?'':'none';
+    });
+    document.getElementById('mgSellCancel').addEventListener('click', function(){
+      document.getElementById('mgSellForm').style.display='none';
+      document.getElementById('mgSellToggle').classList.remove('open');
+    });
+    document.getElementById('mgSellConfirm').addEventListener('click', function(){
+      var qty=parseFloat(document.getElementById('mgSellQty').value)||0;
+      var exit=document.getElementById('mgSellPrice').value;
+      var full=qty>=curData.shares;
+      document.getElementById('mgSellMsg').textContent='Demo: would log '+qty+' '+curData.ticker+' @ $'+exit+
+        (document.getElementById('mgSellJournal').checked?' to the journal':'')+' and '+
+        (full?'close this position.':('reduce it to '+(curData.shares-qty)+' shares.'));
+    });
+
+    function close(){ mgRow.style.display='none'; document.querySelectorAll('.posrow').forEach(function(r){r.classList.remove('mg-open')}); }
+    function openRow(row){ close(); row.classList.add('mg-open'); fill(row);
+      row.parentNode.insertBefore(mgRow, row.nextSibling); mgRow.style.display=''; }
+    document.querySelectorAll('.posrow').forEach(function(row){
+      var manage=row.querySelector('.mgbtn:not(.sell)');
+      var sell=row.querySelector('.mgbtn.sell');
+      if(manage) manage.addEventListener('click', function(e){
+        e.stopPropagation();
+        if(row.classList.contains('mg-open')){ close(); return; }
+        openRow(row);
+      });
+      if(sell) sell.addEventListener('click', function(e){
+        e.stopPropagation();
+        openRow(row);
+        var f=document.getElementById('mgSellForm');
+        f.style.display=''; document.getElementById('mgSellToggle').classList.add('open');
+        f.scrollIntoView({block:'center', behavior:'smooth'});
+      });
+    });
+    document.getElementById('mgClose').addEventListener('click', close);
+  })();
+
+  // ===== Simple <-> Pro column toggle (independent of the navbar Guided/Pro switch) =====
+  function setView(view){
+    document.querySelectorAll('#viewSeg button').forEach(function(x){ x.classList.toggle('on', x.dataset.view===view); });
+    document.body.classList.toggle('pro', view==='pro');
+  }
+  document.querySelectorAll('#viewSeg button').forEach(function(b){
+    b.addEventListener('click', function(){ setView(b.dataset.view); });
+  });
+  setView('pro');   // Pro preselected on this layout
+
+  // ===== Positions table: sortable column headers (design mockup only) =====
+  // Real sorting lives in App.jsx via togglePosSort() (~line 8881), which reorders the
+  // row data and re-renders. This mockup just moves the gold "active sort" styling and
+  // flips the ▲/▼ direction indicator — it never reorders the demo rows.
+  document.querySelectorAll('#posTable thead th.sortable').forEach(function(th){
+    th.addEventListener('click', function(){
+      var wasSorted = th.classList.contains('sorted');
+      var nextDir = wasSorted ? (th.dataset.dir==='▼' ? '▲' : '▼') : '▼';
+      document.querySelectorAll('#posTable thead th.sortable').forEach(function(x){
+        x.classList.remove('sorted'); x.removeAttribute('data-dir');
+      });
+      th.classList.add('sorted');
+      th.dataset.dir = nextDir;
+    });
+  });
+
+  // ===== K4 "Configure" chip -> toggles the P2b sizing config row =====
+  var cfgToggle=document.getElementById('cfgToggle'), cfgRow=document.getElementById('cfgRow');
+  cfgToggle.addEventListener('click', function(){
+    var open=cfgRow.style.display!=='none';
+    cfgRow.style.display=open?'none':'';
+    cfgToggle.setAttribute('aria-expanded', String(!open));
+  });
+
+  // Starting Capital: click-to-edit (demo only)
+  var capWrap=document.getElementById('capWrap'),
+      capText=document.getElementById('capText'),
+      capInput=document.getElementById('capInput');
+  function showCapText(){
+    var n=parseFloat(capInput.value.replace(/[^0-9.]/g,''))||0;
+    var v='$'+Math.round(n).toLocaleString('en-US');
+    capInput.value=v; capText.textContent=v;
+    capInput.style.display='none'; capText.style.display='';
+    capWrap.querySelector('.pencil').style.display='';
+  }
+  capWrap.addEventListener('click', function(){
+    if(capInput.style.display!=='none') return;
+    capInput.value = capText.textContent.replace(/[^0-9.]/g,'');
+    capText.style.display='none';
+    capWrap.querySelector('.pencil').style.display='none';
+    capInput.style.display=''; capInput.focus(); capInput.select();
+  });
+  capInput.addEventListener('blur', showCapText);
+  capInput.addEventListener('keydown', function(e){ if(e.key==='Enter'){ capInput.blur(); } });
+
+  // Target ROTE stepper (demo only — not wired to the KPI strip above)
+  var roteVal=document.getElementById('roteVal'), roteUp=document.getElementById('roteUp'), roteDown=document.getElementById('roteDown');
+  function stepRote(delta){
+    var v=parseFloat(roteVal.textContent)||0;
+    v=Math.max(0.25, Math.min(10, v+delta));
+    roteVal.textContent=v.toFixed(2)+'%';
+  }
+  roteUp.addEventListener('click', function(){ stepRote(0.25); });
+  roteDown.addEventListener('click', function(){ stepRote(-0.25); });
+
+  // Maximum positions stepper (demo only)
+  var maxVal=document.getElementById('maxVal'), maxUp=document.getElementById('maxUp'), maxDown=document.getElementById('maxDown');
+  function stepMax(delta){
+    var v=parseInt(maxVal.textContent,10)||0;
+    v=Math.max(1, Math.min(12, v+delta));
+    maxVal.textContent=v;
+  }
+  maxUp.addEventListener('click', function(){ stepMax(1); });
+  maxDown.addEventListener('click', function(){ stepMax(-1); });
+
+  // Trail-locked profit ON/OFF (demo only)
+  document.querySelectorAll('#tlSeg button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#tlSeg button').forEach(function(x){x.classList.remove('on')});
+      b.classList.add('on');
+    });
+  });
+
+  // Refresh Prices / Save: light demo feedback only, no live data
+  document.getElementById('btnRefresh').addEventListener('click', function(){
+    document.getElementById('chMeta').textContent='8 open positions · prices refreshed just now';
+  });
+  document.getElementById('btnSave').addEventListener('click', function(){
+    var b=this, orig=b.textContent;
+    b.textContent='Saved ✓';
+    setTimeout(function(){ b.textContent=orig; }, 1400);
+  });
+
+  // ===== toast: brief demo feedback for click actions =====
+  var toastEl=document.getElementById('toast'), toastTimer=null;
+  function showToast(msg){
+    toastEl.textContent=msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){ toastEl.classList.remove('show'); }, 2200);
+  }
+
+  // ===== Theme Leaders: click a row -> jump to & flash-highlight matching open positions =====
+  var THEME_MATCH = { 'Cyber': ['PANW','FTNT'], 'Bitcoin': ['MSTR'], 'Oil & Gas': ['XOM'], 'Genomics': ['VRTX'] };
+  document.querySelectorAll('.themerow').forEach(function(row){
+    row.addEventListener('click', function(){
+      var theme=row.dataset.theme;
+      var tickers=THEME_MATCH[theme];
+      var rows=(tickers||[]).map(function(t){ return document.querySelector('.posrow[data-ticker="'+t+'"]'); }).filter(Boolean);
+      if(!rows.length){ showToast('No open position in this theme.'); return; }
+      rows[0].scrollIntoView({block:'center', behavior:'smooth'});
+      rows.forEach(function(r){
+        r.classList.remove('flash');
+        void r.offsetWidth;   // restart the fade animation if the same row was just flashed
+        r.classList.add('flash');
+        setTimeout(function(){ r.classList.remove('flash'); }, 1500);
+      });
+    });
+  });
+
+  // "+ Add Position" (header + below-table): demo only, no Add Position form in this mockup
+  document.querySelectorAll('#btnAddPosTop, #btnAddPosBottom').forEach(function(b){
+    b.addEventListener('click', function(){ showToast('Demo: would open the Add Position form.'); });
+  });
+
+  // ===== Open P/L count-up on load (the only motion on this page besides hover states) =====
+  function rollSpec(text){
+    var t=String(text).trim();
+    var sign=/^[−-]/.test(t)?-1:1, dollar=t.indexOf('$')>=0, pct=/%\s*$/.test(t);
+    var explicitSign=/^[−+-]/.test(t);
+    var numStr=t.replace(/[^\d.]/g,''), dot=numStr.indexOf('.');
+    var dec=dot>=0?(numStr.length-dot-1):0, val=(parseFloat(numStr)||0)*sign;
+    return {sign:sign,explicitSign:explicitSign,dollar:dollar,pct:pct,dec:dec,val:val};
+  }
+  function rollFmt(v,s){ var pre=s.sign<0?'−':(s.explicitSign?'+':''); return pre+(s.dollar?'$':'')+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:s.dec,maximumFractionDigits:s.dec})+(s.pct?'%':''); }
+  function countUp(el,dur){
+    if(!el) return;
+    if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var spec=rollSpec(el.textContent), finalText=el.textContent.trim();
+    dur=dur||1300;
+    var start=null;
+    function ease(t){ return 1-Math.pow(1-t,3); }
+    function frame(now){ if(start===null)start=now; var t=Math.min(1,(now-start)/dur);
+      el.textContent=rollFmt(spec.val*ease(t),spec);
+      if(t<1) requestAnimationFrame(frame); else { el.textContent=finalText; } }
+    el.textContent=rollFmt(0,spec); requestAnimationFrame(frame);
+  }
+  countUp(document.getElementById('kpiPL'), 1300);
+</script>
+</body>
+</html>

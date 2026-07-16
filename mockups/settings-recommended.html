@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIV — Account Settings (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
+    --text:rgba(255,255,255,0.92); --muted:rgba(255,255,255,0.70); --faint:rgba(255,255,255,0.45);
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{font-size:16px}
+  body{background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:var(--font); line-height:1.58; -webkit-font-smoothing:antialiased; min-height:100vh}
+  .shell{width:100%; max-width:1000px; margin:0 auto; padding:22px clamp(18px,2.4vw,40px) 90px}
+  /* settings is form-heavy — keep it readable, just a touch wider on 16-inch / large displays */
+  @media(min-width:1500px){ .shell{max-width:1120px} }
+  /* external 4K / ultrawide displays — settings stays a readable column */
+  @media(min-width:2000px){ .shell{max-width:1280px} }
+
+  .card{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:20px;
+    backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%); padding:22px 24px; overflow:hidden; margin-top:18px}
+  .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)}
+  .cardtitle{font-size:1.02rem; font-weight:800; color:var(--white); letter-spacing:-0.02em}
+  .carddesc{font-size:0.8rem; color:var(--muted); margin-top:4px; line-height:1.5; max-width:640px}
+  body.expert .carddesc{display:none}
+  .eyebrow{font-size:0.6rem; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); margin-bottom:5px}
+
+  .h1{font-size:clamp(1.55rem,3vw,2.05rem); font-weight:800; letter-spacing:-0.04em; color:var(--white)}
+  .goldname{color:var(--goldBright)}
+  .sub{font-size:0.82rem; color:var(--muted); max-width:640px; margin-top:6px}
+  /* header entrance — gated to .reveal so other .sub elements are never hidden (matches dashboard) */
+  .reveal .h1{opacity:0; transform:translateY(14px)}
+  .reveal .sub{opacity:0}
+  .reveal.in-view .h1{animation:hRise 0.42s cubic-bezier(0.22,1,0.36,1) both}
+  .reveal.in-view .sub{animation:hFade 0.48s ease-out 0.2s both}
+  @keyframes hRise{from{opacity:0; transform:translateY(14px)}to{opacity:1; transform:translateY(0)}}
+  @keyframes hFade{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion: reduce){
+    .reveal .h1,.reveal .sub{animation:none !important; opacity:1; transform:none}
+  }
+  .label{font-size:0.62rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted)}
+  .row{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+  .spacer{flex:1}
+
+  /* nav */
+  .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; color:var(--white); font-size:0.95rem}
+  .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
+  .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px; flex-wrap:wrap}
+  .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 16px; border-radius:980px}
+  .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
+  .tabs a:hover:not(.on){color:var(--text)}
+
+  /* tooltip */
+  .term{border-bottom:1px dotted var(--borderGold); cursor:help; position:relative}
+  .term:hover::after{content:attr(data-tip); position:absolute; left:0; top:150%; width:250px; background:#11111b;
+    border:1px solid var(--borderGold); border-radius:12px; padding:10px 12px; font-size:0.72rem; font-weight:400;
+    letter-spacing:0; text-transform:none; color:var(--text); z-index:60; box-shadow:0 14px 40px rgba(0,0,0,0.55); line-height:1.45; white-space:pre-line}
+  .term.tipright:hover::after{left:auto; right:0}
+  body.expert .term{border-bottom:none; cursor:default} body.expert .term:hover::after{content:none}
+
+  /* seg + buttons */
+  .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
+  .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.74rem;
+    font-weight:700; padding:7px 16px; border-radius:980px; transition:all .15s}
+  .seg button.on{background:var(--goldDim); color:var(--goldBright)}
+  .btn{border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text); font-family:var(--font);
+    font-size:0.76rem; font-weight:700; padding:9px 16px; border-radius:980px; cursor:pointer; transition:all .15s}
+  .btn:hover{border-color:var(--borderGold)}
+  .btn.gold{background:var(--goldDim); color:var(--goldBright); border-color:var(--borderGold)}
+  .btn.green{background:rgba(34,197,94,0.12); color:#86efac; border-color:rgba(34,197,94,0.3)}
+  .btn.red{background:rgba(239,68,68,0.12); color:#fda4a4; border-color:rgba(239,68,68,0.3)}
+  .btn.ok{background:rgba(34,197,94,0.2)!important; color:#86efac!important; border-color:rgba(34,197,94,0.4)!important}
+
+  /* fields */
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  .field{display:flex; flex-direction:column; gap:6px}
+  .field label{font-size:0.62rem; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--muted)}
+  .in{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--text);
+    font-family:var(--font); font-size:0.92rem; font-weight:600; padding:10px 12px; outline:none; width:100%}
+  .in:focus{border-color:var(--gold)} .in:disabled{color:var(--faint); cursor:not-allowed}
+  .field .hint{font-size:0.7rem; color:var(--faint); line-height:1.4}
+  body.expert .field .hint{display:none}
+  .prefrow{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:14px 0; border-bottom:1px solid rgba(255,255,255,0.06); flex-wrap:wrap}
+  .prefrow:last-child{border-bottom:none}
+  .prefrow .pl{max-width:430px}
+  .prefrow .pl .t{font-size:0.86rem; font-weight:700; color:var(--white)}
+  .prefrow .pl .d{font-size:0.76rem; color:var(--muted); margin-top:2px; line-height:1.45}
+  body.expert .prefrow .pl .d{display:none}
+
+  /* alerts / status */
+  .alert{display:flex; gap:9px; align-items:flex-start; margin-top:14px; border-radius:12px; padding:11px 14px; font-size:0.78rem; line-height:1.45}
+  .alert svg{width:15px;height:15px;flex:none;margin-top:1px}
+  .alert.warn{background:rgba(239,68,68,0.10); border:1px solid rgba(239,68,68,0.3); color:#fda4a4}
+  .alert.caution{background:rgba(201,152,42,0.12); border:1px solid var(--borderGold); color:var(--goldBright)}
+  .alert.ok{background:rgba(34,197,94,0.10); border:1px solid rgba(34,197,94,0.3); color:#86efac}
+  .conn{display:inline-flex; align-items:center; gap:6px; font-size:0.68rem; font-weight:700; padding:4px 11px; border-radius:980px}
+  .conn.yes{background:rgba(34,197,94,0.12); color:#86efac} .conn.no{background:rgba(255,255,255,0.06); color:var(--muted)}
+  .conn .d{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+  /* welcome */
+  .welcome{display:flex; gap:14px; align-items:flex-start; margin-top:18px; background:var(--goldDim);
+    border:1px solid var(--borderGold); border-radius:16px; padding:14px 18px}
+  .welcome .wd{width:8px;height:8px;border-radius:50%;background:var(--goldBright);box-shadow:0 0 12px var(--goldBright);margin-top:6px;flex:none}
+  .welcome b{color:var(--white)} .welcome .x{margin-left:auto; color:var(--faint); cursor:pointer; font-size:1.1rem; line-height:1}
+  body.expert .welcome{display:none}
+
+  /* ===== tutorial video (guided only) ===== */
+  body.expert .tourwrap{display:none}
+  .tour{position:relative; border:1px solid var(--borderGold); border-radius:16px; overflow:hidden; background:#0a0a12; aspect-ratio:16/6; min-height:200px; margin-top:14px}
+  .tourbg{position:absolute; inset:0; background:radial-gradient(560px 280px at 50% -10%, rgba(201,152,42,0.14), transparent 70%)}
+  .tourstage{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:26px 36px 52px; gap:10px}
+  .tourchip{font-size:0.58rem; font-weight:800; letter-spacing:0.13em; text-transform:uppercase; color:var(--gold)}
+  .tourtitle{font-size:clamp(1.1rem,2.6vw,1.5rem); font-weight:800; letter-spacing:-0.03em; color:var(--white)}
+  .tourcap{font-size:0.86rem; color:var(--muted); max-width:520px; line-height:1.5}
+  .tourdots{display:flex; gap:6px; margin-top:4px}
+  .tourdots i{width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,0.18); transition:all .25s}
+  .tourdots i.on{background:var(--goldBright); width:20px; border-radius:5px}
+  .tourposter{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+    background:rgba(8,8,14,0.55); backdrop-filter:blur(2px); cursor:pointer; z-index:3}
+  .tourposter.hidden{display:none}
+  .playbig{width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg,var(--goldBright),var(--goldMid));
+    display:flex; align-items:center; justify-content:center; box-shadow:0 12px 40px rgba(201,152,42,0.4); transition:transform .15s}
+  .tourposter:hover .playbig{transform:scale(1.07)}
+  .playbig svg{width:26px; height:26px; color:#0a0a0a; margin-left:3px}
+  .postertitle{font-size:0.98rem; font-weight:800; color:var(--white)} .postersub{font-size:0.76rem; color:var(--muted)}
+  .tourbar{position:absolute; left:0; right:0; bottom:0; display:flex; align-items:center; gap:11px; padding:11px 15px;
+    background:linear-gradient(0deg, rgba(8,8,14,0.92), transparent); z-index:4}
+  .tourbtn{background:rgba(255,255,255,0.1); border:none; width:32px; height:32px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--white); flex:none}
+  .tourbtn:hover{background:rgba(255,255,255,0.18)} .tourbtn svg{width:14px; height:14px}
+  .tourprog{flex:1; height:5px; background:rgba(255,255,255,0.14); border-radius:980px; overflow:hidden}
+  .tourprog .fill{height:100%; width:0%; background:linear-gradient(90deg,var(--goldMid),var(--goldBright)); transition:width .2s linear}
+  .tourtime{font-size:0.66rem; color:var(--muted); flex:none; min-width:32px; text-align:right}
+
+  /* steps expander */
+  .expander{margin-top:18px; border-top:1px solid var(--border); padding-top:15px}
+  .exhead{display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--goldBright); font-weight:700; font-size:0.85rem}
+  .exhead .chev{margin-left:6px; transition:transform .2s} .exhead.open .chev{transform:rotate(180deg)}
+  .exbody{display:none; margin-top:14px} .exbody.open{display:block}
+  .steps{display:flex; flex-direction:column; gap:11px}
+  .step{border-left:2px solid var(--borderGold); padding:1px 0 1px 14px}
+  .step .sn{font-size:0.58rem; font-weight:800; color:var(--gold); text-transform:uppercase; letter-spacing:0.08em}
+  .step b{display:block; color:var(--white); font-size:0.84rem; margin-top:2px}
+  .step p{font-size:0.78rem; color:var(--muted); margin-top:3px; line-height:1.5}
+  .step code{background:rgba(255,255,255,0.07); padding:1px 6px; border-radius:5px; font-size:0.85em; color:var(--goldBright)}
+
+  /* ignore chips */
+  .chips{display:flex; flex-wrap:wrap; gap:7px; margin-top:12px}
+  .chip{display:inline-flex; align-items:center; gap:5px; font-size:0.72rem; font-weight:600; color:var(--muted);
+    background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; padding:4px 10px}
+
+  /* admin */
+  .ownerzone{border:1px solid rgba(239,68,68,0.3); border-radius:22px; padding:6px; margin-top:30px; background:rgba(239,68,68,0.035)}
+  .ownerhead{display:flex; align-items:center; gap:12px; padding:14px 18px 8px; flex-wrap:wrap}
+  .ownerbadge{font-size:0.58rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:#fda4a4; background:rgba(239,68,68,0.14); padding:4px 11px; border-radius:980px}
+  .ownerzone .card{margin:12px}
+  .codeshow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:1.35rem; color:var(--goldBright); letter-spacing:0.08em; font-weight:700}
+  .memrow{display:flex; align-items:center; gap:10px; padding:10px 2px; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.82rem}
+  .memrow:last-child{border-bottom:none}
+  .memrow .mn{font-weight:700; color:var(--white)} .memrow .me{color:var(--muted); font-size:0.74rem}
+  .memrow .adm{font-size:0.58rem; font-weight:700; color:var(--goldBright); background:var(--goldDim); padding:2px 8px; border-radius:980px}
+  .memrow .jd{margin-left:auto; color:var(--faint); font-size:0.72rem}
+  body.member .ownerzone .card{display:none}
+  .membernote{display:none; margin:12px; padding:16px 18px; border:1px dashed var(--border); border-radius:14px; color:var(--muted); font-size:0.82rem}
+  body.member .membernote{display:block}
+
+  /* guide panel */
+  .guidepanel{position:fixed; right:24px; bottom:24px; width:330px; max-width:calc(100vw - 40px); z-index:200;
+    background:#11111b; border:1px solid var(--borderGold); border-radius:16px; padding:15px 17px; box-shadow:0 22px 60px rgba(0,0,0,0.6); display:none}
+  body:not(.expert) .guidepanel{display:block}
+  .guidepanel.speaking{border-color:var(--goldBright); box-shadow:0 0 0 1px var(--goldBright), 0 22px 60px rgba(0,0,0,0.6)}
+  .gp-head{display:flex; align-items:center; gap:9px; margin-bottom:7px}
+  .gp-dot{width:8px; height:8px; border-radius:50%; background:var(--goldBright); flex:none}
+  .guidepanel.speaking .gp-dot{animation:gppulse 1s ease-in-out infinite}
+  @keyframes gppulse{0%,100%{opacity:1; transform:scale(1)}50%{opacity:0.35; transform:scale(1.6)}}
+  .gp-title{font-size:0.82rem; font-weight:800; color:var(--goldBright); flex:1}
+  .gp-mute{background:transparent; border:none; cursor:pointer; color:var(--muted); padding:3px; line-height:0; display:flex}
+  .gp-mute:hover{color:var(--text)} .gp-mute svg{width:18px; height:18px}
+  .gp-body{font-size:0.78rem; color:var(--text); line-height:1.55} .gp-body b{color:var(--goldBright)}
+  body:not(.expert) .guide{transition:box-shadow .2s; border-radius:20px}
+  body:not(.expert) .guide.guide-active{box-shadow:0 0 0 1px var(--borderGold), 0 0 50px rgba(201,152,42,0.13)}
+
+  /* toast */
+  .toast{position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px); z-index:400; background:#11111b;
+    border:1px solid var(--borderGold); border-radius:12px; padding:12px 18px; font-size:0.8rem; color:var(--text);
+    box-shadow:0 14px 40px rgba(0,0,0,0.6); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:90vw}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+  @media(max-width:680px){ .grid2{grid-template-columns:1fr} .navbar{flex-wrap:wrap} }
+  /* ===== phones (iPhone 15 Pro 393px and up) ===== */
+  @media(max-width:600px){
+    .navbar{flex-wrap:wrap; gap:10px} .navbar .spacer{display:none}
+    .tabs{overflow-x:auto; max-width:100%; scrollbar-width:none} .tabs::-webkit-scrollbar{display:none} .tabs a{white-space:nowrap}
+    .tour{aspect-ratio:auto; height:280px; min-height:0}     /* fixed height avoids the aspect-ratio min-width blowout */
+    .tourstage{padding:18px 16px 50px} .tourtitle{font-size:1.05rem} .tourcap{font-size:0.8rem}
+    .card{padding:18px 16px}
+    .prefrow{flex-direction:column; align-items:flex-start; gap:10px}
+    .ownerhead{flex-direction:column; align-items:flex-start}
+    .codeshow{font-size:1.15rem}
+    .memrow{flex-wrap:wrap} .memrow .jd{margin-left:0; width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- NAV -->
+  <div class="navbar">
+    <div class="brand"><img class="vmark" src="../public/logo-mark.png" alt="VIV" style="background:none; object-fit:contain"> Valen Insiders Vault</div>
+    <div class="tabs">
+      <a href="dashboard-recommended.html">Dashboard</a>
+      <a href="journal-recommended.html">Journal</a>
+      <a href="premium-recommended.html">Premium tools</a>
+      <a href="daily-setups.html">Daily Setups</a>
+      <a href="model-book.html">Model Book</a>
+      <a href="studies.html" title="Admin-only tab">Studies</a>
+      <a href="quant.html" title="Admin-only tab">Quant</a>
+      <a href="settings-recommended.html" class="on">Settings</a>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+      <button class="on" data-mode="guided">Guided</button>
+      <button data-mode="pro" onclick="location.href='settings-pro.html'">Pro</button>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <div class="reveal">
+    <div class="eyebrow">Settings</div>
+    <div class="h1" style="margin-top:2px">Account Settings</div>
+    <div class="sub guide" data-gtitle="Account settings" data-gaudio="audio/settings-intro.mp3" data-gbody="This is your account hub. Set how the app looks and behaves, connect Interactive Brokers so your trades log themselves, and check that your data is healthy. Hover anything for a plain-English explanation.">Set how the app looks and behaves, connect your broker, and keep your data healthy. Hover any underlined word for a plain-English definition.</div>
+  </div>
+
+  <!-- WELCOME -->
+  <div class="welcome">
+    <span class="wd"></span>
+    <div><b>First time here?</b> The most useful thing is connecting <b>Interactive Brokers</b> so your trades log themselves — press play on the tutorial in that section. The guide in the corner explains everything <b>out loud</b>. Switch to <b>Pro</b> (top-right) for a clean view.</div>
+    <span class="x" onclick="this.closest('.welcome').style.display='none'">&times;</span>
+  </div>
+
+  <!-- ===== PROFILE ===== -->
+  <div class="card guide" data-gtitle="Profile" data-gaudio="audio/settings-profile.mp3" data-gbody="Your name and login email. Your display name is what shows on shared stats and in the members list. Your email is the address you signed in with and can't be changed here.">
+    <div class="eyebrow">You</div>
+    <div class="cardtitle">Profile</div>
+    <div class="carddesc">Your name and login. Your display name appears on shared stats and in the members list.</div>
+    <div class="grid2" style="margin-top:16px">
+      <div class="field"><label><span class="term" data-tip="The name shown on your shared stat cards and in the members list. Change it any time.">Display name</span></label><input class="in" id="dispName" value="Valen"><div class="hint">What others see.</div></div>
+      <div class="field"><label><span class="term" data-tip="The email you signed in with. To change it, contact support — it can't be edited here for security.">Email</span></label><input class="in" value="valen@valensontrades.com" disabled><div class="hint">Fixed — your login.</div></div>
+    </div>
+    <div class="row" style="margin-top:16px"><button class="btn gold" id="saveProfile">Save profile</button></div>
+  </div>
+
+  <!-- ===== PREFERENCES ===== -->
+  <div class="card guide" data-gtitle="Preferences" data-gaudio="audio/settings-prefs.mp3" data-gbody="Your preferences. Choose whether the app opens in Guided mode with explanations and voiceover, or Pro mode for a clean expert view. Decide whether dollar amounts are hidden behind percentages by default. And pick a comfortable text size. These stick across your devices.">
+    <div class="eyebrow">How the app behaves</div>
+    <div class="cardtitle">Preferences</div>
+    <div class="carddesc">These are remembered on your account, across pages and devices.</div>
+
+    <div class="prefrow" style="margin-top:8px">
+      <div class="pl"><div class="t"><span class="term" data-tip="Guided shows explanations, hover definitions, and voiceover everywhere — best while you're learning. Pro hides all of that for a clean, fast expert view.">Default mode</span></div>
+        <div class="d">Guided shows explanations and voiceover everywhere. Pro is a clean, fast expert view. This is the same toggle as the top-right — set your default here.</div></div>
+      <div class="seg" id="prefMode"><button class="on" data-mode="guided">Guided</button><button data-mode="pro">Pro</button></div>
+    </div>
+
+    <div class="prefrow">
+      <div class="pl"><div class="t"><span class="term" data-tip="When on, the app shows percentages instead of dollar amounts by default, so you can screenshot or screen-share without revealing your account size. You can flip it any time from the Journal.">Privacy by default</span></div>
+        <div class="d">Hide dollar amounts behind percentages by default — handy for screenshots and screen-shares. You can still toggle it per page.</div></div>
+      <div class="seg" id="prefPrivacy"><button class="on" data-priv="off">Show $</button><button data-priv="on">Show % only</button></div>
+    </div>
+
+    <div class="prefrow">
+      <div class="pl"><div class="t"><span class="term" data-tip="Sets the text size across the whole app. Larger sizes are easier on the eyes; smaller fits more on screen.">Text size</span></div>
+        <div class="d">Pick a comfortable reading size. Applies everywhere instantly.</div></div>
+      <div class="seg" id="prefFont">
+        <button data-font="small">Small</button><button class="on" data-font="standard">Standard</button><button data-font="large">Large</button><button data-font="huge">Huge</button>
+      </div>
+    </div>
+
+    <div class="prefrow">
+      <div class="pl"><div class="t"><span class="term" data-tip="The celebration card when you're green, and the encouragement card when you're red, can each be dismissed on the Journal. After you close one it stays hidden for 3 days. Reset here to bring them back right away.">Community reminders</span></div>
+        <div class="d">The “share your win” and “rough patch” cards on the Journal can be dismissed — each then snoozes for 3 days. Reset to show them again now.</div></div>
+      <button class="btn" id="resetSnooze">Reset reminders</button>
+    </div>
+  </div>
+
+  <!-- ===== INTERACTIVE BROKERS ===== -->
+  <div class="card guide" data-gtitle="Interactive Brokers" data-gaudio="audio/settings-ibkr.mp3" data-gbody="Connect Interactive Brokers to pull your positions and closed trades automatically. You paste two things from your broker — a query I D and a read-only token. It can only read your statements, never trade or move money. Press play on the tutorial if it's your first time.">
+    <div class="eyebrow">Auto-log your trades</div>
+    <div class="cardtitle">Interactive Brokers sync</div>
+    <div class="carddesc">Connect your IBKR account and your real positions and closed trades flow in automatically — so you barely have to type anything. <b>It only ever reads your statements; it can never trade or move money.</b></div>
+
+    <div class="alert caution" style="margin-top:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg><div><b>Do I need this?</b> It's optional but recommended. Without it you log trades by hand; with it, they appear automatically (about a day after they happen). New to it? <b>Press play on the 1-minute tutorial below.</b></div></div>
+
+    <!-- tutorial video -->
+    <div class="tourwrap">
+      <div class="tour" id="tour">
+        <div class="tourbg"></div>
+        <div class="tourstage">
+          <div class="tourchip" id="tourChip">Setup tutorial · 1 of 6</div>
+          <div class="tourtitle" id="tourTitle">How to connect Interactive Brokers</div>
+          <div class="tourcap" id="tourCap">A 5-minute, one-time setup. Press play and I'll walk you through every step.</div>
+          <div class="tourdots" id="tourDots"></div>
+        </div>
+        <div class="tourposter" id="tourPoster">
+          <div class="playbig"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+          <div class="postertitle">Watch: connect IBKR (step by step)</div>
+          <div class="postersub">One-time setup · about 5 minutes</div>
+        </div>
+        <div class="tourbar">
+          <button class="tourbtn" id="tourPlay" aria-label="Play / pause"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+          <div class="tourprog"><div class="fill" id="tourFill"></div></div>
+          <div class="tourtime" id="tourTime">0 / 6</div>
+          <button class="tourbtn" id="tourReplay" aria-label="Replay" title="Replay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- connection -->
+    <div class="row" style="margin-top:20px"><span class="label">Your IBKR connection</span><span class="conn no" id="connStatus"><span class="d"></span>Not connected</span></div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="field"><label><span class="term" data-tip="A number that identifies the report (Flex Query) you created in IBKR. You'll copy it from the Flex Queries list.">Flex Query ID</span></label><input class="in" id="ibkrQid" placeholder="e.g. 1519726"><div class="hint">From your IBKR Flex Queries list.</div></div>
+      <div class="field"><label><span class="term" data-tip="A long read-only key that lets the app fetch your statements. Treat it like a password. It cannot trade or move money.">Flex Web Service token</span></label><input class="in" id="ibkrTok" type="password" placeholder="paste your token"><div class="hint">Read-only — like a password.</div></div>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="btn gold" id="saveConn">Save connection</button>
+      <span class="hint" style="max-width:420px">Stored privately on your own account. The token is read-only — it can pull statements but can't trade or move money.</span></div>
+
+    <!-- ignore tickers -->
+    <div class="row" style="margin-top:22px"><span class="label">Ignore tickers on sync</span><span class="conn no" id="ignCount" style="display:none"></span></div>
+    <div class="carddesc" style="margin-top:6px">Tickers here are skipped automatically on every sync (they still show in the preview so you can override). Good for index hedges or account-only tickers you don't track in VIV.</div>
+    <div class="row" style="margin-top:10px; align-items:flex-end">
+      <div class="field" style="flex:1; min-width:240px"><input class="in" id="ignInput" placeholder="e.g. SPY, QQQ, VXX, SOXL"></div>
+      <button class="btn" id="ignSave">Save list</button>
+    </div>
+    <div class="chips" id="ignChips"></div>
+
+    <!-- written steps -->
+    <div class="expander">
+      <div class="exhead" id="exHead">📘 First time? Connect Interactive Brokers — step by step <span class="chev">▾</span></div>
+      <div class="exbody" id="exBody">
+        <div class="carddesc" style="margin-bottom:6px">A one-time setup that lets the app <b>read (never change)</b> your IBKR statements. About 5 minutes — follow each step exactly.</div>
+        <div class="steps">
+          <div class="step"><span class="sn">Step 1 · Log in on a computer</span><b>Open the IBKR Client Portal</b><p>Go to interactivebrokers.com → Client Portal (web, not the app). Top menu: <b>Performance &amp; Reports → Flex Queries</b>.</p></div>
+          <div class="step"><span class="sn">Step 2 · Create the query</span><b>New Activity Flex Query</b><p>Click the blue <b>+</b> next to "Activity Flex Query". In <b>Query Name</b> type <code>VIV</code>.</p></div>
+          <div class="step"><span class="sn">Step 3 · Tick two sections</span><b>Open Positions &amp; Trades</b><p>Under <b>Open Positions</b> click <b>Select All</b>. Under <b>Trades</b> click <b>Select All</b>. Leave everything else unticked.</p></div>
+          <div class="step"><span class="sn">Step 4 · Delivery settings</span><b>XML, last 365 days</b><p>Format = <code>XML</code>, Period = <b>Last 365 Calendar Days</b>. (We only keep trades from <b>May 2026</b> on, so nothing recent is missed.)</p></div>
+          <div class="step"><span class="sn">Step 5 · General settings</span><b>Leave the defaults</b><p>Date <code>yyyyMMdd</code>, Time <code>HHmmss</code>, Separator <code>;</code>, all Yes/No = No. Click <b>Continue → Create</b>.</p></div>
+          <div class="step"><span class="sn">Step 6 · Copy the Query ID</span><b>Write down the number</b><p>The query now shows a <b>Query ID</b> on the list. Copy it.</p></div>
+          <div class="step"><span class="sn">Step 7 · Get a token</span><b>Flex Web Service</b><p>Find <b>Flex Web Service Configuration</b>, switch <b>Status</b> to <b>on</b>, click <b>Generate New Token</b> (longest expiry), and copy it. <span style="color:var(--goldBright)">Treat it like a password.</span></p></div>
+          <div class="step"><span class="sn">Step 8 · Paste &amp; save</span><b>Link your account</b><p>Paste the <b>Query ID</b> and <b>token</b> into the fields above and click <b>Save connection</b>. Done — privately linked to you. The <b>Sync</b> button now pulls your data.</p></div>
+        </div>
+        <div class="alert ok" style="margin-top:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg><div><b>Good to know:</b> trades appear about <b>1 business day</b> after they happen (log manually for same-day, then reconcile). Every sync shows a <b>preview first</b> and only adds/updates IBKR rows — it never edits or deletes your manual entries.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DATA INTEGRITY ===== -->
+  <div class="card guide" data-gtitle="Data integrity check" data-gaudio="audio/settings-integrity.mp3" data-gbody="A health check for your records. It scans for duplicates, orphaned trades, and sign errors, and tells you whether everything is clean. It only reads your data — it never changes anything.">
+    <div class="eyebrow">Safety</div>
+    <div class="cardtitle">Check my data</div>
+    <div class="carddesc">Scan your trades and positions for duplicates, orphans, and sign errors. <b>Read-only — nothing is ever changed.</b> A good habit before and after a big import.</div>
+    <div class="row" style="margin-top:16px"><span class="conn yes"><span class="d"></span>Auto-checked on every sync</span><span class="hint">Your records are scanned for duplicates, orphans, and sign errors automatically — no manual run needed.</span></div>
+  </div>
+
+  <!-- ===== OWNER-ONLY ZONE ===== -->
+  <div class="ownerzone" id="ownerZone">
+    <div class="ownerhead">
+      <span class="ownerbadge">● Owner only</span>
+      <div style="flex:1"><div class="cardtitle" style="font-size:0.98rem">Access management &amp; data protection</div><div class="carddesc" style="margin-top:2px">Members never see this section. Manage who can register and back up everyone's data.</div></div>
+      <div class="seg" id="viewAs" title="Preview what a normal member sees"><button class="on" data-as="owner">View as owner</button><button data-as="member">View as member</button></div>
+    </div>
+    <div class="membernote">A regular member sees <b>none</b> of this — the entire owner zone is hidden for non-admins. Switch back to <b>View as owner</b> to manage codes, members, and backups.</div>
+
+    <!-- access code -->
+    <div class="card guide" data-gtitle="Registration code" data-gaudio="audio/settings-code.mp3" data-gbody="The code new members need to create an account. Share it in your community. Set a new one and the old code stops working immediately, so you can rotate it whenever you want.">
+      <div class="cardtitle" style="font-size:0.95rem">Active registration code</div>
+      <div class="carddesc">New members need this to sign up. Share it in your Skool community. Setting a new one deactivates the old one immediately.</div>
+      <div class="row" style="margin-top:14px; gap:14px"><span class="codeshow" id="codeShow">VIV-MAY-2026</span>
+        <button class="btn" id="copyCode">Copy</button><button class="btn red" id="deactCode">Deactivate</button></div>
+      <div class="row" style="margin-top:16px; align-items:flex-end">
+        <div class="field" style="flex:1; min-width:220px"><label>Set a new code</label><input class="in" id="newCode" placeholder="e.g. VIV-JUN-2026"></div>
+        <button class="btn gold" id="setCode">Set new code</button>
+      </div>
+    </div>
+
+    <!-- members -->
+    <div class="card">
+      <div class="cardtitle" style="font-size:0.95rem">Registered members <span style="color:var(--faint); font-weight:600; font-size:0.8rem">· 5 total</span></div>
+      <div style="margin-top:12px">
+        <div class="memrow"><div><div class="mn">Valen</div><div class="me">valen@valensontrades.com</div></div><span class="adm">Admin</span><span class="jd">Joined 2026-04-02</span></div>
+        <div class="memrow"><div><div class="mn">Marcus T.</div><div class="me">marcus.t@gmail.com</div></div><span class="jd">Joined 2026-05-06</span></div>
+        <div class="memrow"><div><div class="mn">Priya N.</div><div class="me">priya.n@outlook.com</div></div><span class="jd">Joined 2026-05-14</span></div>
+        <div class="memrow"><div><div class="mn">Dwayne K.</div><div class="me">dwayne.k@gmail.com</div></div><span class="jd">Joined 2026-05-21</span></div>
+        <div class="memrow"><div><div class="mn">Sofia R.</div><div class="me">sofia.r@proton.me</div></div><span class="jd">Joined 2026-06-01</span></div>
+      </div>
+    </div>
+
+    <!-- backup -->
+    <div class="card">
+      <div class="cardtitle" style="font-size:0.95rem">Backup &amp; restore</div>
+      <div class="carddesc">Export all member data (positions, trades, profiles, settings). <b>Run a backup before every deploy.</b> Restore is non-destructive — it only adds or updates, never deletes.</div>
+      <div class="row" style="margin-top:16px; gap:10px">
+        <button class="btn green" id="expJson">⤓ Export full backup (JSON)</button>
+        <button class="btn gold" id="expCsv">⤓ Export CSV (Excel)</button>
+        <label class="btn" style="cursor:pointer">⤒ Restore from backup<input type="file" id="restoreFile" accept=".json" style="display:none"></label>
+      </div>
+      <div id="backupStatus" style="margin-top:12px; font-size:0.76rem; color:var(--faint)"></div>
+    </div>
+  </div>
+
+  <!-- guide assistant -->
+  <div class="guidepanel" id="guidePanel" aria-live="polite">
+    <div class="gp-head"><span class="gp-dot"></span><span class="gp-title" id="gpTitle">Guided walkthrough</span><button class="gp-mute" id="gpMute" title="Mute voiceover" aria-label="Toggle voiceover"></button></div>
+    <div class="gp-body" id="gpBody">Hover any card and I'll explain it — out loud. Or press play on the IBKR tutorial. Switch to <b>Pro</b> (top-right) to turn this off.</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+</div>
+
+<script>
+  var $=function(id){return document.getElementById(id);};
+  function toast(m){ var el=$('toast'); el.textContent=m; el.classList.add('show'); clearTimeout(window.__t); window.__t=setTimeout(function(){el.classList.remove('show');},3000); }
+  function flashOk(btn, txt){ var o=btn.textContent; btn.textContent=txt||'Saved ✓'; btn.classList.add('ok'); setTimeout(function(){btn.textContent=o; btn.classList.remove('ok');},1800); }
+
+  /* ===== persisted Guided/Pro (shared across pages & sessions) ===== */
+  function setMode(mode, persist){
+    document.querySelectorAll('[data-mode]').forEach(function(x){ x.classList.toggle('on', x.dataset.mode===mode); });
+    document.body.classList.toggle('expert', mode==='pro');
+    if(persist!==false){ try{ localStorage.setItem('viv-mode', mode); }catch(e){} }
+  }
+  document.querySelectorAll('[data-mode]').forEach(function(b){
+    b.addEventListener('click', function(){ setMode(b.dataset.mode, true); if(b.dataset.mode==='pro') stopGuide(); });
+  });
+
+  /* ===== privacy default ===== */
+  function setPriv(v, persist){ document.querySelectorAll('#prefPrivacy button').forEach(function(x){x.classList.toggle('on',x.dataset.priv===v)});
+    if(persist!==false){ try{ localStorage.setItem('viv-privacy-mode', v); }catch(e){} toast(v==='on'?'Privacy on by default — amounts shown as %':'Dollar amounts shown by default'); } }
+  document.querySelectorAll('#prefPrivacy button').forEach(function(b){ b.addEventListener('click', function(){ setPriv(b.dataset.priv,true); }); });
+
+  /* ===== font size ===== */
+  var FONTPX={small:15,standard:16,large:18,huge:20};
+  function setFont(v, persist){ document.querySelectorAll('#prefFont button').forEach(function(x){x.classList.toggle('on',x.dataset.font===v)});
+    document.documentElement.style.fontSize=(FONTPX[v]||16)+'px';
+    if(persist!==false){ try{ localStorage.setItem('viv-font', v); }catch(e){} toast('Text size: '+v.charAt(0).toUpperCase()+v.slice(1)); } }
+  document.querySelectorAll('#prefFont button').forEach(function(b){ b.addEventListener('click', function(){ setFont(b.dataset.font,true); }); });
+
+  /* ===== restore prefs on load ===== */
+  (function(){
+    var m=null,p=null,f=null; try{ m=localStorage.getItem('viv-mode'); p=localStorage.getItem('viv-privacy-mode'); f=localStorage.getItem('viv-font'); }catch(e){}
+    // mode is page-based now: guided page always shows Guided active
+    if(p==='on'||p==='off') setPriv(p,false);
+    if(f&&FONTPX[f]) setFont(f,false);
+  })();
+
+  /* ===== profile / IBKR demo saves ===== */
+  $('saveProfile').addEventListener('click', function(){ flashOk(this,'Saved ✓'); toast('Profile saved.'); });
+  // reset the 3-day snooze on both Journal community cards (same localStorage keys the Journal writes)
+  $('resetSnooze').addEventListener('click', function(){
+    try{ localStorage.removeItem('viv-winshare-dismissed'); localStorage.removeItem('viv-support-dismissed'); }catch(e){}
+    flashOk(this,'Reset ✓'); toast('Community reminders reset — they\'ll show again on the Journal.');
+  });
+  function refreshConn(){ var ok=$('ibkrQid').value.trim()&&$('ibkrTok').value.trim();
+    var s=$('connStatus'); s.className='conn '+(ok?'yes':'no'); s.innerHTML='<span class="d"></span>'+(ok?'Connected ✓':'Not connected'); }
+  ['ibkrQid','ibkrTok'].forEach(function(id){ $(id).addEventListener('input',refreshConn); });
+  $('saveConn').addEventListener('click', function(){ refreshConn(); flashOk(this,'Saved ✓'); toast('IBKR connection saved (private to you).'); });
+
+  /* ===== ignore tickers ===== */
+  function renderIgn(){ var raw=$('ignInput').value; var list=raw.split(/[\s,]+/).map(function(s){return s.toUpperCase().trim();}).filter(Boolean);
+    list=list.filter(function(v,i){return list.indexOf(v)===i;});
+    $('ignChips').innerHTML=list.map(function(t){return '<span class="chip">⊘ '+t+'</span>';}).join('');
+    var c=$('ignCount'); if(list.length){ c.style.display=''; c.className='conn yes'; c.innerHTML='<span class="d"></span>'+list.length+' ignored'; } else c.style.display='none';
+    return list; }
+  $('ignSave').addEventListener('click', function(){ var list=renderIgn(); $('ignInput').value=list.join(', '); flashOk(this,'Saved ✓'); toast('Ignore list saved ('+list.length+' tickers).'); });
+
+  /* ===== data integrity: now runs automatically on each sync (no manual button) ===== */
+
+  /* ===== owner-only: view-as gating ===== */
+  document.querySelectorAll('#viewAs button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#viewAs button').forEach(function(x){x.classList.remove('on')}); b.classList.add('on');
+      if(b.dataset.as==='member'){ document.body.classList.add('member'); toast('Previewing as a member — the owner zone is hidden.'); }
+      else document.body.classList.remove('member');
+    });
+  });
+  /* keep view-as visible by exempting it from the hide rule via re-show after toggle */
+  $('copyCode').addEventListener('click', function(){ try{navigator.clipboard.writeText($('codeShow').textContent.trim());}catch(e){} flashOk(this,'Copied ✓'); toast('Registration code copied.'); });
+  $('deactCode').addEventListener('click', function(){ $('codeShow').textContent='— none —'; toast('Code deactivated. New members can\'t register until you set one.'); });
+  $('setCode').addEventListener('click', function(){ var v=$('newCode').value.trim().toUpperCase(); if(!v){toast('Enter a code first.');return;} $('codeShow').textContent=v; $('newCode').value=''; flashOk(this,'Set ✓'); toast('New registration code is live: '+v); });
+
+  /* ===== backup / restore (demo) ===== */
+  $('expJson').addEventListener('click', function(){
+    var data={exported_at:'2026-06-07T12:00:00Z', version:'1.0', counts:{positions:7,trades:12,profiles:5,settings:9}, note:'Demo backup from the mockup.'};
+    var url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+    var a=document.createElement('a'); a.href=url; a.download='VIV_Backup_2026-06-07.json'; a.click(); URL.revokeObjectURL(url);
+    $('backupStatus').textContent='Exported: 7 positions, 12 trades, 5 profiles, 9 settings.'; toast('Full backup downloaded.');
+  });
+  $('expCsv').addEventListener('click', function(){
+    var csv='Symbol,Entry Date,Exit Date,Shares,P/L %,P/L $\nNVDA,2026-05-14,2026-05-28,396,18.4,7900\n';
+    var url=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    var a=document.createElement('a'); a.href=url; a.download='VIV_Trades_2026-06-07.csv'; a.click(); URL.revokeObjectURL(url);
+    $('backupStatus').textContent='CSV exported (positions + trades).'; toast('CSV downloaded.');
+  });
+  $('restoreFile').addEventListener('change', function(){ if(this.files[0]){ $('backupStatus').textContent='Restored from "'+this.files[0].name+'" — non-destructive (adds/updates only).'; toast('Demo: would restore from '+this.files[0].name+'.'); } this.value=''; });
+
+  /* ===== steps expander ===== */
+  $('exHead').addEventListener('click', function(){ this.classList.toggle('open'); $('exBody').classList.toggle('open'); });
+
+  /* ===== IBKR tutorial video (sequential narrated chapters) ===== */
+  var TOUR=[
+    {chip:'Setup tutorial · 1 of 6', t:'Why connect Interactive Brokers?', c:'It reads your account — positions and closed trades — so your journal fills in automatically. It only reads; it can\'t trade. One-time, 5-minute setup.', a:'audio/ibkr-tour-0.mp3'},
+    {chip:'Step 1–2 · Create the query', t:'Make a Flex Query', c:'Log in to the IBKR Client Portal on a computer, open Performance & Reports → Flex Queries, add an Activity Flex Query, and name it VIV.', a:'audio/ibkr-tour-1.mp3'},
+    {chip:'Step 3 · Pick two sections', t:'Open Positions + Trades', c:'Tick just two sections — Open Positions (Select All) and Trades (Select All). Leave everything else unchecked.', a:'audio/ibkr-tour-2.mp3'},
+    {chip:'Step 4–5 · Delivery settings', t:'XML, last 365 days', c:'Set format to XML and period to the last 365 days. Leave the general settings on defaults, then Continue and Create.', a:'audio/ibkr-tour-3.mp3'},
+    {chip:'Step 6–7 · Get your keys', t:'Query ID + token', c:'Copy the Query ID from the list. Then open Flex Web Service, switch it on, generate a token with the longest expiry, and copy it. Treat it like a password.', a:'audio/ibkr-tour-4.mp3'},
+    {chip:'Step 8 · Link it', t:'Paste & save', c:'Paste the Query ID and token into the fields here and click Save connection. Your account is linked, privately to you. The Sync button now pulls your data.', a:'audio/ibkr-tour-5.mp3'}
+  ];
+  (function(){
+    var i=0, playing=false, audio=new Audio(); audio.preload='auto';
+    var chip=$('tourChip'), tt=$('tourTitle'), cap=$('tourCap'), dots=$('tourDots'), fill=$('tourFill'), time=$('tourTime'),
+        poster=$('tourPoster'), playBtn=$('tourPlay'), replay=$('tourReplay');
+    var PLAY='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+        PAUSE='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>';
+    dots.innerHTML=TOUR.map(function(_,k){return '<i'+(k===0?' class="on"':'')+'></i>';}).join('');
+    function render(){ var ch=TOUR[i]; chip.textContent=ch.chip; tt.textContent=ch.t; cap.textContent=ch.c;
+      dots.querySelectorAll('i').forEach(function(d,k){ d.classList.toggle('on',k===i); }); time.textContent=(i+1)+' / '+TOUR.length; }
+    var fb=null;
+    function playChapter(){ render(); audio.src=TOUR[i].a; audio.currentTime=0; audio.play().catch(function(){}); clearTimeout(fb); fb=setTimeout(function(){ if(playing) next(); },15000); }
+    function next(){ clearTimeout(fb); if(i<TOUR.length-1){ i++; playChapter(); } else stop(true); }
+    function start(){ poster.classList.add('hidden'); playing=true; playBtn.innerHTML=PAUSE; stopGuide(); playChapter(); }
+    function pause(){ playing=false; playBtn.innerHTML=PLAY; try{audio.pause();}catch(e){} clearTimeout(fb); }
+    function stop(done){ playing=false; playBtn.innerHTML=PLAY; try{audio.pause();}catch(e){} clearTimeout(fb); if(done) fill.style.width='100%'; }
+    audio.addEventListener('ended', next);
+    audio.addEventListener('timeupdate', function(){ var d=audio.duration||0, fr=d?audio.currentTime/d:0; fill.style.width=Math.min(100,(i+fr)/TOUR.length*100)+'%'; });
+    poster.addEventListener('click', function(){ i=0; fill.style.width='0%'; start(); });
+    playBtn.addEventListener('click', function(){ if(playing) pause(); else { if(poster.classList.contains('hidden')){ playing=true; playBtn.innerHTML=PAUSE; stopGuide(); if(audio.src){audio.play().catch(function(){}); clearTimeout(fb); fb=setTimeout(function(){if(playing)next();},15000);} else playChapter(); } else { i=0; fill.style.width='0%'; start(); } } });
+    replay.addEventListener('click', function(){ i=0; fill.style.width='0%'; poster.classList.add('hidden'); start(); });
+    window.__tourPlaying=function(){ return playing; };
+    render();
+  })();
+
+  /* ===== guided voiceover assistant (video has priority — muted while it plays) ===== */
+  var stopGuide=function(){};
+  (function(){
+    var panel=$('guidePanel'), gpTitle=$('gpTitle'), gpBody=$('gpBody'), gpMute=$('gpMute');
+    var SPK_ON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>';
+    var SPK_OFF='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>';
+    gpMute.innerHTML=SPK_ON;
+    var voiceOn=true, synth=window.speechSynthesis||null, audio=new Audio(); audio.preload='auto';
+    audio.addEventListener('playing', function(){panel.classList.add('speaking')});
+    audio.addEventListener('ended', function(){panel.classList.remove('speaking')});
+    audio.addEventListener('pause', function(){panel.classList.remove('speaking')});
+    function stopAll(){ try{audio.pause();}catch(e){} if(synth) synth.cancel(); }
+    stopGuide=stopAll;
+    var primed=false; function prime(){ if(primed)return; primed=true; audio.muted=true;
+      audio.play().then(function(){audio.pause();audio.currentTime=0;audio.muted=false;}).catch(function(){audio.muted=false;}); }
+    document.addEventListener('pointerdown', prime, {once:true}); document.addEventListener('keydown', prime, {once:true});
+    function narrate(el){ if(!voiceOn) return;
+      if(window.__tourPlaying && window.__tourPlaying()) return;   // video has priority
+      var src=el.getAttribute('data-gaudio');
+      if(src){ try{audio.pause();}catch(e){} audio.src=src; audio.currentTime=0; audio.play().catch(function(){}); }
+      else if(synth){ synth.cancel(); var u=new SpeechSynthesisUtterance((el.getAttribute('data-gtitle')||'')+'. '+(el.getAttribute('data-gbody')||''));
+        u.onstart=function(){panel.classList.add('speaking')}; u.onend=function(){panel.classList.remove('speaking')}; synth.speak(u); }
+    }
+    gpMute.addEventListener('click', function(){ voiceOn=!voiceOn; if(!voiceOn) stopAll(); gpMute.innerHTML=voiceOn?SPK_ON:SPK_OFF; gpMute.title=voiceOn?'Mute voiceover':'Unmute voiceover'; });
+    document.querySelectorAll('.guide').forEach(function(el){
+      el.addEventListener('mouseenter', function(){
+        if(document.body.classList.contains('expert')) return;
+        document.querySelectorAll('.guide-active').forEach(function(x){x.classList.remove('guide-active')});
+        el.classList.add('guide-active');
+        gpTitle.textContent=el.getAttribute('data-gtitle')||''; gpBody.textContent=el.getAttribute('data-gbody')||'';
+        narrate(el);
+      });
+      el.addEventListener('mouseleave', function(){ el.classList.remove('guide-active'); });
+    });
+  })();
+
+  /* ===== scroll-reveal: header entrance starts only when it scrolls into view ===== */
+  (function(){
+    var els=document.querySelectorAll('.reveal');
+    if(!els.length) return;
+    if(!('IntersectionObserver' in window)){ els.forEach(function(e){e.classList.add('in-view');}); return; }
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in-view'); io.unobserve(en.target); } });
+    }, {threshold:0.18, rootMargin:'0px 0px -8% 0px'});
+    els.forEach(function(e){ io.observe(e); });
+  })();
+</script>
+</body>
+</html>

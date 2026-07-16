@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIV — Recommended Dashboard (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     VIV brand tokens (from CLAUDE.md C object) — with the ONE
+     change I recommend: muted lifted from 0.58 -> 0.70 for legibility.
+     ============================================================ */
+  :root{
+    --bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
+    --text:rgba(255,255,255,0.92);
+    --muted:rgba(255,255,255,0.70);        /* was 0.58 — lifted */
+    --faint:rgba(255,255,255,0.45);        /* genuinely tertiary only */
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:var(--font); line-height:1.58; font-size:16px;
+    -webkit-font-smoothing:antialiased; padding:0; min-height:100vh;
+  }
+  /* tabular figures so numeric columns/readouts don't shift width */
+  .big,.north .big,.mini .val,.val,.outval,.outsub,.pl,.stepval,.numfield,.capinput,
+  tbody td,.allocnote,.alloclegend,.breakdown,.deployhead,.deploysub{font-variant-numeric:tabular-nums}
+  .shell{width:100%; max-width:1240px; margin:0 auto; padding:22px clamp(18px,2.4vw,40px) 80px}
+  /* 16-inch MacBook Pro (logical ~1728px) and larger external displays use more width */
+  @media(min-width:1500px){ .shell{max-width:1400px} }
+  /* external 4K / ultrawide displays */
+  @media(min-width:2000px){ .shell{max-width:1680px} }
+
+  /* nav tabs */
+  .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem}
+  .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
+  .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
+  .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+  .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
+  .tabs a:hover:not(.on){color:var(--text)}
+
+  /* glass card */
+  .card{
+    position:relative; background:var(--glass);
+    border:1px solid var(--border); border-radius:22px;
+    backdrop-filter:blur(28px) saturate(160%);
+    -webkit-backdrop-filter:blur(28px) saturate(160%);
+    padding:26px 28px; overflow:hidden;
+  }
+  .card::before{
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%);
+  }
+
+  /* typography helpers */
+  .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+  /* entrance animations are gated: hidden until a .reveal ancestor scrolls into view (.in-view) */
+  .h1{font-size:clamp(1.55rem,3vw,2.05rem); font-weight:800; letter-spacing:-0.04em; color:var(--white); opacity:0; transform:translateY(14px)}
+  .goldname{color:var(--goldBright)}
+  .sub{font-size:0.82rem; color:var(--muted); max-width:560px; margin-top:6px; opacity:0}
+  .riseup{opacity:0; transform:translateY(14px)}
+  .reveal.in-view .h1{animation:hRise 0.42s cubic-bezier(0.22,1,0.36,1) both}
+  .reveal.in-view .sub{animation:hFade 0.48s ease-out 0.2s both}
+  .reveal.in-view .riseup{animation:hRise 0.42s cubic-bezier(0.22,1,0.36,1) 0.1s both}
+  @keyframes hRise{from{opacity:0; transform:translateY(14px)}to{opacity:1; transform:translateY(0)}}
+  @keyframes hFade{from{opacity:0}to{opacity:1}}
+  /* risk allocation bar grows from zero on scroll-in (recompute sets the target inline width) */
+  .alloc.reveal:not(.in-view) .allocfill{width:0 !important}
+  .alloc.reveal.in-view .allocfill{transition:width 0.9s cubic-bezier(0.22,1,0.36,1)}
+  /* Open P/L sparkline: area + line rise together from the baseline on scroll-in */
+  #sparkRise{transform-box:fill-box; transform-origin:bottom; transform:scaleY(0); opacity:0.35}
+  .reveal.in-view #sparkRise{animation:sparkRise 0.95s cubic-bezier(0.22,1,0.36,1) both}
+  @keyframes sparkRise{from{transform:scaleY(0); opacity:0.35}to{transform:scaleY(1); opacity:1}}
+  /* reduced motion: never leave gated content hidden — show final state instantly */
+  @media (prefers-reduced-motion: reduce){
+    .h1,.sub,.riseup{animation:none !important; opacity:1; transform:none}
+    .alloc .allocfill{transition:none !important}
+    #sparkRise{animation:none !important; transform:none; opacity:1}
+  }
+  .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+
+  /* inline jargon: term + plain words, with dotted hover */
+  .term{border-bottom:1px dotted var(--borderGold); cursor:help; position:relative}
+  .term .plain{color:var(--faint); font-weight:500}
+  .term:hover::after{
+    content:attr(data-tip); position:absolute; left:0; top:130%;
+    width:240px; background:#11111b; border:1px solid var(--borderGold);
+    border-radius:12px; padding:10px 12px; font-size:0.72rem; font-weight:400;
+    letter-spacing:0; text-transform:none; color:var(--text); z-index:30;
+    box-shadow:0 14px 40px rgba(0,0,0,0.55); line-height:1.45; white-space:pre-line;
+  }
+  .term.tipright:hover::after{left:auto; right:0}
+
+  .row{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+  .spacer{flex:1}
+
+  /* ===== 1. ONE DOMINANT NUMBER ===== */
+  .hero{
+    display:grid; grid-template-columns:1.4fr 1fr; gap:18px; margin-top:22px;
+  }
+  .hero .equity{grid-column:1 / -1}   /* full-width row so controls have room */
+  .hero .north{
+    grid-row:span 1; display:flex; flex-direction:column; justify-content:center;
+    background:linear-gradient(140deg, rgba(34,197,94,0.10), transparent 70%);
+    border:1px solid rgba(34,197,94,0.22);
+  }
+  .north .big{
+    font-size:clamp(2.4rem,6vw,3.6rem); font-weight:800; letter-spacing:-0.045em;
+    color:var(--green); line-height:1; margin-top:8px;
+  }
+  .north .meta{font-size:0.78rem; color:var(--muted); margin-top:10px}
+  .spark{width:100%; height:52px; margin-top:16px; display:block}
+  .sparklabel{font-size:0.64rem; color:var(--faint); margin-top:5px; text-transform:uppercase; letter-spacing:0.1em; font-weight:600}
+  .mini{display:flex; flex-direction:column; justify-content:center}
+  .mini .val{font-size:1.7rem; font-weight:800; letter-spacing:-0.035em; margin-top:6px}
+  .mini .val.green{color:var(--green)} .mini .val.red{color:var(--red)} .mini .val.gold{color:var(--goldBright)}
+  .mini .hint{font-size:0.72rem; color:var(--muted); margin-top:6px}
+
+  /* ===== Compounding Equity tile: editable Starting Capital + Trail-Locked toggle ===== */
+  .equity .val{margin-top:8px}
+  .breakdown{font-size:0.8rem; color:var(--muted); margin-top:12px; line-height:1.75}
+  .breakdown .op{margin-left:6px}
+  .editcap{display:inline-flex; align-items:center; gap:5px; cursor:pointer; border-bottom:1px dotted var(--borderGold); padding-bottom:1px}
+  .editcap .capval{color:var(--text); font-weight:700}
+  .editcap .pencil{font-size:0.74rem; color:var(--gold)}
+  .capinput{background:rgba(255,255,255,0.05); border:1px solid var(--gold); border-radius:7px; color:var(--white); font-family:var(--font); font-size:0.82rem; font-weight:700; padding:4px 9px; width:120px; outline:none}
+  .tlrow{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid var(--border)}
+  .tllabel{display:flex; flex-direction:column; gap:3px}
+  .tllabel .gtip{font-size:0.7rem; color:var(--faint); font-weight:500}
+  .tlseg button[data-tl]{padding:6px 16px}
+  .equity.off .tlseg button[data-tl=on]{color:var(--muted); background:transparent}
+  .equity.off .tlseg button[data-tl=off]{color:var(--goldBright); background:var(--goldDim)}
+
+  /* collapsible header for the sizing console */
+  .card.equity{justify-content:flex-start}
+  .collapsehdr{display:flex; align-items:center; gap:14px; width:100%; background:transparent; border:none;
+               cursor:pointer; font-family:var(--font); color:var(--text); padding:0 0 18px; text-align:left}
+  .collapsetitle{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+  .collapsesummary{display:none; font-size:0.78rem; color:var(--muted); font-variant-numeric:tabular-nums}
+  .chev{margin-left:auto; color:var(--gold); font-size:1.35rem; line-height:1; transition:transform .2s}
+  .equity.collapsed .chev{transform:rotate(-90deg)}
+  .equity.collapsed .equity-grid{display:none}
+  .equity.collapsed .collapsesummary{display:inline}
+  .equity.collapsed .collapsehdr{padding-bottom:0}
+
+  /* three-column equity tile: equity | inputs (ROTE+Max) | outputs */
+  .equity-grid{display:grid; grid-template-columns:1.4fr 0.95fr 1.35fr; gap:0; width:100%}
+  .eq-left{padding-right:26px; display:flex; flex-direction:column}
+  .eq-left .tlrow{margin-top:auto}            /* push ON/OFF to the bottom */
+  .eq-col{padding-left:26px; border-left:1px solid var(--border); display:flex; flex-direction:column; justify-content:center}
+  .eq-col .ctrl + .ctrl{margin-top:22px}      /* gap between stacked inputs */
+  .ctrl .label{margin-bottom:9px}
+
+  /* outputs: read-only 2x2 */
+  .outgrid{display:grid; grid-template-columns:1fr 1fr; gap:18px 20px}
+  .outlabel{font-size:0.58rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:6px}
+  .outval{font-size:1.3rem; font-weight:800; letter-spacing:-0.03em; color:var(--white)}
+  .outval.green{color:var(--green)} .outval.red{color:var(--red)} .outval.gold{color:var(--goldBright)}
+  .outsub{font-size:0.68rem; color:var(--muted); margin-top:5px}
+  .outsub .g{color:var(--goldBright); font-weight:700}
+
+  /* rich tooltip (allows colored values inside) */
+  .richterm{position:relative; cursor:help; border-bottom:1px dotted var(--borderGold); padding-bottom:1px}
+  .richterm .pop{
+    display:none; position:absolute; left:0; top:150%; width:230px;
+    background:#11111b; border:1px solid var(--borderGold); border-radius:12px;
+    padding:10px 12px; font-size:0.72rem; font-weight:400; letter-spacing:0;
+    text-transform:none; color:var(--text); z-index:30; line-height:1.5;
+    box-shadow:0 14px 40px rgba(0,0,0,0.55);
+  }
+  .richterm:hover .pop{display:block}
+  .richterm .pop.right{left:auto; right:0}
+  .richterm .pop .g{color:var(--goldBright); font-weight:700}
+
+  /* ===== Risk allocation bar ===== */
+  .alloc{margin-top:18px}
+  .allocnote{font-size:0.76rem; color:var(--muted)}
+  .allocbar{position:relative; height:12px; border-radius:980px; overflow:hidden; margin:15px 0 13px;
+            background:rgba(34,197,94,0.18)}   /* remainder = available (green) */
+  .allocfill{position:absolute; left:0; top:0; height:100%; border-radius:980px; transition:width .25s ease;
+             background:linear-gradient(90deg, #dc4646, var(--red))}   /* at risk = red */
+  .allocbar.over .allocfill{background:linear-gradient(90deg, #991b1b, #dc2626)}
+  .alloclegend{display:flex; gap:24px; flex-wrap:wrap; font-size:0.78rem; color:var(--muted)}
+  .alloclegend b{color:var(--text); font-weight:700}
+  .leg{display:inline-flex; align-items:center}
+  .legdot{width:9px; height:9px; border-radius:50%; margin-right:8px}
+  .legdot.risk{background:var(--red)}
+  .legdot.avail{background:var(--green)}
+  .legdot.free{background:var(--blue)}
+  .deploy{margin-top:16px; padding:14px 16px; border-radius:14px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25)}
+  .deploy.over{background:rgba(239,68,68,0.08); border-color:rgba(239,68,68,0.28)}
+  .deployhead{font-size:0.86rem; font-weight:700; color:var(--green)}
+  .deploy.over .deployhead{color:#fca5a5}
+  .deployhead b{color:var(--white)}
+  .deploysub{font-size:0.74rem; color:var(--muted); margin-top:5px}
+  .deploysub b{color:var(--text); font-weight:700}
+
+  /* ===== Guided tutorial assistant (hover explanation + voiceover) ===== */
+  .guidepanel{position:fixed; right:24px; bottom:24px; width:330px; max-width:calc(100vw - 40px); z-index:200;
+    background:#11111b; border:1px solid var(--borderGold); border-radius:16px; padding:15px 17px;
+    box-shadow:0 22px 60px rgba(0,0,0,0.6); display:none}
+  body:not(.expert) .guidepanel{display:block}
+  .guidepanel.speaking{border-color:var(--goldBright); box-shadow:0 0 0 1px var(--goldBright), 0 22px 60px rgba(0,0,0,0.6)}
+  .gp-head{display:flex; align-items:center; gap:9px; margin-bottom:7px}
+  .gp-dot{width:8px; height:8px; border-radius:50%; background:var(--goldBright); flex:none}
+  .guidepanel.speaking .gp-dot{animation:gppulse 1s ease-in-out infinite}
+  @keyframes gppulse{0%,100%{opacity:1; transform:scale(1)}50%{opacity:0.35; transform:scale(1.6)}}
+  .gp-title{font-size:0.82rem; font-weight:800; color:var(--goldBright); flex:1}
+  .gp-mute{background:transparent; border:none; cursor:pointer; color:var(--muted); padding:3px; line-height:0; display:flex}
+  .gp-mute:hover{color:var(--text)}
+  .gp-mute svg{width:18px; height:18px}
+  .gp-body{font-size:0.78rem; color:var(--text); line-height:1.55}
+  .gp-body b{color:var(--goldBright)}
+  /* highlight the section currently being explained (Guided only) */
+  body:not(.expert) .guide{transition:box-shadow .2s}
+  body:not(.expert) .guide.guide-active{box-shadow:0 0 0 1px var(--borderGold), 0 0 50px rgba(201,152,42,0.13)}
+  .ctrlinput{display:inline-flex; align-items:center; gap:7px}
+  .numfield{background:rgba(255,255,255,0.05); border:1px solid var(--borderGold); border-radius:9px; color:var(--white); font-family:var(--font); font-size:1.2rem; font-weight:800; letter-spacing:-0.02em; padding:8px 13px; width:100px; outline:none}
+  .numfield:focus{border-color:var(--gold)}
+  .ctrlinput .suffix{color:var(--muted); font-weight:700; font-size:1.05rem}
+  .ctrlhint{font-size:0.7rem; color:var(--faint); margin-top:8px}
+  .stepper{display:inline-flex; align-items:center; border:1px solid var(--borderGold); border-radius:980px; overflow:hidden; background:rgba(255,255,255,0.03)}
+  .stepper button{border:none; background:transparent; color:var(--goldBright); font-family:var(--font); font-size:1.3rem; font-weight:700; width:44px; height:42px; cursor:pointer; line-height:1; transition:background .15s}
+  .stepper button:hover:not(:disabled){background:var(--goldDim)}
+  .stepper button:disabled{color:var(--faint); cursor:not-allowed}
+  .stepper .stepval{min-width:54px; text-align:center; font-size:1.2rem; font-weight:800; color:var(--white)}
+
+  /* welcoming default banner */
+  .welcome{
+    display:flex; gap:14px; align-items:flex-start; margin-top:22px;
+    background:var(--goldDim); border:1px solid var(--borderGold);
+    border-radius:16px; padding:16px 18px;
+  }
+  .welcome .dot{width:8px;height:8px;border-radius:50%;background:var(--goldBright);box-shadow:0 0 12px var(--goldBright);margin-top:6px;flex:none}
+  .welcome b{color:var(--white)}
+  .welcome .x{margin-left:auto; color:var(--faint); cursor:pointer; font-size:1.1rem; line-height:1}
+
+  /* ===== table ===== */
+  .toolbar{display:flex; align-items:center; gap:10px; margin:30px 0 14px; flex-wrap:wrap}
+  .toolbar h2{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+  .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
+  .seg button{
+    border:none; background:transparent; color:var(--muted); cursor:pointer;
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:7px 16px; border-radius:980px;
+    letter-spacing:0.02em; transition:all .15s;
+  }
+  .seg button.on{background:var(--goldDim); color:var(--goldBright)}
+  .btn{
+    border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text);
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:8px 16px;
+    border-radius:980px; cursor:pointer;
+  }
+  .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+  /* full-width add-position row beneath the table — easy reach after scrolling the list */
+  .addrow{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin:10px 0 2px;
+    padding:12px; border:1px dashed var(--borderGold,rgba(201,152,42,0.45)); border-radius:12px;
+    background:transparent; color:var(--goldBright); font-family:var(--font); font-size:0.78rem; font-weight:700;
+    letter-spacing:0.02em; cursor:pointer; transition:background .15s ease, border-color .15s ease}
+  .addrow:hover{background:rgba(201,152,42,0.10); border-color:var(--goldBright)}
+
+  table{width:100%; border-collapse:collapse}
+  thead th{
+    font-size:0.6rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--muted); text-align:right; padding:12px 14px; border-bottom:1px solid var(--border);
+  }
+  thead th:first-child, thead th:nth-child(2){text-align:left}
+  tbody td{padding:15px 14px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.84rem}
+  tbody td:first-child, tbody td:nth-child(2){text-align:left}
+  tbody tr:hover{background:rgba(255,255,255,0.025)}
+  .tick{font-weight:800; letter-spacing:-0.01em; font-size:0.92rem; display:flex; align-items:center; gap:9px}
+  .srcdot{width:7px;height:7px;border-radius:50%}
+  .srcdot.ibkr{background:var(--goldBright); box-shadow:0 0 8px var(--goldBright)}
+  .srcdot.man{background:rgba(255,255,255,0.28)}
+  .tag{display:inline-block; font-size:0.68rem; font-weight:600; color:var(--muted); background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:7px; padding:3px 9px}
+  .pl.up{color:var(--green); font-weight:700} .pl.dn{color:var(--red); font-weight:700}
+  .pl .pct{display:block; font-size:0.7rem; color:var(--muted); font-weight:500; margin-top:2px}
+
+  /* bold status pills — the column the eye should hit first */
+  .status{display:inline-flex; align-items:center; gap:7px; font-size:0.7rem; font-weight:700; padding:6px 12px; border-radius:980px; letter-spacing:0.02em}
+  .status .d{width:7px;height:7px;border-radius:50%}
+  .st-risk{background:rgba(239,68,68,0.12); color:#fda4a4; border:1px solid rgba(239,68,68,0.3)}
+  .st-risk .d{background:var(--red)}
+  .st-free{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+  .st-free .d{background:var(--green)}
+  .st-lock{background:rgba(59,130,246,0.12); color:#93c5fd; border:1px solid rgba(59,130,246,0.3)}
+  .st-lock .d{background:var(--blue)}
+
+  /* size health bar */
+  .sizebar{display:inline-flex; flex-direction:column; align-items:flex-end; gap:4px}
+  .sizebar .track{width:70px;height:5px;border-radius:980px;background:rgba(255,255,255,0.1);overflow:hidden}
+  .sizebar .fill{height:100%;border-radius:980px}
+  .sizebar small{font-size:0.66rem; color:var(--muted)}
+
+  .pro-only{display:none}
+  body.pro .pro-only{display:table-cell}
+  body.pro thead .pro-only{display:table-cell}
+
+  /* ===== Pro (expert) mode: strip the teaching layer ===== */
+  body.expert .welcome{display:none}
+  body.expert .term{border-bottom:none; cursor:default}
+  body.expert .term:hover::after{content:none}
+  body.expert .outsub{display:none}
+  body.expert .charthint{display:none}
+  body.expert .deploysub{display:none}   /* keep the one-line headline only */
+  .pro-note{font-size:0.72rem; color:var(--faint); margin-top:14px}
+
+  /* ===== Open Positions: per-row Manage panel ===== */
+  .mgcell{text-align:right; white-space:nowrap}
+  .mgcell .mgbtn + .mgbtn{margin-left:6px}
+  .mgbtn{background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+         font-size:0.68rem; font-weight:700; padding:6px 13px; border-radius:980px; cursor:pointer; white-space:nowrap}
+  .mgbtn:hover{color:var(--text); border-color:var(--borderGold)}
+  .mgbtn.sell{background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.32); color:#fca5a5}
+  .mgbtn.sell:hover{background:rgba(239,68,68,0.16); color:#fecaca}
+  .posrow.mg-open .mgbtn{background:var(--goldDim); color:var(--goldBright); border-color:var(--borderGold)}
+  .mgrow > td{padding:0 !important; border-bottom:1px solid rgba(255,255,255,0.06)}
+  .mgpanel{margin:2px 8px 14px; background:rgba(201,152,42,0.045); border:1px solid var(--borderGold); border-radius:16px; padding:18px 20px}
+  .mghead{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding-bottom:15px; margin-bottom:16px; border-bottom:1px solid var(--border)}
+  .mgtick{font-size:1.05rem; font-weight:800; color:var(--white); letter-spacing:-0.01em}
+  .mgls{font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--green); border:1px solid rgba(34,197,94,0.3); border-radius:6px; padding:2px 7px}
+  .mgmeta{font-size:0.74rem; color:var(--muted)} .mgmeta b{color:var(--text); font-weight:700; font-variant-numeric:tabular-nums}
+  .mgclose{margin-left:auto; background:transparent; border:none; color:var(--faint); font-size:1.4rem; line-height:1; cursor:pointer}
+  .mgclose:hover{color:var(--text)}
+  .mggrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0}
+  .mgcol{padding:0 22px; border-left:1px solid var(--border)}
+  .mgcol:first-child{padding-left:0; border-left:none}
+  .mgcol:last-child{padding-right:0}
+  .mgcoltitle{font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold); margin-bottom:14px}
+  .mgfield{display:flex; align-items:center; gap:8px; margin-bottom:10px}
+  .mgfield label{flex:1; font-size:0.76rem; color:var(--muted)}
+  .mgin{width:98px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--white);
+        font-family:var(--font); font-size:0.82rem; font-weight:700; padding:6px 9px; text-align:right; outline:none; font-variant-numeric:tabular-nums}
+  .mgin:focus{border-color:var(--gold)}
+  .mgin.gold{border-color:var(--borderGold); color:var(--goldBright)}
+  .mglock{background:transparent; border:none; color:var(--faint); cursor:pointer; font-size:0.78rem; padding:2px; line-height:0}
+  .mglock:hover{color:var(--gold)}
+  .mgsave{margin-top:8px}
+  .mgacts{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px}
+  .mgact{font-size:0.7rem; padding:7px 13px}
+  .mgactlist{font-size:0.76rem; color:var(--faint); padding:8px 0; min-height:36px}
+  .mgnote{font-size:0.68rem; color:var(--faint); line-height:1.5; margin-top:6px}
+  .mgreadout{display:flex; flex-direction:column}
+  .mgr{display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.78rem}
+  .mgr span{color:var(--muted)} .mgr b{color:var(--text); font-weight:700; font-variant-numeric:tabular-nums}
+  .mgr b.green{color:var(--green)} .mgr b.red{color:var(--red)} .mgr b.gold{color:var(--goldBright)}
+
+  /* Sell / Close + partial-sell */
+  .mgfoot{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:18px; padding-top:16px; border-top:1px solid var(--border)}
+  .mgfoot-hint{font-size:0.72rem; color:var(--faint)}
+  .mgsell{background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.32); color:#fca5a5; font-weight:700}
+  .mgsell:hover{background:rgba(239,68,68,0.16)}
+  .mgsell.open{background:rgba(239,68,68,0.18); color:#fecaca}
+  .mgsellform{margin-top:16px; padding-top:16px; border-top:1px dashed var(--borderGold)}
+  .mgsellgrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0}
+  .mgsellcol{padding:0 22px; border-left:1px solid var(--border)}
+  .mgsellcol:first-child{padding-left:0; border-left:none}
+  .mgsellcol:last-child{padding-right:0}
+  .quickrow{display:flex; align-items:center; gap:6px; margin:0 0 12px}
+  .chipbtn{background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+           font-size:0.66rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer}
+  .chipbtn:hover{color:var(--text); border-color:var(--borderGold)}
+  .mgof{font-size:0.7rem; color:var(--faint); margin-left:4px}
+  .mgsel{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--white);
+         font-family:var(--font); font-size:0.78rem; font-weight:600; padding:6px 9px; outline:none; cursor:pointer}
+  .mgsel:focus{border-color:var(--gold)}
+  .mgcheck{display:flex; align-items:center; gap:8px; font-size:0.76rem; color:var(--muted); margin-top:12px; cursor:pointer}
+  .mgcheck input{accent-color:var(--gold); width:15px; height:15px}
+  .mgoptional{color:var(--faint); font-weight:500; text-transform:none; letter-spacing:0}
+  .mgjournal{display:flex; flex-direction:column; gap:8px}
+  .mgta{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--text);
+        font-family:var(--font); font-size:0.76rem; padding:8px 10px; outline:none; resize:vertical; min-height:38px}
+  .mgta:focus{border-color:var(--gold)}
+  .mgin.wide{width:100%; text-align:left; font-weight:500}
+  .mgsellactions{display:flex; gap:10px; margin-top:14px}
+  .mgsellmsg{font-size:0.74rem; color:var(--green); margin-top:10px; min-height:18px}
+
+  /* mobile: cards instead of a 24-col scroll */
+  @media(max-width:760px){
+    .hero{grid-template-columns:1fr 1fr; }
+    .hero .north{grid-column:1 / -1}
+    .equity-grid{grid-template-columns:1fr}
+    .mggrid{grid-template-columns:1fr}
+    .mgcol{padding:18px 0 0; border-left:none; border-top:1px solid var(--border)}
+    .mgcol:first-child{padding-top:0}
+    .mgsellgrid{grid-template-columns:1fr}
+    .mgsellcol{padding:18px 0 0; border-left:none; border-top:1px solid var(--border)}
+    .mgsellcol:first-child{padding-top:0}
+    .eq-left{padding-right:0}
+    .eq-col{padding-left:0; border-left:none; border-top:1px solid var(--border); padding-top:20px; margin-top:20px}
+    table thead{display:none}
+    table, tbody, tr, td{display:block; width:100%}
+    tbody tr{border:1px solid var(--border); border-radius:16px; padding:8px 4px; margin-bottom:12px}
+    tbody td{display:flex; justify-content:space-between; align-items:center; text-align:right; border:none; padding:8px 14px}
+    tbody td::before{content:attr(data-l); color:var(--muted); font-size:0.66rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:700}
+    .tick{font-size:1rem}
+  }
+  /* ===== phones (iPhone 15 Pro 393px and up) ===== */
+  @media(max-width:600px){
+    .navbar{flex-wrap:wrap; gap:10px} .navbar .spacer{display:none}
+    .tabs{overflow-x:auto; max-width:100%; scrollbar-width:none} .tabs::-webkit-scrollbar{display:none} .tabs a{white-space:nowrap}
+    .hero{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- NAV TABS -->
+  <div class="navbar">
+    <div class="brand"><img class="vmark" src="../public/logo-mark.png" alt="VIV" style="background:none; object-fit:contain"> Valen Insiders Vault</div>
+    <div class="tabs">
+      <a href="dashboard-recommended.html" class="on">Dashboard</a>
+      <a href="journal-recommended.html">Journal</a>
+      <a href="premium-recommended.html">Premium tools</a>
+      <a href="daily-setups.html">Daily Setups</a>
+      <a href="model-book.html">Model Book</a>
+      <a href="studies.html" title="Admin-only tab">Studies</a>
+      <a href="quant.html" title="Admin-only tab">Quant</a>
+      <a href="settings-recommended.html">Settings</a>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+      <button class="on" data-mode="guided">Guided</button>
+      <button data-mode="pro" onclick="location.href='dashboard-pro.html'">Pro</button>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <div class="reveal">
+    <div class="eyebrow">Dashboard</div>
+    <div class="row" style="margin-top:6px">
+      <div class="h1">Welcome back, <span class="goldname">Valen</span></div>
+    </div>
+    <div class="sub">Your trading compounding cockpit. Everything below updates live from your positions and closed trades.</div>
+  </div>
+
+  <!-- 1. ONE DOMINANT NUMBER -->
+  <div class="hero">
+    <div class="card north guide reveal" data-countup="heroPL" data-gtitle="Open profit and loss this month" data-gaudio="audio/open-pl.mp3" data-gbody="This is how much your open positions are up or down so far this month. Green means you're in profit on the month; red means you're down. The line below shows your account's 30-day trend.">
+      <div class="label">Open P/L &middot; this month's live result</div>
+      <div class="big" id="heroPL">+$4,182.50</div>
+      <div class="meta">+2.34% across 6 open positions &middot; you're green on the month</div>
+      <svg class="spark" viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Equity trend over the last 30 days, trending up">
+        <defs>
+          <linearGradient id="sparkg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="rgba(34,197,94,0.34)"/>
+            <stop offset="100%" stop-color="rgba(34,197,94,0)"/>
+          </linearGradient>
+        </defs>
+        <g id="sparkRise">
+        <path d="M0,44 L32,46 L64,40 L96,42 L128,33 L160,36 L192,26 L224,30 L256,18 L288,22 L320,9 L320,56 L0,56 Z" fill="url(#sparkg)"/>
+        <path d="M0,44 L32,46 L64,40 L96,42 L128,33 L160,36 L192,26 L224,30 L256,18 L288,22 L320,9" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+        </g>
+      </svg>
+      <div class="sparklabel">30-day equity trend</div>
+    </div>
+    <div class="card mini guide reveal" data-countup="rtsVal" data-gtitle="Risk in the market" data-gaudio="audio/risk-market.mp3" data-gbody="This is the total you would lose if every open position hit its stop at the same time. Keep it below your personal limit — here, two percent of your account.">
+      <div class="label">
+        <span class="term" data-tip="Risk To Stop: the total dollars you'd lose right now if every open position hit its stop. This is your real exposure.">
+          Risk in the market <span class="plain">(RTS)</span>
+        </span>
+      </div>
+      <div class="val red" id="rtsVal">$1,920</div>
+      <div class="hint riseup">1.1% of equity at risk — well inside your 2% rule</div>
+    </div>
+    <div class="card mini equity guide" data-gtitle="Live risk budget and sizing" data-gaudio="audio/console.mp3" data-gbody="Set how much of your account you are willing to risk, and across how many trades. The right side shows your total risk budget and how big each new trade can be.">
+     <button class="collapsehdr" id="eqCollapse" aria-expanded="true" aria-controls="eqGrid">
+       <span class="collapsetitle">Live Risk Budget &amp; Sizing</span>
+       <span class="collapsesummary" id="eqSummary"></span>
+       <span class="chev" id="eqChev" aria-hidden="true">&#9662;</span>
+     </button>
+     <div class="equity-grid" id="eqGrid">
+
+      <!-- LEFT column: compounding equity (small) -->
+      <div class="eq-left">
+        <div class="label">
+          <span class="term" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">
+            Compounding equity <span class="plain">(ROTE base)</span>
+          </span>
+        </div>
+        <div class="val gold" id="equityVal">$179,041</div>
+
+        <!-- breakdown: Starting Capital is click-to-edit; trail-locked is auto-calc -->
+        <div class="breakdown">
+          Start
+          <span class="editcap" id="capWrap">
+            <span class="capval" id="capText">$150,000</span>
+            <span class="pencil">&#9998;</span>
+            <input class="capinput" id="capInput" type="text" value="$150,000" style="display:none" />
+          </span>
+          <span class="op">+ $29,041 realized</span>
+          <span class="op tl" id="tlBreak">+ $0 trail-locked</span>
+        </div>
+
+        <!-- Trail-Locked: NOT typed — auto-calculated; you only toggle include/exclude -->
+        <div class="tlrow">
+          <div class="tllabel">
+            <span class="term" data-tip="Trail-locked profit is calculated automatically: the sum of (stop − entry) × shares for every position whose stop sits above entry. You don't enter it — you only choose whether it counts toward your sizing base.">
+              Include trail-locked profit
+            </span>
+            <small class="gtip">Auto-calculated from your stops &middot; $0 locked right now</small>
+          </div>
+          <div class="seg tlseg" id="tlSeg">
+            <button class="on" data-tl="on">ON &#9679;</button>
+            <button data-tl="off">OFF</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- INPUTS column: Target ROTE + Maximum positions (both editable) -->
+      <div class="eq-col">
+        <div class="ctrl">
+          <div class="label">
+            <span class="term" data-tip="Target ROTE: the % of total equity you're willing to have at risk across ALL open trades at once. Your total risk budget = equity × this %.">
+              Target ROTE <span class="plain">(risk budget %)</span>
+            </span>
+          </div>
+          <div class="ctrlinput">
+            <input class="numfield" id="roteInput" type="text" value="2.00" />
+            <span class="suffix">%</span>
+          </div>
+        </div>
+
+        <div class="ctrl">
+          <div class="label">
+            <span class="term" data-tip="The most open positions you'll hold at once. Sizing divides your risk budget across this many trades so you don't over-concentrate.">
+              Maximum positions
+            </span>
+          </div>
+          <div class="stepper">
+            <button id="maxDown" aria-label="decrease" disabled>&minus;</button>
+            <span class="stepval" id="maxVal">0</span>
+            <button id="maxUp" aria-label="increase">&plus;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- OUTPUTS column: read-only, computed live from the inputs -->
+      <div class="eq-col">
+        <div class="outgrid">
+          <div class="out">
+            <div class="outlabel">Total risk budget</div>
+            <div class="outval gold" id="oBudget">$3,581</div>
+            <div class="outsub"><span class="g" id="subBudgetRote">2.00%</span> of <span class="g" id="subBudgetEq">$179,041</span></div>
+          </div>
+          <div class="out">
+            <div class="outlabel">R per trade <span class="plain">(full)</span></div>
+            <div class="outval" id="oR">&mdash;</div>
+            <div class="outsub"><span class="g" id="subReach">&mdash;</span> ROTE each</div>
+          </div>
+          <div class="out">
+            <div class="outlabel">Current ROTE</div>
+            <div class="outval" id="oCur">1.07%</div>
+            <div class="outsub">Target: <span class="g" id="subTarget">2.00%</span> max</div>
+          </div>
+          <div class="out">
+            <div class="outlabel">Available</div>
+            <div class="outval green" id="oAvail">$1,661</div>
+            <div class="outsub"><span class="g" id="subAvailPct">0.93%</span> ROTE remaining</div>
+          </div>
+        </div>
+      </div>
+
+     </div>
+    </div>
+  </div>
+
+  <!-- RISK ALLOCATION -->
+  <div class="card alloc guide reveal" data-gtitle="Risk allocation" data-gaudio="audio/allocation.mp3" data-gbody="A picture of your risk budget. Red is risk already in the market, green is what is still free to deploy, and blue counts positions whose stops are locked in profit.">
+    <div class="row">
+      <div class="label">Risk allocation</div>
+      <div class="spacer"></div>
+      <div class="allocnote" id="allocNote">$1,920 of $3,581 budget deployed</div>
+    </div>
+    <div class="allocbar" id="allocBar">
+      <div class="allocfill" id="allocFill" style="width:54%"></div>
+    </div>
+    <div class="alloclegend">
+      <span class="leg"><span class="legdot risk"></span>At Risk&nbsp;<b id="legDep">$1,920</b>&nbsp;<span id="legDepPct">(2)</span></span>
+      <span class="leg"><span class="legdot avail"></span>Available&nbsp;<b id="legAvail">$1,661</b>&nbsp;<span id="legAvailPct">(46%)</span></span>
+      <span class="leg"><span class="legdot free"></span>Risk-Free&nbsp;<b>4</b>&nbsp;<span>(freed $34,688)</span></span>
+    </div>
+
+    <!-- deploy guidance: turns the numbers into a plain-English next action -->
+    <div class="deploy" id="deployBanner">
+      <div class="deployhead" id="deployHead">You can deploy <b>$1,661</b> more risk</div>
+      <div class="deploysub" id="deploySub">Set your Maximum positions above to see how that splits into per-trade sizing.</div>
+    </div>
+  </div>
+
+  <!-- welcoming default for new / guided users -->
+  <div class="welcome">
+    <span class="dot"></span>
+    <div>
+      <b>New here?</b> Hover any card and the guide in the corner will explain it — <b>out loud</b>. Mute the voiceover anytime,
+      or switch to <span class="term" data-tip="Pro mode hides all the guidance and voiceover for experienced traders.">Pro</span> (top-right) to turn the whole tutorial off.
+    </div>
+    <span class="x">&times;</span>
+  </div>
+
+  <!-- TABLE -->
+  <div class="toolbar">
+    <h2>Open Positions</h2>
+    <div class="spacer"></div>
+    <div class="seg" id="viewSeg">
+      <button class="on" data-view="simple">Simple</button>
+      <button data-view="pro">Pro &middot; all columns</button>
+    </div>
+    <button class="btn">Refresh Prices</button>
+    <button class="btn gold">+ Add Position</button>
+  </div>
+
+  <div class="card guide" style="padding:8px 6px" data-gtitle="Open positions" data-gaudio="audio/positions.mp3" data-gbody="Every trade you currently hold. Start in Simple view for the essentials, or switch to Pro for full detail. The colored status shows which positions are at risk.">
+  <table>
+    <thead>
+      <tr>
+        <th><span class="term" data-tip="Where this position sits on risk.&#10;At Risk = stop below entry (you could still lose).&#10;Risk-Free = stop at entry.&#10;Profit Locked = stop above entry (gains secured).">Status</span></th>
+        <th><span class="term" data-tip="The ticker symbol. The dot shows the source: gold = auto-synced from IBKR, grey = entered manually.">Symbol</span></th>
+        <th class="pro-only"><span class="term" data-tip="How many shares you currently hold in this position.">Shares</span></th>
+        <th class="pro-only"><span class="term" data-tip="Your average entry price per share across every buy in this position.">Avg Cost</span></th>
+        <th class="pro-only"><span class="term" data-tip="The pattern or reason you took the trade (e.g. VCP, Breakout). Lets you track which setups actually work for you.">Setup</span></th>
+        <th><span class="term" data-tip="Total dollars in this position — shares × average cost.">Position size</span></th>
+        <th><span class="term" data-tip="Whether this position matches your target size.&#10;On size = good · Oversized = too big · Undersized = room to add.">Size health</span></th>
+        <th class="pro-only"><span class="term tipright" data-tip="Your current protective stop price — where you'll exit to cap the loss.">Stop</span></th>
+        <th><span class="term tipright" data-tip="Dollars you'd lose if price falls to your stop from here. $0 or 'locked' means no money is at risk.">Risk to stop</span></th>
+        <th class="pro-only"><span class="term tipright" data-tip="R-multiple — profit or loss measured in units of your initial risk. +2R means you've made twice what you risked.">R</span></th>
+        <th><span class="term tipright" data-tip="Open profit or loss on this position right now, in $ and %. It's on paper until you sell.">P/L</span></th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="posrow" data-ticker="NVDA" data-status="At Risk" data-statusclass="st-risk" data-ls="Long" data-shares="120" data-avg="$118.40" data-cur="$129.60" data-size="$14,208" data-setup="VCP · Breakout" data-orig="$112.00" data-stop2="—" data-trail="—" data-dts="13.6% · $17.60" data-rts="$768" data-rote="0.43%" data-r="+1.8R" data-locked="$0" data-sbe="110 of 120 sh" data-realized="$0" data-unreal="+$1,344 (+9.46%)" data-comm="$8.40">
+        <td data-l="Status"><span class="status st-risk"><span class="d"></span>At Risk</span></td>
+        <td data-l="Symbol"><span class="tick"><span class="srcdot ibkr"></span>NVDA</span></td>
+        <td class="pro-only" data-l="Shares">120</td>
+        <td class="pro-only" data-l="Avg Cost">$118.40</td>
+        <td class="pro-only" data-l="Setup"><span class="tag">VCP</span></td>
+        <td data-l="Position size">$14,208</td>
+        <td data-l="Size health"><span class="sizebar"><span class="track"><span class="fill" style="width:78%;background:var(--green)"></span></span><small>On size</small></span></td>
+        <td class="pro-only" data-l="Stop">$112.00</td>
+        <td data-l="Risk to stop"><span class="pl dn">$768</span></td>
+        <td class="pro-only" data-l="R"><span class="pl up">+1.8R</span></td>
+        <td data-l="P/L"><span class="pl up">+$1,344<span class="pct">+9.46%</span></span></td>
+        <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+      </tr>
+      <tr class="posrow" data-ticker="AVGO" data-status="Risk-Free" data-statusclass="st-free" data-ls="Long" data-shares="45" data-avg="$172.10" data-cur="$194.06" data-size="$7,744" data-setup="Breakout" data-orig="$172.10" data-stop2="—" data-trail="$176.00" data-dts="11.3% · $21.96" data-rts="$0" data-rote="0.00%" data-r="+2.4R" data-locked="$0" data-sbe="40 of 45 sh" data-realized="$0" data-unreal="+$988 (+12.76%)" data-comm="$4.20">
+        <td data-l="Status"><span class="status st-free"><span class="d"></span>Risk-Free</span></td>
+        <td data-l="Symbol"><span class="tick"><span class="srcdot ibkr"></span>AVGO</span></td>
+        <td class="pro-only" data-l="Shares">45</td>
+        <td class="pro-only" data-l="Avg Cost">$172.10</td>
+        <td class="pro-only" data-l="Setup"><span class="tag">Breakout</span></td>
+        <td data-l="Position size">$7,744</td>
+        <td data-l="Size health"><span class="sizebar"><span class="track"><span class="fill" style="width:42%;background:var(--blue)"></span></span><small>Undersized</small></span></td>
+        <td class="pro-only" data-l="Stop">$172.10</td>
+        <td data-l="Risk to stop"><span class="pl up">$0</span></td>
+        <td class="pro-only" data-l="R"><span class="pl up">+2.4R</span></td>
+        <td data-l="P/L"><span class="pl up">+$988<span class="pct">+12.76%</span></span></td>
+        <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+      </tr>
+      <tr class="posrow" data-ticker="PANW" data-status="Profit Locked" data-statusclass="st-lock" data-ls="Long" data-shares="80" data-avg="$188.20" data-cur="$214.50" data-size="$15,056" data-setup="Pivot · Momentum" data-orig="$180.00" data-stop2="$188.20" data-trail="$196.00" data-dts="8.6% · $18.50" data-rts="Locked" data-rote="0.00%" data-r="+3.1R" data-locked="$624" data-sbe="70 of 80 sh" data-realized="$0" data-unreal="+$2,104 (+13.97%)" data-comm="$6.00">
+        <td data-l="Status"><span class="status st-lock"><span class="d"></span>Profit Locked</span></td>
+        <td data-l="Symbol"><span class="tick"><span class="srcdot man"></span>PANW</span></td>
+        <td class="pro-only" data-l="Shares">80</td>
+        <td class="pro-only" data-l="Avg Cost">$188.20</td>
+        <td class="pro-only" data-l="Setup"><span class="tag">Pivot</span></td>
+        <td data-l="Position size">$15,056</td>
+        <td data-l="Size health"><span class="sizebar"><span class="track"><span class="fill" style="width:96%;background:var(--red)"></span></span><small>Oversized</small></span></td>
+        <td class="pro-only" data-l="Stop">$196.00</td>
+        <td data-l="Risk to stop"><span class="pl up">locked</span></td>
+        <td class="pro-only" data-l="R"><span class="pl up">+3.1R</span></td>
+        <td data-l="P/L"><span class="pl up">+$2,104<span class="pct">+13.97%</span></span></td>
+        <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+      </tr>
+      <tr class="posrow" data-ticker="KLAC" data-status="At Risk" data-statusclass="st-risk" data-ls="Long" data-shares="30" data-avg="$610.00" data-cur="$601.53" data-size="$18,300" data-setup="VCP" data-orig="$572.00" data-stop2="—" data-trail="—" data-dts="4.9% · $29.53" data-rts="$1,152" data-rote="0.64%" data-r="-0.2R" data-locked="$0" data-sbe="— underwater" data-realized="$0" data-unreal="-$254 (-1.37%)" data-comm="$6.00">
+        <td data-l="Status"><span class="status st-risk"><span class="d"></span>At Risk</span></td>
+        <td data-l="Symbol"><span class="tick"><span class="srcdot ibkr"></span>KLAC</span></td>
+        <td class="pro-only" data-l="Shares">30</td>
+        <td class="pro-only" data-l="Avg Cost">$610.00</td>
+        <td class="pro-only" data-l="Setup"><span class="tag">VCP</span></td>
+        <td data-l="Position size">$18,300</td>
+        <td data-l="Size health"><span class="sizebar"><span class="track"><span class="fill" style="width:72%;background:var(--green)"></span></span><small>On size</small></span></td>
+        <td class="pro-only" data-l="Stop">$572.00</td>
+        <td data-l="Risk to stop"><span class="pl dn">$1,152</span></td>
+        <td class="pro-only" data-l="R"><span class="pl dn">-0.2R</span></td>
+        <td data-l="P/L"><span class="pl dn">-$254<span class="pct">-1.37%</span></span></td>
+        <td class="mgcell" data-l=""><button class="mgbtn">Manage</button><button class="mgbtn sell" title="Sell or close this position">Sell</button></td>
+      </tr>
+
+      <!-- reusable Manage panel: populated from the clicked row, inserted beneath it -->
+      <tr id="mgRow" class="mgrow" style="display:none"><td colspan="12">
+        <div class="mgpanel">
+          <div class="mghead">
+            <span class="status" id="mgStatus"><span class="d"></span><span id="mgStatusTxt"></span></span>
+            <span class="mgtick" id="mgTicker"></span>
+            <span class="mgls" id="mgLs"></span>
+            <span class="mgmeta"><b id="mgShares"></b> sh @ <b id="mgAvg"></b></span>
+            <span class="mgmeta">Position <b id="mgSize"></b></span>
+            <span class="mgmeta">Setup <b id="mgSetup"></b></span>
+            <button class="mgclose" id="mgClose" aria-label="Close">&times;</button>
+          </div>
+          <div class="mggrid">
+            <div class="mgcol">
+              <div class="mgcoltitle">Stops &amp; price</div>
+              <div class="mgfield"><label><span class="term" data-tip="The latest market price (~15 min delayed). Drives your live P/L and how far you are from your stop.">Current price</span></label><input class="mgin gold" id="mgCur"></div>
+              <div class="mgfield"><label><span class="term" data-tip="Your first protective stop, set when you entered. The lock keeps it from being changed by accident.">Original stop</span></label><input class="mgin" id="mgOrig"><button class="mglock" title="Lock this stop">&#128274;</button></div>
+              <div class="mgfield"><label><span class="term" data-tip="A raised stop after the trade moved your way — often lifted up to your entry (break-even).">2nd stop</span></label><input class="mgin" id="mgStop2"><button class="mglock" title="Lock this stop">&#128274;</button></div>
+              <div class="mgfield"><label><span class="term" data-tip="A stop that follows price upward to lock in more profit as the trade works.">Trailing stop</span></label><input class="mgin" id="mgTrail"></div>
+              <button class="btn gold mgsave">Save stops</button>
+            </div>
+            <div class="mgcol">
+              <div class="mgcoltitle">Activity today</div>
+              <div class="mgacts">
+                <button class="btn mgact">Trim</button>
+                <button class="btn mgact">Add</button>
+                <button class="btn mgact">Nudge stop</button>
+                <button class="btn mgact">Note</button>
+              </div>
+              <div class="mgactlist" id="mgActList">No activity logged today.</div>
+              <div class="mgnote">Calculation only &mdash; logging here doesn't change your shares, stop, or P/L. IBKR sync fills the journal overnight.</div>
+            </div>
+            <div class="mgcol">
+              <div class="mgcoltitle">Risk &amp; P/L</div>
+              <div class="mgreadout">
+                <div class="mgr"><span class="term tipright" data-tip="Dollars you'd lose if price hits your stop from here. $0 or 'Locked' means no money is at risk.">Risk to stop</span><b id="mgRts"></b></div>
+                <div class="mgr"><span class="term tipright" data-tip="ROTE — this position's risk as a % of your whole account. Keep the total across positions inside your limit.">Risk on equity</span><b id="mgRote"></b></div>
+                <div class="mgr"><span class="term tipright" data-tip="Profit or loss in units of your initial risk. +2R = twice what you risked; -1R = a full planned loss.">R-multiple</span><b id="mgR"></b></div>
+                <div class="mgr"><span class="term tipright" data-tip="Profit already secured because your stop sits above entry — you keep this even if it reverses to the stop.">Locked profit</span><b id="mgLocked"></b></div>
+                <div class="mgr"><span class="term tipright" data-tip="SBE — Shares to Break-Even. How many shares to sell at the current price to recover your full cost basis, so the shares you keep are effectively free. '—' means the position is underwater (selling can't recover cost yet).">SBE &middot; Shares to Break-Even</span><b id="mgSbe"></b></div>
+                <div class="mgr"><span class="term tipright" data-tip="Profit already banked from earlier partial sells of this position.">Realized</span><b id="mgRealized"></b></div>
+                <div class="mgr"><span class="term tipright" data-tip="Paper profit/loss still open — it keeps changing until you sell.">Unrealized</span><b id="mgUnreal"></b></div>
+                <div class="mgr"><span class="term tipright" data-tip="Broker fees paid on this position so far.">Commission</span><b id="mgComm"></b></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sell / Close + partial-sell -->
+          <div class="mgfoot">
+            <button class="btn mgsell" id="mgSellToggle">Sell / Close position</button>
+            <span class="mgfoot-hint">Logs a closed trade to your journal and reduces (or closes) this position.</span>
+          </div>
+          <div class="mgsellform" id="mgSellForm" style="display:none">
+            <div class="mgsellgrid">
+
+              <div class="mgsellcol">
+                <div class="mgcoltitle">Sell details</div>
+                <div class="mgfield"><label><span class="term" data-tip="How many shares to sell now. Fewer than your total = partial sell (position stays open); all = full close.">Shares to sell</span></label><input class="mgin" id="mgSellQty"></div>
+                <div class="quickrow">
+                  <button class="chipbtn" data-pct="25">25%</button>
+                  <button class="chipbtn" data-pct="50">50%</button>
+                  <button class="chipbtn" data-pct="75">75%</button>
+                  <button class="chipbtn" data-pct="100">All</button>
+                  <span class="mgof" id="mgSellOf"></span>
+                </div>
+                <div class="mgfield"><label><span class="term" data-tip="The price you're selling at. Drives the realized P/L shown on the right.">Exit price</span></label><input class="mgin gold" id="mgSellPrice"></div>
+                <div class="mgfield"><label><span class="term" data-tip="Broker fee for this sale. Leave blank to estimate it from the position's commission.">Commission</span></label><input class="mgin" id="mgSellComm" placeholder="0.00"></div>
+                <div class="mgfield"><label><span class="term" data-tip="Why you're selling — saved to your journal so you can review your decisions later.">Exit reason</span></label>
+                  <select class="mgsel" id="mgSellReason">
+                    <option>Sold Into Strength</option>
+                    <option>Hit Initial Stop</option>
+                    <option>Hit Trailing Stop</option>
+                    <option>Time Stop</option>
+                    <option>Risk Reduction</option>
+                    <option>Changed Thesis</option>
+                  </select>
+                </div>
+                <label class="mgcheck"><input type="checkbox" id="mgSellJournal" checked> Add to journal</label>
+              </div>
+
+              <div class="mgsellcol">
+                <div class="mgcoltitle">Trade review <span class="mgoptional">(optional)</span></div>
+                <div class="mgjournal" id="mgJournalFields">
+                  <textarea class="mgta" id="mgRight" placeholder="What went right?"></textarea>
+                  <textarea class="mgta" id="mgWrong" placeholder="What went wrong?"></textarea>
+                  <textarea class="mgta" id="mgLearned" placeholder="What I learned"></textarea>
+                  <input class="mgin wide" id="mgTv" placeholder="tradingview.com/… (chart link)">
+                </div>
+              </div>
+
+              <div class="mgsellcol">
+                <div class="mgcoltitle">This sale</div>
+                <div class="mgreadout">
+                  <div class="mgr"><span class="term tipright" data-tip="What share of this position you're selling in this order.">% of position</span><b id="sSoldPct"></b></div>
+                  <div class="mgr"><span class="term tipright" data-tip="Shares left open after this sale. Zero means the position closes.">Shares remaining</span><b id="sRemain"></b></div>
+                  <div class="mgr"><span class="term tipright" data-tip="Cash profit/loss you bank on the shares sold = (exit − average cost) × shares.">Realized P/L</span><b id="sPl"></b></div>
+                  <div class="mgr"><span class="term tipright" data-tip="The percentage gain or loss on the shares you're selling.">Return</span><b id="sPct"></b></div>
+                  <div class="mgr"><span class="term tipright" data-tip="The realized profit measured in units of your initial risk (R).">Realized R</span><b id="sR"></b></div>
+                </div>
+                <div class="mgsellactions">
+                  <button class="btn gold" id="mgSellConfirm">Sell</button>
+                  <button class="btn" id="mgSellCancel">Cancel</button>
+                </div>
+                <div class="mgsellmsg" id="mgSellMsg"></div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </td></tr>
+    </tbody>
+  </table>
+  <button class="addrow" type="button">+ Add Position</button>
+  </div>
+  <div class="pro-note">Showing the 5 columns that drive a decision. Switch to <b>Pro</b> above for the full 24-column blotter (shares, avg cost, stops, commission, tags, R-multiple…).</div>
+
+  <!-- Guided-mode tutorial assistant: explanation + voiceover on hover -->
+  <div class="guidepanel" id="guidePanel" aria-live="polite">
+    <div class="gp-head">
+      <span class="gp-dot"></span>
+      <span class="gp-title" id="gpTitle">Guided walkthrough</span>
+      <button class="gp-mute" id="gpMute" title="Mute voiceover" aria-label="Toggle voiceover"></button>
+    </div>
+    <div class="gp-body" id="gpBody">Hover any card and I'll explain it &mdash; out loud. Switch to <b>Pro</b> (top-right) to turn this off.</div>
+  </div>
+
+</div>
+
+<script>
+  // ===== Open Positions: per-row Manage panel =====
+  (function(){
+    var mgRow=document.getElementById('mgRow');
+    var curData={avg:0,price:0,shares:0,stop:0,ls:'Long',ticker:''};
+    function num(s){ return parseFloat(String(s).replace(/[^0-9.\-]/g,''))||0; }
+    function colorize(id,val){ var el=document.getElementById(id); el.textContent=val; el.classList.remove('green','red','gold');
+      if(val.indexOf('-')===0) el.classList.add('red'); else if(val.indexOf('+')===0) el.classList.add('green'); }
+    function fill(row){
+      var d=row.dataset;
+      curData={ avg:num(d.avg), price:num(d.cur), shares:num(d.shares), stop:num(d.orig), ls:d.ls, ticker:d.ticker };
+      // reset the sell form to this position's defaults
+      document.getElementById('mgSellForm').style.display='none';
+      document.getElementById('mgSellToggle').classList.remove('open');
+      document.getElementById('mgSellQty').value=curData.shares;
+      document.getElementById('mgSellOf').textContent='of '+curData.shares+' shares';
+      document.getElementById('mgSellPrice').value=curData.price;
+      document.getElementById('mgSellComm').value='';
+      document.getElementById('mgSellReason').selectedIndex=0;
+      document.getElementById('mgSellJournal').checked=true;
+      document.getElementById('mgJournalFields').style.display='';
+      ['mgRight','mgWrong','mgLearned','mgTv'].forEach(function(i){document.getElementById(i).value='';});
+      document.getElementById('mgSellMsg').textContent='';
+      recomputeSell();
+      document.getElementById('mgStatus').className='status '+d.statusclass;
+      document.getElementById('mgStatusTxt').textContent=d.status;
+      document.getElementById('mgTicker').textContent=d.ticker;
+      document.getElementById('mgLs').textContent=d.ls;
+      document.getElementById('mgShares').textContent=d.shares;
+      document.getElementById('mgAvg').textContent=d.avg;
+      document.getElementById('mgSize').textContent=d.size;
+      document.getElementById('mgSetup').textContent=d.setup;
+      document.getElementById('mgCur').value=d.cur;
+      document.getElementById('mgOrig').value=d.orig;
+      document.getElementById('mgStop2').value=d.stop2;
+      document.getElementById('mgTrail').value=d.trail;
+      var rts=document.getElementById('mgRts'); rts.textContent=d.rts;
+      rts.className=(d.rts==='$0'||/locked/i.test(d.rts))?'green':'red';
+      document.getElementById('mgRote').textContent=d.rote;
+      colorize('mgR', d.r);
+      var lk=document.getElementById('mgLocked'); lk.textContent=d.locked; lk.className=(d.locked!=='$0')?'green':'';
+      document.getElementById('mgSbe').textContent=d.sbe;
+      document.getElementById('mgRealized').textContent=d.realized;
+      colorize('mgUnreal', d.unreal);
+      document.getElementById('mgComm').textContent=d.comm;
+    }
+    // ----- partial-sell live calculator -----
+    function fmtUsd(n){ return (n>=0?'+':'-')+'$'+Math.abs(Math.round(n)).toLocaleString('en-US'); }
+    function recomputeSell(){
+      var qty=parseFloat(document.getElementById('mgSellQty').value)||0;
+      var exit=parseFloat(document.getElementById('mgSellPrice').value)||0;
+      var sh=curData.shares, avg=curData.avg, stop=curData.stop, isShort=curData.ls==='Short';
+      var soldPct=sh>0?Math.min(100,qty/sh*100):0;
+      var remain=Math.max(0, sh-qty);
+      var pl=isShort?(avg-exit)*qty:(exit-avg)*qty;
+      var plPct=avg>0?(isShort?(avg-exit)/avg:(exit-avg)/avg)*100:0;
+      var riskFrac=avg>0?(isShort?(stop-avg):(avg-stop))/avg:0;
+      var r=riskFrac>0?(plPct/100)/riskFrac:null;
+      document.getElementById('sSoldPct').textContent=soldPct.toFixed(0)+'%';
+      document.getElementById('sRemain').textContent=remain+(remain<=0?' — closes position':'');
+      colorize('sPl', fmtUsd(pl));
+      colorize('sPct', (plPct>=0?'+':'')+plPct.toFixed(2)+'%');
+      var sR=document.getElementById('sR');
+      if(r===null){ sR.textContent='—'; sR.className=''; } else colorize('sR', (r>=0?'+':'')+r.toFixed(1)+'R');
+      var btn=document.getElementById('mgSellConfirm');
+      btn.textContent = (qty>=sh) ? 'Close position' : (qty>0 ? 'Sell '+qty+' shares' : 'Sell');
+    }
+    document.getElementById('mgSellToggle').addEventListener('click', function(){
+      var f=document.getElementById('mgSellForm'); var open=f.style.display!=='none';
+      f.style.display=open?'none':''; this.classList.toggle('open',!open);
+    });
+    document.getElementById('mgSellQty').addEventListener('input', recomputeSell);
+    document.getElementById('mgSellPrice').addEventListener('input', recomputeSell);
+    document.querySelectorAll('.quickrow .chipbtn').forEach(function(b){
+      b.addEventListener('click', function(){
+        document.getElementById('mgSellQty').value=Math.round(curData.shares*(+b.dataset.pct)/100);
+        recomputeSell();
+      });
+    });
+    document.getElementById('mgSellJournal').addEventListener('change', function(){
+      document.getElementById('mgJournalFields').style.display=this.checked?'':'none';
+    });
+    document.getElementById('mgSellCancel').addEventListener('click', function(){
+      document.getElementById('mgSellForm').style.display='none';
+      document.getElementById('mgSellToggle').classList.remove('open');
+    });
+    document.getElementById('mgSellConfirm').addEventListener('click', function(){
+      var qty=parseFloat(document.getElementById('mgSellQty').value)||0;
+      var exit=document.getElementById('mgSellPrice').value;
+      var full=qty>=curData.shares;
+      document.getElementById('mgSellMsg').textContent='Demo: would log '+qty+' '+curData.ticker+' @ $'+exit+
+        (document.getElementById('mgSellJournal').checked?' to the journal':'')+' and '+
+        (full?'close this position.':('reduce it to '+(curData.shares-qty)+' shares.'));
+    });
+
+    function close(){ mgRow.style.display='none'; document.querySelectorAll('.posrow').forEach(function(r){r.classList.remove('mg-open')}); }
+    function openRow(row){ close(); row.classList.add('mg-open'); fill(row);
+      row.parentNode.insertBefore(mgRow, row.nextSibling); mgRow.style.display=''; }
+    document.querySelectorAll('.posrow').forEach(function(row){
+      var manage=row.querySelector('.mgbtn:not(.sell)');
+      var sell=row.querySelector('.mgbtn.sell');
+      if(manage) manage.addEventListener('click', function(e){
+        e.stopPropagation();
+        if(row.classList.contains('mg-open')){ close(); return; }
+        openRow(row);
+      });
+      if(sell) sell.addEventListener('click', function(e){
+        e.stopPropagation();
+        openRow(row);                                   // open the panel...
+        var f=document.getElementById('mgSellForm');    // ...and jump straight to the sell form
+        f.style.display=''; document.getElementById('mgSellToggle').classList.add('open');
+        f.scrollIntoView({block:'center', behavior:'smooth'});
+      });
+    });
+    document.getElementById('mgClose').addEventListener('click', close);
+  })();
+
+  // Persisted preferences (Guided/Pro + Simple/Pro) — shared across Dashboard & Journal, survives sessions
+  function setView(view, persist){
+    document.querySelectorAll('#viewSeg button').forEach(function(x){ x.classList.toggle('on', x.dataset.view===view); });
+    document.body.classList.toggle('pro', view==='pro');
+    if(persist!==false){ try{ localStorage.setItem('viv-view', view); }catch(e){} }
+  }
+  function setMode(mode, persist){
+    document.querySelectorAll('#modeSeg button').forEach(function(x){ x.classList.toggle('on', x.dataset.mode===mode); });
+    var expert = mode==='pro';
+    document.body.classList.toggle('expert', expert);
+    setView(expert?'pro':'simple', persist);   // mode drives the table view too
+    if(persist!==false){ try{ localStorage.setItem('viv-mode', mode); }catch(e){} }
+  }
+
+  // Simple <-> Pro table toggle
+  document.querySelectorAll('#viewSeg button').forEach(function(b){
+    b.addEventListener('click', function(){ setView(b.dataset.view, true); });
+  });
+  // dismiss welcome
+  document.querySelector('.welcome .x').addEventListener('click', function(){
+    this.closest('.welcome').style.display='none';
+  });
+
+  // Guided / Pro: the app-level teaching toggle. Strips scaffolding + syncs the table default.
+  document.querySelectorAll('#modeSeg button').forEach(function(b){
+    b.addEventListener('click', function(){ setMode(b.dataset.mode, true); });
+  });
+
+  // Restore saved preferences on load (persists across pages & sessions)
+  (function(){
+    var savedMode=null, savedView=null;
+    try{ savedMode=localStorage.getItem('viv-mode'); savedView=localStorage.getItem('viv-view'); }catch(e){}
+    // mode is page-based now: this guided page always shows Guided active (Pro lives in the -pro.html sibling)
+    if(savedView==='pro'||savedView==='simple') setView(savedView, false);  // independent table override
+  })();
+
+  // Compounding equity console: collapse / expand
+  var eqCard=document.querySelector('.card.equity'), eqCollapse=document.getElementById('eqCollapse');
+  eqCollapse.addEventListener('click', function(){
+    var collapsed = eqCard.classList.toggle('collapsed');
+    eqCollapse.setAttribute('aria-expanded', String(!collapsed));
+  });
+
+  // ===== Guided tutorial assistant: hover a card -> explain it + speak it aloud =====
+  (function(){
+    var panel=document.getElementById('guidePanel'),
+        gpTitle=document.getElementById('gpTitle'), gpBody=document.getElementById('gpBody'),
+        gpMute=document.getElementById('gpMute');
+    var SPK_ON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>';
+    var SPK_OFF='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>';
+    gpMute.innerHTML=SPK_ON;
+    var voiceOn=true, synth=window.speechSynthesis||null;
+    var audio=new Audio();   // plays the recorded HyperFrames/Kokoro clips
+    audio.preload='auto';
+    audio.addEventListener('playing', function(){ panel.classList.add('speaking'); });
+    audio.addEventListener('ended',  function(){ panel.classList.remove('speaking'); });
+    audio.addEventListener('pause',  function(){ panel.classList.remove('speaking'); });
+    function stopAll(){ try{audio.pause();}catch(e){} if(synth) synth.cancel(); }
+    // unlock audio on the first user gesture (browsers block autoplay until then)
+    var primed=false;
+    function prime(){ if(primed) return; primed=true; audio.muted=true;
+      audio.play().then(function(){ audio.pause(); audio.currentTime=0; audio.muted=false; })
+                  .catch(function(){ audio.muted=false; }); }
+    document.addEventListener('pointerdown', prime, {once:true});
+    document.addEventListener('keydown', prime, {once:true});
+    function narrate(el){
+      if(!voiceOn) return;
+      var src=el.getAttribute('data-gaudio');
+      if(src){                                   // preferred: real recorded clip
+        try{audio.pause();}catch(e){}
+        audio.src=src; audio.currentTime=0;
+        audio.play().catch(function(){ /* autoplay blocked until first click */ });
+      } else if(synth){                          // fallback: browser TTS
+        synth.cancel();
+        var u=new SpeechSynthesisUtterance((el.getAttribute('data-gtitle')||'')+'. '+(el.getAttribute('data-gbody')||''));
+        u.onstart=function(){panel.classList.add('speaking')}; u.onend=function(){panel.classList.remove('speaking')};
+        synth.speak(u);
+      }
+    }
+    gpMute.addEventListener('click', function(){
+      voiceOn=!voiceOn;
+      if(!voiceOn) stopAll();
+      gpMute.innerHTML=voiceOn?SPK_ON:SPK_OFF;
+      gpMute.title=voiceOn?'Mute voiceover':'Unmute voiceover';
+    });
+    document.querySelectorAll('.guide').forEach(function(el){
+      el.addEventListener('mouseenter', function(){
+        if(document.body.classList.contains('expert')) return;   // Pro mode = no tutorial
+        document.querySelectorAll('.guide-active').forEach(function(x){x.classList.remove('guide-active')});
+        el.classList.add('guide-active');
+        gpTitle.textContent=el.getAttribute('data-gtitle')||'';
+        gpBody.textContent=el.getAttribute('data-gbody')||'';
+        narrate(el);
+      });
+      el.addEventListener('mouseleave', function(){ el.classList.remove('guide-active'); });
+    });
+    // switching to Pro stops any narration immediately
+    document.querySelectorAll('#modeSeg button').forEach(function(b){
+      b.addEventListener('click', function(){ if(b.dataset.mode==='pro') stopAll(); });
+    });
+  })();
+
+  // Starting Capital: click-to-edit (demonstrates the "set once" feel)
+  var capWrap=document.getElementById('capWrap'),
+      capText=document.getElementById('capText'),
+      capInput=document.getElementById('capInput');
+  function showCapText(){
+    var num=parseFloat(capInput.value.replace(/[^0-9.]/g,''))||0;
+    var v='$'+Math.round(num).toLocaleString('en-US');   // $ + thousands separators
+    capInput.value=v; capText.textContent=v;
+    capInput.style.display='none'; capText.style.display='';
+    capWrap.querySelector('.pencil').style.display='';
+  }
+  capWrap.addEventListener('click', function(e){
+    if(capInput.style.display!=='none') return;
+    capInput.value = capText.textContent.replace(/[^0-9.]/g,'');   // raw digits while editing
+    capText.style.display='none';
+    capWrap.querySelector('.pencil').style.display='none';
+    capInput.style.display=''; capInput.focus(); capInput.select();
+  });
+  capInput.addEventListener('blur', showCapText);
+  capInput.addEventListener('keydown', function(e){ if(e.key==='Enter'){ capInput.blur(); } });
+
+  // Trail-Locked: include/exclude toggle (the amount itself is auto-calculated)
+  var equityTile=document.querySelector('.card.equity'),
+      tlBreak=document.getElementById('tlBreak');
+  document.querySelectorAll('#tlSeg button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#tlSeg button').forEach(function(x){x.classList.remove('on')});
+      b.classList.add('on');
+      var off = b.dataset.tl === 'off';
+      equityTile.classList.toggle('off', off);
+      tlBreak.textContent = off ? 'trail-locked excluded' : '+ $0 trail-locked';
+      tlBreak.style.opacity = off ? '0.55' : '1';
+    });
+  });
+
+  // ===== R-mode console: inputs (ROTE %, max positions) drive read-only outputs =====
+  var EQUITY=179041, CURRENT_RISK=1920;   // sample data: equity + risk already deployed
+  var roteInput=document.getElementById('roteInput'),
+      maxVal=document.getElementById('maxVal'), maxDown=document.getElementById('maxDown'), maxUp=document.getElementById('maxUp'),
+      oBudget=document.getElementById('oBudget'), oR=document.getElementById('oR'),
+      oCur=document.getElementById('oCur'), oAvail=document.getElementById('oAvail'),
+      subBudgetRote=document.getElementById('subBudgetRote'), subBudgetEq=document.getElementById('subBudgetEq'),
+      subReach=document.getElementById('subReach'), subTarget=document.getElementById('subTarget'), subAvailPct=document.getElementById('subAvailPct'),
+      allocBar=document.getElementById('allocBar'), allocFill=document.getElementById('allocFill'), allocNote=document.getElementById('allocNote'),
+      legDep=document.getElementById('legDep'), legDepPct=document.getElementById('legDepPct'),
+      legAvail=document.getElementById('legAvail'), legAvailPct=document.getElementById('legAvailPct'),
+      deployBanner=document.getElementById('deployBanner'), deployHead=document.getElementById('deployHead'), deploySub=document.getElementById('deploySub');
+  function fmt(n){ return '$'+Math.round(n).toLocaleString('en-US'); }
+  function recompute(){
+    var pct=parseFloat(roteInput.value.replace(/[^0-9.]/g,''))||0;
+    var n=parseInt(maxVal.textContent,10)||0;
+    var budget=EQUITY*(pct/100);
+    var avail=budget-CURRENT_RISK;
+    var availPct=avail/EQUITY*100;
+
+    // outputs + always-visible subtexts (matches the live app)
+    oBudget.textContent=fmt(budget);
+    var eqSum=document.getElementById('eqSummary');
+    if(eqSum) eqSum.textContent='Equity '+fmt(EQUITY)+' · Budget '+fmt(budget)+' · Available '+fmt(avail);
+    subBudgetRote.textContent=pct.toFixed(2)+'%';
+    subBudgetEq.textContent=fmt(EQUITY);
+    oR.innerHTML = n>0 ? fmt(budget/n) : '&mdash;';
+    subReach.innerHTML = n>0 ? (pct/n).toFixed(2)+'%' : '&mdash;';
+    oCur.textContent=(CURRENT_RISK/EQUITY*100).toFixed(2)+'%';
+    subTarget.textContent = pct.toFixed(2)+'%';
+    oAvail.textContent=fmt(avail);
+    oAvail.className='outval '+(avail>=0?'green':'red');
+    subAvailPct.textContent=availPct.toFixed(2)+'%';
+    maxDown.disabled = n<=0;
+
+    // risk allocation bar: deployed (gold) vs available (green) of total budget
+    var over=avail<0;
+    var depPct = budget>0 ? Math.min(100, CURRENT_RISK/budget*100) : 100;
+    allocFill.style.width = depPct.toFixed(0)+'%';
+    allocBar.classList.toggle('over', over);
+    legDep.textContent = fmt(CURRENT_RISK);   // count stays static in HTML "(2)"
+    legAvail.textContent = fmt(Math.max(0,avail));
+    legAvailPct.textContent = '('+(budget>0?Math.round(Math.max(0,avail)/budget*100):0)+'%)';
+    allocNote.textContent = over ? ('Over budget by '+fmt(-avail))
+                                 : (fmt(CURRENT_RISK)+' of '+fmt(budget)+' budget at risk');
+
+    // deploy guidance: turn the numbers into a plain next action
+    deployBanner.classList.toggle('over', over);
+    if(over){
+      deployHead.innerHTML = 'You are <b>'+fmt(-avail)+'</b> over your risk budget';
+      deploySub.innerHTML = 'Close a position or tighten a stop before adding new risk &mdash; or raise Target ROTE if you mean to risk more.';
+    } else if(n>0){
+      var rPer=budget/n, fullT=Math.floor(avail/rPer), halfT=Math.floor(avail/(rPer/2));
+      deployHead.innerHTML = 'You can deploy <b>'+fmt(avail)+'</b> more risk';
+      deploySub.innerHTML = "That's <b>"+availPct.toFixed(2)+'% ROTE</b> free. Room for <b>'+fullT+' full-R trade'+(fullT===1?'':'s')+'</b> at '+fmt(rPer)+' each, or <b>'+halfT+' half-R</b> at '+fmt(rPer/2)+' each.';
+    } else {
+      deployHead.innerHTML = 'You can deploy <b>'+fmt(avail)+'</b> more risk';
+      deploySub.innerHTML = "That's <b>"+availPct.toFixed(2)+'% ROTE</b> free. Set Maximum positions above to see per-trade sizing.';
+    }
+  }
+  roteInput.addEventListener('input', recompute);
+  maxUp.addEventListener('click', function(){ maxVal.textContent=(parseInt(maxVal.textContent,10)||0)+1; recompute(); });
+  maxDown.addEventListener('click', function(){ var n=parseInt(maxVal.textContent,10)||0; if(n>0){ maxVal.textContent=n-1; recompute(); } });
+  recompute();
+
+  /* ===== hero P/L count-up ("accelerometer") on open ===== */
+  function rollSpec(text){
+    var t=String(text).trim();
+    var sign=/^[−-]/.test(t)?-1:1, dollar=t.indexOf('$')>=0, pct=/%\s*$/.test(t);
+    var explicitSign=/^[−+-]/.test(t);   // only show a leading sign if the source had one (e.g. heroPL "+$…"); RTS "$1,920" stays unsigned
+    var numStr=t.replace(/[^\d.]/g,''), dot=numStr.indexOf('.');
+    var dec=dot>=0?(numStr.length-dot-1):0, val=(parseFloat(numStr)||0)*sign;
+    return {sign:sign,explicitSign:explicitSign,dollar:dollar,pct:pct,dec:dec,val:val};
+  }
+  function rollFmt(v,s){ var pre=s.sign<0?'−':(s.explicitSign?'+':''); return pre+(s.dollar?'$':'')+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:s.dec,maximumFractionDigits:s.dec})+(s.pct?'%':''); }
+  function countUp(el,dur){
+    if(!el||el.__rolling) return;
+    var spec=rollSpec(el.textContent), finalText=el.textContent.trim();
+    if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    el.__rolling=true; dur=dur||1300;
+    var start=null;
+    function ease(t){ return 1-Math.pow(1-t,3); }   // easeOutCubic — rolls up fast, settles
+    function frame(now){ if(start===null)start=now; var t=Math.min(1,(now-start)/dur);
+      el.textContent=rollFmt(spec.val*ease(t),spec);
+      if(t<1) requestAnimationFrame(frame); else { el.textContent=finalText; el.__rolling=false; } }
+    el.textContent=rollFmt(0,spec); requestAnimationFrame(frame);
+  }
+  /* ===== scroll-reveal: every animation starts only when its block scrolls into view ===== */
+  (function(){
+    var els=document.querySelectorAll('.reveal');
+    if(!els.length) return;
+    function fire(el){
+      el.classList.add('in-view');
+      var cu=el.getAttribute('data-countup');
+      if(cu){ var t=document.getElementById(cu); if(t) countUp(t, cu==='rtsVal'?1100:1300); }
+    }
+    if(!('IntersectionObserver' in window)){ els.forEach(fire); return; }
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if(en.isIntersecting){ fire(en.target); io.unobserve(en.target); } });
+    }, {threshold:0.18, rootMargin:'0px 0px -8% 0px'});
+    els.forEach(function(e){ io.observe(e); });
+  })();
+</script>
+</body>
+</html>

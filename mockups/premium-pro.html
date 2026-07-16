@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIV — Premium Tools (Pro layout)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     VIV brand tokens — copied verbatim from dashboard-pro.html
+     ============================================================ */
+  :root{
+    --bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
+    --text:rgba(255,255,255,0.92);
+    --muted:rgba(255,255,255,0.70);
+    --faint:rgba(255,255,255,0.45);
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:var(--font); line-height:1.5; font-size:16px;
+    -webkit-font-smoothing:antialiased; padding:0; min-height:100vh;
+  }
+  .v,.rtable td,.tile .v{font-variant-numeric:tabular-nums}
+
+  /* ===== SHELL — copied from dashboard-pro.html ===== */
+  .shell{width:100%; max-width:1400px; margin:0 auto; padding:22px 24px 80px}
+  @media(min-width:2000px){ .shell{max-width:1680px} }
+
+  /* ===== P0. NAV — copied verbatim from dashboard-pro.html ===== */
+  .navbar{display:flex; align-items:center; gap:16px; margin-bottom:22px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem}
+  .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
+  .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
+  .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+  .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
+  .tabs a:hover:not(.on){color:var(--text)}
+  .spacer{flex:1}
+  .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
+  .seg button, .seg a{
+    border:none; background:transparent; color:var(--muted); cursor:pointer; text-decoration:none;
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:7px 16px; border-radius:980px;
+    letter-spacing:0.02em; transition:all .15s; display:inline-block;
+  }
+  .seg button.on, .seg a.on{background:var(--goldDim); color:var(--goldBright)}
+  .seg button:hover:not(.on), .seg a:hover:not(.on){color:var(--text)}
+
+  /* ===== SHARED CARD CHROME — uniform across every panel, copied from dashboard-pro.html ===== */
+  .card{
+    position:relative; background:var(--glass);
+    border:1px solid var(--border); border-radius:16px;
+    backdrop-filter:blur(24px) saturate(150%);
+    -webkit-backdrop-filter:blur(24px) saturate(150%);
+    padding:18px 20px; overflow:visible;
+  }
+  .card::before{
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%);
+   border-radius:inherit;}
+  .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+  .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+  .sech{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+  /* identical header on every card: label + info dot, divided from the body */
+  .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+  .cardhead .label{flex:1}
+  .infodot{width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex;
+    align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic;
+    color:var(--faint); cursor:help; flex:none}
+  .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+  /* shared hover-tooltip pattern (exact, so every Pro page matches) — dot copy lives in data-tip= */
+  .infodot{position:relative; cursor:help}
+  .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+  .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+    font-size:0.62rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em}
+  .ghostchip:hover{color:var(--text); border-color:var(--borderGold)}
+  .btn{
+    border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text);
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:8px 16px;
+    border-radius:980px; cursor:pointer;
+  }
+  .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+  .row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+
+  /* ===== P1. COMMAND HEADER — copied from dashboard-pro.html (no action buttons here) ===== */
+  .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:8px}
+  .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+  .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px}
+
+  /* ===== P2. TOOL TABS — compact pill segment row (reuses .seg) ===== */
+  .toolseg{margin:18px 0 24px; flex-wrap:wrap}
+  .toolseg button{padding:8px 16px; font-size:0.76rem}
+
+  /* ===== P3. TOOL PANELS ===== */
+  .toolpanel{display:none} .toolpanel.on{display:block}
+  .panelhead2{display:flex; align-items:center; gap:9px; margin-bottom:16px}
+
+  .io2{display:grid; grid-template-columns:1fr 1.2fr; gap:14px; align-items:start}
+  .iogrid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  .field{display:flex; flex-direction:column; gap:6px}
+  .field.full{grid-column:1/-1}
+  .field label{font-size:0.64rem; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--muted)}
+  .in{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--text);
+    font-family:var(--font); font-size:0.92rem; font-weight:600; padding:10px 12px; outline:none; width:100%; font-variant-numeric:tabular-nums}
+  .in:focus{border-color:var(--gold)}
+  .miniseg{display:inline-flex; border:1px solid var(--border); border-radius:9px; overflow:hidden}
+  .miniseg button{border:none; background:transparent; color:var(--muted); font-family:var(--font); font-size:0.78rem; font-weight:700; padding:9px 14px; cursor:pointer}
+  .miniseg button.on{background:var(--goldDim); color:var(--goldBright)}
+
+  /* KPI-tile styling — sized to sit four-in-a-row inside a card, matching dashboard-pro's kpinum weight/tracking */
+  .results{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
+  .tile{background:var(--glass); border:1px solid var(--border); border-radius:14px; padding:14px 16px}
+  .tile .label{margin-bottom:8px}
+  .tile .v{font-size:1.35rem; font-weight:800; letter-spacing:-0.03em; white-space:nowrap}
+  .tile .v.green{color:var(--green)} .tile .v.red{color:var(--red)} .tile .v.gold{color:var(--goldBright)}
+  .tile .vsub{font-size:0.66rem; color:var(--faint); margin-top:4px}
+  .big-emph{border-color:var(--borderGold); background:linear-gradient(140deg, rgba(201,152,42,0.10), transparent 75%)}
+
+  .rtable{width:100%; border-collapse:collapse; margin-top:10px}
+  .rtable th{font-size:0.58rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); text-align:right; padding:8px 9px; border-bottom:1px solid var(--border)}
+  .rtable th:first-child, .rtable td:first-child{text-align:left}
+  .rtable td{font-size:0.81rem; padding:9px 9px; border-bottom:1px solid rgba(255,255,255,0.05); text-align:right}
+  .rtable td.green{color:#86efac} .rtable td.red{color:#fda4a4} .rtable td.gold{color:var(--goldBright)}
+
+  .eqbox{margin-top:18px}
+  .eqwrap{display:flex; gap:12px}
+  .eqy{display:flex; flex-direction:column; justify-content:space-between; font-size:0.62rem; color:var(--faint); min-width:46px; text-align:right; padding:2px 0; font-variant-numeric:tabular-nums}
+  .eqplot{flex:1; position:relative; height:170px}
+  .eqsvg{width:100%; height:100%; display:block}
+  .eqsvg .grid{stroke:rgba(255,255,255,0.06); stroke-width:1}
+
+  .plantarget{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:18px; padding-top:14px; border-top:1px solid var(--border)}
+  .plantarget .in{max-width:80px}
+  .solveout{flex-basis:100%; font-size:0.72rem; color:var(--faint); line-height:1.5}
+
+  .scenchip{display:inline-flex; align-items:center; gap:6px; border:1px solid var(--borderGold); background:rgba(201,152,42,0.06);
+    border-radius:980px; padding:6px 12px; font-size:0.7rem; color:var(--text); font-family:var(--font); cursor:pointer}
+  .scenchip:hover{background:rgba(201,152,42,0.12); border-color:var(--goldBright)}
+  .scenchip b{color:var(--goldBright)}
+
+  /* confirmation toast — used by "Save playbook design" */
+  .toast{position:fixed; right:24px; bottom:24px; z-index:300; background:#13131c; border:1px solid var(--borderGold);
+    border-radius:12px; padding:13px 18px; font-size:0.78rem; color:var(--text); box-shadow:0 14px 40px rgba(0,0,0,0.5);
+    opacity:0; transform:translateY(8px); transition:opacity .2s ease, transform .2s ease; pointer-events:none}
+  .toast.show{opacity:1; transform:translateY(0)}
+  .toast b{color:var(--goldBright)}
+
+  /* brief highlight when the Solve goal-seek writes a new value into a field */
+  @keyframes fieldFlash{0%{box-shadow:0 0 0 3px rgba(240,192,80,0.35); border-color:var(--goldBright)}100%{box-shadow:0 0 0 0 rgba(240,192,80,0); border-color:var(--border)}}
+  .flash{animation:fieldFlash 1.1s ease}
+
+  /* compact pass/fail status pill — replaces the guided mode's stacked .alert boxes */
+  .badge{display:inline-flex; align-items:center; gap:7px; font-size:0.72rem; font-weight:700; padding:6px 13px; border-radius:980px}
+  .badge .d{width:7px; height:7px; border-radius:50%}
+  .badge.pos{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)} .badge.pos .d{background:var(--green)}
+  .badge.neg{background:rgba(239,68,68,0.12); color:#fda4a4; border:1px solid rgba(239,68,68,0.3)} .badge.neg .d{background:var(--red)}
+
+  .placeholder-desc{font-size:0.84rem; color:var(--muted); line-height:1.6; margin-top:2px}
+  .placeholder-note{font-size:0.72rem; color:var(--faint); margin-top:14px; padding-top:12px; border-top:1px solid var(--border)}
+
+  @media(max-width:1000px){ .io2{grid-template-columns:1fr} }
+  @media(max-width:760px){
+    .navbar .spacer{display:none}
+    .tabs{overflow-x:auto; max-width:100%; scrollbar-width:none} .tabs::-webkit-scrollbar{display:none} .tabs a{white-space:nowrap}
+    .toolseg{overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none} .toolseg::-webkit-scrollbar{display:none}
+    .iogrid{grid-template-columns:1fr}
+    .results{grid-template-columns:1fr 1fr}
+    .card{padding:16px 16px}
+  }
+</style>
+</head>
+<body class="pro">
+<div class="shell">
+
+  <!-- P0. NAV -->
+  <div class="navbar">
+    <div class="brand"><img class="vmark" src="../public/logo-mark.png" alt="VIV" style="background:none; object-fit:contain"> Valen Insiders Vault</div>
+    <div class="tabs">
+      <a href="dashboard-pro.html">Dashboard</a>
+      <a href="journal-pro.html">Journal</a>
+      <a href="premium-pro.html" class="on">Premium tools</a>
+      <!-- Live nav (commit 1353d7a) also has: Daily Setups + Model Book (members), Studies + Quant (admin-only). No Pro variants needed - those pages have no Guided/Pro toggle. -->
+      <a href="daily-setups.html">Daily Setups</a>
+      <a href="model-book.html">Model Book</a>
+      <a href="studies.html" title="Admin-only tab">Studies</a>
+      <a href="quant.html" title="Admin-only tab">Quant</a>
+      <a href="settings-pro.html">Settings</a>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
+      <a href="premium-recommended.html" data-mode="guided">Guided</a>
+      <a href="premium-pro.html" class="on" data-mode="pro">Pro</a>
+    </div>
+  </div>
+
+  <!-- P1. COMMAND HEADER — no action buttons on this page -->
+  <div class="cmdheader">
+    <div class="cmdleft">
+      <div class="eyebrow">Premium tools</div>
+      <h1 class="ch1">Calculators</h1>
+      <div class="cmdmeta">5 tools &middot; inputs persist across sessions</div>
+    </div>
+  </div>
+
+  <!-- RECONCILIATION: premium-recommended.html (the guided base, 827 lines) ships an OUTDATED
+       tool set — it drops "Setup Grader" entirely and includes a nonexistent "Expected Move"
+       tool. The live app's real 5 tabs (src/App.jsx ~line 3488:
+       tabs = ["Setup Grader","Return Simulator","Risk","Expectancy","Risk Finance"]) are used
+       below instead: Setup Grader, Return Simulator, Position Risk, Expectancy, Risk Finance. -->
+
+  <!-- PRO-ONLY DESIGN DECISION (flag for review): the live app currently shows a "What is X?"
+       intro card at the top of every tool panel in BOTH Guided and Pro mode. This Pro mockup
+       removes that card entirely — the same one-line explanation now lives in the info dot's
+       title= attribute on each panel's header, matching dashboard-pro.html's info-dot pattern
+       used everywhere else in Pro. Confirm this is the intended Pro behavior before it ships. -->
+
+  <!-- OMITTED vs. the guided base (by design, Pro strips all hand-holding chrome):
+       welcome banner, PremiumTour video walkthrough, field .hint captions, .interp callouts,
+       the floating voice guide panel, and .term hover-tooltips (native title= attrs on the
+       info dots replace them). -->
+
+  <!-- P2. TOOL TABS -->
+  <div class="seg toolseg" id="toolTabs">
+    <button data-tool="grader">Setup Grader</button>
+    <button class="on" data-tool="sim">Return Simulator</button>
+    <button data-tool="risk">Position Risk</button>
+    <button data-tool="exp">Expectancy</button>
+    <button data-tool="fin">Risk Finance</button>
+  </div>
+
+  <!-- ============ TOOL: SETUP GRADER (placeholder) ============ -->
+  <!-- Live source: src/SetupGrader.jsx, SECTIONS (Leadership & Stock Selection / Prior Move / Base Quality) -->
+  <div class="toolpanel" id="panel-grader">
+    <div class="card">
+      <div class="cardhead"><span class="label">Setup Grader</span><span class="infodot" data-tip="Grade any breakout out of 5 stars across Leadership & Stock Selection, Prior Move, and Base Quality — the 5th star only unlocks when the highest-signal factors line up together.">i</span></div>
+      <div class="placeholder-desc">Screening watchlist &rarr; tick chart characteristics &rarr; &#9733; score.</div>
+      <!-- Admin-only publish column slots into the watchlist table here (visible only to admin
+           accounts) — not rendered in this mockup. -->
+      <div class="placeholder-note">Full Pro layout after direction approval.</div>
+    </div>
+  </div>
+
+  <!-- ============ TOOL: RETURN SIMULATOR (active, fully built) ============ -->
+  <div class="toolpanel on" id="panel-sim">
+    <div class="panelhead2">
+      <span class="sech">Return Simulator</span>
+      <span class="infodot" data-tip="Plays your trading style forward over many trades to show how your account could compound. Set your risk per trade, win rate, and winner sizes, and it projects your ending balance.">i</span>
+    </div>
+    <div class="io2">
+      <div class="card">
+        <div class="cardhead"><span class="label">Inputs</span><span class="infodot" data-tip="The assumptions behind your projection — starting and current capital, risk per trade, average loss, win rate, trade count, and how your winners are sized.">i</span></div>
+        <div class="iogrid">
+          <div class="field"><label>Starting capital</label><input class="in" id="s_start" value="100000"></div>
+          <div class="field"><label>Current capital</label><input class="in" id="s_cur" value="100000"></div>
+          <div class="field full"><label>Design unit</label>
+            <div class="miniseg" id="s_unit"><button class="on" data-u="r">R-multiple</button><button data-u="pct">% of position</button></div>
+          </div>
+          <div class="field"><label id="s_risklabel">Risk per trade %</label><input class="in" id="s_risk" value="0.5"></div>
+          <div class="field"><label id="s_avglosslabel">Avg loss (R)</label><input class="in" id="s_avgloss" value="1"></div>
+          <div class="field"><label>Win rate %</label><input class="in" id="s_winrate" value="40"></div>
+          <div class="field"><label># trades</label><input class="in" id="s_trades" value="250"></div>
+        </div>
+
+        <div class="label" style="margin-top:18px;margin-bottom:8px">Winners <span style="color:var(--faint);text-transform:none;letter-spacing:0;font-weight:500">— mix by size, scaled to your win rate &amp; trade count</span></div>
+        <table class="rtable">
+          <thead><tr><th id="s_tierhead">Winner size (R)</th><th>How many</th></tr></thead>
+          <tbody id="s_tiers">
+            <tr><td style="text-align:left"><input class="in" data-tg value="2" style="max-width:100px"></td><td><input class="in" data-tc value="60" style="max-width:100px;margin-left:auto"></td></tr>
+            <tr><td style="text-align:left"><input class="in" data-tg value="5" style="max-width:100px"></td><td><input class="in" data-tc value="30" style="max-width:100px;margin-left:auto"></td></tr>
+            <tr><td style="text-align:left"><input class="in" data-tg value="10" style="max-width:100px"></td><td><input class="in" data-tc value="10" style="max-width:100px;margin-left:auto"></td></tr>
+          </tbody>
+        </table>
+
+        <div class="plantarget">
+          <span class="label" style="flex:none">Plan backwards from a target</span>
+          <input class="in" id="s_target" value="100">
+          <span style="font-size:0.72rem;color:var(--muted)">%</span>
+          <button class="ghostchip" id="s_solve">Solve</button>
+          <span class="solveout" id="s_solveOut"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="cardhead"><span class="label">Projection</span><span class="infodot" data-tip="What your account could grow to, given the assumptions on the left — total return, ending balance, win rate, and how much losers drag on growth.">i</span></div>
+        <div class="results">
+          <div class="tile big-emph"><div class="label">Total return</div><div class="v gold" id="o_ret">&mdash;</div><div class="vsub">from current capital</div></div>
+          <div class="tile big-emph"><div class="label">Ending balance</div><div class="v gold" id="o_end">&mdash;</div><div class="vsub" id="o_endsub">projected</div></div>
+          <div class="tile"><div class="label">Effective win rate</div><div class="v" id="o_wr">&mdash;</div><div class="vsub" id="o_wrsub">W / L</div></div>
+          <div class="tile"><div class="label">Loss drag</div><div class="v red" id="o_drag">&mdash;</div><div class="vsub">from all losers</div></div>
+        </div>
+        <div class="eqbox">
+          <div class="label" style="margin-bottom:10px">Projected equity curve</div>
+          <div class="eqwrap">
+            <div class="eqy" id="s_eqy"></div>
+            <div class="eqplot"><svg viewBox="0 0 600 180" preserveAspectRatio="none" class="eqsvg">
+              <defs><linearGradient id="sgPro" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(201,152,42,0.30)"/><stop offset="100%" stop-color="rgba(201,152,42,0)"/></linearGradient></defs>
+              <line x1="0" y1="45" x2="600" y2="45" class="grid"/><line x1="0" y1="90" x2="600" y2="90" class="grid"/><line x1="0" y1="135" x2="600" y2="135" class="grid"/>
+              <path id="s_area" d="" fill="url(#sgPro)"/><path id="s_line" d="" fill="none" stroke="var(--goldBright)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+            </svg></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <button class="ghostchip" id="s_save">&#65291; Save as scenario</button>
+          <button class="ghostchip" id="s_pb">&#128190; Save playbook design</button>
+        </div>
+        <div id="s_scen" class="row" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TOOL: POSITION RISK (fully built, hidden until its tab is clicked) ============ -->
+  <div class="toolpanel" id="panel-risk">
+    <div class="panelhead2">
+      <span class="sech">Position Risk</span>
+      <span class="infodot" data-tip="The #1 rule is to never lose much on one trade — enter price, risk per trade %, and your stop, and it tells you exactly how many shares to buy. Your stop sets the size, not the other way around.">i</span>
+    </div>
+    <div class="io2">
+      <div class="card">
+        <div class="cardhead"><span class="label">Inputs</span><span class="infodot" data-tip="Risk-first sizing: fix how much of your account you're willing to lose if your stop is hit, and the stop distance determines everything else.">i</span></div>
+        <div class="iogrid">
+          <div class="field"><label>Share price $</label><input class="in" id="r_price" value="142.50"></div>
+          <div class="field"><label>Risk per trade %</label><input class="in" id="r_risk" value="1"></div>
+          <div class="field full"><label>Portfolio $</label><input class="in" id="r_port" value="500000"></div>
+          <div class="field full"><label>Stop &mdash; how it's measured</label>
+            <div class="miniseg" id="r_mode"><button class="on" data-m="%">% below entry</button><button data-m="$">$ below entry</button></div>
+          </div>
+          <div class="field full"><label id="r_stoplabel">Stop (% below entry)</label><input class="in" id="r_stop" value="6.11"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="cardhead"><span class="label">Sizing</span><span class="infodot" data-tip="The exact share count, position size, and dollar risk this trade works out to, plus your profit targets in R.">i</span></div>
+        <div class="results">
+          <div class="tile big-emph"><div class="label">Shares to buy</div><div class="v gold" id="ro_shares">&mdash;</div><div class="vsub" id="ro_posval">&mdash;</div></div>
+          <div class="tile"><div class="label">Position size %</div><div class="v" id="ro_possize">&mdash;</div><div class="vsub">of your account</div></div>
+          <div class="tile big-emph"><div class="label">Account risk $</div><div class="v" id="ro_riskdollar">&mdash;</div><div class="vsub" id="ro_riskpctsub">of equity</div></div>
+          <div class="tile"><div class="label">Stop price</div><div class="v" id="ro_stopprice">&mdash;</div><div class="vsub">sell-if-wrong level</div></div>
+        </div>
+        <div class="label" style="margin-top:18px">Profit targets in R</div>
+        <table class="rtable">
+          <thead><tr><th>Target</th><th>Price</th><th>% gain</th><th>$ profit</th></tr></thead>
+          <tbody id="ro_rtable"></tbody>
+        </table>
+        <div id="ro_status" style="margin-top:14px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TOOL: EXPECTANCY (placeholder) ============ -->
+  <!-- Live source: ExpectancyTab, ~src/App.jsx:2505 -->
+  <div class="toolpanel" id="panel-exp">
+    <div class="card">
+      <div class="cardhead"><span class="label">Expectancy</span><span class="infodot" data-tip="Does your strategy actually make money? Blends your win rate with your average win and loss into an edge per trade — above zero means you make money over time.">i</span></div>
+      <div class="placeholder-desc">Inputs &rarr; Edge per trade, G/L ratio, Trades-to-goal + Kelly table.</div>
+      <div class="placeholder-note">Full Pro layout after direction approval.</div>
+    </div>
+  </div>
+
+  <!-- ============ TOOL: RISK FINANCE (placeholder) ============ -->
+  <!-- Live source: RiskFinanceTab, ~src/App.jsx:2623 -->
+  <div class="toolpanel" id="panel-fin">
+    <div class="card">
+      <div class="cardhead"><span class="label">Risk Finance</span><span class="infodot" data-tip="You're up on a trade — now protect it. Shows how many shares to sell so the rest becomes risk-free, riding on house money.">i</span></div>
+      <div class="placeholder-desc">Inputs &rarr; Stop %, P/L, R + sell-to-lock-safety table.</div>
+      <div class="placeholder-note">Full Pro layout after direction approval.</div>
+    </div>
+  </div>
+
+  <!-- confirmation toast — reused by "Save playbook design" -->
+  <div class="toast" id="toast"></div>
+
+</div>
+
+<script>
+  var $=function(id){return document.getElementById(id);};
+  function num(id){ return parseFloat(String($(id).value).replace(/[^0-9.\-]/g,''))||0; }
+  function f0(n){ return Math.round(isFinite(n)?n:0).toLocaleString('en-US'); }
+  function f2(n){ return (isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function money(n){ return (n<0?'−$':'$')+f2(Math.abs(n)); }
+  function sgnPct(n){ return (n>=0?'+':'−')+Math.abs(n).toFixed(2)+'%'; }
+  function setCls(el,base,c){ el.className=base+(c?(' '+c):''); }
+  var toastTimer=null;
+  function showToast(html){
+    var t=$('toast'); t.innerHTML=html; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.classList.remove('show'); }, 3200);
+  }
+
+  /* ============ P2. tool tab switching ============ */
+  document.querySelectorAll('#toolTabs button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#toolTabs button').forEach(function(x){x.classList.remove('on')}); b.classList.add('on');
+      document.querySelectorAll('.toolpanel').forEach(function(p){p.classList.remove('on')});
+      $('panel-'+b.dataset.tool).classList.add('on');
+    });
+  });
+
+  /* ============ TOOL: RETURN SIMULATOR ============
+     Live default design unit is R-multiple (src/App.jsx simUnit state, ~line 2768). Winner-tier
+     "How many" fields are read as a MIX (weights), scaled to the winners implied by Win rate % ×
+     # trades — this collapses the guided base's separate "by count / by win rate" toggle into one
+     dense Pro row, reusing the same weighted-mix concept the live "Plan backwards" solver already
+     uses (src/App.jsx ~line 2886, "integer winners per tier, mix preserved"). Deliberate Pro-mode
+     simplification — flagged for review alongside the other deviations. */
+  var simUnit='r';
+  document.querySelectorAll('#s_unit button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#s_unit button').forEach(function(x){x.classList.remove('on')}); b.classList.add('on');
+      simUnit=b.dataset.u;
+      $('s_risklabel').textContent = simUnit==='r' ? 'Risk per trade %' : 'Position size %';
+      $('s_avglosslabel').textContent = simUnit==='r' ? 'Avg loss (R)' : 'Avg loss %';
+      $('s_tierhead').textContent = simUnit==='r' ? 'Winner size (R)' : 'Winner size %';
+      renderSim();
+    });
+  });
+  function tierWeights(){
+    var out=[];
+    document.querySelectorAll('#s_tiers tr').forEach(function(tr){
+      var g=parseFloat(tr.querySelector('[data-tg]').value)||0;
+      var w=Math.max(0,parseFloat(tr.querySelector('[data-tc]').value)||0);
+      if(w>0) out.push({gain:g,w:w});
+    });
+    return out;
+  }
+  function gainFrac(g){ return simUnit==='pct' ? g/100 : g; }
+  function renderSim(){
+    var start=num('s_start'), cur=num('s_cur')||start;
+    var risk=num('s_risk')/100;
+    var lossFrac = simUnit==='pct' ? num('s_avgloss')/100 : num('s_avgloss');
+    var winRatePct=num('s_winrate'), trades=Math.max(0,Math.floor(num('s_trades')));
+    var winners=Math.round(trades*winRatePct/100), losers=Math.max(0,trades-winners);
+    var weights=tierWeights(), totalW=weights.reduce(function(s,t){return s+t.w;},0);
+    var tiers=weights.map(function(t){ return {gain:t.gain, count: totalW>0?Math.round(winners*t.w/totalW):0}; });
+    var distributed=tiers.reduce(function(s,t){return s+t.count;},0), drift=winners-distributed;
+    if(tiers.length && drift!==0){ var big=tiers.reduce(function(m,t){return t.count>=m.count?t:m;},tiers[0]); big.count=Math.max(0,big.count+drift); }
+
+    var ps=risk;
+    var lossMult=1-ps*lossFrac, lossDrag=Math.pow(Math.max(lossMult,0),losers);
+    var tierStats=tiers.map(function(t){ var per=1+ps*gainFrac(t.gain); return {gain:t.gain,count:t.count,per:per,mult:Math.pow(per,t.count)}; });
+    var winMult=tierStats.reduce(function(m,t){return m*t.mult;},1);
+    var base=cur, endEq=base*lossDrag*winMult;
+    var totalReturn=base>0?(endEq/base-1)*100:0;
+    var effWinners=tierStats.reduce(function(s,t){return s+t.count;},0), effTotal=effWinners+losers;
+    var effWinRate=effTotal>0?effWinners/effTotal*100:0;
+    var fromStart=start>0?(endEq/start-1)*100:totalReturn;
+
+    $('o_ret').textContent=sgnPct(totalReturn); setCls($('o_ret'),'v',totalReturn>=0?'gold':'red');
+    $('o_end').textContent=money(endEq);
+    $('o_endsub').textContent=(fromStart>=0?'+':'−')+Math.abs(fromStart).toFixed(2)+'% from start';
+    $('o_wr').textContent=effWinRate.toFixed(2)+'%'; $('o_wrsub').textContent=f0(effWinners)+' W / '+f0(losers)+' L';
+    $('o_drag').textContent='×'+lossDrag.toFixed(2);
+
+    var seq=[], wq=[]; tierStats.forEach(function(t){ for(var i=0;i<t.count;i++) wq.push(t.gain); });
+    var nL=losers, nW=wq.length, totN=nW+nL, wi=0, li=0;
+    for(var k=0;k<totN;k++){ if(li/Math.max(1,nL) <= wi/Math.max(1,nW) && li<nL){ seq.push(null); li++; } else if(wi<nW){ seq.push(wq[wi++]); } else if(li<nL){ seq.push(null); li++; } }
+    var step=Math.max(1,Math.ceil(seq.length/400)); var eq=base, pts=[base];
+    for(var j=0;j<seq.length;j++){ var g=seq[j]===null? -lossFrac : gainFrac(seq[j]); eq*=(1+ps*g); if(j%step===0||j===seq.length-1) pts.push(eq); }
+    var lo=Math.min.apply(null,pts), hi=Math.max.apply(null,pts); if(hi===lo) hi=lo+1;
+    var W=600,H=180,pad=10,h=H-2*pad;
+    var line='M'+pts.map(function(v,i){ var x=pts.length>1?(i/(pts.length-1))*W:0; var y=pad+(1-(v-lo)/(hi-lo))*h; return x.toFixed(1)+','+y.toFixed(1); }).join(' L');
+    $('s_line').setAttribute('d',line); $('s_area').setAttribute('d',line+' L600,180 L0,180 Z');
+    $('s_eqy').innerHTML=[hi,lo+(hi-lo)*0.5,lo].map(function(v){return '<span>$'+f0(v/1000)+'k</span>';}).join('');
+  }
+  ['s_start','s_cur','s_risk','s_avgloss','s_winrate','s_trades'].forEach(function(id){ $(id).addEventListener('input',renderSim); });
+  document.querySelectorAll('#s_tiers input').forEach(function(i){ i.addEventListener('input',renderSim); });
+
+  // Plan backwards from a target — simplified goal-seek (mirrors the live solver's log-growth model)
+  $('s_solve').addEventListener('click', function(){
+    var target=num('s_target')/100;
+    if(!(target>0)){ $('s_solveOut').textContent='Enter a target % first.'; return; }
+    var risk=num('s_risk')/100, lossFrac=simUnit==='pct'?num('s_avgloss')/100:num('s_avgloss');
+    var wr=num('s_winrate')/100, weights=tierWeights(), totalW=weights.reduce(function(s,t){return s+t.w;},0);
+    if(!(risk>0)||!totalW||!(lossFrac>0)||!(wr>0&&wr<1)){ $('s_solveOut').textContent='Need risk %, avg loss, win rate and at least one winner tier.'; return; }
+    var gWin=weights.reduce(function(s,t){return s+(t.w/totalW)*Math.log(1+risk*gainFrac(t.gain));},0);
+    var gLoss=Math.log(Math.max(1e-9,1-risk*lossFrac));
+    var g=wr*gWin+(1-wr)*gLoss;
+    if(g<=0){ $('s_solveOut').textContent='This mix never reaches the target at a '+(wr*100).toFixed(0)+'% win rate — raise winner sizes or win rate.'; return; }
+    var N=Math.ceil(Math.log(1+target)/g);
+    $('s_solveOut').textContent='≈ '+f0(N)+' trades needed at this win rate & mix to reach +'+(target*100).toFixed(2)+'%.';
+    var tf=$('s_trades'); tf.value=N; tf.classList.remove('flash'); void tf.offsetWidth; tf.classList.add('flash');
+    renderSim();
+  });
+
+  // Save as scenario — snapshots the full input state so a chip click can reload it later
+  var scenarios=[];
+  function snapshotSim(){
+    return {
+      start:$('s_start').value, cur:$('s_cur').value, unit:simUnit,
+      risk:$('s_risk').value, avgloss:$('s_avgloss').value, winrate:$('s_winrate').value, trades:$('s_trades').value,
+      tiers:Array.prototype.map.call(document.querySelectorAll('#s_tiers tr'), function(tr){
+        return {g:tr.querySelector('[data-tg]').value, c:tr.querySelector('[data-tc]').value};
+      }),
+      ret:$('o_ret').textContent, end:$('o_end').textContent
+    };
+  }
+  function applySimSnapshot(s){
+    $('s_start').value=s.start; $('s_cur').value=s.cur;
+    document.querySelectorAll('#s_unit button').forEach(function(b){ b.classList.toggle('on', b.dataset.u===s.unit); });
+    simUnit=s.unit;
+    $('s_risklabel').textContent = simUnit==='r' ? 'Risk per trade %' : 'Position size %';
+    $('s_avglosslabel').textContent = simUnit==='r' ? 'Avg loss (R)' : 'Avg loss %';
+    $('s_tierhead').textContent = simUnit==='r' ? 'Winner size (R)' : 'Winner size %';
+    $('s_risk').value=s.risk; $('s_avgloss').value=s.avgloss; $('s_winrate').value=s.winrate; $('s_trades').value=s.trades;
+    var rows=document.querySelectorAll('#s_tiers tr');
+    s.tiers.forEach(function(t,i){ if(rows[i]){ rows[i].querySelector('[data-tg]').value=t.g; rows[i].querySelector('[data-tc]').value=t.c; } });
+    renderSim();
+  }
+  function renderScenChips(){
+    $('s_scen').innerHTML=scenarios.map(function(s,i){return '<button type="button" class="scenchip" data-idx="'+i+'" title="Click to reload this scenario">Scenario '+(i+1)+' <b>'+s.ret+'</b> · '+s.end+'</button>';}).join('');
+    document.querySelectorAll('#s_scen .scenchip').forEach(function(btn){
+      btn.addEventListener('click', function(){ applySimSnapshot(scenarios[+btn.dataset.idx]); });
+    });
+  }
+  $('s_save').addEventListener('click', function(){
+    if(scenarios.length>=3) scenarios.shift();
+    scenarios.push(snapshotSim());
+    renderScenChips();
+  });
+  $('s_pb').addEventListener('click', function(){
+    showToast('Saved — compare in <b>Journal › Playbook tracker</b>');
+  });
+
+  /* ============ TOOL: POSITION RISK ============
+     Risk-first sizing, ported from RiskTab's `r` memo (src/App.jsx ~line 2392): fix risk %, the
+     stop distance determines share count; position size is the OUTPUT. */
+  var riskMode='%';
+  document.querySelectorAll('#r_mode button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#r_mode button').forEach(function(x){x.classList.remove('on')}); b.classList.add('on');
+      riskMode=b.dataset.m; $('r_stoplabel').textContent = riskMode==='%'?'Stop (% below entry)':'Stop ($ below entry)';
+      renderRisk();
+    });
+  });
+  function renderRisk(){
+    var sp=num('r_price'), riskPct=num('r_risk'), p=num('r_port'), sv=num('r_stop');
+    var stopPct=riskMode==='%'?sv:(sp>0?(sv/sp)*100:0);
+    var stopPrice=riskMode==='%'?sp*(1-sv/100):sp-sv;
+    var riskPerShare=sp-stopPrice;
+    var riskBudget=p*(riskPct/100);
+    var shares=riskPerShare>0?Math.floor(riskBudget/riskPerShare):0;
+    var posValue=shares*sp, posSizePct=p>0?(posValue/p)*100:0;
+    var totalRisk=shares*riskPerShare, riskPctEq=p>0?(totalRisk/p)*100:0;
+    $('ro_shares').textContent=f0(shares); $('ro_posval').textContent=money(posValue)+' position';
+    $('ro_possize').textContent=posSizePct.toFixed(2)+'%'; setCls($('ro_possize'),'v',posSizePct>30?'red':(posSizePct>25?'gold':''));
+    $('ro_riskdollar').textContent=money(totalRisk);
+    $('ro_riskpctsub').textContent=riskPctEq.toFixed(2)+'% of equity';
+    $('ro_stopprice').textContent='$'+f2(stopPrice);
+    var rows=[1,2,3,4,5,6].map(function(n){ var dr=riskPerShare*n; return {n:n,price:sp+dr,pct:sp>0?(dr/sp)*100:0,dollar:dr*shares}; });
+    $('ro_rtable').innerHTML=rows.map(function(t){ return '<tr><td>'+(t.n===1?'1R (your risk)':(t.n+'R'))+'</td><td>$'+f2(t.price)+'</td><td class="green">+'+t.pct.toFixed(2)+'%</td><td class="'+(t.n===1?'red':'green')+'">'+(t.n===1?'−':'+')+'$'+f0(Math.abs(t.dollar))+'</td></tr>'; }).join('');
+    var ok = stopPct<=10 && riskPctEq<=2 && riskPctEq>0 && posSizePct<=30;
+    var reason = ok ? 'Within the safe zone — ≤2% risk, ≤30% position.' :
+      (stopPct>10 ? 'Stop is '+stopPct.toFixed(1)+'% wide — tighten it or the entry.' :
+      (riskPctEq>2 ? 'Risking '+riskPctEq.toFixed(2)+'% of the account — above the 2% rule.' :
+      'Position is '+posSizePct.toFixed(1)+'% of the account — above the ~30% ceiling.'));
+    $('ro_status').innerHTML='<span class="badge '+(ok?'pos':'neg')+'"><span class="d"></span>'+(ok?'Pass — ':'Check — ')+reason+'</span>';
+  }
+  ['r_price','r_risk','r_port','r_stop'].forEach(function(id){ $(id).addEventListener('input',renderRisk); });
+
+  /* initial paint */
+  renderSim(); renderRisk();
+</script>
+</body>
+</html>

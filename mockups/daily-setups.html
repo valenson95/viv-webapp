@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VIV — Daily Setups (Pro layout)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     VIV brand tokens — copied verbatim from dashboard-pro.html
+     ============================================================ */
+  :root{
+    --bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
+    --text:rgba(255,255,255,0.92);
+    --muted:rgba(255,255,255,0.70);
+    --faint:rgba(255,255,255,0.45);
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:var(--font); line-height:1.5; font-size:16px;
+    -webkit-font-smoothing:antialiased; padding:0; min-height:100vh;
+  }
+
+  /* ===== SHELL ===== */
+  .shell{width:100%; max-width:1400px; margin:0 auto; padding:22px 24px 80px}
+  @media(min-width:2000px){ .shell{max-width:1680px} }
+
+  /* ===== NAV ===== */
+  .navbar{display:flex; align-items:center; gap:16px; margin-bottom:22px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem}
+  .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
+  .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
+  .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+  .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
+  .tabs a:hover:not(.on){color:var(--text)}
+  .spacer{flex:1}
+  .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
+  .seg button{
+    border:none; background:transparent; color:var(--muted); cursor:pointer;
+    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:7px 16px; border-radius:980px;
+    letter-spacing:0.02em; transition:all .15s;
+  }
+  .seg button.on{background:var(--goldDim); color:var(--goldBright)}
+  .seg button:hover:not(.on){color:var(--text)}
+
+  /* ===== SHARED CARD CHROME — uniform across the page ===== */
+  .card{
+    position:relative; background:var(--glass);
+    border:1px solid var(--border); border-radius:16px;
+    backdrop-filter:blur(24px) saturate(150%);
+    -webkit-backdrop-filter:blur(24px) saturate(150%);
+    padding:18px 20px; overflow:visible;
+  }
+  .card::before{
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%);
+   border-radius:inherit;}
+  .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+  .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+  /* identical header on every card: label + info dot, divided from the body */
+  .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+  .cardhead .label{flex:1}
+  .infodot{width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex;
+    align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic;
+    color:var(--faint); flex:none}
+  .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+  /* shared tooltip pattern — copied verbatim so every Pro mockup matches (Jameson, 2026-07-17) */
+  .infodot{position:relative; cursor:help}
+  .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+  /* .tip — same hover-reveal pattern, reused on criteria chips + funnel-status chips (centered, not right-anchored) */
+  .tip{position:relative; cursor:help}
+  .tip:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); left:50%; transform:translateX(-50%); z-index:60; width:max-content; max-width:280px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+
+  /* ===== COMMAND HEADER ===== */
+  .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
+  .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+  .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px}
+
+  /* ===== CONTROLS ROW ===== */
+  .controlsrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:18px}
+  .rowdivider{width:1px; height:18px; background:var(--border)}
+  .takenchip{background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+    font-size:0.72rem; font-weight:800; padding:7px 15px; border-radius:980px; cursor:pointer; letter-spacing:0.01em}
+  .takenchip:hover{color:var(--text)}
+  .takenchip.on{background:rgba(34,197,94,0.12); color:#22c55e; border-color:rgba(34,197,94,0.35)}
+  .searchbox{position:relative; display:inline-flex; align-items:center}
+  .searchbox input{background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:980px; color:var(--white);
+    font-family:var(--font); font-size:0.72rem; font-weight:700; padding:7px 14px; width:130px; outline:none; text-transform:uppercase}
+  .searchbox input:focus{border-color:var(--gold)}
+  .searchbox input::placeholder{color:var(--faint); text-transform:none; font-weight:600}
+  .searchbox .clr{position:absolute; right:8px; background:transparent; border:none; color:var(--faint); font-size:0.9rem; cursor:pointer; line-height:1; display:none}
+  .searchbox.filled .clr{display:block}
+  .searchbox.filled input{padding-right:24px; border-color:var(--borderGold)}
+
+  /* ===== DAY GROUP ROW — slim header, expands to setup cards ===== */
+  .daygroup{margin-bottom:22px}
+  .dayrow{display:flex; align-items:center; gap:10px; margin:0 2px 12px; padding:10px 14px; border-radius:12px;
+    border:1px solid var(--border); background:rgba(255,255,255,0.02); cursor:pointer}
+  .dayrow:hover{border-color:var(--borderGold)}
+  .dayrow.today{border-color:var(--borderGold)}
+  .dayrow.ranked{cursor:default; border-color:var(--borderGold)}
+  .dayrow.ranked:hover{border-color:var(--borderGold)}
+  .daylabel{font-size:0.66rem; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); white-space:nowrap}
+  .dayrow.today .daylabel{color:var(--goldBright); font-size:0.78rem}
+  .daylabel .sub{color:var(--muted); font-weight:700; text-transform:none; letter-spacing:0}
+  .daypreview{display:none; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; overflow:hidden}
+  .daygroup.collapsed .daypreview{display:flex}
+  .daygroup.collapsed .daycards{display:none}
+  .daychip{font-size:0.6rem; font-weight:800; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:2px 7px; white-space:nowrap}
+  .daychip.taken{color:#22c55e; border-color:rgba(34,197,94,0.35)}
+  .dayline{flex:1; height:1px; background:var(--border)}
+  .dayrow.today .dayline{background:rgba(240,192,80,0.35)}
+  .daycount{font-size:0.62rem; color:var(--muted); font-weight:700; white-space:nowrap}
+  .daychevron{font-size:0.7rem; color:var(--goldBright); width:14px; text-align:center}
+
+  /* ===== SETUP CARD ===== */
+  .setupcard{margin-bottom:14px; padding:16px 18px}
+  .setupcard.stale{opacity:0.78}
+  .scard-top{display:flex; gap:16px; flex-wrap:wrap}
+  .chartph{position:relative; flex:0 0 240px; width:240px; height:135px; border-radius:12px; overflow:hidden; border:1px solid var(--border);
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 27px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 40px),
+      linear-gradient(160deg, rgba(201,152,42,0.10), rgba(255,255,255,0.02) 60%, rgba(0,0,0,0.22))}
+  .chartph svg{position:absolute; inset:0; width:100%; height:100%}
+  .chartph .cphtag{position:absolute; left:8px; bottom:7px; font-size:0.62rem; font-weight:800; letter-spacing:0.05em; color:rgba(255,255,255,0.38)}
+  @media(max-width:640px){ .chartph{flex:1 1 100%; width:100%} }
+
+  .scard-body{flex:1 1 260px; min-width:0}
+  .scard-head{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .scticker{font-size:1.3rem; font-weight:800; color:var(--white); text-decoration:none; cursor:pointer}
+  .scticker:hover{color:var(--goldBright); text-decoration:underline}
+  .datechip{font-size:0.64rem; font-weight:800; color:var(--text); background:rgba(255,255,255,0.06); border:1px solid var(--border); padding:3px 9px; border-radius:980px; white-space:nowrap}
+  .badge-new{font-size:0.58rem; font-weight:800; letter-spacing:0.08em; color:var(--goldBright); background:rgba(240,192,80,0.1); border:1px solid var(--borderGold); padding:3px 8px; border-radius:980px}
+  .badge-day{font-size:0.58rem; font-weight:800; letter-spacing:0.05em; color:var(--muted); background:rgba(255,255,255,0.05); border:1px solid var(--border); padding:3px 8px; border-radius:980px; white-space:nowrap}
+  .badge-day.up{color:#86efac; background:rgba(34,197,94,0.1); border-color:rgba(34,197,94,0.35)}
+  .badge-taken{font-size:0.58rem; font-weight:800; letter-spacing:0.08em; color:#22c55e; background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.4); padding:3px 8px; border-radius:980px}
+
+  .stchip{font-size:0.58rem; font-weight:800; letter-spacing:0.04em; padding:3px 9px; border-radius:980px; white-space:nowrap; border:1px solid var(--border)}
+  .stchip.pivot{color:var(--goldBright); background:rgba(240,192,80,0.1); border-color:var(--borderGold)}
+  .stchip.coiling{color:#93c5fd; background:rgba(59,130,246,0.1); border-color:rgba(59,130,246,0.35)}
+  .stchip.fresh{color:var(--text); background:rgba(255,255,255,0.05); border-color:var(--border)}
+  .stchip.triggered{color:#86efac; background:rgba(34,197,94,0.1); border-color:rgba(34,197,94,0.35)}
+  .stchip.faded{color:var(--muted); background:rgba(255,255,255,0.04); border-color:var(--border)}
+
+  .setuptag{font-size:0.66rem; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#93c5fd;
+    background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.35); padding:3px 10px; border-radius:980px; white-space:nowrap}
+  .sectorchip{font-size:0.7rem; font-weight:700; padding:3px 10px; border-radius:980px; border:1px solid var(--border); color:var(--muted); background:rgba(255,255,255,0.05); white-space:nowrap}
+  .sectorchip.in{color:#86efac; background:rgba(34,197,94,0.1); border-color:rgba(34,197,94,0.35)}
+  .sectorchip.off{color:#fca5a5; background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.35)}
+
+  .gradewrap{display:inline-flex; align-items:center; gap:5px; margin-left:auto}
+  .gradebadge{display:inline-flex; min-width:22px; height:22px; padding:0 3px; border-radius:6px; align-items:center; justify-content:center; font-weight:800; font-size:0.74rem; flex:none}
+  .gradebadge.a{background:rgba(34,197,94,0.15); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+  .gradebadge.b{background:var(--goldDim); color:var(--goldBright); border:1px solid var(--borderGold)}
+  .gradebadge.c{background:rgba(239,68,68,0.12); color:#fca5a5; border:1px solid rgba(239,68,68,0.3)}
+  .stars{color:var(--gold); font-size:0.68rem; letter-spacing:1px}
+
+  .thesis{font-size:0.84rem; color:var(--text); line-height:1.58; margin-top:11px}
+
+  .scorehead{padding-bottom:9px; margin-top:14px; margin-bottom:11px}
+  .scorehead .label{flex:none}
+  .scorehead .countchip{background:var(--goldDim); color:var(--goldBright); font-size:0.62rem; font-weight:800; padding:2px 9px; border-radius:980px; margin-left:auto}
+  .scorechips{display:flex; flex-wrap:wrap; gap:8px}
+  .chk{display:inline-flex; align-items:center; gap:6px; font-size:0.72rem; font-weight:600; padding:5px 11px; border-radius:980px; border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--faint)}
+  .chk .mark{font-weight:800; color:rgba(255,255,255,0.22)}
+  .chk.on{color:var(--text); border-color:rgba(34,197,94,0.28); background:rgba(34,197,94,0.06)}
+  .chk.on .mark{color:var(--green)}
+  .chk .auto{color:var(--goldBright); margin-left:1px}
+
+  @media(max-width:760px){
+    .navbar .spacer{display:none}
+    .tabs{overflow-x:auto; max-width:100%; scrollbar-width:none} .tabs::-webkit-scrollbar{display:none} .tabs a{white-space:nowrap}
+  }
+</style>
+</head>
+<body class="pro">
+<div class="shell">
+
+  <!-- P0. NAV -->
+  <div class="navbar">
+    <div class="brand"><img class="vmark" src="../public/logo-mark.png" alt="VIV" style="background:none; object-fit:contain"> Valen Insiders Vault</div>
+    <div class="tabs">
+      <a href="dashboard-pro.html">Dashboard</a>
+      <a href="journal-pro.html">Journal</a>
+      <a href="premium-pro.html">Premium tools</a>
+      <a href="daily-setups.html" class="on">Daily Setups</a>
+      <a href="model-book.html">Model Book</a>
+      <a href="studies.html" title="Admin-only tab">Studies</a>
+      <a href="quant.html" title="Admin-only tab">Quant</a>
+      <a href="settings-pro.html">Settings</a>
+    </div>
+    <div class="spacer"></div>
+    <!-- This page has no Guided/Pro toggle in the live app — right side of the navbar stays empty. -->
+  </div>
+
+  <!-- P1. COMMAND HEADER -->
+  <div class="cmdheader">
+    <div class="cmdleft">
+      <div class="eyebrow">Daily Setups</div>
+      <h1 class="ch1">On the Radar</h1>
+      <div class="cmdmeta">Posted fresh each market day &middot; 5 ideas across 3 sessions &middot; educational, not trade signals</div>
+    </div>
+  </div>
+
+  <!-- CONTROLS ROW -->
+  <div class="controlsrow">
+    <div class="seg" id="sortSeg">
+      <button class="on" data-sort="date">Newest</button>
+      <button data-sort="grade">Top graded</button>
+    </div>
+    <div class="rowdivider"></div>
+    <button class="takenchip" id="takenChip">&#10003; Taken</button>
+    <div class="rowdivider"></div>
+    <div class="searchbox" id="searchBox">
+      <input type="text" id="tickerSearch" placeholder="&#128269; ticker&hellip;" spellcheck="false" title="Type a ticker to see its full history in the feed" />
+      <button class="clr" id="searchClear" aria-label="Clear search">&times;</button>
+    </div>
+  </div>
+
+  <!-- FEED — date groups, each a slim row that expands to setup cards -->
+
+  <!-- Ranked-by-grade view: hidden until "Top graded" is clicked; the 3 date groups collapse into one flat list -->
+  <div class="daygroup" id="rankedGroup" style="display:none">
+    <div class="dayrow ranked">
+      <span class="daylabel" style="color:var(--goldBright); font-size:0.78rem">RANKED BY GRADE</span>
+      <span class="dayline"></span>
+      <span class="daycount" id="rankedCount">5 ideas</span>
+    </div>
+    <div class="daycards" id="rankedFeed"></div>
+  </div>
+
+  <!-- Group 1: TODAY — expanded -->
+  <div class="daygroup" id="grp1">
+    <div class="dayrow today" data-target="grp1">
+      <span class="daylabel">TODAY <span class="sub">&middot; Friday, Jul 17, 2026</span></span>
+      <span class="daypreview">
+        <span class="daychip">NVDA <span style="color:var(--muted)">A</span></span>
+        <span class="daychip taken">PANW <span style="color:var(--muted)">A</span></span>
+      </span>
+      <span class="dayline"></span>
+      <span class="daycount">2 ideas</span>
+      <span class="daychevron">&#9652;</span>
+    </div>
+    <div class="daycards">
+
+      <!-- NVDA -->
+      <div class="card setupcard" data-ticker="NVDA" data-taken="false" data-stars="5" data-pct="0.8125">
+        <div class="scard-top">
+          <div class="chartph">
+            <svg viewBox="0 0 240 135" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="sparkA" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(34,197,94,0.30)"/>
+                  <stop offset="100%" stop-color="rgba(34,197,94,0)"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,108 L24,112 L48,96 L72,100 L96,80 L120,86 L144,60 L168,66 L192,40 L216,48 L240,22 L240,135 L0,135 Z" fill="url(#sparkA)"/>
+              <path d="M0,108 L24,112 L48,96 L72,100 L96,80 L120,86 L144,60 L168,66 L192,40 L216,48 L240,22" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="0" y1="60" x2="240" y2="60" stroke="var(--goldBright)" stroke-width="1" stroke-dasharray="4 4" opacity="0.55"/>
+            </svg>
+            <span class="cphtag">NVDA &middot; 1D</span>
+          </div>
+          <div class="scard-body">
+            <div class="scard-head">
+              <a class="scticker" href="model-book.html" title="Study this pattern in the Model Book">NVDA</a>
+              <span class="datechip">Jul 17</span>
+              <span class="badge-new">NEW</span>
+              <span class="stchip pivot tip" data-tip="Tight and coiled right at the buy point — the watch-closely list">At the pivot</span>
+              <span class="setuptag">VCP &middot; Breakout</span>
+              <span class="sectorchip in" title="Sector is top-5 on the theme tracker at this date — flowing WITH the trend">AI Semis &middot; in theme</span>
+              <span class="gradewrap tip" data-tip="A+ · Table-pounder — everything agrees, full size, this is the trade."><span class="gradebadge a">A+</span><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span></span>
+            </div>
+            <p class="thesis">Three tightening contractions into a rising 21EMA, volume drying up on the last leg. RS line just broke to a new high ahead of price. Watching the $135 pivot on volume &mdash; no chase below it.</p>
+          </div>
+        </div>
+        <div class="cardhead scorehead"><span class="label">Setup-Grader Scorecard</span><span class="infodot" data-tip="16 scored criteria across 3 sections — Leadership / Stock Selection (5), Prior Move (3), Base Quality (8) — plus an 8-item Trigger &amp; Stop checklist that's shown but not scored. ★-makers are confluence factors; the 5th star (A+) only unlocks when they stack. A gold dot ● marks a tick VIV auto-read off the chart.">i</span><span class="countchip">13/16 criteria</span></div>
+        <div class="scorechips">
+          <span class="chk on tip" data-tip="A cluster of narrow-range or inside days right before the breakout — the coil before the release."><span class="mark">&#10003;</span>Inside bars / tight days at the pivot<span class="auto">&#9679;</span></span>
+          <span class="chk on tip" data-tip="Volume fades to nothing through the base — the clearest sign sellers are exhausted and supply is gone."><span class="mark">&#10003;</span>Volume drying up into the apex</span>
+          <span class="chk on tip" data-tip="The stock is beating the market — confirmed by RS Score or price % change vs SPY/QQQ over 1/3/6 months. Leaders go up more, and fall less, than the market."><span class="mark">&#10003;</span>Relative strength &mdash; top-tier</span>
+          <span class="chk on tip" data-tip="Long enough to reset the prior move, not so long the base goes stale."><span class="mark">&#10003;</span>Duration 2 weeks &ndash; 2 months</span>
+        </div>
+        <!-- Admin-only controls (Mark taken / Edit in Setup Grader / Remove post) render here for admin accounts — hidden in this member-view mockup. See DailySetupsTab's isAdmin branch in src/DailySetups.jsx. -->
+      </div>
+
+      <!-- PANW -->
+      <div class="card setupcard" data-ticker="PANW" data-taken="true" data-stars="4" data-pct="0.9375">
+        <div class="scard-top">
+          <div class="chartph">
+            <svg viewBox="0 0 240 135" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="sparkB" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(34,197,94,0.30)"/>
+                  <stop offset="100%" stop-color="rgba(34,197,94,0)"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,100 L24,98 L48,102 L72,90 L96,92 L120,70 L144,74 L168,50 L192,54 L216,34 L240,30 L240,135 L0,135 Z" fill="url(#sparkB)"/>
+              <path d="M0,100 L24,98 L48,102 L72,90 L96,92 L120,70 L144,74 L168,50 L192,54 L216,34 L240,30" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="0" y1="70" x2="240" y2="70" stroke="var(--goldBright)" stroke-width="1" stroke-dasharray="4 4" opacity="0.55"/>
+            </svg>
+            <span class="cphtag">PANW &middot; 1D</span>
+          </div>
+          <div class="scard-body">
+            <div class="scard-head">
+              <a class="scticker" href="model-book.html" title="Study this pattern in the Model Book">PANW</a>
+              <span class="datechip">Jul 17</span>
+              <span class="badge-day up" title="On the focus list since Jul 16 — mention 2 of 2 · setup improving">DAY 2 &middot; since Jul 16 &middot; A&rarr;A</span>
+              <span class="stchip triggered tip" data-tip="The gameplan became a live trade">&#10003; Triggered</span>
+              <span class="badge-taken" title="Executed 2026-07-17 — this gameplan became a live trade">&#10003; TAKEN</span>
+              <span class="setuptag">Pivot &middot; Momentum</span>
+              <span class="sectorchip in" title="Sector is top-5 on the theme tracker at this date — flowing WITH the trend">Cyber &middot; in theme</span>
+              <span class="gradewrap tip" data-tip="A · Strong — excellent setup with minor gaps, size up with confidence."><span class="gradebadge a">A</span><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9734;</span></span>
+            </div>
+            <p class="thesis">Cleared the $214 pivot on 2.1x average volume and followed through the next session. Stop moved to breakeven &mdash; this one's working.</p>
+          </div>
+        </div>
+        <div class="cardhead scorehead"><span class="label">Setup-Grader Scorecard</span><span class="infodot" data-tip="16 scored criteria across 3 sections — Leadership / Stock Selection (5), Prior Move (3), Base Quality (8) — plus an 8-item Trigger &amp; Stop checklist that's shown but not scored. ★-makers are confluence factors; the 5th star (A+) only unlocks when they stack. A gold dot ● marks a tick VIV auto-read off the chart.">i</span><span class="countchip">15/16 criteria</span></div>
+        <div class="scorechips">
+          <span class="chk on tip" data-tip="Judged by PACE, not totals: volume so far vs normal for this time of day. 40%+ of a full day inside the first 30 min = real demand. No pace = no trade."><span class="mark">&#10003;</span>Range-expansion breakout on volume<span class="auto">&#9679;</span></span>
+          <span class="chk on tip" data-tip="The stock is beating the market — confirmed by RS Score or price % change vs SPY/QQQ over 1/3/6 months. Leaders go up more, and fall less, than the market."><span class="mark">&#10003;</span>Relative strength &mdash; top-tier</span>
+          <span class="chk on tip" data-tip="Price is above both the 10- and 20-day moving averages, and both are sloping up — the trend is clearly intact."><span class="mark">&#10003;</span>Above rising 10 &amp; 20-day MA</span>
+          <span class="chk on tip" data-tip="A cluster of narrow-range or inside days right before the breakout — the coil before the release."><span class="mark">&#10003;</span>Inside bars / tight days at the pivot</span>
+        </div>
+        <!-- Admin-only controls (Mark taken / Edit in Setup Grader / Remove post) render here for admin accounts — hidden in this member-view mockup. -->
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Group 2: YESTERDAY — expanded -->
+  <div class="daygroup" id="grp2">
+    <div class="dayrow" data-target="grp2">
+      <span class="daylabel">YESTERDAY <span class="sub">&middot; Thursday, Jul 16, 2026</span></span>
+      <span class="daypreview">
+        <span class="daychip">MSTR <span style="color:var(--muted)">B</span></span>
+      </span>
+      <span class="dayline"></span>
+      <span class="daycount">1 idea</span>
+      <span class="daychevron">&#9652;</span>
+    </div>
+    <div class="daycards">
+
+      <!-- MSTR -->
+      <div class="card setupcard" data-ticker="MSTR" data-taken="false" data-stars="3" data-pct="0.5625">
+        <div class="scard-top">
+          <div class="chartph">
+            <svg viewBox="0 0 240 135" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="sparkC" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(240,192,80,0.28)"/>
+                  <stop offset="100%" stop-color="rgba(240,192,80,0)"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,118 L24,104 L48,108 L72,84 L96,90 L120,64 L144,70 L168,44 L192,50 L216,32 L240,28 L240,135 L0,135 Z" fill="url(#sparkC)"/>
+              <path d="M0,118 L24,104 L48,108 L72,84 L96,90 L120,64 L144,70 L168,44 L192,50 L216,32 L240,28" fill="none" stroke="var(--goldBright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="0" y1="34" x2="240" y2="34" stroke="rgba(255,255,255,0.35)" stroke-width="1" stroke-dasharray="4 4"/>
+            </svg>
+            <span class="cphtag">MSTR &middot; 1D</span>
+          </div>
+          <div class="scard-body">
+            <div class="scard-head">
+              <a class="scticker" href="model-book.html" title="Study this pattern in the Model Book">MSTR</a>
+              <span class="datechip">Jul 16</span>
+              <span class="stchip fresh tip" data-tip="First look — on the radar, base not built yet">Fresh</span>
+              <span class="setuptag">Momentum</span>
+              <span class="sectorchip off" title="Sector is NOT top-5 on the theme tracker at this date — fighting the rotation">Bitcoin &middot; off theme</span>
+              <span class="gradewrap tip" data-tip="B · Tradeable — decent but flawed, trade smaller or wait for it to tighten."><span class="gradebadge b">B</span><span class="stars">&#9733;&#9733;&#9733;&#9734;&#9734;</span></span>
+            </div>
+            <p class="thesis">Extended 18% above the 50MA already &mdash; chasing here isn't ideal. Flagging for a pullback entry near the rising 10-day if momentum holds.</p>
+          </div>
+        </div>
+        <div class="cardhead scorehead"><span class="label">Setup-Grader Scorecard</span><span class="infodot" data-tip="16 scored criteria across 3 sections — Leadership / Stock Selection (5), Prior Move (3), Base Quality (8) — plus an 8-item Trigger &amp; Stop checklist that's shown but not scored. ★-makers are confluence factors; the 5th star (A+) only unlocks when they stack. A gold dot ● marks a tick VIV auto-read off the chart.">i</span><span class="countchip">9/16 criteria</span></div>
+        <div class="scorechips">
+          <span class="chk on tip" data-tip="Price is above both the 10- and 20-day moving averages, and both are sloping up — the trend is clearly intact."><span class="mark">&#10003;</span>Above rising 10 &amp; 20-day MA</span>
+          <span class="chk on tip" data-tip="Watch the volume signature — the rally came on expanding, above-average volume, ideally a clean 30–45° angle climb: steady and powerful, not a vertical/climactic spike."><span class="mark">&#10003;</span>Sharp, high-volume advance</span>
+          <span class="chk tip" data-tip="Two checks: extension ≤ 4× ATR from the 50-day MA, and a 1st or 2nd base, not a late-stage 3rd/4th. Under 4× = launchpad. Over = you're buying someone's exit."><span class="mark">&#10007;</span>Fresh, not extended</span>
+        </div>
+        <!-- Admin-only controls (Mark taken / Edit in Setup Grader / Remove post) render here for admin accounts — hidden in this member-view mockup. -->
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Group 3: older — starts COLLAPSED to show the slim-row preview state -->
+  <div class="daygroup collapsed" id="grp3">
+    <div class="dayrow" data-target="grp3">
+      <span class="daylabel">Monday <span class="sub">&middot; Jul 6, 2026</span></span>
+      <span class="daypreview">
+        <span class="daychip">AVGO <span style="color:var(--muted)">B</span></span>
+        <span class="daychip">KLAC <span style="color:var(--muted)">C</span></span>
+      </span>
+      <span class="dayline"></span>
+      <span class="daycount">2 ideas</span>
+      <span class="daychevron">&#9662;</span>
+    </div>
+    <div class="daycards">
+
+      <!-- AVGO -->
+      <div class="card setupcard" data-ticker="AVGO" data-taken="false" data-stars="3" data-pct="0.625">
+        <div class="scard-top">
+          <div class="chartph">
+            <svg viewBox="0 0 240 135" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="sparkD" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(240,192,80,0.24)"/>
+                  <stop offset="100%" stop-color="rgba(240,192,80,0)"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,84 L24,78 L48,90 L72,80 L96,88 L120,74 L144,82 L168,70 L192,78 L216,68 L240,72 L240,135 L0,135 Z" fill="url(#sparkD)"/>
+              <path d="M0,84 L24,78 L48,90 L72,80 L96,88 L120,74 L144,82 L168,70 L192,78 L216,68 L240,72" fill="none" stroke="var(--goldBright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="0" y1="66" x2="240" y2="66" stroke="rgba(255,255,255,0.35)" stroke-width="1" stroke-dasharray="4 4"/>
+            </svg>
+            <span class="cphtag">AVGO &middot; 1D</span>
+          </div>
+          <div class="scard-body">
+            <div class="scard-head">
+              <a class="scticker" href="model-book.html" title="Study this pattern in the Model Book">AVGO</a>
+              <span class="datechip">Jul 6</span>
+              <span class="badge-day" title="On the focus list since Jun 30 — mention 3 of 3">DAY 3 &middot; since Jun 30 &middot; B&rarr;B</span>
+              <span class="stchip coiling tip" data-tip="Base is developing — contraction started but not pivot-tight yet">Coiling</span>
+              <span class="setuptag">VCP</span>
+              <span class="sectorchip in" title="Sector is top-5 on the theme tracker at this date — flowing WITH the trend">AI Semis &middot; in theme</span>
+              <span class="gradewrap tip" data-tip="B · Tradeable — decent but flawed, trade smaller or wait for it to tighten."><span class="gradebadge b">B</span><span class="stars">&#9733;&#9733;&#9733;&#9734;&#9734;</span></span>
+            </div>
+            <p class="thesis">Third look at this base &mdash; tightening but still one contraction short of pivot-tight. Coiling just under the $196 highs.</p>
+          </div>
+        </div>
+        <div class="cardhead scorehead"><span class="label">Setup-Grader Scorecard</span><span class="infodot" data-tip="16 scored criteria across 3 sections — Leadership / Stock Selection (5), Prior Move (3), Base Quality (8) — plus an 8-item Trigger &amp; Stop checklist that's shown but not scored. ★-makers are confluence factors; the 5th star (A+) only unlocks when they stack. A gold dot ● marks a tick VIV auto-read off the chart.">i</span><span class="countchip">10/16 criteria</span></div>
+        <div class="scorechips">
+          <span class="chk on tip" data-tip="Volatility compresses toward a tight apex as the base matures."><span class="mark">&#10003;</span>Tightening range (contraction)</span>
+          <span class="chk on tip" data-tip="Volume fades to nothing through the base — the clearest sign sellers are exhausted and supply is gone."><span class="mark">&#10003;</span>Volume drying up into the apex</span>
+          <span class="chk tip" data-tip="A cluster of narrow-range or inside days right before the breakout — the coil before the release. Not there yet on this one."><span class="mark">&#10007;</span>Inside bars / tight days at the pivot</span>
+        </div>
+        <!-- Admin-only controls (Mark taken / Edit in Setup Grader / Remove post) render here for admin accounts — hidden in this member-view mockup. -->
+      </div>
+
+      <!-- KLAC -->
+      <div class="card setupcard stale" data-ticker="KLAC" data-taken="false" data-stars="2" data-pct="0.375">
+        <div class="scard-top">
+          <div class="chartph">
+            <svg viewBox="0 0 240 135" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="sparkE" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(239,68,68,0.22)"/>
+                  <stop offset="100%" stop-color="rgba(239,68,68,0)"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,60 L24,68 L48,64 L72,78 L96,74 L120,90 L144,86 L168,100 L192,96 L216,108 L240,104 L240,135 L0,135 Z" fill="url(#sparkE)"/>
+              <path d="M0,60 L24,68 L48,64 L72,78 L96,74 L120,90 L144,86 L168,100 L192,96 L216,108 L240,104" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="0" y1="60" x2="240" y2="60" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="4 4"/>
+            </svg>
+            <span class="cphtag">KLAC &middot; 1D</span>
+          </div>
+          <div class="scard-body">
+            <div class="scard-head">
+              <a class="scticker" href="model-book.html" title="Study this pattern in the Model Book">KLAC</a>
+              <span class="datechip">Jul 6</span>
+              <span class="stchip faded tip" data-tip="Idea aged out — over 5 days without triggering">Faded</span>
+              <span class="setuptag">VCP</span>
+              <span class="sectorchip">Chip Equip</span>
+              <span class="gradewrap tip" data-tip="C · Marginal — too much missing, usually a pass."><span class="gradebadge c">C</span><span class="stars">&#9733;&#9733;&#9734;&#9734;&#9734;</span></span>
+            </div>
+            <p class="thesis">Never triggered &mdash; the base broadened out and RS rolled over before the pivot. Off the radar unless it resets and tightens again.</p>
+          </div>
+        </div>
+        <div class="cardhead scorehead"><span class="label">Setup-Grader Scorecard</span><span class="infodot" data-tip="16 scored criteria across 3 sections — Leadership / Stock Selection (5), Prior Move (3), Base Quality (8) — plus an 8-item Trigger &amp; Stop checklist that's shown but not scored. ★-makers are confluence factors; the 5th star (A+) only unlocks when they stack. A gold dot ● marks a tick VIV auto-read off the chart.">i</span><span class="countchip">6/16 criteria</span></div>
+        <div class="scorechips">
+          <span class="chk tip" data-tip="A cluster of narrow-range or inside days right before the breakout — the coil before the release. The base broadened out instead."><span class="mark">&#10007;</span>Inside bars / tight days at the pivot</span>
+          <span class="chk tip" data-tip="The stock is beating the market — confirmed by RS Score or price % change vs SPY/QQQ over 1/3/6 months. RS rolled over here."><span class="mark">&#10007;</span>Relative strength &mdash; top-tier</span>
+          <span class="chk on tip" data-tip="Long enough to reset the prior move, not so long the base goes stale."><span class="mark">&#10003;</span>Duration 2 weeks &ndash; 2 months</span>
+        </div>
+        <!-- Admin-only controls (Mark taken / Edit in Setup Grader / Remove post) render here for admin accounts — hidden in this member-view mockup. -->
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ===== shared state =====
+  var takenChip = document.getElementById('takenChip');
+  var dateGroups = document.querySelectorAll('.daygroup:not(#rankedGroup)'); // grp1/grp2/grp3 — the date-grouped view
+  var rankedGroup = document.getElementById('rankedGroup');
+  var rankedFeed = document.getElementById('rankedFeed');
+  var rankedCount = document.getElementById('rankedCount');
+  var allCards = document.querySelectorAll('.setupcard');
+  var rankedMode = false;
+
+  // remember each card's home (date-group container + document order) so "Newest" can restore it
+  var cardHomes = [];
+  allCards.forEach(function(card){ cardHomes.push({ el: card, parent: card.parentElement }); });
+
+  // ===== Day group rows: click to expand/collapse (mirrors the live feed's collapsed-by-default groups) =====
+  document.querySelectorAll('.dayrow').forEach(function(row){
+    if (!row.hasAttribute('data-target')) return; // the ranked-view header isn't collapsible
+    row.addEventListener('click', function(){
+      var grp = document.getElementById(row.getAttribute('data-target'));
+      var collapsing = !grp.classList.contains('collapsed');
+      grp.classList.toggle('collapsed');
+      row.querySelector('.daychevron').innerHTML = collapsing ? '&#9662;' : '&#9652;';
+    });
+  });
+
+  // ===== Sort seg — REAL reorder: "Newest" = the 3 date groups; "Top graded" = one flat list, best first =====
+  document.querySelectorAll('#sortSeg button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#sortSeg button').forEach(function(x){ x.classList.remove('on'); });
+      b.classList.add('on');
+      if (b.getAttribute('data-sort') === 'grade') showRanked(); else showByDate();
+    });
+  });
+
+  function showRanked(){
+    rankedMode = true;
+    var sorted = cardHomes.map(function(h){ return h.el; }).sort(function(a, b){
+      var sa = parseFloat(a.getAttribute('data-stars')) || 0, sb = parseFloat(b.getAttribute('data-stars')) || 0;
+      if (sb !== sa) return sb - sa; // stars desc
+      var pa = parseFloat(a.getAttribute('data-pct')) || 0, pb = parseFloat(b.getAttribute('data-pct')) || 0;
+      return pb - pa; // tie-break: % of criteria passed, desc
+    });
+    sorted.forEach(function(card){ rankedFeed.appendChild(card); });
+    rankedCount.textContent = sorted.length + ' idea' + (sorted.length !== 1 ? 's' : '');
+    dateGroups.forEach(function(g){ g.style.display = 'none'; });
+    rankedGroup.style.display = '';
+    applyFilters(takenChip.classList.contains('on')); // keep any active filter applied to the new layout
+  }
+  function showByDate(){
+    rankedMode = false;
+    cardHomes.forEach(function(h){ h.parent.appendChild(h.el); }); // reinsert in original doc order = original grouping
+    rankedGroup.style.display = 'none';
+    dateGroups.forEach(function(g){ g.style.display = ''; });
+    applyFilters(takenChip.classList.contains('on'));
+  }
+
+  // ===== "✔ Taken" filter chip: shows only taken setups, forcing their day groups open =====
+  takenChip.addEventListener('click', function(){
+    var on = takenChip.classList.toggle('on');
+    applyFilters(on);
+  });
+
+  // ===== Ticker search: filters cards by ticker substring, forcing matching groups open =====
+  var searchInput = document.getElementById('tickerSearch');
+  var searchBox = document.getElementById('searchBox');
+  var searchClear = document.getElementById('searchClear');
+  searchInput.addEventListener('input', function(){
+    searchBox.classList.toggle('filled', searchInput.value.trim().length > 0);
+    applyFilters(takenChip.classList.contains('on'));
+  });
+  searchClear.addEventListener('click', function(){
+    searchInput.value = '';
+    searchBox.classList.remove('filled');
+    applyFilters(takenChip.classList.contains('on'));
+  });
+
+  function applyFilters(takenOnly){
+    var q = searchInput.value.trim().toUpperCase();
+    var active = takenOnly || q.length > 0;
+    allCards.forEach(function(card){
+      var matchesTaken = !takenOnly || card.getAttribute('data-taken') === 'true';
+      var matchesQuery = !q || card.getAttribute('data-ticker').indexOf(q) !== -1;
+      card.style.display = (matchesTaken && matchesQuery) ? '' : 'none';
+    });
+    if (rankedMode) {
+      var visibleRanked = rankedFeed.querySelectorAll('.setupcard:not([style*="display: none"])').length;
+      rankedCount.textContent = visibleRanked + ' idea' + (visibleRanked !== 1 ? 's' : '');
+      return; // the ranked view is a single flat list — no per-group collapse logic to run
+    }
+    dateGroups.forEach(function(grp){
+      var visibleCards = grp.querySelectorAll('.setupcard:not([style*="display: none"])').length;
+      if (active) {
+        grp.classList.toggle('collapsed', visibleCards === 0);
+      } else {
+        // filters cleared — restore each group's default open/collapsed state
+        grp.classList.toggle('collapsed', grp.id === 'grp3');
+      }
+      var chev = grp.querySelector('.daychevron');
+      if (chev) chev.innerHTML = grp.classList.contains('collapsed') ? '&#9662;' : '&#9652;';
+    });
+  }
+</script>
+</body>
+</html>
