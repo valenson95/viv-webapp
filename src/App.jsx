@@ -4604,7 +4604,8 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj.expert .cmdactions .btn.ghost{background:transparent}
 .vj.expert .cmdactions .conn{margin-left:0}
 /* P2. KPI strip */
-.vj.expert .kpistrip{display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-top:6px}
+.vj.expert .kpistrip{display:grid; grid-template-columns:repeat(auto-fit, minmax(215px,1fr)); gap:14px; margin-top:6px}
+.vj.expert .kpistrip > *{min-width:0}
 .vj.expert .kpi{padding:14px 18px; display:flex; flex-direction:column; min-height:112px}
 .vj.expert .kpi .cardhead{padding-bottom:8px; margin-bottom:10px}
 .vj.expert .kpibody{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-height:0}
@@ -8697,7 +8698,8 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-size:0.62rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em}
 .vd.expert .ghostchip:hover{color:var(--text); border-color:var(--borderGold)}
 /* P2. KPI strip — five short cards, collapsing 5→3→2 */
-.vd.expert .kpistrip{display:grid; grid-template-columns:repeat(5,1fr); gap:14px}
+.vd.expert .kpistrip{display:grid; grid-template-columns:repeat(auto-fit, minmax(215px,1fr)); gap:14px}
+.vd.expert .kpistrip > *{min-width:0}
 .vd.expert .kpi{padding:14px 18px; display:flex; flex-direction:column; min-height:112px}
 .vd.expert .kpi .cardhead{padding-bottom:8px; margin-bottom:10px}
 .vd.expert .kpibody{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-height:0}
