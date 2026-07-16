@@ -274,6 +274,9 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     ticker: "", entry_date: "", before_img: "", after_img: "", thesis: "", lesson: "",
     ticked: [], elite: [], characteristics: [], is_published: false,
     ...(initial || {}),
+    // outcome_img is a VIRTUAL slot (no DB column) — lives in metrics.study.outcome_img; lifted
+    // to top level here so chartSlot/uploadImg/zoom treat all three charts identically.
+    outcome_img: initial?.metrics?.study?.outcome_img || "",
     metrics: { ...(initial?.metrics || {}), study: initial?.metrics?.study || {
       setup: "Momentum Breakout", direction: "long", regime_tag: "",
       checks: {}, m: {}, grade: { letter: "" }, outcome: {}, refusal: "",
@@ -286,9 +289,10 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   const lbl = { fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.muted, marginBottom: 4, display: "block" };
   const sect = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "14px 0 8px" };
   const cls = outcomeClass(s);
-  // ── click-to-zoom lightbox: click either chart to enlarge, ←/→ toggles HTF↔LTF, Esc closes ──
-  const [zoom, setZoom] = useState(null); // null | "before_img" | "after_img"
-  const zoomSlots = ["before_img", "after_img"].filter(k => row[k]); // only attached charts
+  // ── click-to-zoom lightbox: click any chart to enlarge, ←/→ cycles Context→BEFORE→AFTER, Esc closes ──
+  const [zoom, setZoom] = useState(null); // null | "before_img" | "after_img" | "outcome_img"
+  const SLOT_TITLES = { before_img: "CONTEXT — HTF", after_img: "BEFORE — the setup", outcome_img: "AFTER — the outcome" };
+  const zoomSlots = ["before_img", "after_img", "outcome_img"].filter(k => row[k]); // only attached charts
   useEffect(() => {
     if (!zoom) return;
     const onKey = (e) => {
@@ -306,14 +310,15 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       <label style={lbl}>{title}</label>
       <div style={{ fontSize: "0.62rem", color: C.muted, marginBottom: 6 }}>{hint}</div>
       <input type="file" accept="image/*" onChange={e => onUpload(e.target.files[0], slot, setRow)} style={{ fontSize: "0.7rem", color: C.muted }} />
-      {row[slot] && <img src={row[slot]} alt="" onClick={() => setZoom(slot)} title="Click to zoom (← → toggles HTF/LTF · Esc closes)" style={{ display: "block", marginTop: 8, width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)", cursor: "zoom-in" }} />}
+      {row[slot] && <img src={row[slot]} alt="" onClick={() => setZoom(slot)} title="Click to zoom (← → cycles Context/BEFORE/AFTER · Esc closes)" style={{ display: "block", marginTop: 8, width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)", cursor: "zoom-in" }} />}
     </div>
   );
   const doSave = () => {
     if (!row.ticker.trim()) { alert("Ticker first."); return; }
     const q = studyQuality(s); // grade is derived from ticks at save time — stored for the grid + calibration
-    const body = { ...row,
-      metrics: { ...row.metrics, study: { ...s, grade: { letter: q.letter === "—" ? "" : q.letter, auto: true, on: q.on, total: q.total } } },
+    const { outcome_img, ...bodyRow } = row; // virtual slot → folded back into metrics.study (no DB column)
+    const body = { ...bodyRow,
+      metrics: { ...row.metrics, study: { ...s, outcome_img: outcome_img || "", grade: { letter: q.letter === "—" ? "" : q.letter, auto: true, on: q.on, total: q.total } } },
       pattern: s.setup === "Parabolic" ? `Parabolic ${s.direction === "short" ? "Short" : "Long"}` : s.setup,
       outcome: cls ? MB_OUTCOME[cls] : null, thesis: row.thesis,
       lesson: [s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n") || null };
@@ -356,8 +361,9 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
 
       <div style={sect}>Charts — two timeframes</div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-        {chartSlot("before_img", "HTF chart", "Weekly/monthly — the pole, the base in context, where it sits in the longer trend")}
-        {chartSlot("after_img", "LTF chart", "Daily/intraday — the tightening, the trigger bar, the stop structure")}
+        {chartSlot("before_img", "Context — HTF", "Weekly/monthly — the pole, the base in context, where it sits in the longer trend")}
+        {chartSlot("after_img", "BEFORE — the setup", "Daily/intraday with the RIGHT EDGE = trigger day — exactly what your eyes saw at the decision moment")}
+        {chartSlot("outcome_img", "AFTER — the outcome", "Same chart weeks later — what the setup became. BEFORE→AFTER is the pattern-recognition rep")}
       </div>
 
       {/* 👁 HIS ticks — only chart-readable factors, grader-style 3 buckets per setup.
@@ -432,7 +438,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           style={{ position: "fixed", inset: 0, zIndex: 1400, background: "rgba(4,4,8,0.9)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10, color: C.white, fontFamily: font }}>
             {zoomSlots.length > 1 && <button onClick={() => setZoom(zoomSlots[(zoomSlots.indexOf(zoom) - 1 + zoomSlots.length) % zoomSlots.length])} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 10, fontSize: "1.3rem", cursor: "pointer" }} aria-label="Previous">‹</button>}
-            <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>{zoom === "before_img" ? "HTF chart" : "LTF chart"}{zoomSlots.length > 1 ? " · ← → to toggle" : ""}</span>
+            <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>{SLOT_TITLES[zoom] || zoom}{zoomSlots.length > 1 ? " · ← → to cycle" : ""}</span>
             {zoomSlots.length > 1 && <button onClick={() => setZoom(zoomSlots[(zoomSlots.indexOf(zoom) + 1) % zoomSlots.length])} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 10, fontSize: "1.3rem", cursor: "pointer" }} aria-label="Next">›</button>}
             <button onClick={() => setZoom(null)} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.muted, width: 40, height: 40, borderRadius: 10, fontSize: "1.1rem", cursor: "pointer", marginLeft: 8 }} aria-label="Close">✕</button>
           </div>

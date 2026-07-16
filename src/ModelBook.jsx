@@ -483,6 +483,12 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 onMouseEnter={e => e.currentTarget.style.borderColor = C.borderGold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
                 <b style={{ width: 64, color: firstOfGroup ? undefined : "transparent" }}>{r.ticker}{firstOfGroup && groupN > 1 ? <span style={{ color: C.muted, fontWeight: 400, fontSize: "0.64rem" }}> ×{groupN}</span> : null}</b>
                 <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
+                {/* BEFORE→AFTER flash-card strip — the pattern-recognition rep at a glance */}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
+                  {r.after_img ? <img src={r.after_img} alt="before" title="BEFORE — the setup" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
+                  <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
+                  {s.outcome_img ? <img src={s.outcome_img} alt="after" title="AFTER — the outcome" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} /> : <span title="No AFTER chart yet — drop `TICKER DATE AFTER.png` in the study inbox" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
+                </span>
                 <span style={{ width: 150 }}>{r.pattern}</span>
                 {(() => { const q = studyQuality(s); return <span style={{ width: 70, color: q.letter === "—" ? C.muted : q.letter === "A+" ? "#7ef0a0" : C.goldBright, fontWeight: 700 }} title={`${q.on}/${q.total} criteria ticked`}>{q.letter}</span>; })()}
                 <span style={{ flex: 1, color: C.muted, fontSize: "0.7rem" }}>{s.regime_tag || ""}</span>

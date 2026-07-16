@@ -1,8 +1,9 @@
 // STUDY-INGEST — Valen's chart-handoff workflow (2026-07-14):
 //   1. In the webapp he creates the study (ticker + date + his eyeball ticks), or not — either way works.
 //   2. He saves chart screenshots to  AI-OS/trading/research/chart-study/inbox/
-//      named like:  AA 2021-03-01 HTF.png   ·   AA_2021-03-01_LTF.png   (any separators;
-//      HTF/weekly/W → HTF slot, LTF/daily/D → LTF slot; a single unlabeled file → LTF).
+//      named like:  AA 2021-03-01 HTF.png · AA_2021-03-01_LTF.png · AA 2021-03-01 AFTER.png
+//      (any separators; HTF/weekly/W → Context slot, LTF/daily/D → BEFORE slot,
+//       AFTER/OUT/OUTCOME → the outcome chart (metrics.study.outcome_img); unlabeled → BEFORE).
 //   3. This script: groups files by ticker+date → finds the study row (creates it via
 //      study-fill.mjs --write if missing, so metrics/outcome auto-fill too) → uploads the
 //      images to the trade-charts bucket → attaches (HTF=before_img, LTF=after_img) →
@@ -26,7 +27,8 @@ for (const f of files) {
   const m = f.match(/^([A-Za-z.]+)[ _-]+(\d{4}-\d{2}-\d{2})(?:[ _-]+([A-Za-z]+))?\.(png|jpe?g|webp)$/);
   if (!m) { console.log(`✗ skip "${f}" — name it TICKER YYYY-MM-DD HTF|LTF.png`); continue; }
   const [, tk, date, tfRaw] = m;
-  const tf = /^(htf|w|weekly|m|monthly)$/i.test(tfRaw || "") ? "HTF" : "LTF";
+  const tf = /^(htf|w|weekly|m|monthly)$/i.test(tfRaw || "") ? "HTF"
+    : /^(after|out|outcome|result)$/i.test(tfRaw || "") ? "AFTER" : "LTF";
   const key = `${tk.toUpperCase()}|${date}`;
   (groups[key] = groups[key] || {}).ticker = tk.toUpperCase();
   groups[key].date = date;
@@ -48,15 +50,18 @@ for (const g of Object.values(groups)) {
     if (!row) { console.log('  ✗ row still missing (date mismatch? study-fill may have snapped to another session — rename the file to that date)'); continue; }
   }
   const patch = {};
+  let outcomeUrl = null; // AFTER chart is a virtual slot → metrics.study.outcome_img (no DB column)
   for (const { f, tf } of g.files) {
     const path = `modelbook/${UID}/study/${g.ticker}-${g.date}-${tf}.png`;
     const buf = readFileSync(`${INBOX}/${f}`);
     const { error: upErr } = await sb.storage.from('trade-charts').upload(path, buf, { upsert: true, contentType: 'image/png' });
     if (upErr) { console.log(`  ✗ upload ${f}: ${upErr.message}`); continue; }
     const { data: url } = sb.storage.from('trade-charts').getPublicUrl(path);
-    patch[tf === "HTF" ? "before_img" : "after_img"] = url.publicUrl;
+    if (tf === "AFTER") outcomeUrl = url.publicUrl;
+    else patch[tf === "HTF" ? "before_img" : "after_img"] = url.publicUrl;
     console.log(`  ✓ ${tf} ← ${f}`);
   }
+  if (outcomeUrl) patch.metrics = { ...row.metrics, study: { ...row.metrics.study, outcome_img: outcomeUrl } };
   if (Object.keys(patch).length) {
     const { error } = await sb.from('model_book').update(patch).eq('id', row.id);
     if (error) { console.log(`  ✗ attach: ${error.message}`); continue; }
