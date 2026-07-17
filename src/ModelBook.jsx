@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
 import { SECTIONS, sectionsFor, scoreTicked, versionOf, stampV2 } from "./SetupGrader.jsx";
@@ -529,13 +530,19 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {studyMode && fScope === "mine" && isAdmin && (
         <div style={{ marginBottom: 20 }}>
           <StudyScoreboard C={C} rows={studyRows} />
-          {studyEditing !== null ? (
-            <StudyEditor C={C} font={font} busy={busy} initial={studyEditing.id ? studyEditing : null}
-              onSave={async (r) => { if (await save(r)) setStudyEditing(null); }}
-              onCancel={() => setStudyEditing(null)} onUpload={uploadImg} />
-          ) : (
-            <button onClick={() => setStudyEditing({})} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", marginBottom: 14 }}>＋ New study</button>
-          )}
+          {/* Editor opens as a blurred-backdrop POPUP (Valen 2026-07-17) — click a row anywhere in the
+              list and edit right there, no scrolling back up. Backdrop click / Cancel closes; clicks
+              inside never close (members are editing). Portaled to body so no card backdrop-filter
+              becomes its containing block. No Esc-close here: the editor's chart lightbox owns Esc. */}
+          {studyEditing !== null && createPortal(
+            <div onClick={() => setStudyEditing(null)} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "4vh 3vw" }}>
+              <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1180, margin: "0 auto", background: "rgba(10,10,16,0.92)", borderRadius: 16 }}>
+                <StudyEditor C={C} font={font} busy={busy} initial={studyEditing.id ? studyEditing : null}
+                  onSave={async (r) => { if (await save(r)) setStudyEditing(null); }}
+                  onCancel={() => setStudyEditing(null)} onUpload={uploadImg} />
+              </div>
+            </div>, document.body)}
+          <button onClick={() => setStudyEditing({})} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", marginBottom: 14 }}>＋ New study</button>
           {studyRows.length === 0 && studyEditing === null && (
             <div style={{ color: C.muted, fontSize: "0.82rem", padding: "18px 0" }}>No studies yet — hit ＋ New study. Grade blind (grade + prediction locked before the outcome opens), then record what happened. The scoreboard finds your winner DNA as the sample grows.</div>
           )}
@@ -644,7 +651,16 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               </div>
               {/* BEFORE | AFTER — always left/right, clearly compared (responsive, no innerWidth snapshot) */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 16 }}>
-                <div>
+                <div style={{ position: "relative" }}>
+                  {/* Point-in-time cap + ADR% badge — rides along when a ★-promoted study surfaces here (same row, same stats) */}
+                  {(() => {
+                    const sm = r.metrics?.study?.m; if (!sm) return null;
+                    const cap = +(sm.mcap_t || 0), adr = sm.adr20;
+                    const parts = [];
+                    if (cap > 0) parts.push("≈" + (cap >= 1e9 ? "$" + (cap / 1e9).toFixed(1) + "B" : "$" + Math.round(cap / 1e6) + "M"));
+                    if (adr != null && adr !== "" && !Number.isNaN(+adr)) parts.push("ADR " + (+adr).toFixed(1) + "%");
+                    return parts.length ? <span title={`At the trigger date — cap from SEC shares outstanding (${sm.mcap_asof || "n/a"}), ADR20 from the 20 sessions before the trigger.`} style={{ position: "absolute", top: 26, right: 6, zIndex: 2, background: "rgba(8,8,14,0.82)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.04em", padding: "3px 8px", borderRadius: 7, whiteSpace: "nowrap", cursor: "help", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>{parts.join(" · ")}</span> : null;
+                  })()}
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>◀ Before — the setup <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
                   {r.before_img ? <img src={r.before_img} alt="before" onClick={() => setZoom({ imgs: { before: r.before_img, after: r.after_img }, slot: "before" })} style={{ width: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>before chart pending</div>}
                 </div>

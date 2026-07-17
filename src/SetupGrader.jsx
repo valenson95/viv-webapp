@@ -123,7 +123,7 @@ export const SECTIONS = [
         s: "The last bar(s) sit inside the prior bar's range — maximum coil." },
       { c: "SMA 10/20/50 converging at the pivot", bonus: true,
         s: "The 10/20/50-day MAs pinch together at the pivot — energy building." },
-      { c: "Surfing rising 10/20-day MA into the pivot",
+      { c: "Surfing rising 10/20/50-day MA into the pivot",
         s: "Riding a rising 10/20-day MA into the pivot." },
     ],
   },

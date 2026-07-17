@@ -28,7 +28,8 @@ for (const f of files) {
   if (!m) { console.log(`✗ skip "${f}" — name it TICKER YYYY-MM-DD HTF|LTF.png`); continue; }
   const [, tk, date, tfRaw] = m;
   const tf = /^(htf|w|weekly|m|monthly)$/i.test(tfRaw || "") ? "HTF"
-    : /^(after|out|outcome|result)$/i.test(tfRaw || "") ? "AFTER" : "LTF";
+    : /^(after|out|outcome|result)$/i.test(tfRaw || "") ? "AFTER"
+    : /^(trig|trigger|entry|5min|ltfafter)$/i.test(tfRaw || "") ? "TRIG" : "LTF";
   const key = `${tk.toUpperCase()}|${date}`;
   (groups[key] = groups[key] || {}).ticker = tk.toUpperCase();
   groups[key].date = date;
@@ -50,7 +51,7 @@ for (const g of Object.values(groups)) {
     if (!row) { console.log('  ✗ row still missing (date mismatch? study-fill may have snapped to another session — rename the file to that date)'); continue; }
   }
   const patch = {};
-  let outcomeUrl = null; // AFTER chart is a virtual slot → metrics.study.outcome_img (no DB column)
+  let outcomeUrl = null, trigUrl = null; // AFTER + TRIG are virtual slots → metrics.study.{outcome_img,trigger_ltf_img}
   for (const { f, tf } of g.files) {
     const path = `modelbook/${UID}/study/${g.ticker}-${g.date}-${tf}.png`;
     const buf = readFileSync(`${INBOX}/${f}`);
@@ -58,10 +59,12 @@ for (const g of Object.values(groups)) {
     if (upErr) { console.log(`  ✗ upload ${f}: ${upErr.message}`); continue; }
     const { data: url } = sb.storage.from('trade-charts').getPublicUrl(path);
     if (tf === "AFTER") outcomeUrl = url.publicUrl;
+    else if (tf === "TRIG") trigUrl = url.publicUrl;
     else patch[tf === "HTF" ? "before_img" : "after_img"] = url.publicUrl;
     console.log(`  ✓ ${tf} ← ${f}`);
   }
-  if (outcomeUrl) patch.metrics = { ...row.metrics, study: { ...row.metrics.study, outcome_img: outcomeUrl } };
+  if (outcomeUrl || trigUrl) patch.metrics = { ...row.metrics, study: { ...row.metrics.study,
+    ...(outcomeUrl ? { outcome_img: outcomeUrl } : {}), ...(trigUrl ? { trigger_ltf_img: trigUrl } : {}) } };
   if (Object.keys(patch).length) {
     const { error } = await sb.from('model_book').update(patch).eq('id', row.id);
     if (error) { console.log(`  ✗ attach: ${error.message}`); continue; }

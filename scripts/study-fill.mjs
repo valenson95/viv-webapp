@@ -178,7 +178,39 @@ else if (risk > 0) {
 }
 const f=(x,d=1)=>x==null||Number.isNaN(x)?null:+x.toFixed(d);
 
+// ── Point-in-time MARKET CAP at the trigger (Valen 2026-07-17: cap + ADR% badge top-right of the chart).
+// Shares outstanding from SEC company facts (free, official, HISTORICAL by filing) — pick the newest
+// filing with filed-date ≤ trigger (no lookahead), cap = shares × trigger close. Foreign/unmapped
+// tickers → null = "not measured", never guessed.
+const SEC_UA = { headers: { "User-Agent": "VIV Research valen@valensontrades.com" } };
+async function mcapAtTrigger(sym, dateISO, closePx) {
+  try {
+    const tk = await (await fetch("https://www.sec.gov/files/company_tickers.json", SEC_UA)).json();
+    const hit = Object.values(tk).find(v => v.ticker === sym);
+    if (!hit) return null;
+    const cik = String(hit.cik_str).padStart(10, "0");
+    // Concept fallback chain — multi-class filers (PLTR) 404 on the dei concept; us-gaap carries them.
+    let rows = null, src = null;
+    for (const [taxo, tag] of [["dei", "EntityCommonStockSharesOutstanding"], ["us-gaap", "CommonStockSharesOutstanding"], ["us-gaap", "CommonStockSharesIssued"]]) {
+      const r = await fetch(`https://data.sec.gov/api/xbrl/companyconcept/CIK${cik}/${taxo}/${tag}.json`, SEC_UA);
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j.units?.shares?.length) { rows = j.units.shares; src = `${taxo}/${tag}`; break; }
+    }
+    if (!rows) return null;
+    const elig = rows.filter(r => (r.filed || r.end) <= dateISO);
+    if (!elig.length) return null;
+    const latestEnd = elig.reduce((a, b) => (b.end > a.end ? b : a)).end;
+    // dedupe (end,val) then sum — per-class facts sum, filing repeats collapse
+    const seen = new Set(); let shares = 0;
+    for (const r of elig.filter(r => r.end === latestEnd)) { const k = r.end + "|" + r.val; if (!seen.has(k)) { seen.add(k); shares += r.val; } }
+    return { cap: shares * closePx, shares, asof: `${latestEnd} · ${src}` };
+  } catch { return null; }
+}
+const mcap = await mcapAtTrigger(T, t.d, t.c);
+
 const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(ret(63)), ext_50ma:f(ext50,2),
+  mcap_t: mcap ? Math.round(mcap.cap) : null, mcap_asof: mcap ? `${mcap.asof} (SEC shares ${(mcap.shares/1e6).toFixed(1)}M × trigger close)` : null,
   from_high_pct:f(fromHigh), breakout_num:bnum+" (approx: 4% RE-days last 90)", up_days_before:upb, re_pct:f(re), gap_pct:f(gap),
   vol_ratio:f(volr,2), rvol_eod:f(rvol,2), rvol_30m:f(rvol30,2), vol30_adv_pct:f(vol30adv,0),
   closing_range:f(crange,0), stop_width_adr:f(((entry-lod)/entry*100)/adr20,2),

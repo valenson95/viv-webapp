@@ -672,6 +672,15 @@ function PlaybookTracker({ trades, uid, setPage }) {
 
 const WHATS_NEW = [
   {
+    tag: "Improved",
+    date: "July 17, 2026",
+    title: "📖 Model Book charts now show size-at-the-time",
+    items: [
+      "Official Model Book studies carry a badge on the chart (top-right): the stock's MARKET CAP and ADR% as of the trigger day — measured from filings available at the time, never today's numbers. Study which size tier the big moves actually come from. No badge = we couldn't measure it honestly, so we left it blank.",
+      "Setup Grader wording sharpened: the base-quality tick is now “Surfing a rising 10/20/50-day MA into the pivot” — same tick, clearer target.",
+    ],
+  },
+  {
     tag: "New",
     date: "July 17, 2026",
     title: "🧰 The big one: new grader checklist, R-mode everywhere, drag-your-dashboard",

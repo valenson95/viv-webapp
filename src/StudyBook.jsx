@@ -40,7 +40,7 @@ export const STUDY_SETUPS = {
         ["prior_nr", "Day before trigger = narrow-range or negative day"],
         ["inside", "Inside bar(s) right before the trigger — coil tell", "bonus"],
         ["ma_conv", "SMA 10/20/50 converging at the pivot", "bonus"],
-        ["ma_surf", "Surfing rising 10/20-day MA into the pivot"],
+        ["ma_surf", "Surfing rising 10/20/50-day MA into the pivot"],
       ]},
       { title: "Trigger day", items: [
         ["re", "Day-1 range expansion ≥4% — bar visibly bigger than last 5–10"],
@@ -292,6 +292,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     // outcome_img is a VIRTUAL slot (no DB column) — lives in metrics.study.outcome_img; lifted
     // to top level here so chartSlot/uploadImg/zoom treat all three charts identically.
     outcome_img: initial?.metrics?.study?.outcome_img || "",
+    trigger_ltf_img: initial?.metrics?.study?.trigger_ltf_img || "", // 4th virtual slot: trigger-day 5-min entry detail (Valen 2026-07-17)
     metrics: { ...(initial?.metrics || {}), study: initial?.metrics?.study || {
       setup: "Momentum Breakout", direction: "long", regime_tag: "",
       checks: {}, m: {}, grade: { letter: "" }, outcome: {}, refusal: "",
@@ -306,8 +307,8 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   const cls = outcomeClass(s);
   // ── click-to-zoom lightbox: click any chart to enlarge, ←/→ cycles Context→BEFORE→AFTER, Esc closes ──
   const [zoom, setZoom] = useState(null); // null | "before_img" | "after_img" | "outcome_img"
-  const SLOT_TITLES = { before_img: "CONTEXT — HTF", after_img: "BEFORE — the setup", outcome_img: "AFTER — the outcome" };
-  const zoomSlots = ["before_img", "after_img", "outcome_img"].filter(k => row[k]); // only attached charts
+  const SLOT_TITLES = { before_img: "CONTEXT — HTF", after_img: "BEFORE — the setup", outcome_img: "AFTER — the outcome", trigger_ltf_img: "TRIGGER — 5-min entry detail" };
+  const zoomSlots = ["before_img", "after_img", "trigger_ltf_img", "outcome_img"].filter(k => row[k]); // only attached charts
   useEffect(() => {
     if (!zoom) return;
     const onKey = (e) => {
@@ -320,20 +321,36 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [zoom, zoomSlots.length]);
+  // ── Point-in-time cap + ADR% badge (Valen 2026-07-17): top-right of every study chart.
+  // mcap_t = SEC shares (newest filing ≤ trigger) × trigger close, computed by study-fill;
+  // blank = not measured, never guessed. "≈" marks the cap as filing-interval approximate.
+  const capBadge = (() => {
+    const cap = +(s.m?.mcap_t || 0), adr = s.m?.adr20;
+    const parts = [];
+    if (cap > 0) parts.push("≈" + (cap >= 1e9 ? "$" + (cap / 1e9).toFixed(1) + "B" : "$" + Math.round(cap / 1e6) + "M"));
+    if (adr != null && adr !== "" && !Number.isNaN(+adr)) parts.push("ADR " + (+adr).toFixed(1) + "%");
+    return parts.length ? { text: parts.join(" · "), tip: `At the trigger date — cap from SEC shares outstanding (${s.m?.mcap_asof || "n/a"}), ADR20 from the 20 sessions before the trigger.` } : null;
+  })();
+  const badgeStyle = { position: "absolute", top: 6, right: 6, zIndex: 2, background: "rgba(8,8,14,0.82)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.04em", padding: "3px 8px", borderRadius: 7, whiteSpace: "nowrap", cursor: "help", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" };
   const chartSlot = (slot, title, hint) => (
     <div style={{ flex: 1, minWidth: 240 }}>
       <label style={lbl}>{title}</label>
       <div style={{ fontSize: "0.62rem", color: C.muted, marginBottom: 6 }}>{hint}</div>
       <input type="file" accept="image/*" onChange={e => onUpload(e.target.files[0], slot, setRow)} style={{ fontSize: "0.7rem", color: C.muted }} />
-      {row[slot] && <img src={row[slot]} alt="" onClick={() => setZoom(slot)} title="Click to zoom (← → cycles Context/BEFORE/AFTER · Esc closes)" style={{ display: "block", marginTop: 8, width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)", cursor: "zoom-in" }} />}
+      {row[slot] && (
+        <div style={{ position: "relative", marginTop: 8 }}>
+          {capBadge && <span title={capBadge.tip} style={badgeStyle}>{capBadge.text}</span>}
+          <img src={row[slot]} alt="" onClick={() => setZoom(slot)} title="Click to zoom (← → cycles Context/BEFORE/AFTER · Esc closes)" style={{ display: "block", width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)", cursor: "zoom-in" }} />
+        </div>
+      )}
     </div>
   );
   const doSave = () => {
     if (!row.ticker.trim()) { alert("Ticker first."); return; }
     const q = studyQuality(s); // grade is derived from ticks at save time — stored for the grid + calibration
-    const { outcome_img, ...bodyRow } = row; // virtual slot → folded back into metrics.study (no DB column)
+    const { outcome_img, trigger_ltf_img, ...bodyRow } = row; // virtual slots → folded back into metrics.study (no DB columns)
     const body = { ...bodyRow,
-      metrics: { ...row.metrics, study: { ...s, outcome_img: outcome_img || "", grade: { letter: q.letter === "—" ? "" : q.letter, auto: true, on: q.on, total: q.total } } },
+      metrics: { ...row.metrics, study: { ...s, outcome_img: outcome_img || "", trigger_ltf_img: trigger_ltf_img || "", grade: { letter: q.letter === "—" ? "" : q.letter, auto: true, on: q.on, total: q.total } } },
       pattern: s.setup === "Parabolic" ? `Parabolic ${s.direction === "short" ? "Short" : "Long"}` : s.setup,
       outcome: cls ? MB_OUTCOME[cls] : null, thesis: row.thesis,
       lesson: [s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n") || null };
@@ -380,6 +397,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
         {chartSlot("before_img", "Context — HTF", "Weekly/monthly — the pole, the base in context, where it sits in the longer trend")}
         {chartSlot("after_img", "BEFORE — the setup", "Daily/intraday with the RIGHT EDGE = trigger day — exactly what your eyes saw at the decision moment")}
         {chartSlot("outcome_img", "AFTER — the outcome", "Same chart weeks later — what the setup became. BEFORE→AFTER is the pattern-recognition rep")}
+        {chartSlot("trigger_ltf_img", "TRIGGER — 5-min entry detail", "Optional: the trigger day on 5-min — ORH, the reclaim, how the entry actually traded")}
       </div>
 
       {/* 👁 HIS ticks — only chart-readable factors, grader-style 3 buckets per setup.
@@ -458,7 +476,10 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
             {zoomSlots.length > 1 && <button onClick={() => setZoom(zoomSlots[(zoomSlots.indexOf(zoom) + 1) % zoomSlots.length])} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 10, fontSize: "1.3rem", cursor: "pointer" }} aria-label="Next">›</button>}
             <button onClick={() => setZoom(null)} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.muted, width: 40, height: 40, borderRadius: 10, fontSize: "1.1rem", cursor: "pointer", marginLeft: 8 }} aria-label="Close">✕</button>
           </div>
-          <img src={row[zoom]} alt={zoom} style={{ maxWidth: "96vw", maxHeight: "82vh", objectFit: "contain", borderRadius: 10, border: `1px solid ${C.borderGold}`, cursor: "zoom-out" }} onClick={() => setZoom(null)} />
+          <div style={{ position: "relative" }}>
+            {capBadge && <span title={capBadge.tip} style={{ ...badgeStyle, top: 10, right: 10, fontSize: "0.72rem", padding: "5px 11px" }}>{capBadge.text}</span>}
+            <img src={row[zoom]} alt={zoom} style={{ maxWidth: "96vw", maxHeight: "82vh", objectFit: "contain", borderRadius: 10, border: `1px solid ${C.borderGold}`, cursor: "zoom-out", display: "block" }} onClick={() => setZoom(null)} />
+          </div>
         </div>
       )}
     </div>
