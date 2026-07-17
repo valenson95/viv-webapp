@@ -224,6 +224,46 @@ function useDragReorder(length) {
   return { order, dragProps, setOrder };
 }
 
+// ─── Card Arrange Utility ───
+// Drag-handle rearranging for dashboard cards, persisted per browser. Order is stored as section
+// KEYS (not indexes) so a saved layout survives cards being added/removed in later versions.
+// The wrapper is only draggable while its handle is held (armed) — clicks, text selection and
+// inputs inside the card keep working normally.
+function useCardArrange(keys, storageKey) {
+  const [order, setOrder] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      const valid = saved.filter(k => keys.includes(k));
+      return valid.length ? [...valid, ...keys.filter(k => !valid.includes(k))] : keys;
+    } catch { return keys; }
+  });
+  const [armed, setArmed] = useState(null);
+  const dragFrom = useRef(null);
+  const wrapProps = (vi) => ({
+    draggable: armed === vi,
+    onDragStart: (e) => {
+      if (armed !== vi) { e.preventDefault(); return; }
+      dragFrom.current = vi; e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", ""); } catch {}
+    },
+    onDragOver: (e) => e.preventDefault(),
+    onDrop: (e) => {
+      e.preventDefault();
+      const from = dragFrom.current;
+      if (from == null || from === vi) return;
+      setOrder(prev => { const n = [...prev]; const [r] = n.splice(from, 1); n.splice(vi, 0, r); try { localStorage.setItem(storageKey, JSON.stringify(n)); } catch {} return n; });
+      dragFrom.current = null;
+    },
+    onDragEnd: () => { setArmed(null); dragFrom.current = null; },
+  });
+  const handleProps = (vi) => ({
+    onMouseDown: () => setArmed(vi),
+    onMouseUp: () => setArmed(null),
+    title: "Drag to rearrange — your layout is saved to this browser",
+  });
+  return { order, wrapProps, handleProps, armed };
+}
+
 // ─── What's New — changelog the user can refer to (button in the top nav, modal of update notes).
 // Add new entries to the TOP of WHATS_NEW as features ship.
 // ── PLAYBOOK TRACKER ─────────────────────────────────────────────────────────
@@ -3607,7 +3647,7 @@ useEffect(() => {
   const io = new IntersectionObserver((ents) => { ents.forEach(en => { if (en.isIntersecting) { en.target.classList.add("in-view"); io.unobserve(en.target); } }); }, { threshold: 0.18, rootMargin: "0px 0px -8% 0px" });
   els.forEach(e => io.observe(e));
   return () => io.disconnect();
-}, [tab]);
+}, [tab, expert]);
 
 const applyMode = (m) => { setUiMode(m); if (m === "pro") { try { audioRef.current && audioRef.current.pause(); } catch {} setGuide(null); setActiveGuide(null); } };
 // the global corner Pro Mode toggle (HeaderControls) broadcasts mode changes — apply them here
@@ -4389,6 +4429,14 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
     transform-origin:top; transform:scaleY(0); opacity:0}
 .vj .reveal.in-view .bar.pos,.vj .reveal.in-view .bar.neg{animation:barRise 0.55s cubic-bezier(0.22,1,0.36,1) both}
 @keyframes barRise{from{transform:scaleY(0); opacity:0}to{transform:scaleY(1); opacity:1}}
+/* Return-distribution histogram — every bar grows from the zero baseline when the card scrolls into view.
+   Wins anchor at the bottom edge (grow up), losses at the top edge (grow down); stagger sweeps left→right. */
+.vj .dbar{transform:scaleY(0)}
+.vj .dbar.dpos{transform-origin:bottom}
+.vj .dbar.dneg{transform-origin:top}
+.vj .reveal.in-view .dbar{animation:distGrow 0.6s cubic-bezier(0.22,1,0.36,1) both; animation-delay:calc(var(--i, 0)*12ms)}
+@keyframes distGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@media(prefers-reduced-motion:reduce){.vj .dbar{transform:none} .vj .reveal.in-view .dbar{animation:none}}
 .vj #eqRise,.vj #heroRise{transform-box:fill-box; transform-origin:bottom}
 .vj .reveal.in-view #eqRise{animation:eqRise 1.05s cubic-bezier(0.22,1,0.36,1) both}
 .vj .reveal.in-view #heroRise{animation:eqRise 0.95s cubic-bezier(0.22,1,0.36,1) both}
@@ -4871,8 +4919,8 @@ function CoachHero({ data, pro = false }) {
     </Card>
   ) : null;
   return (
-    <div className="reveal" style={{ marginTop: 18 }}>
-      <style dangerouslySetInnerHTML={{ __html: ".coachtop{display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; margin-bottom:14px}.coachtop > div{margin-bottom:0 !important}@media(max-width:1100px){.coachtop{grid-template-columns:1fr}}@keyframes jarvisPulse{0%{box-shadow:0 0 4px rgba(201,152,42,0.55); opacity:0.7; transform:scale(0.88)}100%{box-shadow:0 0 14px rgba(201,152,42,0.95); opacity:1; transform:scale(1.14)}}.jarvisdot{box-shadow:0 0 8px rgba(201,152,42,0.8); animation:jarvisPulse 2.4s ease-in-out infinite alternate}@media(prefers-reduced-motion:reduce){.jarvisdot{animation:none; box-shadow:0 0 10px rgba(201,152,42,0.85)}}" }} />
+    <div className="reveal coachhero" style={{ marginTop: 18 }}>
+      <style dangerouslySetInnerHTML={{ __html: ".coachhero{animation:coachIn 0.6s cubic-bezier(0.22,1,0.36,1) both}@keyframes coachIn{from{opacity:0; transform:translateY(18px)}to{opacity:1; transform:none}}@media(prefers-reduced-motion:reduce){.coachhero{animation:none}}.coachtop{display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; margin-bottom:14px}.coachtop > div{margin-bottom:0 !important}@media(max-width:1100px){.coachtop{grid-template-columns:1fr}}@keyframes jarvisPulse{0%{box-shadow:0 0 4px rgba(201,152,42,0.55); opacity:0.7; transform:scale(0.88)}100%{box-shadow:0 0 14px rgba(201,152,42,0.95); opacity:1; transform:scale(1.14)}}.jarvisdot{box-shadow:0 0 8px rgba(201,152,42,0.8); animation:jarvisPulse 2.4s ease-in-out infinite alternate}@media(prefers-reduced-motion:reduce){.jarvisdot{animation:none; box-shadow:0 0 10px rgba(201,152,42,0.85)}}" }} />
       <div onClick={toggleCollapsed} title={collapsed ? "Expand Jarvis" : "Collapse Jarvis"} aria-expanded={!collapsed}
         style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: collapsed ? 0 : 10, cursor: "pointer", userSelect: "none" }}>
         <span className="jarvisdot" style={{ width: 8, height: 8, borderRadius: "50%", background: C.gold }} />
@@ -4881,7 +4929,9 @@ function CoachHero({ data, pro = false }) {
         {collapsed && <span style={{ fontSize: "0.72rem", color: C.text, fontWeight: 700, marginLeft: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.headline}</span>}
         <span aria-hidden style={{ marginLeft: "auto", color: C.gold, fontSize: "1.05rem", lineHeight: 1, transition: "transform .2s", transform: collapsed ? "rotate(-90deg)" : "none" }}>▾</span>
       </div>
-      {!collapsed && <>
+      {/* grid-rows 0fr→1fr animates the body's height smoothly on expand/collapse */}
+      <div style={{ display: "grid", gridTemplateRows: collapsed ? "0fr" : "1fr", transition: "grid-template-rows 0.45s cubic-bezier(0.22,1,0.36,1)" }} aria-hidden={collapsed}>
+      <div style={{ overflow: "hidden", minHeight: 0 }}>
       {pro
         ? <div className="coachtop"><div style={{ minWidth: 0 }}>{briefingCard}{workingCard}</div>{attentionCard}</div>
         : <>{briefingCard}{workingCard}</>}
@@ -5111,7 +5161,8 @@ function CoachHero({ data, pro = false }) {
           ))}
         </Card>
       )}
-      </>}
+      </div>
+      </div>
     </div>
   );
 }
@@ -6182,7 +6233,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
       });
     }, 600);
     return () => { io.disconnect(); clearTimeout(settle); };
-  }, []);
+  }, [expert]); // re-observe after a Guided/Pro toggle swaps the rendered tree — fresh .reveal nodes must animate on scroll, not stay hidden
 
   const applyMode = (m) => { setUiMode(m); if (m === "pro") { try { audioRef.current && audioRef.current.pause(); } catch {} setGuide(null); setActiveGuide(null); } };
   // the global corner Pro Mode toggle (HeaderControls) broadcasts mode changes — apply them here
@@ -7007,7 +7058,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                         const c = distCounts[i], h = yFor(c);
                         const sel = distSel === i;
                         return (<div key={i} title={`${b.lab}: ${c} trade${c === 1 ? "" : "s"} — click to see them`} onClick={() => c && setDistSel(s => s === i ? null : i)} style={{ flex: 1, position: "relative", cursor: c ? "pointer" : "default" }}>
-                          {c ? <div style={{ position: "absolute", left: "14%", right: "14%", height: h, ...(b.side === "neg" ? { top: halfH } : { top: halfH - h }), background: b.side === "neg" ? "linear-gradient(180deg,#ff6b6b,#b83232)" : "linear-gradient(180deg,#33d484,#1f8f57)", borderRadius: b.side === "neg" ? "0 0 3px 3px" : "3px 3px 0 0", outline: sel ? "2px solid var(--goldBright)" : "none", outlineOffset: 1 }} /> : null}
+                          {c ? <div className={"dbar " + (b.side === "neg" ? "dneg" : "dpos")} style={{ "--i": i, position: "absolute", left: "14%", right: "14%", height: h, ...(b.side === "neg" ? { top: halfH } : { top: halfH - h }), background: b.side === "neg" ? "linear-gradient(180deg,#ff6b6b,#b83232)" : "linear-gradient(180deg,#33d484,#1f8f57)", borderRadius: b.side === "neg" ? "0 0 3px 3px" : "3px 3px 0 0", outline: sel ? "2px solid var(--goldBright)" : "none", outlineOffset: 1 }} /> : null}
                         </div>);
                       })}
                     </div>
@@ -7734,7 +7785,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <div className="cardhead"><span className="label" style={{ flex: "none" }}>Equity Curve</span><span className="infodot" data-tip="Your account value over time. A line climbing left to right means your account is growing — toggle dollars / percent, or trades / months.">i</span></div>
               {equityCardBody}
             </div>
-            <div className="card">
+            <div className="card reveal">{/* reveal-gated so the bars grow from zero when scrolled into view (Pro had no gate) */}
               <div className="cardhead"><span className="label" style={{ flex: "none" }}>Return Distribution</span><span className="infodot" data-tip="The size of your wins and losses. Losses sit left in red, wins right in green — healthy trading keeps losses small and lets a few big winners carry the return.">i</span></div>
               {distCardBody}
             </div>
@@ -8476,6 +8527,19 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .equity.collapsed .equity-grid{display:none}
 .vd .equity.collapsed .collapsesummary{display:inline}
 .vd .equity.collapsed .collapsehdr{padding-bottom:0}
+/* ── drag-to-rearrange cards — the ⋮⋮ handle peeks over the card's top-right on hover; hold it to drag ── */
+.vd .dragwrap{position:relative}
+.vd .dragwrap .draghandle{position:absolute; top:-9px; right:12px; z-index:6; display:none; align-items:center; justify-content:center; padding:1px 8px; border-radius:7px; background:#14141e; border:1px solid var(--border); color:var(--muted); cursor:grab; font-size:0.72rem; letter-spacing:1px; user-select:none; line-height:1.5}
+.vd .dragwrap:hover .draghandle{display:inline-flex}
+.vd .dragwrap .draghandle:hover{color:var(--goldBright); border-color:var(--borderGold)}
+.vd .dragwrap .draghandle:active{cursor:grabbing}
+.vd .dragwrap.dragging{opacity:0.5}
+.vd .kpistrip .dragwrap{display:flex; min-width:0}
+.vd .kpistrip .dragwrap>.card{flex:1; min-width:0}
+/* ── scroll-in reveal for cards (Pro) — hidden until the IntersectionObserver adds .in-view ── */
+.vd .vrev{opacity:0; transform:translateY(14px); transition:opacity .55s ease, transform .55s cubic-bezier(0.22,1,0.36,1); transition-delay:calc(var(--i, 0)*70ms)}
+.vd .vrev.in-view{opacity:1; transform:none}
+@media(prefers-reduced-motion:reduce){.vd .vrev{opacity:1; transform:none; transition:none}}
 .vd .equity-grid{display:grid; grid-template-columns:1.4fr 0.95fr 1.35fr; gap:0; width:100%}
 .vd .eq-left{padding-right:26px; display:flex; flex-direction:column}
 .vd .eq-left .tlrow{margin-top:auto}
@@ -9599,6 +9663,10 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
   const [manageId, setManageId] = useState(null);
   const [sellOpen, setSellOpen] = useState(false);
   const [cfgOpen, setCfgOpen] = useState(false); // Pro layout: reveal the relocated sizing controls (⚙ Configure)
+  // drag-to-rearrange card layouts (hold a card's ⋮⋮ handle) — one saved order per group per browser
+  const kpiArr = useCardArrange(["openpl", "risk", "equity", "budget", "rote"], "viv-dash-kpi-order");   // Pro KPI strip
+  const ctxArr = useCardArrange(["market", "alloc", "themes"], "viv-dash-ctx-order");                     // Pro context row
+  const stackArr = useCardArrange(["market", "themes", "alloc", "edge"], "viv-dash-stack-order"); // Guided card stack
   const [capEditing, setCapEditing] = useState(false);
   const [capDraft, setCapDraft] = useState("");
   const [activeGuide, setActiveGuide] = useState(null);
@@ -9627,7 +9695,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
       });
     }, 600);
     return () => { io.disconnect(); clearTimeout(settle); };
-  }, []);
+  }, [expert]); // re-observe after a Guided/Pro toggle swaps the rendered tree — fresh .reveal nodes must animate on scroll, not stay hidden
 
   const applyMode = (m) => { setUiMode(m); if (m === "pro") { try { audioRef.current && audioRef.current.pause(); } catch {} setGuide(null); setActiveGuide(null); } };
   // the global corner Pro Mode toggle (HeaderControls) broadcasts mode changes — apply them here
@@ -9978,10 +10046,10 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           </div>
 
-          {/* P2. KPI STRIP */}
-          <div className="kpistrip">
-
-            {/* K1: Open P/L */}
+          {/* P2. KPI STRIP — hold a card's ⋮⋮ handle to rearrange; the order is saved per browser */}
+          {(() => {
+            const KPI_CARDS = {
+            openpl: (
             <div className="card kpi">
               <div className="cardhead"><span className="label">Open P/L</span><span className="infodot" data-tip="How much your open positions are up or down right now. Green means you're in profit; the line below is your realized equity trend.">i</span></div>
               <div className="kpibody">
@@ -9998,8 +10066,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 </div>
               </div>
             </div>
-
-            {/* K2: Risk in Market */}
+            ),
+            /* K2: Risk in Market */
+            risk: (
             <div className="card kpi">
               <div className="cardhead"><span className="label">Risk in Market</span><span className="infodot" data-tip="The total you'd lose if every open position hit its stop at once. Keep it inside your risk rule.">i</span></div>
               <div className="kpibody">
@@ -10016,8 +10085,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 </div>
               </div>
             </div>
-
-            {/* K3: Equity */}
+            ),
+            /* K3: Equity */
+            equity: (
             <div className="card kpi">
               <div className="cardhead"><span className="label">Equity</span><span className="infodot" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">i</span></div>
               <div className="kpibody">
@@ -10028,8 +10098,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 </div>
               </div>
             </div>
-
-            {/* K4: Risk Budget */}
+            ),
+            /* K4: Risk Budget */
+            budget: (
             <div className="card kpi">
               <div className="cardhead">
                 <span className="label">Risk Budget</span>
@@ -10050,8 +10121,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 </div>
               </div>
             </div>
-
-            {/* K5: Current ROTE */}
+            ),
+            /* K5: Current ROTE */
+            rote: (
             <div className="card kpi">
               <div className="cardhead"><span className="label">Current ROTE</span><span className="infodot" data-tip="Your risk currently on the table as a percent of total equity, measured against the Target ROTE cap you've set.">i</span></div>
               <div className="kpibody">
@@ -10067,8 +10139,19 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 </div>
               </div>
             </div>
-
-          </div>
+            ),
+            };
+            return (
+              <div className="kpistrip">
+                {kpiArr.order.map((k, vi) => (
+                  <div key={k} className={"dragwrap reveal vrev" + (kpiArr.armed === vi ? " dragging" : "")} style={{ "--i": vi }} {...kpiArr.wrapProps(vi)}>
+                    <span className="draghandle" {...kpiArr.handleProps(vi)}>⋮⋮</span>
+                    {KPI_CARDS[k]}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* P2b. CONFIG ROW — relocated sizing controls; same state/handlers as Guided's "Live Risk Budget & Sizing" */}
           {cfgOpen && (
@@ -10113,9 +10196,11 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           )}
 
-          {/* P3. CONTEXT ROW */}
-          <div className="ctxrow" style={{ marginTop: 14 }}>
-            <MarketContext C={C} font={font} />
+          {/* P3. CONTEXT ROW — cards drag-to-rearrange like the KPI strip */}
+          {(() => {
+            const CTX_CARDS = {
+            market: (<MarketContext C={C} font={font} />),
+            alloc: (
             <div className="card">
               <div className="cardhead"><span className="label">Risk Allocation</span><span className="infodot" data-tip="A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.">i</span></div>
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -10130,8 +10215,20 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 </div>
               </div>
             </div>
-            <ThemeStrip C={C} font={font} variant="pro" />
-          </div>
+            ),
+            themes: (<ThemeStrip C={C} font={font} variant="pro" />),
+            };
+            return (
+              <div className="ctxrow" style={{ marginTop: 14 }}>
+                {ctxArr.order.map((k, vi) => (
+                  <div key={k} className={"dragwrap reveal vrev" + (ctxArr.armed === vi ? " dragging" : "")} style={{ "--i": vi }} {...ctxArr.wrapProps(vi)}>
+                    <span className="draghandle" {...ctxArr.handleProps(vi)}>⋮⋮</span>
+                    {CTX_CARDS[k]}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <EdgeLedger C={C} font={font} session={session} setPage={setPage} />  {/* admin-only: renders null for members */}
 
           {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS */}
@@ -10290,9 +10387,6 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           </div>
         </div>
 
-        {/* MARKET CONTEXT — swapped with Risk allocation (2026-07-17) */}
-        <MarketContext C={C} font={font} />
-
         {/* welcome banner */}
         {!expert && !welcomeDismissed && (
           <div className="welcome">
@@ -10302,10 +10396,15 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           </div>
         )}
 
-        {/* THEME LEADERS STRIP (this week's DeepVue leaders) */}
-        <ThemeStrip C={C} font={font} />
-
-        {/* RISK ALLOCATION — swapped with Market context (2026-07-17) */}
+        {/* Guided card stack — hold a card's ⋮⋮ handle to rearrange; the order is saved per browser */}
+        {(() => {
+          const STACK_CARDS = {
+          /* MARKET CONTEXT — swapped with Risk allocation (2026-07-17) */
+          market: (<MarketContext C={C} font={font} />),
+          /* THEME LEADERS STRIP (this week's DeepVue leaders) */
+          themes: (<ThemeStrip C={C} font={font} />),
+          /* RISK ALLOCATION — swapped with Market context (2026-07-17) */
+          alloc: (
         <div className={"card alloc guide reveal" + gactive("alloc")} onMouseEnter={guideEnter("alloc", "Risk allocation", "A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.", "/audio/allocation.mp3")} onMouseLeave={guideLeave("alloc")}>
           <div className="row">
             <div className="label">Risk allocation</div>
@@ -10331,7 +10430,16 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           </div>
         </div>
-        <EdgeLedger C={C} font={font} session={session} setPage={setPage} />  {/* admin-only: renders null for members */}
+          ),
+          edge: (<EdgeLedger C={C} font={font} session={session} setPage={setPage} />), /* admin-only: renders null for members */
+          };
+          return stackArr.order.map((k, vi) => (
+            <div key={k} className={"dragwrap" + (stackArr.armed === vi ? " dragging" : "")} {...stackArr.wrapProps(vi)}>
+              <span className="draghandle" {...stackArr.handleProps(vi)}>⋮⋮</span>
+              {STACK_CARDS[k]}
+            </div>
+          ));
+        })()}
 
         {/* TABLE */}
         <div className="toolbar">
@@ -10828,7 +10936,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
       });
     }, 600);
     return () => { io.disconnect(); clearTimeout(settle); };
-  }, []);
+  }, [expert]); // re-observe after a Guided/Pro toggle swaps the rendered tree — fresh .reveal nodes must animate on scroll, not stay hidden
 
   const applyMode = (m) => { setUiMode(m); if (m === "pro") { try { audioRef.current && audioRef.current.pause(); } catch {} setGuide(null); setActiveGuide(null); } };
   // the global corner Pro Mode toggle (HeaderControls) broadcasts mode changes — apply them here
