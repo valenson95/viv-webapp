@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from "recharts";
 import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 // html2canvas is loaded on demand (win-card screenshot only) — keeps ~200KB out of the initial bundle
+import { captureElement } from "./captureElement.js"; // shared camera helper (equity-curve + calendar)
 import TradeCalendar from "./Calendar.jsx";
 import TradeReplayChart from "./TradeReplayChart.jsx";
 import { sectorFor, useSectors } from "./sectors.js";
@@ -329,8 +330,10 @@ function PlaybookTracker({ trades, uid, setPage }) {
     return { total: d.total, taken: m.n, remaining: Math.max(0, d.total - m.n), frac, tiers, suffix: unitR ? "R" : "%" };
   }, [pb.design, m]);
   const [more, setMore] = useState(false);
-  const [hov, setHov] = useState(null); // hovered trade index on the projection chart (0..100)
+  const [hov, setHov] = useState(null); // hovered trade index on the projection chart (0..100 in × view, 0..total in R view)
   const [roll, setRoll] = useState(1);  // MC seed — ↻ rolls another equally-likely future
+  const [projView, setProjView] = useState(() => { try { return localStorage.getItem("viv-playbook-projview") || "r"; } catch { return "r"; } }); // projection default = cumulative R
+  useEffect(() => { try { localStorage.setItem("viv-playbook-projview", projView); } catch { /* private mode */ } }, [projView]);
   // Arrived via the simulator's "Compare stats" button → scroll here and open the comparison.
   useEffect(() => {
     try {
@@ -357,6 +360,46 @@ function PlaybookTracker({ trades, uid, setPage }) {
   // ── Scoreboard: YOUR DESIGN vs LIVE, one row per metric. Pass/fail compares with half a
   // display-unit of tolerance so a live value that ROUNDS to the target (44.36% shown as 44.4%
   // against a 44.4% target) can't print a phantom MISS.
+  // ── R-VIEW projection data (default projection chart): cumulative R vs trades taken. The design
+  // line is a straight slope = design expectancy/trade in R; the band is a deterministic P10–P90
+  // Monte-Carlo cone over the design's R trade-mix; the actual line is the REAL closed trades in
+  // chronological order, cumulative sum of r_mult (trades without a recorded R excluded + counted,
+  // never guessed). Computed once (useMemo), not per render.
+  const rView = useMemo(() => {
+    const dz = pb.design || {};
+    const unitR = dz.unit === "r";
+    const total = Math.max(1, Math.round(Number(dz.total) || 100));
+    const avgLoss = Number(pb.targets.avgLoss) || 0;
+    const dTiers = (dz.tiers || []).filter(t => t.gain > 0 && t.count > 0);
+    const designPool = [];
+    if (unitR) {
+      dTiers.forEach(t => { for (let i = 0; i < t.count; i++) designPool.push(t.gain); });
+      const tierWins = dTiers.reduce((s, t) => s + t.count, 0);
+      const smallW = Math.max(0, (dz.winners || 0) - tierWins);
+      const smallG = dTiers.length ? Math.min(...dTiers.map(t => t.gain)) / 2 : 1;
+      for (let i = 0; i < smallW; i++) designPool.push(smallG);
+      for (let i = 0; i < (dz.losers || 0); i++) designPool.push(-avgLoss);
+    }
+    const designR = unitR && designPool.length ? designPool.reduce((s, v) => s + v, 0) / designPool.length : null;
+    let band = null;
+    if (unitR && designPool.length) {
+      const RUNS = 120;
+      const mulberry = (seed) => () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      const runs = Array.from({ length: RUNS }, (_, k) => { const r = mulberry(12345 + k * 104729); const out = [0]; let acc = 0; for (let i = 0; i < total; i++) { acc += designPool[Math.floor(r() * designPool.length)]; out.push(acc); } return out; });
+      band = Array.from({ length: total + 1 }, (_, i) => { const col = runs.map(p => p[i]).sort((a, b) => a - b); return [col[Math.floor(RUNS * 0.1)], col[Math.floor(RUNS * 0.9)]]; });
+    }
+    const closed = (trades || []).filter(t => t.exit).slice();
+    const dv = (t) => { const n = new Date(t.exit).getTime(); return isNaN(n) ? 0 : n; };
+    closed.sort((a, b) => dv(a) - dv(b));
+    const cumByTrade = [0];
+    let acc = 0, noR = 0;
+    for (const t of closed) {
+      const rv = t.rMult == null ? (t.r_mult == null ? null : Number(t.r_mult)) : Number(t.rMult);
+      if (rv != null && isFinite(rv)) acc += rv; else noR += 1;
+      cumByTrade.push(acc);
+    }
+    return { unitR, total, designR, band, cumByTrade, takenN: closed.length, actualCumR: acc, noR };
+  }, [pb.design, pb.targets, trades]);
   const winsN = m.winPcts.length;
   const desWinRate = pb.design && pb.design.total ? (pb.design.winners / pb.design.total) * 100 : Number(pb.targets.winRate);
   const pass = (v, dir, tgt, tol = 0.05) => (v == null || !Number.isFinite(tgt)) ? null : (dir === "lte" ? v <= tgt + tol : v >= tgt - tol);
@@ -408,6 +451,7 @@ function PlaybookTracker({ trades, uid, setPage }) {
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
         <input value={pb.name} onChange={e => setPb(p => ({ ...p, name: e.target.value }))} title="Name your playbook"
           style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "var(--goldBright)", fontWeight: 800, fontSize: "0.86rem", padding: "5px 10px", minWidth: 200 }} />
+        <span className="infodot" data-tip="Your saved trading plan vs what you're actually delivering — same trades, same math. Each metric gets a PASS or FAIL, and the winner ladder checks whether the big R-multiple wins are landing on schedule. Targets come from the design you saved in the Return Simulator.">i</span>
         <button className="distbtn" style={{ marginLeft: "auto" }} onClick={goDesign} title="Rework the design in the Return Simulator, then save — nothing here changes until you do">✎ Edit playbook design</button>
       </div>
       {/* ── ONE verdict — the whole card answered in a glance. The only loud colour on this card. ── */}
@@ -480,12 +524,79 @@ function PlaybookTracker({ trades, uid, setPage }) {
               </b>
             )}
           </div>
-          {/* Projected equity — SIMULATED trade-by-trade from the design's REAL mix (losses,
-              small wins, the occasional homer), not smooth compounding: a straight "average" line
-              hides the drawdowns the design actually implies (Valen 2026-07-12). Seeded PRNG keeps
-              the chart stable between renders; ↻ rolls another equally-likely future. INTERACTIVE:
-              glide/drag across the chart to read both curves at any trade. */}
+          {/* Projection — DEFAULT = cumulative R vs trades taken (linear, no compounding); the
+              × equity view (compounded, size-dependent) is one pill-toggle away. R view: gold =
+              design slope, band = deterministic P10–P90 Monte-Carlo cone, white = your REAL closed
+              trades' cumulative R. × view: SIMULATED trade-by-trade from the design's mix; ↻ rolls
+              another equally-likely future. INTERACTIVE: glide across to inspect any trade. */}
           {proj.evSim != null && proj.evAct != null && (() => {
+            const projToggle = (
+              <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", fontSize: "0.6rem", fontWeight: 800 }} title="Switch the projection between cumulative R and compounded × equity">
+                {[["r", "R"], ["x", "× equity"]].map(([k, l]) => (
+                  <button key={k} type="button" onClick={() => setProjView(k)} style={{ padding: "3px 10px", border: "none", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.04em", background: projView === k ? "rgba(240,192,80,0.14)" : "transparent", color: projView === k ? "var(--goldBright)" : "var(--muted)" }}>{l}</button>
+                ))}
+              </div>
+            );
+            // ── R VIEW (default): cumulative R vs trades taken ──
+            if (projView === "r") {
+              const { total, designR, band, cumByTrade, takenN, actualCumR, noR } = rView;
+              const desEnd = designR != null ? total * designR : null;
+              const desAtN = designR != null ? takenN * designR : null;
+              const gap = desAtN != null ? actualCumR - desAtN : null;
+              const vals = [0];
+              if (desEnd != null) vals.push(desEnd);
+              if (band) band.forEach(b => { vals.push(b[0], b[1]); });
+              for (let i = 0; i <= takenN; i++) vals.push(cumByTrade[i]);
+              const lo = Math.min(...vals), hiR = Math.max(...vals), hi = hiR === lo ? lo + 1 : hiR;
+              const X = (i) => (i / total) * 600, Y = (v) => 10 + (1 - (v - lo) / (hi - lo)) * 158;
+              const h = hov == null ? null : Math.min(total, Math.max(0, hov));
+              const actAtH = h == null ? null : (h <= takenN ? cumByTrade[h] : null);
+              const desAtH = (h == null || designR == null) ? null : h * designR;
+              return (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "2px 12px", marginBottom: 6 }}>
+                    <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)" }}>Cumulative R — {takenN} of {total} trades taken</span>
+                    <span style={{ fontSize: "0.7rem", color: h == null ? "var(--muted)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+                      {h == null
+                        ? (gap == null ? "glide across the chart to inspect any trade" : <b style={{ color: gap >= 0 ? "var(--green)" : "var(--red)" }}>{gap >= 0 ? "ahead of" : "behind"} the design by {Math.abs(gap).toFixed(1)}R at trade {takenN}</b>)
+                        : <>trade {h} · design <b style={{ color: "var(--goldBright)" }}>{desAtH == null ? "—" : (desAtH >= 0 ? "+" : "") + desAtH.toFixed(1) + "R"}</b> · you <b>{actAtH == null ? "—" : (actAtH >= 0 ? "+" : "") + actAtH.toFixed(1) + "R"}</b></>}
+                    </span>
+                    <span style={{ marginLeft: "auto" }} />
+                    {projToggle}
+                  </div>
+                  <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 10px", background: "rgba(255,255,255,0.015)", touchAction: "none", cursor: "crosshair" }}
+                    onPointerMove={e => { const r = e.currentTarget.getBoundingClientRect(); const f = Math.min(1, Math.max(0, (e.clientX - r.left - 10) / Math.max(1, r.width - 20))); setHov(Math.round(f * total)); }}
+                    onPointerLeave={() => setHov(null)}>
+                    <svg viewBox="0 0 600 180" style={{ width: "100%", height: 160, display: "block" }} preserveAspectRatio="none" role="img" aria-label="Design vs actual cumulative R">
+                      <line x1="0" y1={Y(0).toFixed(1)} x2="600" y2={Y(0).toFixed(1)} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                      {band && <path d={"M" + band.map((b, i) => `${X(i).toFixed(1)},${Y(b[1]).toFixed(1)}`).join(" L") + " L" + band.slice().reverse().map((b, i) => `${X(total - i).toFixed(1)},${Y(b[0]).toFixed(1)}`).join(" L") + " Z"} fill="rgba(201,152,42,0.08)" stroke="none" />}
+                      {designR != null && takenN > 0 && (() => {
+                        const top = [], bot = [];
+                        for (let i = 0; i <= takenN; i++) { top.push(`${X(i).toFixed(1)},${Y(i * designR).toFixed(1)}`); bot.push(`${X(takenN - i).toFixed(1)},${Y(cumByTrade[takenN - i]).toFixed(1)}`); }
+                        return <path d={"M" + top.join(" L") + " L" + bot.join(" L") + " Z"} fill={gap >= 0 ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.06)"} stroke="none" />;
+                      })()}
+                      {desEnd != null && <line x1={X(0).toFixed(1)} y1={Y(0).toFixed(1)} x2={X(total).toFixed(1)} y2={Y(desEnd).toFixed(1)} stroke="var(--goldBright)" strokeWidth="2" vectorEffect="non-scaling-stroke" />}
+                      <path d={"M" + cumByTrade.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" L")} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                      {takenN > 0 && <circle cx={X(takenN).toFixed(1)} cy={Y(actualCumR).toFixed(1)} r="4" fill="#ffffff" />}
+                      {h != null && (<>
+                        <line x1={X(h).toFixed(1)} y1="0" x2={X(h).toFixed(1)} y2="180" stroke="rgba(255,255,255,0.22)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                        {desAtH != null && <circle cx={X(h).toFixed(1)} cy={Y(desAtH).toFixed(1)} r="3.5" fill="var(--goldBright)" />}
+                        {actAtH != null && <circle cx={X(h).toFixed(1)} cy={Y(actAtH).toFixed(1)} r="3.5" fill="#ffffff" />}
+                      </>)}
+                    </svg>
+                  </div>
+                  {takenN > 0 && <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 4 }}>◗ you are here — trade {takenN} of {total}, cumulative <b style={{ color: actualCumR >= 0 ? "var(--green)" : "var(--red)" }}>{(actualCumR >= 0 ? "+" : "") + actualCumR.toFixed(1)}R</b></div>}
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "0.64rem", color: "var(--muted)", marginTop: 6 }}>
+                    {designR != null && <span className="term" data-tip="The design's expectancy per trade in R, drawn straight — where a system with your planned win rate, average loss and winner tiers should sit after each trade."><i style={{ display: "inline-block", width: 12, height: 2, background: "var(--goldBright)", verticalAlign: "middle", marginRight: 5 }} />design slope <b style={{ color: "var(--goldBright)" }}>{(designR >= 0 ? "+" : "") + designR.toFixed(2)}R/trade</b></span>}
+                    {band && <span className="term" data-tip="120 Monte-Carlo runs of the design's exact trade mix in R — 80% of futures stay inside this cone. Judge yourself against the BAND, not one line."><i style={{ display: "inline-block", width: 12, height: 8, background: "rgba(201,152,42,0.25)", verticalAlign: "middle", marginRight: 5 }} />band = 80% of design futures</span>}
+                    <span className="term" data-tip="Your real closed trades in order, cumulative sum of R — only trades with a recorded R count."><i style={{ display: "inline-block", width: 12, height: 2, background: "rgba(255,255,255,0.75)", verticalAlign: "middle", marginRight: 5 }} />your actual cumulative R → <b>{(actualCumR >= 0 ? "+" : "") + actualCumR.toFixed(1)}R</b></span>
+                  </div>
+                  {noR > 0 && <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 5 }}>{noR} trade{noR === 1 ? "" : "s"} without a recorded R excluded — never guessed.</div>}
+                  {designR == null && <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 5 }}>Design line &amp; band need an R-unit design — switch the Return Simulator to R multiples to see them here.</div>}
+                </div>
+              );
+            }
+            // ── × EQUITY VIEW (compounded, size-dependent) ──
             const N = 100, sz = proj.size / 100;
             const gPer = (r) => 1 + sz * (proj.unitR ? r : r / 100); // one trade's equity multiplier
             const mulberry = (seed) => () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -526,7 +637,9 @@ function PlaybookTracker({ trades, uid, setPage }) {
                   <span style={{ fontSize: "0.7rem", color: h == null ? "var(--muted)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
                     {h == null ? "glide across the chart to inspect any trade" : <>trade {h} · design <b style={{ color: "var(--goldBright)" }}>×{simC[h].toFixed(3)}</b> · you <b>×{actC[h].toFixed(3)}</b> · gap <b style={{ color: actC[h] >= simC[h] ? "var(--green)" : "var(--red)" }}>{(actC[h] - simC[h] >= 0 ? "+" : "") + (actC[h] - simC[h]).toFixed(3)}</b></>}
                   </span>
-                  {paths && <button className="distbtn" style={{ marginLeft: "auto", fontSize: "0.62rem", padding: "3px 10px" }} onClick={() => setRoll(r => r + 1)} title="Both lines are ONE possible future drawn from the trade mix — roll the dice again to see another equally-likely path">↻ another future</button>}
+                  <span style={{ marginLeft: "auto" }} />
+                  {paths && <button className="distbtn" style={{ fontSize: "0.62rem", padding: "3px 10px" }} onClick={() => setRoll(r => r + 1)} title="Both lines are ONE possible future drawn from the trade mix — roll the dice again to see another equally-likely path">↻ another future</button>}
+                  {projToggle}
                 </div>
                 <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 10px", background: "rgba(255,255,255,0.015)", touchAction: "none", cursor: "crosshair" }}
                   onPointerMove={e => { const r = e.currentTarget.getBoundingClientRect(); const f = Math.min(1, Math.max(0, (e.clientX - r.left - 10) / Math.max(1, r.width - 20))); setHov(Math.round(f * N)); }}
@@ -560,6 +673,22 @@ function PlaybookTracker({ trades, uid, setPage }) {
 const WHATS_NEW = [
   {
     tag: "New",
+    date: "July 17, 2026",
+    title: "🧰 The big one: new grader checklist, R-mode everywhere, drag-your-dashboard",
+    items: [
+      "Setup Grader rebuilt as a ONE-PAGE checklist: three cards (Prior Move · Base Quality · Trigger Day), every criterion with a plain-English one-liner under it, 14 scored ticks + 2 bonus tells that are tracked but never graded. Leadership context (RS, theme, liquidity, ADR) sits above as a not-scored strip. Grading pre-market? Leave the Trigger ticks and finish the grade after the open — that's what separates the A from the B. Every grade saved before today keeps its original checklist and score.",
+      "See your results in R, not just dollars: the Performance calendar and the Equity curve both get a $ · R · % slider. R mode counts only trades with a recorded stop — anything else is excluded and says so, never guessed.",
+      "Playbook tracker: the projection now defaults to CUMULATIVE R vs trades taken — your actual line against the design's slope and its 80% probability cone, with a live 'ahead/behind by X.XR' readout. The old ×-equity view is one click away, and a new ⓘ explains the whole card.",
+      "Make the dashboard yours: hover any card for the ⋮⋮ handle and drag to rearrange (KPIs, context row, and the Guided stack). Equity card gets its own ⚙ Configure and a click-to-toggle Trail-locked chip.",
+      "Theme Leaders now shows the 5 WEAKEST themes under the leaders — and clicking the card opens the full 31-theme table over a blurred backdrop. Click anywhere to come back.",
+      "Edge Matrix simplified to Grade × Theme (market context still has its own tab in Objective Edge) with an ⤢ expand view; the Return Distribution's data sheet opens in a zoomed pop-up editor.",
+      "Screenshots on tap: 📷 on the calendar and equity curve copies the image to your clipboard or downloads a PNG.",
+      "Daily Setups: the at-a-glance card is now WEEKLY SETUPS — how many ideas made the list each day this week. Fewer setups = the market is offering less; that's information too.",
+      "Watchlist housekeeping: Clear all (or just selected) rows in one go — saved grades are always kept — and a new ⇄ button attaches any saved grade to an open position of your choice.",
+    ],
+  },
+  {
+    tag: "Improved",
     date: "July 17, 2026",
     title: "✨ A cleaner shell: real Pro layouts, one control strip, tidier nav",
     items: [
@@ -3516,7 +3645,7 @@ function Cu({ children, dur }) {
 // bar + dots + auto-advance. Hidden in Pro via CSS (.vp.expert .tourwrap).
 const PREMIUM_TOUR = [
   { chip: "Guided tour · 1 of 6", t: "Welcome to Premium Tools", c: "Five tools that answer the big money questions before you trade. Each one explains itself — let's take a quick tour.", a: "/audio/premium-tour-0.mp3" },
-  { chip: "Tool 1 · Setup Grader", t: "Setup Grader", c: "Use this while scanning and screening for the best stocks in the market — not during live trading. Tick the characteristics of an A+ breakout across three areas — leadership & stock selection, the prior move, and base quality — and it scores the chart out of five stars, so you spend your time only on the strongest setups. The fifth star (A+) unlocks only when the highest-signal factors line up together.", a: "" },
+  { chip: "Tool 1 · Setup Grader", t: "Setup Grader", c: "Use this while scanning and screening for the best stocks in the market — not during live trading. Tick the characteristics of an A+ breakout across three areas — the prior move, base quality, and the trigger day — and it scores the chart out of five stars, so you spend your time only on the strongest setups. Grading pre-market? Leave the trigger ticks for after the open. The fifth star (A+) unlocks only when the highest-signal factors line up together.", a: "" },
   { chip: "Tool 2 · Return Simulator", t: "Return Simulator", c: "See what your account could grow to from your win rate, average loss, and winner sizes. Compounding, made visual.", a: "/audio/premium-tour-1.mp3" },
   { chip: "Tool 3 · Position Risk", t: "Position Risk", c: "Get the exact number of shares to buy so a stop-out only costs a small, planned amount of your account.", a: "/audio/premium-tour-2.mp3" },
   { chip: "Tool 4 · Expectancy", t: "Expectancy", c: "Find out whether your system actually makes money — your edge per trade, and the trades needed to hit your goal.", a: "/audio/premium-tour-3.mp3" },
@@ -3660,7 +3789,7 @@ const gactive = (key) => (!expert && activeGuide === key ? " guide-active" : "")
 const guideProps = { guideEnter, guideLeave, gactive, expert };
 
 const TOOLTABS = [
-  { k: "grader", label: "Setup Grader", tip: "Grade any breakout out of 5 stars across Leadership & Stock Selection, Prior Move, and Base Quality — the 5th star only unlocks when the highest-signal factors line up together." },
+  { k: "grader", label: "Setup Grader", tip: "Grade any breakout out of 5 stars across Prior Move, Base Quality, and Trigger Day — the 5th star only unlocks when the highest-signal factors line up together." },
   { k: "sim", label: "Return Simulator", tip: "Plays your trading style forward over many trades to show how your account could compound — set risk per trade, win rate, and winner sizes, and it projects your ending balance." },
   { k: "risk", label: "Position Risk", tip: "The #1 rule is to never lose much on one trade — enter price, risk per trade %, and your stop, and it tells you exactly how many shares to buy." },
   { k: "exp", label: "Expectancy", tip: "Does your strategy actually make money? Blends win rate with average win and loss into an edge per trade — above zero means you make money over time." },
@@ -3677,7 +3806,7 @@ if (expert) return (
 
       {/* NAV */}
       <div className="navbar">
-        <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+        <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
         <div className="tabs">
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -3725,7 +3854,7 @@ return (
 
       {/* NAV */}
       <div className="navbar">
-        <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+        <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
         <div className="tabs">
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -4746,15 +4875,21 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 /* P5b. Playbook strip */
 .vj.expert .playbookstrip{margin-top:14px}
 /* P6. Objective edge + edge matrix */
-.vj.expert .edgegrid{display:grid; grid-template-columns:1.1fr 1fr; gap:14px; margin-top:14px; align-items:start}
+.vj.expert .edgegrid{display:grid; grid-template-columns:1.1fr 1fr; gap:14px; margin-top:14px; align-items:stretch}
 @media(max-width:1000px){ .vj.expert .edgegrid{grid-template-columns:1fr} }
 .vj.expert .edgerows{display:flex; flex-direction:column; gap:2px; margin-top:2px}
 /* P7. Analytics row — 4-up */
-.vj.expert .vagrid{grid-template-columns:repeat(3,1fr); margin-top:14px; align-items:start}
-.vj.expert .vacol{display:flex; flex-direction:column; gap:20px}
-@media(max-width:1100px){ .vj.expert .vagrid{grid-template-columns:repeat(2,1fr)} }
-@media(max-width:600px){ .vj.expert .vagrid{grid-template-columns:1fr} }
+.vj.expert .vagrid{grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:14px; align-items:start}
+@media(max-width:1100px){ .vj.expert .vagrid{grid-template-columns:1fr} }
 .vj.expert .vacard{padding:16px 17px}
+/* Drag-to-rearrange for the VIV Analytics cards (mirrors the dashboard .vd .dragwrap system) */
+.vj .dragwrap{position:relative; min-width:0}
+.vj .dragwrap .draghandle{position:absolute; top:-9px; right:12px; z-index:6; display:none; align-items:center; justify-content:center; padding:1px 8px; border-radius:7px; background:#14141e; border:1px solid var(--border); color:var(--muted); cursor:grab; font-size:0.72rem; letter-spacing:1px; user-select:none; line-height:1.5}
+.vj .dragwrap:hover .draghandle{display:inline-flex}
+.vj .dragwrap .draghandle:hover{color:var(--goldBright); border-color:var(--borderGold)}
+.vj .dragwrap .draghandle:active{cursor:grabbing}
+.vj .dragwrap.dragging{opacity:0.5}
+.vj .vawinlose{display:flex; flex-direction:column; gap:14px; min-width:0}
 /* P8. Closed trades table — dense Pro chrome, scoped to the Pro .tablewrap only (guided uses .tbl-scroll) */
 .vj.expert .tradehead .sech,.vj.expert .tradehead h2{font-size:0.95rem}
 .vj.expert .countchip{background:var(--goldDim); color:var(--goldBright); font-size:0.66rem; font-weight:800; padding:3px 10px; border-radius:980px}
@@ -5268,7 +5403,9 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   const [previewTrade, setPreviewTrade] = useState(null); // TradeZella-style slide-in overview preview
   const [highlightTradeId, setHighlightTradeId] = useState(null); // gold flash on a trade row jumped-to from VIV Analytics
   const [tradeSorts, setTradeSorts] = useState([]); // [{key, dir}] multi-sort for trades
-  const [eqYAxis, setEqYAxis] = useState("$"); // "$" or "%"
+  const [eqUnit, setEqUnit] = useState(() => { try { return localStorage.getItem("viv-eq-mode") || "$"; } catch { return "$"; } }); // "$" | "r" | "pct" — equity-curve display unit (persisted)
+  useEffect(() => { try { localStorage.setItem("viv-eq-mode", eqUnit); } catch { /* private mode */ } }, [eqUnit]);
+  const eqTrackRef = useRef(null); // $/R/% sliding-toggle track (Calendar-style)
   const [eqXAxis, setEqXAxis] = useState("trades"); // "trades" or "months"
   const [eqHover, setEqHover] = useState(null); // hovered equity-curve point index → interactive readout
   const [distExpanded, setDistExpanded] = useState(false); // expand/collapse distribution analysis
@@ -6406,52 +6543,82 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   }, [dateFiltered]);
 
   // ── equity-curve SVG (green-above / red-below split, $/% Y-axis, by trade / by month X) ──
-  const eqMode = (privacyMode ? "%" : eqYAxis);          // "$" | "%" (privacy forces %)
+  const eqMode = (privacyMode && eqUnit === "$") ? "pct" : eqUnit; // "$" | "r" | "pct"; privacy hides only $ (R/% never reveal account size)
   const eqSvg = useMemo(() => {
+    // ── $ EQUITY SERIES — ALWAYS computed; drives the risk-ladder PILL regardless of display unit ──
     // FILL-LEVEL booking (sync-rule #19: every DAILY aggregate consumes fills, not merged campaigns).
     // A campaign's partial trims hit the curve on THEIR exit days — real-time equity while the position
     // is still open — instead of the whole campaign landing on the final exit date. This matches the
     // performance calendar exactly; win-rate/trade-count stats stay campaign-level on purpose.
     const fillRows = dateFiltered.flatMap(t => (t._fills && t._fills.length > 1) ? t._fills : [t]);
-    const sorted = fillRows.slice().sort((a, b) => Date.parse(tradeDateISO(a.exit) || 0) - Date.parse(tradeDateISO(b.exit) || 0));
-    // Cumulative equity series — one node per calendar DAY (By Date) or per month (By Month).
-    // Trades that fall on the same date/month are summed into a single node, so the X axis shows
-    // dates (never times) and same-day trades total together rather than each getting its own point.
-    const groupKeys = [];
-    const eq = [startCap];
+    const sortedD = fillRows.slice().sort((a, b) => Date.parse(tradeDateISO(a.exit) || 0) - Date.parse(tradeDateISO(b.exit) || 0));
+    const dKeys = []; const eqD = [startCap];
     {
       const sums = {};
-      sorted.forEach(t => {
+      sortedD.forEach(t => {
         const iso = tradeDateISO(t.exit || t.entry) || "Unknown";
         const k = eqXAxis === "months" ? (iso.slice(0, 7) || "Unknown") : iso; // YYYY-MM or YYYY-MM-DD
-        if (!(k in sums)) { sums[k] = 0; groupKeys.push(k); }
+        if (!(k in sums)) { sums[k] = 0; dKeys.push(k); }
         sums[k] += (Number(t.plDollar) || 0);
       });
+      dKeys.sort();
+      dKeys.forEach(k => eqD.push(eqD[eqD.length - 1] + sums[k]));
+    }
+    // $-series 5/10-SMA → the PILL status. Pinned to the $ curve so switching display unit never
+    // changes the real-money risk signal. ($ and % are a linear transform → identical status; only
+    // the R series would differ, hence the pin — see report.)
+    const smaOfD = (p) => eqD.map((_, i) => i + 1 >= p ? eqD.slice(i + 1 - p, i + 1).reduce((s, v) => s + v, 0) / p : null);
+    const d5a = smaOfD(5), d10a = smaOfD(10); const lastD = eqD[eqD.length - 1], ld5 = d5a[d5a.length - 1], ld10 = d10a[d10a.length - 1];
+    const riskStatus = ld10 != null && lastD < ld10 ? "brake" : ld5 != null && lastD < ld5 ? "derisk" : ld5 != null ? "full" : null;
+
+    // ── DISPLAYED SERIES — one node per calendar DAY (By Date) or per month (By Month). ──
+    const isR = eqMode === "r";
+    let eq, groupKeys, base, rExcluded = 0;
+    if (isR) {
+      // Cumulative R over CAMPAIGNS with a RECORDED R only (a fill has no honest per-fill R). Trades
+      // without a recorded R are skipped and counted — never guessed. Baseline = 0R.
+      const rTrades = dateFiltered.filter(t => t.exit).slice().sort((a, b) => Date.parse(tradeDateISO(a.exit) || 0) - Date.parse(tradeDateISO(b.exit) || 0));
+      groupKeys = []; const sums = {};
+      rTrades.forEach(t => {
+        const rv = t.rMult == null ? (t.r_mult == null ? null : Number(t.r_mult)) : Number(t.rMult);
+        if (rv == null || !isFinite(rv)) { rExcluded += 1; return; }
+        const iso = tradeDateISO(t.exit || t.entry) || "Unknown";
+        const k = eqXAxis === "months" ? (iso.slice(0, 7) || "Unknown") : iso;
+        if (!(k in sums)) { sums[k] = 0; groupKeys.push(k); }
+        sums[k] += rv;
+      });
       groupKeys.sort();
-      groupKeys.forEach(k => eq.push(eq[eq.length - 1] + sums[k]));
+      eq = [0]; groupKeys.forEach(k => eq.push(eq[eq.length - 1] + sums[k]));
+      base = 0;
+    } else {
+      eq = eqD; groupKeys = dKeys; base = startCap; // "$" and "pct" plot the same $ curve; only labels/tooltip differ
     }
     let lo = Math.min(...eq), hi = Math.max(...eq); if (hi === lo) hi = lo + 1;
     const pad = 12, W = 600, H = 210, h = H - 2 * pad;
     const X = (i) => eq.length > 1 ? (i / (eq.length - 1)) * W : 0;
     const Y = (v) => pad + (1 - (v - lo) / (hi - lo)) * h;
-    const yb = Y(startCap);
+    const yb = Y(base);
     const pts = eq.map((v, i) => ({ x: X(i), y: Y(v), v }));
     const posSegs = [], negSegs = []; let cur = [], curSign = null;
     const flush = () => { if (cur.length > 1) (curSign >= 0 ? posSegs : negSegs).push(cur); cur = []; };
     for (let pi = 0; pi < pts.length; pi++) {
-      const p = pts[pi], sign = p.v >= startCap ? 1 : -1;
+      const p = pts[pi], sign = p.v >= base ? 1 : -1;
       if (pi === 0) { curSign = sign; cur = [{ x: p.x, y: p.y }]; continue; }
-      const prev = pts[pi - 1], prevSign = prev.v >= startCap ? 1 : -1;
+      const prev = pts[pi - 1], prevSign = prev.v >= base ? 1 : -1;
       if (sign !== prevSign && (p.v - prev.v) !== 0) {
-        const f = (startCap - prev.v) / (p.v - prev.v), cx = prev.x + (p.x - prev.x) * f;
+        const f = (base - prev.v) / (p.v - prev.v), cx = prev.x + (p.x - prev.x) * f;
         cur.push({ x: cx, y: yb }); flush(); curSign = sign; cur = [{ x: cx, y: yb }, { x: p.x, y: p.y }];
       } else cur.push({ x: p.x, y: p.y });
     }
     flush();
     const linePath = (segs) => segs.map(s => "M" + s.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" L")).join(" ");
     const areaPath = (segs) => segs.map(s => "M" + s[0].x.toFixed(1) + "," + yb.toFixed(1) + " L" + s.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" L") + " L" + s[s.length - 1].x.toFixed(1) + "," + yb.toFixed(1) + " Z").join(" ");
-    const pct = eqMode === "%";
-    const ylab = (v) => { if (pct) { const p = startCap > 0 ? (v - startCap) / startCap * 100 : 0; return Math.round(p) === 0 ? "0%" : (p > 0 ? "+" : "−") + Math.abs(Math.round(p)) + "%"; } return "$" + Math.round(v / 1000) + "k"; };
+    const pct = eqMode === "pct";
+    const ylab = (v) => {
+      if (pct) { const p = startCap > 0 ? (v - startCap) / startCap * 100 : 0; return Math.round(p) === 0 ? "0%" : (p > 0 ? "+" : "−") + Math.abs(Math.round(p)) + "%"; }
+      if (isR) { return Math.abs(v) < 0.05 ? "0R" : (v > 0 ? "+" : "−") + Math.abs(v).toFixed(1) + "R"; }
+      return "$" + Math.round(v / 1000) + "k";
+    };
     const yLabels = [hi, lo + (hi - lo) * 2 / 3, lo + (hi - lo) / 3, lo].map(ylab);
     let xs;
     if (eqXAxis === "months") { xs = groupKeys.map(m => { const d = new Date(m + "-15"); return isNaN(d) ? m : d.toLocaleString("default", { month: "short", year: "2-digit" }); }); }
@@ -6460,21 +6627,17 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
       if (ds.length <= 8) xs = ds;
       else { const step = (ds.length - 1) / 7; xs = Array.from({ length: 8 }, (_, k) => ds[Math.round(k * step)]); }
     }
-    const totalPL = eq[eq.length - 1] - startCap, totalRet = startCap > 0 ? totalPL / startCap * 100 : 0, n = dateFiltered.length; // n = campaigns (trades), not fills
-    // ── Equity SMAs (5/10/20 equity nodes) — the derisk/brake overlay. SMA runs over the
-    // equity NODES (one per trading day in By-Date mode). Rule: equity below its 5-SMA =
-    // START DERISKING; below the 10-SMA = HARD BRAKE (no new risk, review open trades);
-    // the 20-SMA is the long guardrail for regime context.
+    const totalPL = eqD[eqD.length - 1] - startCap, totalRet = startCap > 0 ? totalPL / startCap * 100 : 0, totalR = isR ? eq[eq.length - 1] : null, n = dateFiltered.length; // n = campaigns (trades), not fills
+    // ── SMA OVERLAY (5/10/20) — computed on the DISPLAYED series so the lines + their "hit" glow track
+    // whatever unit is shown. The PILL (riskStatus) stays pinned to the $ series above. ──
     const smaOf = (p) => eq.map((_, i) => i + 1 >= p ? eq.slice(i + 1 - p, i + 1).reduce((s, v) => s + v, 0) / p : null);
     const smaPath = (arr) => { let out = "", pen = false; arr.forEach((v, i) => { if (v == null) { pen = false; return; } out += (pen ? " L" : " M") + X(i).toFixed(1) + "," + Y(v).toFixed(1); pen = true; }); return out.trim(); };
     const sma5 = smaOf(5), sma10 = smaOf(10), sma20 = smaOf(20);
     const lastV = eq[eq.length - 1], l5 = sma5[sma5.length - 1], l10 = sma10[sma10.length - 1], l20 = sma20[sma20.length - 1];
-    // Pill ladder runs on the 5/10 lines only; the 20-SMA "no edge" state signals via a GLOW on
-    // its line instead of a loud card (Valen, 2026-07-11). hit = equity at/below the line now.
+    // hit = displayed equity at/below the displayed line now → the line GLOWS.
     const hit = (lv) => lv != null && lastV <= lv * 1.002;
     const hits = { s5: hit(l5), s10: hit(l10), s20: hit(l20) };
-    const riskStatus = l10 != null && lastV < l10 ? "brake" : l5 != null && lastV < l5 ? "derisk" : l5 != null ? "full" : null;
-    return { yb, linePos: linePath(posSegs), lineNeg: linePath(negSegs), areaPos: areaPath(posSegs), areaNeg: areaPath(negSegs), yLabels, xs, totalPL, totalRet, n, pct,
+    return { yb, linePos: linePath(posSegs), lineNeg: linePath(negSegs), areaPos: areaPath(posSegs), areaNeg: areaPath(negSegs), yLabels, xs, totalPL, totalRet, totalR, n, pct, unit: eqMode, isR, base, rExcluded,
       pts: eq.map((v, i) => ({ x: X(i), y: Y(v), v, key: i === 0 ? "Start" : groupKeys[i - 1], delta: i === 0 ? 0 : (eq[i] - eq[i - 1]) })), startCap, W, H,
       smaPaths: { s5: smaPath(sma5), s10: smaPath(sma10), s20: smaPath(sma20) }, riskStatus, hits, lastV, l5, l10, l20 };
   }, [dateFiltered, startCap, eqMode, eqXAxis]);
@@ -6497,6 +6660,23 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
     return out;
   }, [DIST_RANGE]);
   const [distPanelOpen, setDistPanelOpen] = useState(false);
+  const vaArr = useCardArrange(["recap", "insights", "winlose"], "viv-jrn-analytics-order"); // Pro VIV Analytics card order
+  const [matrixPopup, setMatrixPopup] = useState(false);   // Edge Matrix full-screen popup (Pro)
+  const [eqCamOpen, setEqCamOpen] = useState(false);       // equity-curve camera menu
+  const [eqCamStatus, setEqCamStatus] = useState(null);    // "copied" | "downloaded"
+  // Esc closes the Edge Matrix popup + the Return-Distribution data-sheet modal (page-level popups).
+  useEffect(() => {
+    if (!matrixPopup && !distPanelOpen) return;
+    const onKey = (e) => { if (e.key === "Escape") { setMatrixPopup(false); setDistPanelOpen(false); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [matrixPopup, distPanelOpen]);
+  const doEqCapture = async (mode) => {
+    setEqCamOpen(false);
+    const card = document.getElementById("eqCaptureCard");
+    const st = await captureElement(card, mode, "VIV-Equity");
+    if (st) { setEqCamStatus(st); setTimeout(() => setEqCamStatus(null), 2200); }
+  };
   const [distEdits, setDistEdits] = useState({});        // {bucketIdx: count} what-if overrides
   // Per-bucket TRADE LISTS (not just counts) — every bar is auditable: click it to see exactly
   // which trades it counts (ticker · date · return · P&L → open details). [[feedback-aggregates-must-be-auditable]]
@@ -6653,22 +6833,22 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             if (id === "t:un") return pop.filter(t => !fitOf(t));
             if (id && id.startsWith("g:")) { const L = id.slice(2); return L === "un" ? pop.filter(t => !letterOf(t)) : pop.filter(t => letterOf(t) === L); }
             if (id && id.startsWith("m:")) { const c = id.slice(2); return c === "un" ? pop.filter(t => !ctxOf(t)) : pop.filter(t => ctxOf(t) === c); }
-            if (id && id.startsWith("x:")) { // 3-D combo: grade|theme|context — SAME population as the matrix (entries ≥ theme coverage)
-              const [G, T, X] = id.slice(2).split("|");
+            if (id && id.startsWith("x:")) { // combo: grade|theme — SAME population as the matrix (entries ≥ theme coverage)
+              const [G, T] = id.slice(2).split("|");
               return pop.filter(t => { const iso = tradeDateISO(t.entry); return iso && THEME_COVERAGE_START && iso >= THEME_COVERAGE_START; })
-                .filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
+                .filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T);
             }
             return [];
           };
-          // 3-D matrix: Grade × Theme × Context — ONLY trades entered from THEME_COVERAGE_START
-          // (2026-06-26, the first theme snapshot). Earlier trades have no honest theme tag, so a
-          // 3-D cell built on them would be fake precision. The 1-D columns above still cover all trades.
+          // Edge Matrix: Grade × Theme — ONLY trades entered from THEME_COVERAGE_START (2026-06-26,
+          // the first theme snapshot). Earlier trades have no honest theme tag, so a cell built on
+          // them would be fake precision. The 1-D groups on the left still cover all trades.
           const pop3d = pop.filter(t => { const iso = tradeDateISO(t.entry); return iso && THEME_COVERAGE_START && iso >= THEME_COVERAGE_START; });
           const combos = [];
           const gKeys = [...byGrade.map(g => g.L), ...(ungraded.n ? ["un"] : [])];
-          for (const G of gKeys) for (const T of ["in", "off", "un"]) for (const X of ["trend", "chop", "down", "un"]) {
-            const rows = pop3d.filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T && (ctxOf(t) || "un") === X);
-            if (rows.length) combos.push({ id: `x:${G}|${T}|${X}`, G, T, X, ...agg(rows) });
+          for (const G of gKeys) for (const T of ["in", "off", "un"]) {
+            const rows = pop3d.filter(t => (letterOf(t) || "un") === G && (fitOf(t) || "un") === T);
+            if (rows.length) combos.push({ id: `x:${G}|${T}`, G, T, ...agg(rows) });
           }
           combos.sort((a, b) => b.n - a.n);
           // NOTE: every cell must be shrink/wrap-safe — fixed minWidths inside a minmax(300px,1fr)
@@ -6694,7 +6874,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>
                   The {rows.length} trade{rows.length !== 1 ? "s" : ""} behind “{id === "t:in" ? "In-theme" : id === "t:off" ? "Off-theme" : id === "t:un" ? "Untagged"
                     : id === "m:trend" ? "Trending tape" : id === "m:chop" ? "Choppy tape" : id === "m:down" ? "Downtrend tape" : id === "m:un" ? "No market data"
-                    : id.startsWith("x:") ? (() => { const [G, T, X] = id.slice(2).split("|"); return `${G === "un" ? "Ungraded" : G} · ${T === "in" ? "In-theme" : T === "off" ? "Off-theme" : "Untagged"} · ${X === "un" ? "No mkt data" : ({ trend: "Trending", chop: "Choppy", down: "Downtrend" })[X]}`; })()
+                    : id.startsWith("x:") ? (() => { const [G, T] = id.slice(2).split("|"); return `${G === "un" ? "Ungraded" : G} · ${T === "in" ? "In-theme" : T === "off" ? "Off-theme" : "Untagged"}`; })()
                     : id.slice(2) + " setups"}”
                   {isTheme && id !== "t:un" && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · judged against the theme snapshot at each trade's ENTRY date</span>}
                   {id === "t:un" && <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}> · entered before theme coverage, missing an entry date, or unknown sector — never guessed. Fix the entry date via Edit trade and it re-tags automatically.</span>}
@@ -6721,11 +6901,14 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             );
           };
           if (!byGrade.length && !inT.n && !offT.n) return null;
+          // Theme columns for the matrix (grade × theme). Present-only, in a fixed order.
+          const THEME_ORDER = ["in", "off", "un"];
+          const themeHead = (t) => t === "in" ? <>{dot("var(--green)")}In-theme</> : t === "off" ? <>{dot("var(--red)")}Off-theme</> : <>{dot("rgba(255,255,255,0.25)")}Untagged</>;
           const matrixBlock = combos.length > 0 && (
                 <div style={{ marginTop: 18 }}>
                   <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
-                    <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)" }}>3-D edge matrix — grade × theme × market context</div>
-                    {/* view toggle — heatmap (default, visual) vs the classic sortable table (unchanged) */}
+                    <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)" }}>Edge matrix — grade × theme</div>
+                    {/* view toggle — heatmap (visual) vs the sortable table */}
                     <div style={{ marginLeft: "auto", display: "inline-flex", border: "1px solid var(--borderGold)", borderRadius: 8, overflow: "hidden", fontSize: "0.62rem", fontWeight: 700 }}>
                       {[["heatmap", "Heatmap"], ["table", "Table"]].map(([v, lbl]) => (
                         <button key={v} type="button" onClick={() => setEdgeMatrixView(v)}
@@ -6738,24 +6921,17 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   <div style={{ background: "rgba(201,152,42,0.06)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "8px 12px", fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, marginBottom: 8 }}>
                     Starts at <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the first theme snapshot
                     <span onClick={() => setEdgeNotes(n => ({ ...n, matrix: !n.matrix }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.matrix ? "hide ▴" : "why? ▾"}</span>
-                    {edgeNotes.matrix && <div style={{ marginTop: 4 }}>Trades entered before that have no theme tracking, so crossing them here would be inaccurate; they're excluded from the matrix (the single-dimension columns above still cover every trade).</div>}
+                    {edgeNotes.matrix && <div style={{ marginTop: 4 }}>Trades entered before that have no theme tracking, so crossing them here would be inaccurate; they're excluded from the matrix (the single-dimension groups on the left still cover every trade).</div>}
                   </div>
                   {edgeMatrixView === "heatmap" ? (() => {
-                    // HEATMAP — same `combos` data, laid out as grade × context grids, one panel per theme state.
-                    // Colour = outcome (avgR) only; numbers stay neutral. Cells reuse the combo id so the
-                    // shared EdgeList drill-down below the matrix renders the exact trades on click.
+                    // HEATMAP — grade rows × theme columns. Colour = outcome (avgR); numbers stay neutral.
+                    // Cells reuse the combo id so the shared EdgeList drill-down renders exact trades on click.
                     const GRADE_ORDER = ["A+", "A", "B", "C", "un"];
-                    const CTX_ORDER = ["trend", "chop", "down", "un"];
                     const gradeLabel = (g) => g === "un" ? "Ungraded" : g;
-                    const ctxHead = (x) => x === "un"
-                      ? <>{dot("rgba(255,255,255,0.25)")}No data</>
-                      : <>{dot(CTX_DOT[x])}{CTX_LABEL[x]}</>;
-                    const themePanels = [
-                      { key: "in", label: "In-theme", dotc: "var(--green)" },
-                      { key: "off", label: "Off-theme", dotc: "var(--red)" },
-                      { key: "un", label: "Untagged", dotc: "rgba(255,255,255,0.25)" },
-                    ];
                     const byId = Object.fromEntries(combos.map(c => [c.id, c]));
+                    const grades = GRADE_ORDER.filter(g => combos.some(c => c.G === g));
+                    const themes = THEME_ORDER.filter(t => combos.some(c => c.T === t));
+                    if (!grades.length || !themes.length) return null;
                     const cellBg = (id) => {
                       const c = byId[id];
                       if (!c || c.avgR == null) return "rgba(255,255,255,0.02)";
@@ -6763,50 +6939,35 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                       if (a < 0.02) return "rgba(255,255,255,0.03)";
                       return c.avgR >= 0 ? `rgba(34,197,94,${a.toFixed(3)})` : `rgba(239,68,68,${a.toFixed(3)})`;
                     };
-                    const panels = themePanels
-                      .map(p => {
-                        const grades = GRADE_ORDER.filter(g => combos.some(c => c.T === p.key && c.G === g));
-                        const ctxs = CTX_ORDER.filter(x => combos.some(c => c.T === p.key && c.X === x));
-                        return { ...p, grades, ctxs };
-                      })
-                      .filter(p => p.grades.length && p.ctxs.length);
-                    if (!panels.length) return null;
                     return (
                       <div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-start" }}>
-                          {panels.map(p => (
-                            <div key={p.key} style={{ flex: "1 1 300px", minWidth: 0 }}>
-                              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text)", marginBottom: 6, display: "flex", alignItems: "center" }}>{dot(p.dotc)}{p.label}</div>
-                              <div style={{ overflowX: "auto" }}>
-                                <div style={{ display: "grid", gridTemplateColumns: `minmax(60px,auto) repeat(${p.ctxs.length}, minmax(92px,1fr))`, gap: 4 }}>
-                                  {/* header row: blank corner + context columns */}
-                                  <div />
-                                  {p.ctxs.map(x => (
-                                    <div key={x} style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)", fontWeight: 700, padding: "2px 4px", display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>{ctxHead(x)}</div>
-                                  ))}
-                                  {/* one row per grade */}
-                                  {p.grades.map(g => (
-                                    <React.Fragment key={g}>
-                                      <div style={{ fontSize: "0.72rem", fontWeight: 800, color: g === "un" ? "var(--muted)" : "var(--text)", display: "flex", alignItems: "center", whiteSpace: "nowrap", paddingRight: 4 }}>{gradeLabel(g)}</div>
-                                      {p.ctxs.map(x => {
-                                        const id = `x:${g}|${p.key}|${x}`;
-                                        const c = byId[id];
-                                        const open = edgeOpen === id;
-                                        if (!c) return <div key={x} style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: "0.8rem" }}>—</div>;
-                                        return (
-                                          <div key={x} onClick={() => setEdgeOpen(open ? null : id)} title="Click to see the exact trades behind this combination"
-                                            style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: cellBg(id), border: open ? "1px solid var(--goldBright)" : "1px solid rgba(255,255,255,0.06)", boxShadow: open ? "0 0 0 1px var(--goldBright)" : "none", padding: "5px 7px", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
-                                            <div style={{ fontSize: "0.82rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "var(--text)" }}>{c.avgR == null ? "—" : (c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2) + "R"}</div>
-                                            <div style={{ fontSize: "0.58rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>n={c.n} · {c.winPct}%</div>
-                                          </div>
-                                        );
-                                      })}
-                                    </React.Fragment>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                        <div style={{ overflowX: "auto" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: `minmax(64px,auto) repeat(${themes.length}, minmax(110px,1fr))`, gap: 4, minWidth: 0 }}>
+                            {/* header row: blank corner + theme columns */}
+                            <div />
+                            {themes.map(t => (
+                              <div key={t} style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)", fontWeight: 700, padding: "2px 4px", display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>{themeHead(t)}</div>
+                            ))}
+                            {/* one row per grade */}
+                            {grades.map(g => (
+                              <React.Fragment key={g}>
+                                <div style={{ fontSize: "0.72rem", fontWeight: 800, color: g === "un" ? "var(--muted)" : "var(--text)", display: "flex", alignItems: "center", whiteSpace: "nowrap", paddingRight: 4 }}>{gradeLabel(g)}</div>
+                                {themes.map(t => {
+                                  const id = `x:${g}|${t}`;
+                                  const c = byId[id];
+                                  const open = edgeOpen === id;
+                                  if (!c) return <div key={t} style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: "0.8rem" }}>—</div>;
+                                  return (
+                                    <div key={t} onClick={() => setEdgeOpen(open ? null : id)} title="Click to see the exact trades behind this combination"
+                                      style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: cellBg(id), border: open ? "1px solid var(--goldBright)" : "1px solid rgba(255,255,255,0.06)", boxShadow: open ? "0 0 0 1px var(--goldBright)" : "none", padding: "5px 7px", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
+                                      <div style={{ fontSize: "0.82rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "var(--text)" }}>{c.avgR == null ? "—" : (c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2) + "R"}</div>
+                                      <div style={{ fontSize: "0.58rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>n={c.n} · {c.winPct}%</div>
+                                    </div>
+                                  );
+                                })}
+                              </React.Fragment>
+                            ))}
+                          </div>
                         </div>
                         <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Colour = average R per trade. Click any cell to see its exact trades. Cells under ~10 trades are direction, not proof.</div>
                       </div>
@@ -6814,23 +6975,21 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   })() : (
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem", tableLayout: "fixed" }}>
-                      <colgroup><col style={{ width: "13%" }} /><col style={{ width: "15%" }} /><col style={{ width: "18%" }} /><col style={{ width: "11%" }} /><col style={{ width: "12%" }} /><col style={{ width: "12%" }} /><col style={{ width: "13%" }} /><col style={{ width: "6%" }} /></colgroup>
+                      <colgroup><col style={{ width: "16%" }} /><col style={{ width: "22%" }} /><col style={{ width: "14%" }} /><col style={{ width: "15%" }} /><col style={{ width: "13%" }} /><col style={{ width: "14%" }} /><col style={{ width: "6%" }} /></colgroup>
                       <thead><tr style={{ color: "var(--muted)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                        <th style={{ textAlign: "left", padding: "4px 8px" }}>Grade</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Theme</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Market</th>
+                        <th style={{ textAlign: "left", padding: "4px 8px" }}>Grade</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Theme</th>
                         <th style={{ textAlign: "right", padding: "4px 8px" }}>Trades</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Win %</th><th style={{ textAlign: "right", padding: "4px 8px" }}>PF</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Avg R</th><th></th>
                       </tr></thead>
                       <tbody>
                         {combos.map(c => (
-                          /* NOTE: .vj tbody td right-aligns everything past column 2 — the first three
-                             (text) columns need EXPLICIT textAlign:left or headers and cells drift apart
-                             (the Market-column misalignment Valen caught, 2026-07-11). */
+                          /* NOTE: .vj tbody td right-aligns everything past column 2 — the first two
+                             (text) columns need EXPLICIT textAlign:left or headers and cells drift apart. */
                           <tr key={c.id} onClick={() => setEdgeOpen(edgeOpen === c.id ? null : c.id)} title="Click to see the exact trades behind this combination"
                             onMouseEnter={e => { if (edgeOpen !== c.id) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
                             onMouseLeave={e => { e.currentTarget.style.background = edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent"; }}
                             style={{ cursor: "pointer", background: edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                             <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 800, color: c.G === "un" ? "var(--muted)" : "var(--text)" }}>{c.G === "un" ? "Ungraded" : c.G}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.T === "un" ? "var(--muted)" : "var(--text)" }}>{c.T === "in" ? <>{dot("var(--green)")}In</> : c.T === "off" ? <>{dot("var(--red)")}Off</> : <>{dot("rgba(255,255,255,0.25)")}Untagged</>}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.X === "un" ? "var(--muted)" : "var(--text)" }}>{c.X === "un" ? <>{dot("rgba(255,255,255,0.25)")}No data</> : <>{dot(CTX_DOT[c.X])}{CTX_LABEL[c.X]}</>}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.T === "un" ? "var(--muted)" : "var(--text)" }}>{c.T === "in" ? <>{dot("var(--green)")}In-theme</> : c.T === "off" ? <>{dot("var(--red)")}Off-theme</> : <>{dot("rgba(255,255,255,0.25)")}Untagged</>}</td>
                             <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{c.n}</td>
                             <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: "var(--text)" }}>{c.winPct}%</td>
                             <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: c.pf == null ? "var(--muted)" : "var(--text)" }}>{c.pf == null ? "—" : c.pf === Infinity ? "∞" : c.pf.toFixed(2)}</td>
@@ -6849,7 +7008,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           if (proLayout) return (
             <div className="edgegrid">
               {/* Objective Edge — one group at a time via the 3-way seg (reuses the same Row/EdgeList content) */}
-              <div className="card">
+              <div className="card" style={{ height: "100%" }}>
                 <div className="cardhead"><span className="label">Objective Edge</span><span className="infodot" data-tip="Connects your process to your results across three dimensions judged at entry: the setup grade you gave the trade, whether its sector was in-theme, and the market context — SPY trending, choppy, or in a downtrend versus its 21-day EMA.">i</span></div>
                 <div className="seg" style={{ marginBottom: 8 }}>
                   <button className={edgeGroup === "grade" ? "on" : ""} type="button" onClick={() => setEdgeGroup("grade")}>By setup grade</button>
@@ -6878,12 +7037,31 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   {edgeOpen && !edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
                 </div>
               </div>
-              {/* Edge Matrix — the existing 3-D matrix with its heatmap/table toggle */}
-              <div className="card">
-                <div className="cardhead"><span className="label">Edge Matrix</span><span className="infodot" data-tip="Grade × market context × theme fit crossed in one view so you can see exactly which combination your edge lives in. Toggle the heatmap or the sortable table.">i</span></div>
-                {matrixBlock || <div style={{ fontSize: "0.72rem", color: "var(--muted)", padding: "4px 2px" }}>Not enough theme-tracked trades yet to cross grade × theme × market. The single-dimension groups on the left still cover every trade.</div>}
+              {/* Edge Matrix — grade × theme; compact in-card (scrolls) + full-screen popup on expand */}
+              <div className="card" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                <div className="cardhead">
+                  <span className="label">Edge Matrix</span>
+                  <span className="infodot" data-tip="Setup grade × theme fit crossed in one view so you can see exactly which combination your edge lives in. Toggle the heatmap or the sortable table; click any cell/row for its exact trades.">i</span>
+                  {matrixBlock && <button type="button" onClick={() => setMatrixPopup(true)} title="Expand the full matrix" style={{ marginLeft: "auto", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", fontFamily: "inherit", fontSize: "0.62rem", fontWeight: 700, padding: "3px 9px", cursor: "pointer" }}>⤢ Expand</button>}
+                </div>
+                {matrixBlock
+                  ? <div style={{ flex: 1, minHeight: 0, maxHeight: 420, overflowY: "auto", marginTop: -6 }}>{matrixBlock}</div>
+                  : <div style={{ fontSize: "0.72rem", color: "var(--muted)", padding: "4px 2px" }}>Not enough theme-tracked trades yet to cross grade × theme. The single-dimension groups on the left still cover every trade.</div>}
                 {edgeOpen && edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
               </div>
+              {matrixPopup && matrixBlock && createPortal((
+                <div className="vj expert" onClick={(e) => { if (e.target === e.currentTarget) setMatrixPopup(false); }}
+                  style={{ position: "fixed", inset: 0, zIndex: 1250, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}>
+                  <div style={{ fontFamily: font, position: "relative", width: "min(94vw, 1040px)", maxHeight: "86vh", overflowY: "auto", background: "var(--glass)", border: "1px solid var(--border)", borderRadius: 18, padding: "20px 24px", backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", boxShadow: "0 30px 80px rgba(0,0,0,0.6)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                      <span style={{ fontSize: "0.92rem", fontWeight: 800, color: "var(--goldBright)" }}>Edge Matrix — grade × theme</span>
+                      <button type="button" aria-label="Close" onClick={() => setMatrixPopup(false)} style={{ marginLeft: "auto", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: "1.1rem", lineHeight: 1 }}>×</button>
+                    </div>
+                    {matrixBlock}
+                    {edgeOpen && edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
+                  </div>
+                </div>
+              ), document.body)}
             </div>
           );
           return (<>
@@ -6934,17 +7112,38 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             </div>
           </>);
   };
+  // $ / R / % equity-curve unit toggle — a gold thumb slides between three options (click OR drag on
+  // the track picks). Matches Calendar.jsx. Privacy hides $ only, so a $-pick snaps to % under privacy.
+  const EQ_UNITS = [["$", "$"], ["r", "R"], ["pct", "%"]];
+  const eqIdx = Math.max(0, EQ_UNITS.findIndex(u => u[0] === eqMode)); // reflect the EFFECTIVE (post-privacy) unit
+  const pickEqUnit = (clientX) => { const el = eqTrackRef.current; if (!el) return; const r = el.getBoundingClientRect(); const f = (clientX - r.left) / Math.max(1, r.width); const i = Math.max(0, Math.min(2, Math.floor(f * 3))); let k = EQ_UNITS[i][0]; if (privacyMode && k === "$") k = "pct"; setEqUnit(k); };
+  const onEqTrackDown = (e) => { e.preventDefault(); pickEqUnit(e.clientX); const move = (ev) => pickEqUnit(ev.clientX); const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); };
   const equityCardBody = (<>
               <div className="row">
                 <div className="label">Account value over time</div>
                 <div className="spacer"></div>
-                <div className="seg" id="eqSeg">
-                  <button className={eqMode === "$" ? "on" : ""} disabled={privacyMode} onClick={() => !privacyMode && setEqYAxis("$")} title={privacyMode ? "Privacy mode is on — turn it off to view dollar amounts" : ""}>$</button>
-                  <button className={eqMode === "%" ? "on" : ""} onClick={() => setEqYAxis("%")}>%</button>
+                <div ref={eqTrackRef} onPointerDown={onEqTrackDown} title="Show equity as dollars, R-multiples, or percent"
+                  style={{ position: "relative", display: "flex", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", cursor: "pointer", userSelect: "none", touchAction: "none" }}>
+                  <div style={{ position: "absolute", top: 3, bottom: 3, left: 3, width: "calc((100% - 6px) / 3)", transform: `translateX(${eqIdx * 100}%)`, background: C.gold, borderRadius: 8, transition: "transform .18s cubic-bezier(.22,1,.36,1)", pointerEvents: "none" }} />
+                  {EQ_UNITS.map(([k, lbl]) => (
+                    <span key={k} style={{ position: "relative", zIndex: 1, color: eqMode === k ? "#1a1206" : C.muted, padding: "7px 0", width: 36, textAlign: "center", fontFamily: font, fontWeight: 700, fontSize: "0.78rem", pointerEvents: "none" }}>{lbl}</span>
+                  ))}
                 </div>
                 <div className="seg" id="eqXSeg">
                   <button className={eqXAxis === "trades" ? "on" : ""} onClick={() => setEqXAxis("trades")}>By Date</button>
                   <button className={eqXAxis === "months" ? "on" : ""} onClick={() => setEqXAxis("months")}>By Month</button>
+                </div>
+                <div className="viv-hide-screenshot" style={{ position: "relative" }}>
+                  <button type="button" title="Save this chart as an image" onClick={() => setEqCamOpen(o => !o)}
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 8, color: eqCamStatus ? "var(--green)" : "var(--muted)", cursor: "pointer", fontSize: "0.9rem", lineHeight: 1, padding: "5px 9px" }}>
+                    {eqCamStatus === "copied" ? "Copied ✓" : eqCamStatus === "downloaded" ? "Saved ✓" : "📷"}
+                  </button>
+                  {eqCamOpen && (
+                    <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 20, background: "#11111b", border: "1px solid var(--border)", borderRadius: 10, padding: 5, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", whiteSpace: "nowrap" }}>
+                      <button type="button" onClick={() => doEqCapture("copy")} style={{ display: "block", width: "100%", textAlign: "left", background: "transparent", border: "none", color: "var(--text)", fontFamily: font, fontSize: "0.72rem", fontWeight: 600, padding: "6px 12px", borderRadius: 7, cursor: "pointer" }}>Copy image</button>
+                      <button type="button" onClick={() => doEqCapture("download")} style={{ display: "block", width: "100%", textAlign: "left", background: "transparent", border: "none", color: "var(--text)", fontFamily: font, fontSize: "0.72rem", fontWeight: 600, padding: "6px 12px", borderRadius: 7, cursor: "pointer" }}>Download PNG</button>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="chartwrap">
@@ -6985,14 +7184,24 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   {eqHover != null && eqSvg.pts[eqHover] && (() => {
                     const p = eqSvg.pts[eqHover];
                     const leftPct = (p.x / eqSvg.W) * 100, topPct = (p.y / eqSvg.H) * 100;
-                    const ret = eqSvg.startCap > 0 ? (p.v - eqSvg.startCap) / eqSvg.startCap * 100 : 0;
-                    const dpct = eqSvg.startCap > 0 ? p.delta / eqSvg.startCap * 100 : 0;
-                    const valStr = privacyMode ? ((ret >= 0 ? "+" : "−") + Math.abs(ret).toFixed(1) + "%") : ("$" + Math.round(p.v).toLocaleString());
-                    const dStr = privacyMode ? ((p.delta >= 0 ? "+" : "−") + Math.abs(dpct).toFixed(1) + "%") : ((p.delta >= 0 ? "+" : "−") + "$" + Math.abs(Math.round(p.delta)).toLocaleString());
+                    // Readout in the SELECTED unit (eqSvg.unit already resolves privacy: $ → % under privacy).
+                    let valStr, dStr;
+                    if (eqSvg.unit === "r") {
+                      valStr = (p.v >= 0 ? "+" : "−") + Math.abs(p.v).toFixed(2) + "R";
+                      dStr = (p.delta >= 0 ? "+" : "−") + Math.abs(p.delta).toFixed(2) + "R";
+                    } else if (eqSvg.unit === "pct") {
+                      const ret = eqSvg.startCap > 0 ? (p.v - eqSvg.startCap) / eqSvg.startCap * 100 : 0;
+                      const dpct = eqSvg.startCap > 0 ? p.delta / eqSvg.startCap * 100 : 0;
+                      valStr = (ret >= 0 ? "+" : "−") + Math.abs(ret).toFixed(1) + "%";
+                      dStr = (p.delta >= 0 ? "+" : "−") + Math.abs(dpct).toFixed(1) + "%";
+                    } else {
+                      valStr = "$" + Math.round(p.v).toLocaleString();
+                      dStr = (p.delta >= 0 ? "+" : "−") + "$" + Math.abs(Math.round(p.delta)).toLocaleString();
+                    }
                     return (<>
                       <div style={{ position: "absolute", left: leftPct + "%", top: topPct + "%", width: 9, height: 9, borderRadius: "50%", background: "#fff", border: "2px solid var(--gold)", transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: 4 }} />
                       <div style={{ position: "absolute", left: leftPct + "%", top: 4, transform: leftPct > 65 ? "translateX(calc(-100% - 10px))" : "translateX(10px)", pointerEvents: "none", zIndex: 5, background: "rgba(8,8,14,0.96)", border: "1px solid var(--borderGold)", borderRadius: 8, padding: "6px 9px", fontSize: "0.62rem", fontWeight: 700, whiteSpace: "nowrap", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,0.55)" }}>
-                        <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: "0.52rem", marginBottom: 2 }}>{p.key === "Start" ? "Starting capital" : (eqXAxis === "months" ? "Month " : "") + p.key}</div>
+                        <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: "0.52rem", marginBottom: 2 }}>{p.key === "Start" ? (eqSvg.isR ? "Start · 0R" : "Starting capital") : (eqXAxis === "months" ? "Month " : "") + p.key}</div>
                         <div>{valStr}</div>
                         {p.key !== "Start" && <div style={{ color: p.delta >= 0 ? "var(--green)" : "var(--red)", marginTop: 1, fontSize: "0.55rem" }}>{dStr} that {eqXAxis === "months" ? "month" : "day"}</div>}
                       </div>
@@ -7022,6 +7231,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 </div>
               )}
               <div className="charthint">{!eqSvg.n ? "No trades match this filter."
+                : eqSvg.isR ? <>Cumulative <span className={eqSvg.totalR >= 0 ? "g" : "rd"}>{sgnR(eqSvg.totalR)}</span> across {eqSvg.n} closed trade{eqSvg.n === 1 ? "" : "s"}{eqSvg.rExcluded ? <> · <span style={{ color: "var(--muted)" }}>{eqSvg.rExcluded} without a recorded R excluded — never guessed</span></> : null}.</>
                 : eqSvg.pct ? <>Account return <span className="g">{sgnPct(eqSvg.totalRet)}</span> across {eqSvg.n} closed trade{eqSvg.n === 1 ? "" : "s"}.</>
                   : <>Account {eqSvg.totalPL >= 0 ? "grew" : "fell"} <span className={eqSvg.totalPL >= 0 ? "g" : "rd"}>{sgnMoney(eqSvg.totalPL)} ({sgnPct(eqSvg.totalRet)})</span> across {eqSvg.n} closed trade{eqSvg.n === 1 ? "" : "s"}.</>}</div>
   </>);
@@ -7103,41 +7313,53 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 );
               })()}
 
-              <div className={"distpanel" + (distPanelOpen ? " open" : "")}>
-                  <div className="distpanel-inner">
-                    <div className="disttoolbar">
-                      <button className={"distbtn" + (Object.keys(distEdits).length === 0 ? " on" : "")} onClick={() => setDistEdits({})} title="Restore the actual counts from your trades">↺ Refill from trades</button>
-                      <button className="distbtn" onClick={() => { const z = {}; DIST_BUCKETS.forEach((_, i) => z[i] = 0); setDistEdits(z); }} title="Zero every bucket to model from scratch">Clear all</button>
-                      <span style={{ fontSize: "0.62rem", color: "var(--muted)" }}>Edit any count to model a different distribution — the chart and stats update live.</span>
-                    </div>
-                    <div className="distsum">
-                      <div className="ds"><div className="dsk">Total trades</div><div className="dsv">{distTotal}</div></div>
-                      <div className="ds"><div className="dsk">Wins / Losses</div><div className="dsv">{distWins} / {distLosses}</div></div>
-                      <div className="ds"><div className="dsk">Win rate</div><div className="dsv">{distTotal ? Math.round(distWins / distTotal * 100) : 0}%</div></div>
-                      <div className="ds"><div className="dsk">Return / trade</div><div className={"dsv " + (distRpt >= 0 ? "green" : "red")}>{distFmtPct(distRpt)}</div></div>
-                    </div>
-                    <table className="disttable">
-                      <thead><tr><th>Return bucket</th><th>Side</th><th># Trades</th><th>Midpoint</th><th>Contribution</th></tr></thead>
-                      <tbody>
-                        {DIST_BUCKETS.map((b, i) => {
-                          const contrib = distTotal ? distCounts[i] * b.mid / distTotal : 0;
-                          const edited = distEdits[i] !== undefined && distEdits[i] !== (distBase[i] || 0);
-                          return (
-                            <tr key={i}>
-                              <td>{b.lab}</td>
-                              <td style={{ color: b.side === "pos" ? "var(--green)" : "var(--red)" }}>{b.side === "pos" ? "Win" : "Loss"}</td>
-                              <td><input className={"distin" + (edited ? " edited" : "")} type="number" min="0" step="1" value={distCounts[i]} onChange={e => { let v = parseInt(e.target.value, 10); if (isNaN(v) || v < 0) v = 0; setDistEdits(p => ({ ...p, [i]: v })); }} /></td>
-                              <td>{(b.mid >= 0 ? "+" : "−") + Math.abs(b.mid)}%</td>
-                              <td className={contrib >= 0 ? "g" : "r"}>{distFmtPct(contrib)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                    <div className="distnote">Contribution = midpoint × (count ÷ total). Editing here is a what-if model; it doesn't change your logged trades.</div>
-                  </div>
-                </div>
   </>);
+  // Return-Distribution data sheet — re-housed from an inline panel into a page-level modal (#7).
+  // Members EDIT here, so: backdrop-click + Esc + × close, clicks inside do NOT. Portaled to
+  // document.body so the card's backdrop-filter can't become its containing block.
+  const distSheetPortal = distPanelOpen && createPortal((
+    <div className="vj" onClick={(e) => { if (e.target === e.currentTarget) setDistPanelOpen(false); }}
+      style={{ position: "fixed", inset: 0, zIndex: 1250, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}>
+      <div style={{ fontFamily: font, position: "relative", width: "min(94vw, 1100px)", maxHeight: "88vh", overflowY: "auto", background: "var(--glass)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 26px", backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", boxShadow: "0 30px 80px rgba(0,0,0,0.6)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <span style={{ fontSize: "0.92rem", fontWeight: 800, color: "var(--goldBright)" }}>Return distribution — data sheet</span>
+          <button type="button" aria-label="Close" onClick={() => setDistPanelOpen(false)} style={{ marginLeft: "auto", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: "1.1rem", lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ zoom: 1.1 }}>
+          <div className="disttoolbar">
+            <button className={"distbtn" + (Object.keys(distEdits).length === 0 ? " on" : "")} onClick={() => setDistEdits({})} title="Restore the actual counts from your trades">↺ Refill from trades</button>
+            <button className="distbtn" onClick={() => { const z = {}; DIST_BUCKETS.forEach((_, i) => z[i] = 0); setDistEdits(z); }} title="Zero every bucket to model from scratch">Clear all</button>
+            <span style={{ fontSize: "0.62rem", color: "var(--muted)" }}>Edit any count to model a different distribution — the chart and stats update live.</span>
+          </div>
+          <div className="distsum">
+            <div className="ds"><div className="dsk">Total trades</div><div className="dsv">{distTotal}</div></div>
+            <div className="ds"><div className="dsk">Wins / Losses</div><div className="dsv">{distWins} / {distLosses}</div></div>
+            <div className="ds"><div className="dsk">Win rate</div><div className="dsv">{distTotal ? Math.round(distWins / distTotal * 100) : 0}%</div></div>
+            <div className="ds"><div className="dsk">Return / trade</div><div className={"dsv " + (distRpt >= 0 ? "green" : "red")}>{distFmtPct(distRpt)}</div></div>
+          </div>
+          <table className="disttable">
+            <thead><tr><th>Return bucket</th><th>Side</th><th># Trades</th><th>Midpoint</th><th>Contribution</th></tr></thead>
+            <tbody>
+              {DIST_BUCKETS.map((b, i) => {
+                const contrib = distTotal ? distCounts[i] * b.mid / distTotal : 0;
+                const edited = distEdits[i] !== undefined && distEdits[i] !== (distBase[i] || 0);
+                return (
+                  <tr key={i}>
+                    <td>{b.lab}</td>
+                    <td style={{ color: b.side === "pos" ? "var(--green)" : "var(--red)" }}>{b.side === "pos" ? "Win" : "Loss"}</td>
+                    <td><input className={"distin" + (edited ? " edited" : "")} type="number" min="0" step="1" value={distCounts[i]} onChange={e => { let v = parseInt(e.target.value, 10); if (isNaN(v) || v < 0) v = 0; setDistEdits(p => ({ ...p, [i]: v })); }} /></td>
+                    <td>{(b.mid >= 0 ? "+" : "−") + Math.abs(b.mid)}%</td>
+                    <td className={contrib >= 0 ? "g" : "r"}>{distFmtPct(contrib)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="distnote">Contribution = midpoint × (count ÷ total). Editing here is a what-if model; it doesn't change your logged trades.</div>
+        </div>
+      </div>
+    </div>
+  ), document.body);
   const closedTradesTable = (
           <table>
             <thead>
@@ -7615,7 +7837,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
 
           {/* NAV TABS */}
           <div className="navbar">
-            <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+            <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
             <div className="tabs">
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
               <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -7781,7 +8003,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
 
           {/* P4. CHARTS ROW — shared equity + distribution bodies, Pro card chrome */}
           <div className="chartrow">
-            <div className="card">
+            <div className="card" id="eqCaptureCard">
               <div className="cardhead"><span className="label" style={{ flex: "none" }}>Equity Curve</span><span className="infodot" data-tip="Your account value over time. A line climbing left to right means your account is growing — toggle dollars / percent, or trades / months.">i</span></div>
               {equityCardBody}
             </div>
@@ -7826,40 +8048,59 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               {[["all", "All time"], ["month", "Month"], ["week", "Week"], ["day", "Day"]].map(([k, l]) => <button key={k} className={vaPeriod === k ? "on" : ""} onClick={() => setVaPeriod(k)}>{l}</button>)}
             </div>
           </div>
-          <div className="vagrid">
-            <div className="vacol">
-            <div className="card vacard">
-              <div className="eyebrow-row"><span className="eyebrow">Recap</span><span className="infodot" data-tip="A snapshot of how you traded in this window — net P/L, win rate, the outlier trades that drove results, and the tags you leaned on.">i</span></div>
-              <div className="varecap">
-                <div className="vastat"><div className="vak">{PERIOD_NET_LABEL[vaPeriod]}</div><div className={"vav " + (va.net >= 0 ? "green" : "red")}>{va.n ? (privacyMode ? sgnPct(startCap > 0 ? va.net / startCap * 100 : 0) : sgnMoney(va.net)) : "—"}</div><div className="vasub">{va.n ? `${va.n} ${va.n === 1 ? "trade" : "trades"}` : "no trades in this period"}</div></div>
-                <div className="vastat"><div className="vak">Win rate</div><div className={"vav " + (va.winRate >= 50 ? "green" : (va.n ? "red" : ""))}>{va.n ? Math.round(va.winRate) + "%" : "—"}</div><div className="vasub">{va.n ? `${va.wins}W / ${va.losses}L` : "—"}</div></div>
-                <div className="vastat"><div className="vak">Outlier trades</div><div className="vav gold">{va.outliers.length}</div><div className="vasub">{va.outliers.length
-                  ? <>{(outliersExpanded ? va.outliers : va.outliers.slice(0, 3)).map(t => t.ticker).join(" · ")}{va.outliers.length > 3 ? <> · <span className="seemore" onClick={() => setOutliersExpanded(e => !e)}>{outliersExpanded ? "see less" : `see more (+${va.outliers.length - 3})`}</span></> : ""}</>
-                  : "|R| ≥ 2.5 · none"}</div></div>
+          {(() => {
+            // Pro VIV Analytics: Recap | Insights | (Winners over Losers), drag-to-rearrange (⋮⋮).
+            const vaCards = {
+              recap: (
+                <div className="card vacard">
+                  <div className="eyebrow-row"><span className="eyebrow">Recap</span><span className="infodot" data-tip="A snapshot of how you traded in this window — net P/L, win rate, the outlier trades that drove results, and the tags you leaned on.">i</span></div>
+                  <div className="varecap">
+                    <div className="vastat"><div className="vak">{PERIOD_NET_LABEL[vaPeriod]}</div><div className={"vav " + (va.net >= 0 ? "green" : "red")}>{va.n ? (privacyMode ? sgnPct(startCap > 0 ? va.net / startCap * 100 : 0) : sgnMoney(va.net)) : "—"}</div><div className="vasub">{va.n ? `${va.n} ${va.n === 1 ? "trade" : "trades"}` : "no trades in this period"}</div></div>
+                    <div className="vastat"><div className="vak">Win rate</div><div className={"vav " + (va.winRate >= 50 ? "green" : (va.n ? "red" : ""))}>{va.n ? Math.round(va.winRate) + "%" : "—"}</div><div className="vasub">{va.n ? `${va.wins}W / ${va.losses}L` : "—"}</div></div>
+                    <div className="vastat"><div className="vak">Outlier trades</div><div className="vav gold">{va.outliers.length}</div><div className="vasub">{va.outliers.length
+                      ? <>{(outliersExpanded ? va.outliers : va.outliers.slice(0, 3)).map(t => t.ticker).join(" · ")}{va.outliers.length > 3 ? <> · <span className="seemore" onClick={() => setOutliersExpanded(e => !e)}>{outliersExpanded ? "see less" : `see more (+${va.outliers.length - 3})`}</span></> : ""}</>
+                      : "|R| ≥ 2.5 · none"}</div></div>
+                  </div>
+                  <div className="vacommentary">{va.n
+                    ? <>You closed <b>{va.n}</b> trade{va.n === 1 ? "" : "s"} in this view for <b>{sgnMoney(va.net)}</b> at a <b>{Math.round(va.winRate)}%</b> win rate{va.best ? <>, led by <b>{va.best.ticker}</b> ({sgnPct(Number(va.best.plPct))})</> : ""}. {va.expectancy >= 0 ? <>Expectancy held positive at <b>{sgnR(va.expectancy)}</b>/trade — keep doing more of the same.</> : <>Expectancy slipped to <b>{sgnR(va.expectancy)}</b>/trade — tighten entries and cut losers faster.</>}</>
+                    : "No trades in this view yet — adjust the filters above."}</div>
+                  <div className="vatagline"><span className="vak">Most-traded tags</span><div className="vatags">{va.tags.length ? va.tags.map(({ g, c }) => <span key={g} className="vatag">{g}<b>{c}</b></span>) : <span className="vasub">— no tags in this view</span>}</div></div>
+                </div>
+              ),
+              insights: (
+                <div className="card vacard">
+                  <div className="eyebrow-row"><span className="eyebrow">Insights</span><span className="infodot" data-tip="Plain-language takeaways pulled from your numbers — what's working, what's leaking money, and the one habit worth fixing next.">i</span></div>
+                  <ul className="valist">{vaInsights.map((o, i) => <li key={i}><span className={"ic " + o.k}>{o.ic}</span><span>{o.t}</span></li>)}</ul>
+                </div>
+              ),
+              winlose: (
+                <div className="vawinlose">
+                  <div className="card vacard">
+                    <div className="eyebrow-row"><span className="eyebrow" style={{ color: "var(--green)" }}>▲ Best winners</span><span className="infodot" data-tip="Your biggest winning trades in this window. Click a row to jump to it in Closed Trades. Study what they had in common — these are the setups to size up.">i</span></div>
+                    <div className="vatrades">{va.winners.length ? va.winners.map(t => (
+                      <div key={t.id} className="varow win clickable" title="Jump to this trade in Closed Trades" onClick={() => jumpToTrade(t)}><span className="vtk">{t.ticker}</span><span className="vsetup">{t.setup || "—"}</span><span className="vret green">{sgnPct(Number(t.plPct))}</span><span className="vpl green">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></div>
+                    )) : <div className="vaempty">No winning trades in this view.</div>}</div>
+                  </div>
+                  <div className="card vacard">
+                    <div className="eyebrow-row"><span className="eyebrow" style={{ color: "var(--red)" }}>▼ Worst losers</span><span className="infodot" data-tip="Your biggest losing trades in this window. Click a row to jump to it in Closed Trades. Look for the shared mistake — that's the leak to plug.">i</span></div>
+                    <div className="vatrades">{va.losers.length ? va.losers.map(t => (
+                      <div key={t.id} className="varow loss clickable" title="Jump to this trade in Closed Trades" onClick={() => jumpToTrade(t)}><span className="vtk">{t.ticker}</span><span className="vsetup">{t.setup || "—"}</span><span className="vret red">{sgnPct(Number(t.plPct))}</span><span className="vpl red">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></div>
+                    )) : <div className="vaempty">No losing trades in this view — clean slate.</div>}</div>
+                  </div>
+                </div>
+              ),
+            };
+            return (
+              <div className="vagrid">
+                {vaArr.order.map((k, vi) => (
+                  <div key={k} className={"dragwrap" + (vaArr.armed === vi ? " dragging" : "")} {...vaArr.wrapProps(vi)}>
+                    <span className="draghandle" {...vaArr.handleProps(vi)}>⋮⋮</span>
+                    {vaCards[k]}
+                  </div>
+                ))}
               </div>
-              <div className="vacommentary">{va.n
-                ? <>You closed <b>{va.n}</b> trade{va.n === 1 ? "" : "s"} in this view for <b>{sgnMoney(va.net)}</b> at a <b>{Math.round(va.winRate)}%</b> win rate{va.best ? <>, led by <b>{va.best.ticker}</b> ({sgnPct(Number(va.best.plPct))})</> : ""}. {va.expectancy >= 0 ? <>Expectancy held positive at <b>{sgnR(va.expectancy)}</b>/trade — keep doing more of the same.</> : <>Expectancy slipped to <b>{sgnR(va.expectancy)}</b>/trade — tighten entries and cut losers faster.</>}</>
-                : "No trades in this view yet — adjust the filters above."}</div>
-              <div className="vatagline"><span className="vak">Most-traded tags</span><div className="vatags">{va.tags.length ? va.tags.map(({ g, c }) => <span key={g} className="vatag">{g}<b>{c}</b></span>) : <span className="vasub">— no tags in this view</span>}</div></div>
-            </div>
-            <div className="card vacard">
-              <div className="eyebrow-row"><span className="eyebrow">Insights</span><span className="infodot" data-tip="Plain-language takeaways pulled from your numbers — what's working, what's leaking money, and the one habit worth fixing next.">i</span></div>
-              <ul className="valist">{vaInsights.map((o, i) => <li key={i}><span className={"ic " + o.k}>{o.ic}</span><span>{o.t}</span></li>)}</ul>
-            </div>
-            </div>
-            <div className="card vacard">
-              <div className="eyebrow-row"><span className="eyebrow" style={{ color: "var(--green)" }}>▲ Best winners</span><span className="infodot" data-tip="Your biggest winning trades in this window. Click a row to jump to it in Closed Trades. Study what they had in common — these are the setups to size up.">i</span></div>
-              <div className="vatrades">{va.winners.length ? va.winners.map(t => (
-                <div key={t.id} className="varow win clickable" title="Jump to this trade in Closed Trades" onClick={() => jumpToTrade(t)}><span className="vtk">{t.ticker}</span><span className="vsetup">{t.setup || "—"}</span><span className="vret green">{sgnPct(Number(t.plPct))}</span><span className="vpl green">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></div>
-              )) : <div className="vaempty">No winning trades in this view.</div>}</div>
-            </div>
-            <div className="card vacard">
-              <div className="eyebrow-row"><span className="eyebrow" style={{ color: "var(--red)" }}>▼ Worst losers</span><span className="infodot" data-tip="Your biggest losing trades in this window. Click a row to jump to it in Closed Trades. Look for the shared mistake — that's the leak to plug.">i</span></div>
-              <div className="vatrades">{va.losers.length ? va.losers.map(t => (
-                <div key={t.id} className="varow loss clickable" title="Jump to this trade in Closed Trades" onClick={() => jumpToTrade(t)}><span className="vtk">{t.ticker}</span><span className="vsetup">{t.setup || "—"}</span><span className="vret red">{sgnPct(Number(t.plPct))}</span><span className="vpl red">{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></div>
-              )) : <div className="vaempty">No losing trades in this view — clean slate.</div>}</div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* FX MIS-PRICING ALERT (shared handlers) */}
           {fxFlagged.length > 0 && (
@@ -7919,6 +8160,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           {tradeDetailsPortal}
           {factualEditorPortal}
           {linkModalPortal}
+          {distSheetPortal}
 
         </div>{/* /shell */}
       </div>
@@ -7933,7 +8175,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
 
         {/* NAV TABS — verbatim from Dashboard, Journal active */}
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -8235,10 +8477,10 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
         </div>
 
         {/* EQUITY CURVE + RETURN DISTRIBUTION */}
-        <div className={"chartrow" + (distPanelOpen ? " dist-open" : "")}>
+        <div className="chartrow">
           <div className="chartcol eqcol">
             <div className="toolbar"><h2 className="sech guide" onMouseEnter={guideEnter("eq", "Equity curve", "Your account value over time. A line climbing left to right means your account is growing. Toggle dollars / percent.", "/audio/equity-curve.mp3")} onMouseLeave={guideLeave("eq")}>Equity curve</h2></div>
-            <div className="card reveal">
+            <div className="card reveal" id="eqCaptureCard">
               {equityCardBody}
             </div>
           </div>{/* /chartcol */}
@@ -8358,6 +8600,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
 
         {/* INLINE FACTUAL EDITOR — opens over a modal when an inline Edit is triggered */}
         {factualEditorPortal}
+        {distSheetPortal}
 
         {/* welcome banner */}
         {!expert && !welcomeDismissed && (
@@ -8809,8 +9052,8 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 /* Every Pro card header: micro-label + info dot, divided from the body (Pro's replacement for the guided voice). */
 .vd.expert .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
 .vd.expert .cardhead .label{flex:1}
-.vd.expert .infodot{position:relative; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none}
-.vd.expert .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
+.vd .infodot{position:relative; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none}
+.vd .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
 .vd.expert .tipwrap{position:relative; cursor:help}
 .vd.expert .infodot:hover::after,.vd.expert .tipwrap:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
 /* P1. Command header */
@@ -8851,7 +9094,11 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .cfgitem .stepper .stepval{min-width:64px}
 @media(max-width:900px){ .vd.expert .cfggrid{grid-template-columns:1fr 1fr; gap:18px 0} .vd.expert .cfgitem{border-left:none; padding:0} }
 /* P3. Context row */
-.vd.expert .ctxrow{display:grid; grid-template-columns:1fr 1fr 1.2fr; gap:14px; align-items:start}
+.vd.expert .ctxrow{display:grid; grid-template-columns:1fr 1.1fr; gap:14px}
+.vd.expert .ctxrow > .dragwrap{min-width:0}
+.vd.expert .ctxstack{display:flex; flex-direction:column; gap:14px; min-width:0}
+.vd.expert .ctxstack > .dragwrap{flex:1 1 0; min-width:0; display:flex; flex-direction:column}
+.vd.expert .ctxstack > .dragwrap > .card{flex:1}
 @media(max-width:1100px){ .vd.expert .ctxrow{grid-template-columns:1fr} }
 .vd.expert .ctxrow .allocbar{margin:4px 0 12px}
 .vd.expert .ctxrow .alloclegend{gap:16px; font-size:0.74rem}
@@ -10014,7 +10261,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
 
           {/* NAV TABS */}
           <div className="navbar">
-            <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+            <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
             <div className="tabs">
               <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -10089,7 +10336,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             /* K3: Equity */
             equity: (
             <div className="card kpi">
-              <div className="cardhead"><span className="label">Equity</span><span className="infodot" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">i</span></div>
+              <div className="cardhead"><span className="label">Equity</span><span className="infodot" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">i</span><button className="ghostchip" onClick={() => setCfgOpen(o => !o)} aria-expanded={cfgOpen} title="Edit your starting capital and sizing inputs">⚙ Configure</button></div>
               <div className="kpibody">
                 <div className="kpimain">
                   <div className="kpinum gold">{usd0(compEquity)}</div>
@@ -10199,7 +10446,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           {/* P3. CONTEXT ROW — cards drag-to-rearrange like the KPI strip */}
           {(() => {
             const CTX_CARDS = {
-            market: (<MarketContext C={C} font={font} />),
+            market: (<MarketContext C={C} font={font} defaultExpanded />),
             alloc: (
             <div className="card">
               <div className="cardhead"><span className="label">Risk Allocation</span><span className="infodot" data-tip="A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.">i</span></div>
@@ -10218,18 +10465,27 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             ),
             themes: (<ThemeStrip C={C} font={font} variant="pro" />),
             };
+            {/* Two columns for alignment: slots 0+1 of the drag order STACK in the left column
+                (cards stretch to share its height), slot 2 fills the right. Drag still reorders
+                which card lands in which slot. */}
+            const ctxWrap = (k, vi) => (
+              <div key={k} className={"dragwrap reveal vrev" + (ctxArr.armed === vi ? " dragging" : "")} style={{ "--i": vi }} {...ctxArr.wrapProps(vi)}>
+                <span className="draghandle" {...ctxArr.handleProps(vi)}>⋮⋮</span>
+                {CTX_CARDS[k]}
+              </div>
+            );
             return (
               <div className="ctxrow" style={{ marginTop: 14 }}>
-                {ctxArr.order.map((k, vi) => (
-                  <div key={k} className={"dragwrap reveal vrev" + (ctxArr.armed === vi ? " dragging" : "")} style={{ "--i": vi }} {...ctxArr.wrapProps(vi)}>
-                    <span className="draghandle" {...ctxArr.handleProps(vi)}>⋮⋮</span>
-                    {CTX_CARDS[k]}
-                  </div>
-                ))}
+                <div className="ctxstack">{ctxArr.order.slice(0, 2).map((k, i) => ctxWrap(k, i))}</div>
+                {ctxArr.order.slice(2).map((k, i) => ctxWrap(k, i + 2))}
               </div>
             );
           })()}
-          <EdgeLedger C={C} font={font} session={session} setPage={setPage} />  {/* admin-only: renders null for members */}
+          {/* admin-only Edge Ledger: wrapped so the 14px row rhythm holds (its own card has no top
+              margin and previously sat flush under the tall theme card); members render nothing. */}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && (
+            <div style={{ marginTop: 14 }}><EdgeLedger C={C} font={font} session={session} setPage={setPage} /></div>
+          )}
 
           {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS */}
           <div className="card poscard" style={{ marginTop: 14 }}>
@@ -10262,7 +10518,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
 
         {/* NAV TABS */}
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
           <div className="tabs">
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -11180,7 +11436,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
 
         {/* NAV — identical to Guided */}
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -11360,7 +11616,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
 
         {/* NAV */}
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -11633,7 +11889,7 @@ function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -11660,7 +11916,7 @@ function DailySetupsShell({ setPage, session, displayName }) {
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -11687,7 +11943,7 @@ function MentorShell({ setPage, session }) {
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -11721,7 +11977,7 @@ function QuantShell({ setPage, session }) {
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>

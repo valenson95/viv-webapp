@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { listSetups, deleteSetup, markTaken } from "./dailySetups.js";
-import { SECTIONS } from "./SetupGrader.jsx";
+import { sectionsFor, scoreTicked, versionOf } from "./SetupGrader.jsx";
 import { themeFit, themeRanks } from "./themes.js";
 
 // ══════════════════════════════════════════════════════════════════
@@ -41,6 +41,18 @@ function daysAgo(iso) {
   const d = new Date(iso + "T00:00:00");
   if (isNaN(d)) return null;
   return Math.round((new Date(todayISO() + "T00:00:00") - d) / 86400e3);
+}
+// Mon–Fri ISO dates of the trading week containing today — same local date convention as todayISO/daysAgo.
+// Weekend: Sat rolls back to that week's Mon; Sun rolls back to the just-finished Mon–Fri.
+function tradingWeekMonFri() {
+  const base = new Date(todayISO() + "T00:00:00");
+  const dow = base.getDay();                 // 0=Sun … 6=Sat
+  const monOffset = dow === 0 ? -6 : 1 - dow; // Sunday → previous Monday
+  return [0, 1, 2, 3, 4].map(i => {
+    const d = new Date(base);
+    d.setDate(base.getDate() + monOffset + i);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
 }
 
 export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
@@ -92,16 +104,21 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
 
   // ── THE FUNNEL — status is DERIVED from the scorecard, never hand-curated (honest by design).
   // Mirrors the method members are taught: fresh idea → coiling base → tight at the pivot → triggered.
-  //   pivot    = tight days at the pivot ticked (2-3), or tightening + volume dry-up together (2-1 & 2-2)
+  //   pivot    = tight/inside days at the pivot, or tightening + volume dry-up together
   //   coiling  = base is developing (any contraction evidence, or a repeat mention)
   //   fresh    = first look, no contraction evidence yet
   //   triggered= Valen marked it taken · faded = >5 days old and never triggered
+  // VERSION-AWARE: the base-quality tick keys differ between the v1 and v2 checklists, so the
+  // funnel reads the right keys per row (v2: tight 1-0 / inside 1-5 / vol-dry 1-1 / higher-lows 1-3).
   const statusOf = (r) => {
+    const v = versionOf(r.ticked);
     const t = new Set(r.ticked || []);
     if (r.taken_at) return "triggered";
     if ((daysAgo(r.trade_date) ?? 0) > 5) return "faded";
-    if (t.has("2-3") || (t.has("2-1") && t.has("2-2"))) return "pivot";
-    if (t.has("2-1") || t.has("2-2") || mentionInfo(r).nth > 1) return "coiling";
+    const pivot = v === 2 ? (t.has("1-0") || t.has("1-5")) : (t.has("2-3") || (t.has("2-1") && t.has("2-2")));
+    const coiling = v === 2 ? (t.has("1-1") || t.has("1-3")) : (t.has("2-1") || t.has("2-2"));
+    if (pivot) return "pivot";
+    if (coiling || mentionInfo(r).nth > 1) return "coiling";
     return "fresh";
   };
   const STATUS_META = {
@@ -213,7 +230,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
           </div>
           {/* the board: latest post per ticker — sortable, table-layout FIXED (headers can never drift
               from their cells), collapsed to the top rows with a toggle at BOTH top and bottom.
-              Color discipline (Valen): only A+ or a 16/16 sweep earns green/gold — the rest stay dark. */}
+              Color discipline (Valen): only A+ or a full-sweep (all scored ticks) earns green/gold — the rest stay dark. */}
           {(() => {
             const filteredBoard = sortedBoard.filter(x => !statusF || x.s === statusF);
             const LIMIT = 8;
@@ -267,12 +284,13 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                         const tr = themeRanks(r.sector, r.trade_date);
                         const wk = rankCell(tr && tr.week ? tr.week : null);
                         const mo = rankCell(tr && tr.month ? tr.month : null);
-                        const passed = (r.ticked || []).length;
-                        const hot = r.letter === "A+" || passed === 16; // ONLY these earn the highlight
+                        const sc = scoreTicked(r.ticked); // version-aware passed/total (never re-scores; just counts against the right list)
+                        const passed = sc.passed;
+                        const hot = r.letter === "A+" || (sc.total > 0 && sc.passed === sc.total); // ONLY these earn the highlight
                         const cells = [
                           td(<><span style={{ fontWeight: 800, color: C.white }}>{r.ticker}</span>{s === "triggered" && <span title="Marked taken — this gameplan became a live trade" style={{ color: "#22c55e", marginLeft: 5, fontWeight: 800 }}>✔</span>}</>),
                           td(<><span style={{ fontWeight: 800, color: hot ? C.green : C.text }}>{r.letter}</span> <span style={{ color: hot ? C.goldBright : "rgba(255,255,255,0.3)", fontSize: "0.66rem" }}>{"★".repeat(r.stars)}</span></>),
-                          td(<><span style={{ fontWeight: 800, color: hot ? C.goldBright : C.text }}>{passed}/16</span><span style={{ color: C.muted, marginLeft: 6, fontSize: "0.68rem" }}>{r.pct != null ? `${Math.round(r.pct * 100)}%` : ""}</span></>),
+                          td(<><span style={{ fontWeight: 800, color: hot ? C.goldBright : C.text }}>{passed}/{sc.total}</span><span style={{ color: C.muted, marginLeft: 6, fontSize: "0.68rem" }}>{r.pct != null ? `${Math.round(r.pct * 100)}%` : ""}</span></>),
                           td(<span style={{ color: C.text }}>{shortDate(mi.first?.trade_date || r.trade_date)}</span>),
                           td(<span style={{ color: wk.col, fontWeight: wk.bold ? 800 : 400 }}>{wk.txt}</span>),
                           td(<span style={{ color: mo.col, fontWeight: mo.bold ? 800 : 400 }}>{mo.txt}</span>),
@@ -293,30 +311,33 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
             );
           })()}
         </div>
-        {/* the graph half — one bar per stage, same statuses as the chips; clicking filters the feed */}
+        {/* the graph half — posts published per weekday this trading week (counts POSTS, not latest-per-ticker) */}
         <div style={{ ...cardChrome, padding: "16px 18px" }}>
           <div style={{ ...cardHead, marginBottom: 12 }}>
-            <span style={{ ...microLabel, flex: 1 }}>The Funnel · at a glance</span>
-            <span style={{ fontSize: "0.62rem", color: C.muted }}>latest post per ticker</span>
+            <span style={{ ...microLabel, flex: 1 }}>Weekly Setups</span>
+            {(() => { const wk = tradingWeekMonFri(); return <span style={{ fontSize: "0.62rem", color: C.muted }}>{shortDate(wk[0])} – {shortDate(wk[4])}</span>; })()}
           </div>
           {(() => {
-            const FLOW = ["fresh", "coiling", "pivot", "triggered", "faded"]; // narrative order: idea → live trade
-            const max = Math.max(...FLOW.map(s => statusCounts[s] || 0), 1);
-            return FLOW.map(s => {
-              const m = STATUS_META[s], n = statusCounts[s] || 0, on = statusF === s;
+            const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+            const week = tradingWeekMonFri();
+            const counts = week.map(ds => (rows || []).filter(r => r.trade_date === ds).length);
+            const max = Math.max(...counts, 1);
+            const tISO = todayISO();
+            return week.map((ds, i) => {
+              const n = counts[i], future = ds > tISO;
               return (
-                <div key={s} onClick={() => setStatusF(on ? null : s)} title={`${m.tip} — click to filter the feed`}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 6px", borderRadius: 8, cursor: "pointer", background: on ? "rgba(255,255,255,0.05)" : "transparent" }}>
-                  <span style={{ width: 96, flex: "none", fontSize: "0.7rem", fontWeight: 800, color: n ? m.col : "rgba(255,255,255,0.28)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</span>
+                <div key={ds} title={future ? `${DAY_NAMES[i]} — not yet` : `${dateLabel(ds)} — ${n} setup${n !== 1 ? "s" : ""} posted`}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 6px", borderRadius: 8 }}>
+                  <span style={{ width: 96, flex: "none", fontSize: "0.7rem", fontWeight: 800, color: future ? "rgba(255,255,255,0.28)" : (n ? C.text : "rgba(255,255,255,0.4)"), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{DAY_NAMES[i]}</span>
                   <div style={{ flex: 1, height: 16, background: "rgba(255,255,255,0.04)", borderRadius: 5, overflow: "hidden" }}>
-                    <div style={{ width: `${n ? Math.max(4, (n / max) * 100) : 0}%`, height: "100%", background: m.bg, borderRight: n ? `2px solid ${m.col}` : "none", transition: "width .3s" }} />
+                    <div style={{ width: `${!future && n ? Math.max(4, (n / max) * 100) : 0}%`, height: "100%", background: C.goldDim, borderRight: n ? `2px solid ${C.goldBright}` : "none", transition: "width .3s" }} />
                   </div>
-                  <b style={{ width: 24, flex: "none", textAlign: "right", fontSize: "0.78rem", color: n ? C.text : "rgba(255,255,255,0.28)", fontVariantNumeric: "tabular-nums" }}>{n}</b>
+                  <b style={{ width: 24, flex: "none", textAlign: "right", fontSize: "0.78rem", color: future ? "rgba(255,255,255,0.28)" : (n ? C.text : "rgba(255,255,255,0.4)"), fontVariantNumeric: "tabular-nums" }}>{future ? "—" : n}</b>
                 </div>
               );
             });
           })()}
-          <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 10, lineHeight: 1.55 }}>Ideas move down the funnel: fresh → coiling → at the pivot → ✔ triggered. Click a stage to filter the board and the feed.</div>
+          <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 10, lineHeight: 1.55 }}>Fewer setups showing up = the market is offering less — traction drying up is information too.</div>
         </div>
         </div>
       )}
@@ -485,29 +506,34 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                   </div>
                 </div>
 
-                {/* auditable scorecard: all 16 ticks flat, no subheaders (Valen's spec) */}
-                {expanded && (
+                {/* auditable scorecard: all ticks flat, no subheaders (Valen's spec). VERSION-AWARE:
+                    a post's own checklist labels/denominator (legacy vs v2) come from sectionsFor. */}
+                {expanded && (() => {
+                  const sec2 = scoreTicked(r.ticked); // version-aware passed/total for the header count
+                  return (
                   <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
                     <div style={{ ...cardHead, paddingBottom: 9, marginBottom: 11 }}>
                       <span style={{ ...microLabel }}>Setup-Grader Scorecard</span>
-                      <span title="16 scored criteria — ★ marks a confluence factor (★-maker); a gold dot ● marks a tick VIV auto-read off the chart. Every grade is auditable: each star traces to its ticks." style={{ width: 15, height: 15, borderRadius: "50%", border: `1px solid ${C.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 700, fontStyle: "italic", color: faint, cursor: "help", flex: "none" }}>i</span>
-                      <span style={{ background: C.goldDim, color: C.goldBright, fontSize: "0.62rem", fontWeight: 800, padding: "2px 9px", borderRadius: 980, marginLeft: "auto" }}>{tickedSet.size}/16 criteria</span>
+                      <span title="Scored criteria — ★ marks a confluence factor (★-maker), a Bonus tick is tracked but not scored; a gold dot ● marks a tick VIV auto-read off the chart. Every grade is auditable: each star traces to its ticks." style={{ width: 15, height: 15, borderRadius: "50%", border: `1px solid ${C.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 700, fontStyle: "italic", color: faint, cursor: "help", flex: "none" }}>i</span>
+                      <span style={{ background: C.goldDim, color: C.goldBright, fontSize: "0.62rem", fontWeight: 800, padding: "2px 9px", borderRadius: 980, marginLeft: "auto" }}>{sec2.passed}/{sec2.total} criteria</span>
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {SECTIONS.flatMap((sec, si) => sec.reminder ? [] : sec.items.map((it, ii) => {
+                      {sectionsFor(r.ticked).flatMap((sec, si) => sec.reminder ? [] : sec.items.map((it, ii) => {
                         const k = si + "-" + ii, isOn = tickedSet.has(k);
                         return (
                           <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.72rem", fontWeight: 600, padding: "5px 11px", borderRadius: 980, border: `1px solid ${isOn ? "rgba(34,197,94,0.28)" : C.border}`, background: isOn ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.03)", color: isOn ? C.text : faint }}>
                             <span style={{ fontWeight: 800, color: isOn ? C.green : "rgba(255,255,255,0.22)" }}>{isOn ? "✓" : "✗"}</span>
                             {it.c}
                             {it.star && <span title="★-maker (confluence factor)" style={{ fontSize: "0.62rem", color: isOn ? C.goldMid : "rgba(255,255,255,0.2)" }}>★</span>}
+                            {it.bonus && <span title="Bonus factor — tracked but not scored" style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: isOn ? C.goldBright : "rgba(255,255,255,0.25)", border: `1px solid ${isOn ? C.goldBright : "rgba(255,255,255,0.2)"}`, padding: "0 5px", borderRadius: 99 }}>Bonus</span>}
                             {isOn && autoSet.has(k) && <span title="Auto-read from the chart by VIV" style={{ fontSize: "0.56rem", color: C.goldBright }}>●</span>}
                           </span>
                         );
                       }))}
                     </div>
                   </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}

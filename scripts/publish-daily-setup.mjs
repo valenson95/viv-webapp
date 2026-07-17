@@ -17,26 +17,34 @@ if (!URL_ || !KEY) { console.error("Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };
 const UID = "0e32b092-029a-436d-8cb5-67621e1467b0"; // vc-lv@live.com (admin — this feed is his)
 
-// ── Setup-Grader formula mirror (SetupGrader.jsx SECTIONS — keep in lockstep) ──
-// Only the 16 SCORED keys count (sections 0–2). Trigger & Stop ("3-x") is a live-execution
-// reminder in the webapp and is NEVER scored — manifest entries are whitelisted + deduped
-// so a stray key can't inflate the grade past 100%.
-const SCORED = ["0-0","0-1","0-2","0-3","0-4","1-0","1-1","1-2","2-0","2-1","2-2","2-3","2-4","2-5","2-6","2-7"];
+// ── Setup-Grader formula mirror (SetupGrader.jsx v2 SECTIONS — keep in LOCKSTEP) ──
+// v2 checklist (CHECKLIST_VERSION 2): buckets 0 Prior move / 1 Base quality / 2 Trigger day.
+// 14 SCORED keys + 2 BONUS keys (1-5 inside, 1-6 ma_conv) that STORE + display but never score.
+// Leadership is a non-scored context strip (not in the manifest) and Trigger & Stop ("3-x") stays
+// a live-execution reminder — both are excluded from the scored denominator (14 = Study-Book-aligned).
+// V2_SENTINEL is appended to the stored `ticked` so the webapp reads these posts as v2 (never
+// re-scores them against v1). Mirrors SetupGrader.js{stampV2, versionOf, scoreTicked}.
+const V2_SENTINEL = "__v2";
+const SCORED = ["0-0","0-1","0-2","1-0","1-1","1-2","1-3","1-4","1-7","2-0","2-1","2-2","2-3","2-4"];
+const BONUS = ["1-5","1-6"];
+const ALLOWED = new Set([...SCORED, ...BONUS]); // tickable + storable (bonus kept for display)
 const SCORED_SET = new Set(SCORED);
-const TOTAL = SCORED.length; // 16
-const STAR_KEYS = new Set(["0-0", "0-2", "1-0", "1-2", "2-2", "2-3", "2-5"]);
+const TOTAL = SCORED.length; // 14
+const STAR_KEYS = new Set(["0-0", "0-1", "1-0", "1-3", "1-4", "2-0", "2-2"]); // 7 structure-core ★-makers
 const STARMAKERS = STAR_KEYS.size;
 const letterFor = (s) => ({ 5: "A+", 4: "A", 3: "B", 2: "C", 1: "C", 0: "—" })[s] || "—";
+const stampV2 = (ticked) => [...ticked.filter(k => /^\d+-\d+$/.test(k)), V2_SENTINEL];
 function gradeFrom(rawTicked) {
-  const ticked = [...new Set(rawTicked)].filter(k => SCORED_SET.has(k));
-  const dropped = [...new Set(rawTicked)].filter(k => !SCORED_SET.has(k));
-  const passed = ticked.length;
-  const starHit = ticked.filter(k => STAR_KEYS.has(k)).length;
+  const kept = [...new Set(rawTicked)].filter(k => ALLOWED.has(k));       // scored + bonus (stored)
+  const dropped = [...new Set(rawTicked)].filter(k => !ALLOWED.has(k));   // stray / reminder / unknown
+  const scored = kept.filter(k => SCORED_SET.has(k));                     // scored only (grades)
+  const passed = scored.length;
+  const starHit = scored.filter(k => STAR_KEYS.has(k)).length;
   const pct = passed / TOTAL;
   let stars = Math.round(pct * 5);
   if (stars >= 5 && starHit < STARMAKERS) stars = 4;
   if (passed === 0) stars = 0;
-  return { ticked, dropped, passed, starHit, pct, stars, letter: letterFor(stars) };
+  return { ticked: kept, dropped, passed, starHit, pct, stars, letter: letterFor(stars) };
 }
 
 const manifestPath = process.argv[2];
@@ -48,8 +56,9 @@ for (const e of entries) {
   const ticker = String(e.ticker || "").toUpperCase().trim();
   if (!ticker || !Array.isArray(e.ticked)) { console.error(`SKIP bad entry: ${JSON.stringify(e).slice(0, 80)}`); continue; }
   const date = e.trade_date || todayMYT;
-  const g = gradeFrom(e.ticked); // g.ticked = whitelisted + deduped — use IT everywhere below
-  const auto = [...new Set(e.auto || e.ticked)].filter(k => SCORED_SET.has(k));
+  const g = gradeFrom(e.ticked); // g.ticked = whitelisted (scored+bonus) + deduped — use IT below
+  const storedTicked = stampV2(g.ticked); // append the v2 marker so the webapp reads it as v2
+  const auto = [...new Set(e.auto || e.ticked)].filter(k => ALLOWED.has(k));
   if (g.dropped.length) console.warn(`${ticker}: dropped non-scored/unknown keys from manifest: ${g.dropped.join(", ")}`);
 
   // 1) chart → storage
@@ -72,7 +81,7 @@ for (const e of entries) {
     body: JSON.stringify([{
       created_by: UID, ticker, trade_date: date, sector: e.sector || null,
       stars: g.stars, letter: g.letter, pct: g.pct, star_hit: g.starHit, starmakers: STARMAKERS,
-      ticked: g.ticked, auto, note: e.note || null, chart_img: chartUrl, is_published: true,
+      ticked: storedTicked, auto, note: e.note || null, chart_img: chartUrl, is_published: true,
       // Breakout | Pullback — from the Daily Trade Ideas subfolder (needs the setup_type ALTER run)
       ...(e.setup_type ? { setup_type: e.setup_type } : {}),
     }]),
@@ -83,10 +92,10 @@ for (const e of entries) {
     method: "POST", headers: { ...H, Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify([{
       user_id: UID, symbol: ticker, stars: g.stars, letter: g.letter, pct: g.pct,
-      star_hit: g.starHit, starmakers: STARMAKERS, ticked: g.ticked, auto,
+      star_hit: g.starHit, starmakers: STARMAKERS, ticked: storedTicked, auto,
       updated_at: new Date().toISOString(),
     }]),
   });
 
-  console.log(`${ticker} ${date}: ${g.stars}★ ${g.letter} (${g.passed}/16 · ${g.starHit}/7) — post ${ins.ok ? "PUBLISHED ✓" : "FAILED: " + await ins.text()} · grade ${gr.ok ? "synced ✓" : "FAILED"}${chartUrl ? " · chart ✓" : ""}`);
+  console.log(`${ticker} ${date}: ${g.stars}★ ${g.letter} (${g.passed}/${TOTAL} · ${g.starHit}/${STARMAKERS}) — post ${ins.ok ? "PUBLISHED ✓" : "FAILED: " + await ins.text()} · grade ${gr.ok ? "synced ✓" : "FAILED"}${chartUrl ? " · chart ✓" : ""}`);
 }

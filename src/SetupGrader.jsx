@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { loadActiveGrades, getGrade, saveGrade, archiveGrade, letterFor, useGrades } from "./grades.js";
 import { supabase } from "./supabaseClient";
 import { publishSetup } from "./dailySetups.js";
@@ -13,7 +14,10 @@ import { themeFit } from "./themes.js";
 // Member-facing: no mentor/vendor brand names — VIV's own method.
 // ══════════════════════════════════════════════════════════════════
 
-export const SECTIONS = [
+// ── LEGACY (v1) checklist — FROZEN verbatim. Saved grades made before CHECKLIST_VERSION 2
+// (no version marker in their `ticked`) are still rendered/scored against THIS list so history
+// never silently re-scores. Do not edit — new work happens on SECTIONS (v2) below.
+export const LEGACY_SECTIONS = [
   {
     title: "Leadership / Stock Selection",
     items: [
@@ -86,14 +90,161 @@ export const SECTIONS = [
   },
 ];
 
+// ── v2 checklist — Valen's STUDY checklist, mirrored VERBATIM from StudyBook.jsx
+// STUDY_SETUPS["Momentum Breakout"].buckets (labels must match). 14 scored ticks + 2 BONUS
+// (inside, ma_conv) that tick & save but are EXCLUDED from the score (same convention as
+// StudyBook's studyQuality). `s` = hover help (no mentor names — VIV's own method).
+export const SECTIONS = [
+  {
+    title: "Prior move / trend",
+    items: [
+      { c: "Prior pole — big move ≥30% into the base", star: true,
+        s: "A big run-up first — strength before the rest, not a random pop." },
+      { c: "Pole linear — clean advance, no whipsaw", star: true,
+        s: "The advance was clean and controlled, not whipsaw." },
+      { c: "Young trend — 1st–3rd breakout, not late/extended",
+        s: "1st–3rd breakout of the trend — not the late, obvious one." },
+    ],
+  },
+  {
+    title: "Base quality",
+    items: [
+      { c: "Tightening series — ≥3 visibly narrow-range days pre-trigger", star: true,
+        s: "Several small, quiet days in a row — the coil before the spring." },
+      { c: "Volume drying up in the base (lower than usual)",
+        s: "Volume fades inside the base — sellers running out." },
+      { c: "Orderly base — no big red bars inside",
+        s: "No ugly red bars inside the base." },
+      { c: "Higher lows forming into the pivot", star: true,
+        s: "Each dip holds higher than the last — buyers stepping up into the pivot." },
+      { c: "Day before trigger = narrow-range or negative day", star: true,
+        s: "A quiet or down day right before — nobody's chasing yet." },
+      { c: "Inside bar(s) right before the trigger — coil tell", bonus: true,
+        s: "The last bar(s) sit inside the prior bar's range — maximum coil." },
+      { c: "SMA 10/20/50 converging at the pivot", bonus: true,
+        s: "The 10/20/50-day MAs pinch together at the pivot — energy building." },
+      { c: "Surfing rising 10/20-day MA into the pivot",
+        s: "Riding a rising 10/20-day MA into the pivot." },
+    ],
+  },
+  {
+    title: "Trigger day",
+    items: [
+      { c: "Day-1 range expansion ≥4% — bar visibly bigger than last 5–10", star: true,
+        s: "The breakout bar is visibly bigger than recent days — real range expansion." },
+      { c: "≤2 up-days before the trigger (not buying day 3)",
+        s: "Not already up 2 days in a row — buy the start of the swing, not day 3." },
+      { c: "Closed ≥70% of the day's range", star: true,
+        s: "Finishes near the top of its range — buyers held it into the close." },
+      { c: "Volume expansion — trigger bar volume above prior day",
+        s: "Breakout volume above the prior day — conviction behind the move." },
+      { c: "Gapped up on the trigger day",
+        s: "Opened above yesterday's close on trigger day." },
+    ],
+  },
+  {
+    title: "Trigger & Stop",
+    reminder: true,
+    note: "Live-market checklist — run these at your entry. The grade above is decided pre-market; this is execution, so it's a reminder, not part of the star score.",
+    items: [
+      { c: "Range-expansion breakout on volume",
+        s: "Judge volume by PACE, not totals: volume so far vs normal for this time of day. 40%+ of a full day inside the first 30 min = real demand. No pace = no trade — breakouts without volume are the ones that fade." },
+      { c: "Opening-range confirmation",
+        s: "Enter on the break of the opening range high (1-, 5-, or 60-minute depending on when it fires) — you let it prove itself, you don't guess ahead of the move." },
+      { c: "Entry near the pivot, not extended",
+        s: "You're buying right at the breakout pivot, not chasing 5–10% above it. A close entry keeps the stop tight and the reward-to-risk high." },
+      { c: "Tight stop — under 1 ADR (ideally < ½)", key: true,
+        s: "(entry − stop) ÷ ATR < 0.5. Then size from the math, before the order: shares = risk $ ÷ (entry − stop). Tight stop = explosive R:R; a stop a full ADR away means the day's fuel is already spent." },
+      { c: "Tight candle at trigger — DCR ≤ ½ ATR", key: true,
+        s: "Daily Candle Range (today's high − low) ÷ ATR(14). Under 50% means you're entering while the range is still coiled, not after it already expanded — the candle-level version of a tight stop. A wide range at trigger = the day's fuel is half-spent before you're even in." },
+      { c: "Invalidation defined before entry",
+        s: "Know your exact 'I'm wrong' price BEFORE you buy. Pro upgrade: three stops of ⅓ each at ⅓ / ⅔ / full distance — a straight-line failure costs ~0.67R instead of 1R, without moving the level." },
+      { c: "Not the first 30 minutes (unless volume is extreme)",
+        s: "The first 30 min is auction noise that hunts tight stops. If the setup is real, it's still valid at 10:00. Exception: truly extreme volume." },
+      { c: "Clear calendar & clean session — no events, max 3 new positions",
+        s: "No fresh entries before econ data or into earnings (≥5 days away). Max ~3 new positions per session — one bad day must never erase a good week." },
+    ],
+  },
+];
+
+// Leadership / stock selection — NON-SCORED context strip (Valen 2026-07-17). Labels pulled
+// verbatim from the v1 leadership block (now in LEGACY_SECTIONS). These are the top-down filters
+// the member checks mentally with DeepVue open BEFORE the chart earns a grade — they are NOT
+// tickable and NEVER enter pct/stars, so the scored denominator stays 14 (Study-Book-aligned).
+export const LEADERSHIP_CONTEXT = {
+  title: "Leadership / Stock Selection",
+  note: "Check these top-down with DeepVue open before you grade the chart — a strong name in a strong group. Context only, not part of the star score.",
+  items: [
+    { c: "Relative strength — top-tier", s: "Beating the market — RS rank ~90+, or leading SPY/QQQ over 1/3/6 months." },
+    { c: "In-theme leader", s: "Sits in a top-5 sector the market is actively rotating INTO." },
+    { c: "Liquid enough — ≥ $50M / 20 days", s: "Enough dollar volume to size in and out cleanly." },
+    { c: "ADR% > 4%", s: "Average daily range wide enough that a few good days pay multiple R." },
+    { c: "Above rising 10 & 20-day MA", s: "Price over both, and both sloping up — trend intact." },
+  ],
+};
+
+// ══ VERSION-AWARENESS ══════════════════════════════════════════════
+// Saved grades persist their checklist version so history never silently re-scores under a
+// new list. Chosen mechanism: a SENTINEL string appended to the `ticked` array — it rides the
+// EXISTING save path unchanged (localStorage spreads the whole grade; Supabase's `ticked` text[]
+// column round-trips it) with ZERO schema change and ZERO new write path. A `clv` column would
+// have needed a migration + a best-effort second write that could 400 the whole upsert before
+// the column exists; the sentinel avoids all of that. v1 rows (pre-2026-07) carry NO sentinel.
+export const CHECKLIST_VERSION = 2;
+export const V2_SENTINEL = "__v2";
+// versionOf: sentinel present → 2 · real "si-ii" ticks but no sentinel → 1 (legacy) · empty → 2
+// (nothing to mislabel, so new/blank authoring surfaces default to the current checklist).
+export const versionOf = (ticked) => {
+  const arr = Array.isArray(ticked) ? ticked : [];
+  if (arr.includes(V2_SENTINEL)) return 2;
+  return arr.some(k => /^\d+-\d+$/.test(k)) ? 1 : 2;
+};
+export const sectionsFor = (ticked) => versionOf(ticked) === 1 ? LEGACY_SECTIONS : SECTIONS;
+// stampV2: strip any existing sentinel, keep only scored/bonus "si-ii" keys, append the marker once.
+export const stampV2 = (ticked) => [...(ticked || []).filter(k => /^\d+-\d+$/.test(k)), V2_SENTINEL];
+
+// Count scored (non-bonus) items + ★-makers for a given section list.
+const tallyOf = (secs) => { let total = 0, sm = 0; secs.forEach(s => { if (s.reminder) return; s.items.forEach(i => { if (i.bonus) return; total++; if (i.star) sm++; }); }); return { total, sm }; };
+const V2_TALLY = tallyOf(SECTIONS);
+const V1_TALLY = tallyOf(LEGACY_SECTIONS);
+export const LEGACY_STARMAKERS = V1_TALLY.sm; // old checklist ★-maker count (frozen alongside LEGACY_SECTIONS)
+export const totalFor = (ticked) => (versionOf(ticked) === 1 ? V1_TALLY : V2_TALLY).total;
+export const starmakersFor = (ticked) => (versionOf(ticked) === 1 ? V1_TALLY : V2_TALLY).sm;
+
+// Version-aware scoring of a saved `ticked` array — picks the matching checklist + denominator,
+// excludes bonus ticks from the score, and applies the SAME star/letter formula the live grader
+// uses. Consumers that recompute a saved row (Model Book, scorecards) MUST use this so a legacy
+// row is never scored against the v2 list.
+export function scoreTicked(ticked) {
+  const secs = sectionsFor(ticked);
+  const t = new Set(ticked || []);
+  let passed = 0, starHit = 0, total = 0, sm = 0;
+  secs.forEach((sec, si) => {
+    if (sec.reminder) return;
+    sec.items.forEach((it, ii) => {
+      if (it.bonus) return;               // bonus ticks save + show but never grade
+      total++; if (it.star) sm++;
+      if (t.has(si + "-" + ii)) { passed++; if (it.star) starHit++; }
+    });
+  });
+  const pct = total ? passed / total : 0;
+  let stars = Math.round(pct * 5);
+  if (stars >= 5 && starHit < sm) stars = 4; // A+ requires full ★-maker confluence
+  if (passed === 0) stars = 0;
+  return { passed, total, starHit, starmakers: sm, pct, stars, letter: letterFor(stars) };
+}
+
 const CHECK = (
   <svg viewBox="0 0 24 24" fill="none" style={{ width: 13, height: 13 }}>
     <path d="M20 6L9 17l-5-5" stroke="#08080e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
+// v2 ★-makers = the 7 structure-critical ticks (pole, linear, tight, higher_lows, prior_nr, re,
+// closehi) flagged `star:true` above. Provisional structure-core; re-tune when the Study Book lift
+// table reaches n≥50 (pre-registration rule). Bonus ticks (inside, ma_conv) are never scored.
 let TOTAL = 0, STARMAKERS = 0;
-SECTIONS.forEach(s => { if (s.reminder) return; s.items.forEach(i => { TOTAL++; if (i.star) STARMAKERS++; }); });
+SECTIONS.forEach(s => { if (s.reminder) return; s.items.forEach(i => { if (i.bonus) return; TOTAL++; if (i.star) STARMAKERS++; }); });
 
 const GRADES = {
   5: ["A+ · Table-pounder", "Everything agrees — full size, this is the trade."],
@@ -126,6 +277,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [sel, setSel] = useState(() => new Set()); // bulk-selected watchlist symbols
+  const [rowSync, setRowSync] = useState(null); // { sym, x, y } — watchlist row whose "attach to position" menu is open (portaled: the table's overflow container would clip an absolute menu)
   const [openSym, setOpenSym] = useState(""); // watchlist row expanded inline via its Open button
   const [editOn, setEditOn] = useState(() => new Set());   // inline editor: ticked criteria for the open row
   const [editAuto, setEditAuto] = useState(() => new Set()); // inline editor: surviving auto-read dots
@@ -138,6 +290,14 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   };
   const loadSeq = useRef(""); // last loadTicker target — guards async prefill against ticker switches
   const [editDate, setEditDate] = useState(null); // set when editing an existing post — republish keeps its date
+  const [legacyLoaded, setLegacyLoaded] = useState(null); // saved grade made on the PREVIOUS checklist — show its frozen score + a re-grade notice, start v2 unticked
+  // Apply a saved/loaded grade to the live editor. v2 grades restore their ticks; a LEGACY (v1)
+  // grade must NOT map its old ticks onto the new items (meanings differ) — start the v2 checklist
+  // unticked and surface the frozen score via the notice instead.
+  const applyLoadedTicks = (tickedArr, autoArr) => {
+    if (versionOf(tickedArr) === 1) { setOn(new Set()); setAuto(new Set()); }
+    else { setOn(new Set(tickedArr || [])); setAuto(new Set(autoArr || [])); }
+  };
 
   // ✎ Edit from the Daily Setups feed → the full post loads here; republish REPLACES it (same ticker+date)
   useEffect(() => {
@@ -149,8 +309,8 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
       if (!e || !e.ticker) return;
       loadSeq.current = e.ticker; // block any in-flight prefill from overwriting this payload
       setTicker(e.ticker);
-      setOn(new Set(e.ticked || []));
-      setAuto(new Set(e.auto || []));
+      applyLoadedTicks(e.ticked, e.auto);
+      setLegacyLoaded(versionOf(e.ticked) === 1 ? { ...e, ...scoreTicked(e.ticked) } : null);
       setNote(e.note || "");
       setChartImg(e.chart_img || "");
       setEditDate(e.trade_date || null);
@@ -163,13 +323,13 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     setAuto(prev => { if (!prev.has(key)) return prev; const n = new Set(prev); n.delete(key); return n; });
     setOn(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
   };
-  const reset = () => { setOn(new Set()); setAuto(new Set()); };
+  const reset = () => { setOn(new Set()); setAuto(new Set()); setLegacyLoaded(null); };
 
   let passed = 0, starHit = 0;
   const secCounts = SECTIONS.map((sec, si) => {
     let sc = 0;
     sec.items.forEach((it, ii) => {
-      if (on.has(si + "-" + ii)) { sc++; if (!sec.reminder) { passed++; if (it.star) starHit++; } }
+      if (on.has(si + "-" + ii)) { sc++; if (!sec.reminder && !it.bonus) { passed++; if (it.star) starHit++; } } // bonus ticks count toward the bucket tally but never the score
     });
     return sc;
   });
@@ -186,7 +346,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   // chart_img persists with the grade so reopening a saved grade shows its chart again (JH bug
   // 2026-07-14). Only real storage URLs are kept — the data-URL fallback (storage unreachable)
   // would bloat localStorage past its quota and can't be shared across devices anyway.
-  const grade = { stars, pct, passed, total: TOTAL, starHit, starmakers: STARMAKERS, letter, label: gLabel, ticked: [...on], auto: autoLive,
+  const grade = { stars, pct, passed, total: TOTAL, starHit, starmakers: STARMAKERS, letter, label: gLabel, ticked: stampV2([...on]), auto: autoLive,
     chart_img: /^https?:/.test(chartImg) ? chartImg : "", note: note.trim() };
   const posSyms = Array.from(new Set((positions || []).map(p => String(p.sym || p.symbol || "").toUpperCase().trim()).filter(Boolean)));
   const posSet = new Set(posSyms);
@@ -194,9 +354,27 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const savedRows = Object.values(saved).sort((a, b) => (b.stars - a.stars) || (a.sym < b.sym ? -1 : 1));
 
   const flashMsg = (m) => { setFlash(m); setTimeout(() => setFlash(""), 3400); };
+  // ── Clear the watchlist in bulk — reuses the SAME per-row × path (archiveGrade): the row leaves
+  // this list but the saved grade is KEPT everywhere it's read (Open Positions' Grade column, Model
+  // Book, published Daily Setups). Selection-aware: ticked rows → "Clear selected", else all rows.
+  // Confirm-gated (matches the row × copy). Stops and reports on the first failure — rest left intact.
+  const clearWatchlist = () => {
+    const syms = (sel.size > 0 ? savedRows.filter(g => sel.has(g.sym)) : savedRows).map(g => g.sym);
+    const n = syms.length;
+    if (!n) return;
+    const scoped = sel.size > 0;
+    if (!window.confirm(`Remove ${n} ${scoped ? "selected " : ""}ticker${n === 1 ? "" : "s"} from the screening watchlist?\n\nThe saved grade${n === 1 ? " is" : "s are"} KEPT everywhere ${n === 1 ? "it's" : "they're"} used — Open Positions' Grade column, the Model Book, and any published Daily Setups. This only clears ${n === 1 ? "it" : "them"} from this list; grade a name again anytime to bring it back.`)) return;
+    let done = 0;
+    try { for (const s of syms) { archiveGrade(s); done++; } }
+    catch (e) { setSel(new Set()); setOpenSym(""); flashMsg(`Stopped after ${done} of ${n} — ${e?.message || "error"}. The rest were left intact.`); return; }
+    setSel(new Set());
+    setOpenSym("");
+    flashMsg(`Cleared ${done} ✓`);
+  };
   const loadTicker = (sym) => {
     const g = getGrade(sym);
-    setTicker(sym); setOn(new Set(g && g.ticked ? g.ticked : [])); setAuto(new Set(g && g.auto ? g.auto : []));
+    setTicker(sym); applyLoadedTicks(g && g.ticked, g && g.auto);
+    setLegacyLoaded(g && versionOf(g.ticked) === 1 ? { ...g, ...scoreTicked(g.ticked) } : null);
     // the saved grade's own chart + annotation come back with it (JH bug 2026-07-14);
     // the daily_setups prefill below only fills whatever is still blank.
     setChartImg(g?.chart_img || ""); setNote(g?.note || ""); setEditDate(null); // switching tickers leaves post-edit mode
@@ -229,7 +407,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
       const { data } = await q;
       const row = data && data[0];
       if (!row) return false;
-      const patch = { stars, letter, pct, star_hit: starHit, starmakers: STARMAKERS, ticked: [...on], auto: autoLive };
+      const patch = { stars, letter, pct, star_hit: starHit, starmakers: STARMAKERS, ticked: stampV2([...on]), auto: autoLive };
       if (note.trim()) patch.note = note.trim();       // never blank an existing note/chart
       if (chartImg) patch.chart_img = chartImg;         // with an empty kit
       const { error } = await supabase.from("daily_setups").update(patch).eq("id", row.id);
@@ -241,7 +419,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     const s = (symArg || ticker || "").toUpperCase().trim();
     if (!s) { flashMsg("Enter a ticker first ↑"); return; }
     if (passed === 0) { flashMsg("Tick some criteria first"); return; }
-    saveGrade(s, grade); setTicker(s);
+    saveGrade(s, grade); setTicker(s); setLegacyLoaded(null); // this is now a fresh v2 grade
     const postSynced = await syncPostScore(s);
     flashMsg(postSynced
       ? `Saved ${s} — the live Daily Setups post updated instantly`
@@ -284,14 +462,15 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     for (const g of rows) {
       const post = posts[g.sym] || {};
       const tset = new Set(g.ticked || []);
-      const items = [];
-      SECTIONS.forEach((sec, si) => { if (sec.reminder) return; sec.items.forEach((it, ii) => items.push({ label: it.c, on: tset.has(si + "-" + ii), star: !!it.star })); });
+      const items = []; // version-aware: legacy grades render their OWN checklist labels
+      sectionsFor(g.ticked).forEach((sec, si) => { if (sec.reminder) return; sec.items.forEach((it, ii) => { if (it.bonus) return; items.push({ label: it.c, on: tset.has(si + "-" + ii), star: !!it.star }); }); });
+      const sc = scoreTicked(g.ticked); // frozen display prefers g.*, but counts come from the right list
       const sector = post.sector || sectorFor(g.sym);
       const cv = await renderShareCard({
         ticker: g.sym, sector, themeStatus: themeFit(sector, today),
         dateLabel: new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }),
         stars: g.stars || 0, letter: g.letter || "—", label: (GRADES[g.stars || 0] || GRADES[0])[0],
-        passed: (g.ticked || []).length, total: TOTAL, starHit: g.starHit ?? 0, starmakers: STARMAKERS,
+        passed: sc.passed, total: sc.total, starHit: g.starHit ?? sc.starHit, starmakers: g.starmakers ?? sc.starmakers,
         items, chartUrl: post.chart_img || null,
       });
       await new Promise(res => cv.toBlob(b => {
@@ -349,7 +528,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     const res = await publishSetup({
       created_by: uid, ticker: s, trade_date: editDate || localISO(),
       sector: sectorFor(s), stars, letter, pct, star_hit: starHit, starmakers: STARMAKERS,
-      ticked: [...on], auto: autoLive, note: note.trim(), chart_img: chartImg,
+      ticked: stampV2([...on]), auto: autoLive, note: note.trim(), chart_img: chartImg,
     });
     setBusy(false);
     flashMsg(!res.ok
@@ -364,10 +543,10 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     if (!s) { flashMsg("Enter a ticker first ↑"); return; }
     setBusy(true);
     try {
-      const items = []; // ALL 16 scored criteria, flat, in checklist order
+      const items = []; // the 14 SCORED criteria, flat, in checklist order (bonus ticks excluded)
       SECTIONS.forEach((sec, si) => {
         if (sec.reminder) return;
-        sec.items.forEach((it, ii) => items.push({ label: it.c, on: on.has(si + "-" + ii), star: !!it.star }));
+        sec.items.forEach((it, ii) => { if (it.bonus) return; items.push({ label: it.c, on: on.has(si + "-" + ii), star: !!it.star }); });
       });
       const today = localISO(); // same calendar day as the printed dateLabel + the published trade_date
       const cv = await renderShareCard({
@@ -386,12 +565,12 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
     <div className="toolpanel on" id="panel-grader">
       {/* intro / guide */}
       <div className={"intro guide" + gactive("grader")} data-gtitle="Setup Grader"
-        onMouseEnter={guideEnter("grader", "Setup Grader", "Use this while you're scanning and screening for the best stocks in the market — not during live trading. Tick every characteristic that's true of the chart, and it grades the setup out of five stars across three areas: leadership, the prior move, and base quality. The fifth star — an A-plus — only unlocks when the highest-signal factors line up together.", undefined)}
+        onMouseEnter={guideEnter("grader", "Setup Grader", "Use this while you're scanning and screening for the best stocks in the market — not during live trading. Tick every characteristic that's true of the chart, and it grades the setup out of five stars across three areas: the prior move, the base, and the trigger day. Leadership sits above as a context check. The fifth star — an A-plus — only unlocks when the highest-signal factors line up together.", undefined)}
         onMouseLeave={guideLeave("grader")}>
         <div className="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg></div>
         <div>
           <h3>What is the Setup Grader?</h3>
-          <p>Use it while <b>scanning and screening</b> for the best stocks — <b>not during live trading</b>. Tick every characteristic that's true and it scores the chart out of <b>5 stars</b> across three areas: <b>leadership</b>, the <b>prior move</b>, and <b>base quality</b>. A <b style={{ color: C.gold }}>★ maker</b> is a <b>confluence factor</b> — a high-signal criterion that independently raises the odds the breakout works. You can tick most boxes and still cap at 4★; the <b>fifth star (A+) only unlocks when the ★-makers stack</b> — because {STARMAKERS} unrelated signals agreeing is an edge, one alone is luck. When you're ready to enter, the <b style={{ color: C.blue }}>Trigger &amp; Stop</b> live-checklist at the bottom covers execution.</p>
+          <p>Use it while <b>scanning and screening</b> for the best stocks — <b>not during live trading</b>. Tick every characteristic that's true and it scores the chart out of <b>5 stars</b> across three areas: the <b>prior move</b>, the <b>base</b>, and the <b>trigger day</b> ({TOTAL} scored ticks). <b style={{ color: C.gold }}>Leadership</b> sits above as a <b>context check</b> (not scored), and two <b style={{ color: C.goldBright }}>Bonus</b> ticks are tracked but left out of the score. A <b style={{ color: C.gold }}>★ maker</b> is a <b>confluence factor</b> — a high-signal criterion that independently raises the odds the breakout works. You can tick most boxes and still cap at 4★; the <b>fifth star (A+) only unlocks when the ★-makers stack</b> — because {STARMAKERS} unrelated signals agreeing is an edge, one alone is luck. When you're ready to enter, the <b style={{ color: C.blue }}>Trigger &amp; Stop</b> live-checklist at the bottom covers execution.</p>
         </div>
       </div>
 
@@ -400,6 +579,13 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
           <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Screening watchlist</span>
           <span style={{ fontSize: "0.72rem", color: C.muted }}>grade names as you scan — each saves with its ★ score</span>
+          {isAdmin && savedRows.length > 0 && (
+            <button onClick={clearWatchlist} disabled={busy}
+              title="Clear these names from the watchlist. Their saved grades are kept everywhere else (positions, Model Book, Daily Setups)."
+              style={{ background: "rgba(239,68,68,0.08)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.38)", fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 12px", borderRadius: 99, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>
+              🗑 {sel.size > 0 ? `Clear selected (${sel.size})` : `Clear all (${savedRows.length})`}
+            </button>
+          )}
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
             <input value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} onKeyDown={e => { if (e.key === "Enter") startTicker(); }}
               placeholder="Ticker e.g. NVDA" maxLength={8}
@@ -452,23 +638,31 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                       <td style={{ padding: "9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><span style={{ fontWeight: 800, fontSize: "0.86rem", color: letterColor(C, g.letter) }}>{g.letter}</span></td>
                       <td style={{ padding: "9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><MiniStars C={C} n={g.stars} /></td>
                       <td style={{ padding: "9px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: "0.82rem", color: C.text, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>{Math.round((g.pct || 0) * 100)}%</td>
-                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button onClick={(e) => { e.stopPropagation(); opened ? setOpenSym("") : openRow(g); }} style={{ background: opened ? C.goldDim : "transparent", border: `1px solid ${opened ? C.borderGold : C.border}`, color: opened ? C.goldBright : C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 11px", borderRadius: 8, cursor: "pointer" }}>{opened ? "Close" : "Open"}</button></td>
+                      <td onClick={e => e.stopPropagation()} style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)`, whiteSpace: "nowrap", position: "relative" }}>
+                        <button onClick={(e) => { e.stopPropagation(); opened ? setOpenSym("") : openRow(g); }} style={{ background: opened ? C.goldDim : "transparent", border: `1px solid ${opened ? C.borderGold : C.border}`, color: opened ? C.goldBright : C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 11px", borderRadius: 8, cursor: "pointer" }}>{opened ? "Close" : "Open"}</button>
+                        <button title={`Attach ${g.sym}'s saved grade to an open position of your choice`} onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setRowSync(p => p?.sym === g.sym ? null : { sym: g.sym, x: r.right, y: r.bottom }); }} style={{ marginLeft: 6, background: rowSync?.sym === g.sym ? "rgba(59,130,246,0.18)" : "rgba(59,130,246,0.10)", border: "1px solid rgba(59,130,246,0.3)", color: C.blue, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 9px", borderRadius: 8, cursor: "pointer" }}>⇄</button>
+                      </td>
                       <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button title="Remove from this list (grade is kept)" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Remove ${g.sym} from the screening watchlist?\n\nThe saved grade is KEPT everywhere it's used — Open Positions' Grade column, the Model Book, and any published Daily Setups. This only clears ${g.sym} from this list; grade it again anytime to bring it back.`)) archiveGrade(g.sym); }} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>×</button></td>
                     </tr>
                     {opened && (() => {
-                      // Inline editor — score recomputed live from editOn with the exact grader math.
+                      // Inline editor — VERSION-AWARE: a legacy row keeps its own list, denominator
+                      // and star-maker set; a v2 row uses v2. Bonus ticks save but never score.
+                      const eSecs = sectionsFor(g.ticked);
+                      const eTotal = totalFor(g.ticked), eSM = starmakersFor(g.ticked), eV = versionOf(g.ticked);
                       let ePassed = 0, eStarHit = 0;
-                      SECTIONS.forEach((sec, si) => { if (sec.reminder) return; sec.items.forEach((it, ii) => { if (editOn.has(si + "-" + ii)) { ePassed++; if (it.star) eStarHit++; } }); });
-                      const ePct = ePassed / TOTAL;
+                      eSecs.forEach((sec, si) => { if (sec.reminder) return; sec.items.forEach((it, ii) => { if (it.bonus) return; if (editOn.has(si + "-" + ii)) { ePassed++; if (it.star) eStarHit++; } }); });
+                      const ePct = eTotal ? ePassed / eTotal : 0;
                       let eStars = Math.round(ePct * 5);
-                      if (eStars >= 5 && eStarHit < STARMAKERS) eStars = 4;
+                      if (eStars >= 5 && eStarHit < eSM) eStars = 4;
                       if (ePassed === 0) eStars = 0;
                       const eLetter = letterFor(eStars);
                       const dirty = [...editOn].sort().join(",") !== [...(g.ticked || [])].sort().join(",");
                       const saveRow = () => {
                         if (ePassed === 0) { setRowMsg("Tick at least one criterion first"); return; }
-                        saveGrade(g.sym, { stars: eStars, pct: ePct, passed: ePassed, total: TOTAL, starHit: eStarHit, starmakers: STARMAKERS,
-                          letter: eLetter, label: (GRADES[eStars] || GRADES[0])[0], ticked: [...editOn], auto: [...editAuto].filter(k => editOn.has(k)),
+                        saveGrade(g.sym, { stars: eStars, pct: ePct, passed: ePassed, total: eTotal, starHit: eStarHit, starmakers: eSM,
+                          letter: eLetter, label: (GRADES[eStars] || GRADES[0])[0],
+                          ticked: eV === 2 ? stampV2([...editOn]) : [...editOn], // preserve the row's checklist version
+                          auto: [...editAuto].filter(k => editOn.has(k)),
                           chart_img: g.chart_img || "", note: g.note || "" });
                         setRowMsg(`Saved ${g.sym} ✓`);
                       };
@@ -482,7 +676,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                             <MiniStars C={C} n={eStars} size={0.9} />
                             <span style={{ fontWeight: 800, fontSize: "0.9rem", color: letterColor(C, eLetter) }}>{eLetter}</span>
                             <span style={{ fontSize: "0.8rem", fontWeight: 700, color: C.white }}>{(GRADES[eStars] || GRADES[0])[0]}</span>
-                            <span style={{ fontSize: "0.72rem", color: C.muted }}>{ePassed}/{TOTAL} criteria · {eStarHit}/{STARMAKERS} ★-makers{dirty ? " · unsaved edits" : ""}</span>
+                            <span style={{ fontSize: "0.72rem", color: C.muted }}>{ePassed}/{eTotal} criteria · {eStarHit}/{eSM} ★-makers{eV === 1 ? " · previous checklist" : ""}{dirty ? " · unsaved edits" : ""}</span>
                             <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                               {rowMsg && <span style={{ fontSize: "0.72rem", fontWeight: 700, color: rowMsg.includes("✓") ? C.green : C.goldBright }}>{rowMsg}</span>}
                               <button onClick={saveRow} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Save grade</button>
@@ -498,7 +692,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                             </div>
                           )}
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "8px 18px", padding: "8px 6px 0" }}>
-                            {SECTIONS.map((sec, si) => {
+                            {eSecs.map((sec, si) => {
                               if (sec.reminder) return null;
                               return (
                                 <div key={si}>
@@ -510,7 +704,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                                         style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.74rem", lineHeight: 1.6, color: isOn ? C.text : "rgba(255,255,255,0.35)", cursor: "pointer", userSelect: "none", borderRadius: 6, padding: "1px 4px" }}
                                         onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                                         <span style={{ color: isOn ? C.goldBright : "rgba(255,255,255,0.22)", fontWeight: 800 }}>{isOn ? "✓" : "·"}</span>
-                                        <span>{it.c}{it.star && <span style={{ color: C.goldMid, marginLeft: 5, fontSize: "0.62rem" }}>★</span>}{isOn && editAuto.has(key) && <span title="Auto-read from the chart by VIV" style={{ marginLeft: 5, fontSize: "0.6rem", color: C.goldBright }}>●</span>}</span>
+                                        <span>{it.c}{it.star && <span style={{ color: C.goldMid, marginLeft: 5, fontSize: "0.62rem" }}>★</span>}{it.bonus && <span style={{ marginLeft: 5, fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "0 5px", borderRadius: 99 }}>Bonus</span>}{isOn && editAuto.has(key) && <span title="Auto-read from the chart by VIV" style={{ marginLeft: 5, fontSize: "0.6rem", color: C.goldBright }}>●</span>}</span>
                                       </div>
                                     );
                                   })}
@@ -529,6 +723,33 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
             </table>
           </div>
         )}
+        {/* Per-row "attach grade to position" menu — portaled to body: the table's overflow
+            container (and the card's backdrop-filter) would clip/mis-anchor it otherwise. */}
+        {rowSync && createPortal((() => {
+          const g = getGrade(rowSync.sym);
+          if (!g) return null;
+          const targets = posSyms.filter(s => s !== rowSync.sym);
+          return (
+            <>
+              <div onClick={() => setRowSync(null)} style={{ position: "fixed", inset: 0, zIndex: 1240 }} />
+              <div style={{ position: "fixed", top: Math.min(rowSync.y + 6, window.innerHeight - 260), left: Math.max(10, rowSync.x - 230), zIndex: 1250, width: 230, maxHeight: 240, overflowY: "auto", background: "#0c0c14", border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, boxShadow: "0 18px 44px rgba(0,0,0,0.6)", textAlign: "left", fontFamily: font }}>
+                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, padding: "7px 10px 6px" }}>Attach {rowSync.sym}&#39;s grade to…</div>
+                {targets.length === 0 ? (
+                  <div style={{ fontSize: "0.74rem", color: C.muted, padding: "8px 10px 12px" }}>{posSet.has(rowSync.sym) ? `${rowSync.sym} already shows on its own open position.` : "No open positions found. Grades show on a position automatically once you hold its ticker."}</div>
+                ) : targets.map(s => {
+                  const eg = getGrade(s);
+                  return (
+                    <div key={s} onClick={() => { if (eg && !window.confirm(`${s} already has a saved ${eg.letter} grade — overwrite it with ${rowSync.sym}'s ${g.letter}?`)) return; saveGrade(s, g); setRowSync(null); flashMsg(`${rowSync.sym} grade attached to ${s} — shows on its Open Positions row`); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 10px", borderRadius: 8, cursor: "pointer" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <span style={{ fontWeight: 800, fontSize: "0.82rem", color: C.white }}>{s}</span>
+                      {eg ? <span style={{ fontSize: "0.66rem", fontWeight: 700, color: letterColor(C, eg.letter) }}>has {eg.letter}</span> : <span style={{ fontSize: "0.64rem", color: C.muted }}>ungraded</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          );
+        })(), document.body)}
       </div>
 
       {/* SCORE PANEL */}
@@ -592,6 +813,18 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
         {flash && <div style={{ flexBasis: "100%", fontSize: "0.74rem", color: C.green, fontWeight: 700, marginTop: 2 }}>✓ {flash}</div>}
       </div>
 
+      {/* LEGACY-GRADE NOTICE — a saved grade made on the PREVIOUS checklist can't be mapped onto the
+          new items (meanings differ). Show its frozen score, start the v2 checklist unticked. */}
+      {legacyLoaded && (
+        <div style={{ fontFamily: font, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.28)", borderRadius: 12, padding: "10px 14px", marginBottom: 16 }}>
+          <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.blue, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", padding: "3px 9px", borderRadius: 99 }}>Previous checklist</span>
+          <span style={{ fontSize: "0.8rem", color: C.text }}>
+            {ticker ? `${ticker.toUpperCase().trim()} was ` : "This name was "}
+            graded <b style={{ color: letterColor(C, legacyLoaded.letter) }}>{legacyLoaded.letter} · {legacyLoaded.stars}★</b> ({legacyLoaded.passed}/{legacyLoaded.total}) on the previous checklist — <b style={{ color: C.goldBright }}>re-grade below to update</b>. The saved grade stays untouched until you Save.
+          </span>
+        </div>
+      )}
+
       {/* DAILY POST KIT — attach the chart, annotate, publish to members / copy the Skool card */}
       <div style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "14px 16px", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
@@ -629,69 +862,96 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
         </div>
       </div>
 
-      {/* SECTIONS */}
-      {SECTIONS.map((sec, si) => {
-        const full = secCounts[si] === sec.items.length;
-        const rem = sec.reminder;
-        const scoredNum = SECTIONS.slice(0, si).filter(s => !s.reminder).length + 1;
-        return (
-          <div key={si} style={{ fontFamily: font, background: rem ? "rgba(59,130,246,0.04)" : C.glass, border: `1px ${rem ? "dashed" : "solid"} ${rem ? "rgba(59,130,246,0.28)" : C.border}`, borderRadius: 16, padding: "6px 8px 10px", marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 14px 10px" }}>
-              <div style={{ width: 26, height: 26, borderRadius: 8, display: "grid", placeItems: "center", background: rem ? "rgba(59,130,246,0.12)" : C.goldDim, color: rem ? C.blue : C.gold, fontWeight: 800, fontSize: "0.82rem", border: `1px solid ${rem ? "rgba(59,130,246,0.3)" : C.borderGold}` }}>
-                {rem ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 15, height: 15 }}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" strokeLinecap="round" /></svg> : scoredNum}
-              </div>
-              <div style={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "-0.01em", color: C.white }}>{sec.title}</div>
-              {rem && <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.blue, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", padding: "3px 9px", borderRadius: 99 }}>Not scored</span>}
-              <div style={{
-                marginLeft: "auto", fontSize: "0.74rem", fontWeight: 700, fontVariantNumeric: "tabular-nums",
-                padding: "5px 13px", borderRadius: 99,
-                border: `1px solid ${full ? "rgba(34,197,94,0.4)" : C.border}`,
-                background: full ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.05)",
-                color: full ? C.green : C.muted,
-              }}>{secCounts[si]} / {sec.items.length} {rem ? "checked" : "passed"}</div>
-            </div>
-            {rem && sec.note && (
-              <div style={{ display: "flex", gap: 9, alignItems: "flex-start", margin: "0 14px 8px", padding: "9px 12px", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.18)", borderRadius: 10, fontSize: "0.76rem", color: C.muted, lineHeight: 1.45 }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2" style={{ width: 15, height: 15, flex: "0 0 auto", marginTop: 1 }}><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" strokeLinecap="round" /></svg>
-                <span>{sec.note}</span>
-              </div>
-            )}
+      {/* ═══ ONE-PAGE CHECKLIST — leadership context strip · 3 scored bucket cards · trigger strip ═══ */}
 
-            {sec.items.map((it, ii) => {
-              const key = si + "-" + ii, isOn = on.has(key);
-              return (
-                <div key={ii} onClick={() => toggle(key)} style={{
-                  display: "flex", alignItems: "flex-start", gap: 14, padding: "12px 14px", borderRadius: 12,
-                  cursor: "pointer", userSelect: "none", transition: "background .15s",
-                  background: isOn ? "rgba(201,152,42,0.06)" : "transparent",
-                }}
-                  onMouseEnter={e => { if (!isOn) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = isOn ? "rgba(201,152,42,0.06)" : "transparent"; }}>
-                  <div style={{
-                    flex: "0 0 22px", width: 22, height: 22, borderRadius: 7, marginTop: 1,
-                    border: isOn ? `1.5px solid ${C.goldBright}` : "1.5px solid rgba(255,255,255,0.22)",
-                    background: isOn ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
-                    display: "grid", placeItems: "center", transition: ".18s",
-                  }}>{isOn && CHECK}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "0.94rem", fontWeight: 600, lineHeight: 1.3, color: isOn ? C.goldBright : C.text }}>
-                      {it.c}
-                      {isOn && auto.has(key) && (
-                        <span title="Auto-read from the chart by VIV — cross-check it; any click clears the dot"
-                          style={{ marginLeft: 8, fontSize: "0.62rem", color: C.goldBright, verticalAlign: "middle", textShadow: "0 0 8px rgba(240,192,80,0.7)" }}>●</span>
-                      )}
+      {/* Leadership / Stock Selection — NON-SCORED context (dashed, not tickable, not in pct/stars) */}
+      <div style={{ fontFamily: font, background: "rgba(201,152,42,0.04)", border: `1px dashed ${C.borderGold}`, borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+          <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold }}>{LEADERSHIP_CONTEXT.title}</span>
+          <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.gold, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "3px 9px", borderRadius: 99 }}>Not scored</span>
+          <span style={{ fontSize: "0.72rem", color: C.muted, flex: "1 1 240px", lineHeight: 1.4 }}>{LEADERSHIP_CONTEXT.note}</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "4px 18px" }}>
+          {LEADERSHIP_CONTEXT.items.map((it, i) => (
+            <div key={i} style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.76rem", lineHeight: 1.4 }}>
+              <span style={{ color: C.gold, flex: "0 0 auto" }}>▹</span>
+              <span style={{ color: C.text }}><b style={{ fontWeight: 700 }}>{it.c}</b> <span style={{ color: C.muted }}>— {it.s}</span></span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Three SCORED buckets — house-style glass cards, 3-across (1-col under ~900px via auto-fit) */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(285px, 1fr))", gap: 14, marginBottom: 14 }}>
+        {SECTIONS.map((sec, si) => {
+          if (sec.reminder) return null;
+          const full = secCounts[si] === sec.items.length;
+          const scoredNum = SECTIONS.slice(0, si).filter(s => !s.reminder).length + 1;
+          return (
+            <div key={si} style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "12px 14px" }}>
+              {/* header: number chip + uppercase micro-label + count, hairline divider */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 9, marginBottom: 8, borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ width: 20, height: 20, borderRadius: 6, display: "grid", placeItems: "center", background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.68rem", border: `1px solid ${C.borderGold}`, flex: "none" }}>{scoredNum}</span>
+                <span style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: C.gold, flex: 1 }}>{sec.title}</span>
+                <span style={{ fontSize: "0.68rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", padding: "3px 9px", borderRadius: 99, border: `1px solid ${full ? "rgba(34,197,94,0.4)" : C.border}`, background: full ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.05)", color: full ? C.green : C.muted }}>{secCounts[si]}/{sec.items.length}</span>
+              </div>
+              {si === 2 && (
+                <div style={{ fontSize: "0.68rem", color: C.muted, fontStyle: "italic", lineHeight: 1.4, margin: "0 0 8px" }}>Grading pre-market? Leave these unticked — come back after the open to finish the grade.</div>
+              )}
+              {sec.items.map((it, ii) => {
+                const key = si + "-" + ii, isOn = on.has(key);
+                return (
+                  <div key={ii} onClick={() => toggle(key)} style={{
+                    display: "flex", gap: 9, alignItems: "flex-start", padding: "5px 4px", borderRadius: 8,
+                    cursor: "pointer", userSelect: "none", background: isOn ? "rgba(201,152,42,0.06)" : "transparent",
+                  }}
+                    onMouseEnter={e => { if (!isOn) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = isOn ? "rgba(201,152,42,0.06)" : "transparent"; }}>
+                    <div style={{
+                      flex: "0 0 18px", width: 18, height: 18, borderRadius: 5, marginTop: 1,
+                      border: isOn ? `1.5px solid ${C.goldBright}` : "1.5px solid rgba(255,255,255,0.22)",
+                      background: isOn ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
+                      display: "grid", placeItems: "center",
+                    }}>{isOn && CHECK}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "0.8rem", fontWeight: 600, lineHeight: 1.25, color: isOn ? C.goldBright : C.text }}>
+                        {it.c}
+                        {it.star && <span style={{ marginLeft: 6, fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldMid, background: "rgba(201,152,42,0.12)", border: `1px solid ${C.borderGold}`, padding: "1px 6px", borderRadius: 99, whiteSpace: "nowrap" }}>★ maker</span>}
+                        {it.bonus && <span title="Bonus factor — tracked but excluded from the star score" style={{ marginLeft: 6, fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "1px 6px", borderRadius: 99, whiteSpace: "nowrap" }}>Bonus</span>}
+                        {isOn && auto.has(key) && <span title="Auto-read from the chart by VIV — cross-check it; any click clears the dot" style={{ marginLeft: 6, fontSize: "0.58rem", color: C.goldBright, textShadow: "0 0 8px rgba(240,192,80,0.7)" }}>●</span>}
+                      </div>
+                      <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 1, lineHeight: 1.35 }}>{it.s}</div>
                     </div>
-                    <div style={{ fontSize: "0.79rem", color: C.muted, marginTop: 3, lineHeight: 1.45 }}>{it.s}</div>
                   </div>
-                  {it.star && (
-                    <div style={{ flex: "0 0 auto", fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.goldMid, background: "rgba(201,152,42,0.12)", border: `1px solid ${C.borderGold}`, padding: "3px 8px", borderRadius: 99, marginTop: 2, whiteSpace: "nowrap" }}>★ maker</div>
-                  )}
-                  {it.key && (
-                    <div style={{ flex: "0 0 auto", fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.blue, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", padding: "3px 8px", borderRadius: 99, marginTop: 2, whiteSpace: "nowrap" }}>R:R driver</div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Trigger & Stop — slim NON-SCORED reminder strip (unchanged content; still tickable, never scored) */}
+      {SECTIONS.map((sec, si) => {
+        if (!sec.reminder) return null;
+        return (
+          <div key={si} style={{ fontFamily: font, background: "rgba(59,130,246,0.04)", border: "1px dashed rgba(59,130,246,0.28)", borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+              <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.blue }}>{sec.title}</span>
+              <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.blue, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", padding: "3px 9px", borderRadius: 99 }}>Not scored</span>
+              <span style={{ fontSize: "0.72rem", color: C.muted, flex: "1 1 240px", lineHeight: 1.4 }}>{sec.note}</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "2px 16px" }}>
+              {sec.items.map((it, ii) => {
+                const key = si + "-" + ii, isOn = on.has(key);
+                return (
+                  <div key={ii} onClick={() => toggle(key)} title={it.s} style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.74rem", lineHeight: 1.45, padding: "3px 2px", borderRadius: 6, cursor: "pointer", userSelect: "none", color: isOn ? C.text : "rgba(255,255,255,0.55)" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <span style={{ color: isOn ? C.blue : "rgba(255,255,255,0.3)", fontWeight: 800, flex: "0 0 auto" }}>{isOn ? "✓" : "○"}</span>
+                    <span>{it.c}{it.key && <span style={{ marginLeft: 5, fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.blue }}>· R:R</span>}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
       })}

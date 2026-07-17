@@ -69,6 +69,16 @@ export const THEME_SNAPSHOTS = {
     // DOWNSIDE intraday while Medical/Retail/Airlines/Banks absorbed the money.
     day:   [["Medical",1.44],["Retail",1.24],["Airlines",1.23],["Banks",0.97],["Biotechnology",0.88],["Home Construction",0.80],["China Internet",0.71],["HealthCare",0.64],["Social Media",0.13],["Aerospace",0.06],["Transports",-0.09],["Genomics",-0.10],["Real Estate",-0.11],["Solar",-0.13],["Bitcoin Miners",-0.13],["Steel",-0.26],["Materials",-0.32],["Industrials",-0.40],["Bitcoin",-0.42],["Gold Miners",-0.59],["Silver Miners",-0.61],["Robotics",-0.66],["Software",-0.76],["Growth Stocks",-0.95],["Utilities",-1.12],["Oil & Gas",-1.39],["AI",-1.97],["Quantum",-2.13],["Telecom",-2.27],["Semiconductors",-2.65],["Cybersecurity",-3.25]],
   },
+  "2026-07-17": {
+    // 1M NOT provided this drop — CARRIED from 2026-07-16 (tagging uses the latest monthly ranks).
+    month: [["Genomics",23.16],["Cybersecurity",15.81],["Biotechnology",11.27],["Airlines",5.82],["HealthCare",4.38],["Banks",3.96],["Software",3.57],["Social Media",2.27],["Industrials",2.20],["Bitcoin",2.14],["China Internet",1.93],["Retail",1.56],["Utilities",1.55],["Transports",1.20],["Aerospace",1.12],["Home Construction",1.02],["Medical",0.38],["Real Estate",-1.76],["Robotics",-2.94],["Materials",-3.22],["Growth Stocks",-4.28],["AI",-4.50],["Semiconductors",-4.71],["Gold Miners",-7.53],["Telecom",-7.81],["Steel",-8.12],["Silver Miners",-8.17],["Quantum",-8.30],["Oil & Gas",-10.77],["Solar",-11.47],["Bitcoin Miners",-19.66]],
+    // Fresh 1W: Banks + Transports IN the top-5 (Bitcoin/Steel out) — defensive/cyclical weekly leadership,
+    // China Internet the lone risk theme and strengthening.
+    week:  [["China Internet",7.72],["Retail",3.80],["Banks",3.69],["Transports",3.26],["Oil & Gas",2.95],["Steel",1.87],["Social Media",1.31],["Real Estate",1.27],["Bitcoin",0.66],["Cybersecurity",0.35],["Home Construction",0.32],["Medical",-0.10],["Software",-0.46],["Utilities",-0.50],["Solar",-1.15],["Materials",-1.20],["Industrials",-1.22],["HealthCare",-1.98],["Semiconductors",-2.15],["Telecom",-2.86],["Robotics",-2.90],["Airlines",-3.88],["Growth Stocks",-4.17],["Biotechnology",-4.40],["AI",-4.46],["Quantum",-5.65],["Gold Miners",-5.76],["Aerospace",-5.80],["Genomics",-5.89],["Silver Miners",-6.04],["Bitcoin Miners",-8.61]],
+    // day = Thursday's "Since Open" (momentum ex gaps). Second straight defensive session POST-TSMC:
+    // Medical/Home-Construction/Banks green while AI/Semis/Cyber/Quantum stayed red intraday.
+    day:   [["Medical",2.90],["Home Construction",2.66],["Banks",2.40],["Transports",2.26],["Real Estate",1.68],["Retail",1.59],["Materials",1.15],["Airlines",1.00],["Industrials",0.76],["HealthCare",0.72],["Utilities",0.51],["Bitcoin",0.05],["Biotechnology",-0.02],["Steel",-0.17],["China Internet",-0.25],["Robotics",-0.45],["Software",-0.50],["Oil & Gas",-1.04],["Cybersecurity",-1.16],["Semiconductors",-1.19],["Telecom",-1.26],["AI",-1.40],["Aerospace",-1.61],["Quantum",-1.85],["Solar",-1.85],["Gold Miners",-2.03],["Silver Miners",-2.03],["Social Media",-2.08],["Growth Stocks",-2.19],["Genomics",-3.28],["Bitcoin Miners",-5.91]],
+  },
 };
 
 // Normalize ANY date shape to ISO (YYYY-MM-DD) — manual positions carry M/D/YY strings,

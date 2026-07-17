@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
-import { SECTIONS } from "./SetupGrader.jsx";
+import { SECTIONS, sectionsFor, scoreTicked, versionOf, stampV2 } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
 import { isStudyRow, StudyEditor, StudyScoreboard, outcomeClass, studyQuality } from "./StudyBook.jsx";
 
@@ -50,22 +50,10 @@ export const PATTERNS = ["Trendline Breakout", "Pullback Buy", "Episodic Pivot",
 export const OUTCOMES = ["Huge Winner", "Winner", "Subpar", "Loser"];
 
 // ── Objective star math — the EXACT Setup Grader checklist + formula (perfect mirror, zero bias).
-// The stars are COMPUTED from the same 16 ticks; nothing is hand-assigned.
-let MB_TOTAL = 0, MB_STARMAKERS = 0;
-SECTIONS.forEach(s => { if (s.reminder) return; s.items.forEach(i => { MB_TOTAL++; if (i.star) MB_STARMAKERS++; }); });
-export function starsFromTicked(ticked) {
-  const t = ticked || [];
-  let passed = 0, starHit = 0;
-  SECTIONS.forEach((sec, si) => {
-    if (sec.reminder) return;
-    sec.items.forEach((it, ii) => { if (t.includes(si + "-" + ii)) { passed++; if (it.star) starHit++; } });
-  });
-  const pct = MB_TOTAL ? passed / MB_TOTAL : 0;
-  let stars = Math.round(pct * 5);
-  if (stars >= 5 && starHit < MB_STARMAKERS) stars = 4; // A+ requires full ★-maker confluence — same gate as the grader
-  if (passed === 0) stars = 0;
-  return { stars, passed, starHit, pct };
-}
+// The stars are COMPUTED from the ticks; nothing is hand-assigned. VERSION-AWARE via scoreTicked:
+// a legacy row is scored against the v1 list + denominator, a v2 row against v2 — a saved row is
+// NEVER re-scored against the wrong checklist. Returns {stars,passed,starHit,pct,total,starmakers}.
+export function starsFromTicked(ticked) { return scoreTicked(ticked); }
 
 // The elite layer — ONLY factors the Setup Grader checklist does NOT already score
 // (no double-counting: dead volume / inside days / EMA pinch / freshness are grader ★-makers).
@@ -116,14 +104,19 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
     const [row, setRow] = useState(() => {
       let prefill = {};
       try { prefill = JSON.parse(sessionStorage.getItem("viv-mb-prefill") || "{}"); sessionStorage.removeItem("viv-mb-prefill"); } catch {}
-      return {
+      const base = {
         ticker: "", pattern: "Trendline Breakout", theme: "", entry_date: "", exit_date: "", before_img: "", after_img: "",
         elite: [], ticked: [], outcome: "", run_pct: "", run_up_pct: "", angle: "", characteristics: [],
         days_held: "", r_mult: "", thesis: "", lesson: "", is_published: false, metrics: {},
         ...prefill, ...(initial || {}),
       };
+      // Stamp NEW / empty / already-v2 tick arrays with the v2 marker up front so versionOf stays
+      // unambiguous as the admin ticks (a bare "0-0" would otherwise read as a legacy key). Genuine
+      // legacy rows (real keys, no marker) are left untouched and keep scoring on the v1 list.
+      if (versionOf(base.ticked) === 2) base.ticked = stampV2(base.ticked || []);
+      return base;
     });
-    const graded = starsFromTicked(row.ticked); // OBJECTIVE — same 16 ticks + formula as the Setup Grader
+    const graded = starsFromTicked(row.ticked); // OBJECTIVE — version-aware (scoreTicked): never re-scores a legacy row against v2
     const eff = effectiveStars(graded.stars, (row.elite || []).length);
     // AUTO-FILL layer — metrics._auto lists every field/tick VIV pre-filled from the chart (shown as a
     // gold dot). A human edit on that field clears its dot: the value becomes Valen-confirmed.
@@ -223,11 +216,11 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <span style={{ ...lbl, marginBottom: 0 }}>Setup Grader checklist — stars compute from these ticks</span>
-          <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.goldBright }}>{graded.stars}★ · {graded.passed}/{MB_TOTAL} · {graded.starHit}/{MB_STARMAKERS} ★-makers</span>
+          <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.goldBright }}>{graded.stars}★ · {graded.passed}/{graded.total} · {graded.starHit}/{graded.starmakers} ★-makers</span>
           <button onClick={pullGrade} title="Import this ticker's saved Setup Grader ticks" style={{ ...chipBtn, whiteSpace: "nowrap", marginLeft: "auto" }}>Pull from grader</button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 10, marginBottom: 14 }}>
-          {SECTIONS.filter(s => !s.reminder).map((sec, si) => (
+          {sectionsFor(row.ticked).filter(s => !s.reminder).map((sec, si) => (
             <div key={si} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", background: "rgba(255,255,255,0.015)" }}>
               <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>{sec.title}</div>
               {sec.items.map((it, ii) => {
@@ -235,7 +228,7 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
                 return (
                   <div key={ii} onClick={() => toggleTick(key)} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 2px", cursor: "pointer" }}>
                     <span style={{ color: on ? C.goldBright : "rgba(255,255,255,0.22)", fontWeight: 800, lineHeight: 1.3 }}>{on ? "✓" : "○"}</span>
-                    <span style={{ fontSize: "0.76rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 }}>{it.c}{it.star && <span style={{ fontSize: "0.56rem", color: C.goldMid, marginLeft: 5 }}>★ maker</span>}<AutoDot k={"tick:" + key} /></span>
+                    <span style={{ fontSize: "0.76rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 }}>{it.c}{it.star && <span style={{ fontSize: "0.56rem", color: C.goldMid, marginLeft: 5 }}>★ maker</span>}{it.bonus && <span style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "0 5px", borderRadius: 99, marginLeft: 5 }}>Bonus</span>}<AutoDot k={"tick:" + key} /></span>
                   </div>
                 );
               })}

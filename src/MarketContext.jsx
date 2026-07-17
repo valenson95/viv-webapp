@@ -57,32 +57,17 @@ const regimeTip = (r) => {
   return `Market condition, anchored to the 21-day EMA over the past 10 trading sessions — Trending: closed above the EMA21 for 10+ straight sessions. Downtrend: closed below it for 10+ straight sessions. Choppy: neither — hovering up and down through the line. ${now} Breakouts carry the best odds in a Trending tape; a Choppy tape fades them; a Downtrend is swimming upstream.`;
 };
 
-// Plain-English one-liner per index, built from the numbers only.
-function readFor(r) {
-  const above = r.mas.filter(m => m.above).map(m => m.k + "d");
-  const below = r.mas.filter(m => !m.above).map(m => m.k + "d");
-  const stack = above.length === 4 ? "above its full 10/20/50/200-day MA stack"
-    : below.length === 4 ? "below all of its 10/20/50/200-day MAs"
-    : `above the ${above.join("/")} MA${above.length > 1 ? "s" : ""}, below the ${below.join("/")}`;
-  const b = bandFor(r.ext);
-  const extTxt = `${r.ext >= 0 ? "" : "−"}${Math.abs(r.ext).toFixed(1)}× ATR from the 50-day`;
-  const tail = b.label === "No new risk" ? " — very stretched; go easy on new buys."
-    : b.label === "Selective" ? " — stretched; be picky with fresh buys."
-    : b.label === "Fresh" ? " — room to work."
-    : " — recovery zone; watch for it to climb back above its short-term averages.";
-  return `${r.sym} trades ${stack} at ${extTxt}${tail}`;
-}
-
 const SAMPLE = [
   { sym: "SPY", price: 747.71, ext: 0.91, asof: "2026-07-07", mas: [{ k: 10, v: 740.74, above: true }, { k: 20, v: 741.29, above: true }, { k: 50, v: 739.01, above: true }, { k: 200, v: 693.19, above: true }] },
   { sym: "QQQ", price: 709.43, ext: -0.14, asof: "2026-07-07", mas: [{ k: 10, v: 717.77, above: false }, { k: 20, v: 720.43, above: false }, { k: 50, v: 711.66, above: false }, { k: 200, v: 636.18, above: true }] },
 ];
 
-export default function MarketContext({ C, font }) {
+export default function MarketContext({ C, font, defaultExpanded = false }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
-  const [showInfo, setShowInfo] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem("viv-mktctx-collapsed") !== "0"; } catch { return true; } }); // collapsed by default
+  // Collapsed by default; a call site can flip the default with defaultExpanded. A member's own
+  // toggle (persisted) always wins over either default.
+  const [collapsed, setCollapsed] = useState(() => { try { const s = localStorage.getItem("viv-mktctx-collapsed"); return s != null ? s !== "0" : !defaultExpanded; } catch { return !defaultExpanded; } });
   const toggleCollapsed = () => setCollapsed(c => { const n = !c; try { localStorage.setItem("viv-mktctx-collapsed", n ? "1" : "0"); } catch {} return n; });
   useEffect(() => {
     let dead = false;
@@ -117,22 +102,12 @@ export default function MarketContext({ C, font }) {
       <div onClick={toggleCollapsed} title={collapsed ? "Expand Market Context" : "Collapse Market Context"} aria-expanded={!collapsed}
         style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: collapsed ? 0 : 10, flexWrap: "wrap", cursor: "pointer", userSelect: "none" }}>
         <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Market Context</span>
-        {!collapsed && <button onClick={(e) => { e.stopPropagation(); setShowInfo(v => !v); }} style={{ background: "transparent", border: "none", padding: 0, fontFamily: font, fontSize: "0.6rem", color: C.muted, cursor: "pointer", borderBottom: "1px dotted var(--borderGold, rgba(201,152,42,0.4))" }}>{showInfo ? "hide ✕" : "what is this?"}</button>}
+        <span className="infodot" onClick={(e) => e.stopPropagation()} data-tip="Is the market at a good buy spot, or stretched? Green chips = the index is above that moving average. The ×-multiple is how far it's run above its 50-day line — under 2× there's room, 4×+ is stretched, go easy on new buys. SPY is the broad market; QQQ is the growth tape where breakouts live — trade smaller when it's below its short-term MAs.">i</span>
         <span style={{ marginLeft: "auto", fontSize: "0.58rem", color: C.faint || C.muted }}>
           {rows ? (err === "sample" ? "sample data (dev)" : `as of ${rows[0].asof} close`) : "loading…"}
         </span>
         <span aria-hidden style={{ color: C.gold, fontSize: "1.05rem", lineHeight: 1, alignSelf: "center", transition: "transform .2s", transform: collapsed ? "rotate(-90deg)" : "none" }}>▾</span>
       </div>
-      {!collapsed && showInfo && (
-        <div style={{ fontSize: "0.68rem", color: "var(--text, #eee)", lineHeight: 1.6, background: "rgba(201,152,42,0.06)", border: "1px solid var(--borderGold, rgba(201,152,42,0.3))", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
-          This card tells you one thing: <b>are you buying stocks while the market is stretched, or at a good spot?</b><br />
-          The arrows show whether SPY and QQQ are above (🟢) or below (🔴) each of their key moving averages.
-          The badge shows how far the index has run above its 50-day line, measured in daily ranges — the <b>ATR% Multiple from the 50-MA</b>, the same number as the extension badges on your positions.
-          A low number means the market has room. A high number (4×+) means it's stretched — historically pullbacks start around 5×, so go easy on new buys there.<br />
-          The <b>condition badge</b> anchors to the <b>21-day EMA over the past 10 trading sessions</b>: <b style={{ color: "#22c55e" }}>Trending</b> = closed above the EMA21 for 10+ straight sessions · <b style={{ color: "#ef4444" }}>Downtrend</b> = below it for 10+ straight sessions · <b style={{ color: "#f0c050" }}>Choppy</b> = neither, price hovering through the line. It's the same definition your Objective Edge "market context" dimension uses — so the dashboard read and your stats speak one language.<br />
-          <span style={{ color: C.muted }}>Tip: toggle on <b>Guided</b> mode (top of the page) and hover anything on the dashboard for more plain-English explanations.</span>
-        </div>
-      )}
       {/* collapsed = the simple read: price · market condition · extension per index, one line */}
       {collapsed && rows && (
         <div onClick={toggleCollapsed} style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center", paddingTop: 8, cursor: "pointer" }}>
@@ -175,9 +150,6 @@ export default function MarketContext({ C, font }) {
               </div>
             );
           })}
-          <div style={{ fontSize: "0.66rem", color: C.muted, lineHeight: 1.55, paddingTop: 9, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-            {rows.map(r => readFor(r)).join(" ")}
-          </div>
         </>
       )}
     </div>

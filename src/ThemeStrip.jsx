@@ -7,6 +7,14 @@ import { latestSnapshot, consistentTop } from "./themes.js";
 // ─────────────────────────────────────────────────────────────
 export default function ThemeStrip({ C, font, variant }) {
   const [full, setFull] = React.useState(false);
+  const [popup, setPopup] = React.useState(false);
+  // Close the expanded popup on Escape (listener only while open).
+  React.useEffect(() => {
+    if (!popup) return;
+    const onKey = (e) => { if (e.key === "Escape") setPopup(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [popup]);
   const snap = latestSnapshot();
   if (!snap) return null;
 
@@ -14,40 +22,85 @@ export default function ThemeStrip({ C, font, variant }) {
   // Same data source (themes.js snapshots); keeps the "updated <date>" note, drops
   // the full-tracker toggle / legend / guidance. Default variant is unchanged below.
   if (variant === "pro") {
-    const wk = (snap.week || []).slice(0, 5);
-    const mo = (snap.month || []).slice(0, 5);
-    const Col = ({ title, rows }) => (
-      <div>
-        <h4 style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: C.muted, marginBottom: 9 }}>{title}</h4>
-        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          {rows.map(([name, pct], i) => {
-            const pos = pct >= 0;
-            return (
-              <div key={name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.74rem" }}>
-                <span style={{ color: C.muted, opacity: 0.65, fontWeight: 700, width: 13, flex: "none", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
-                <span style={{ flex: 1, color: "rgba(255,255,255,0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
-                <span style={{ color: pos ? C.green : C.red, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{pos ? "+" : ""}{pct.toFixed(2)}%</span>
-              </div>
-            );
-          })}
+    const wkRows = snap.week || [];
+    const moRows = snap.month || [];
+    const wkTop = wkRows.slice(0, 5);
+    const moTop = moRows.slice(0, 5);
+    // Weakest = bottom-5, worst first.
+    const wkBot = wkRows.slice(-5).reverse();
+    const moBot = moRows.slice(-5).reverse();
+    // Shared column renderer — colors each % by sign (green ≥ 0, red < 0).
+    const Col = ({ title, rows, size }) => {
+      const fs = size === "lg" ? "0.9rem" : "0.74rem";
+      return (
+        <div>
+          <h4 style={{ fontSize: size === "lg" ? "0.66rem" : "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: C.muted, marginBottom: 9 }}>{title}</h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: size === "lg" ? 9 : 7 }}>
+            {rows.map(([name, pct], i) => {
+              const pos = pct >= 0;
+              return (
+                <div key={name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: fs }}>
+                  <span style={{ color: C.muted, opacity: 0.65, fontWeight: 700, width: 15, flex: "none", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
+                  <span style={{ flex: 1, color: "rgba(255,255,255,0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+                  <span style={{ color: pos ? C.green : C.red, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{pos ? "+" : ""}{pct.toFixed(2)}%</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      );
+    };
+    const microLabel = (txt) => (
+      <div style={{ fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.muted, opacity: 0.8 }}>{txt}</div>
     );
+    const divider = <div style={{ height: 1, background: C.border, margin: "14px 0" }} />;
     return (
-      <div style={{ fontFamily: font, position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", overflow: "hidden",
-        backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)" }}>
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)", pointerEvents: "none" }} />
-        <div style={{ position: "relative" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
-            <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.muted }}>Theme Leaders</span>
-            <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.goldBright || C.gold, fontWeight: 700 }}>updated {snap.date}</span>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-            <Col title="1 Week" rows={wk} />
-            <Col title="1 Month" rows={mo} />
+      <>
+        <div
+          onClick={() => setPopup(true)}
+          title="Click to expand"
+          style={{ fontFamily: font, position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", overflow: "hidden", cursor: "pointer",
+            backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)" }}>
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)", pointerEvents: "none" }} />
+          <div style={{ position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.muted }}>Theme Leaders</span>
+              <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.goldBright || C.gold, fontWeight: 700 }}>updated {snap.date}</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+              <Col title="1 Week" rows={wkTop} />
+              <Col title="1 Month" rows={moTop} />
+            </div>
+            {divider}
+            <div style={{ marginBottom: 11 }}>{microLabel("Weakest")}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+              <Col title="1 Week · Weakest" rows={wkBot} />
+              <Col title="1 Month · Weakest" rows={moBot} />
+            </div>
           </div>
         </div>
-      </div>
+        {popup && (
+          <div
+            onClick={() => setPopup(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 1250, display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+              background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}>
+            <div style={{ fontFamily: font, position: "relative", width: "min(92vw, 860px)", maxHeight: "86vh", overflowY: "auto", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 18, padding: "24px 26px", overflowX: "hidden",
+              backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", boxShadow: "0 30px 80px rgba(0,0,0,0.6)" }}>
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)", pointerEvents: "none" }} />
+              <div style={{ position: "relative" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 13, marginBottom: 6, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 800, letterSpacing: "0.02em", color: "rgba(255,255,255,0.95)" }}>Theme Leaders — updated {snap.date}</span>
+                  <span style={{ marginLeft: "auto", fontSize: "0.6rem", color: C.muted, opacity: 0.75, fontWeight: 600 }}>click anywhere to close</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginTop: 14 }}>
+                  <Col title={`1 Week (${wkRows.length})`} rows={wkRows} size="lg" />
+                  <Col title={`1 Month (${moRows.length})`} rows={moRows} size="lg" />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
