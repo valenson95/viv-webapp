@@ -23,6 +23,21 @@ const mbISO = (d) => {
   return "";
 };
 
+// ── Card date range → "Feb 18 → Apr 30, 2025" (ISO in; tolerant of null / one-sided ranges)
+const mbFmtDay = (iso) => {
+  if (!iso) return "";
+  const d = new Date(String(iso).slice(0, 10) + "T00:00:00");
+  return isNaN(d) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+const mbDateRange = (entry, exit) => {
+  const e = mbFmtDay(entry), x = mbFmtDay(exit);
+  const yr = String(exit || entry || "").slice(0, 4);
+  const yTag = /^\d{4}$/.test(yr) ? `, ${yr}` : "";
+  if (e && x) return `${e} → ${x}${yTag}`;
+  const one = e || x;
+  return one ? `${one}${yTag}` : "";
+};
+
 // ══════════════════════════════════════════════════════════════════
 // VIV MODEL BOOK — curated database of the best winning setups, for
 // pattern-recognition study. Each entry = before/after charts + the full
@@ -80,13 +95,16 @@ export function outcomeFromR(rMult, runPct) {
   return null;
 }
 
-const Stars = ({ C, n, max = 7, size = "0.95rem" }) => (
-  <span style={{ letterSpacing: 1.5, fontSize: size, whiteSpace: "nowrap" }}>
-    {Array.from({ length: max }, (_, k) => (
-      <span key={k} style={{ color: k < n ? (k >= 5 ? "#7ef0a0" : C.goldBright) : "rgba(255,255,255,0.13)", textShadow: k < n ? "0 0 10px rgba(240,192,80,0.4)" : "none" }}>★</span>
-    ))}
-  </span>
-);
+const Stars = ({ C, n, max, size = "0.95rem" }) => {
+  const slots = max || (n >= 6 ? n : 5); // 5-star base scale; the 6th/7th (green) show only for elite
+  return (
+    <span style={{ letterSpacing: 1.5, fontSize: size, whiteSpace: "nowrap" }}>
+      {Array.from({ length: slots }, (_, k) => (
+        <span key={k} style={{ color: k < n ? (k >= 5 ? "#7ef0a0" : C.goldBright) : "rgba(255,255,255,0.13)", textShadow: k < n ? "0 0 10px rgba(240,192,80,0.4)" : "none" }}>★</span>
+      ))}
+    </span>
+  );
+};
 
 // ── Entry editor — MODULE scope on purpose: defined inline it was recreated on every
 // parent render (new component type → React unmounts/remounts → typed form wiped, prefill
@@ -280,6 +298,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [fPattern, setFPattern] = useState("All");
+  const [patternOpen, setPatternOpen] = useState(false); // pattern filter dropdown open/closed — presentation only, drives the same fPattern
   const [fTier, setFTier] = useState("All"); // All | 7 | 6 | 5
   // Deep link from the top nav ("Studies" admin link): viv-mb-view=studies opens My Book → 📚 Studies
   // directly. Read-and-clear synchronously so it only steers this mount, never a later visit.
@@ -306,6 +325,14 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [zoom, detail]);
+
+  // Pattern dropdown — Esc closes it (outside-click is handled by an invisible backdrop under the menu)
+  useEffect(() => {
+    if (!patternOpen) return;
+    const onKey = (e) => { if (e.key === "Escape") setPatternOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [patternOpen]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -388,20 +415,38 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   };
 
   const chip = (active) => ({
-    fontSize: "0.72rem", fontWeight: 700, padding: "6px 14px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
+    display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
+    fontSize: "0.72rem", fontWeight: 700, padding: "7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
     border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? "#08080e" : C.muted,
     background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
   });
+  // Grade badge derived from the objective star tier (same source as the stars — no new data, no re-scoring)
+  const gradeBadge = (n) => n >= 5 ? { l: "A+", fg: "#86efac", bg: "rgba(34,197,94,0.15)", bd: "rgba(34,197,94,0.3)" }
+    : n === 4 ? { l: "A", fg: "#86efac", bg: "rgba(34,197,94,0.15)", bd: "rgba(34,197,94,0.3)" }
+    : n === 3 ? { l: "B", fg: C.goldBright, bg: C.goldDim, bd: C.borderGold }
+    : { l: "C", fg: "#fca5a5", bg: "rgba(239,68,68,0.12)", bd: "rgba(239,68,68,0.3)" };
+  const outcomeChip = (o) => o === "Huge Winner" ? { fg: "#7ef0a0", bg: "rgba(126,240,160,0.08)", bd: "rgba(126,240,160,0.35)" }
+    : o === "Winner" ? { fg: C.green, bg: "rgba(34,197,94,0.08)", bd: "rgba(34,197,94,0.3)" }
+    : o === "Loser" ? { fg: C.red, bg: "rgba(239,68,68,0.08)", bd: "rgba(239,68,68,0.3)" }
+    : { fg: C.muted, bg: "rgba(255,255,255,0.03)", bd: C.border };
 
   return (
     <div style={{ fontFamily: font }}>
-      {/* header */}
-      <div className="toolbar" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <h2 className={"sech guide" + (gactive ? gactive("modelbook") : "")}
-          onMouseEnter={guideEnter ? guideEnter("modelbook", "Model Book", "Two books in one: the ⭐ VIV Official library — curated elite setups, read-only — and 🔒 My Book, your private collection only you can see. Study the before chart, the exact factors that made it elite, then the outcome. Stars are computed from the Setup Grader ticks (objective, no bias). Fields marked with a gold dot were auto-read off the chart by VIV — edit any that look off. Pattern recognition is built by reps: same patterns, hundreds of examples.", undefined) : undefined}
-          onMouseLeave={guideLeave ? guideLeave("modelbook") : undefined}>Model Book</h2>
-        <span style={{ fontSize: "0.74rem", color: C.muted }}>study the best — before → factors → after</span>
-        {!editing && !studyEditing && <button onClick={() => (studyMode && fScope === "mine" && isAdmin) ? setStudyEditing({}) : setEditing({})} style={{ marginLeft: "auto", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer" }}>{(studyMode && fScope === "mine" && isAdmin) ? "＋ New study" : isAdmin ? "+ Add entry" : "+ Add to my book"}</button>}
+      {/* command header */}
+      <div className="toolbar" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap", marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold }}>Model Book</div>
+          <h2 className={"sech guide" + (gactive ? gactive("modelbook") : "")}
+            onMouseEnter={guideEnter ? guideEnter("modelbook", "Model Book", "Two books in one: the ⭐ VIV Official library — curated elite setups, read-only — and 🔒 My Book, your private collection only you can see. Study the before chart, the exact factors that made it elite, then the outcome. Stars are computed from the Setup Grader ticks (objective, no bias). Fields marked with a gold dot were auto-read off the chart by VIV — edit any that look off. Pattern recognition is built by reps: same patterns, hundreds of examples.", undefined) : undefined}
+            onMouseLeave={guideLeave ? guideLeave("modelbook") : undefined}
+            style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, marginTop: 5 }}>The Pattern Library</h2>
+          <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 6 }}>{visible.length} {visible.length === 1 ? "entry" : "entries"} · the best setups, kept for study — before → factors → after</div>
+        </div>
+        {!editing && !studyEditing && (
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button onClick={() => (studyMode && fScope === "mine" && isAdmin) ? setStudyEditing({}) : setEditing({})} style={{ background: `linear-gradient(120deg, ${C.goldMid}, ${C.goldBright}, ${C.goldDeep})`, color: "#0a0a0a", border: "none", fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", boxShadow: "0 6px 18px rgba(201,152,42,0.25)" }}>{(studyMode && fScope === "mine" && isAdmin) ? "＋ New study" : isAdmin ? "+ Add entry" : "+ Add to my book"}</button>
+          </div>
+        )}
       </div>
 
       {editing !== null && <MBEditor C={C} font={font} busy={busy} isAdmin={isAdmin} initial={editing.id ? editing : null} onSave={save} onCancel={() => setEditing(null)} onUpload={uploadImg} journaledTrades={journaledTrades} />}
@@ -416,10 +461,43 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
             style={chip(studyMode && fScope === "mine")}>📚 Studies{studyRows.length ? ` (${studyRows.length})` : ""}</button>
         )}
         <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
-        {["All", ...PATTERNS].map(p => {
-          const n = p === "All" ? rows.length : rows.filter(r => r.pattern === p).length;
-          return <button key={p} onClick={() => setFPattern(p)} style={chip(fPattern === p)}>{p}{p !== "All" && n > 0 ? ` (${n})` : ""}</button>;
-        })}
+        {/* pattern filter — click-down dropdown (drives the same fPattern state; scope/tier stay as chips) */}
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setPatternOpen(o => !o)} aria-haspopup="menu" aria-expanded={patternOpen} style={{
+            display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap",
+            fontSize: "0.72rem", fontWeight: 700, padding: "7px 13px 7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
+            border: `1px solid ${(fPattern !== "All" || patternOpen) ? C.goldBright : C.border}`,
+            color: fPattern !== "All" ? C.goldBright : C.muted,
+            background: fPattern !== "All" ? C.goldDim : "rgba(255,255,255,0.03)",
+          }}>
+            <span>Pattern: {fPattern}</span>
+            <span style={{ fontSize: "0.6rem", transform: patternOpen ? "rotate(180deg)" : "none", transition: "transform .14s", opacity: 0.8 }}>▾</span>
+          </button>
+          {patternOpen && (
+            <>
+              <div onClick={() => setPatternOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div role="menu" style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 210, background: "#13131c", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, padding: 5, boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }}>
+                {["All", ...PATTERNS].map(p => {
+                  const n = p === "All" ? rows.length : rows.filter(r => r.pattern === p).length;
+                  const on = fPattern === p;
+                  return (
+                    <button key={p} role="menuitem" onClick={() => { setFPattern(p); setPatternOpen(false); }} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%",
+                      fontFamily: font, fontSize: "0.75rem", fontWeight: 700, textAlign: "left",
+                      padding: "8px 11px", borderRadius: 7, cursor: "pointer", border: "none",
+                      color: on ? C.goldBright : C.text, background: on ? C.goldDim : "transparent",
+                    }}
+                    onMouseEnter={e => { if (!on) e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                    onMouseLeave={e => { if (!on) e.currentTarget.style.background = "transparent"; }}>
+                      <span>{p === "All" ? "All patterns" : p}</span>
+                      <span style={{ fontSize: "0.66rem", fontWeight: 700, color: on ? C.goldBright : C.muted }}>{n > 0 ? n : ""}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
         <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
         {["All", "7", "6", "5"].map(t => {
           const n = t === "All" ? 0 : rows.filter(r => effectiveStars(r.stars, (r.elite || []).length).n === +t).length;
@@ -502,33 +580,52 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       )}
 
       {/* card grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16, marginTop: 4 }}>
         {(studyMode ? [] : visible).map(r => {
           const eff = effectiveStars(cardStars(r), (r.elite || []).length);
+          const elite = eff.n >= 6;
+          const img = r.after_img || r.before_img;
+          const gb = gradeBadge(eff.n);
+          const dr = mbDateRange(r.entry_date, r.exit_date);
+          const rTxt = r.r_mult != null ? `${r.r_mult > 0 ? "+" : ""}${r.r_mult}R` : (r.run_pct != null ? `${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : "");
+          const rUp = (r.r_mult != null ? r.r_mult : r.run_pct || 0) >= 0;
           return (
-            <div key={r.id} onClick={() => setDetail(r)} style={{ background: C.glass, border: `1px solid ${eff.n >= 6 ? "rgba(126,240,160,0.3)" : C.border}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "transform .15s, border-color .15s" }}
-              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.borderColor = C.borderGold; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.borderColor = eff.n >= 6 ? "rgba(126,240,160,0.3)" : C.border; }}>
-              {r.after_img || r.before_img ? (
-                <img src={r.after_img || r.before_img} alt={r.ticker} style={{ width: "100%", height: 160, objectFit: "cover", display: "block", borderBottom: `1px solid ${C.border}` }} />
-              ) : (
-                <div style={{ height: 160, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.8rem", borderBottom: `1px solid ${C.border}` }}>chart pending</div>
-              )}
-              <div style={{ padding: "13px 15px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                  <span style={{ fontWeight: 800, fontSize: "1.02rem", color: C.white }}>{r.ticker}</span>
+            <div key={r.id} onClick={() => setDetail(r)} style={{ position: "relative", background: C.glass, border: `1px solid ${elite ? "rgba(126,240,160,0.32)" : C.border}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "transform .15s ease, border-color .15s ease" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.borderColor = elite ? "rgba(126,240,160,0.55)" : C.borderGold; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.borderColor = elite ? "rgba(126,240,160,0.32)" : C.border; }}>
+              {/* chart area */}
+              <div style={{ position: "relative", height: 160, overflow: "hidden", borderBottom: `1px solid ${C.border}` }}>
+                {elite && <span style={{ position: "absolute", top: 12, right: 12, zIndex: 2, fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 99, background: "rgba(126,240,160,0.16)", border: "1px solid rgba(126,240,160,0.45)", color: "#7ef0a0", boxShadow: "0 0 16px rgba(126,240,160,0.25)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}>⭐ Elite</span>}
+                {img ? (
+                  <img src={img} alt={r.ticker} style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }} />
+                ) : (
+                  <div style={{ position: "relative", height: 160, background: "linear-gradient(180deg, rgba(201,152,42,0.10), rgba(201,152,42,0) 55%), repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 28px), #0d0d16" }}>
+                    <span style={{ position: "absolute", left: 12, bottom: 4, fontSize: "2.6rem", fontWeight: 800, letterSpacing: "-0.02em", color: "rgba(255,255,255,0.05)", lineHeight: 1, userSelect: "none", pointerEvents: "none" }}>{r.ticker}</span>
+                  </div>
+                )}
+              </div>
+              {/* body */}
+              <div style={{ padding: "14px 16px 16px" }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{r.ticker}</span>
+                  {dr && <span style={{ fontSize: "0.64rem", color: C.muted, whiteSpace: "nowrap" }}>{dr}</span>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 9 }}>
                   <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.gold, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 9px", borderRadius: 99 }}>{r.pattern}</span>
-                  {inModelBook(r) && <span title="Starred from a 📚 Study" style={{ fontSize: "0.58rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, padding: "2px 8px", borderRadius: 99 }}>📚 study</span>}
-                  {!r.is_published && !isStudyRow(r) && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: isAdmin ? C.muted : "#8ab4f8", border: `1px solid ${isAdmin ? C.border : "rgba(138,180,248,0.35)"}`, padding: "2px 8px", borderRadius: 99 }}>{isAdmin ? "DRAFT" : "🔒 PERSONAL"}</span>}
-                  {r.is_published && <span title="Curated by the VIV team" style={{ fontSize: "0.58rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 8px", borderRadius: 99 }}>⭐ VIV</span>}
-                  {r.outcome && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: r.outcome === "Huge Winner" ? "#7ef0a0" : r.outcome === "Winner" ? C.green : r.outcome === "Loser" ? C.red : C.muted, border: `1px solid ${C.border}`, padding: "2px 8px", borderRadius: 99 }}>{r.outcome}</span>}
-                  <span style={{ marginLeft: "auto", fontSize: "0.8rem", fontWeight: 800, color: (r.run_pct || 0) >= 0 ? C.green : C.red }}>{r.run_pct != null ? `${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : ""}</span>
+                  {inModelBook(r) && <span title="Starred from a 📚 Study" style={{ fontSize: "0.58rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, padding: "2px 9px", borderRadius: 99 }}>📚 study</span>}
+                  {!r.is_published && !isStudyRow(r) && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: isAdmin ? C.muted : "#8ab4f8", border: `1px solid ${isAdmin ? C.border : "rgba(138,180,248,0.35)"}`, padding: "2px 9px", borderRadius: 99 }}>{isAdmin ? "DRAFT" : "🔒 PERSONAL"}</span>}
+                  {r.is_published && <span title="Curated by the VIV team" style={{ fontSize: "0.58rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 9px", borderRadius: 99 }}>⭐ VIV</span>}
+                  {r.outcome && (() => { const oc = outcomeChip(r.outcome); return <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: oc.fg, background: oc.bg, border: `1px solid ${oc.bd}`, padding: "3px 10px", borderRadius: 99, whiteSpace: "nowrap" }}>{r.outcome}</span>; })()}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7 }}>
-                  <Stars C={C} n={eff.n} size="0.8rem" />
-                  <span style={{ fontSize: "0.68rem", fontWeight: 800, color: eff.n >= 6 ? "#7ef0a0" : C.muted }}>{eff.label}</span>
-                  <span style={{ marginLeft: "auto", fontSize: "0.66rem", color: C.muted }}>{r.days_held != null ? `${r.days_held}d` : ""}{r.r_mult != null ? ` · ${r.r_mult}R` : ""}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 11, paddingTop: 11, borderTop: `1px solid ${C.border}` }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 21, height: 21, padding: "0 5px", borderRadius: 6, fontWeight: 800, fontSize: "0.66rem", color: gb.fg, background: gb.bg, border: `1px solid ${gb.bd}` }}>{gb.l}</span>
+                    <Stars C={C} n={eff.n} size="0.82rem" />
+                  </span>
+                  <span style={{ fontSize: "0.66rem", fontWeight: 800, color: elite ? "#7ef0a0" : C.muted }}>{eff.label}</span>
+                  {rTxt && <span style={{ marginLeft: "auto", fontSize: "0.84rem", fontWeight: 800, color: rUp ? C.green : C.red }}>{rTxt}</span>}
                 </div>
+                {r.lesson && <div style={{ fontSize: "0.74rem", color: C.muted, lineHeight: 1.5, marginTop: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{r.lesson}</div>}
               </div>
             </div>
           );

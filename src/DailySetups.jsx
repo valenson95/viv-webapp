@@ -19,8 +19,6 @@ const Stars = ({ C, n, size = "1.05rem" }) => (
   </span>
 );
 
-const letterColor = (C, l) => l === "A+" ? C.green : l === "A" ? C.goldBright : l === "B" ? C.muted : C.red;
-
 function dateLabel(iso) {
   if (!iso) return "Undated";
   const d = new Date(iso + "T00:00:00");
@@ -158,22 +156,46 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
     });
   }
 
+  // ── Restyle tokens (approved mockup: mockups/daily-setups.html) — uniform card chrome + chip
+  //    language, all built on the C palette / font prop. Presentation only; no logic depends on these.
+  const faint = "rgba(255,255,255,0.45)";
+  const cardChrome = {
+    position: "relative",
+    background: `linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%), ${C.glass}`,
+    border: `1px solid ${C.border}`,
+    borderRadius: 16,
+    backdropFilter: "blur(24px) saturate(150%)",
+    WebkitBackdropFilter: "blur(24px) saturate(150%)",
+  };
+  const microLabel = { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.muted };
+  const cardHead = { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}` };
+  const segWrap = { display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 980, padding: 3, gap: 2, background: "rgba(255,255,255,0.02)" };
+  const gradeBadge = (letter) => {
+    const fam = (letter === "A+" || letter === "A")
+      ? { bg: "rgba(34,197,94,0.15)", col: "#86efac", bd: "rgba(34,197,94,0.3)" }
+      : letter === "B"
+        ? { bg: C.goldDim, col: C.goldBright, bd: C.borderGold }
+        : { bg: "rgba(239,68,68,0.12)", col: "#fca5a5", bd: "rgba(239,68,68,0.3)" };
+    return { display: "inline-flex", minWidth: 22, height: 22, padding: "0 4px", borderRadius: 6, alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.74rem", background: fam.bg, color: fam.col, border: `1px solid ${fam.bd}`, flex: "none" };
+  };
+
   return (
     <div id="panel-daily" style={{ fontFamily: font }}>
-      {/* intro — inline-styled (self-contained: renders identically in any page CSS scope) */}
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "16px 18px", marginBottom: 18 }}>
-        <div style={{ flex: "0 0 40px", width: 40, height: 40, borderRadius: 12, display: "grid", placeItems: "center", background: "rgba(201,152,42,0.1)", border: `1px solid ${C.borderGold}`, color: C.gold }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 20, height: 20 }}><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: "1rem", fontWeight: 800, color: C.white, marginBottom: 4 }}>Daily Setups</div>
-          <p style={{ margin: 0, fontSize: "0.82rem", color: C.muted, lineHeight: 1.55 }}>The setups on VIV's radar, posted fresh each day — the chart, the read, and the <b style={{ color: C.text }}>full Setup-Grader scorecard</b> behind the stars. Click <b style={{ color: C.gold }}>See the scorecard</b> on any post to see exactly which criteria passed — every grade is auditable, nothing is hand-waved. A gold dot <span style={{ color: C.goldBright }}>●</span> marks a tick that was auto-read off the chart. <b style={{ color: C.text }}>Educational, not trade signals</b> — the entry, the stop, and the decision are always yours.</p>
+      {/* command header — page top (approved mockup): eyebrow · h1 · muted meta */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold }}>Daily Setups</div>
+        <h1 style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, margin: "5px 0 0" }}>On the Radar</h1>
+        <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+          Posted fresh each market day{rows && rows.length ? ` · ${rows.length} idea${rows.length !== 1 ? "s" : ""} on the radar` : ""} · the chart, the read, and the full auditable scorecard behind every star · educational, not trade signals
         </div>
       </div>
 
       {/* THE FUNNEL — status chips (derived from each post's own scorecard) + the at-a-glance board */}
       {rows && rows.length > 0 && boardRows.length > 0 && (
-        <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "14px 16px", marginBottom: 16 }}>
+        <div style={{ ...cardChrome, padding: "16px 18px", marginBottom: 16 }}>
+          <div style={{ ...cardHead, marginBottom: 12 }}>
+            <span style={{ ...microLabel, flex: 1 }}>The Funnel</span>
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
             {["pivot", "coiling", "fresh", "triggered", "faded"].map(s => {
               const m = STATUS_META[s], n = statusCounts[s] || 0, on = statusF === s;
@@ -273,23 +295,32 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
       )}
 
       {rows && rows.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-          {[["date", "Newest"], ["grade", "Top graded"]].map(([k, lbl]) => (
-            <button key={k} onClick={() => setSortBy(k)}
-              style={{ background: sortBy === k ? "rgba(201,152,42,0.14)" : "rgba(255,255,255,0.04)", color: sortBy === k ? C.goldBright : C.muted, border: `1px solid ${sortBy === k ? C.borderGold : C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, cursor: "pointer" }}>{lbl}</button>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
+          {/* sort — pill segmented control */}
+          <div style={segWrap}>
+            {[["date", "Newest"], ["grade", "Top graded"]].map(([k, lbl]) => (
+              <button key={k} onClick={() => setSortBy(k)}
+                style={{ border: "none", background: sortBy === k ? C.goldDim : "transparent", color: sortBy === k ? C.goldBright : C.muted, fontFamily: font, fontSize: "0.74rem", fontWeight: 700, padding: "7px 16px", borderRadius: 980, letterSpacing: "0.02em", cursor: "pointer" }}>{lbl}</button>
+            ))}
+          </div>
           <span style={{ width: 1, height: 18, background: C.border }} />
-          {[["all", "All"], ["taken", "✔ Taken"]].map(([k, lbl]) => (
-            <button key={k} onClick={() => setView(k)}
-              style={{ background: view === k ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.04)", color: view === k ? "#22c55e" : C.muted, border: `1px solid ${view === k ? "rgba(34,197,94,0.35)" : C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, cursor: "pointer" }}>{lbl}</button>
-          ))}
+          {/* view filter — All / ✔ Taken pill segmented control (taken = green) */}
+          <div style={segWrap}>
+            {[["all", "All"], ["taken", "✔ Taken"]].map(([k, lbl]) => (
+              <button key={k} onClick={() => setView(k)}
+                style={{ border: "none", background: view === k ? (k === "taken" ? "rgba(34,197,94,0.12)" : C.goldDim) : "transparent", color: view === k ? (k === "taken" ? "#22c55e" : C.goldBright) : C.muted, fontFamily: font, fontSize: "0.74rem", fontWeight: 700, padding: "7px 15px", borderRadius: 980, letterSpacing: "0.02em", cursor: "pointer" }}>{lbl}</button>
+            ))}
+          </div>
           <span style={{ width: 1, height: 18, background: C.border }} />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 ticker…" spellCheck={false}
-            title="Type a ticker to see its full history in the feed — every post, oldest thesis to latest"
-            style={{ background: "rgba(255,255,255,0.04)", color: C.white, border: `1px solid ${q.trim() ? C.borderGold : C.border}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "6px 12px", borderRadius: 99, width: 110, outline: "none", textTransform: "uppercase" }} />
-          {q.trim() && (
-            <button onClick={() => setQ("")} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "0.85rem", cursor: "pointer", padding: 0 }}>×</button>
-          )}
+          {/* ticker search */}
+          <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 ticker…" spellCheck={false}
+              title="Type a ticker to see its full history in the feed — every post, oldest thesis to latest"
+              style={{ background: "rgba(255,255,255,0.04)", color: C.white, border: `1px solid ${q.trim() ? C.borderGold : C.border}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: q.trim() ? "7px 26px 7px 14px" : "7px 14px", borderRadius: 980, width: 130, outline: "none", textTransform: "uppercase" }} />
+            {q.trim() && (
+              <button onClick={() => setQ("")} aria-label="Clear search" style={{ position: "absolute", right: 8, background: "transparent", border: "none", color: faint, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
+            )}
+          </div>
         </div>
       )}
 
@@ -302,11 +333,11 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
       {rows === null ? (
         <div style={{ color: C.muted, fontSize: "0.84rem", padding: "30px 8px" }}>Loading the feed…</div>
       ) : rows.length === 0 ? (
-        <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "34px 20px", textAlign: "center", color: C.muted, fontSize: "0.86rem" }}>
+        <div style={{ ...cardChrome, padding: "34px 20px", textAlign: "center", color: C.muted, fontSize: "0.86rem" }}>
           No setups published yet — the first daily post lands here.
         </div>
       ) : groups.length === 0 ? (
-        <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "30px 20px", textAlign: "center", color: C.muted, fontSize: "0.85rem" }}>
+        <div style={{ ...cardChrome, padding: "30px 20px", textAlign: "center", color: C.muted, fontSize: "0.85rem" }}>
           No taken setups yet — ✔ Mark taken on a post when the trade is executed.
         </div>
       ) : groups.map((g, gi) => {
@@ -319,9 +350,9 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         const dayOpen = forceOpen || openDays.has(g.date);
         const toggleDay = () => { if (forceOpen) return; setOpenDays(prev => { const n = new Set(prev); n.has(g.date) ? n.delete(g.date) : n.add(g.date); return n; }); };
         return (
-        <div key={g.date + "-" + gi} style={{ marginBottom: dayOpen ? 26 : 10 }}>
+        <div key={g.date + "-" + gi} style={{ marginBottom: dayOpen ? 22 : 12 }}>
           <div onClick={toggleDay} title={forceOpen ? undefined : dayOpen ? "Collapse this day" : "Show this day's charts"}
-            style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 2px 10px", cursor: forceOpen ? "default" : "pointer", padding: dayOpen ? 0 : "10px 12px", borderRadius: 12, border: dayOpen ? "none" : `1px solid ${rel === "TODAY" ? C.borderGold : C.border}`, background: dayOpen ? "transparent" : "rgba(255,255,255,0.02)" }}>
+            style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 2px 12px", cursor: forceOpen ? "default" : "pointer", padding: "10px 14px", borderRadius: 12, border: `1px solid ${rel === "TODAY" ? C.borderGold : C.border}`, background: "rgba(255,255,255,0.02)" }}>
             <div style={{ fontSize: rel === "TODAY" ? "0.78rem" : "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: rel === "TODAY" ? C.goldBright : C.gold, whiteSpace: "nowrap" }}>
               {rel ? <>{rel} <span style={{ color: C.muted, fontWeight: 700 }}>· {g.label}</span></> : g.label}
             </div>
@@ -351,7 +382,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
             const fit = themeFit(r.sector, r.trade_date);
             const fitCol = fit === "in" ? "#22c55e" : fit === "off" ? "#ef4444" : null;
             return (
-              <div key={r.id} style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, marginBottom: 14, opacity: isStale ? 0.78 : 1 }}>
+              <div key={r.id} style={{ ...cardChrome, padding: "16px 18px", marginBottom: 14, opacity: isStale ? 0.78 : 1 }}>
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                   {/* chart thumb */}
                   {r.chart_img && (
@@ -389,8 +420,10 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                           {r.sector}{fit ? (fit === "in" ? " · in theme" : " · off theme") : ""}
                         </span>
                       )}
-                      <Stars C={C} n={r.stars} />
-                      <span style={{ fontSize: "0.92rem", fontWeight: 800, color: letterColor(C, r.letter) }}>{r.letter}</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginLeft: isAdmin ? 0 : "auto" }}>
+                        <span style={gradeBadge(r.letter)}>{r.letter}</span>
+                        <Stars C={C} n={r.stars} size="0.72rem" />
+                      </span>
                       {r.taken_at && <span title={"Executed " + String(r.taken_at).slice(0, 10) + " — this gameplan became a live trade"} style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: "#22c55e", background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.4)", padding: "3px 8px", borderRadius: 99 }}>✔ TAKEN</span>}
                       {r._local && <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: C.gold, background: "rgba(201,152,42,0.12)", border: `1px solid ${C.borderGold}`, padding: "3px 8px", borderRadius: 99 }}>LOCAL</span>}
                       {isAdmin && (
@@ -417,7 +450,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                     <div style={{ fontSize: "0.74rem", color: C.muted, marginTop: 5 }}>
                       {r.pct != null ? `${Math.round(r.pct * 100)}% of criteria` : ""}{r.star_hit != null ? ` · ${r.star_hit}/${r.starmakers} ★-makers` : ""}
                     </div>
-                    {r.note && <div style={{ fontSize: "0.86rem", color: C.text, lineHeight: 1.55, marginTop: 9 }}>{r.note}</div>}
+                    {r.note && <div style={{ fontSize: "0.84rem", color: C.text, lineHeight: 1.58, marginTop: 11 }}>{r.note}</div>}
                     <button onClick={() => setOpenId(expanded ? null : r.id)}
                       style={{ marginTop: 11, background: "rgba(201,152,42,0.08)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer" }}>
                       {expanded ? "Hide the scorecard ▴" : "See the scorecard ▾"}
@@ -427,20 +460,25 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
 
                 {/* auditable scorecard: all 16 ticks flat, no subheaders (Valen's spec) */}
                 {expanded && (
-                  <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "3px 22px" }}>
-                    {SECTIONS.flatMap((sec, si) => sec.reminder ? [] : sec.items.map((it, ii) => {
-                      const k = si + "-" + ii, isOn = tickedSet.has(k);
-                      return (
-                        <div key={k} style={{ display: "flex", gap: 8, alignItems: "baseline", padding: "3px 0", fontSize: "0.8rem", lineHeight: 1.4, minWidth: 0 }}>
-                          <span style={{ flex: "0 0 auto", fontWeight: 800, color: isOn ? C.green : "rgba(255,255,255,0.22)" }}>{isOn ? "✓" : "✗"}</span>
-                          <span style={{ color: isOn ? C.text : "rgba(255,255,255,0.35)", minWidth: 0 }}>
+                  <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+                    <div style={{ ...cardHead, paddingBottom: 9, marginBottom: 11 }}>
+                      <span style={{ ...microLabel }}>Setup-Grader Scorecard</span>
+                      <span title="16 scored criteria — ★ marks a confluence factor (★-maker); a gold dot ● marks a tick VIV auto-read off the chart. Every grade is auditable: each star traces to its ticks." style={{ width: 15, height: 15, borderRadius: "50%", border: `1px solid ${C.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 700, fontStyle: "italic", color: faint, cursor: "help", flex: "none" }}>i</span>
+                      <span style={{ background: C.goldDim, color: C.goldBright, fontSize: "0.62rem", fontWeight: 800, padding: "2px 9px", borderRadius: 980, marginLeft: "auto" }}>{tickedSet.size}/16 criteria</span>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {SECTIONS.flatMap((sec, si) => sec.reminder ? [] : sec.items.map((it, ii) => {
+                        const k = si + "-" + ii, isOn = tickedSet.has(k);
+                        return (
+                          <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.72rem", fontWeight: 600, padding: "5px 11px", borderRadius: 980, border: `1px solid ${isOn ? "rgba(34,197,94,0.28)" : C.border}`, background: isOn ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.03)", color: isOn ? C.text : faint }}>
+                            <span style={{ fontWeight: 800, color: isOn ? C.green : "rgba(255,255,255,0.22)" }}>{isOn ? "✓" : "✗"}</span>
                             {it.c}
-                            {it.star && <span title="★-maker (confluence factor)" style={{ marginLeft: 6, fontSize: "0.62rem", color: isOn ? C.goldMid : "rgba(255,255,255,0.2)" }}>★</span>}
-                            {isOn && autoSet.has(k) && <span title="Auto-read from the chart by VIV" style={{ marginLeft: 6, fontSize: "0.56rem", color: C.goldBright }}>●</span>}
+                            {it.star && <span title="★-maker (confluence factor)" style={{ fontSize: "0.62rem", color: isOn ? C.goldMid : "rgba(255,255,255,0.2)" }}>★</span>}
+                            {isOn && autoSet.has(k) && <span title="Auto-read from the chart by VIV" style={{ fontSize: "0.56rem", color: C.goldBright }}>●</span>}
                           </span>
-                        </div>
-                      );
-                    }))}
+                        );
+                      }))}
+                    </div>
                   </div>
                 )}
               </div>

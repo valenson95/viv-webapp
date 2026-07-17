@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ResponsiveContainer, ComposedChart, Area, LineChart, Line, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ScatterChart, Scatter, ZAxis, LabelList,
@@ -19,11 +19,13 @@ import { supabase } from "./supabaseClient";
 //   ladder (fills → campaigns → cohort), so every N can be cross-checked.
 
 const ADMIN_EMAIL = "vc-lv@live.com";
+// Palette aligned to the VIV brand `C` tokens (dashboard-pro) so the research bench reads as
+// the same design system: glass surfaces, pure-white alpha neutrals, brand blue.
 const T = {
-  card: "rgba(255,255,255,0.016)", border: "rgba(255,255,255,0.07)", borderSoft: "rgba(255,255,255,0.05)",
-  text: "#E7E9EE", muted: "#9AA0B0", faint: "#5A6072",
+  card: "rgba(255,255,255,0.042)", border: "rgba(255,255,255,0.09)", borderSoft: "rgba(255,255,255,0.06)",
+  text: "rgba(255,255,255,0.92)", muted: "rgba(255,255,255,0.70)", faint: "rgba(255,255,255,0.45)",
   gold: "#c9982a", goldBright: "#f0c050", goldSoft: "rgba(201,152,42,0.55)",
-  green: "#22c55e", red: "#ef4444", blue: "#7AA2F7", grey: "#7C8496",
+  green: "#22c55e", red: "#ef4444", blue: "#3b82f6", grey: "#7C8496",
   grid: "rgba(255,255,255,0.045)",
 };
 const fmt$ = (v) => v == null ? "—" : (v < 0 ? "−$" : "$") + Math.abs(Math.round(v)).toLocaleString();
@@ -33,42 +35,42 @@ const mean = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
 const median = (a) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
 /* ─── primitives (webapp visual language) ────────────────────────────────── */
+// Card micro-label — muted uppercase, the uniform section header across every card (brand chrome).
 const SecHead = ({ children }) => (
-  <span style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: T.gold }}>{children}</span>
+  <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: T.muted }}>{children}</span>
 );
-const Panel = ({ title, meta, children, footnote, howto, collapsed = false }) => {
+const cardLabel = { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: T.muted };
+// Uniform card: glass surface (via .qcard), header = micro-label + meta + info-dot + collapse
+// chevron, hairline divider below. The "how to read" pointers live in the info-dot tooltip
+// (same pattern as the mockup) so the card body stays clean; nothing is removed, just relocated.
+const Panel = ({ title, meta, children, footnote, howto, tip, collapsed = false, style }) => {
   const [open, setOpen] = useState(!collapsed);
+  const dotTip = tip || (howto ? howto.filter(Boolean).map(h => "· " + h).join("\n") : null);
   return (
-    <section style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "16px 20px", marginBottom: 16 }}>
-      <header onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "baseline", gap: 12, cursor: "pointer", userSelect: "none" }}>
-        <SecHead>{title}</SecHead>
-        <span style={{ flex: 1, borderBottom: `1px solid ${T.borderSoft}`, transform: "translateY(-3px)" }} />
-        {meta && <span style={{ fontSize: "0.64rem", color: T.faint, fontVariantNumeric: "tabular-nums" }}>{meta}</span>}
+    <section className="qcard" style={style}>
+      <div onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none", paddingBottom: open ? 11 : 0, marginBottom: open ? 14 : 0, borderBottom: open ? `1px solid ${T.border}` : "none" }}>
+        <span style={{ ...cardLabel, flex: 1 }}>{title}</span>
+        {meta && <span style={{ fontSize: "0.66rem", color: T.faint, fontVariantNumeric: "tabular-nums" }}>{meta}</span>}
+        {dotTip && <span className="idot" data-tip={dotTip} onClick={e => e.stopPropagation()}>i</span>}
         <span style={{ fontSize: "0.7rem", color: T.faint }}>{open ? "▴" : "▾"}</span>
-      </header>
-      {open && <div style={{ marginTop: 14 }}>{children}</div>}
-      {/* "How to read" as scannable ROWS, one pointer each — never a wall of prose (Valen) */}
-      {open && howto && (
-        <div style={{ marginTop: 12, borderTop: `1px solid ${T.borderSoft}`, paddingTop: 10 }}>
-          <div style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.faint, marginBottom: 6 }}>How to read</div>
-          {howto.map((h, i) => (
-            <div key={i} style={{ display: "flex", gap: 9, padding: "3px 0", fontSize: "0.7rem", lineHeight: 1.55, color: T.muted }}>
-              <span style={{ color: T.gold, flex: "none" }}>·</span><span>{h}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      </div>
+      {open && <div>{children}</div>}
       {open && footnote && <p style={{ margin: "12px 0 0", fontSize: "0.68rem", lineHeight: 1.6, color: T.muted, maxWidth: "92ch" }}>{footnote}</p>}
     </section>
   );
 };
 const Kpi = ({ label, value, tone, sub, tip }) => (
-  <div style={{ flex: "1 1 138px", minWidth: 138, padding: "2px 18px 2px 0", borderRight: `1px solid ${T.borderSoft}` }}>
-    <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: T.faint }}>
-      {tip ? <span className="term" data-tip={tip}>{label}</span> : label}
+  <div className="qcard kpicard">
+    <div className="kpihead">
+      <span style={{ ...cardLabel, flex: 1 }}>{label}</span>
+      {tip && <span className="idot" data-tip={tip}>i</span>}
     </div>
-    <div style={{ fontSize: "1.35rem", fontWeight: 800, color: tone || T.text, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em", marginTop: 3 }}>{value}</div>
-    {sub && <div style={{ fontSize: "0.62rem", color: T.muted, marginTop: 2, lineHeight: 1.45 }}>{sub}</div>}
+    <div className="kpibody">
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: "1.4rem", fontWeight: 800, color: tone || T.text, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em", lineHeight: 1.05, whiteSpace: "nowrap" }}>{value}</div>
+        {sub && <div style={{ fontSize: "0.66rem", color: T.muted, marginTop: 4, lineHeight: 1.4 }}>{sub}</div>}
+      </div>
+    </div>
   </div>
 );
 const dot = (c) => <i style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: c, marginRight: 7, verticalAlign: "middle" }} />;
@@ -87,24 +89,37 @@ const Say = ({ children, points }) => (
       : children}
   </div>
 );
-const Chip = ({ ok, children }) => (
-  <span style={{ fontWeight: 800, fontSize: "0.62rem", whiteSpace: "nowrap", color: ok == null ? T.muted : ok ? T.green : T.red }}>
-    {ok == null ? "—" : (ok ? "✓ " : "✕ ")}{children}
-  </span>
-);
+// Verdict pill — brand pass/miss chip (green / red / neutral), same shape everywhere.
+const Chip = ({ ok, children }) => {
+  const c = ok == null
+    ? { bg: "rgba(255,255,255,0.05)", bd: "rgba(255,255,255,0.14)", fg: T.muted }
+    : ok
+      ? { bg: "rgba(34,197,94,0.10)", bd: "rgba(34,197,94,0.32)", fg: "#86efac" }
+      : { bg: "rgba(239,68,68,0.10)", bd: "rgba(239,68,68,0.32)", fg: "#fca5a5" };
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.02em", padding: "3px 10px", borderRadius: 980, whiteSpace: "nowrap", background: c.bg, border: `1px solid ${c.bd}`, color: c.fg }}>
+      {children}
+    </span>
+  );
+};
 // Donut gauge (Rocketsheets-style ring, doctrine colours) — pct 0..100, number in the centre
 const Donut = ({ pct, center, label, sub, color = T.gold, tip }) => {
   const r = 25, cir = 2 * Math.PI * r, f = Math.min(1, Math.max(0, (pct || 0) / 100));
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "1 1 150px", minWidth: 150, padding: "2px 14px 2px 0", borderRight: `1px solid ${T.borderSoft}` }}>
-      <svg width="64" height="64" viewBox="0 0 64 64" style={{ flex: "none" }}>
-        <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
-        <circle cx="32" cy="32" r={r} fill="none" stroke={color} strokeWidth="6" strokeDasharray={`${(cir * f).toFixed(1)} ${cir.toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 32 32)" />
-        <text x="32" y="36" textAnchor="middle" fill={T.text} fontSize="12.5" fontWeight="800" style={{ fontVariantNumeric: "tabular-nums" }}>{center}</text>
-      </svg>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: T.faint }}>{tip ? <span className="term" data-tip={tip}>{label}</span> : label}</div>
-        {sub && <div style={{ fontSize: "0.62rem", color: T.muted, marginTop: 2, lineHeight: 1.45 }}>{sub}</div>}
+    <div className="qcard kpicard">
+      <div className="kpihead">
+        <span style={{ ...cardLabel, flex: 1 }}>{label}</span>
+        {tip && <span className="idot" data-tip={tip}>i</span>}
+      </div>
+      <div className="kpibody">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <svg width="56" height="56" viewBox="0 0 64 64" style={{ flex: "none" }}>
+            <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
+            <circle cx="32" cy="32" r={r} fill="none" stroke={color} strokeWidth="6" strokeDasharray={`${(cir * f).toFixed(1)} ${cir.toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 32 32)" />
+            <text x="32" y="37" textAnchor="middle" fill={T.text} fontSize="13" fontWeight="800" style={{ fontVariantNumeric: "tabular-nums" }}>{center}</text>
+          </svg>
+          {sub && <div style={{ minWidth: 0, fontSize: "0.66rem", color: T.muted, lineHeight: 1.45 }}>{sub}</div>}
+        </div>
       </div>
     </div>
   );
@@ -177,6 +192,33 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
   const [sortKey, setSortKey] = useState("pl");
   const [sortDir, setSortDir] = useState(-1);
   const [eqMaP, setEqMaP] = useState(10);
+
+  // ── cohort toggle must not scroll-jump. Switching cohorts re-renders the whole page (different
+  // N → different content height); pin the scroll position of the actual scroll container across
+  // that reflow so the click never visibly moves the page (same fix the mockup applies).
+  const rootRef = useRef(null);
+  const pendingScroll = useRef(null);
+  const findScrollParent = () => {
+    let el = rootRef.current?.parentElement;
+    while (el) {
+      const oy = getComputedStyle(el).overflowY;
+      if ((oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight) return el;
+      el = el.parentElement;
+    }
+    return null;
+  };
+  const switchMode = (k) => {
+    if (k === mode) return;
+    const sp = findScrollParent();
+    pendingScroll.current = sp ? { el: sp, top: sp.scrollTop } : { el: null, top: window.scrollY };
+    setMode(k);
+  };
+  useLayoutEffect(() => {
+    const p = pendingScroll.current;
+    if (!p) return;
+    if (p.el) p.el.scrollTop = p.top; else window.scrollTo(window.scrollX, p.top);
+    pendingScroll.current = null;
+  }, [mode]);
 
   useEffect(() => {
     if (!isAdmin || !session?.user?.id) return;
@@ -468,7 +510,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
   );
 
   return (
-    <div className="qa" style={{ fontFamily: font, maxWidth: 1440, margin: "0 auto", color: T.text }}>
+    <div className="qa" ref={rootRef} style={{ fontFamily: font, maxWidth: 1440, margin: "0 auto", color: T.text }}>
       {/* .term tooltips are scoped to .vj/.vp in App.jsx — this page needs its own scope or every
           data-tip is silently dead (Valen found the definitions never showed, 2026-07-11). */}
       <style>{`
@@ -482,28 +524,64 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           text-transform:none; letter-spacing:0; text-align:left; font-variant-numeric:normal;
           box-shadow:0 10px 30px rgba(0,0,0,0.6)}
         .qa .term.tipright:hover::after{left:auto; right:0}
+        /* ── uniform card chrome (brand glass surface) ── */
+        .qa .qcard{position:relative; background:rgba(255,255,255,0.042); border:1px solid rgba(255,255,255,0.09); border-radius:16px; backdrop-filter:blur(24px) saturate(150%); -webkit-backdrop-filter:blur(24px) saturate(150%); padding:18px 20px; overflow:visible; margin-bottom:14px}
+        .qa .qcard::before{content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit; background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)}
+        /* ── info dot (how-to-read lives in its tooltip) ── */
+        .qa .idot{width:15px; height:15px; border-radius:50%; border:1px solid rgba(255,255,255,0.14); display:inline-flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic; color:rgba(255,255,255,0.45); cursor:help; flex:none; position:relative}
+        .qa .idot:hover{color:#c9982a; border-color:rgba(201,152,42,0.4)}
+        .qa .idot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:320px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 13px; font-size:0.68rem; font-weight:500; line-height:1.6; color:#E7E9EE; text-transform:none; letter-spacing:0; white-space:pre-line; text-align:left; font-variant-numeric:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+        /* ── KPI strip ── */
+        .qa .kpistrip{display:grid; grid-template-columns:repeat(auto-fit, minmax(158px,1fr)); gap:14px; margin-bottom:14px}
+        .qa .kpicard{min-height:112px; padding:14px 18px; display:flex; flex-direction:column; margin-bottom:0}
+        .qa .kpihead{display:flex; align-items:center; gap:8px; padding-bottom:8px; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.09)}
+        .qa .kpibody{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-height:0}
+        @media(max-width:760px){ .qa .kpistrip{grid-template-columns:repeat(2,1fr)} }
+        /* ── paired card rows ── */
+        .qa .halfgrid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px}
+        .qa .exitgrid{display:grid; grid-template-columns:repeat(auto-fit, minmax(430px,1fr)); gap:14px; margin-bottom:14px}
+        .qa .halfgrid > *, .qa .exitgrid > *{margin-bottom:0}
+        @media(max-width:1000px){ .qa .halfgrid{grid-template-columns:1fr} }
         body.qa-open .viv-cursor-glow{display:none !important}
       `}</style>
-      {/* header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "4px 0 18px", flexWrap: "wrap" }}>
-        {[["dashboard", "← Dashboard"], ["journal", "Journal"], ["tools", "Premium tools"], ["daily", "Daily Setups"], ["modelbook", "Model Book"], ["studies", "Studies"], ["settings", "Settings"]].map(([pg, label]) => (
-          <button key={pg} onClick={() => { if (pg === "studies") { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); } else setPage && setPage(pg); }}
-            style={{ background: "transparent", border: `1px solid ${T.border}`, color: T.muted, borderRadius: 8, padding: "5px 13px", cursor: "pointer", fontFamily: font, fontSize: "0.72rem" }}>{label}</button>
-        ))}
-        <div>
-          <div style={{ fontSize: "1.05rem", fontWeight: 800, letterSpacing: "-0.01em" }}>Quant Analysis</div>
-          <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 1 }}>{mode === "sys" ? `SYSTEM COHORT · ENTERED ≥ ${data.systemEntry} · LIVE RECORD` : `STRESS-TEST OVERLAY · FULL HISTORY SINCE ${data.since || "2026-05-01"}`} · N={A.n} CLOSED CAMPAIGNS</div>
+      {/* nav — pill tab bar (Quant active). Page renders standalone in App.jsx, so these buttons
+          are the only way to navigate away — kept fully wired to setPage. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
+        <div style={{ display: "inline-flex", gap: 4, background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, borderRadius: 980, padding: 4, flexWrap: "wrap" }}>
+          {[["dashboard", "Dashboard"], ["journal", "Journal"], ["tools", "Premium tools"], ["daily", "Daily Setups"], ["modelbook", "Model Book"], ["studies", "Studies"], ["quant", "Quant"], ["settings", "Settings"]].map(([pg, label]) => {
+            const active = pg === "quant";
+            return (
+              <button key={pg} onClick={() => { if (active) return; if (pg === "studies") { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); } else setPage && setPage(pg); }}
+                style={{ border: "none", cursor: active ? "default" : "pointer", fontFamily: font, background: active ? "rgba(201,152,42,0.15)" : "transparent", color: active ? T.goldBright : T.muted, fontSize: "0.78rem", fontWeight: 700, padding: "7px 16px", borderRadius: 980 }}>{label}</button>
+            );
+          })}
         </div>
-        <span style={{ display: "inline-flex", gap: 4, marginLeft: 6 }}>
-          {[["sys", "System cohort"], ["all", "Stress-test (full)"]].map(([k, lab2]) => (
-            <button key={k} onClick={() => setMode(k)} title={k === "sys" ? `Campaigns entered on/after ${data.systemEntry} — the 3-stop / derisk-trim book, tracked in real time. Small n by design: it grows with every new trade.` : `Your FULL history since ${data.since || "May"} (incl. the recovered pre-system book) replayed through the new entry criteria — a stress test of the rules, NOT the system's live record`}
-              style={{ background: mode === k ? "rgba(201,152,42,0.12)" : "transparent", border: `1px solid ${mode === k ? T.gold : T.border}`, color: mode === k ? T.goldBright : T.faint, borderRadius: 8, padding: "4px 11px", cursor: "pointer", fontFamily: font, fontSize: "0.68rem", fontWeight: 700 }}>{lab2}</button>
-          ))}
-        </span>
-        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.1em", color: stTone, border: `1px solid ${stTone}44`, borderRadius: 99, padding: "4px 13px" }}>
-          {dot(stTone)}{String(verdict).toUpperCase().replace(/-/g, " ")}
-        </span>
-        <span style={{ fontSize: "0.62rem", color: T.faint }}>{String(data.asof).slice(0, 16).replace("T", " ")} UTC</span>
+      </div>
+
+      {/* command header */}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap", marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: T.gold }}>Quant</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 5, flexWrap: "wrap" }}>
+            <h1 style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", margin: 0 }}>Quant Analysis</h1>
+            <span style={{ display: "inline-flex", border: `1px solid ${T.border}`, borderRadius: 980, padding: 3, gap: 2, background: "rgba(255,255,255,0.02)" }}
+              title="Same population as the journal, two cuts — the toggle IS the reconciliation">
+              {[["sys", "System cohort"], ["all", "Stress-test (full)"]].map(([k, lab2]) => (
+                <button key={k} onClick={() => switchMode(k)} title={k === "sys" ? `Campaigns entered on/after ${data.systemEntry} — the 3-stop / derisk-trim book, tracked in real time. Small n by design: it grows with every new trade.` : `Your FULL history since ${data.since || "May"} (incl. the recovered pre-system book) replayed through the new entry criteria — a stress test of the rules, NOT the system's live record`}
+                  style={{ border: "none", background: mode === k ? "rgba(201,152,42,0.15)" : "transparent", color: mode === k ? T.goldBright : T.muted, cursor: "pointer", fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "6px 14px", borderRadius: 980, letterSpacing: "0.02em" }}>{lab2}</button>
+              ))}
+            </span>
+            <span style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.08em", padding: "3px 10px", borderRadius: 980, background: "rgba(201,152,42,0.15)", color: T.goldBright, border: `1px solid rgba(201,152,42,0.22)` }}
+              title="Admin-only research bench — never shown to members">ADMIN</span>
+          </div>
+          <div style={{ fontSize: "0.8rem", color: T.muted, marginTop: 6 }}>{mode === "sys" ? `System cohort · entered ≥ ${data.systemEntry}` : `Stress-test (full) · full history since ${data.since || "2026-05-01"}, incl. recovered pre-system book`} · N={A.n} closed campaigns · the journal records your trades, this page judges the system behind them</div>
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.08em", padding: "6px 14px", borderRadius: 980, whiteSpace: "nowrap", background: `${stTone}1a`, color: stTone, border: `1px solid ${stTone}59` }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: stTone }} />{String(verdict).toUpperCase().replace(/-/g, " ")}
+          </span>
+          <span style={{ fontSize: "0.66rem", color: T.faint }}>{String(data.asof).slice(0, 16).replace("T", " ")} UTC</span>
+        </div>
       </div>
 
       {/* how to read this page — the 30-second orientation */}
@@ -524,90 +602,52 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         </div>
       </section>
 
-      {/* reconciliation — why this N vs the journal's N */}
-      <Panel title="What's counted here (vs the journal)" meta={`${rec.fillsVerified ?? "—"} fills → ${rec.campaignsAll ?? allCamps.length} campaigns → ${rec.campaignsSystem ?? "—"} system`}
-        howto={[
-          "The journal page counts campaign rows across its date filter; this page counts the SAME campaigns, chosen by the toggle above.",
-          "Stress-test (full) = your ENTIRE verified history, incl. the recovered pre-system book (May–Jun manual rows, dates census-proven, zero overlap with pipeline rows) — old trades replayed through the new entry criteria.",
-          "System cohort = the LIVE record — only trades entered under the system. Recovered history can never enter it (the build asserts this and dies if violated).",
-          "Every number on this page is computed from exactly the cohort named in the header — nothing is inherited from a different population.",
-          "R sanity: every recovered row's recorded R is recomputed from its own entry/stop/exit — mismatches would be listed here by name.",
-        ]}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 26px" }}>
-          {[
-            ["Fills since " + (rec.since || "May"), rec.fillsAll],
-            ["Pipeline-verified", rec.fillsVerified],
-            ["Recovered legacy (dates normalized)", rec.recoveredLegacy],
-            ["Unrecoverable / failed sanity", rec.legacyExcluded],
-            ["Dupes dropped (by broker exec id)", rec.dupesDropped],
-            ["Exit-only fills attached by stop match", rec.exitOnlyAttached],
-            ["Exit-only orphans ($-stats only)", rec.exitOnlyOrphans],
-            ["Impossible clock times dropped", rec.impossibleTimesDropped],
-            ["R cross-check (recovered rows)", rec.rCrossCheck ? `${rec.rCrossCheck.checked - rec.rCrossCheck.mismatched}/${rec.rCrossCheck.checked} match` : "—"],
-            ["→ Campaigns (stress-test full)", rec.campaignsAll ?? allCamps.length],
-            ["→ System cohort (≥ " + (rec.systemEntry || data.systemEntry) + ")", rec.campaignsSystem],
-            ["Option campaigns", rec.optionCampaigns ?? 0],
-            ["Open runners (not counted)", rec.openRunners],
-          ].map(([k, val]) => (
-            <div key={k}>
-              <div style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.faint }}>{k}</div>
-              <div style={{ fontSize: "0.9rem", fontWeight: 700, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{val ?? "—"}</div>
-            </div>
-          ))}
+      {/* KPI strip — donuts for the two ratio dials, trend arrows = last 10 trades vs all-time */}
+      <div className="kpistrip">
+          <Kpi label="Net P&L" value={fmt$(A.net)} tone={A.net >= 0 ? T.green : T.red} sub="this cohort, closed only"
+            tip={"· realized $ across this cohort's closed campaigns\n· no direct lever — it follows expectancy × trades × sizing\n· fix the inputs, not the output"} />
+          <Kpi label="Expectancy" value={sgnR(A.expR)} tone={(A.expR ?? 0) >= 0 ? T.green : T.red}
+            tip={"· average R per closed campaign — the edge itself\n· lever 1: stop losses beyond the design cap → Entries\n· lever 2: bank more of what winners offer → Exits\n· everything else is noise"}
+            sub={extra.r10 != null ? <>last 10: <b style={{ color: extra.r10 >= (A.expR ?? 0) ? T.green : T.red }}>{sgnR(extra.r10)} {extra.r10 >= (A.expR ?? 0) ? "▲ improving" : "▼ declining"}</b></> : "mean R / campaign"} />
+          <Donut pct={A.wr} center={A.wr == null ? "—" : Math.round(A.wr) + "%"} label="Win rate"
+            tip={"· share of campaigns that closed positive\n· improve: stricter entry gates (fresh ≤4×, tight LoD)\n· don't chase it — your design only needs ~40%\n· forcing more shrinks the big winners that pay for everything"}
+            sub={extra.w10 != null ? <>{A.nW}W/{A.nL}L · last 10: <b style={{ color: extra.w10 >= (A.wr ?? 0) ? T.green : T.red }}>{extra.w10}% {extra.w10 >= (A.wr ?? 0) ? "▲" : "▼"}</b></> : `${A.nW}W / ${A.nL}L`} />
+          <Donut pct={A.payoff != null ? Math.min(100, A.payoff / 3 * 100) : 0} center={num(A.payoff)} label="Payoff ($)"
+            tip={"· average $ win ÷ average $ loss\n· improve the top: capture more of system-max → Exits\n· improve the bottom: losers at their design cap → Entries\n· ring fills at 3.0 — comfortable homerun-system level"}
+            sub={`breakeven needs ${num(A.wBE)} · ring full at 3.0`} />
+          <Kpi label="Profit factor" value={A.pf === Infinity ? "∞" : num(A.pf)} sub="gross won ÷ gross lost"
+            tip={"· TOTAL $ won ÷ TOTAL $ lost (frequency included)\n· 1.0 = breakeven · 1.3+ = worth pressing\n· same 2 levers as expectancy\n· one deep loss drags it hard — hence the deep-loss benchmark"} />
+          <Kpi label="SQN" value={num(A.sqn)} sub="Tharp scale · 2+ good"
+            tip={"· System Quality Number: average R ÷ spread of results × √n\n· rewards CONSISTENCY — same average, steadier results = higher score\n· scale: <1.6 hard to trade · 2–3 good · 3+ excellent\n· improve: cap deep losses · no oversized one-offs · log more trades (√n)"} />
+          <Kpi label="Sample" value={`${A.n} / 50`} sub={A.n >= 30 ? "outcome readable" : "building to 30 — judge adherence"}
+            tip={"· closed campaigns in this cohort\n· under 30: 2–3 trades can flip verdicts → judge ADHERENCE, not outcome\n· at 30: the edge's sign is readable\n· at 50: Monte Carlo calibrated"} />
         </div>
-        {rec.rCrossCheck?.mismatched > 0 && (
-          <div style={{ fontSize: "0.68rem", color: T.red, marginTop: 10 }}>R mismatches (recorded vs recomputed — treat these rows' R as unverified): {(rec.rCrossCheck.rows || []).join(" · ")}</div>
-        )}
-        {(rec.unparseableRows || []).length > 0 && (
-          <div style={{ fontSize: "0.68rem", color: T.red, marginTop: 6 }}>Unrecoverable rows (by name): {rec.unparseableRows.join(" · ")}</div>
-        )}
-      </Panel>
-
-      {/* DATA COVERAGE — every exclusion NAMED. An unnamed exclusion is how "is AMD missing?"
-          happens; this panel makes silent data loss structurally impossible to hide. */}
-      {data.coverage && (
-        <Panel title="Data coverage — every exclusion has a name" meta={`${data.coverage.scored} of ${allCamps.length} campaigns fully scored · ${data.coverage.intraday0} with intraday day-0`} collapsed
-          footnote="Scored = has bar-derived metrics (MFE/MAE, sims). A campaign can still count in win rate and $ P&L while excluded here — exclusion reasons are about the R/bar math only. If a name you traded is missing from BOTH the scored set and this list, that IS a bug: flag it immediately.">
-          {(data.coverage.excluded || []).length === 0
-            ? <div style={{ fontSize: "0.72rem", color: T.muted }}>Nothing excluded — every campaign carries full metrics.</div>
-            : (data.coverage.excluded || []).map((x, i) => (
-              <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "6px 4px", borderTop: i ? `1px solid ${T.borderSoft}` : "none", fontSize: "0.72rem" }}>
-                <b style={{ minWidth: 56 }}>{x.t}</b>
-                <span style={{ color: T.muted, minWidth: 84, fontVariantNumeric: "tabular-nums" }}>{x.d || "no date"}</span>
-                <span style={{ color: T.faint, fontSize: "0.66rem" }}>{x.sys ? "system cohort" : "full journal"}</span>
-                <span style={{ color: T.muted, flex: "1 1 240px" }}>{x.why}</span>
-              </div>
-            ))}
-          {(data.coverage.barsMissing || []).length > 0 && <div style={{ fontSize: "0.66rem", color: T.red, marginTop: 8 }}>Price-feed gaps (rerun the ledger; if persistent, the ticker may be delisted/renamed): {data.coverage.barsMissing.join(" · ")}</div>}
-          {/* WHY SECTION SAMPLE SIZES DIFFER — each metric needs different inputs; every n is
-              traceable to a rule here, not a bug (Valen asked, 2026-07-11) */}
-          <div style={{ marginTop: 14, borderTop: `1px solid ${T.borderSoft}`, paddingTop: 10 }}>
-            <div style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Why sections show different sample sizes</div>
+        {/* R-vs-$ reconciliation — shown whenever the two disagree in sign or the risk unit is
+            wildly uneven. Partials ARE counted; the gap is SIZING, and it names names. */}
+        {sizing.uw != null && sizing.ul != null && (((A.net ?? 0) < 0) !== ((A.expR ?? 0) < 0) || sizing.ul > sizing.uw * 1.5 || sizing.uw > sizing.ul * 1.5) && (
+          <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 12, background: "rgba(201,152,42,0.05)", border: "1px solid rgba(201,152,42,0.3)" }}>
+            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Why R and $ disagree — your risk unit wasn't constant</div>
             {[
-              [`${A.n}`, "All closed campaigns in this cohort", "scoreboard $ rows, win rate, per-ticker P&L"],
-              [`${A.nR}`, "…that also have an R (needs an original stop)", "R distribution, equity curve, Monte Carlo"],
-              [`${rows.filter(c => c.mfeR != null).length}`, "…that also have price bars for the whole trade", "trim tournament, 3-stop replay, MFE/MAE"],
-              [`${lab.wMAEn}`, "…winners only, with post-entry dip data", "3-stop rung table"],
-              [`${lab.capN}`, "…winners only, with a system-max ceiling to compare against", "Exits capture"],
-              [`${dk.trimDays?.length ?? 0}`, "…campaigns you actually trimmed", "trim adherence"],
-              [`${data.waitGate?.simmed ?? 0} of ${data.waitGate?.eligible ?? 0}`, "…entered before 10:00 ET with a recorded entry time", "30-min wait gate"],
-            ].map(([n2, why, used], i) => (
-              <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "4px 0", fontSize: "0.7rem", alignItems: "baseline" }}>
-                <b style={{ minWidth: 64, fontVariantNumeric: "tabular-nums" }}>{n2}</b>
-                <span style={{ color: T.muted, flex: "1 1 260px", minWidth: 0 }}>{why}</span>
-                <span style={{ color: T.faint, fontSize: "0.64rem" }}>{used}</span>
+              <>Not a math error, and partials ARE counted — every campaign is all its legs summed; R is blended against the initial risk.</>,
+              <>This cohort made <b>{sgnR(sizing.sumR)}</b> across {sizing.nR} R-scored campaigns, yet {fmt$(A.net)} in dollars — because <b>$ risked per 1R was not the same trade to trade</b>.</>,
+              <>Losers carried <b>{fmt$(sizing.ul)}</b> of risk per R on average vs <b>{fmt$(sizing.uw)}</b> on winners — the losses were simply BIGGER bets.</>,
+              sizing.big && sizing.small && <>Extremes: <b>{sizing.big.ticker}</b> risked ≈{fmt$(sizing.unit(sizing.big))}/R while <b>{sizing.small.ticker}</b> risked ≈{fmt$(sizing.unit(sizing.small))}/R — a {Math.round(sizing.unit(sizing.big) / Math.max(1, sizing.unit(sizing.small)))}× spread.</>,
+              sizing.evenNet != null && <>At ONE constant unit (≈{fmt$(sizing.mid)}/R) the same R would have been ≈ <b style={{ color: sizing.evenNet >= 0 ? T.green : T.red }}>{fmt$(sizing.evenNet)}</b>.</>,
+              sizing.noRn > 0 && <>{sizing.noRn} campaign{sizing.noRn === 1 ? "" : "s"} without a recorded R ({fmt$(sizing.noRpl)}) count in $ but are invisible to expectancy.</>,
+              <>Fix: R-based sizing only works when 1R = the SAME dollars everywhere — pick the unit, size every entry to it.</>,
+            ].filter(Boolean).map((p, i) => (
+              <div key={i} style={{ display: "flex", gap: 9, padding: "2px 0", fontSize: "0.72rem", lineHeight: 1.6, color: T.muted }}>
+                <span style={{ color: T.gold, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
               </div>
             ))}
-            <div style={{ fontSize: "0.64rem", color: T.faint, marginTop: 4 }}>Each row is a subset of the one above it. A metric never silently drops a trade the rule doesn't exclude.</div>
           </div>
-        </Panel>
-      )}
+        )}
 
       {/* BENCHMARK SCOREBOARD — the religious tracker */}
-      <section style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "16px 20px", marginBottom: 16 }}>
-        <div style={{ marginBottom: 10 }}>
-          <SecHead>System scoreboard — is the system doing its job?</SecHead>
-          <div style={{ fontSize: "0.68rem", color: T.muted, marginTop: 4, lineHeight: 1.6 }}>Ten numbers, each with a FIXED target the system was designed to. This is the whole page in one table — everything below only explains the misses.</div>
+      <section className="qcard">
+        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${T.border}` }}>
+          <span style={{ ...cardLabel, flex: 1 }}>System scoreboard — is the system doing its job?</span>
+          <span className="idot" data-tip={"Ten numbers, each with a FIXED target the system was designed to. This is the whole page in one table — everything below only explains the misses."}>i</span>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "4px 12px", padding: "12px 16px", borderRadius: 12, background: bd.bg, border: `1px solid ${bd.bd}`, marginBottom: 12 }}>
           <b style={{ color: bd.col, fontSize: "0.95rem", fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{bd.word}</b>
@@ -638,51 +678,9 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         <div style={{ fontSize: "0.62rem", color: T.muted, marginTop: 8, lineHeight: 1.5 }}>Benchmarks are fixed system targets, not aspirations — a MISS names the exact lab section below that explains it. Judge adherence (not outcome) until n ≥ 30; outcome readable at 30; Monte Carlo calibrated at 50.</div>
       </section>
 
-      {/* KPI strip — donuts for the two ratio dials, trend arrows = last 10 trades vs all-time */}
-      <section style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "14px 20px", marginBottom: 16 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "14px 18px", alignItems: "center" }}>
-          <Kpi label="Net P&L" value={fmt$(A.net)} tone={A.net >= 0 ? T.green : T.red} sub="this cohort, closed only"
-            tip={"· realized $ across this cohort's closed campaigns\n· no direct lever — it follows expectancy × trades × sizing\n· fix the inputs, not the output"} />
-          <Kpi label="Expectancy" value={sgnR(A.expR)} tone={(A.expR ?? 0) >= 0 ? T.green : T.red}
-            tip={"· average R per closed campaign — the edge itself\n· lever 1: stop losses beyond the design cap → Entries\n· lever 2: bank more of what winners offer → Exits\n· everything else is noise"}
-            sub={extra.r10 != null ? <>last 10: <b style={{ color: extra.r10 >= (A.expR ?? 0) ? T.green : T.red }}>{sgnR(extra.r10)} {extra.r10 >= (A.expR ?? 0) ? "▲ improving" : "▼ declining"}</b></> : "mean R / campaign"} />
-          <Donut pct={A.wr} center={A.wr == null ? "—" : Math.round(A.wr) + "%"} label="Win rate"
-            tip={"· share of campaigns that closed positive\n· improve: stricter entry gates (fresh ≤4×, tight LoD)\n· don't chase it — your design only needs ~40%\n· forcing more shrinks the big winners that pay for everything"}
-            sub={extra.w10 != null ? <>{A.nW}W/{A.nL}L · last 10: <b style={{ color: extra.w10 >= (A.wr ?? 0) ? T.green : T.red }}>{extra.w10}% {extra.w10 >= (A.wr ?? 0) ? "▲" : "▼"}</b></> : `${A.nW}W / ${A.nL}L`} />
-          <Donut pct={A.payoff != null ? Math.min(100, A.payoff / 3 * 100) : 0} center={num(A.payoff)} label="Payoff ($)"
-            tip={"· average $ win ÷ average $ loss\n· improve the top: capture more of system-max → Exits\n· improve the bottom: losers at their design cap → Entries\n· ring fills at 3.0 — comfortable homerun-system level"}
-            sub={`breakeven needs ${num(A.wBE)} · ring full at 3.0`} />
-          <Kpi label="Profit factor" value={A.pf === Infinity ? "∞" : num(A.pf)} sub="gross won ÷ gross lost"
-            tip={"· TOTAL $ won ÷ TOTAL $ lost (frequency included)\n· 1.0 = breakeven · 1.3+ = worth pressing\n· same 2 levers as expectancy\n· one deep loss drags it hard — hence the deep-loss benchmark"} />
-          <Kpi label="SQN" value={num(A.sqn)} sub="Tharp scale · 2+ good"
-            tip={"· System Quality Number: average R ÷ spread of results × √n\n· rewards CONSISTENCY — same average, steadier results = higher score\n· scale: <1.6 hard to trade · 2–3 good · 3+ excellent\n· improve: cap deep losses · no oversized one-offs · log more trades (√n)"} />
-          <Kpi label="Sample" value={`${A.n} / 50`} sub={A.n >= 30 ? "outcome readable" : "building to 30 — judge adherence"}
-            tip={"· closed campaigns in this cohort\n· under 30: 2–3 trades can flip verdicts → judge ADHERENCE, not outcome\n· at 30: the edge's sign is readable\n· at 50: Monte Carlo calibrated"} />
-        </div>
-        {/* R-vs-$ reconciliation — shown whenever the two disagree in sign or the risk unit is
-            wildly uneven. Partials ARE counted; the gap is SIZING, and it names names. */}
-        {sizing.uw != null && sizing.ul != null && (((A.net ?? 0) < 0) !== ((A.expR ?? 0) < 0) || sizing.ul > sizing.uw * 1.5 || sizing.uw > sizing.ul * 1.5) && (
-          <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 12, background: "rgba(201,152,42,0.05)", border: "1px solid rgba(201,152,42,0.3)" }}>
-            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Why R and $ disagree — your risk unit wasn't constant</div>
-            {[
-              <>Not a math error, and partials ARE counted — every campaign is all its legs summed; R is blended against the initial risk.</>,
-              <>This cohort made <b>{sgnR(sizing.sumR)}</b> across {sizing.nR} R-scored campaigns, yet {fmt$(A.net)} in dollars — because <b>$ risked per 1R was not the same trade to trade</b>.</>,
-              <>Losers carried <b>{fmt$(sizing.ul)}</b> of risk per R on average vs <b>{fmt$(sizing.uw)}</b> on winners — the losses were simply BIGGER bets.</>,
-              sizing.big && sizing.small && <>Extremes: <b>{sizing.big.ticker}</b> risked ≈{fmt$(sizing.unit(sizing.big))}/R while <b>{sizing.small.ticker}</b> risked ≈{fmt$(sizing.unit(sizing.small))}/R — a {Math.round(sizing.unit(sizing.big) / Math.max(1, sizing.unit(sizing.small)))}× spread.</>,
-              sizing.evenNet != null && <>At ONE constant unit (≈{fmt$(sizing.mid)}/R) the same R would have been ≈ <b style={{ color: sizing.evenNet >= 0 ? T.green : T.red }}>{fmt$(sizing.evenNet)}</b>.</>,
-              sizing.noRn > 0 && <>{sizing.noRn} campaign{sizing.noRn === 1 ? "" : "s"} without a recorded R ({fmt$(sizing.noRpl)}) count in $ but are invisible to expectancy.</>,
-              <>Fix: R-based sizing only works when 1R = the SAME dollars everywhere — pick the unit, size every entry to it.</>,
-            ].filter(Boolean).map((p, i) => (
-              <div key={i} style={{ display: "flex", gap: 9, padding: "2px 0", fontSize: "0.72rem", lineHeight: 1.6, color: T.muted }}>
-                <span style={{ color: T.gold, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* WHERE THE MONEY CAME FROM — per-ticker campaign P&L, top and bottom */}
-      <Panel title="Where the money came from — by ticker" meta={`${mode === "sys" ? "system cohort" : "full journal"} · closed campaigns`}
+      {/* WHERE THE MONEY CAME FROM + RESULT SHAPE — two half-width cards, stack < 1000px */}
+      <div className="halfgrid">
+        <Panel title="Where the money came from — by ticker" meta={`${mode === "sys" ? "system cohort" : "full journal"} · closed campaigns`}
         howto={[
           "Each bar = one ticker's TOTAL closed P&L in this cohort (all its campaigns summed).",
           "Left = who paid you. Right = who cost you. Bar length is proportional to dollars.",
@@ -691,7 +689,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         <Say>
           {byTicker.top[0] ? <><b>{byTicker.top[0].t}</b> is your biggest earner at <b style={{ color: T.green }}>{fmt$(byTicker.top[0].pl)}</b>{byTicker.bottom[0] ? <>; <b>{byTicker.bottom[0].t}</b> cost the most at <b style={{ color: T.red }}>{fmt$(byTicker.bottom[0].pl)}</b></> : null}.</> : <>No closed campaigns in this cohort yet.</>}
         </Say>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 18 }}>
           {[{ list: byTicker.top, label: "TOP EARNERS", col: T.green }, { list: byTicker.bottom, label: "BIGGEST COSTS", col: T.red }].map((side, si) => (
             <div key={si}>
               <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 6 }}>{side.label}</div>
@@ -709,6 +707,38 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
           ))}
         </div>
       </Panel>
+        <Panel title="Result shape — where do your trades finish?" meta={`n=${A.nR} scored campaigns`}
+          howto={[
+            "Each bar counts trades that finished at that R.",
+            "R = profit in units of what you risked: risk $1,000, make $3,000 = +3R; lose the full stop = −1R.",
+            "Healthy shape: losses WALLED at −1R (nothing further left) and a real tail of +3R/+5R winners on the right.",
+            "The right tail pays for everything — protect it before optimizing anything else.",
+          ]}>
+          <Say>
+            {(() => {
+              const beyond = A.rlist.filter(r => r < -1.05).length, losers = A.rlist.filter(r => r <= 0).length;
+              const tail = A.rlist.filter(r => r >= 2).length;
+              return <>
+                {losers ? <>The loss wall: <b>{beyond === 0 ? "holding — no loser finished beyond −1R" : <span style={{ color: T.red }}>{beyond} of {losers} losers finished beyond −1R</span>}</b>. </> : null}
+                Right tail: <b>{tail}</b> trade{tail === 1 ? "" : "s"} at +2R or better{tail ? " — the tail exists; protect it" : " — no big winners yet, which is what the expectancy math is waiting on"}.
+              </>;
+            })()}
+          </Say>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={hist} margin={{ left: 0, right: 8, top: 18 }}>
+              <CartesianGrid vertical={false} stroke={T.grid} strokeDasharray="3 5" />
+              {/* horizontal labels, upright — the slanted version was unreadable (Valen 2026-07-11) */}
+              <XAxis dataKey="bucket" {...axis} interval={0} angle={0} textAnchor="middle" height={28} tick={{ fill: T.muted, fontSize: 10, fontWeight: 600 }} />
+              <YAxis {...axis} width={26} allowDecimals={false} />
+              <Tooltip cursor={{ fill: "rgba(255,255,255,0.03)" }} content={<TT render={(p) => <>{p[0]?.payload?.bucket}: <b>{p[0]?.payload?.n}</b> campaigns</>} />} />
+              <Bar dataKey="n" radius={[3, 3, 0, 0]} maxBarSize={34}>
+                {hist.map((d, i) => <Cell key={i} fill={d.tone} fillOpacity={0.7} />)}
+                <LabelList dataKey="n" position="top" style={{ fill: T.muted, fontSize: 10 }} formatter={(x) => x || ""} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Panel>
+      </div>
 
       {/* ENTRY REFINEMENTS */}
       <Panel title="Entry Refinements — do your entry rules make money?" meta={`${lab.wMAEn} winners have MAE (worst-dip) data`}
@@ -902,8 +932,8 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         </div>
       </Panel>
 
-      {/* EXIT / WINNER MANAGEMENT LAB */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(430px, 1fr))", gap: 16 }}>
+      {/* EXITS + SYSTEM HEALTH — winner capture beside the equity curve, side by side */}
+      <div className="exitgrid">
         <Panel title="Exits — how much of each winner do you keep?" meta={`median: ${lab.capMed != null ? Math.round(lab.capMed * 100) + "%" : "—"} of system-max captured · n=${lab.capN}`}
           howto={[
             "Every dot is ONE trade.",
@@ -945,38 +975,83 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
             </ScatterChart>
           </ResponsiveContainer>
         </Panel>
-
-        <Panel title="Result shape — where do your trades finish?" meta={`n=${A.nR} scored campaigns`}
-          howto={[
-            "Each bar counts trades that finished at that R.",
-            "R = profit in units of what you risked: risk $1,000, make $3,000 = +3R; lose the full stop = −1R.",
-            "Healthy shape: losses WALLED at −1R (nothing further left) and a real tail of +3R/+5R winners on the right.",
-            "The right tail pays for everything — protect it before optimizing anything else.",
-          ]}>
+        <Panel title="System health — your equity, traded like a stock" meta={`${mode === "sys" ? "system cohort" : "full journal"} · exit order`}
+        howto={[
+          "Gold line = cumulative R, one step per closed campaign in exit order. Dashed = its own " + eqMaP + "-trade moving average.",
+          "NOT the same as the journal's equity curve: that one is your ACCOUNT in dollars over calendar days (sizing included); this one is the SYSTEM in risk units per trade — it strips out position size and asks only 'is the edge itself trending?'",
+          "Above the MA = in gear → full unit risk allowed. Below = the system itself is in a downtrend → halve new-position risk until the line is reclaimed.",
+          "Red dots mark trades taken while below the line. Lower panel = rolling-10 expectancy vs the +0.25R line — the system's pulse.",
+        ]}>
+        {eqState && (
           <Say>
-            {(() => {
-              const beyond = A.rlist.filter(r => r < -1.05).length, losers = A.rlist.filter(r => r <= 0).length;
-              const tail = A.rlist.filter(r => r >= 2).length;
-              return <>
-                {losers ? <>The loss wall: <b>{beyond === 0 ? "holding — no loser finished beyond −1R" : <span style={{ color: T.red }}>{beyond} of {losers} losers finished beyond −1R</span>}</b>. </> : null}
-                Right tail: <b>{tail}</b> trade{tail === 1 ? "" : "s"} at +2R or better{tail ? " — the tail exists; protect it" : " — no big winners yet, which is what the expectancy math is waiting on"}.
-              </>;
-            })()}
+            The system is <b style={{ color: eqState.above ? T.green : T.red }}>{eqState.above ? "IN GEAR" : "IN A REAL DRAWDOWN"}</b> — equity sits {eqState.gap > 0 ? "+" : ""}{eqState.gap}R {eqState.above ? "above" : "below"} its own {eqMaP}-trade average.
+            {eqState.above ? " Rule: full unit risk is allowed." : " Rule: halve new-position risk until the line is reclaimed — the throttle forces you smallest when cold."}
+            {roll.length > 0 && <> The last-10-trades expectancy is <b>{(roll[roll.length - 1].exp >= 0 ? "+" : "") + roll[roll.length - 1].exp}R</b> per trade{roll[roll.length - 1].exp >= 0.25 ? " — above the +0.25R line." : " — below the +0.25R line; watch it."}</>}
           </Say>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={hist} margin={{ left: 0, right: 8, top: 18 }}>
-              <CartesianGrid vertical={false} stroke={T.grid} strokeDasharray="3 5" />
-              {/* horizontal labels, upright — the slanted version was unreadable (Valen 2026-07-11) */}
-              <XAxis dataKey="bucket" {...axis} interval={0} angle={0} textAnchor="middle" height={28} tick={{ fill: T.muted, fontSize: 10, fontWeight: 600 }} />
-              <YAxis {...axis} width={26} allowDecimals={false} />
-              <Tooltip cursor={{ fill: "rgba(255,255,255,0.03)" }} content={<TT render={(p) => <>{p[0]?.payload?.bucket}: <b>{p[0]?.payload?.n}</b> campaigns</>} />} />
-              <Bar dataKey="n" radius={[3, 3, 0, 0]} maxBarSize={34}>
-                {hist.map((d, i) => <Cell key={i} fill={d.tone} fillOpacity={0.7} />)}
-                <LabelList dataKey="n" position="top" style={{ fill: T.muted, fontSize: 10 }} formatter={(x) => x || ""} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Panel>
+        )}
+        {eqState && (
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "10px 16px", marginBottom: 14 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.1em", color: eqState.above ? T.green : T.red, border: `1px solid ${(eqState.above ? T.green : T.red)}44`, borderRadius: 99, padding: "4px 13px" }}>
+              {dot(eqState.above ? T.green : T.red)}{eqState.above ? "IN GEAR · FULL RISK" : "BELOW EQUITY-MA · HALF RISK"}
+            </span>
+            <span style={{ fontSize: "0.7rem", color: T.muted }}>
+              Equity <b style={{ color: T.text }}>{eqState.cum}R</b> is <b style={{ color: eqState.above ? T.green : T.red }}>{eqState.gap > 0 ? "+" : ""}{eqState.gap}R</b> {eqState.above ? "above" : "below"} its {eqMaP}-MA (<b style={{ color: T.text }}>{eqState.ma}R</b>) · {eqState.streak} trades this side
+              <span style={{ color: T.faint }}> · max drawdown <b style={{ color: T.text, fontVariantNumeric: "tabular-nums" }}>{extra.mdd}R</b> · longest streaks <b style={{ color: T.text }}>{extra.maxW}W</b>/<b style={{ color: T.text }}>{extra.maxL}L</b> · now {extra.curW ? `${extra.curW} win${extra.curW > 1 ? "s" : ""} running` : extra.curL ? `${extra.curL} loss${extra.curL > 1 ? "es" : ""} running` : "flat"}</span>
+            </span>
+            <span style={{ marginLeft: "auto", display: "inline-flex", gap: 4 }}>
+              <button onClick={() => setOvl(o => !o)} title="Overlay the same trades' cumulative $ P&L (right axis). Where the two lines diverge, position sizing — not the edge — did the work."
+                style={{ background: ovl ? "rgba(122,162,247,0.12)" : "transparent", border: `1px solid ${ovl ? T.blue : T.border}`, color: ovl ? T.blue : T.faint, borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontSize: "0.64rem", fontFamily: font }}>$ overlay</button>
+              {[5, 10, 20].map(p => (
+                <button key={p} onClick={() => setEqMaP(p)} style={{ background: p === eqMaP ? "rgba(201,152,42,0.12)" : "transparent", border: `1px solid ${p === eqMaP ? T.gold : T.border}`, color: p === eqMaP ? T.goldBright : T.faint, borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontSize: "0.64rem", fontFamily: font }}>{p}-MA</button>
+              ))}
+            </span>
+          </div>
+        )}
+        <ResponsiveContainer width="100%" height={230}>
+          <ComposedChart data={eqMA} margin={{ left: 0, right: 8, top: 6 }}>
+            <defs>
+              <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={T.gold} stopOpacity={0.22} />
+                <stop offset="100%" stopColor={T.gold} stopOpacity={0.01} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} stroke={T.grid} strokeDasharray="3 5" />
+            <XAxis dataKey="i" {...axis} tickMargin={8} />
+            <YAxis yAxisId="r" {...axis} width={38} tickFormatter={(t) => t + "R"} />
+            {ovl && <YAxis yAxisId="usd" orientation="right" {...axis} width={52} tickFormatter={(t) => "$" + (Math.abs(t) >= 1000 ? (t / 1000).toFixed(0) + "k" : t)} />}
+            <Tooltip cursor={{ stroke: T.border }} content={<TT render={(p) => {
+              const d = p[0]?.payload; if (!d) return null;
+              return <><div style={{ color: T.muted }}>{d.d} · trade #{d.i}</div><div><b>{d.t}</b> {d.r > 0 ? "+" : ""}{d.r}R</div><div>cumulative <b>{d.cum}R</b> · {eqMaP}-MA <b>{d.ma}R</b></div>{ovl && <div style={{ color: T.blue }}>cumulative $ {d.cumUsd?.toLocaleString()}</div>}<div style={{ color: d.below ? T.red : T.green }}>{d.below ? "below MA — derisk" : "above MA — full size"}</div></>;
+            }} />} />
+            <ReferenceLine yAxisId="r" y={0} stroke={T.border} />
+            <Area yAxisId="r" type="monotone" dataKey="cum" stroke={T.gold} strokeWidth={1.6} fill="url(#eqFill)"
+              dot={(pr) => <circle key={pr.index} cx={pr.cx} cy={pr.cy} r={2.2} fill={pr.payload?.below ? T.red : T.gold} />}
+              activeDot={{ r: 4, fill: T.gold }} />
+            <Line yAxisId="r" type="monotone" dataKey="ma" stroke="rgba(255,255,255,0.55)" strokeWidth={1.3} strokeDasharray="5 4" dot={false} activeDot={{ r: 3, fill: "#fff" }} />
+            {ovl && <Line yAxisId="usd" type="monotone" dataKey="cumUsd" stroke={T.blue} strokeWidth={1.4} dot={false} activeDot={{ r: 3, fill: T.blue }} />}
+          </ComposedChart>
+        </ResponsiveContainer>
+        {ovl && <div style={{ fontSize: "0.64rem", color: T.muted, margin: "2px 0 6px" }}><i style={{ display: "inline-block", width: 12, height: 2, background: T.blue, verticalAlign: "middle", marginRight: 5 }} />same trades in DOLLARS (right axis) — where blue and gold diverge, position sizing did the work, not the edge.</div>}
+        <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "2px 12px", margin: "10px 0 2px" }}>
+          <span className="term" data-tip="A moving window: after every trade, take just the LAST 10 trades and average their R. Trade #24's value = the average of trades 15–24. The all-time average moves slowly; this line shows what you're doing LATELY — it turns down many trades before the overall numbers do." style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.faint }}>The pulse — average R of your last 10 trades</span>
+          {roll.length > 0 && (
+            <span style={{ fontSize: "0.7rem", fontVariantNumeric: "tabular-nums" }}>
+              now <b style={{ color: roll[roll.length - 1].exp >= 0.25 ? T.green : T.red }}>{(roll[roll.length - 1].exp >= 0 ? "+" : "") + roll[roll.length - 1].exp}R</b>
+              <span style={{ color: T.faint, fontSize: "0.62rem" }}> per trade · target ≥ +0.25R {roll[roll.length - 1].exp >= 0.25 ? "✓" : "✕"}</span>
+            </span>
+          )}
+        </div>
+        <ResponsiveContainer width="100%" height={110}>
+          <LineChart data={roll} margin={{ left: 0, right: 8, top: 10 }}>
+            <XAxis dataKey="i" {...axis} hide />
+            <YAxis {...axis} width={38} domain={["auto", "auto"]} tickFormatter={(t) => t + "R"} />
+            <Tooltip content={<TT render={(p) => <>rolling-10 expectancy after #{p[0]?.payload?.i}: <b>{p[0]?.payload?.exp > 0 ? "+" : ""}{p[0]?.payload?.exp}R</b></>} />} />
+            <ReferenceLine y={0} stroke={`${T.red}55`} strokeDasharray="4 4" />
+            <ReferenceLine y={0.25} stroke={`${T.green}45`} strokeDasharray="4 4" label={{ value: "+0.25R", position: "right", fill: T.faint, fontSize: 9 }} />
+            <Line type="monotone" dataKey="exp" stroke="rgba(255,255,255,0.65)" strokeWidth={1.5} dot={false} activeDot={{ r: 3.5, fill: "#fff" }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </Panel>
       </div>
 
       {/* derisk protocol — system cohort by definition */}
@@ -1105,85 +1180,6 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         </Panel>
       )}
 
-      {/* equity + throttle */}
-      <Panel title="System health — your equity, traded like a stock" meta={`${mode === "sys" ? "system cohort" : "full journal"} · exit order`}
-        howto={[
-          "Gold line = cumulative R, one step per closed campaign in exit order. Dashed = its own " + eqMaP + "-trade moving average.",
-          "NOT the same as the journal's equity curve: that one is your ACCOUNT in dollars over calendar days (sizing included); this one is the SYSTEM in risk units per trade — it strips out position size and asks only 'is the edge itself trending?'",
-          "Above the MA = in gear → full unit risk allowed. Below = the system itself is in a downtrend → halve new-position risk until the line is reclaimed.",
-          "Red dots mark trades taken while below the line. Lower panel = rolling-10 expectancy vs the +0.25R line — the system's pulse.",
-        ]}>
-        {eqState && (
-          <Say>
-            The system is <b style={{ color: eqState.above ? T.green : T.red }}>{eqState.above ? "IN GEAR" : "IN A REAL DRAWDOWN"}</b> — equity sits {eqState.gap > 0 ? "+" : ""}{eqState.gap}R {eqState.above ? "above" : "below"} its own {eqMaP}-trade average.
-            {eqState.above ? " Rule: full unit risk is allowed." : " Rule: halve new-position risk until the line is reclaimed — the throttle forces you smallest when cold."}
-            {roll.length > 0 && <> The last-10-trades expectancy is <b>{(roll[roll.length - 1].exp >= 0 ? "+" : "") + roll[roll.length - 1].exp}R</b> per trade{roll[roll.length - 1].exp >= 0.25 ? " — above the +0.25R line." : " — below the +0.25R line; watch it."}</>}
-          </Say>
-        )}
-        {eqState && (
-          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "10px 16px", marginBottom: 14 }}>
-            <span style={{ display: "inline-flex", alignItems: "center", fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.1em", color: eqState.above ? T.green : T.red, border: `1px solid ${(eqState.above ? T.green : T.red)}44`, borderRadius: 99, padding: "4px 13px" }}>
-              {dot(eqState.above ? T.green : T.red)}{eqState.above ? "IN GEAR · FULL RISK" : "BELOW EQUITY-MA · HALF RISK"}
-            </span>
-            <span style={{ fontSize: "0.7rem", color: T.muted }}>
-              Equity <b style={{ color: T.text }}>{eqState.cum}R</b> is <b style={{ color: eqState.above ? T.green : T.red }}>{eqState.gap > 0 ? "+" : ""}{eqState.gap}R</b> {eqState.above ? "above" : "below"} its {eqMaP}-MA (<b style={{ color: T.text }}>{eqState.ma}R</b>) · {eqState.streak} trades this side
-              <span style={{ color: T.faint }}> · max drawdown <b style={{ color: T.text, fontVariantNumeric: "tabular-nums" }}>{extra.mdd}R</b> · longest streaks <b style={{ color: T.text }}>{extra.maxW}W</b>/<b style={{ color: T.text }}>{extra.maxL}L</b> · now {extra.curW ? `${extra.curW} win${extra.curW > 1 ? "s" : ""} running` : extra.curL ? `${extra.curL} loss${extra.curL > 1 ? "es" : ""} running` : "flat"}</span>
-            </span>
-            <span style={{ marginLeft: "auto", display: "inline-flex", gap: 4 }}>
-              <button onClick={() => setOvl(o => !o)} title="Overlay the same trades' cumulative $ P&L (right axis). Where the two lines diverge, position sizing — not the edge — did the work."
-                style={{ background: ovl ? "rgba(122,162,247,0.12)" : "transparent", border: `1px solid ${ovl ? T.blue : T.border}`, color: ovl ? T.blue : T.faint, borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontSize: "0.64rem", fontFamily: font }}>$ overlay</button>
-              {[5, 10, 20].map(p => (
-                <button key={p} onClick={() => setEqMaP(p)} style={{ background: p === eqMaP ? "rgba(201,152,42,0.12)" : "transparent", border: `1px solid ${p === eqMaP ? T.gold : T.border}`, color: p === eqMaP ? T.goldBright : T.faint, borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontSize: "0.64rem", fontFamily: font }}>{p}-MA</button>
-              ))}
-            </span>
-          </div>
-        )}
-        <ResponsiveContainer width="100%" height={230}>
-          <ComposedChart data={eqMA} margin={{ left: 0, right: 8, top: 6 }}>
-            <defs>
-              <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={T.gold} stopOpacity={0.22} />
-                <stop offset="100%" stopColor={T.gold} stopOpacity={0.01} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid vertical={false} stroke={T.grid} strokeDasharray="3 5" />
-            <XAxis dataKey="i" {...axis} tickMargin={8} />
-            <YAxis yAxisId="r" {...axis} width={38} tickFormatter={(t) => t + "R"} />
-            {ovl && <YAxis yAxisId="usd" orientation="right" {...axis} width={52} tickFormatter={(t) => "$" + (Math.abs(t) >= 1000 ? (t / 1000).toFixed(0) + "k" : t)} />}
-            <Tooltip cursor={{ stroke: T.border }} content={<TT render={(p) => {
-              const d = p[0]?.payload; if (!d) return null;
-              return <><div style={{ color: T.muted }}>{d.d} · trade #{d.i}</div><div><b>{d.t}</b> {d.r > 0 ? "+" : ""}{d.r}R</div><div>cumulative <b>{d.cum}R</b> · {eqMaP}-MA <b>{d.ma}R</b></div>{ovl && <div style={{ color: T.blue }}>cumulative $ {d.cumUsd?.toLocaleString()}</div>}<div style={{ color: d.below ? T.red : T.green }}>{d.below ? "below MA — derisk" : "above MA — full size"}</div></>;
-            }} />} />
-            <ReferenceLine yAxisId="r" y={0} stroke={T.border} />
-            <Area yAxisId="r" type="monotone" dataKey="cum" stroke={T.gold} strokeWidth={1.6} fill="url(#eqFill)"
-              dot={(pr) => <circle key={pr.index} cx={pr.cx} cy={pr.cy} r={2.2} fill={pr.payload?.below ? T.red : T.gold} />}
-              activeDot={{ r: 4, fill: T.gold }} />
-            <Line yAxisId="r" type="monotone" dataKey="ma" stroke="rgba(255,255,255,0.55)" strokeWidth={1.3} strokeDasharray="5 4" dot={false} activeDot={{ r: 3, fill: "#fff" }} />
-            {ovl && <Line yAxisId="usd" type="monotone" dataKey="cumUsd" stroke={T.blue} strokeWidth={1.4} dot={false} activeDot={{ r: 3, fill: T.blue }} />}
-          </ComposedChart>
-        </ResponsiveContainer>
-        {ovl && <div style={{ fontSize: "0.64rem", color: T.muted, margin: "2px 0 6px" }}><i style={{ display: "inline-block", width: 12, height: 2, background: T.blue, verticalAlign: "middle", marginRight: 5 }} />same trades in DOLLARS (right axis) — where blue and gold diverge, position sizing did the work, not the edge.</div>}
-        <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "2px 12px", margin: "10px 0 2px" }}>
-          <span className="term" data-tip="A moving window: after every trade, take just the LAST 10 trades and average their R. Trade #24's value = the average of trades 15–24. The all-time average moves slowly; this line shows what you're doing LATELY — it turns down many trades before the overall numbers do." style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.faint }}>The pulse — average R of your last 10 trades</span>
-          {roll.length > 0 && (
-            <span style={{ fontSize: "0.7rem", fontVariantNumeric: "tabular-nums" }}>
-              now <b style={{ color: roll[roll.length - 1].exp >= 0.25 ? T.green : T.red }}>{(roll[roll.length - 1].exp >= 0 ? "+" : "") + roll[roll.length - 1].exp}R</b>
-              <span style={{ color: T.faint, fontSize: "0.62rem" }}> per trade · target ≥ +0.25R {roll[roll.length - 1].exp >= 0.25 ? "✓" : "✕"}</span>
-            </span>
-          )}
-        </div>
-        <ResponsiveContainer width="100%" height={110}>
-          <LineChart data={roll} margin={{ left: 0, right: 8, top: 10 }}>
-            <XAxis dataKey="i" {...axis} hide />
-            <YAxis {...axis} width={38} domain={["auto", "auto"]} tickFormatter={(t) => t + "R"} />
-            <Tooltip content={<TT render={(p) => <>rolling-10 expectancy after #{p[0]?.payload?.i}: <b>{p[0]?.payload?.exp > 0 ? "+" : ""}{p[0]?.payload?.exp}R</b></>} />} />
-            <ReferenceLine y={0} stroke={`${T.red}55`} strokeDasharray="4 4" />
-            <ReferenceLine y={0.25} stroke={`${T.green}45`} strokeDasharray="4 4" label={{ value: "+0.25R", position: "right", fill: T.faint, fontSize: 9 }} />
-            <Line type="monotone" dataKey="exp" stroke="rgba(255,255,255,0.65)" strokeWidth={1.5} dot={false} activeDot={{ r: 3.5, fill: "#fff" }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </Panel>
-
       {/* open campaigns */}
       <Panel title="Open campaigns — realized + marked" meta="a trimmed campaign is never read as finished"
         footnote="Floor = realized to date plus what the remaining shares lock in at the current stop or trail — the campaign's guaranteed outcome. Unrealized R uses the campaign's own locked risk unit. On close, each campaign migrates into the cohort and every aggregate on this page updates.">
@@ -1269,8 +1265,88 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         })()}
       </Panel>
 
+      {/* reconciliation — why this N vs the journal's N */}
+      <Panel title="What's counted here (vs the journal)" meta={`${rec.fillsVerified ?? "—"} fills → ${rec.campaignsAll ?? allCamps.length} campaigns → ${rec.campaignsSystem ?? "—"} system`}
+        howto={[
+          "The journal page counts campaign rows across its date filter; this page counts the SAME campaigns, chosen by the toggle above.",
+          "Stress-test (full) = your ENTIRE verified history, incl. the recovered pre-system book (May–Jun manual rows, dates census-proven, zero overlap with pipeline rows) — old trades replayed through the new entry criteria.",
+          "System cohort = the LIVE record — only trades entered under the system. Recovered history can never enter it (the build asserts this and dies if violated).",
+          "Every number on this page is computed from exactly the cohort named in the header — nothing is inherited from a different population.",
+          "R sanity: every recovered row's recorded R is recomputed from its own entry/stop/exit — mismatches would be listed here by name.",
+        ]}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 26px" }}>
+          {[
+            ["Fills since " + (rec.since || "May"), rec.fillsAll],
+            ["Pipeline-verified", rec.fillsVerified],
+            ["Recovered legacy (dates normalized)", rec.recoveredLegacy],
+            ["Unrecoverable / failed sanity", rec.legacyExcluded],
+            ["Dupes dropped (by broker exec id)", rec.dupesDropped],
+            ["Exit-only fills attached by stop match", rec.exitOnlyAttached],
+            ["Exit-only orphans ($-stats only)", rec.exitOnlyOrphans],
+            ["Impossible clock times dropped", rec.impossibleTimesDropped],
+            ["R cross-check (recovered rows)", rec.rCrossCheck ? `${rec.rCrossCheck.checked - rec.rCrossCheck.mismatched}/${rec.rCrossCheck.checked} match` : "—"],
+            ["→ Campaigns (stress-test full)", rec.campaignsAll ?? allCamps.length],
+            ["→ System cohort (≥ " + (rec.systemEntry || data.systemEntry) + ")", rec.campaignsSystem],
+            ["Option campaigns", rec.optionCampaigns ?? 0],
+            ["Open runners (not counted)", rec.openRunners],
+          ].map(([k, val]) => (
+            <div key={k}>
+              <div style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.faint }}>{k}</div>
+              <div style={{ fontSize: "0.9rem", fontWeight: 700, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{val ?? "—"}</div>
+            </div>
+          ))}
+        </div>
+        {rec.rCrossCheck?.mismatched > 0 && (
+          <div style={{ fontSize: "0.68rem", color: T.red, marginTop: 10 }}>R mismatches (recorded vs recomputed — treat these rows' R as unverified): {(rec.rCrossCheck.rows || []).join(" · ")}</div>
+        )}
+        {(rec.unparseableRows || []).length > 0 && (
+          <div style={{ fontSize: "0.68rem", color: T.red, marginTop: 6 }}>Unrecoverable rows (by name): {rec.unparseableRows.join(" · ")}</div>
+        )}
+      </Panel>
+
+      {/* DATA COVERAGE — every exclusion NAMED. An unnamed exclusion is how "is AMD missing?"
+          happens; this panel makes silent data loss structurally impossible to hide. */}
+      {data.coverage && (
+        <Panel title="Data coverage — every exclusion has a name" meta={`${data.coverage.scored} of ${allCamps.length} campaigns fully scored · ${data.coverage.intraday0} with intraday day-0`} collapsed
+          footnote="Scored = has bar-derived metrics (MFE/MAE, sims). A campaign can still count in win rate and $ P&L while excluded here — exclusion reasons are about the R/bar math only. If a name you traded is missing from BOTH the scored set and this list, that IS a bug: flag it immediately.">
+          {(data.coverage.excluded || []).length === 0
+            ? <div style={{ fontSize: "0.72rem", color: T.muted }}>Nothing excluded — every campaign carries full metrics.</div>
+            : (data.coverage.excluded || []).map((x, i) => (
+              <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "6px 4px", borderTop: i ? `1px solid ${T.borderSoft}` : "none", fontSize: "0.72rem" }}>
+                <b style={{ minWidth: 56 }}>{x.t}</b>
+                <span style={{ color: T.muted, minWidth: 84, fontVariantNumeric: "tabular-nums" }}>{x.d || "no date"}</span>
+                <span style={{ color: T.faint, fontSize: "0.66rem" }}>{x.sys ? "system cohort" : "full journal"}</span>
+                <span style={{ color: T.muted, flex: "1 1 240px" }}>{x.why}</span>
+              </div>
+            ))}
+          {(data.coverage.barsMissing || []).length > 0 && <div style={{ fontSize: "0.66rem", color: T.red, marginTop: 8 }}>Price-feed gaps (rerun the ledger; if persistent, the ticker may be delisted/renamed): {data.coverage.barsMissing.join(" · ")}</div>}
+          {/* WHY SECTION SAMPLE SIZES DIFFER — each metric needs different inputs; every n is
+              traceable to a rule here, not a bug (Valen asked, 2026-07-11) */}
+          <div style={{ marginTop: 14, borderTop: `1px solid ${T.borderSoft}`, paddingTop: 10 }}>
+            <div style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Why sections show different sample sizes</div>
+            {[
+              [`${A.n}`, "All closed campaigns in this cohort", "scoreboard $ rows, win rate, per-ticker P&L"],
+              [`${A.nR}`, "…that also have an R (needs an original stop)", "R distribution, equity curve, Monte Carlo"],
+              [`${rows.filter(c => c.mfeR != null).length}`, "…that also have price bars for the whole trade", "trim tournament, 3-stop replay, MFE/MAE"],
+              [`${lab.wMAEn}`, "…winners only, with post-entry dip data", "3-stop rung table"],
+              [`${lab.capN}`, "…winners only, with a system-max ceiling to compare against", "Exits capture"],
+              [`${dk.trimDays?.length ?? 0}`, "…campaigns you actually trimmed", "trim adherence"],
+              [`${data.waitGate?.simmed ?? 0} of ${data.waitGate?.eligible ?? 0}`, "…entered before 10:00 ET with a recorded entry time", "30-min wait gate"],
+            ].map(([n2, why, used], i) => (
+              <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "4px 0", fontSize: "0.7rem", alignItems: "baseline" }}>
+                <b style={{ minWidth: 64, fontVariantNumeric: "tabular-nums" }}>{n2}</b>
+                <span style={{ color: T.muted, flex: "1 1 260px", minWidth: 0 }}>{why}</span>
+                <span style={{ color: T.faint, fontSize: "0.64rem" }}>{used}</span>
+              </div>
+            ))}
+            <div style={{ fontSize: "0.64rem", color: T.faint, marginTop: 4 }}>Each row is a subset of the one above it. A metric never silently drops a trade the rule doesn't exclude.</div>
+          </div>
+        </Panel>
+      )}
+
       {/* audit */}
-      <Panel title="Closed campaigns — audit" meta={`${sorted.length} rows · click a column to sort`} collapsed>
+      <Panel title="Closed campaigns — audit" meta={`${sorted.length} rows · click a column to sort`} collapsed
+        tip={"Every closed campaign in this cohort, one row each — ticker, entry, grade, extension at entry, P&L, R, winner capture, and trim day. Every KPI and chart on this page traces back to these rows."}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr>
@@ -1300,7 +1376,8 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
       </Panel>
 
       {/* methodology */}
-      <Panel title="Methodology & definitions" collapsed>
+      <Panel title="Methodology & definitions" collapsed
+        tip={"How every number on this page is computed — populations, campaign definition, R formula, and the truth hierarchy (this page is an IBKR-rebuild estimate; the trades journal is realized-P&L source of truth). Read this before disputing a number."}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem" }}>
           <tbody>
             {[

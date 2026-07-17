@@ -220,46 +220,61 @@ export function liftTable(rows) {
 
 export function StudyScoreboard({ C, rows }) {
   const { rows: lifts, nWin, nFail, n } = liftTable(rows);
-  const box = { background: "rgba(0,0,0,0.25)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", flex: 1, minWidth: 130 };
   const small = n < 30;
   const bySetup = {};
   rows.forEach(r => { const s = r.metrics.study.setup; bySetup[s] = (bySetup[s] || 0) + 1; });
+  // Uniform card chrome — 16px radius, glass, top-left sheen, uppercase micro-label + divider head.
+  const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" };
+  const box = { background: "rgba(0,0,0,0.25)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 16px", flex: 1, minWidth: 140 };
+  const boxNum = { display: "block", fontSize: "1.3rem", fontWeight: 800, color: C.white, lineHeight: 1.1 };
+  const boxLbl = { fontSize: "0.6rem", color: C.muted, textTransform: "uppercase", letterSpacing: ".08em" };
+  const subhead = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "16px 0 10px" };
+  const gloss = { border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 12px", fontSize: "0.72rem", color: C.muted, lineHeight: 1.5 };
+  const glossTerm = { display: "block", marginBottom: 3, fontSize: "0.76rem", color: C.goldBright };
   return (
-    <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, marginBottom: 16 }}>
-      <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, marginBottom: 10 }}>Study scoreboard</div>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-        <div style={box}><b style={{ fontSize: "1.1rem" }}>{rows.length}</b><div style={{ fontSize: "0.6rem", color: C.muted }}>STUDIES</div></div>
+    <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", marginBottom: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
+      <div style={sheen} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}` }}>
+        <span style={{ flex: 1, fontSize: "0.62rem", fontWeight: 700, letterSpacing: ".13em", textTransform: "uppercase", color: C.muted }}>Study Scoreboard</span>
+        <span title="Historical EXERCISE mode: fixed factor + metric cards on past winners so commonality emerges from the counts, never from memory." style={{ flex: "none", width: 15, height: 15, borderRadius: "50%", border: `1px solid ${C.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 700, fontStyle: "italic", color: C.muted, cursor: "help" }}>i</span>
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={box}><b style={boxNum}>{rows.length}</b><span style={boxLbl}>Studies</span></div>
         {Object.entries(bySetup).map(([k, v]) => (
-          <div key={k} style={box}><b style={{ fontSize: "1.1rem" }}>{v}</b><div style={{ fontSize: "0.6rem", color: C.muted }}>{k.toUpperCase()}</div></div>
+          <div key={k} style={box}><b style={boxNum}>{v}</b><span style={boxLbl}>{k}</span></div>
         ))}
-        <div style={box}><b style={{ fontSize: "1.1rem" }}>{nWin}W / {nFail}F</b><div style={{ fontSize: "0.6rem", color: C.muted }}>RESOLVED CLASSES</div></div>
+        <div style={box}><b style={boxNum}>{nWin}W / {nFail}F</b><span style={boxLbl}>Resolved Classes</span></div>
       </div>
       {/* Outcome-class glossary — the PRE-REGISTERED definitions (winner-dna.md); measured from
           the trigger day's 5-min-ORH entry, never re-defined after seeing data. */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10, fontSize: "0.62rem", color: C.muted }}>
+      <div style={subhead}>Outcome-class glossary</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: 8, marginBottom: 6 }}>
         {[["🦖 Monster", "ran +20% or more within 20 sessions of the trigger — the campaign class the whole study hunts"],
           ["🏆 Big winner", "ran +8% or more within 5 sessions — a real burst (the 8–40% class)"],
           ["🌱 Works small", "only +4–8% in 5 sessions — the idea worked but paid little; partials matter here"],
           ["💀 Failure", "under +4% in 5 sessions, or broke the trigger-day low before ever reaching +4% — the control group that makes lift math possible"],
         ].map(([term, def]) => (
-          <span key={term} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "3px 9px" }}>
-            <b style={{ color: C.goldBright }}>{term}</b> — {def}
-          </span>
+          <div key={term} style={gloss}>
+            <b style={glossTerm}>{term}</b>{def}
+          </div>
         ))}
       </div>
       {lifts.length > 0 && (
         <>
-          <div style={{ fontSize: "0.62rem", color: small ? "#e0a955" : C.muted, marginBottom: 6 }}>
+          <div style={subhead}>Factor lift</div>
+          <div style={small
+            ? { fontSize: "0.72rem", color: "#e0a955", margin: "0 0 10px", padding: "9px 12px", background: "rgba(224,169,85,0.08)", border: "1px solid rgba(224,169,85,0.25)", borderRadius: 8, lineHeight: 1.5 }
+            : { fontSize: "0.72rem", color: C.muted, margin: "0 0 10px", lineHeight: 1.5 }}>
             {small ? `⚠ n=${n} — early read, believe nothing before n≥30 per class (promote at n≥50). Add FAILURES too — without them lift can't be computed (winners-only = survivor bias).`
                    : `n=${n} resolved — lift = % of winners with the factor ÷ % of failures with it. ≥2 = edge candidate · ~1 = noise.`}
           </div>
-          <div style={{ maxHeight: 220, overflowY: "auto" }}>
-            {lifts.slice(0, 16).map((l, i) => (
-              <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: "0.68rem", padding: "3px 0", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
-                <span style={{ width: 120, color: C.muted, flexShrink: 0 }}>{l.setup}</span>
-                <span style={{ flex: 1 }}>{l.label}</span>
-                <span style={{ color: C.muted }}>{Math.round(l.pW * 100)}%W · {Math.round(l.pF * 100)}%F</span>
-                <b style={{ width: 52, textAlign: "right", color: l.lift >= 2 ? "#7ef0a0" : l.lift < 0.7 ? "#e05555" : C.muted }}>{l.lift === Infinity ? "∞" : l.lift.toFixed(2)}×</b>
+          <div style={{ maxHeight: 280, overflowY: "auto", paddingTop: 2 }}>
+            {lifts.slice(0, 16).map((l, i, arr) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", borderBottom: i === arr.length - 1 ? "none" : "1px solid rgba(255,255,255,0.05)", fontSize: "0.74rem" }}>
+                <span style={{ width: 170, flex: "none", color: C.muted, fontSize: "0.66rem" }}>{l.setup}</span>
+                <span style={{ flex: 1, color: C.text }}>{l.label}</span>
+                <span style={{ width: 118, flex: "none", textAlign: "right", whiteSpace: "nowrap", color: C.muted, fontSize: "0.68rem" }}>{Math.round(l.pW * 100)}%W · {Math.round(l.pF * 100)}%F</span>
+                <b style={{ width: 56, flex: "none", textAlign: "right", fontWeight: 800, color: l.lift >= 2 ? "#7ef0a0" : l.lift < 0.7 ? "#e05555" : C.muted }}>{l.lift === Infinity ? "∞" : l.lift.toFixed(2)}×</b>
               </div>
             ))}
           </div>
@@ -325,8 +340,9 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     onSave(body);
   };
   return (
-    <div style={{ background: C.glass, border: `1px solid ${C.goldBright}`, borderRadius: 14, padding: 18, marginBottom: 18, fontFamily: font }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+    <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 16, padding: 18, marginBottom: 18, fontFamily: font, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}` }}>
         <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>📚 Study {row.ticker ? `· ${row.ticker}` : "· new"}</span>
         {/* Star toggle = "show this study in the Model Book too". No duplication — the study stays
             in 📚 for the lift stats; when starred it ALSO appears as a Model Book card. Saved with the study. */}

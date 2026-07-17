@@ -5,10 +5,52 @@ import { latestSnapshot, consistentTop } from "./themes.js";
 // Theme Leaders — Top-5 · 1W and Top-5 · 1M as two side-by-side tables.
 // Consistent leaders (top-5 in BOTH) highlighted green. VIV glass + gold.
 // ─────────────────────────────────────────────────────────────
-export default function ThemeStrip({ C, font }) {
+export default function ThemeStrip({ C, font, variant }) {
   const [full, setFull] = React.useState(false);
   const snap = latestSnapshot();
   if (!snap) return null;
+
+  // ── Pro variant: compact two-table (1W | 1M) card matching dashboard-pro mockup.
+  // Same data source (themes.js snapshots); keeps the "updated <date>" note, drops
+  // the full-tracker toggle / legend / guidance. Default variant is unchanged below.
+  if (variant === "pro") {
+    const wk = (snap.week || []).slice(0, 5);
+    const mo = (snap.month || []).slice(0, 5);
+    const Col = ({ title, rows }) => (
+      <div>
+        <h4 style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: C.muted, marginBottom: 9 }}>{title}</h4>
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          {rows.map(([name, pct], i) => {
+            const pos = pct >= 0;
+            return (
+              <div key={name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.74rem" }}>
+                <span style={{ color: C.muted, opacity: 0.65, fontWeight: 700, width: 13, flex: "none", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
+                <span style={{ flex: 1, color: "rgba(255,255,255,0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+                <span style={{ color: pos ? C.green : C.red, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{pos ? "+" : ""}{pct.toFixed(2)}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+    return (
+      <div style={{ fontFamily: font, position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", overflow: "hidden",
+        backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)" }}>
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)", pointerEvents: "none" }} />
+        <div style={{ position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+            <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.muted }}>Theme Leaders</span>
+            <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.goldBright || C.gold, fontWeight: 700 }}>updated {snap.date}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+            <Col title="1 Week" rows={wk} />
+            <Col title="1 Month" rows={mo} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const both = new Set(consistentTop());
   const week = full ? (snap.week || []) : (snap.week || []).slice(0, 5);
   const month = full ? (snap.month || []) : (snap.month || []).slice(0, 5);

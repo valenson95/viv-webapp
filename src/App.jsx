@@ -3139,10 +3139,12 @@ const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vp{background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
     color:var(--text); font-family:var(--font); line-height:1.58; font-size:16px; -webkit-font-smoothing:antialiased; min-height:100vh}
 .vp .shell{width:100%; max-width:1240px; margin:0 auto; padding:22px clamp(18px,2.4vw,40px) 90px}
+.vp.expert .shell{max-width:1400px}
 @media(min-width:1500px){
 .vp .shell{max-width:1400px} }
 @media(min-width:2000px){
-.vp .shell{max-width:1680px} }
+.vp .shell{max-width:1680px}
+.vp.expert .shell{max-width:1680px} }
 .vp .tabnum,.vp .v,.vp .outval,.vp .rtable td,.vp .tile .v{font-variant-numeric:tabular-nums}
 .vp .card{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:22px;
     backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%); padding:24px 26px; overflow:hidden}
@@ -4023,10 +4025,12 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
     -webkit-font-smoothing:antialiased; min-height:100vh;}
 .vj .big,.vj .north .big,.vj .mini .val,.vj .val,.vj .outval,.vj .metricval,.vj .pl,.vj tbody td,.vj .mgr b,.vj .charthint,.vj .edgeval{font-variant-numeric:tabular-nums}
 .vj .shell{width:100%; max-width:1240px; margin:0 auto; padding:22px clamp(18px,2.4vw,40px) 80px}
+.vj.expert .shell{max-width:1400px}
 @media(min-width:1500px){
 .vj .shell{max-width:1400px} }
 @media(min-width:2000px){
-.vj .shell{max-width:1680px} }
+.vj .shell{max-width:1680px}
+.vj.expert .shell{max-width:1680px} }
 .vj .card{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:22px;
     backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%); padding:26px 28px; overflow:hidden}
 .vj .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)}
@@ -4648,7 +4652,8 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 @media(max-width:1000px){ .vj.expert .edgegrid{grid-template-columns:1fr} }
 .vj.expert .edgerows{display:flex; flex-direction:column; gap:2px; margin-top:2px}
 /* P7. Analytics row — 4-up */
-.vj.expert .vagrid{grid-template-columns:repeat(4,1fr); margin-top:14px}
+.vj.expert .vagrid{grid-template-columns:repeat(3,1fr); margin-top:14px; align-items:start}
+.vj.expert .vacol{display:flex; flex-direction:column; gap:20px}
 @media(max-width:1100px){ .vj.expert .vagrid{grid-template-columns:repeat(2,1fr)} }
 @media(max-width:600px){ .vj.expert .vagrid{grid-template-columns:1fr} }
 .vj.expert .vacard{padding:16px 17px}
@@ -4764,14 +4769,14 @@ function RationaleBlock({ rationale }) {
 
 // Admin-only account COACH hero — Claude's standing read (recent vs peak vs system + open runners),
 // written to public.claude_insights. Members never see this. Mirrors render_coach.py.
-function CoachHero({ data }) {
+function CoachHero({ data, pro = false }) {
   if (!data || typeof data !== "object") return null;
   const vcol = (v) => ({ good: C.green, improving: C.green, aligned: C.green, holding: C.gold, watch: C.gold, risk: C.red, degrading: C.red }[String(v || "").toLowerCase()] || C.muted);
   const d = data.drift || {}, sc = data.scorecards || {}, pw = data.peak_window || {};
   const bd = "1px solid rgba(255,255,255,0.08)";
-  const Card = ({ title, children }) => (
-    <div style={{ background: "rgba(255,255,255,0.02)", border: bd, borderRadius: 12, padding: "16px 18px", marginBottom: 14 }}>
-      {title && <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.muted, marginBottom: 12, fontWeight: 700 }}>{title}</div>}
+  const Card = ({ title, children, style }) => (
+    <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "16px 18px", marginBottom: 14, backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", ...style }}>
+      {title && <div style={{ fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: ".13em", color: C.muted, paddingBottom: 11, marginBottom: 14, fontWeight: 700, borderBottom: `1px solid ${C.border}` }}>{title}</div>}
       {children}
     </div>
   );
@@ -4783,22 +4788,46 @@ function CoachHero({ data }) {
       ))}
     </div>
   );
+  const briefingCard = (
+    <Card>
+      <div style={{ fontSize: "0.95rem", lineHeight: 1.55, fontWeight: 700, color: C.white }}>{data.headline}</div>
+      <div style={{ display: "flex", gap: 8, margin: "12px 0 6px", flexWrap: "wrap" }}>
+        {[["vs peak", d.vs_peak], ["vs system", d.vs_system]].map(([k, v]) => v ? (
+          <span key={k} style={{ fontSize: "0.6rem", fontWeight: 700, padding: "4px 11px", borderRadius: 20, border: `1px solid ${vcol(v)}`, color: vcol(v) }}>{k} · {v}</span>
+        ) : null)}
+      </div>
+      {d.summary && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
+    </Card>
+  );
+  const attentionCard = (Array.isArray(data.attention) && data.attention.length > 0) ? (
+    <Card title="Pay attention now" style={{ border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 0 24px rgba(239,68,68,0.15)" }}>
+      {data.attention.map((a, i) => (
+        <div key={i} style={{ borderLeft: `3px solid ${C.red}`, background: "rgba(0,0,0,0.25)", borderRadius: 6, padding: "10px 14px", marginBottom: 9 }}>
+          <div style={{ fontSize: "0.54rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.red, fontWeight: 700 }}>{a.lens}</div>
+          <div style={{ fontSize: "0.78rem", fontWeight: 700, margin: "2px 0 4px" }}>{a.title}</div>
+          <div style={{ fontSize: "0.7rem", color: C.text, lineHeight: 1.55 }}>{a.detail}</div>
+        </div>
+      ))}
+    </Card>
+  ) : null;
+  const workingCard = (Array.isArray(data.working) && data.working.length > 0) ? (
+    <Card title="Keep doing">
+      <ul style={{ margin: 0, paddingLeft: 18 }}>
+        {data.working.map((w, i) => <li key={i} style={{ fontSize: "0.7rem", color: C.text, lineHeight: 1.7 }}>{w}</li>)}
+      </ul>
+    </Card>
+  ) : null;
   return (
     <div className="reveal" style={{ marginTop: 18 }}>
+      <style dangerouslySetInnerHTML={{ __html: ".coachtop{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; align-items:start; margin-bottom:14px}.coachtop > div{margin-bottom:0 !important}@media(max-width:1100px){.coachtop{grid-template-columns:1fr}}@keyframes jarvisPulse{0%{box-shadow:0 0 4px rgba(201,152,42,0.55); opacity:0.7; transform:scale(0.88)}100%{box-shadow:0 0 14px rgba(201,152,42,0.95); opacity:1; transform:scale(1.14)}}.jarvisdot{box-shadow:0 0 8px rgba(201,152,42,0.8); animation:jarvisPulse 2.4s ease-in-out infinite alternate}@media(prefers-reduced-motion:reduce){.jarvisdot{animation:none; box-shadow:0 0 10px rgba(201,152,42,0.85)}}" }} />
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.gold }} />
+        <span className="jarvisdot" style={{ width: 8, height: 8, borderRadius: "50%", background: C.gold }} />
         <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".04em", textTransform: "uppercase", color: C.goldBright }}>Jarvis · admin</span>
         {data.scope && <span style={{ fontSize: "0.58rem", color: C.muted }}>{data.scope}</span>}
       </div>
-      <Card>
-        <div style={{ fontSize: "0.95rem", lineHeight: 1.55, fontWeight: 700, color: C.white }}>{data.headline}</div>
-        <div style={{ display: "flex", gap: 8, margin: "12px 0 6px", flexWrap: "wrap" }}>
-          {[["vs peak", d.vs_peak], ["vs system", d.vs_system]].map(([k, v]) => v ? (
-            <span key={k} style={{ fontSize: "0.6rem", fontWeight: 700, padding: "4px 11px", borderRadius: 20, border: `1px solid ${vcol(v)}`, color: vcol(v) }}>{k} · {v}</span>
-          ) : null)}
-        </div>
-        {d.summary && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
-      </Card>
+      {pro
+        ? <div className="coachtop">{briefingCard}{attentionCard}{workingCard}</div>
+        : briefingCard}
       {false /* Goldilocks zone hidden per Valen (2026-07-04) */ && data.goldilocks && (() => { const g = data.goldilocks;
         const tile = (label, val, color) => (
           <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "10px 6px", textAlign: "center", flex: 1, minWidth: 64 }}>
@@ -4927,24 +4956,8 @@ function CoachHero({ data }) {
           <Scorecard title="Baseline · since May 1" s={sc.baseline || {}} />
         </div>
       </Card>)}
-      {Array.isArray(data.attention) && data.attention.length > 0 && (
-        <Card title="Pay attention now">
-          {data.attention.map((a, i) => (
-            <div key={i} style={{ borderLeft: `3px solid ${C.red}`, background: "rgba(0,0,0,0.25)", borderRadius: 6, padding: "10px 14px", marginBottom: 9 }}>
-              <div style={{ fontSize: "0.54rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.red, fontWeight: 700 }}>{a.lens}</div>
-              <div style={{ fontSize: "0.78rem", fontWeight: 700, margin: "2px 0 4px" }}>{a.title}</div>
-              <div style={{ fontSize: "0.7rem", color: C.text, lineHeight: 1.55 }}>{a.detail}</div>
-            </div>
-          ))}
-        </Card>
-      )}
-      {Array.isArray(data.working) && data.working.length > 0 && (
-        <Card title="Keep doing">
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {data.working.map((w, i) => <li key={i} style={{ fontSize: "0.7rem", color: C.text, lineHeight: 1.7 }}>{w}</li>)}
-          </ul>
-        </Card>
-      )}
+      {!pro && attentionCard}
+      {!pro && workingCard}
       {Array.isArray(data.lenses) && data.lenses.length > 0 && (
         <Card title="Lens sweep">
           {data.lenses.map((l, i) => (
@@ -7512,7 +7525,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
           </div>
 
           {/* COACH — admin-only standing read from Claude (kept in Pro too) */}
-          {isAdmin && coachRead && <CoachHero data={coachRead} />}
+          {isAdmin && coachRead && <CoachHero data={coachRead} pro />}
 
           {/* P1. COMMAND HEADER */}
           <div className="cmdheader">
@@ -7711,6 +7724,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             </div>
           </div>
           <div className="vagrid">
+            <div className="vacol">
             <div className="card vacard">
               <div className="eyebrow-row"><span className="eyebrow">Recap</span><span className="infodot" data-tip="A snapshot of how you traded in this window — net P/L, win rate, the outlier trades that drove results, and the tags you leaned on.">i</span></div>
               <div className="varecap">
@@ -7728,6 +7742,7 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             <div className="card vacard">
               <div className="eyebrow-row"><span className="eyebrow">Insights</span><span className="infodot" data-tip="Plain-language takeaways pulled from your numbers — what's working, what's leaking money, and the one habit worth fixing next.">i</span></div>
               <ul className="valist">{vaInsights.map((o, i) => <li key={i}><span className={"ic " + o.k}>{o.ic}</span><span>{o.t}</span></li>)}</ul>
+            </div>
             </div>
             <div className="card vacard">
               <div className="eyebrow-row"><span className="eyebrow" style={{ color: "var(--green)" }}>▲ Best winners</span><span className="infodot" data-tip="Your biggest winning trades in this window. Click a row to jump to it in Closed Trades. Study what they had in common — these are the setups to size up.">i</span></div>
@@ -8324,10 +8339,12 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
     -webkit-font-smoothing:antialiased; padding:0; min-height:100vh;}
 .vd .big,.vd .north .big,.vd .mini .val,.vd .val,.vd .outval,.vd .outsub,.vd .pl,.vd .stepval,.vd .numfield,.vd .capinput,.vd tbody td,.vd .allocnote,.vd .alloclegend,.vd .breakdown,.vd .deployhead,.vd .deploysub{font-variant-numeric:tabular-nums}
 .vd .shell{width:100%; max-width:1240px; margin:0 auto; padding:22px clamp(18px,2.4vw,40px) 80px}
+.vd.expert .shell{max-width:1400px}
 @media(min-width:1500px){
 .vd .shell{max-width:1400px} }
 @media(min-width:2000px){
-.vd .shell{max-width:1680px} }
+.vd .shell{max-width:1680px}
+.vd.expert .shell{max-width:1680px} }
 .vd .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:wrap}
 .vd .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem}
 .vd .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
@@ -8712,6 +8729,9 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .kpichip{display:inline-block; margin-top:7px; font-size:0.6rem; font-weight:700; padding:3px 9px; border-radius:980px; background:var(--goldDim); color:var(--goldBright); letter-spacing:0.03em}
 .vd.expert .kpiviz{flex:none; width:70px; height:40px}
 .vd.expert .kpiviz svg{width:100%; height:100%; display:block; overflow:visible}
+.vd.expert .kpiviz.hastip{position:relative}
+.vd.expert .kpitip{display:none; position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:8px 12px; box-shadow:0 10px 30px rgba(0,0,0,0.55); font-size:0.72rem; font-weight:700; line-height:1.55; text-align:right; white-space:nowrap}
+.vd.expert .kpiviz.hastip:hover .kpitip{display:block}
 @media(max-width:1200px){ .vd.expert .kpistrip{grid-template-columns:repeat(3,1fr)} }
 @media(max-width:760px){ .vd.expert .kpistrip{grid-template-columns:repeat(2,1fr)} }
 /* P2b. Config row */
@@ -9928,11 +9948,12 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                   <div className={"kpinum " + (rtsTotal > 0 ? "red" : "green")}>{usd0(rtsTotal)}</div>
                   <div className="kpisub">{pct2(rtsPct)} of equity</div>
                 </div>
-                <div className="kpiviz">
+                <div className="kpiviz hastip">
                   <svg viewBox="0 0 70 40" role="img" aria-label="risk versus ROTE cap">
                     <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="6" strokeLinecap="round" />
                     <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="var(--goldBright)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(kRiskFrac * SEMI).toFixed(1)} 999`} />
                   </svg>
+                  <div className="kpitip"><div style={{ color: "var(--goldBright)" }}>At risk {usd0(rtsTotal)}</div><div style={{ color: "var(--green)" }}>Budget {usd0(budget.totalBudget)}</div></div>
                 </div>
               </div>
             </div>
@@ -9961,11 +9982,12 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
                   <div className="kpinum gold">{usd0(budget.totalBudget)}</div>
                   <div className="kpisub">Available {usd0(budget.available)}</div>
                 </div>
-                <div className="kpiviz">
+                <div className="kpiviz hastip">
                   <svg viewBox="0 0 40 40" role="img" aria-label="risk budget deployed">
                     <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(34,197,94,0.35)" strokeWidth="6" />
                     <circle cx="20" cy="20" r="15" fill="none" stroke="var(--goldBright)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(kBudgetFrac * RING).toFixed(1)} ${RING}`} transform="rotate(-90 20 20)" />
                   </svg>
+                  <div className="kpitip"><div style={{ color: "var(--goldBright)" }}>Deployed {usd0(budget.deployedRisk)}</div><div style={{ color: "var(--green)" }}>Available {usd0(budget.available)}</div></div>
                 </div>
               </div>
             </div>
@@ -10045,7 +10067,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
               <div className="allocnote">{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
             </div>
             <MarketContext C={C} font={font} />
-            <ThemeStrip C={C} font={font} />
+            <ThemeStrip C={C} font={font} variant="pro" />
           </div>
           <EdgeLedger C={C} font={font} session={session} setPage={setPage} />  {/* admin-only: renders null for members */}
 
@@ -10313,10 +10335,12 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs{background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
     color:var(--text); font-family:var(--font); line-height:1.58; -webkit-font-smoothing:antialiased; min-height:100vh}
 .vs .shell{width:100%; max-width:1240px; margin:0 auto; padding:22px clamp(18px,2.4vw,40px) 90px}
+.vs.expert .shell{max-width:1400px}
 @media(min-width:1500px){
 .vs .shell{max-width:1400px} }
 @media(min-width:2000px){
-.vs .shell{max-width:1680px} }
+.vs .shell{max-width:1680px}
+.vs.expert .shell{max-width:1680px} }
 .vs .card{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:22px;
     backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%); padding:22px 24px; overflow:hidden; margin-top:18px}
 .vs .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)}
@@ -11467,11 +11491,6 @@ function ModelBookShell({ setPage, onLogout, session, displayName, journaledTrad
           <WhatsNew />
           <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
         </div>
-        <div className="reveal in-view" style={{ marginBottom: 10 }}>
-          <div className="eyebrow">Model Book</div>
-          <div className="h1" style={{ marginTop: 6 }}>Study the <span className="goldname">best setups</span>, {(displayName && displayName.trim()) || "trader"}</div>
-          <div className="sub">Real winners, graded and dissected — the before chart, the exact factors that made it elite, then the outcome. Pattern recognition is built by reps.</div>
-        </div>
         <ModelBookPage C={C} font={font} session={session} isAdmin={isAdmin} journaledTrades={journaledTrades} />
       </div>
     </div>
@@ -11499,11 +11518,6 @@ function DailySetupsShell({ setPage, onLogout, session, displayName }) {
           <div className="spacer"></div>
           <WhatsNew />
           <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
-        </div>
-        <div className="reveal in-view" style={{ marginBottom: 10 }}>
-          <div className="eyebrow">Daily Setups</div>
-          <div className="h1" style={{ marginTop: 6 }}>Today's setups on <span className="goldname">the radar</span>, {(displayName && displayName.trim()) || "trader"}</div>
-          <div className="sub">Fresh each day — the chart, the read, and the full graded scorecard behind every star. Educational, not trade signals.</div>
         </div>
         <DailySetupsTab C={C} font={font} session={session} isAdmin={isAdmin} setPage={setPage} />
       </div>
