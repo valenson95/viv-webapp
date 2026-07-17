@@ -399,12 +399,15 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     const { error } = await supabase.from("model_book").delete().eq("id", row.id);
     if (error) setError(String(error.message)); else { setDetail(null); load(); }
   };
-  // one-click star toggle on a study row: flips metrics.study.in_model_book (no duplication —
-  // the study stays for lift; starred ⇒ it also shows as a Model Book card)
+  // one-click star toggle on a study row: ★ = publish. The card and the study are ONE row —
+  // starring flips in_model_book AND is_published together, so the study appears in ⭐ VIV Official
+  // (member-visible) as a card while staying in 📚 Studies for the lift math. Unstar = unpublish.
   const toggleModelBook = async (row) => {
-    const mt = { ...row.metrics, study: { ...row.metrics.study, in_model_book: !row.metrics?.study?.in_model_book } };
-    setRows(rs => rs.map(x => x.id === row.id ? { ...x, metrics: mt } : x)); // optimistic
-    const { error } = await supabase.from("model_book").update({ metrics: mt }).eq("id", row.id);
+    const starring = !row.metrics?.study?.in_model_book;
+    if (starring && !window.confirm(`Star ${row.ticker} ${row.entry_date}?\n\nThis publishes it to the ⭐ VIV Official book — members will see the card, charts, stats AND your thesis/lesson text. Check the notes read clean before starring.`)) return;
+    const mt = { ...row.metrics, study: { ...row.metrics.study, in_model_book: starring } };
+    setRows(rs => rs.map(x => x.id === row.id ? { ...x, metrics: mt, is_published: starring } : x)); // optimistic
+    const { error } = await supabase.from("model_book").update({ metrics: mt, is_published: starring }).eq("id", row.id);
     if (error) { setError(String(error.message)); load(); }
   };
 
