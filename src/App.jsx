@@ -4866,11 +4866,12 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 /* P5. Calendar + key metrics row */
 .vj.expert .calmetrow{display:grid; grid-template-columns:1.2fr 1fr; gap:14px; margin-top:14px; align-items:stretch}
 @media(max-width:1000px){ .vj.expert .calmetrow{grid-template-columns:1fr} }
-.vj.expert .metricsmini{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
-.vj.expert .mmtile{background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:10px; padding:9px 10px; cursor:grab}
+/* Tiles sized to fill ~70% of the (calendar-height) card — roomier, not wall-to-wall (Valen 07-17). */
+.vj.expert .metricsmini{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; grid-auto-rows:minmax(84px,auto)}
+.vj.expert .mmtile{background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:12px; padding:14px 16px; cursor:grab; display:flex; flex-direction:column; justify-content:center; min-width:0}
 .vj.expert .mmtile.dragging{opacity:0.4; border-color:var(--borderGold); cursor:grabbing}
-.vj.expert .mmk{font-size:0.56rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--faint); font-weight:700}
-.vj.expert .mmv{font-size:0.78rem; font-weight:800; margin-top:4px; letter-spacing:-0.01em; font-variant-numeric:tabular-nums}
+.vj.expert .mmk{font-size:0.64rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--faint); font-weight:700}
+.vj.expert .mmv{font-size:1.15rem; font-weight:800; margin-top:6px; letter-spacing:-0.01em; font-variant-numeric:tabular-nums; white-space:nowrap}
 .vj.expert .mmv.green{color:var(--green)} .vj.expert .mmv.red{color:var(--red)} .vj.expert .mmv.gold{color:var(--goldBright)}
 /* P5b. Playbook strip */
 .vj.expert .playbookstrip{margin-top:14px}
