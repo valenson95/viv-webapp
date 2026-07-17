@@ -13,6 +13,12 @@ import { isStudyRow, StudyEditor, StudyScoreboard, outcomeClass, studyQuality } 
 const STUDY_LETTER_N = { "A+": 5, A: 4, B: 3, C: 2 };
 const inModelBook = (r) => isStudyRow(r) && !!r.metrics?.study?.in_model_book;
 const cardStars = (r) => isStudyRow(r) ? (STUDY_LETTER_N[studyQuality(r.metrics.study).letter] || 0) : r.stars;
+// Study rows map chart slots differently from card rows: after_img = BEFORE (the setup, right edge
+// = trigger) and the AFTER outcome lives in metrics.study.outcome_img (virtual slot; before_img =
+// optional HTF context). Cards + detail must present the study PAIR or the outcome never shows.
+const displayImgs = (r) => isStudyRow(r)
+  ? { before: r.after_img || r.before_img || "", after: r.metrics?.study?.outcome_img || "" }
+  : { before: r.before_img || "", after: r.after_img || "" };
 
 // tolerant date → ISO (journal trades carry ISO or M/D/YY)
 const mbISO = (d) => {
@@ -587,7 +593,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         {(studyMode ? [] : visible).map(r => {
           const eff = effectiveStars(cardStars(r), (r.elite || []).length);
           const elite = eff.n >= 6;
-          const img = r.after_img || r.before_img;
+          const di = displayImgs(r);
+          const img = di.before || di.after;
           const gb = gradeBadge(eff.n);
           const dr = mbDateRange(r.entry_date, r.exit_date);
           const rTxt = r.r_mult != null ? `${r.r_mult > 0 ? "+" : ""}${r.r_mult}R` : (r.run_pct != null ? `${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : "");
@@ -665,11 +672,11 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                     return parts.length ? <span title={`At the trigger date — cap from SEC shares outstanding (${sm.mcap_asof || "n/a"}), ADR20 from the 20 sessions before the trigger.`} style={{ position: "absolute", top: 26, right: 6, zIndex: 2, background: "rgba(8,8,14,0.82)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.04em", padding: "3px 8px", borderRadius: 7, whiteSpace: "nowrap", cursor: "help", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>{parts.join(" · ")}</span> : null;
                   })()}
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>◀ Before — the setup <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
-                  {r.before_img ? <img src={r.before_img} alt="before" onClick={() => setZoom({ imgs: { before: r.before_img, after: r.after_img }, slot: "before" })} style={{ width: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>before chart pending</div>}
+                  {(() => { const di = displayImgs(r); return di.before ? <img src={di.before} alt="before" onClick={() => setZoom({ imgs: { before: di.before, after: di.after }, slot: "before" })} style={{ width: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>before chart pending</div>; })()}
                 </div>
                 <div>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.green, marginBottom: 7 }}>After — the outcome ▶ <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
-                  {r.after_img ? <img src={r.after_img} alt="after" onClick={() => setZoom({ imgs: { before: r.before_img, after: r.after_img }, slot: "after" })} style={{ width: "100%", borderRadius: 12, border: "1px solid rgba(34,197,94,0.35)", cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>after chart pending</div>}
+                  {(() => { const di = displayImgs(r); return di.after ? <img src={di.after} alt="after" onClick={() => setZoom({ imgs: { before: di.before, after: di.after }, slot: "after" })} style={{ width: "100%", borderRadius: 12, border: "1px solid rgba(34,197,94,0.35)", cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>after chart pending</div>; })()}
                 </div>
               </div>
               {/* Objective metric strip — gold dot = auto-read off the chart by VIV */}

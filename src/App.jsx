@@ -679,6 +679,8 @@ const WHATS_NEW = [
       "Official Model Book studies carry a badge on the chart (top-right): the stock's MARKET CAP and ADR% as of the trigger day — measured from filings available at the time, never today's numbers. Study which size tier the big moves actually come from. No badge = we couldn't measure it honestly, so we left it blank.",
       "Setup Grader wording sharpened: the base-quality tick is now “Surfing a rising 10/20/50-day MA into the pivot” — same tick, clearer target.",
       "More official studies: starred research studies now flow straight into the ⭐ VIV Official book — same row, same live stats, presented as a card. Nine new entries landed today (RKLB, ASTS, SNDK, PLTR, VRT).",
+      "Fixed: study cards in the Model Book now show the correct Before (the setup) AND After (the outcome) charts — the outcome was previously hidden on promoted studies.",
+      "Dashboard Equity card: the curve now carries the same MA5 / MA10 / MA20 overlay as the Journal equity curve (dashed gold / red / violet — hover the chart for the legend).",
     ],
   },
   {
@@ -9995,7 +9997,11 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
     const xy = pts.map((v, i) => [+(i * step).toFixed(1), +(H - ((v - min) / range) * (H - 6) - 3).toFixed(1)]);
     const line = xy.map((p, i) => (i ? "L" : "M") + p[0] + "," + p[1]).join(" ");
     const area = "M" + xy[0][0] + "," + H + " " + xy.map(p => "L" + p[0] + "," + p[1]).join(" ") + " L" + xy[xy.length - 1][0] + "," + H + " Z";
-    return { line, area, up: pts[pts.length - 1] >= 0 };
+    // MA5/10/20 of the same per-trade cumulative series — mirrors the Journal equity curve overlay
+    const smaOf = (p) => pts.map((_, i) => i + 1 >= p ? pts.slice(i + 1 - p, i + 1).reduce((s, v) => s + v, 0) / p : null);
+    const smaPath = (arr) => { let out = "", pen = false; arr.forEach((v, i) => { if (v == null) { pen = false; return; } out += (pen ? " L" : " M") + (i * step).toFixed(1) + "," + (H - ((v - min) / range) * (H - 6) - 3).toFixed(1); pen = true; }); return out.trim(); };
+    const smas = { s5: smaPath(smaOf(5)), s10: smaPath(smaOf(10)), s20: smaPath(smaOf(20)) };
+    return { line, area, smas, up: pts[pts.length - 1] >= 0 };
   }, [journaledTrades]);
   const sparkLine = spark ? spark.line : "M0,44 L32,46 L64,40 L96,42 L128,33 L160,36 L192,26 L224,30 L256,18 L288,22 L320,9";
   const sparkArea = spark ? spark.area : "M0,44 L32,46 L64,40 L96,42 L128,33 L160,36 L192,26 L224,30 L256,18 L288,22 L320,9 L320,56 L0,56 Z";
@@ -10315,10 +10321,14 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                   <div className={"kpinum " + (openPL >= 0 ? "green" : "red")}><Cu>{usdSigned(openPL)}</Cu></div>
                   <div className="kpisub">{pctSigned(openPLpct)} across {openCount} position{openCount === 1 ? "" : "s"}</div>
                 </div>
-                <div className="kpiviz tipwrap" data-tip={spark ? `Realized P/L trend · ${(journaledTrades || []).length} closed trades` : "Realized equity trend"}>
+                <div className="kpiviz tipwrap" data-tip={spark ? `Realized P/L trend · ${(journaledTrades || []).length} closed trades · dashed lines = MA5 (gold) / MA10 (red) / MA20 (violet) of the curve` : "Realized equity trend"}>
                   <svg viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Realized equity trend">
                     <defs><linearGradient id="sparkgPro" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={spark && !spark.up ? "rgba(239,68,68,0.30)" : "rgba(34,197,94,0.34)"} /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient></defs>
                     <path d={sparkArea} fill="url(#sparkgPro)" />
+                    {/* MA5/10/20 overlays — same convention + colors as the Journal equity curve */}
+                    {spark?.smas?.s20 && <path d={spark.smas.s20} fill="none" stroke="rgba(168,130,255,0.7)" strokeWidth="1.1" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
+                    {spark?.smas?.s10 && <path d={spark.smas.s10} fill="none" stroke="rgba(239,68,68,0.75)" strokeWidth="1.1" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
+                    {spark?.smas?.s5 && <path d={spark.smas.s5} fill="none" stroke="rgba(240,192,80,0.85)" strokeWidth="1.1" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
                     <path d={sparkLine} fill="none" stroke={spark && !spark.up ? "var(--red)" : "var(--green)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                   </svg>
                 </div>
