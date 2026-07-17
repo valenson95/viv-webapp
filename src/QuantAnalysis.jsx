@@ -185,7 +185,7 @@ class QABoundary extends React.Component {
 export default function QuantAnalysis(props) { return <QABoundary><QuantAnalysisInner {...props} /></QABoundary>; }
 
 /* ─── page ───────────────────────────────────────────────────────────────── */
-function QuantAnalysisInner({ C, font, session, setPage }) {
+function QuantAnalysisInner({ C, font, session }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL;
   const [data, setData] = useState(null);
   const [mode, setMode] = useState("sys"); // "sys" = system cohort · "all" = full journal since May
@@ -544,21 +544,7 @@ function QuantAnalysisInner({ C, font, session, setPage }) {
         @media(max-width:1000px){ .qa .halfgrid{grid-template-columns:1fr} }
         body.qa-open .viv-cursor-glow{display:none !important}
       `}</style>
-      {/* nav — pill tab bar (Quant active). Page renders standalone in App.jsx, so these buttons
-          are the only way to navigate away — kept fully wired to setPage. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
-        <div style={{ display: "inline-flex", gap: 4, background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, borderRadius: 980, padding: 4, flexWrap: "wrap" }}>
-          {[["dashboard", "Dashboard"], ["journal", "Journal"], ["tools", "Premium tools"], ["daily", "Daily Setups"], ["modelbook", "Model Book"], ["studies", "Studies"], ["quant", "Quant"], ["settings", "Settings"]].map(([pg, label]) => {
-            const active = pg === "quant";
-            return (
-              <button key={pg} onClick={() => { if (active) return; if (pg === "studies") { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); } else setPage && setPage(pg); }}
-                style={{ border: "none", cursor: active ? "default" : "pointer", fontFamily: font, background: active ? "rgba(201,152,42,0.15)" : "transparent", color: active ? T.goldBright : T.muted, fontSize: "0.78rem", fontWeight: 700, padding: "7px 16px", borderRadius: 980 }}>{label}</button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* command header */}
+      {/* command header — the page nav is the shared navbar in App.jsx's QuantShell */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap", marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: T.gold }}>Quant</div>

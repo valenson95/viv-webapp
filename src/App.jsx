@@ -800,7 +800,13 @@ function WhatsNew() {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: WHATS_NEW_CSS }} />
-      <button onClick={openModal} title={unread ? "What's New — new update available" : "What's New"} className={unread ? "viv-wn-glow" : ""} style={{ marginLeft: 10, display: "inline-flex", alignItems: "center", gap: 6, background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer", whiteSpace: "nowrap", animation: unread ? "wnGlow 1.8s ease-in-out infinite" : "none" }}>✦ What's New{unread && <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.goldBright, boxShadow: `0 0 8px ${C.goldBright}` }} />}</button>
+      <button onClick={openModal} title={unread ? "What's New — new update available" : "What's New"} aria-label="What's New" className={unread ? "viv-wn-glow" : ""} style={{ position: "relative", width: 34, height: 34, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, borderRadius: "50%", cursor: "pointer", animation: unread ? "wnGlow 1.8s ease-in-out infinite" : "none" }}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16, display: "block" }}>
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+        {unread && <span style={{ position: "absolute", top: 5, right: 6, width: 7, height: 7, borderRadius: "50%", background: C.goldBright, boxShadow: `0 0 8px ${C.goldBright}` }} />}
+      </button>
       {open && (
         <div onClick={closeModal} className="viv-wn-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "6vh 16px", overflowY: "auto", animation: (closing ? "wnOverlayOut" : "wnOverlayIn") + " 0.2s ease forwards" }}>
           <div onClick={e => e.stopPropagation()} className="viv-wn-card" style={{ width: 580, maxWidth: "100%", background: C.bg2, border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "24px 28px 28px", boxShadow: "0 30px 80px rgba(0,0,0,0.6)", fontFamily: font, animation: (closing ? "wnCardOut 0.2s cubic-bezier(0.4,0,1,1)" : "wnCardIn 0.28s cubic-bezier(0.22,1,0.36,1)") + " forwards" }}>
@@ -832,6 +838,46 @@ function WhatsNew() {
         </div>
       )}
     </>
+  );
+}
+
+// ─── Fixed corner controls — notification bell (What's New) · Pro Mode toggle · Sign out.
+// Rendered ONCE at the app root (outside the page switch) so they sit in the same spot on
+// every page. Mode changes broadcast a window event; each page's uiMode state listens for it
+// (the pages still own their localStorage "viv-mode" copy — this is just the shared switch).
+const broadcastUiMode = (m) => {
+  try { localStorage.setItem("viv-mode", m); } catch {}
+  window.dispatchEvent(new CustomEvent("viv-mode-change", { detail: m }));
+};
+// Read-only Guided/Pro mode state — localStorage snapshot, then follows viv-mode-change broadcasts.
+function useUiMode() {
+  const [uiMode, setUiMode] = useState(() => { try { return localStorage.getItem("viv-mode") === "pro" ? "pro" : "guided"; } catch { return "guided"; } });
+  useEffect(() => {
+    const h = (e) => setUiMode(e.detail === "pro" ? "pro" : "guided");
+    window.addEventListener("viv-mode-change", h);
+    return () => window.removeEventListener("viv-mode-change", h);
+  }, []);
+  return uiMode;
+}
+function HeaderControls({ onLogout, inline }) {
+  const pro = useUiMode() === "pro";
+  return (
+    <div style={inline
+      ? { display: "flex", alignItems: "center", gap: 8, fontFamily: font }
+      : { position: "fixed", top: 20, right: 22, zIndex: 150, display: "flex", alignItems: "center", gap: 8, fontFamily: font, background: "rgba(8,8,14,0.6)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", border: `1px solid ${C.border}`, borderRadius: 980, padding: "5px 7px" }}>
+      {/* keep the page navbars clear of the fixed cluster (tabs otherwise run underneath it) */}
+      {!inline && <style dangerouslySetInnerHTML={{ __html: `.vp .navbar,.vj .navbar,.vd .navbar,.vs .navbar{padding-right:300px}` }} />}
+      <WhatsNew />
+      <button onClick={() => broadcastUiMode(pro ? "guided" : "pro")} title={pro ? "Pro Mode is on — click for Guided (plain-English explainers everywhere)" : "Pro Mode is off — click to strip the guided teaching layer"}
+        style={{ display: "inline-flex", alignItems: "center", gap: 8, background: pro ? C.goldDim : "rgba(255,255,255,0.05)", border: `1px solid ${pro ? C.borderGold : C.border}`, borderRadius: 980, padding: "6px 10px 6px 13px", cursor: "pointer", fontFamily: font, transition: "background .18s, border-color .18s" }}>
+        <span style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: pro ? C.goldBright : C.muted, whiteSpace: "nowrap" }}>Pro Mode</span>
+        <span style={{ position: "relative", width: 32, height: 17, borderRadius: 980, background: pro ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.14)", transition: "background .18s", flex: "none" }}>
+          <span style={{ position: "absolute", top: 2, left: pro ? 17 : 2, width: 13, height: 13, borderRadius: "50%", background: pro ? "#08080e" : "rgba(255,255,255,0.75)", transition: "left .18s" }} />
+        </span>
+        <span style={{ fontSize: "0.62rem", fontWeight: 800, width: 20, textAlign: "left", color: pro ? C.goldBright : C.muted }}>{pro ? "On" : "Off"}</span>
+      </button>
+      {!inline && <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer", whiteSpace: "nowrap" }}>Sign out</button>}
+    </div>
   );
 }
 
@@ -3501,7 +3547,7 @@ function PremiumTour({ onPlayStateChange }) {
     </div>
   );
 }
-function PremiumToolsPage({ setPage, onLogout, session, demo, portfolioSize, journaledTrades, positions, displayName }) {
+function PremiumToolsPage({ setPage, session, demo, portfolioSize, journaledTrades, positions, displayName }) {
   const[tab,setTab]=useState(0);const tabs=["Setup Grader","Return Simulator","Risk","Expectancy","Risk Finance"];
   // Arrived via the Playbook tracker's "Edit playbook design" → open straight on the Return Simulator.
   useEffect(() => { try { if (sessionStorage.getItem("viv-goto-sim")) { sessionStorage.removeItem("viv-goto-sim"); setTab(1); } } catch { /* private mode */ } }, []);
@@ -3518,7 +3564,7 @@ function PremiumToolsPage({ setPage, onLogout, session, demo, portfolioSize, jou
 // PLACEMENT: paste the helper block + PREM_CSS module const ABOVE the function,
 // and put everything inside `return ( … );` as the new PremiumToolsPage return.
 // The existing tab state (`tab`/`setTab`), `realizedPL`, `currentCapital`,
-// `tabs`, `demo`, `portfolioSize`, `journaledTrades`, `setPage`, `onLogout`
+// `tabs`, `demo`, `portfolioSize`, `journaledTrades`, `setPage`
 // props are reused unchanged.
 // ════════════════════════════════════════════════════════════════════════
 
@@ -3550,6 +3596,8 @@ useEffect(() => {
 }, [tab]);
 
 const applyMode = (m) => { setUiMode(m); if (m === "pro") { try { audioRef.current && audioRef.current.pause(); } catch {} setGuide(null); setActiveGuide(null); } };
+// the global corner Pro Mode toggle (HeaderControls) broadcasts mode changes — apply them here
+useEffect(() => { const h = (e) => applyMode(e.detail); window.addEventListener("viv-mode-change", h); return () => window.removeEventListener("viv-mode-change", h); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 const narrate = (audio) => { if (guideMuted || tourPlayingRef.current || !audio || !audioRef.current) return; try { audioRef.current.pause(); audioRef.current.src = audio; audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); } catch {} };
 // guide handlers shared with sub-tabs via props (guideEnter / guideLeave / gactive)
 const guideEnter = (key, title, body, audio) => () => { if (expert) return; setActiveGuide(key); setGuide({ title, body }); narrate(audio); };
@@ -3582,16 +3630,9 @@ if (expert) return (
           <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
-        <div className="spacer"></div>
-        <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
-          <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
-          <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
-        </div>
-        <WhatsNew />
-        <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
       </div>
 
       {/* P1. COMMAND HEADER */}
@@ -3638,16 +3679,9 @@ return (
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
-        <div className="spacer"></div>
-        <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
-          <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
-          <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
-        </div>
-        <WhatsNew />
-        <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
       </div>
 
       {/* HEADER */}
@@ -4026,11 +4060,13 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .big,.vj .north .big,.vj .mini .val,.vj .val,.vj .outval,.vj .metricval,.vj .pl,.vj tbody td,.vj .mgr b,.vj .charthint,.vj .edgeval{font-variant-numeric:tabular-nums}
 .vj .shell{width:100%; max-width:1240px; margin:0 auto; padding:22px clamp(18px,2.4vw,40px) 80px}
 .vj.expert .shell{max-width:1400px}
+.vj.prowide .shell{max-width:1400px} /* width-only Pro parity for the .vj page shells (Model Book / Daily / Mentor / Quant) — no .expert content restyling */
 @media(min-width:1500px){
 .vj .shell{max-width:1400px} }
 @media(min-width:2000px){
 .vj .shell{max-width:1680px}
-.vj.expert .shell{max-width:1680px} }
+.vj.expert .shell{max-width:1680px}
+.vj.prowide .shell{max-width:1680px} }
 .vj .card{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:22px;
     backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%); padding:26px 28px; overflow:hidden}
 .vj .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)}
@@ -4782,52 +4818,52 @@ function CoachHero({ data, pro = false }) {
   );
   const Scorecard = ({ title, s, accent }) => (
     <div style={{ background: "rgba(0,0,0,0.25)", border: `1px solid ${accent ? C.gold : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "12px 14px" }}>
-      <div style={{ fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.goldBright, fontWeight: 700, marginBottom: 8 }}>{title}</div>
+      <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, fontWeight: 700, marginBottom: 8 }}>{title}</div>
       {[["Win rate", (s.win_rate ?? "—") + "%"], ["Expectancy", (s.expectancy ?? "—") + "R"], ["Profit factor", s.pf ?? "—"], ["In-theme", (s.pct_in_theme ?? "—") + "%"], ["Trades", s.n ?? "—"]].map(([k, v]) => (
-        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", padding: "2px 0" }}><span style={{ color: C.muted }}>{k}</span><b>{v}</b></div>
+        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", padding: "2px 0" }}><span style={{ color: C.muted }}>{k}</span><b>{v}</b></div>
       ))}
     </div>
   );
   const briefingCard = (
     <Card>
-      <div style={{ fontSize: "0.95rem", lineHeight: 1.55, fontWeight: 700, color: C.white }}>{data.headline}</div>
+      <div style={{ fontSize: "0.78rem", lineHeight: 1.55, fontWeight: 700, color: C.white }}>{data.headline}</div>
       <div style={{ display: "flex", gap: 8, margin: "12px 0 6px", flexWrap: "wrap" }}>
         {[["vs peak", d.vs_peak], ["vs system", d.vs_system]].map(([k, v]) => v ? (
-          <span key={k} style={{ fontSize: "0.6rem", fontWeight: 700, padding: "4px 11px", borderRadius: 20, border: `1px solid ${vcol(v)}`, color: vcol(v) }}>{k} · {v}</span>
+          <span key={k} style={{ fontSize: "0.58rem", fontWeight: 700, letterSpacing: ".04em", padding: "4px 11px", borderRadius: 20, border: `1px solid ${vcol(v)}`, color: vcol(v) }}>{k} · {v}</span>
         ) : null)}
       </div>
-      {d.summary && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
+      {d.summary && <div style={{ fontSize: "0.72rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
     </Card>
   );
   const attentionCard = (Array.isArray(data.attention) && data.attention.length > 0) ? (
     <Card title="Pay attention now" style={{ border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 0 24px rgba(239,68,68,0.15)" }}>
       {data.attention.map((a, i) => (
         <div key={i} style={{ borderLeft: `3px solid ${C.red}`, background: "rgba(0,0,0,0.25)", borderRadius: 6, padding: "10px 14px", marginBottom: 9 }}>
-          <div style={{ fontSize: "0.54rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.red, fontWeight: 700 }}>{a.lens}</div>
+          <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.red, fontWeight: 700 }}>{a.lens}</div>
           <div style={{ fontSize: "0.78rem", fontWeight: 700, margin: "2px 0 4px" }}>{a.title}</div>
-          <div style={{ fontSize: "0.7rem", color: C.text, lineHeight: 1.55 }}>{a.detail}</div>
+          <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.55 }}>{a.detail}</div>
         </div>
       ))}
     </Card>
   ) : null;
   const workingCard = (Array.isArray(data.working) && data.working.length > 0) ? (
-    <Card title="Keep doing">
+    <Card title="Keep doing" style={{ border: "1px solid rgba(34,197,94,0.35)", boxShadow: "0 0 24px rgba(34,197,94,0.15)" }}>
       <ul style={{ margin: 0, paddingLeft: 18 }}>
-        {data.working.map((w, i) => <li key={i} style={{ fontSize: "0.7rem", color: C.text, lineHeight: 1.7 }}>{w}</li>)}
+        {data.working.map((w, i) => <li key={i} style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7 }}>{w}</li>)}
       </ul>
     </Card>
   ) : null;
   return (
     <div className="reveal" style={{ marginTop: 18 }}>
-      <style dangerouslySetInnerHTML={{ __html: ".coachtop{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; align-items:start; margin-bottom:14px}.coachtop > div{margin-bottom:0 !important}@media(max-width:1100px){.coachtop{grid-template-columns:1fr}}@keyframes jarvisPulse{0%{box-shadow:0 0 4px rgba(201,152,42,0.55); opacity:0.7; transform:scale(0.88)}100%{box-shadow:0 0 14px rgba(201,152,42,0.95); opacity:1; transform:scale(1.14)}}.jarvisdot{box-shadow:0 0 8px rgba(201,152,42,0.8); animation:jarvisPulse 2.4s ease-in-out infinite alternate}@media(prefers-reduced-motion:reduce){.jarvisdot{animation:none; box-shadow:0 0 10px rgba(201,152,42,0.85)}}" }} />
+      <style dangerouslySetInnerHTML={{ __html: ".coachtop{display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; margin-bottom:14px}.coachtop > div{margin-bottom:0 !important}@media(max-width:1100px){.coachtop{grid-template-columns:1fr}}@keyframes jarvisPulse{0%{box-shadow:0 0 4px rgba(201,152,42,0.55); opacity:0.7; transform:scale(0.88)}100%{box-shadow:0 0 14px rgba(201,152,42,0.95); opacity:1; transform:scale(1.14)}}.jarvisdot{box-shadow:0 0 8px rgba(201,152,42,0.8); animation:jarvisPulse 2.4s ease-in-out infinite alternate}@media(prefers-reduced-motion:reduce){.jarvisdot{animation:none; box-shadow:0 0 10px rgba(201,152,42,0.85)}}" }} />
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <span className="jarvisdot" style={{ width: 8, height: 8, borderRadius: "50%", background: C.gold }} />
-        <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".04em", textTransform: "uppercase", color: C.goldBright }}>Jarvis · admin</span>
-        {data.scope && <span style={{ fontSize: "0.58rem", color: C.muted }}>{data.scope}</span>}
+        <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: C.goldBright }}>Jarvis · admin</span>
+        {data.scope && <span style={{ fontSize: "0.66rem", color: C.muted }}>{data.scope}</span>}
       </div>
       {pro
-        ? <div className="coachtop">{briefingCard}{attentionCard}{workingCard}</div>
-        : briefingCard}
+        ? <div className="coachtop"><div style={{ minWidth: 0 }}>{briefingCard}{workingCard}</div>{attentionCard}</div>
+        : <>{briefingCard}{workingCard}</>}
       {false /* Goldilocks zone hidden per Valen (2026-07-04) */ && data.goldilocks && (() => { const g = data.goldilocks;
         const tile = (label, val, color) => (
           <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "10px 6px", textAlign: "center", flex: 1, minWidth: 64 }}>
@@ -4911,7 +4947,7 @@ function CoachHero({ data, pro = false }) {
         const tile = (label, val, color) => (
           <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "12px 10px", textAlign: "center", flex: 1, minWidth: 90 }}>
             <div style={{ fontSize: "1.4rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
-            <div style={{ fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.muted, marginTop: 5 }}>{label}</div>
+            <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.muted, marginTop: 5 }}>{label}</div>
           </div>
         );
         const rc = Array.isArray(ch.r_curve) ? ch.r_curve : [];
@@ -4941,7 +4977,7 @@ function CoachHero({ data, pro = false }) {
                   <path d={`${path} L ${W},${H} L 0,${H} Z`} fill="rgba(201,152,42,0.10)" />
                   <path d={path} fill="none" stroke={C.gold} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
                 </svg>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.56rem", color: C.muted, marginTop: 4 }}><span>{rc.length} trades</span><span style={{ color: C.green, fontWeight: 700 }}>+{(rsv[rsv.length - 1] || 0).toFixed(0)}R total</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.58rem", color: C.muted, marginTop: 4 }}><span>{rc.length} trades</span><span style={{ color: C.green, fontWeight: 700 }}>+{(rsv[rsv.length - 1] || 0).toFixed(0)}R total</span></div>
               </Card>
             )}
             {/* "Avg R by setup" and "R distribution" removed per Valen (2026-06-26) — replaced by the Goldilocks card + single deep-dive analysis below. */}
@@ -4957,17 +4993,16 @@ function CoachHero({ data, pro = false }) {
         </div>
       </Card>)}
       {!pro && attentionCard}
-      {!pro && workingCard}
       {Array.isArray(data.lenses) && data.lenses.length > 0 && (
         <Card title="Lens sweep">
           {data.lenses.map((l, i) => (
             <div key={i} style={{ padding: "6px 0", borderBottom: i < data.lenses.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: vcol(l.verdict) }} />
-                <span style={{ fontSize: "0.7rem", flex: 1 }}>{l.name}</span>
+                <span style={{ fontSize: "0.72rem", flex: 1 }}>{l.name}</span>
                 <span style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", color: vcol(l.verdict) }}>{l.verdict}</span>
               </div>
-              {l.note && <div style={{ fontSize: "0.62rem", color: C.muted, marginLeft: 16, marginTop: 2, lineHeight: 1.45 }}>{l.note}</div>}
+              {l.note && <div style={{ fontSize: "0.66rem", color: C.muted, marginLeft: 16, marginTop: 2, lineHeight: 1.45 }}>{l.note}</div>}
             </div>
           ))}
         </Card>
@@ -4976,9 +5011,9 @@ function CoachHero({ data, pro = false }) {
         <Card title={`Behavioral metrics${data.viz.tagged_count != null ? ` · ${data.viz.tagged_count} trades tagged` : ""}`}>
           {[["Avg R by conviction", data.viz.conviction_calibration], ["Avg R by idea source", data.viz.idea_source]].map(([t2, arr]) => Array.isArray(arr) && arr.length ? (
             <div key={t2} style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.goldBright, fontWeight: 700, marginBottom: 7 }}>{t2}</div>
+              <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, fontWeight: 700, marginBottom: 7 }}>{t2}</div>
               {arr.map((r, j) => { const v = Number(r.avg_r) || 0, w = Math.min(100, Math.abs(v) / 3 * 100); return (
-                <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, fontSize: "0.64rem" }}>
+                <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, fontSize: "0.66rem" }}>
                   <div style={{ width: 130, color: C.text }}>{r.label} <span style={{ color: C.muted }}>· {r.n}</span></div>
                   <div style={{ flex: 1, position: "relative", height: 14, background: "rgba(255,255,255,0.04)", borderRadius: 3 }}>
                     <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "rgba(255,255,255,0.15)" }} />
@@ -4990,13 +5025,13 @@ function CoachHero({ data, pro = false }) {
           ) : null)}
           {Array.isArray(data.viz.plan_adherence) && data.viz.plan_adherence.length > 0 && (
             <div>
-              <div style={{ fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.goldBright, fontWeight: 700, marginBottom: 7 }}>Plan adherence</div>
+              <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, fontWeight: 700, marginBottom: 7 }}>Plan adherence</div>
               {data.viz.plan_adherence.map((r, j) => (
-                <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.64rem", padding: "2px 0" }}><span style={{ color: C.text }}>{r.label}</span><b style={{ color: r.good ? C.green : C.red }}>{r.n}</b></div>
+                <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.66rem", padding: "2px 0" }}><span style={{ color: C.text }}>{r.label}</span><b style={{ color: r.good ? C.green : C.red }}>{r.n}</b></div>
               ))}
             </div>
           )}
-          {data.viz.note && <div style={{ fontSize: "0.58rem", color: C.muted, marginTop: 8, fontStyle: "italic" }}>{data.viz.note}</div>}
+          {data.viz.note && <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 8, fontStyle: "italic" }}>{data.viz.note}</div>}
         </Card>
       )}
       {Array.isArray(data.open_runners) && data.open_runners.length > 0 && (
@@ -5007,10 +5042,10 @@ function CoachHero({ data, pro = false }) {
                 <div style={{ width: 48 }}><b>{p.ticker}</b></div>
                 <div style={{ width: 54, color: (p.upl_pct || 0) >= 0 ? C.green : C.red }}>{p.upl_pct}%</div>
                 <div style={{ width: 62, color: C.muted }}>{p.stop || "—"}</div>
-                <div style={{ width: 66 }}><span style={{ fontSize: "0.5rem", fontWeight: 700, textTransform: "uppercase", padding: "2px 7px", borderRadius: 20, border: `1px solid ${vcol(p.status)}`, color: vcol(p.status) }}>{p.status}</span></div>
-                <div style={{ flex: 1, color: C.muted, fontSize: "0.6rem", lineHeight: 1.4 }}>{(p.flags || []).join(" · ") || "ok"}</div>
+                <div style={{ width: 66 }}><span style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", padding: "2px 7px", borderRadius: 20, border: `1px solid ${vcol(p.status)}`, color: vcol(p.status) }}>{p.status}</span></div>
+                <div style={{ flex: 1, color: C.muted, fontSize: "0.66rem", lineHeight: 1.4 }}>{(p.flags || []).join(" · ") || "ok"}</div>
               </div>
-              {p.take && <div style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.55, marginTop: 6, paddingLeft: 11, borderLeft: `2px solid ${vcol(p.status)}` }}>{p.take}</div>}
+              {p.take && <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.55, marginTop: 6, paddingLeft: 11, borderLeft: `2px solid ${vcol(p.status)}` }}>{p.take}</div>}
             </div>
           ))}
         </Card>
@@ -5019,7 +5054,7 @@ function CoachHero({ data, pro = false }) {
         <Card title="The deep dive · all angles">
           {data.deep_dive.map((s, i) => (
             <div key={i} style={{ marginBottom: 15, paddingBottom: 13, borderBottom: i < data.deep_dive.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
-              <div style={{ fontSize: "0.76rem", fontWeight: 800, color: C.goldBright, marginBottom: 5 }}>{s.title}</div>
+              <div style={{ fontSize: "0.78rem", fontWeight: 800, color: C.goldBright, marginBottom: 5 }}>{s.title}</div>
               <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7 }}>{s.body}</div>
             </div>
           ))}
@@ -5029,13 +5064,13 @@ function CoachHero({ data, pro = false }) {
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
           {Array.isArray(data.focus_on) && data.focus_on.length > 0 && (
             <div style={{ flex: 1, minWidth: 240, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 12, padding: "14px 16px" }}>
-              <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.green, fontWeight: 800, marginBottom: 8 }}>✓ Focus on</div>
+              <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.green, fontWeight: 800, marginBottom: 8 }}>✓ Focus on</div>
               <ul style={{ margin: 0, paddingLeft: 16 }}>{data.focus_on.map((x, i) => <li key={i} style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7, marginBottom: 4 }}>{x}</li>)}</ul>
             </div>
           )}
           {Array.isArray(data.avoid) && data.avoid.length > 0 && (
             <div style={{ flex: 1, minWidth: 240, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 12, padding: "14px 16px" }}>
-              <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.red, fontWeight: 800, marginBottom: 8 }}>✕ Don't focus on</div>
+              <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.red, fontWeight: 800, marginBottom: 8 }}>✕ Don't focus on</div>
               <ul style={{ margin: 0, paddingLeft: 16 }}>{data.avoid.map((x, i) => <li key={i} style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7, marginBottom: 4 }}>{x}</li>)}</ul>
             </div>
           )}
@@ -5108,7 +5143,7 @@ const excTime = (bt, res) => {
   return String(bt);
 };
 
-function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit }) {
+function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   useSectors((journaledTrades || []).map(t => t.ticker)); // theme fallback for tickers not in the curated map
   const gradesV = useSavedGrades(); // re-render + re-run the freeze when grades save/sync
@@ -6128,6 +6163,8 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
   }, []);
 
   const applyMode = (m) => { setUiMode(m); if (m === "pro") { try { audioRef.current && audioRef.current.pause(); } catch {} setGuide(null); setActiveGuide(null); } };
+  // the global corner Pro Mode toggle (HeaderControls) broadcasts mode changes — apply them here
+  useEffect(() => { const h = (e) => applyMode(e.detail); window.addEventListener("viv-mode-change", h); return () => window.removeEventListener("viv-mode-change", h); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const narrate = (audio) => { if (guideMuted || !audio || !audioRef.current) return; try { audioRef.current.pause(); audioRef.current.src = audio; audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); } catch {} };
   const guideEnter = (key, title, body, audio) => () => { if (expert) return; setActiveGuide(key); setGuide({ title, body }); narrate(audio); };
   const guideLeave = (key) => () => { setActiveGuide(g => (g === key ? null : g)); };
@@ -7512,16 +7549,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
-            <div className="spacer"></div>
-            <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
-              <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
-              <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
-            </div>
-            <WhatsNew />
-            <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
           </div>
 
           {/* COACH — admin-only standing read from Claude (kept in Pro too) */}
@@ -7838,16 +7868,9 @@ function TradeJournalPage({ setPage, onLogout, journaledTrades, setJournaledTrad
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
-          <div className="spacer"></div>
-          <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
-            <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
-            <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
-          </div>
-          <WhatsNew />
-          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
         </div>
 
         {/* HEADER */}
@@ -8756,7 +8779,7 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .poscard tbody td{padding:8px 10px; font-size:0.74rem}
   }`;
 
-function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning, displayName }) {
+function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning, displayName }) {
   // Alias so existing `INTRADAY_FEATURE_ENABLED` references inside this component keep reading as a single
   // flag without rewriting every callsite. Reactive — flipping the Settings toggle re-renders the table.
   const INTRADAY_FEATURE_ENABLED = intradayFeatureEnabled;
@@ -9566,6 +9589,8 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
   }, []);
 
   const applyMode = (m) => { setUiMode(m); if (m === "pro") { try { audioRef.current && audioRef.current.pause(); } catch {} setGuide(null); setActiveGuide(null); } };
+  // the global corner Pro Mode toggle (HeaderControls) broadcasts mode changes — apply them here
+  useEffect(() => { const h = (e) => applyMode(e.detail); window.addEventListener("viv-mode-change", h); return () => window.removeEventListener("viv-mode-change", h); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const narrate = (audio) => { if (guideMuted || !audio || !audioRef.current) return; try { audioRef.current.pause(); audioRef.current.src = audio; audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); } catch {} };
   const guideEnter = (key, title, body, audio) => () => { if (expert) return; setActiveGuide(key); setGuide({ title, body }); narrate(audio); };
   const guideLeave = (key) => () => { setActiveGuide(g => (g === key ? null : g)); };
@@ -9887,16 +9912,9 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
-            <div className="spacer"></div>
-            <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
-              <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
-              <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
-            </div>
-            <WhatsNew />
-            <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
           </div>
 
           {/* P1. COMMAND HEADER */}
@@ -10056,6 +10074,7 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
 
           {/* P3. CONTEXT ROW */}
           <div className="ctxrow" style={{ marginTop: 14 }}>
+            <MarketContext C={C} font={font} />
             <div className="card">
               <div className="cardhead"><span className="label">Risk Allocation</span><span className="infodot" data-tip="A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.">i</span></div>
               <div className={"allocbar" + (over ? " over" : "")}><div className="allocfill" style={{ width: allocPct.toFixed(0) + "%" }}></div></div>
@@ -10066,7 +10085,6 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
               </div>
               <div className="allocnote">{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
             </div>
-            <MarketContext C={C} font={font} />
             <ThemeStrip C={C} font={font} variant="pro" />
           </div>
           <EdgeLedger C={C} font={font} session={session} setPage={setPage} />  {/* admin-only: renders null for members */}
@@ -10110,16 +10128,9 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
-          <div className="spacer"></div>
-          <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
-            <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
-            <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
-          </div>
-          <WhatsNew />
-          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
         </div>
 
         {/* HEADER */}
@@ -10234,7 +10245,22 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
           </div>
         </div>
 
-        {/* RISK ALLOCATION */}
+        {/* MARKET CONTEXT — swapped with Risk allocation (2026-07-17) */}
+        <MarketContext C={C} font={font} />
+
+        {/* welcome banner */}
+        {!expert && !welcomeDismissed && (
+          <div className="welcome">
+            <span className="dot"></span>
+            <div><b>New here?</b> Hover any card and the guide in the corner will explain it — <b>out loud</b>. Mute the voiceover anytime, or switch to <span className="term" data-tip="Pro mode hides all the guidance and voiceover for experienced traders.">Pro</span> (top-right) to turn the whole tutorial off.</div>
+            <span className="x" onClick={() => { setWelcomeDismissed(true); try { localStorage.setItem("viv-welcome-x", "1"); } catch {} }}>&times;</span>
+          </div>
+        )}
+
+        {/* THEME LEADERS STRIP (this week's DeepVue leaders) */}
+        <ThemeStrip C={C} font={font} />
+
+        {/* RISK ALLOCATION — swapped with Market context (2026-07-17) */}
         <div className={"card alloc guide reveal" + gactive("alloc")} onMouseEnter={guideEnter("alloc", "Risk allocation", "A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.", "/audio/allocation.mp3")} onMouseLeave={guideLeave("alloc")}>
           <div className="row">
             <div className="label">Risk allocation</div>
@@ -10258,19 +10284,6 @@ function DashboardPage({ setPage, onLogout, onJournalTrade, setupTypes, tags: al
             </div>
           </div>
         </div>
-
-        {/* welcome banner */}
-        {!expert && !welcomeDismissed && (
-          <div className="welcome">
-            <span className="dot"></span>
-            <div><b>New here?</b> Hover any card and the guide in the corner will explain it — <b>out loud</b>. Mute the voiceover anytime, or switch to <span className="term" data-tip="Pro mode hides all the guidance and voiceover for experienced traders.">Pro</span> (top-right) to turn the whole tutorial off.</div>
-            <span className="x" onClick={() => { setWelcomeDismissed(true); try { localStorage.setItem("viv-welcome-x", "1"); } catch {} }}>&times;</span>
-          </div>
-        )}
-
-        {/* THEME LEADERS STRIP (this week's DeepVue leaders) */}
-        <ThemeStrip C={C} font={font} />
-        <MarketContext C={C} font={font} />
         <EdgeLedger C={C} font={font} session={session} setPage={setPage} />  {/* admin-only: renders null for members */}
 
         {/* TABLE */}
@@ -10771,6 +10784,8 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
   }, []);
 
   const applyMode = (m) => { setUiMode(m); if (m === "pro") { try { audioRef.current && audioRef.current.pause(); } catch {} setGuide(null); setActiveGuide(null); } };
+  // the global corner Pro Mode toggle (HeaderControls) broadcasts mode changes — apply them here
+  useEffect(() => { const h = (e) => applyMode(e.detail); window.addEventListener("viv-mode-change", h); return () => window.removeEventListener("viv-mode-change", h); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const narrate = (audio) => { if (guideMuted || !audio || !audioRef.current) return; try { audioRef.current.pause(); audioRef.current.src = audio; audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); } catch {} };
   const guideEnter = (key, title, body, audio) => () => { if (expert) return; setActiveGuide(key); setGuide({ title, body }); narrate(audio); };
   const guideLeave = (key) => () => { setActiveGuide(g => (g === key ? null : g)); };
@@ -11017,16 +11032,9 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-            {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+            {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
-          <div className="spacer"></div>
-          <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
-            <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
-            <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
-          </div>
-          <WhatsNew />
-          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
         </div>
 
         {/* P1. COMMAND HEADER */}
@@ -11063,7 +11071,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
 
             <div className="prow">
               <span className="plabel">Default mode</span>
-              <div className="seg" id="prefMode"><button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button><button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button></div>
+              <div className="seg" id="prefMode"><button className={uiMode === "guided" ? "on" : ""} onClick={() => broadcastUiMode("guided")}>Guided</button><button className={uiMode === "pro" ? "on" : ""} onClick={() => broadcastUiMode("pro")}>Pro</button></div>
             </div>
             <div className="prow">
               <span className="plabel">Privacy by default</span>
@@ -11205,16 +11213,9 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
-          <div className="spacer"></div>
-          <div className="seg" id="modeSeg" title="Guided explains everything; Pro strips it back for experts">
-            <button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button>
-            <button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button>
-          </div>
-          <WhatsNew />
-          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
         </div>
 
         {/* HEADER */}
@@ -11254,7 +11255,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <div className="prefrow" style={{ marginTop: 8 }}>
             <div className="pl"><div className="t"><span className="term" data-tip="Guided shows explanations, hover definitions, and voiceover everywhere — best while you're learning. Pro hides all of that for a clean, fast expert view.">Default mode</span></div>
               <div className="d">Guided shows explanations and voiceover everywhere. Pro is a clean, fast expert view. This is the same toggle as the top-right — set your default here.</div></div>
-            <div className="seg" id="prefMode"><button className={uiMode === "guided" ? "on" : ""} onClick={() => applyMode("guided")}>Guided</button><button className={uiMode === "pro" ? "on" : ""} onClick={() => applyMode("pro")}>Pro</button></div>
+            <div className="seg" id="prefMode"><button className={uiMode === "guided" ? "on" : ""} onClick={() => broadcastUiMode("guided")}>Guided</button><button className={uiMode === "pro" ? "on" : ""} onClick={() => broadcastUiMode("pro")}>Pro</button></div>
           </div>
 
           <div className="prefrow">
@@ -11469,10 +11470,11 @@ const ADMIN_EMAIL = "vc-lv@live.com";
 // ═══════════════════════════════════════
 // ─── Smokey Particle Background for Login ───
 // ─── MODEL BOOK PAGE SHELL — reuses the journal CSS scope (.vj) for navbar/cards ───
-function ModelBookShell({ setPage, onLogout, session, displayName, journaledTrades }) {
+function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const prowide = useUiMode() === "pro"; // width parity with the core pages' .expert shells
   return (
-    <div className="vj">
+    <div className={"vj" + (prowide ? " prowide" : "")}>
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
@@ -11487,9 +11489,6 @@ function ModelBookShell({ setPage, onLogout, session, displayName, journaledTrad
             {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
-          <div className="spacer"></div>
-          <WhatsNew />
-          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
         </div>
         <ModelBookPage C={C} font={font} session={session} isAdmin={isAdmin} journaledTrades={journaledTrades} />
       </div>
@@ -11498,10 +11497,11 @@ function ModelBookShell({ setPage, onLogout, session, displayName, journaledTrad
 }
 
 // ── DAILY SETUPS shell — its own nav section (promoted out of Premium tools 2026-07-06) ──
-function DailySetupsShell({ setPage, onLogout, session, displayName }) {
+function DailySetupsShell({ setPage, session, displayName }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const prowide = useUiMode() === "pro"; // width parity with the core pages' .expert shells
   return (
-    <div className="vj">
+    <div className={"vj" + (prowide ? " prowide" : "")}>
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
@@ -11512,12 +11512,9 @@ function DailySetupsShell({ setPage, onLogout, session, displayName }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a className="on" style={{ cursor: "pointer" }}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-            {isAdmin && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
-          <div className="spacer"></div>
-          <WhatsNew />
-          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
         </div>
         <DailySetupsTab C={C} font={font} session={session} isAdmin={isAdmin} setPage={setPage} />
       </div>
@@ -11526,11 +11523,12 @@ function DailySetupsShell({ setPage, onLogout, session, displayName }) {
 }
 
 // ── MENTOR MODE shell — ADMIN-ONLY (renders nothing for members) ──
-function MentorShell({ setPage, onLogout, session }) {
+function MentorShell({ setPage, session }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const prowide = useUiMode() === "pro"; // width parity with the core pages' .expert shells
   if (!isAdmin) return null;
   return (
-    <div className="vj">
+    <div className={"vj" + (prowide ? " prowide" : "")}>
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
@@ -11542,12 +11540,9 @@ function MentorShell({ setPage, onLogout, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a className="on" style={{ cursor: "pointer" }}>Mentor</a>
-            {isAdmin && <><a style={{ cursor: "pointer" }} onClick={() => { sessionStorage.setItem("viv-mb-view", "studies"); setPage && setPage("modelbook"); }}>Studies</a><a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a></>}
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
-          <div className="spacer"></div>
-          <WhatsNew />
-          <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ marginLeft: 14, background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer" }}>Sign out</button>
         </div>
         <div className="reveal in-view" style={{ marginBottom: 10 }}>
           <div className="eyebrow">Mentorship</div>
@@ -11555,6 +11550,34 @@ function MentorShell({ setPage, onLogout, session }) {
           <div className="sub">Roster performance at a glance, drill into any member's trades, replay them candle-by-candle, and leave coaching notes — private until you flip them member-visible.</div>
         </div>
         <MentorModePage C={C} font={font} session={session} />
+      </div>
+    </div>
+  );
+}
+
+// ── QUANT shell — ADMIN-ONLY. Same navbar chrome as every other page (the page previously
+// rendered standalone with its own pill nav, which drifted from the shared top-bar layout). ──
+function QuantShell({ setPage, session }) {
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const prowide = useUiMode() === "pro"; // width parity with the core pages' .expert shells
+  if (!isAdmin) return null;
+  return (
+    <div className={"vj" + (prowide ? " prowide" : "")}>
+      <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
+      <div className="shell">
+        <div className="navbar">
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen Insiders Vault</div>
+          <div className="tabs">
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+            <a className="on" style={{ cursor: "pointer" }}>Quant</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          </div>
+        </div>
+        <QuantAnalysis C={C} font={font} session={session} />
       </div>
     </div>
   );
@@ -11757,9 +11780,8 @@ const mobileCSS = `
   h1 { font-size: 1.35rem !important; line-height: 1.2 !important; letter-spacing: -0.03em !important; }
   h2 { font-size: 1rem !important; line-height: 1.25 !important; }
 
-  /* Phone: hide the top page-nav tabs (Dashboard/Journal/Premium tools/Settings) and the Sign out button for a cleaner mobile header */
+  /* Phone: hide the top page-nav tabs (Dashboard/Journal/Premium tools/Settings) for a cleaner mobile header */
   .navbar .tabs { display: none !important; }
-  .navbar button[title="Sign out"] { display: none !important; }
 
   /* Phone: hide the floating guide narrator panel (corner voiceover/explainer) — too distracting on small screens */
   .guidepanel { display: none !important; }
@@ -13166,13 +13188,13 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage setPage={setPage} onLogout={handleLogout} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
-      {page === "tools" && <PremiumToolsPage setPage={setPage} onLogout={handleLogout} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} positions={positions} displayName={displayName} />}
-      {page === "journal" && <TradeJournalPage setPage={setPage} onLogout={handleLogout} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} />}
-      {page === "daily" && <DailySetupsShell setPage={setPage} onLogout={handleLogout} session={session} displayName={displayName} />}
-      {page === "modelbook" && <ModelBookShell setPage={setPage} onLogout={handleLogout} session={session} displayName={displayName} journaledTrades={journaledTrades} />}
-      {page === "mentor" && <MentorShell setPage={setPage} onLogout={handleLogout} session={session} />}
-      {page === "quant" && isAdmin && <QuantAnalysis C={C} font={font} session={session} setPage={setPage} />}
+      {page === "dashboard" && <DashboardPage setPage={setPage} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
+      {page === "tools" && <PremiumToolsPage setPage={setPage} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} positions={positions} displayName={displayName} />}
+      {page === "journal" && <TradeJournalPage setPage={setPage} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} />}
+      {page === "daily" && <DailySetupsShell setPage={setPage} session={session} displayName={displayName} />}
+      {page === "modelbook" && <ModelBookShell setPage={setPage} session={session} displayName={displayName} journaledTrades={journaledTrades} />}
+      {page === "mentor" && <MentorShell setPage={setPage} session={session} />}
+      {page === "quant" && isAdmin && <QuantShell setPage={setPage} session={session} />}
       {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} uiTheme={uiTheme} setUiTheme={setUiTheme} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
       <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />
@@ -13186,6 +13208,7 @@ function AppInner() {
       <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column", zoom: appZoom }}>
         <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
           <Wordmark size="0.88rem" style={{ lineHeight: 1 }} />
+          <HeaderControls onLogout={handleLogout} inline />
         </div>
         <AppBackground />
         <div style={{ flex: 1, overflowY: "auto", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80, position: "relative", zIndex: 1 }}>{pageContent}</div>
@@ -13218,6 +13241,7 @@ function AppInner() {
         <AppBackground />
         <div style={{ position:"relative",zIndex:1 }}>{pageContent}</div>
       </div>
+      <HeaderControls onLogout={handleLogout} />
     </div>
   );
 }

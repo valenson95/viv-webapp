@@ -126,6 +126,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [sel, setSel] = useState(() => new Set()); // bulk-selected watchlist symbols
+  const [openSym, setOpenSym] = useState(""); // watchlist row expanded inline via its Open button
   const loadSeq = useRef(""); // last loadTicker target — guards async prefill against ticker switches
   const [editDate, setEditDate] = useState(null); // set when editing an existing post — republish keeps its date
 
@@ -426,8 +427,11 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
               <tbody>
                 {savedRows.map((g) => {
                   const active = g.sym === ticker.toUpperCase().trim();
+                  const opened = openSym === g.sym;
+                  const tset = new Set(g.ticked || []);
                   return (
-                    <tr key={g.sym} onClick={() => loadTicker(g.sym)} style={{ cursor: "pointer", background: active ? "rgba(201,152,42,0.07)" : "transparent" }}
+                    <React.Fragment key={g.sym}>
+                    <tr onClick={() => loadTicker(g.sym)} style={{ cursor: "pointer", background: active ? "rgba(201,152,42,0.07)" : "transparent" }}
                       onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
                       onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(201,152,42,0.07)" : "transparent"; }}>
                       {isAdmin && <td onClick={e => e.stopPropagation()} style={{ padding: "9px 4px 9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)`, width: 30 }}>
@@ -440,9 +444,48 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                       <td style={{ padding: "9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><span style={{ fontWeight: 800, fontSize: "0.86rem", color: letterColor(C, g.letter) }}>{g.letter}</span></td>
                       <td style={{ padding: "9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><MiniStars C={C} n={g.stars} /></td>
                       <td style={{ padding: "9px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: "0.82rem", color: C.text, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>{Math.round((g.pct || 0) * 100)}%</td>
-                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button onClick={(e) => { e.stopPropagation(); loadTicker(g.sym); }} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 11px", borderRadius: 8, cursor: "pointer" }}>Open</button></td>
+                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button onClick={(e) => { e.stopPropagation(); setOpenSym(o => o === g.sym ? "" : g.sym); }} style={{ background: opened ? C.goldDim : "transparent", border: `1px solid ${opened ? C.borderGold : C.border}`, color: opened ? C.goldBright : C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 11px", borderRadius: 8, cursor: "pointer" }}>{opened ? "Close" : "Open"}</button></td>
                       <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button title="Remove from this list (grade is kept)" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Remove ${g.sym} from the screening watchlist?\n\nThe saved grade is KEPT everywhere it's used — Open Positions' Grade column, the Model Book, and any published Daily Setups. This only clears ${g.sym} from this list; grade it again anytime to bring it back.`)) archiveGrade(g.sym); }} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>×</button></td>
                     </tr>
+                    {opened && (
+                      <tr>
+                        <td colSpan={isAdmin ? 7 : 6} style={{ padding: "2px 8px 14px", borderBottom: `1px solid rgba(255,255,255,0.04)`, background: "rgba(201,152,42,0.03)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", padding: "10px 6px 4px" }}>
+                            <MiniStars C={C} n={g.stars} size={0.9} />
+                            <span style={{ fontWeight: 800, fontSize: "0.9rem", color: letterColor(C, g.letter) }}>{g.letter}</span>
+                            <span style={{ fontSize: "0.8rem", fontWeight: 700, color: C.white }}>{(GRADES[g.stars || 0] || GRADES[0])[0]}</span>
+                            <span style={{ fontSize: "0.72rem", color: C.muted }}>{(g.ticked || []).length}/{g.total || TOTAL} criteria · {g.starHit ?? 0}/{g.starmakers ?? STARMAKERS} ★-makers</span>
+                            <button onClick={() => loadTicker(g.sym)} style={{ marginLeft: "auto", background: C.goldDim, color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "5px 12px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>Edit in grader ↓</button>
+                          </div>
+                          {(g.note || g.chart_img) && (
+                            <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap", padding: "6px 6px 2px" }}>
+                              {g.chart_img && <img src={g.chart_img} alt={`${g.sym} chart`} style={{ width: 180, maxWidth: "100%", borderRadius: 10, border: `1px solid ${C.border}`, display: "block" }} />}
+                              {g.note && <div style={{ flex: "1 1 220px", fontSize: "0.78rem", color: C.text, lineHeight: 1.5 }}>{g.note}</div>}
+                            </div>
+                          )}
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "8px 18px", padding: "8px 6px 0" }}>
+                            {SECTIONS.map((sec, si) => {
+                              if (sec.reminder) return null;
+                              return (
+                                <div key={si}>
+                                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, margin: "4px 0 6px" }}>{sec.title}</div>
+                                  {sec.items.map((it, ii) => {
+                                    const isOn = tset.has(si + "-" + ii);
+                                    return (
+                                      <div key={ii} style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.74rem", lineHeight: 1.6, color: isOn ? C.text : "rgba(255,255,255,0.35)" }}>
+                                        <span style={{ color: isOn ? C.goldBright : "rgba(255,255,255,0.22)", fontWeight: 800 }}>{isOn ? "✓" : "·"}</span>
+                                        <span>{it.c}{it.star && <span style={{ color: C.goldMid, marginLeft: 5, fontSize: "0.62rem" }}>★</span>}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
