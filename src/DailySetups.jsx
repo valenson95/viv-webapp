@@ -190,9 +190,10 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         </div>
       </div>
 
-      {/* THE FUNNEL — status chips (derived from each post's own scorecard) + the at-a-glance board */}
+      {/* THE FUNNEL — half the row; its stage-distribution graph fills the other half (Jameson 2026-07-17) */}
       {rows && rows.length > 0 && boardRows.length > 0 && (
-        <div style={{ ...cardChrome, padding: "16px 18px", marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 16, alignItems: "start", marginBottom: 16 }}>
+        <div style={{ ...cardChrome, padding: "16px 18px" }}>
           <div style={{ ...cardHead, marginBottom: 12 }}>
             <span style={{ ...microLabel, flex: 1 }}>The Funnel</span>
           </div>
@@ -238,7 +239,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
             return (
               <>
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse", fontSize: "0.76rem", minWidth: 640 }}>
+                  <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse", fontSize: "0.76rem", minWidth: 520 }}>
                     <colgroup>
                       <col style={{ width: "10%" }} />{/* ticker  */}
                       <col style={{ width: "13%" }} />{/* grade   */}
@@ -291,6 +292,32 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
               </>
             );
           })()}
+        </div>
+        {/* the graph half — one bar per stage, same statuses as the chips; clicking filters the feed */}
+        <div style={{ ...cardChrome, padding: "16px 18px" }}>
+          <div style={{ ...cardHead, marginBottom: 12 }}>
+            <span style={{ ...microLabel, flex: 1 }}>The Funnel · at a glance</span>
+            <span style={{ fontSize: "0.62rem", color: C.muted }}>latest post per ticker</span>
+          </div>
+          {(() => {
+            const FLOW = ["fresh", "coiling", "pivot", "triggered", "faded"]; // narrative order: idea → live trade
+            const max = Math.max(...FLOW.map(s => statusCounts[s] || 0), 1);
+            return FLOW.map(s => {
+              const m = STATUS_META[s], n = statusCounts[s] || 0, on = statusF === s;
+              return (
+                <div key={s} onClick={() => setStatusF(on ? null : s)} title={`${m.tip} — click to filter the feed`}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 6px", borderRadius: 8, cursor: "pointer", background: on ? "rgba(255,255,255,0.05)" : "transparent" }}>
+                  <span style={{ width: 96, flex: "none", fontSize: "0.7rem", fontWeight: 800, color: n ? m.col : "rgba(255,255,255,0.28)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</span>
+                  <div style={{ flex: 1, height: 16, background: "rgba(255,255,255,0.04)", borderRadius: 5, overflow: "hidden" }}>
+                    <div style={{ width: `${n ? Math.max(4, (n / max) * 100) : 0}%`, height: "100%", background: m.bg, borderRight: n ? `2px solid ${m.col}` : "none", transition: "width .3s" }} />
+                  </div>
+                  <b style={{ width: 24, flex: "none", textAlign: "right", fontSize: "0.78rem", color: n ? C.text : "rgba(255,255,255,0.28)", fontVariantNumeric: "tabular-nums" }}>{n}</b>
+                </div>
+              );
+            });
+          })()}
+          <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 10, lineHeight: 1.55 }}>Ideas move down the funnel: fresh → coiling → at the pivot → ✔ triggered. Click a stage to filter the board and the feed.</div>
+        </div>
         </div>
       )}
 

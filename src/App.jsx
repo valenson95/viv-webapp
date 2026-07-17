@@ -876,7 +876,9 @@ function HeaderControls({ onLogout, inline }) {
   return (
     <div style={inline
       ? { display: "flex", alignItems: "center", gap: 8, fontFamily: font }
-      : { position: "fixed", top: 20, right: 22, zIndex: 150, display: "flex", alignItems: "center", gap: 8, fontFamily: font, background: "rgba(8,8,14,0.6)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", border: `1px solid ${C.border}`, borderRadius: 980, padding: "5px 7px" }}>
+      : { position: "fixed", top: 20, right: 22, zIndex: 150, display: "flex", alignItems: "center", gap: 8, fontFamily: font, background: "rgba(8,8,14,0.85)", border: `1px solid ${C.border}`, borderRadius: 980, padding: "5px 7px" }}>
+      {/* NO backdrop-filter here — it would become the containing block for the What's New
+          modal's position:fixed overlay, pinning the popup inside this pill instead of the screen */}
       {/* keep the page navbars clear of the fixed cluster (tabs otherwise run underneath it) */}
       {!inline && <style dangerouslySetInnerHTML={{ __html: `.vp .navbar,.vj .navbar,.vd .navbar,.vs .navbar{padding-right:300px}` }} />}
       <WhatsNew />
@@ -4818,6 +4820,9 @@ function RationaleBlock({ rationale }) {
 // Admin-only account COACH hero — Claude's standing read (recent vs peak vs system + open runners),
 // written to public.claude_insights. Members never see this. Mirrors render_coach.py.
 function CoachHero({ data, pro = false }) {
+  // collapsible, expanded by default (Jameson 2026-07-17); choice persists per browser
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem("viv-jarvis-collapsed") === "1"; } catch { return false; } });
+  const toggleCollapsed = () => setCollapsed(c => { const n = !c; try { localStorage.setItem("viv-jarvis-collapsed", n ? "1" : "0"); } catch {} return n; });
   if (!data || typeof data !== "object") return null;
   const vcol = (v) => ({ good: C.green, improving: C.green, aligned: C.green, holding: C.gold, watch: C.gold, risk: C.red, degrading: C.red }[String(v || "").toLowerCase()] || C.muted);
   const d = data.drift || {}, sc = data.scorecards || {}, pw = data.peak_window || {};
@@ -4868,11 +4873,15 @@ function CoachHero({ data, pro = false }) {
   return (
     <div className="reveal" style={{ marginTop: 18 }}>
       <style dangerouslySetInnerHTML={{ __html: ".coachtop{display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; margin-bottom:14px}.coachtop > div{margin-bottom:0 !important}@media(max-width:1100px){.coachtop{grid-template-columns:1fr}}@keyframes jarvisPulse{0%{box-shadow:0 0 4px rgba(201,152,42,0.55); opacity:0.7; transform:scale(0.88)}100%{box-shadow:0 0 14px rgba(201,152,42,0.95); opacity:1; transform:scale(1.14)}}.jarvisdot{box-shadow:0 0 8px rgba(201,152,42,0.8); animation:jarvisPulse 2.4s ease-in-out infinite alternate}@media(prefers-reduced-motion:reduce){.jarvisdot{animation:none; box-shadow:0 0 10px rgba(201,152,42,0.85)}}" }} />
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+      <div onClick={toggleCollapsed} title={collapsed ? "Expand Jarvis" : "Collapse Jarvis"} aria-expanded={!collapsed}
+        style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: collapsed ? 0 : 10, cursor: "pointer", userSelect: "none" }}>
         <span className="jarvisdot" style={{ width: 8, height: 8, borderRadius: "50%", background: C.gold }} />
         <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: C.goldBright }}>Jarvis · admin</span>
         {data.scope && <span style={{ fontSize: "0.66rem", color: C.muted }}>{data.scope}</span>}
+        {collapsed && <span style={{ fontSize: "0.72rem", color: C.text, fontWeight: 700, marginLeft: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.headline}</span>}
+        <span aria-hidden style={{ marginLeft: "auto", color: C.gold, fontSize: "1.05rem", lineHeight: 1, transition: "transform .2s", transform: collapsed ? "rotate(-90deg)" : "none" }}>▾</span>
       </div>
+      {!collapsed && <>
       {pro
         ? <div className="coachtop"><div style={{ minWidth: 0 }}>{briefingCard}{workingCard}</div>{attentionCard}</div>
         : <>{briefingCard}{workingCard}</>}
@@ -5102,6 +5111,7 @@ function CoachHero({ data, pro = false }) {
           ))}
         </Card>
       )}
+      </>}
     </div>
   );
 }
@@ -8791,6 +8801,25 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .poscard tbody td{padding:8px 10px; font-size:0.74rem}
   }`;
 
+// ── Risk-allocation donut — deployed risk (red arc) vs available budget (green track).
+// Replaces the old thin full-width bar so the card's space carries the whole picture at a glance.
+function AllocDonut({ pct, over, size = 104 }) {
+  const p = Math.max(0, Math.min(100, pct || 0));
+  const sw = Math.max(9, size * 0.11);
+  const r = (size - sw) / 2 - 1, cx = size / 2, cy = size / 2, circ = 2 * Math.PI * r;
+  const arc = over ? circ : (p / 100) * circ;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flex: "none", display: "block" }} aria-hidden>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke={over ? "rgba(239,68,68,0.18)" : "rgba(34,197,94,0.35)"} strokeWidth={sw} />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#ef4444" strokeWidth={sw} strokeLinecap={over ? "butt" : "round"}
+        strokeDasharray={`${arc} ${Math.max(0, circ - arc)}`} transform={`rotate(-90 ${cx} ${cy})`}
+        style={over ? { filter: "drop-shadow(0 0 6px rgba(239,68,68,0.6))" } : undefined} />
+      <text x={cx} y={cy - 1} textAnchor="middle" dominantBaseline="auto" fill="#fff" fontSize={size * 0.21} fontWeight="800" fontFamily={font}>{Math.round(p)}%</text>
+      <text x={cx} y={cy + size * 0.14} textAnchor="middle" fill={over ? "#fca5a5" : "rgba(255,255,255,0.55)"} fontSize={size * 0.082} fontWeight="700" letterSpacing="0.08em" fontFamily={font}>{over ? "OVER BUDGET" : "DEPLOYED"}</text>
+    </svg>
+  );
+}
+
 function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning, displayName }) {
   // Alias so existing `INTRADAY_FEATURE_ENABLED` references inside this component keep reading as a single
   // flag without rewriting every callsite. Reactive — flipping the Settings toggle re-renders the table.
@@ -10089,13 +10118,17 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             <MarketContext C={C} font={font} />
             <div className="card">
               <div className="cardhead"><span className="label">Risk Allocation</span><span className="infodot" data-tip="A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.">i</span></div>
-              <div className={"allocbar" + (over ? " over" : "")}><div className="allocfill" style={{ width: allocPct.toFixed(0) + "%" }}></div></div>
-              <div className="alloclegend">
-                <span className="leg tipwrap" data-tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></span>
-                <span className="leg tipwrap" data-tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></span>
-                <span className="leg tipwrap" data-tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></span>
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <AllocDonut pct={allocPct} over={over} size={92} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="alloclegend" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+                    <span className="leg tipwrap" data-tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></span>
+                    <span className="leg tipwrap" data-tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></span>
+                    <span className="leg tipwrap" data-tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></span>
+                  </div>
+                  <div className="allocnote" style={{ marginTop: 8 }}>{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
+                </div>
               </div>
-              <div className="allocnote">{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
             </div>
             <ThemeStrip C={C} font={font} variant="pro" />
           </div>
@@ -10279,20 +10312,22 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             <div className="spacer"></div>
             <div className="allocnote">{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
           </div>
-          <div className={"allocbar" + (over ? " over" : "")}>
-            <div className="allocfill" style={{ width: allocPct.toFixed(0) + "%" }}></div>
-          </div>
-          <div className="alloclegend">
-            <span className="leg"><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b>&nbsp;<span>({budget.atRiskCount})</span></span>
-            <span className="leg"><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b>&nbsp;<span>({budget.totalBudget > 0 ? Math.round(budget.available / budget.totalBudget * 100) : 0}%)</span></span>
-            <span className="leg"><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b>&nbsp;<span>(freed {usd0(budget.freedRisk)})</span></span>
-          </div>
-          <div className={"deploy" + (over ? " over" : "")}>
-            <div className="deployhead">{over ? <>You are <b>{usd0(-rawAvail)}</b> over your risk budget</> : <>You can deploy <b>{usd0(Math.max(0, rawAvail))}</b> more risk</>}</div>
-            <div className="deploysub">
-              {over ? "Close a position or tighten a stop before adding new risk — or raise Target ROTE if you mean to risk more."
-                : (rNumStocks || 0) > 0 ? <>That's <b>{pct2(budget.availablePct)} ROTE</b> free. Room for <b>{fullTrades} full-R trade{fullTrades === 1 ? "" : "s"}</b> at {usd0(rPerTrade)} each, or <b>{halfTrades} half-R</b> at {usd0(rPerTrade / 2)} each.</>
-                  : <>Set your Maximum positions above to see how that splits into per-trade sizing.</>}
+          <div style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap", marginTop: 4 }}>
+            <AllocDonut pct={allocPct} over={over} size={112} />
+            <div style={{ flex: "1 1 280px", minWidth: 0 }}>
+              <div className="alloclegend">
+                <span className="leg"><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b>&nbsp;<span>({budget.atRiskCount})</span></span>
+                <span className="leg"><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b>&nbsp;<span>({budget.totalBudget > 0 ? Math.round(budget.available / budget.totalBudget * 100) : 0}%)</span></span>
+                <span className="leg"><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b>&nbsp;<span>(freed {usd0(budget.freedRisk)})</span></span>
+              </div>
+              <div className={"deploy" + (over ? " over" : "")}>
+                <div className="deployhead">{over ? <>You are <b>{usd0(-rawAvail)}</b> over your risk budget</> : <>You can deploy <b>{usd0(Math.max(0, rawAvail))}</b> more risk</>}</div>
+                <div className="deploysub">
+                  {over ? "Close a position or tighten a stop before adding new risk — or raise Target ROTE if you mean to risk more."
+                    : (rNumStocks || 0) > 0 ? <>That's <b>{pct2(budget.availablePct)} ROTE</b> free. Room for <b>{fullTrades} full-R trade{fullTrades === 1 ? "" : "s"}</b> at {usd0(rPerTrade)} each, or <b>{halfTrades} half-R</b> at {usd0(rPerTrade / 2)} each.</>
+                      : <>Set your Maximum positions above to see how that splits into per-trade sizing.</>}
+                </div>
+              </div>
             </div>
           </div>
         </div>

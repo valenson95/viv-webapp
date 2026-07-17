@@ -82,7 +82,7 @@ export default function MarketContext({ C, font }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [showInfo, setShowInfo] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem("viv-mktctx-collapsed") === "1"; } catch { return false; } });
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem("viv-mktctx-collapsed") !== "0"; } catch { return true; } }); // collapsed by default
   const toggleCollapsed = () => setCollapsed(c => { const n = !c; try { localStorage.setItem("viv-mktctx-collapsed", n ? "1" : "0"); } catch {} return n; });
   useEffect(() => {
     let dead = false;
@@ -131,6 +131,23 @@ export default function MarketContext({ C, font }) {
           A low number means the market has room. A high number (4×+) means it's stretched — historically pullbacks start around 5×, so go easy on new buys there.<br />
           The <b>condition badge</b> anchors to the <b>21-day EMA over the past 10 trading sessions</b>: <b style={{ color: "#22c55e" }}>Trending</b> = closed above the EMA21 for 10+ straight sessions · <b style={{ color: "#ef4444" }}>Downtrend</b> = below it for 10+ straight sessions · <b style={{ color: "#f0c050" }}>Choppy</b> = neither, price hovering through the line. It's the same definition your Objective Edge "market context" dimension uses — so the dashboard read and your stats speak one language.<br />
           <span style={{ color: C.muted }}>Tip: toggle on <b>Guided</b> mode (top of the page) and hover anything on the dashboard for more plain-English explanations.</span>
+        </div>
+      )}
+      {/* collapsed = the simple read: price · market condition · extension per index, one line */}
+      {collapsed && rows && (
+        <div onClick={toggleCollapsed} style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center", paddingTop: 8, cursor: "pointer" }}>
+          {rows.map(r => {
+            const b = bandFor(r.ext), g = REGIME_META[r.regime];
+            return (
+              <span key={r.sym} style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                <b style={{ fontSize: "0.76rem", color: "var(--text, #fff)" }}>{r.sym}</b>
+                <span style={{ fontSize: "0.72rem", color: "var(--text, #fff)", fontVariantNumeric: "tabular-nums" }}>{r.price.toFixed(2)}</span>
+                {g && <span style={{ fontSize: "0.64rem", fontWeight: 700, color: g.color, whiteSpace: "nowrap" }}>{g.icon} {g.label}</span>}
+                <span style={{ fontSize: "0.64rem", fontWeight: 800, color: b.color, whiteSpace: "nowrap" }}>{(r.ext >= 0 ? "" : "−") + Math.abs(r.ext).toFixed(1)}× · {b.label}</span>
+              </span>
+            );
+          })}
+          <span style={{ fontSize: "0.6rem", color: C.muted, marginLeft: "auto" }}>expand for the full read ▸</span>
         </div>
       )}
       {collapsed ? null : !rows ? (

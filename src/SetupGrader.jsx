@@ -127,6 +127,15 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const [busy, setBusy] = useState(false);
   const [sel, setSel] = useState(() => new Set()); // bulk-selected watchlist symbols
   const [openSym, setOpenSym] = useState(""); // watchlist row expanded inline via its Open button
+  const [editOn, setEditOn] = useState(() => new Set());   // inline editor: ticked criteria for the open row
+  const [editAuto, setEditAuto] = useState(() => new Set()); // inline editor: surviving auto-read dots
+  const [rowMsg, setRowMsg] = useState("");                 // inline editor feedback (shows next to Save)
+  const openRow = (g) => { setOpenSym(g.sym); setEditOn(new Set(g.ticked || [])); setEditAuto(new Set(g.auto || [])); setRowMsg(""); };
+  const editToggle = (key) => {
+    setEditAuto(prev => { if (!prev.has(key)) return prev; const n = new Set(prev); n.delete(key); return n; }); // human touch clears the dot
+    setEditOn(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+    setRowMsg("");
+  };
   const loadSeq = useRef(""); // last loadTicker target — guards async prefill against ticker switches
   const [editDate, setEditDate] = useState(null); // set when editing an existing post — republish keeps its date
 
@@ -428,7 +437,6 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                 {savedRows.map((g) => {
                   const active = g.sym === ticker.toUpperCase().trim();
                   const opened = openSym === g.sym;
-                  const tset = new Set(g.ticked || []);
                   return (
                     <React.Fragment key={g.sym}>
                     <tr onClick={() => loadTicker(g.sym)} style={{ cursor: "pointer", background: active ? "rgba(201,152,42,0.07)" : "transparent" }}
@@ -444,19 +452,45 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                       <td style={{ padding: "9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><span style={{ fontWeight: 800, fontSize: "0.86rem", color: letterColor(C, g.letter) }}>{g.letter}</span></td>
                       <td style={{ padding: "9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><MiniStars C={C} n={g.stars} /></td>
                       <td style={{ padding: "9px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: "0.82rem", color: C.text, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>{Math.round((g.pct || 0) * 100)}%</td>
-                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button onClick={(e) => { e.stopPropagation(); setOpenSym(o => o === g.sym ? "" : g.sym); }} style={{ background: opened ? C.goldDim : "transparent", border: `1px solid ${opened ? C.borderGold : C.border}`, color: opened ? C.goldBright : C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 11px", borderRadius: 8, cursor: "pointer" }}>{opened ? "Close" : "Open"}</button></td>
+                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button onClick={(e) => { e.stopPropagation(); opened ? setOpenSym("") : openRow(g); }} style={{ background: opened ? C.goldDim : "transparent", border: `1px solid ${opened ? C.borderGold : C.border}`, color: opened ? C.goldBright : C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 11px", borderRadius: 8, cursor: "pointer" }}>{opened ? "Close" : "Open"}</button></td>
                       <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button title="Remove from this list (grade is kept)" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Remove ${g.sym} from the screening watchlist?\n\nThe saved grade is KEPT everywhere it's used — Open Positions' Grade column, the Model Book, and any published Daily Setups. This only clears ${g.sym} from this list; grade it again anytime to bring it back.`)) archiveGrade(g.sym); }} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>×</button></td>
                     </tr>
-                    {opened && (
+                    {opened && (() => {
+                      // Inline editor — score recomputed live from editOn with the exact grader math.
+                      let ePassed = 0, eStarHit = 0;
+                      SECTIONS.forEach((sec, si) => { if (sec.reminder) return; sec.items.forEach((it, ii) => { if (editOn.has(si + "-" + ii)) { ePassed++; if (it.star) eStarHit++; } }); });
+                      const ePct = ePassed / TOTAL;
+                      let eStars = Math.round(ePct * 5);
+                      if (eStars >= 5 && eStarHit < STARMAKERS) eStars = 4;
+                      if (ePassed === 0) eStars = 0;
+                      const eLetter = letterFor(eStars);
+                      const dirty = [...editOn].sort().join(",") !== [...(g.ticked || [])].sort().join(",");
+                      const saveRow = () => {
+                        if (ePassed === 0) { setRowMsg("Tick at least one criterion first"); return; }
+                        saveGrade(g.sym, { stars: eStars, pct: ePct, passed: ePassed, total: TOTAL, starHit: eStarHit, starmakers: STARMAKERS,
+                          letter: eLetter, label: (GRADES[eStars] || GRADES[0])[0], ticked: [...editOn], auto: [...editAuto].filter(k => editOn.has(k)),
+                          chart_img: g.chart_img || "", note: g.note || "" });
+                        setRowMsg(`Saved ${g.sym} ✓`);
+                      };
+                      const deleteRow = () => {
+                        if (window.confirm(`Remove ${g.sym} from the screening watchlist?\n\nThe saved grade is KEPT everywhere it's used — Open Positions' Grade column, the Model Book, and any published Daily Setups. This only clears ${g.sym} from this list; grade it again anytime to bring it back.`)) { archiveGrade(g.sym); setOpenSym(""); }
+                      };
+                      return (
                       <tr>
                         <td colSpan={isAdmin ? 7 : 6} style={{ padding: "2px 8px 14px", borderBottom: `1px solid rgba(255,255,255,0.04)`, background: "rgba(201,152,42,0.03)" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", padding: "10px 6px 4px" }}>
-                            <MiniStars C={C} n={g.stars} size={0.9} />
-                            <span style={{ fontWeight: 800, fontSize: "0.9rem", color: letterColor(C, g.letter) }}>{g.letter}</span>
-                            <span style={{ fontSize: "0.8rem", fontWeight: 700, color: C.white }}>{(GRADES[g.stars || 0] || GRADES[0])[0]}</span>
-                            <span style={{ fontSize: "0.72rem", color: C.muted }}>{(g.ticked || []).length}/{g.total || TOTAL} criteria · {g.starHit ?? 0}/{g.starmakers ?? STARMAKERS} ★-makers</span>
-                            <button onClick={() => loadTicker(g.sym)} style={{ marginLeft: "auto", background: C.goldDim, color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "5px 12px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>Edit in grader ↓</button>
+                            <MiniStars C={C} n={eStars} size={0.9} />
+                            <span style={{ fontWeight: 800, fontSize: "0.9rem", color: letterColor(C, eLetter) }}>{eLetter}</span>
+                            <span style={{ fontSize: "0.8rem", fontWeight: 700, color: C.white }}>{(GRADES[eStars] || GRADES[0])[0]}</span>
+                            <span style={{ fontSize: "0.72rem", color: C.muted }}>{ePassed}/{TOTAL} criteria · {eStarHit}/{STARMAKERS} ★-makers{dirty ? " · unsaved edits" : ""}</span>
+                            <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                              {rowMsg && <span style={{ fontSize: "0.72rem", fontWeight: 700, color: rowMsg.includes("✓") ? C.green : C.goldBright }}>{rowMsg}</span>}
+                              <button onClick={saveRow} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Save grade</button>
+                              <button onClick={deleteRow} style={{ background: "rgba(239,68,68,0.10)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.4)", fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Delete</button>
+                              <button onClick={() => loadTicker(g.sym)} title="Load into the full grader below for the chart, annotation and publishing" style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Full kit ↓</button>
+                            </div>
                           </div>
+                          <div style={{ fontSize: "0.68rem", color: C.muted, padding: "0 6px 4px" }}>Click any criterion to tick / untick it, then Save — the grade updates right here, no scrolling.</div>
                           {(g.note || g.chart_img) && (
                             <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap", padding: "6px 6px 2px" }}>
                               {g.chart_img && <img src={g.chart_img} alt={`${g.sym} chart`} style={{ width: 180, maxWidth: "100%", borderRadius: 10, border: `1px solid ${C.border}`, display: "block" }} />}
@@ -470,11 +504,13 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                                 <div key={si}>
                                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, margin: "4px 0 6px" }}>{sec.title}</div>
                                   {sec.items.map((it, ii) => {
-                                    const isOn = tset.has(si + "-" + ii);
+                                    const key = si + "-" + ii, isOn = editOn.has(key);
                                     return (
-                                      <div key={ii} style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.74rem", lineHeight: 1.6, color: isOn ? C.text : "rgba(255,255,255,0.35)" }}>
+                                      <div key={ii} onClick={() => editToggle(key)} title={it.s}
+                                        style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.74rem", lineHeight: 1.6, color: isOn ? C.text : "rgba(255,255,255,0.35)", cursor: "pointer", userSelect: "none", borderRadius: 6, padding: "1px 4px" }}
+                                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                                         <span style={{ color: isOn ? C.goldBright : "rgba(255,255,255,0.22)", fontWeight: 800 }}>{isOn ? "✓" : "·"}</span>
-                                        <span>{it.c}{it.star && <span style={{ color: C.goldMid, marginLeft: 5, fontSize: "0.62rem" }}>★</span>}</span>
+                                        <span>{it.c}{it.star && <span style={{ color: C.goldMid, marginLeft: 5, fontSize: "0.62rem" }}>★</span>}{isOn && editAuto.has(key) && <span title="Auto-read from the chart by VIV" style={{ marginLeft: 5, fontSize: "0.6rem", color: C.goldBright }}>●</span>}</span>
                                       </div>
                                     );
                                   })}
@@ -484,7 +520,8 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                           </div>
                         </td>
                       </tr>
-                    )}
+                      );
+                    })()}
                     </React.Fragment>
                   );
                 })}
