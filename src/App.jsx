@@ -519,6 +519,18 @@ function PlaybookTracker({ trades, uid, setPage }) {
 
 const WHATS_NEW = [
   {
+    tag: "New",
+    date: "July 17, 2026",
+    title: "✨ A cleaner shell: real Pro layouts, one control strip, tidier nav",
+    items: [
+      "Pro mode is now a true re-layout — Dashboard, Journal, Premium tools and Settings each get a denser, command-style Pro view instead of just hiding the guides.",
+      "Your controls stopped wandering: What's New is now this bell, Guided/Pro is a Pro Mode on/off pill, and together with Sign out they sit fixed in the top-right corner on every page.",
+      "The top bar is the same seven tabs everywhere, and every page now shares the same width and header layout.",
+      "Setup Grader: hit Open on a watchlist name and its full scorecard expands right under the row — no more scrolling to the bottom.",
+      "Dashboard: Market Context moved up next to your risk picture, and you can now collapse it with one click.",
+    ],
+  },
+  {
     tag: "Fix",
     date: "July 12, 2026",
     title: "🛠 Journal reliability: deleted trades stay deleted + crash fix",
