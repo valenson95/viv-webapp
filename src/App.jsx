@@ -13,6 +13,8 @@ import ThemeStrip from "./ThemeStrip.jsx";
 import MarketContext from "./MarketContext.jsx";
 import EdgeLedger from "./EdgeLedger.jsx";
 import QuantAnalysis from "./QuantAnalysis.jsx";
+import GroupRS, { RotationMini } from "./GroupRS.jsx";
+import MarketMonitor, { BreadthMini } from "./MarketMonitor.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
 import DailySetupsTab from "./DailySetups.jsx";
 import ModelBookPage, { outcomeFromR } from "./ModelBook.jsx";
@@ -230,6 +232,23 @@ function useDragReorder(length) {
 // KEYS (not indexes) so a saved layout survives cards being added/removed in later versions.
 // The wrapper is only draggable while its handle is held (armed) — clicks, text selection and
 // inputs inside the card keep working normally.
+// EyeToggle — stream-privacy eye for the admin. `on` = privacy ON (account size hidden).
+// Outline eye with a slash when hidden; matches the app's SVG icon style.
+function EyeToggle({ on, onClick, title }) {
+  return (
+    <button type="button" onClick={onClick} aria-label="Toggle account-size privacy"
+      title={title || (on ? "Account size hidden — click to reveal" : "Hide account size (for streaming)")}
+      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 8, cursor: "pointer", padding: 0, flex: "none",
+        background: on ? "var(--goldDim)" : "transparent", border: `1px solid ${on ? "var(--borderGold)" : "var(--border)"}`, color: on ? "var(--goldBright)" : "var(--muted)" }}>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+        <circle cx="12" cy="12" r="3" />
+        {on && <line x1="3" y1="3" x2="21" y2="21" />}
+      </svg>
+    </button>
+  );
+}
+
 function useCardArrange(keys, storageKey) {
   const [order, setOrder] = useState(() => {
     try {
@@ -671,6 +690,17 @@ function PlaybookTracker({ trades, uid, setPage }) {
 }
 
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "July 19, 2026",
+    title: "🧭 Two new market lenses on your dashboard: Sector Group Rotation + Market Breadth",
+    items: [
+      "SECTOR GROUP ROTATION — ~60 industry-group ETFs scored two ways every day: Thrust % (how hard the group is running THIS WEEK, today weighted heaviest) and 1M RS % (where today sits in its own month of market-relative strength). Proven leaders still accelerating sit on top, and % off 52-week high keeps everyone honest — an OFF FLOOR tag means the strength is a bounce out of a hole, not a breakout at highs.",
+      "MARKET BREADTH — the market's weather station: how many stocks are up 25%+ vs down 25%+ over the month and the quarter, shown as a simple green/red master switch with a plain-English verdict and a 'breakouts likely to work / fail' read. It never picks a stock — it tells you whether the tape is rewarding strength at all.",
+      "Click either card for the full table — sortable columns (click a header; chain up to 3), preset auto-filters, and on Rotation a TOP-DOWN VIEW tab: index → size segments → equal-weight vs cap-weighted sectors with a Broad/Narrow tag showing whether the WHOLE sector is moving or just a few megacaps.",
+      "Both refresh automatically after each close. Educational context, not signals — your setup rules stay your setup rules.",
+    ],
+  },
   {
     tag: "Improved",
     date: "July 17, 2026",
@@ -3826,6 +3856,8 @@ if (expert) return (
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
       </div>
@@ -3875,6 +3907,8 @@ return (
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
       </div>
@@ -5416,7 +5450,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   const [previewTrade, setPreviewTrade] = useState(null); // TradeZella-style slide-in overview preview
   const [highlightTradeId, setHighlightTradeId] = useState(null); // gold flash on a trade row jumped-to from VIV Analytics
   const [tradeSorts, setTradeSorts] = useState([]); // [{key, dir}] multi-sort for trades
-  const [eqUnit, setEqUnit] = useState(() => { try { return localStorage.getItem("viv-eq-mode") || "$"; } catch { return "$"; } }); // "$" | "r" | "pct" — equity-curve display unit (persisted)
+  const [eqUnit, setEqUnit] = useState(() => { try { return localStorage.getItem("viv-eq-mode") || (isAdmin ? "pct" : "$"); } catch { return isAdmin ? "pct" : "$"; } }); // "$" | "r" | "pct" — equity-curve display unit (persisted); admin defaults to % (stream privacy)
   useEffect(() => { try { localStorage.setItem("viv-eq-mode", eqUnit); } catch { /* private mode */ } }, [eqUnit]);
   const eqTrackRef = useRef(null); // $/R/% sliding-toggle track (Calendar-style)
   const [eqXAxis, setEqXAxis] = useState("trades"); // "trades" or "months"
@@ -5452,7 +5486,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   // Affects Total P/L tile, Equity Curve Y-axis, Tracker monthly Comm column, and Closed Trades P/L $ column.
   // Persists in localStorage so the user can leave it on while screenshotting/sharing without re-toggling.
   const [privacyMode, setPrivacyMode] = useState(() => {
-    try { return localStorage.getItem("viv-privacy-mode") === "1"; } catch { return false; }
+    // Admin (streams tutorials) defaults to privacy ON; an explicit choice persists and wins.
+    try { const s = localStorage.getItem("viv-privacy-mode"); if (s === "1") return true; if (s === "0") return false; return isAdmin; } catch { return isAdmin; }
   });
   useEffect(() => { try { localStorage.setItem("viv-privacy-mode", privacyMode ? "1" : "0"); } catch {} }, [privacyMode]);
   // Link Historical Trades wizard — backfill `positionId` on legacy/unlinked journal trades.
@@ -7858,6 +7893,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
               {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
           </div>
@@ -8197,6 +8234,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
@@ -8492,7 +8531,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
         {/* EQUITY CURVE + RETURN DISTRIBUTION */}
         <div className="chartrow">
           <div className="chartcol eqcol">
-            <div className="toolbar"><h2 className="sech guide" onMouseEnter={guideEnter("eq", "Equity curve", "Your account value over time. A line climbing left to right means your account is growing. Toggle dollars / percent.", "/audio/equity-curve.mp3")} onMouseLeave={guideLeave("eq")}>Equity curve</h2></div>
+            <div className="toolbar" style={{ display: "flex", alignItems: "center", gap: 10 }}><h2 className="sech guide" onMouseEnter={guideEnter("eq", "Equity curve", "Your account value over time. A line climbing left to right means your account is growing. Toggle dollars / percent.", "/audio/equity-curve.mp3")} onMouseLeave={guideLeave("eq")}>Equity curve</h2>{isAdmin && <EyeToggle on={privacyMode} onClick={() => setPrivacyMode(p => !p)} title={privacyMode ? "Account size hidden (stream-safe) — reveal $" : "Hide account size for streaming"} />}</div>
             <div className="card reveal" id="eqCaptureCard">
               {equityCardBody}
             </div>
@@ -9116,6 +9155,14 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .ctxrow .allocbar{margin:4px 0 12px}
 .vd.expert .ctxrow .alloclegend{gap:16px; font-size:0.74rem}
 .vd.expert .ctxrow .allocnote{font-size:0.72rem; color:var(--faint); margin-top:12px; padding-top:12px; border-top:1px solid var(--border)}
+/* P3b. LENS ROW — Row A = 3 lenses (auto-fit so it wraps to stacked cards on narrow), Row B = 2 cols */
+.vd.expert .lensrowA{display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px; align-items:stretch}
+.vd.expert .lensrowA > *{min-width:0; height:100%}
+/* third column = Breadth mini stacked above Risk Allocation, which stretches to fill the column */
+.vd.expert .lensstack{display:flex; flex-direction:column; gap:14px; min-width:0; height:100%}
+.vd.expert .lensstack > :last-child{flex:1 1 auto}
+.vd.expert .lensmini{cursor:pointer; transition:border-color .16s, transform .16s}
+.vd.expert .lensmini:hover{border-color:var(--borderGold); transform:translateY(-2px)}
 /* P4. Positions table — Pro only tightens container/density + sticky head; the table markup is shared with Guided */
 .vd.expert .poscard{padding:16px 16px 18px}
 .vd.expert .poshead h2{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
@@ -9927,6 +9974,15 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
   const kpiArr = useCardArrange(["openpl", "risk", "equity", "budget", "rote"], "viv-dash-kpi-order");   // Pro KPI strip
   const ctxArr = useCardArrange(["market", "alloc", "themes"], "viv-dash-ctx-order");                     // Pro context row
   const stackArr = useCardArrange(["market", "themes", "alloc", "edge"], "viv-dash-stack-order"); // Guided card stack
+  // Stream privacy (admin) — hide account size on the Equity KPI card. Shares the "viv-privacy-mode"
+  // key with the Journal, so the eye stays in sync across pages. Admin fresh device = ON.
+  const [privacyOn, setPrivacyOn] = useState(() => {
+    try { const s = localStorage.getItem("viv-privacy-mode"); if (s === "1") return true; if (s === "0") return false; return isAdmin; } catch { return isAdmin; }
+  });
+  useEffect(() => { try { localStorage.setItem("viv-privacy-mode", privacyOn ? "1" : "0"); } catch {} }, [privacyOn]);
+  // Edge Ledger (admin) — collapsed by default; the choice persists.
+  const [edgeShown, setEdgeShown] = useState(() => { try { return localStorage.getItem("viv-edgeledger-shown") === "1"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("viv-edgeledger-shown", edgeShown ? "1" : "0"); } catch {} }, [edgeShown]);
   const [capEditing, setCapEditing] = useState(false);
   const [capDraft, setCapDraft] = useState("");
   const [activeGuide, setActiveGuide] = useState(null);
@@ -10286,6 +10342,8 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
               {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
           </div>
@@ -10357,11 +10415,11 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             /* K3: Equity */
             equity: (
             <div className="card kpi">
-              <div className="cardhead"><span className="label">Equity</span><span className="infodot" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">i</span><button className="ghostchip" onClick={() => setCfgOpen(o => !o)} aria-expanded={cfgOpen} title="Edit your starting capital and sizing inputs">⚙ Configure</button></div>
+              <div className="cardhead"><span className="label">Equity</span><span className="infodot" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">i</span>{isAdmin && <EyeToggle on={privacyOn} onClick={() => setPrivacyOn(p => !p)} title={privacyOn ? "Account size hidden (stream-safe) — reveal" : "Hide account size for streaming"} />}<button className="ghostchip" onClick={() => setCfgOpen(o => !o)} aria-expanded={cfgOpen} title="Edit your starting capital and sizing inputs">⚙ Configure</button></div>
               <div className="kpibody">
                 <div className="kpimain">
-                  <div className="kpinum gold">{usd0(compEquity)}</div>
-                  <div className="kpisub">Base {usd0(+portfolioSize || 0)} + {usd0(compRealizedPL)} realized</div>
+                  <div className="kpinum gold">{privacyOn ? "•••••••" : usd0(compEquity)}</div>
+                  <div className="kpisub">{privacyOn ? "Base •••• + •••• realized" : `Base ${usd0(+portfolioSize || 0)} + ${usd0(compRealizedPL)} realized`}</div>
                   <span className="kpichip">Trail-locked · {useSecuredProfit ? "ON" : "OFF"}</span>
                 </div>
               </div>
@@ -10432,10 +10490,10 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                     <input className="capinput" autoFocus value={capDraft} onChange={e => setCapDraft(e.target.value)} onBlur={() => { const v = parseFloat(capDraft.replace(/[^0-9.]/g, "")) || 0; setPortfolioSize(v); setCapEditing(false); }} onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }} />
                   ) : (
                     <span className="editcap" title="Click to edit your starting capital" onClick={() => { setCapDraft(String(+portfolioSize || 0)); setCapEditing(true); }}>
-                      <span className="capval">{usd0(+portfolioSize || 0)}</span><span className="pencil">&#9998;</span>
+                      <span className="capval">{privacyOn ? "••••" : usd0(+portfolioSize || 0)}</span><span className="pencil">&#9998;</span>
                     </span>
                   )}
-                  <div className="cfghint">+ {usd0(compRealizedPL)} realized</div>
+                  <div className="cfghint">+ {privacyOn ? "••••" : usd0(compRealizedPL)} realized</div>
                 </div>
                 <div className="cfgitem">
                   <div className="label" style={{ marginBottom: 9 }}>Target ROTE</div>
@@ -10464,48 +10522,53 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           )}
 
-          {/* P3. CONTEXT ROW — cards drag-to-rearrange like the KPI strip */}
+          {/* P3. LENS ROW — 3 equal columns: [Theme Leaders] · [Rotation mini] · [Breadth mini stacked
+              above Risk Allocation]. Minis show for ALL logged-in users; the full nav pages stay
+              admin-only. Market Context was replaced by the Breadth lens. Hard-placed (skip drag). */}
           {(() => {
-            const CTX_CARDS = {
-            market: (<MarketContext C={C} font={font} defaultExpanded />),
-            alloc: (
-            <div className="card">
-              <div className="cardhead"><span className="label">Risk Allocation</span><span className="infodot" data-tip="A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.">i</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <AllocDonut pct={allocPct} over={over} size={92} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="alloclegend" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
-                    <span className="leg tipwrap" data-tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></span>
-                    <span className="leg tipwrap" data-tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></span>
-                    <span className="leg tipwrap" data-tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></span>
+            const allocCard = (
+              <div className="card">
+                <div className="cardhead"><span className="label">Risk Allocation</span><span className="infodot" data-tip="A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.">i</span></div>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <AllocDonut pct={allocPct} over={over} size={92} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="alloclegend" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+                      <span className="leg tipwrap" data-tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></span>
+                      <span className="leg tipwrap" data-tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></span>
+                      <span className="leg tipwrap" data-tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></span>
+                    </div>
+                    <div className="allocnote" style={{ marginTop: 8 }}>{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
                   </div>
-                  <div className="allocnote" style={{ marginTop: 8 }}>{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
                 </div>
-              </div>
-            </div>
-            ),
-            themes: (<ThemeStrip C={C} font={font} variant="pro" />),
-            };
-            {/* Two columns for alignment: slots 0+1 of the drag order STACK in the left column
-                (cards stretch to share its height), slot 2 fills the right. Drag still reorders
-                which card lands in which slot. */}
-            const ctxWrap = (k, vi) => (
-              <div key={k} className={"dragwrap reveal vrev" + (ctxArr.armed === vi ? " dragging" : "")} style={{ "--i": vi }} {...ctxArr.wrapProps(vi)}>
-                <span className="draghandle" {...ctxArr.handleProps(vi)}>⋮⋮</span>
-                {CTX_CARDS[k]}
               </div>
             );
             return (
-              <div className="ctxrow" style={{ marginTop: 14 }}>
-                <div className="ctxstack">{ctxArr.order.slice(0, 2).map((k, i) => ctxWrap(k, i))}</div>
-                {ctxArr.order.slice(2).map((k, i) => ctxWrap(k, i + 2))}
+              // 3 equal columns; the whole stack wraps as a unit under ~940px (auto-fit minmax 300px)
+              <div className="lensrowA" style={{ marginTop: 14 }}>
+                <ThemeStrip C={C} font={font} variant="pro" />
+                <RotationMini C={C} font={font} session={session} />
+                <div className="lensstack">
+                  <BreadthMini C={C} font={font} session={session} />
+                  {allocCard}
+                </div>
               </div>
             );
           })()}
           {/* admin-only Edge Ledger: wrapped so the 14px row rhythm holds (its own card has no top
               margin and previously sat flush under the tall theme card); members render nothing. */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && (
-            <div style={{ marginTop: 14 }}><EdgeLedger C={C} font={font} session={session} setPage={setPage} /></div>
+          {isAdmin && (
+            <div style={{ marginTop: 14 }}>
+              {edgeShown ? (
+                <>
+                  <button onClick={() => setEdgeShown(false)} title="Collapse the Edge Ledger"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 10, fontFamily: font, fontSize: "0.66rem", fontWeight: 700, color: "var(--muted)", background: "transparent", border: "1px solid var(--border)", borderRadius: 99, padding: "5px 12px", cursor: "pointer" }}>Edge Ledger ▾ hide</button>
+                  <EdgeLedger C={C} font={font} session={session} setPage={setPage} />
+                </>
+              ) : (
+                <button onClick={() => setEdgeShown(true)} title="Show the Edge Ledger"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: font, fontSize: "0.66rem", fontWeight: 700, color: "var(--muted)", background: "transparent", border: "1px solid var(--border)", borderRadius: 99, padding: "6px 13px", cursor: "pointer" }}>Edge Ledger ▸ show</button>
+              )}
+            </div>
           )}
 
           {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS */}
@@ -10548,6 +10611,8 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
@@ -10600,7 +10665,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                     <input className="capinput" autoFocus value={capDraft} onChange={e => setCapDraft(e.target.value)} onBlur={() => { const v = parseFloat(capDraft.replace(/[^0-9.]/g, "")) || 0; setPortfolioSize(v); setCapEditing(false); }} onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }} />
                   ) : (
                     <span className="editcap" title="Click to edit your starting capital" onClick={() => { setCapDraft(String(+portfolioSize || 0)); setCapEditing(true); }}>
-                      <span className="capval">{usd0(+portfolioSize || 0)}</span><span className="pencil">&#9998;</span>
+                      <span className="capval">{privacyOn ? "••••" : usd0(+portfolioSize || 0)}</span><span className="pencil">&#9998;</span>
                     </span>
                   )}
                   <span className="op">+ {usd0(compRealizedPL)} realized</span>
@@ -11465,6 +11530,8 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
@@ -11646,6 +11713,8 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
@@ -11919,6 +11988,8 @@ function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
             <a className="on" style={{ cursor: "pointer" }}>Model Book</a>
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip to relaunch */}
             {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
@@ -11945,6 +12016,8 @@ function DailySetupsShell({ setPage, session, displayName }) {
             <a className="on" style={{ cursor: "pointer" }}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
@@ -11973,6 +12046,8 @@ function MentorShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a className="on" style={{ cursor: "pointer" }}>Mentor</a>
             {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
@@ -12010,6 +12085,64 @@ function QuantShell({ setPage, session }) {
           </div>
         </div>
         <QuantAnalysis C={C} font={font} session={session} />
+      </div>
+    </div>
+  );
+}
+
+// ── GROUP RS shell — ADMIN-ONLY. Same navbar chrome as QuantShell. ──
+function GroupRSShell({ setPage, session }) {
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const prowide = useUiMode() === "pro";
+  if (!isAdmin) return null;
+  return (
+    <div className={"vj" + (prowide ? " prowide" : "")}>
+      <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
+      <div className="shell">
+        <div className="navbar">
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="tabs">
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>
+            <a className="on" style={{ cursor: "pointer" }}>Rotation</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          </div>
+        </div>
+        <GroupRS C={C} font={font} setPage={setPage} session={session} />
+      </div>
+    </div>
+  );
+}
+
+// ── MARKET MONITOR shell — ADMIN-ONLY. Same navbar chrome as GroupRSShell. ──
+function MarketMonitorShell({ setPage, session }) {
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const prowide = useUiMode() === "pro";
+  if (!isAdmin) return null;
+  return (
+    <div className={"vj" + (prowide ? " prowide" : "")}>
+      <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
+      <div className="shell">
+        <div className="navbar">
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="tabs">
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>
+            <a className="on" style={{ cursor: "pointer" }}>Breadth</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          </div>
+        </div>
+        <MarketMonitor C={C} font={font} setPage={setPage} session={session} />
       </div>
     </div>
   );
@@ -13627,6 +13760,8 @@ function AppInner() {
       {page === "modelbook" && <ModelBookShell setPage={setPage} session={session} displayName={displayName} journaledTrades={journaledTrades} />}
       {page === "mentor" && <MentorShell setPage={setPage} session={session} />}
       {page === "quant" && isAdmin && <QuantShell setPage={setPage} session={session} />}
+      {page === "grouprs" && isAdmin && <GroupRSShell setPage={setPage} session={session} />}
+      {page === "monitor" && isAdmin && <MarketMonitorShell setPage={setPage} session={session} />}
       {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} uiTheme={uiTheme} setUiTheme={setUiTheme} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
       <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />
