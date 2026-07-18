@@ -13,8 +13,8 @@ import ThemeStrip from "./ThemeStrip.jsx";
 import MarketContext from "./MarketContext.jsx";
 import EdgeLedger from "./EdgeLedger.jsx";
 import QuantAnalysis from "./QuantAnalysis.jsx";
-import GroupRS, { RotationMini } from "./GroupRS.jsx";
-import MarketMonitor, { BreadthMini } from "./MarketMonitor.jsx";
+import { RotationMini } from "./GroupRS.jsx";
+import { BreadthMini } from "./MarketMonitor.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
 import DailySetupsTab from "./DailySetups.jsx";
 import ModelBookPage, { outcomeFromR } from "./ModelBook.jsx";
@@ -695,9 +695,11 @@ const WHATS_NEW = [
     date: "July 19, 2026",
     title: "🧭 Two new market lenses on your dashboard: Sector Group Rotation + Market Breadth",
     items: [
-      "SECTOR GROUP ROTATION — ~60 industry-group ETFs scored two ways every day: Thrust % (how hard the group is running THIS WEEK, today weighted heaviest) and 1M RS % (where today sits in its own month of market-relative strength). Proven leaders still accelerating sit on top, and % off 52-week high keeps everyone honest — an OFF FLOOR tag means the strength is a bounce out of a hole, not a breakout at highs.",
-      "MARKET BREADTH — the market's weather station: how many stocks are up 25%+ vs down 25%+ over the month and the quarter, shown as a simple green/red master switch with a plain-English verdict and a 'breakouts likely to work / fail' read. It never picks a stock — it tells you whether the tape is rewarding strength at all.",
-      "Click either card for the full table — sortable columns (click a header; chain up to 3), preset auto-filters, and on Rotation a TOP-DOWN VIEW tab: index → size segments → equal-weight vs cap-weighted sectors with a Broad/Narrow tag showing whether the WHOLE sector is moving or just a few megacaps.",
+      "SECTOR GROUP ROTATION — ~60 industry-group ETFs scored two ways every day: Thrust % (how hard the group is running THIS WEEK, today weighted heaviest) and 1M RS % (where today sits in its own month of market-relative strength). Proven leaders still accelerating sit on top, and % off 52-week high keeps everyone honest — a ⚠️ next to the number flags a group far below its 52-week high, where the strength is a bounce out of a hole, not a breakout at highs.",
+      "MARKET BREADTH — the market's weather station: how many stocks are up 25%+ vs down 25%+ over the month and the quarter, shown as a simple green/red master switch with a plain-English verdict and a one-line read: breakouts are MORE (green) or LESS (red) likely to work. It never picks a stock — it tells you whether the tape is rewarding strength at all.",
+      "Click either card to pop out the full table — sortable columns (click a header; chain up to 3), preset auto-filters, and on Rotation a TOP-DOWN VIEW tab: index → size segments → equal-weight vs cap-weighted sectors with a Broad/Narrow tag showing whether the WHOLE sector is moving or just a few megacaps.",
+      "REARRANGE YOUR LENSES — drag any of the four dashboard cards (Theme Leaders, Rotation, Breadth, Risk Allocation) by its ⠿ handle to reorder them; your layout saves to your account.",
+      "SCREENSHOT ANY LENS — a 📷 button on each card (and inside the pop-out tables) copies a clean image straight to your clipboard, ready to paste into notes or chat. Falls back to a PNG download where the clipboard isn't available.",
       "Both refresh automatically after each close. Educational context, not signals — your setup rules stay your setup rules.",
     ],
   },
@@ -3855,10 +3857,7 @@ if (expert) return (
           <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
       </div>
 
@@ -3906,10 +3905,7 @@ return (
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
       </div>
 
@@ -7892,10 +7888,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
-              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
           </div>
 
@@ -8233,10 +8226,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
 
@@ -9158,9 +9148,15 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 /* P3b. LENS ROW — Row A = 3 lenses (auto-fit so it wraps to stacked cards on narrow), Row B = 2 cols */
 .vd.expert .lensrowA{display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px; align-items:stretch}
 .vd.expert .lensrowA > *{min-width:0; height:100%}
-/* third column = Breadth mini stacked above Risk Allocation, which stretches to fill the column */
+/* each full-column slot is a drag-wrapper that passes height through to its card */
+.vd.expert .lensrowA > .dragwrap{display:flex; flex-direction:column; min-width:0}
+.vd.expert .lensrowA > .dragwrap > *{flex:1 1 auto; min-height:0}
+/* third column = a stack of two half-height drag slots (Breadth mini + Risk Allocation by default) */
 .vd.expert .lensstack{display:flex; flex-direction:column; gap:14px; min-width:0; height:100%}
-.vd.expert .lensstack > :last-child{flex:1 1 auto}
+.vd.expert .lensstack > .dragwrap{flex:1 1 0; min-width:0; display:flex; flex-direction:column; min-height:0}
+.vd.expert .lensstack > .dragwrap > *{flex:1 1 auto; min-height:0}
+/* a tall card (Theme Leaders) dragged into a half slot scrolls instead of overlapping the card below */
+.vd.expert .lensstack > .dragwrap > .card{overflow:auto}
 .vd.expert .lensmini{cursor:pointer; transition:border-color .16s, transform .16s}
 .vd.expert .lensmini:hover{border-color:var(--borderGold); transform:translateY(-2px)}
 /* P4. Positions table — Pro only tightens container/density + sticky head; the table markup is shared with Guided */
@@ -9974,6 +9970,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
   const kpiArr = useCardArrange(["openpl", "risk", "equity", "budget", "rote"], "viv-dash-kpi-order");   // Pro KPI strip
   const ctxArr = useCardArrange(["market", "alloc", "themes"], "viv-dash-ctx-order");                     // Pro context row
   const stackArr = useCardArrange(["market", "themes", "alloc", "edge"], "viv-dash-stack-order"); // Guided card stack
+  // Lens row — 4 slots (col1 · col2 · stack-top · stack-bottom); rearrangeable by ALL members.
+  // Order persisted per USER id (never per-browser only) so shared browsers don't leak layouts.
+  const lensArr = useCardArrange(["themes", "rotation", "breadth", "alloc"], "viv-lens-order-" + (session?.user?.id || "anon"));
   // Stream privacy (admin) — hide account size on the Equity KPI card. Shares the "viv-privacy-mode"
   // key with the Journal, so the eye stays in sync across pages. Admin fresh device = ON.
   const [privacyOn, setPrivacyOn] = useState(() => {
@@ -10341,10 +10340,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
-              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
           </div>
 
@@ -10522,9 +10518,10 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           )}
 
-          {/* P3. LENS ROW — 3 equal columns: [Theme Leaders] · [Rotation mini] · [Breadth mini stacked
-              above Risk Allocation]. Minis show for ALL logged-in users; the full nav pages stay
-              admin-only. Market Context was replaced by the Breadth lens. Hard-placed (skip drag). */}
+          {/* P3. LENS ROW — 4 rearrangeable cards across 4 slots: [col1] · [col2] · [stack-top] ·
+              [stack-bottom]. Drag any card by its ⠿ handle onto another to swap slots; order saves
+              per-user (viv-lens-order-<uid>). Minis show for ALL logged-in users; the full tables now
+              open from each card's click-through popup (no nav page). Screenshot 📷 lives in each header. */}
           {(() => {
             const allocCard = (
               <div className="card">
@@ -10542,14 +10539,29 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 </div>
               </div>
             );
+            const lensCards = {
+              themes: <ThemeStrip C={C} font={font} variant="pro" />,
+              rotation: <RotationMini C={C} font={font} session={session} />,
+              breadth: <BreadthMini C={C} font={font} session={session} />,
+              alloc: allocCard,
+            };
+            const slot = (vi) => {
+              const key = lensArr.order[vi];
+              return (
+                <div key={key} className={"dragwrap" + (lensArr.armed === vi ? " dragging" : "")} {...lensArr.wrapProps(vi)}>
+                  <span className="draghandle" data-html2canvas-ignore="true" title="Drag to rearrange" onClick={(e) => e.stopPropagation()} {...lensArr.handleProps(vi)}>⠿</span>
+                  {lensCards[key]}
+                </div>
+              );
+            };
             return (
-              // 3 equal columns; the whole stack wraps as a unit under ~940px (auto-fit minmax 300px)
+              // 3 grid columns; column 3 is a stack of two slots. Whole row wraps under ~940px (auto-fit minmax 300px)
               <div className="lensrowA" style={{ marginTop: 14 }}>
-                <ThemeStrip C={C} font={font} variant="pro" />
-                <RotationMini C={C} font={font} session={session} />
+                {slot(0)}
+                {slot(1)}
                 <div className="lensstack">
-                  <BreadthMini C={C} font={font} session={session} />
-                  {allocCard}
+                  {slot(2)}
+                  {slot(3)}
                 </div>
               </div>
             );
@@ -10610,10 +10622,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
 
@@ -10988,7 +10997,7 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs.member .ownerzone .card{display:none}
 .vs .membernote{display:none; margin:12px; padding:16px 18px; border:1px dashed var(--border); border-radius:14px; color:var(--muted); font-size:0.82rem}
 .vs.member .membernote{display:block}
-.vs .guidepanel{position:fixed; right:24px; bottom:24px; width:330px; max-width:calc(100vw - 40px); z-index:200;
+.vs .guidepanel{position:fixed; right:24px; bottom:96px; width:330px; max-width:calc(100vw - 40px); z-index:200;
     background:#11111b; border:1px solid var(--borderGold); border-radius:16px; padding:15px 17px; box-shadow:0 22px 60px rgba(0,0,0,0.6); display:none}
 .vs:not(.expert) .guidepanel{display:block}
 .vs .guidepanel.speaking{border-color:var(--goldBright); box-shadow:0 0 0 1px var(--goldBright), 0 22px 60px rgba(0,0,0,0.6)}
@@ -11529,10 +11538,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-            {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
-            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+            {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
 
@@ -11712,10 +11718,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
-            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
 
@@ -11987,10 +11990,7 @@ function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a className="on" style={{ cursor: "pointer" }}>Model Book</a>
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip to relaunch */}
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
         <ModelBookPage C={C} font={font} session={session} isAdmin={isAdmin} journaledTrades={journaledTrades} />
@@ -12015,10 +12015,7 @@ function DailySetupsShell({ setPage, session, displayName }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a className="on" style={{ cursor: "pointer" }}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
         <DailySetupsTab C={C} font={font} session={session} isAdmin={isAdmin} setPage={setPage} />
@@ -12045,10 +12042,7 @@ function MentorShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a className="on" style={{ cursor: "pointer" }}>Mentor</a>
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>}
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>}
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
         <div className="reveal in-view" style={{ marginBottom: 10 }}>
@@ -12090,63 +12084,8 @@ function QuantShell({ setPage, session }) {
   );
 }
 
-// ── GROUP RS shell — ADMIN-ONLY. Same navbar chrome as QuantShell. ──
-function GroupRSShell({ setPage, session }) {
-  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  const prowide = useUiMode() === "pro";
-  if (!isAdmin) return null;
-  return (
-    <div className={"vj" + (prowide ? " prowide" : "")}>
-      <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
-      <div className="shell">
-        <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
-          <div className="tabs">
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>
-            <a className="on" style={{ cursor: "pointer" }}>Rotation</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("monitor")}>Breadth</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
-          </div>
-        </div>
-        <GroupRS C={C} font={font} setPage={setPage} session={session} />
-      </div>
-    </div>
-  );
-}
-
-// ── MARKET MONITOR shell — ADMIN-ONLY. Same navbar chrome as GroupRSShell. ──
-function MarketMonitorShell({ setPage, session }) {
-  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  const prowide = useUiMode() === "pro";
-  if (!isAdmin) return null;
-  return (
-    <div className={"vj" + (prowide ? " prowide" : "")}>
-      <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
-      <div className="shell">
-        <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
-          <div className="tabs">
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("grouprs")}>Rotation</a>
-            <a className="on" style={{ cursor: "pointer" }}>Breadth</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
-          </div>
-        </div>
-        <MarketMonitor C={C} font={font} setPage={setPage} session={session} />
-      </div>
-    </div>
-  );
-}
+// GROUP RS / MARKET MONITOR shells removed 2026-07-19 — Rotation & Breadth now open from the
+// dashboard lens-card popups (RotationMini/BreadthMini → GroupRS/MarketMonitor). No nav page.
 
 function SmokeBackground() {
   const canvasRef = useRef(null);
@@ -12580,6 +12519,9 @@ function AppInner() {
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
+  // Guard: the retired Rotation/Breadth nav pages ("grouprs"/"monitor") now live in dashboard
+  // popups. If any lingering state lands on them, fall back to the dashboard (never a blank route).
+  useEffect(() => { if (page === "grouprs" || page === "monitor") setPage("dashboard"); }, [page]);
   // Pull the member's setup grades from Supabase (cross-device) once logged in; localStorage stays the offline cache.
   useEffect(() => { if (session?.user?.id) initGrades(session.user.id); }, [session?.user?.id]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -13760,8 +13702,6 @@ function AppInner() {
       {page === "modelbook" && <ModelBookShell setPage={setPage} session={session} displayName={displayName} journaledTrades={journaledTrades} />}
       {page === "mentor" && <MentorShell setPage={setPage} session={session} />}
       {page === "quant" && isAdmin && <QuantShell setPage={setPage} session={session} />}
-      {page === "grouprs" && isAdmin && <GroupRSShell setPage={setPage} session={session} />}
-      {page === "monitor" && isAdmin && <MarketMonitorShell setPage={setPage} session={session} />}
       {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} uiTheme={uiTheme} setUiTheme={setUiTheme} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
       <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />

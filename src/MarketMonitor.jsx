@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MARKET_MONITOR } from "./marketMonitor-data.js";
 import { InfoDot } from "./GroupRS.jsx";
+import { LensCamera } from "./capture.jsx";
 
 // ── BREADTH — market monitor ─────────────────────────────────────────────────
 // A market-breadth "weather station": how many stocks moved 4%+ up vs down today,
@@ -48,14 +49,11 @@ function readBreadth(L) {
   else if (nGreen === 2) sentence = "Buyers are in control — winners outnumber losers across the month and the quarter.";
   else if (nGreen === 0) sentence = "Selling pressure dominates — more stocks are getting hit hard than moving up. Breakouts have no tailwind.";
   else { const g = mGreen ? "month" : "quarter", r = mGreen ? "quarter" : "month"; sentence = `A split tape — strength on the ${g}, but the ${r} is still churning. Chop.`; }
-  // breakout-conditions line — the master-switch doctrine (stockbee-sources/49 §4: "All 4 columns
-  // GREEN → good time to buy breakouts. Any one RED → choppy → breakouts fail."), stated as
-  // observed conditions, not an instruction.
-  let breakouts;
-  if (heavy) breakouts = { ...RED, txt: "Breakouts: likely to FAIL — heavy selling days chop fresh breakouts apart." };
-  else if (nGreen === 2) breakouts = { ...GREEN, txt: "Breakouts: likely to WORK — both horizons green, the tape is rewarding strength." };
-  else if (nGreen === 0) breakouts = { ...RED, txt: "Breakouts: likely to FAIL — sellers own both horizons." };
-  else breakouts = { ...AMBER, txt: "Breakouts: coin-flip — one horizon red means chop, and chop eats breakouts." };
+  // breakout-conditions read — the master-switch doctrine (stockbee-sources/49 §4: "All 4 columns
+  // GREEN → good time to buy breakouts. Any one RED → choppy → breakouts fail."). Plain binary
+  // (Valen 2026-07-19): both horizons green AND no heavy-selling extreme → MORE likely; anything
+  // else → LESS likely. The word MORE/LESS carries the colour; the rest stays neutral.
+  const breakouts = { more: !heavy && mGreen && qGreen };
   return { mUp, mDn, qUp, qDn, mGreen, qGreen, heavy, verdict, sentence, breakouts };
 }
 
@@ -105,6 +103,7 @@ export default function MarketMonitor({ C, font, session }) {
   const fc = MARKET_MONITOR?.formulaCheck || {};
   const latest = allRows[allRows.length - 1] || {};
   const read = readBreadth(latest);
+  const rootRef = useRef(null);
 
   const cardLabel = { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.gold };
   const asofStyle = { fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums", textAlign: "right" };
@@ -195,7 +194,7 @@ export default function MarketMonitor({ C, font, session }) {
   const td = { padding: "6px 9px", borderBottom: `1px solid ${C.border}`, fontSize: "0.72rem", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: C.text, textAlign: "right" };
 
   return (
-    <div className="mm" style={{ fontFamily: font, maxWidth: 1440, margin: "0 auto", color: C.text }}>
+    <div ref={rootRef} className="mm" style={{ fontFamily: font, maxWidth: 1440, margin: "0 auto", color: C.text }}>
       <style>{`
         .mm .mm-card{position:relative;background:rgba(255,255,255,0.042);border:1px solid rgba(255,255,255,0.09);border-radius:16px;backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);padding:18px 20px;margin-bottom:14px}
         .mm .mm-card::before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,0.05),transparent 55%)}
@@ -215,7 +214,10 @@ export default function MarketMonitor({ C, font, session }) {
             How many stocks moved 4%+ up vs down today — the market's weather station. Sets the aggression dial, never picks the stock. Educational, not advice.
           </p>
         </div>
-        <div style={asofStyle}>as of {asof}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <LensCamera getEl={() => rootRef.current} name="breadth-full" C={C} />
+          <div style={asofStyle}>as of {asof}</div>
+        </div>
       </section>
 
       {/* 2 — THE ONE QUESTION (systematic read, member-facing) */}
@@ -410,16 +412,18 @@ HONEST GAPS 5d/10d ratio bands · T2108 bands — undocumented, shown raw.`
 // Everything else (dual bar, ratios, T2108, tiles, table) lives in the popup.
 export function BreadthMini({ C, font, session }) {
   const [open, setOpen] = useState(false);
+  const cardRef = useRef(null);
   const rows = MARKET_MONITOR?.rows || [];
   const asof = MARKET_MONITOR?.asof || "—";
   const latest = rows[rows.length - 1] || {};
   const read = readBreadth(latest);
   return (
     <>
-      <div className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
+      <div ref={cardRef} className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
         <div className="cardhead">
           <span className="label">Market Breadth</span>
           <InfoDot tip="Are breakouts likely to work right now? Tap for counts, ratios and the full sheet." />
+          <LensCamera getEl={() => cardRef.current} name="breadth" C={C} style={{ marginLeft: 6 }} />
           <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
         </div>
         {/* the four-column master switch */}
@@ -429,8 +433,10 @@ export function BreadthMini({ C, font, session }) {
         </div>
         {/* one punchy verdict sentence */}
         <div style={{ marginTop: 11, fontSize: "0.72rem", lineHeight: 1.5, color: C.text }}>{read.sentence}</div>
-        {/* breakout-conditions line — the master-switch doctrine, descriptive */}
-        <div style={{ marginTop: 7, fontSize: "0.7rem", fontWeight: 700, lineHeight: 1.45, color: read.breakouts.fg }}>{read.breakouts.txt}</div>
+        {/* breakout-conditions line — plain binary; MORE/LESS carries the colour */}
+        <div style={{ marginTop: 7, fontSize: "0.72rem", fontWeight: 700, lineHeight: 1.45, color: C.text }}>
+          Breakouts are <span style={{ color: read.breakouts.more ? C.green : C.red, fontWeight: 800 }}>{read.breakouts.more ? "MORE" : "LESS"}</span> likely to work
+        </div>
       </div>
       {open && createPortal(
         <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "32px 16px" }}>

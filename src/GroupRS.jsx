@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { GROUP_RS } from "./groupRS-data.js";
+import { LensCamera } from "./capture.jsx";
 
 // ── ROTATION — group RS table + Plan & Focus ─────────────────────────────────
 // Group-level rotation lens computed from ETF daily closes vs the equal-weight
@@ -89,6 +90,7 @@ export default function GroupRS({ C, font, session }) {
   const [tab, setTab] = useState("groups");     // groups | planfocus
   const [howOpen, setHowOpen] = useState(true);
   const [methodOpen, setMethodOpen] = useState(false);
+  const rootRef = useRef(null);
 
   // ── multi-sort chain (up to 3). Default = thrust desc → rs1m desc → off52 desc.
   const DEFAULT_CHAIN = [{ key: "thrust", dir: "desc" }, { key: "rs1m", dir: "desc" }, { key: "off52", dir: "desc" }];
@@ -339,7 +341,7 @@ export default function GroupRS({ C, font, session }) {
   };
 
   return (
-    <div className="grs" style={{ fontFamily: font, maxWidth: 1440, margin: "0 auto", color: C.text }}>
+    <div ref={rootRef} className="grs" style={{ fontFamily: font, maxWidth: 1440, margin: "0 auto", color: C.text }}>
       <style>{`
         .grs .grs-card{position:relative;background:rgba(255,255,255,0.042);border:1px solid rgba(255,255,255,0.09);border-radius:16px;backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);padding:18px 20px;margin-bottom:14px}
         .grs .grs-card::before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,0.05),transparent 55%)}
@@ -358,7 +360,10 @@ export default function GroupRS({ C, font, session }) {
             Which groups are accelerating, which are resting, which are traps — computed daily from ETF closes vs the equal-weight benchmark. Educational, not advice.
           </p>
         </div>
-        <div style={asofStyle}>as of {asof} close</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <LensCamera getEl={() => rootRef.current} name="rotation-full" C={C} />
+          <div style={asofStyle}>as of {asof} close</div>
+        </div>
       </section>
 
       {/* 2 — HOW TO READ THIS */}
@@ -471,6 +476,7 @@ decode (pre-registered thresholds):
 // ── ROTATION MINI — focal highlight (top 10), clicks to open the full table popup.
 export function RotationMini({ C, font, session }) {
   const [open, setOpen] = useState(false);
+  const cardRef = useRef(null);
   const rows = GROUP_RS?.rows || [];
   const asof = GROUP_RS?.asof || "—";
   const top = [...rows]
@@ -486,10 +492,11 @@ export function RotationMini({ C, font, session }) {
   const hcell = { fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, padding: "0 4px 6px", whiteSpace: "nowrap" };
   return (
     <>
-      <div className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
+      <div ref={cardRef} className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
         <div className="cardhead">
           <span className="label">Sector Group Rotation</span>
           <InfoDot tip="Which sector groups are heating up and which are cooling. Tap for the full table." />
+          <LensCamera getEl={() => cardRef.current} name="rotation" C={C} style={{ marginLeft: 6 }} />
           <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -499,7 +506,6 @@ export function RotationMini({ C, font, session }) {
             <th style={{ ...hcell, textAlign: "right" }}>Thrust %</th>
             <th style={{ ...hcell, textAlign: "right" }}>1M RS %</th>
             <th style={{ ...hcell, textAlign: "right" }}>% off 52W H</th>
-            <th style={{ ...hcell, textAlign: "right" }}></th>
           </tr></thead>
           <tbody>
             {top.map(r => (
@@ -508,11 +514,12 @@ export function RotationMini({ C, font, session }) {
                 <td style={{ fontSize: "0.66rem", color: C.muted, padding: "3px 4px", textAlign: "left", maxWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</td>
                 <td style={{ padding: "3px 4px", textAlign: "right" }}><span style={cellChip(greenHeat(r.thrust == null ? null : r.thrust / 100))}>{r.thrust == null ? "—" : Math.round(r.thrust)}</span></td>
                 <td style={{ padding: "3px 4px", textAlign: "right" }}><span style={cellChip(greenHeat(r.rs1m == null ? null : r.rs1m / 100))}>{r.rs1m == null ? "—" : Math.round(r.rs1m)}</span></td>
-                <td style={{ padding: "3px 4px", textAlign: "right" }}><span style={cellChip(redHeat(off52Mag(r.off52)))}>{r.off52 == null ? "—" : (r.off52 >= -0.05 ? "0%" : Math.round(r.off52) + "%")}</span></td>
-                <td style={{ padding: "3px 2px", textAlign: "right", whiteSpace: "nowrap" }}>
-                  {/* labeled chips, not bare emoji — the glyph was unreadable at mini size (Valen 2026-07-19) */}
-                  {(r.warns || []).includes("trap") && <span title="Off the floor — strong RS, but still ≥15% below its 52-week high. A bounce out of a hole, not a breakout at highs." style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.03em", textTransform: "uppercase", color: WARN.trap.fg, background: WARN.trap.bg, border: `1px solid ${WARN.trap.bd}`, borderRadius: 99, padding: "2px 7px", cursor: "help" }}>{WARN.trap.short}</span>}
-                  {(r.warns || []).includes("artifact") && <span title="Percentile illusion — RS% looks high but the actual month is negative." style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.03em", textTransform: "uppercase", color: WARN.artifact.fg, background: WARN.artifact.bg, border: `1px solid ${WARN.artifact.bd}`, borderRadius: 99, padding: "2px 7px", marginLeft: 3, cursor: "help" }}>{WARN.artifact.short}</span>}
+                <td style={{ padding: "3px 4px", textAlign: "right", whiteSpace: "nowrap" }}>
+                  {/* Valen 2026-07-19: OFF-FLOOR flag is now a plain ⚠️ inline after the value — no
+                      separate column (the empty header box is gone). Numbers stay right-aligned. */}
+                  <span style={cellChip(redHeat(off52Mag(r.off52)))}>{r.off52 == null ? "—" : (r.off52 >= -0.05 ? "0%" : Math.round(r.off52) + "%")}</span>
+                  {(r.warns || []).includes("trap") && <span title="Far below its 52-week high — strength here is a bounce, not a breakout." style={{ marginLeft: 4, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
+                  {(r.warns || []).includes("artifact") && <span title="Percentile illusion — RS% looks high but the actual month is negative." style={{ marginLeft: 3, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
                 </td>
               </tr>
             ))}

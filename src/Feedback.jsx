@@ -137,7 +137,7 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
 
       {/* Floating launcher */}
       <button className="vivfb-fab" onClick={() => setOpen(true)} title="Community feedback" style={{
-        position: "fixed", right: isMobile ? 16 : 24, bottom: isMobile ? 78 : 24, zIndex: 1000, display: "inline-flex", alignItems: "center", gap: 9,
+        position: "fixed", right: isMobile ? 16 : 24, bottom: isMobile ? 78 : 24, zIndex: 1050, display: "inline-flex", alignItems: "center", gap: 9,
         background: gold, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.82rem", padding: "13px 20px", borderRadius: 99, cursor: "pointer",
         boxShadow: "0 12px 34px rgba(201,152,42,0.42)", letterSpacing: "-0.01em",
       }}>

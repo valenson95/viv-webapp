@@ -1,5 +1,6 @@
 import React from "react";
 import { latestSnapshot, consistentTop } from "./themes.js";
+import { LensCamera } from "./capture.jsx";
 
 // ─────────────────────────────────────────────────────────────
 // Theme Leaders — Top-5 · 1W and Top-5 · 1M as two side-by-side tables.
@@ -8,6 +9,8 @@ import { latestSnapshot, consistentTop } from "./themes.js";
 export default function ThemeStrip({ C, font, variant }) {
   const [full, setFull] = React.useState(false);
   const [popup, setPopup] = React.useState(false);
+  const cardRef = React.useRef(null);
+  const popRef = React.useRef(null);
   // Close the expanded popup on Escape (listener only while open).
   React.useEffect(() => {
     if (!popup) return;
@@ -57,6 +60,7 @@ export default function ThemeStrip({ C, font, variant }) {
     return (
       <>
         <div
+          ref={cardRef}
           onClick={() => setPopup(true)}
           title="Click to expand"
           style={{ fontFamily: font, position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", overflow: "hidden", cursor: "pointer",
@@ -65,6 +69,7 @@ export default function ThemeStrip({ C, font, variant }) {
           <div style={{ position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
               <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.muted }}>Theme Leaders</span>
+              <LensCamera getEl={() => cardRef.current} name="theme-leaders" C={C} style={{ marginLeft: 6 }} />
               <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.goldBright || C.gold, fontWeight: 700 }}>updated {snap.date}</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
@@ -84,13 +89,16 @@ export default function ThemeStrip({ C, font, variant }) {
             onClick={() => setPopup(false)}
             style={{ position: "fixed", inset: 0, zIndex: 1250, display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
               background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}>
-            <div style={{ fontFamily: font, position: "relative", width: "min(92vw, 860px)", maxHeight: "86vh", overflowY: "auto", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 18, padding: "24px 26px", overflowX: "hidden",
+            <div ref={popRef} style={{ fontFamily: font, position: "relative", width: "min(92vw, 860px)", maxHeight: "86vh", overflowY: "auto", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 18, padding: "24px 26px", overflowX: "hidden",
               backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", boxShadow: "0 30px 80px rgba(0,0,0,0.6)" }}>
               <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)", pointerEvents: "none" }} />
               <div style={{ position: "relative" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 13, marginBottom: 6, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
                   <span style={{ fontSize: "0.82rem", fontWeight: 800, letterSpacing: "0.02em", color: "rgba(255,255,255,0.95)" }}>Theme Leaders — updated {snap.date}</span>
-                  <span style={{ marginLeft: "auto", fontSize: "0.6rem", color: C.muted, opacity: 0.75, fontWeight: 600 }}>click anywhere to close</span>
+                  <span onClick={e => e.stopPropagation()} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 10 }}>
+                    <LensCamera getEl={() => popRef.current} name="theme-leaders-full" C={C} />
+                    <span style={{ fontSize: "0.6rem", color: C.muted, opacity: 0.75, fontWeight: 600 }}>click anywhere to close</span>
+                  </span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginTop: 14 }}>
                   <Col title={`1 Week (${wkRows.length})`} rows={wkRows} size="lg" />
