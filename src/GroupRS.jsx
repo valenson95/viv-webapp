@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { GROUP_RS } from "./groupRS-data.js";
+import { ETF_HOLDINGS } from "./etfHoldings-data.js";
 import { LensCamera } from "./capture.jsx";
 
 // ── ROTATION — group RS table + Plan & Focus ─────────────────────────────────
@@ -41,6 +42,41 @@ const SECTOR_PAIRS = [
   ["Utilities", "RSPU", "XLU"], ["Technology", "RSPT", "XLK"],
 ];
 const BLOCK_ORDER = ["Index", "Segment", "EW Sector", "SPDR Sector"];
+
+// ── reusable multi-sort chain (up to 3 keys). Click = new primary + previous
+// demoted; click the active primary again flips its direction. Shared by the
+// Sector Groups table AND each Top-Down block (one hook call per instance —
+// fixed count, never in a loop/condition, so React's hook-order rule holds).
+function useSortChain(defaultChain) {
+  const [chain, setChain] = useState(defaultChain);
+  const clickSort = (key) => {
+    if (!key) return;
+    setChain(prev => {
+      if (prev[0] && prev[0].key === key) { const n = [...prev]; n[0] = { key, dir: n[0].dir === "desc" ? "asc" : "desc" }; return n; }
+      const rest = prev.filter(c => c.key !== key);
+      return [{ key, dir: "desc" }, ...rest].slice(0, 3);
+    });
+  };
+  const isDefault = chain.length === defaultChain.length && chain.every((c, i) => c.key === defaultChain[i].key && c.dir === defaultChain[i].dir);
+  return { chain, clickSort, isDefault, reset: () => setChain(defaultChain) };
+}
+
+// ── generic multi-key comparator over a sort chain. null/undefined metrics
+// (e.g. the RSP benchmark row) always sort last and never throw — no NaN math.
+function chainComparator(chain) {
+  return (a, b) => {
+    for (const { key, dir } of chain) {
+      const s = dir === "desc" ? 1 : -1;
+      const va = a[key], vb = b[key];
+      if (va == null && vb == null) continue;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      const cmp = (typeof va === "string" || typeof vb === "string") ? (va < vb ? -1 : va > vb ? 1 : 0) : (va - vb);
+      if (cmp !== 0) return -cmp * s;
+    }
+    return 0;
+  };
+}
 
 // ── InfoDot — viewport-aware tooltip (portal to body, fixed from getBoundingClientRect).
 // Left-edge dots open right, right-edge dots open left; flips above near the viewport
@@ -84,43 +120,102 @@ const greenHeat = (frac) => frac == null ? "rgba(255,255,255,0.03)" : `rgba(34,1
 const off52Mag = (v) => v == null || !isFinite(v) || v >= 0 ? 0 : Math.min(1, Math.abs(v) / 60);
 const redHeat = (mag) => !mag || mag <= 0.02 ? "rgba(255,255,255,0.03)" : `rgba(239,68,68,${(0.05 + 0.45 * Math.max(0, Math.min(1, mag))).toFixed(3)})`;
 
+// ── HOLDINGS POPUP — nested ABOVE the rotation popup (z 1250) at z 1320, below
+// modals (1400). Reads the committed ETF_HOLDINGS snapshot statically — never a
+// runtime fetch. Clicking a ticker cell (Industry Groups + all four Top-Down blocks)
+// opens it: top-N holdings, weight-sorted, TradingView-style (rank · ticker · name ·
+// weight % · slim gold bar). NOT sortable, NOT interactive beyond scroll + close;
+// closes on backdrop click. A ticker with no verifiable basket shows an honest note.
+function HoldingsPopup({ target, onClose, C, font }) {
+  if (!target) return null;
+  const data = ETF_HOLDINGS?.byTicker?.[target.t];
+  const asof = ETF_HOLDINGS?.asof || "—";
+  const holdings = Array.isArray(data) ? data : null;
+  const note = holdings ? null : (data?.note || "Holdings aren't published for this fund.");
+  const weightsUnpublished = holdings && holdings.every(h => h.w == null);
+  const maxW = holdings ? Math.max(0.0001, ...holdings.map(h => (h.w == null || !isFinite(h.w) ? 0 : h.w))) : 1;
+
+  const label = { fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.gold };
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1320, background: "rgba(4,4,8,0.6)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", overflowY: "auto", padding: "40px 16px", fontFamily: font }}>
+      <div onClick={e => e.stopPropagation()} style={{ maxWidth: 460, margin: "0 auto", background: "rgba(255,255,255,0.042)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)", boxShadow: "0 24px 70px rgba(0,0,0,0.6)", overflow: "hidden" }}>
+        {/* header */}
+        <div style={{ padding: "16px 18px 13px", borderBottom: `1px solid ${C.border}`, background: "linear-gradient(135deg,rgba(255,255,255,0.05),transparent 60%)" }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 9, minWidth: 0 }}>
+              <span style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{target.t}</span>
+              <span style={{ fontSize: "0.72rem", fontWeight: 600, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{target.name || ""}</span>
+            </div>
+            <button onClick={onClose} title="Close" style={{ flex: "none", width: 26, height: 26, borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", color: C.muted, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, fontFamily: font }}>×</button>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 7 }}>
+            <span style={label}>{holdings ? `Top ${holdings.length} holdings · weighted` : "Holdings"}</span>
+            <span style={{ fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
+          </div>
+          <div style={{ marginTop: 5, fontSize: "0.6rem", color: "rgba(255,255,255,0.42)", lineHeight: 1.5 }}>
+            Holdings change slowly — refreshed periodically. Educational, not advice.
+          </div>
+        </div>
+        {/* body */}
+        {note ? (
+          <div style={{ padding: "22px 20px", fontSize: "0.76rem", lineHeight: 1.6, color: C.muted }}>{note}</div>
+        ) : (
+          <div style={{ padding: "6px 0 8px", maxHeight: "62vh", overflowY: "auto" }}>
+            {weightsUnpublished && (
+              <div style={{ padding: "8px 18px 10px", fontSize: "0.62rem", lineHeight: 1.5, color: "rgba(255,255,255,0.42)" }}>
+                Per-holding weights aren't published for this fund — showing the top names in the fund's own weight order.
+              </div>
+            )}
+            {holdings.map((h, i) => {
+              const frac = h.w == null || !isFinite(h.w) ? 0 : Math.max(0, Math.min(1, h.w / maxW));
+              return (
+                <div key={h.t + i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 18px", borderBottom: i < holdings.length - 1 ? `1px solid rgba(255,255,255,0.045)` : "none" }}>
+                  <span style={{ flex: "none", width: 20, textAlign: "right", fontSize: "0.62rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
+                  <span style={{ flex: "none", width: 58, fontSize: "0.74rem", fontWeight: 800, color: C.white, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.t || "—"}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: "0.68rem", color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.n || ""}</span>
+                  <span style={{ flex: "none", width: 74, display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+                    {frac > 0 && <span style={{ flex: "none", display: "inline-block", width: Math.round(frac * 34) + 6, height: 7, borderRadius: 3, background: `linear-gradient(90deg, ${C.gold}, ${C.goldBright})` }} />}
+                    <span style={{ flex: "none", width: 42, textAlign: "right", fontSize: "0.7rem", fontWeight: 700, color: h.w == null ? C.muted : C.text, fontVariantNumeric: "tabular-nums" }}>{h.w == null ? "—" : h.w.toFixed(2) + "%"}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>, document.body);
+}
+
 export default function GroupRS({ C, font, session }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL;
   const [filter, setFilter] = useState("all"); // all | buy | fresh | resting | warn
   const [tab, setTab] = useState("groups");     // groups | planfocus
   const [howOpen, setHowOpen] = useState(true);
   const [methodOpen, setMethodOpen] = useState(false);
+  const [holdingsFor, setHoldingsFor] = useState(null); // {t, name} of the ticker whose holdings popup is open
   const rootRef = useRef(null);
 
   // ── multi-sort chain (up to 3). Default = thrust desc → rs1m desc → off52 desc.
   const DEFAULT_CHAIN = [{ key: "thrust", dir: "desc" }, { key: "rs1m", dir: "desc" }, { key: "off52", dir: "desc" }];
-  const [chain, setChain] = useState(DEFAULT_CHAIN);
-  const clickSort = (key) => {
-    if (!key) return;
-    setChain(prev => {
-      if (prev[0] && prev[0].key === key) { const n = [...prev]; n[0] = { key, dir: n[0].dir === "desc" ? "asc" : "desc" }; return n; }
-      const rest = prev.filter(c => c.key !== key);
-      return [{ key, dir: "desc" }, ...rest].slice(0, 3);
-    });
-  };
-  const isDefaultChain = chain.length === DEFAULT_CHAIN.length && chain.every((c, i) => c.key === DEFAULT_CHAIN[i].key && c.dir === DEFAULT_CHAIN[i].dir);
+  const groupSort = useSortChain(DEFAULT_CHAIN);
+  const { chain, clickSort, isDefault: isDefaultChain, reset: resetGroupSort } = groupSort;
+
+  // Top-Down View: PER-BLOCK independent sort state (preferred over one shared
+  // spec — sorting "Segment" by Thrust shouldn't reorder "Index" underneath it).
+  // Default chain = [] → falls back to the fixed rs1m-desc order below.
+  const blockSortIndex = useSortChain([]);
+  const blockSortSegment = useSortChain([]);
+  const blockSortEW = useSortChain([]);
+  const blockSortSPDR = useSortChain([]);
+  const blockSorts = { "Index": blockSortIndex, "Segment": blockSortSegment, "EW Sector": blockSortEW, "SPDR Sector": blockSortSPDR };
 
   const asof = GROUP_RS?.asof || "—";
+  const refreshed = GROUP_RS?.refreshed;
+  const stamp = refreshed && refreshed !== asof ? `as of ${asof} · updated ${refreshed}` : `as of ${asof} close`;
   const allRows = GROUP_RS?.rows || [];
   const pf = GROUP_RS?.pf; // Plan & Focus rows — may be undefined while regenerating
 
-  // multi-key comparator over a chain
-  const cmpChain = (a, b) => {
-    for (const { key, dir } of chain) {
-      const s = dir === "desc" ? 1 : -1;
-      const va = a[key], vb = b[key];
-      if (va == null && vb == null) continue;
-      if (va == null) return 1;
-      if (vb == null) return -1;
-      if (vb !== va) return (vb - va) * s;
-    }
-    return 0;
-  };
+  const cmpChain = chainComparator(chain);
 
   const view = useMemo(() => {
     let r = allRows.filter(row => {
@@ -130,8 +225,6 @@ export default function GroupRS({ C, font, session }) {
     });
     return [...r].sort(cmpChain);
   }, [allRows, filter, chain]);
-
-  const pct1mMax = useMemo(() => Math.max(1, ...view.map(r => Math.abs(r.pct1m)).filter(v => isFinite(v))), [view]);
 
   const counts = useMemo(() => ({
     buy: allRows.filter(r => r.state === "buy").length,
@@ -166,11 +259,6 @@ export default function GroupRS({ C, font, session }) {
       return <rect key={i} x={i * (bw + gap)} y={H - h} width={bw} height={h} rx={0.6} fill={`rgba(34,197,94,${(0.35 + 0.55 * (v ?? 0)).toFixed(2)})`} />;
     })}</svg>);
   };
-  const PctBar = ({ v, max }) => {
-    if (v == null || !isFinite(v) || v === 0) return null;
-    const w = Math.min(1, Math.abs(v) / max) * 40; if (w < 0.5) return null;
-    return <span style={{ display: "inline-block", width: w, height: 8, borderRadius: 3, background: v > 0 ? "rgba(34,197,94,0.55)" : "rgba(239,68,68,0.55)", marginLeft: 6, verticalAlign: "middle" }} />;
-  };
   const StateChips = ({ row }) => (
     <span style={{ display: "inline-flex", gap: 5, flexWrap: "wrap" }}>
       {row.state && (() => { const s = STATE[row.state]; return (
@@ -186,19 +274,21 @@ export default function GroupRS({ C, font, session }) {
   const td = { padding: "7px 9px", borderBottom: `1px solid ${C.border}`, fontSize: "0.74rem", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: C.text };
 
   const jc = (align) => align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start";
-  // sortable header cell (multi-sort aware). Header alignment MUST match its cell content.
-  const th = (label, tip, key, align = "left") => {
-    const ci = chain.findIndex(c => c.key === key);
+  // sortable header cell (multi-sort aware) — takes the chain/onSort to sort BY so the
+  // same header can drive either the shared groups chain or one block's own chain.
+  // Header alignment MUST match its cell content.
+  const th = (chainSpec, onSort, label, tip, key, align = "left") => {
+    const ci = chainSpec.findIndex(c => c.key === key);
     const active = ci >= 0;
     return (
-      <th onClick={() => clickSort(key)} style={{ padding: "8px 9px", fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: active ? C.goldBright : C.muted, borderBottom: `1px solid ${C.border}`, textAlign: align, whiteSpace: "nowrap", cursor: key ? "pointer" : "default", userSelect: "none" }}>
+      <th onClick={() => onSort(key)} style={{ padding: "8px 9px", fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: active ? C.goldBright : C.muted, borderBottom: `1px solid ${C.border}`, textAlign: align, whiteSpace: "nowrap", cursor: key ? "pointer" : "default", userSelect: "none" }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, justifyContent: jc(align) }}>
-          {label}{active ? (chain[ci].dir === "desc" ? " ▾" : " ▴") + SUP[ci] : ""}{tip && <InfoDot tip={tip} />}
+          {label}{active ? (chainSpec[ci].dir === "desc" ? " ▾" : " ▴") + SUP[ci] : ""}{tip && <InfoDot tip={tip} />}
         </span>
       </th>
     );
   };
-  // static (non-sortable) header cell for Plan & Focus blocks + chart/State columns
+  // static (non-sortable) header cell — Group, the two sparkline columns, and State.
   const sth = (label, tip, align = "left") => (
     <th style={{ padding: "8px 9px", fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: align, whiteSpace: "nowrap" }}>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 4, justifyContent: jc(align) }}>{label}{tip && <InfoDot tip={tip} />}</span>
@@ -213,7 +303,9 @@ export default function GroupRS({ C, font, session }) {
     const benchCell = <span style={{ color: C.muted, fontStyle: "italic" }}>benchmark</span>;
     return (
       <tr style={spy ? { boxShadow: `inset 3px 0 0 ${C.gold}` } : undefined}>
-        <td style={{ ...td, fontWeight: 800, color: C.white }}>{row.t}</td>
+        <td style={{ ...td, fontWeight: 800, color: C.white }}>
+          <span className="grs-tk" title="View top holdings" onClick={() => setHoldingsFor({ t: row.t, name: row.name })}>{row.t}</span>
+        </td>
         <td style={{ ...td, color: C.muted, whiteSpace: "normal", minWidth: 130, maxWidth: 200 }}>{row.name}</td>
         <td style={{ ...td, textAlign: "right", background: bench ? "transparent" : heat(row.thrust) }}>
           {bench ? benchCell : (row.thrust == null ? <span title={blank || "not computed"} style={{ color: C.muted }}>—</span> : <span title={`exact ${row.thrust}`} style={{ fontWeight: 700 }}>{row.thrust_snap}</span>)}
@@ -223,9 +315,14 @@ export default function GroupRS({ C, font, session }) {
         </td>
         <td style={{ ...td, textAlign: "center" }}>{row.spark?.length ? <Spark pts={row.spark} /> : <span style={{ color: C.muted }}>—</span>}</td>
         <td style={{ ...td, textAlign: "center" }}>{row.rsSpark?.length ? <RsStrip pts={row.rsSpark} /> : <span style={{ color: C.muted }}>—</span>}</td>
-        <td style={{ ...td, textAlign: "right", color: toneCol(row.pctIntraday) }}>{row.pctIntraday == null ? "—" : sgn(row.pctIntraday)}</td>
-        <td style={{ ...td, textAlign: "right", color: toneCol(row.pct1d) }}>{row.pct1d == null ? "—" : sgn(row.pct1d)}</td>
-        <td style={{ ...td, textAlign: "right", color: toneCol(row.pct1m) }}>{row.pct1m == null ? "—" : <>{sgn(row.pct1m)}<PctBar v={row.pct1m} max={pct1mMax} /></>}</td>
+        <td style={{ ...td, textAlign: "right", color: toneCol(row.pctIntraday) }}>{row.pctIntraday == null ? "—" : sgn(row.pctIntraday) + "%"}</td>
+        <td style={{ ...td, textAlign: "right", color: toneCol(row.pct1d) }}>{row.pct1d == null ? "—" : sgn(row.pct1d) + "%"}</td>
+        <td style={{ ...td, textAlign: "right", color: toneCol(row.pct1m), position: "relative", overflow: "hidden" }}>
+          {row.pct1m != null && isFinite(row.pct1m) && row.pct1m !== 0 && (
+            <div style={{ position: "absolute", top: 4, bottom: 4, right: 0, width: `${(Math.min(1, Math.abs(row.pct1m) / 15) * 100).toFixed(1)}%`, background: row.pct1m > 0 ? "rgba(34,197,94,0.16)" : "rgba(239,68,68,0.16)", borderRadius: 3, pointerEvents: "none" }} />
+          )}
+          <span style={{ position: "relative" }}>{row.pct1m == null ? "—" : sgn(row.pct1m) + "%"}</span>
+        </td>
         <td style={{ ...td, textAlign: "right", background: bench ? "transparent" : redHeat(off52Mag(row.off52)), color: row.off52 == null ? C.muted : row.off52 >= -0.05 ? "#86efac" : "#fca5a5" }}>
           {row.off52 == null ? "—" : (row.off52 >= -0.05 ? "0%" : sgn(row.off52) + "%")}
         </td>
@@ -234,18 +331,20 @@ export default function GroupRS({ C, font, session }) {
     );
   };
 
-  const HeadRow = () => (
+  // shared by the Sector Groups table (global chain) AND each Top-Down block
+  // (its own chain) — caller supplies which sort chain/handler this header drives.
+  const HeadRow = ({ chain: hChain, onSort }) => (
     <tr>
-      {th("Ticker", "The ETF that tracks this group.", null)}
-      {th("Group", "What kind of stocks this ETF holds.", null)}
-      {th("Thrust %", "This week's momentum, ranked 0–100. Higher = money rushing in right now.", "thrust", "right")}
-      {th("1-Mth RS %", "This month's strength, ranked 0–100 vs its own history. 100 = its strongest in a month.", "rs1m", "right")}
-      {sth("1M price", "The group's price shape over the last month.", "center")}
-      {sth("1M RS", "Is the group beating the market lately? Rising bars = yes.", "center")}
-      {th("% Intra", "Today's move from the open — ignoring the overnight gap.", "pctIntraday", "right")}
-      {th("% 1D", "Today's change vs yesterday's close.", "pct1d", "right")}
-      {th("% 1-Mth", "Plain price change over the last month.", "pct1m", "right")}
-      {th("% off 52W H", "How far below its 1-year high it sits. 0% = right at highs.", "off52", "right")}
+      {th(hChain, onSort, "Ticker", "The ETF that tracks this group.", "t")}
+      {sth("Group", "What kind of stocks this ETF holds.")}
+      {th(hChain, onSort, "Thrust %", "This week's momentum, ranked 0–100. Higher = money rushing in right now.", "thrust", "right")}
+      {th(hChain, onSort, "1-Month RS %", "This month's strength, ranked 0–100 vs its own history. 100 = its strongest in a month.", "rs1m", "right")}
+      {sth("1-Month price", "The group's price shape over the last month.", "center")}
+      {sth("1-Month RS", "Is the group beating the market lately? Rising bars = yes.", "center")}
+      {th(hChain, onSort, "% Intraday", "Today's move from the open — ignoring the overnight gap.", "pctIntraday", "right")}
+      {th(hChain, onSort, "% 1-Day", "Today's change vs yesterday's close.", "pct1d", "right")}
+      {th(hChain, onSort, "% 1-Month", "Plain price change over the last month.", "pct1m", "right")}
+      {th(hChain, onSort, "% off 52W H", "How far below its 1-year high it sits. 0% = right at highs.", "off52", "right")}
       {sth("State", "🟢 leading · 🟡 fresh surge · 😴 cooling · ⚠️ illusion · 🪤 off the floor.", "center")}
     </tr>
   );
@@ -275,8 +374,14 @@ export default function GroupRS({ C, font, session }) {
     const blocks = BLOCK_ORDER.map(b => {
       let br = rows.filter(r => r.block === b);
       const bench = br.filter(r => r.benchmark);
-      const rest = br.filter(r => !r.benchmark).sort((a, x) => (x.rs1m ?? -1) - (a.rs1m ?? -1));
-      return { block: b, rows: [...bench, ...rest] }; // benchmark (RSP) pinned first
+      const restRaw = br.filter(r => !r.benchmark);
+      const bChain = blockSorts[b].chain;
+      // no sort active → fixed default order (rs1m desc, same as before this was sortable).
+      // sort active → the chain comparator (nulls always sort last, never crashes).
+      const rest = bChain.length
+        ? [...restRaw].sort(chainComparator(bChain))
+        : [...restRaw].sort((a, x) => (x.rs1m ?? -1) - (a.rs1m ?? -1));
+      return { block: b, rows: [...bench, ...rest] }; // benchmark (RSP) pinned first, never sorted
     }).filter(b => b.rows.length);
 
     const miniChip = (lbl, v, frac) => (
@@ -294,14 +399,25 @@ export default function GroupRS({ C, font, session }) {
 
     return (
       <>
-        {blocks.map(b => (
-          <section key={b.block} className="grs-card" style={{ padding: "6px 8px" }}>
-            <div style={{ ...cardLabel, padding: "10px 10px 4px" }}>{b.block}</div>
-            <div style={{ overflowX: "auto" }}>
-              <table><thead><HeadRow /></thead><tbody>{b.rows.map(r => <DataRow key={r.t} row={r} />)}</tbody></table>
-            </div>
-          </section>
-        ))}
+        {blocks.map(b => {
+          const bs = blockSorts[b.block];
+          return (
+            <section key={b.block} className="grs-card" style={{ padding: "6px 8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 10px 4px" }}>
+                <span style={cardLabel}>{b.block}</span>
+                {!bs.isDefault && (
+                  <button onClick={bs.reset} title="Restore the default order"
+                    style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.62rem", fontWeight: 700, padding: "4px 10px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "rgba(255,255,255,0.03)" }}>
+                    × reset sort
+                  </button>
+                )}
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table><thead><HeadRow chain={bs.chain} onSort={bs.clickSort} /></thead><tbody>{b.rows.map(r => <DataRow key={r.t} row={r} />)}</tbody></table>
+              </div>
+            </section>
+          );
+        })}
 
         {/* EW ↔ CW pairing strip */}
         <section className="grs-card">
@@ -349,6 +465,8 @@ export default function GroupRS({ C, font, session }) {
         .grs thead th{position:sticky;top:0;background:#0c0c14;z-index:2}
         .grs tbody tr{transition:background .12s}
         .grs tbody tr:hover{background:rgba(255,255,255,0.028)}
+        .grs .grs-tk{cursor:pointer;text-decoration:underline;text-decoration-color:rgba(201,152,42,0.4);text-underline-offset:3px;text-decoration-thickness:1px;transition:color .12s}
+        .grs .grs-tk:hover{color:${C.goldBright}}
       `}</style>
 
       {/* 1 — HEADER */}
@@ -362,7 +480,7 @@ export default function GroupRS({ C, font, session }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <LensCamera getEl={() => rootRef.current} name="rotation-full" C={C} />
-          <div style={asofStyle}>as of {asof} close</div>
+          <div style={asofStyle}>{stamp}</div>
         </div>
       </section>
 
@@ -387,7 +505,7 @@ export default function GroupRS({ C, font, session }) {
       {/* 3 — TAB SWITCHER (only when Plan & Focus data is available) */}
       {pf && pf.length > 0 && (
         <section className="grs-card" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["groups", "Sector Groups"], ["planfocus", "Top-Down View"]].map(([k, l]) => (
+          {[["groups", "Industry Groups"], ["planfocus", "Top-Down View"]].map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} style={chip(tab === k)}>{l}</button>
           ))}
         </section>
@@ -402,7 +520,7 @@ export default function GroupRS({ C, font, session }) {
               <button key={k} onClick={() => setFilter(k)} style={chip(filter === k)}>{label}</button>
             ))}
             {!isDefaultChain && (
-              <button onClick={() => setChain(DEFAULT_CHAIN)} title="Restore the default sort chain"
+              <button onClick={resetGroupSort} title="Restore the default sort chain"
                 style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.66rem", fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "rgba(255,255,255,0.03)" }}>
                 × reset sort
               </button>
@@ -413,7 +531,7 @@ export default function GroupRS({ C, font, session }) {
           <section className="grs-card" style={{ padding: "6px 8px" }}>
             <div style={{ overflowX: "auto" }}>
               <table>
-                <thead><HeadRow /></thead>
+                <thead><HeadRow chain={chain} onSort={clickSort} /></thead>
                 <tbody>
                   {view.map(row => <DataRow key={row.t} row={row} />)}
                   {!view.length && (<tr><td colSpan={11} style={{ ...td, textAlign: "center", color: C.muted, padding: 24 }}>No groups match this filter.</td></tr>)}
@@ -469,6 +587,8 @@ decode (pre-registered thresholds):
           )}
         </section>
       )}
+
+      <HoldingsPopup target={holdingsFor} onClose={() => setHoldingsFor(null)} C={C} font={font} />
     </div>
   );
 }
@@ -479,6 +599,8 @@ export function RotationMini({ C, font, session }) {
   const cardRef = useRef(null);
   const rows = GROUP_RS?.rows || [];
   const asof = GROUP_RS?.asof || "—";
+  const refreshed = GROUP_RS?.refreshed;
+  const stamp = refreshed && refreshed !== asof ? `as of ${asof} · updated ${refreshed}` : `as of ${asof}`;
   const top = [...rows]
     .sort((a, b) => (b.rs1m ?? -1) - (a.rs1m ?? -1) || (b.thrust ?? -1) - (a.thrust ?? -1) || (b.off52 ?? -999) - (a.off52 ?? -999))
     .slice(0, 10);
@@ -497,7 +619,7 @@ export function RotationMini({ C, font, session }) {
           <span className="label">Sector Group Rotation</span>
           <InfoDot tip="Which sector groups are heating up and which are cooling. Tap for the full table." />
           <LensCamera getEl={() => cardRef.current} name="rotation" C={C} style={{ marginLeft: 6 }} />
-          <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
+          <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr>
