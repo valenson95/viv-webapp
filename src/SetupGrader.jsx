@@ -215,7 +215,10 @@ export const starmakersFor = (ticked) => (versionOf(ticked) === 1 ? V1_TALLY : V
 // excludes bonus ticks from the score, and applies the SAME star/letter formula the live grader
 // uses. Consumers that recompute a saved row (Model Book, scorecards) MUST use this so a legacy
 // row is never scored against the v2 list.
-export function scoreTicked(ticked) {
+export function scoreTicked(ticked, { makerGate = true } = {}) {
+  // makerGate (default true) preserves the live grader / admin behavior EVERYWHERE. Pass
+  // { makerGate: false } for the member Model Book editor, where all scored ticks weigh
+  // equally and the 5th star is pure tick-proportion (no ★-maker confluence requirement).
   const secs = sectionsFor(ticked);
   const t = new Set(ticked || []);
   let passed = 0, starHit = 0, total = 0, sm = 0;
@@ -229,7 +232,7 @@ export function scoreTicked(ticked) {
   });
   const pct = total ? passed / total : 0;
   let stars = Math.round(pct * 5);
-  if (stars >= 5 && starHit < sm) stars = 4; // A+ requires full ★-maker confluence
+  if (makerGate && stars >= 5 && starHit < sm) stars = 4; // A+ requires full ★-maker confluence (admin/live grader only)
   if (passed === 0) stars = 0;
   return { passed, total, starHit, starmakers: sm, pct, stars, letter: letterFor(stars) };
 }

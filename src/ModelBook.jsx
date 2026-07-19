@@ -60,7 +60,9 @@ export const OUTCOMES = ["Huge Winner", "Winner", "Subpar", "Loser"];
 // The stars are COMPUTED from the ticks; nothing is hand-assigned. VERSION-AWARE via scoreTicked:
 // a legacy row is scored against the v1 list + denominator, a v2 row against v2 — a saved row is
 // NEVER re-scored against the wrong checklist. Returns {stars,passed,starHit,pct,total,starmakers}.
-export function starsFromTicked(ticked) { return scoreTicked(ticked); }
+// opts passes straight through to scoreTicked (default = admin/live behavior, ★-maker gated).
+// Member Model Book editor passes { makerGate: false } → equal-weight ticks, no confluence gate.
+export function starsFromTicked(ticked, opts) { return scoreTicked(ticked, opts); }
 
 // The elite layer — ONLY factors the Setup Grader checklist does NOT already score
 // (no double-counting: dead volume / inside days / EMA pinch / freshness are grader ★-makers).
@@ -123,7 +125,11 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
       if (versionOf(base.ticked) === 2) base.ticked = stampV2(base.ticked || []);
       return base;
     });
-    const graded = starsFromTicked(row.ticked); // OBJECTIVE — version-aware (scoreTicked): never re-scores a legacy row against v2
+    // Members grade on a simpler, equal-weight rule: every scored tick counts the same and stars are
+    // pure tick-proportion (no ★-maker confluence gate on the 5th star). Admin keeps the full gated
+    // rule + Elite layer for his own books/studies. bonus ticks stay excluded from the score for both.
+    const memberMode = !isAdmin;
+    const graded = starsFromTicked(row.ticked, memberMode ? { makerGate: false } : undefined); // OBJECTIVE — version-aware (scoreTicked): never re-scores a legacy row against v2
     const eff = effectiveStars(graded.stars, (row.elite || []).length);
     // AUTO-FILL layer — metrics._auto lists every field/tick VIV pre-filled from the chart (shown as a
     // gold dot). A human edit on that field clears its dot: the value becomes Valen-confirmed.
@@ -222,8 +228,8 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
           </div>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <span style={{ ...lbl, marginBottom: 0 }}>Setup Grader checklist — stars compute from these ticks</span>
-          <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.goldBright }}>{graded.stars}★ · {graded.passed}/{graded.total} · {graded.starHit}/{graded.starmakers} ★-makers</span>
+          <span style={{ ...lbl, marginBottom: 0 }}>{memberMode ? "Setup checklist — tick what the chart shows; stars come from how many boxes it ticks" : "Setup Grader checklist — stars compute from these ticks"}</span>
+          <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.goldBright }}>{graded.stars}★ · {graded.passed}/{graded.total}{memberMode ? "" : ` · ${graded.starHit}/${graded.starmakers} ★-makers`}</span>
           <button onClick={pullGrade} title="Import this ticker's saved Setup Grader ticks" style={{ ...chipBtn, whiteSpace: "nowrap", marginLeft: "auto" }}>Pull from grader</button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 10, marginBottom: 14 }}>
@@ -235,7 +241,7 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
                 return (
                   <div key={ii} onClick={() => toggleTick(key)} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 2px", cursor: "pointer" }}>
                     <span style={{ color: on ? C.goldBright : "rgba(255,255,255,0.22)", fontWeight: 800, lineHeight: 1.3 }}>{on ? "✓" : "○"}</span>
-                    <span style={{ fontSize: "0.76rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 }}>{it.c}{it.star && <span style={{ fontSize: "0.56rem", color: C.goldMid, marginLeft: 5 }}>★ maker</span>}{it.bonus && <span style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "0 5px", borderRadius: 99, marginLeft: 5 }}>Bonus</span>}<AutoDot k={"tick:" + key} /></span>
+                    <span style={{ fontSize: "0.76rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 }}>{it.c}{it.star && !memberMode && <span style={{ fontSize: "0.56rem", color: C.goldMid, marginLeft: 5 }}>★ maker</span>}{it.bonus && <span style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "0 5px", borderRadius: 99, marginLeft: 5 }}>Bonus</span>}<AutoDot k={"tick:" + key} /></span>
                   </div>
                 );
               })}
@@ -248,18 +254,20 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
             onChange={e => setField("characteristics", e.target.value)}
             placeholder="3 tight days, ADR 6.1%, vol dry-up −60%, EMA9>21>50, RS 96" />
         </div>
-        <span style={lbl}>Elite factors — the 6★/7★ layer (tick what was TRUE at entry)</span>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 6, marginBottom: 14 }}>
-          {ELITE.map(f => {
-            const on = row.elite.includes(f.k);
-            return (
-              <div key={f.k} onClick={() => toggleElite(f.k)} style={{ display: "flex", gap: 10, padding: "8px 11px", borderRadius: 10, cursor: "pointer", background: on ? "rgba(126,240,160,0.07)" : "rgba(255,255,255,0.02)", border: `1px solid ${on ? "rgba(126,240,160,0.35)" : C.border}` }}>
-                <span style={{ color: on ? "#7ef0a0" : "rgba(255,255,255,0.25)", fontWeight: 800 }}>{on ? "✓" : "○"}</span>
-                <div><div style={{ fontSize: "0.8rem", fontWeight: 700, color: on ? "#7ef0a0" : C.text }}>{f.c}<AutoDot k={"elite:" + f.k} /></div><div style={{ fontSize: "0.7rem", color: C.muted }}>{f.s}</div></div>
-              </div>
-            );
-          })}
-        </div>
+        {!memberMode && (<>
+          <span style={lbl}>Elite factors — the 6★/7★ layer (tick what was TRUE at entry)</span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 6, marginBottom: 14 }}>
+            {ELITE.map(f => {
+              const on = row.elite.includes(f.k);
+              return (
+                <div key={f.k} onClick={() => toggleElite(f.k)} style={{ display: "flex", gap: 10, padding: "8px 11px", borderRadius: 10, cursor: "pointer", background: on ? "rgba(126,240,160,0.07)" : "rgba(255,255,255,0.02)", border: `1px solid ${on ? "rgba(126,240,160,0.35)" : C.border}` }}>
+                  <span style={{ color: on ? "#7ef0a0" : "rgba(255,255,255,0.25)", fontWeight: 800 }}>{on ? "✓" : "○"}</span>
+                  <div><div style={{ fontSize: "0.8rem", fontWeight: 700, color: on ? "#7ef0a0" : C.text }}>{f.c}<AutoDot k={"elite:" + f.k} /></div><div style={{ fontSize: "0.7rem", color: C.muted }}>{f.s}</div></div>
+                </div>
+              );
+            })}
+          </div>
+        </>)}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
           <div style={{ gridColumn: "1 / -1", fontSize: "0.7rem", color: C.muted, marginBottom: -4 }}>📋 Tip: copy a chart screenshot and press <b style={{ color: C.goldBright }}>⌘V / Ctrl+V</b> right here — first paste fills Before, second fills After.</div>
           {[["before_img", "Before chart (the setup)", "⬆ Upload before chart"], ["after_img", "After chart (the outcome)", "⬆ Upload after chart"]].map(([slot, label, cta]) => (
@@ -375,7 +383,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     setBusy(true); setError(null);
     const body = {
       ticker: (row.ticker || "").toUpperCase().trim(), pattern: row.pattern || "Trendline Breakout",
-      stars: starsFromTicked(row.ticked).stars, // objective — derived from the grader ticks, never hand-set
+      stars: starsFromTicked(row.ticked, isAdmin ? undefined : { makerGate: false }).stars, // objective — from the grader ticks; members score equal-weight (no ★-maker gate). Only THIS save's row is (re)scored — existing rows untouched.
       outcome: row.outcome || outcomeFromR(row.r_mult, row.run_pct) || null, // blank → auto-classified from R
       theme: row.theme || null, entry_date: row.entry_date || null, exit_date: row.exit_date || null,
       before_img: row.before_img || null, after_img: row.after_img || null,

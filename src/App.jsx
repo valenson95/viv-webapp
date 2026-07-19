@@ -762,6 +762,7 @@ const WHATS_NEW = [
       "REARRANGE YOUR LENSES — drag any of the four dashboard cards (Theme Leaders, Rotation, Breadth, Risk Allocation) by its ⠿ handle to reorder them; your layout saves to your account. Dragging is smoother now: the card you're moving dims, the slot it will land in lights up with a gold outline, and it snaps into place with a quick gold flash — and we fixed a bug where a dragged card could vanish until you refreshed.",
       "SCREENSHOT ANY LENS — a 📷 button on each card (and inside the pop-out tables) copies a clean image straight to your clipboard, ready to paste into notes or chat. Falls back to a PNG download where the clipboard isn't available.",
       "Both refresh automatically after each close. Educational context, not signals — your setup rules stay your setup rules.",
+      "Simpler Model Book checklist for your own entries: every box now counts equally toward the stars — no maker tags to decode — so a chart's rating is just how many boxes the setup ticks.",
     ],
   },
   {
