@@ -250,38 +250,97 @@ function EyeToggle({ on, onClick, title }) {
 }
 
 function useCardArrange(keys, storageKey) {
+  // Self-heal any persisted order: dedupe, drop unknown keys, append any missing keys in default
+  // order. A corrupted array (missing/duplicate key) would otherwise leave a card unrendered until
+  // localStorage is cleared — sanitize() means an affected user recovers on the very next read.
+  const sanitize = (arr) => {
+    const seen = new Set(); const out = [];
+    (Array.isArray(arr) ? arr : []).forEach(k => { if (keys.includes(k) && !seen.has(k)) { seen.add(k); out.push(k); } });
+    keys.forEach(k => { if (!seen.has(k)) out.push(k); });
+    return out;
+  };
   const [order, setOrder] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
-      const valid = saved.filter(k => keys.includes(k));
-      return valid.length ? [...valid, ...keys.filter(k => !valid.includes(k))] : keys;
-    } catch { return keys; }
+    try { return sanitize(JSON.parse(localStorage.getItem(storageKey) || "[]")); }
+    catch { return keys.slice(); }
   });
-  const [armed, setArmed] = useState(null);
+  const [armed, setArmed] = useState(null);   // vi whose ⠿ handle is pressed (gates `draggable`)
+  const [dragVi, setDragVi] = useState(null); // vi actually being dragged → origin dims (preview)
+  const [overVi, setOverVi] = useState(null); // vi the pointer is over → "lands here" ghost outline
+  const [flash, setFlash] = useState([]);     // keys pulsed by the snap-on-drop confirmation
+  const [revealed, setRevealed] = useState(false); // React-owned reveal (see note below)
   const dragFrom = useRef(null);
+  const flashT = useRef(null);
+  const persist = (arr) => { try { localStorage.setItem(storageKey, JSON.stringify(arr)); } catch {} };
+  // Reveal is React-owned rather than left to the imperative IntersectionObserver (.reveal → .in-view).
+  // The observer mutates className directly; React re-renders (arm/drag/snap toggles) rewrite the same
+  // className string and CLOBBER that imperative class — which reverted `.vrev` to opacity:0 and made
+  // the dragged KPI card vanish until a hard refresh. Owning `revealed` here keeps `.in-view` in every
+  // rendered className so no re-render can drop it.
+  useEffect(() => { const t = setTimeout(() => setRevealed(true), 20); return () => clearTimeout(t); }, []);
+  // Persist the healed order once on mount so a corrupted stored value is repaired in place.
+  useEffect(() => { persist(order); return () => { if (flashT.current) clearTimeout(flashT.current); }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const reset = () => { setArmed(null); setDragVi(null); setOverVi(null); dragFrom.current = null; };
+  // Safety net: if the handle is pressed then released WITHOUT a drag (mouseup lands off the handle),
+  // or a drag is abandoned, clear armed/drag state so nothing stays stuck "armed"/dimmed.
+  useEffect(() => {
+    const clear = () => { if (dragFrom.current == null) setArmed(a => (a == null ? a : null)); };
+    window.addEventListener("mouseup", clear);
+    window.addEventListener("dragend", reset);
+    return () => { window.removeEventListener("mouseup", clear); window.removeEventListener("dragend", reset); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const wrapProps = (vi) => ({
     draggable: armed === vi,
     onDragStart: (e) => {
       if (armed !== vi) { e.preventDefault(); return; }
-      dragFrom.current = vi; e.dataTransfer.effectAllowed = "move";
-      try { e.dataTransfer.setData("text/plain", ""); } catch {}
+      dragFrom.current = vi; setDragVi(vi);
+      try {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", "");
+        // Clean drag image = the card itself (grabbed at full opacity, before the origin dims), not
+        // the browser's default giant translucent page grab that would obscure the live ghost preview.
+        const el = e.currentTarget;
+        if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(el, Math.min(48, el.offsetWidth / 2), 22);
+      } catch {}
     },
-    onDragOver: (e) => e.preventDefault(),
+    onDragOver: (e) => {
+      e.preventDefault();                                   // REQUIRED so the browser allows the drop
+      try { e.dataTransfer.dropEffect = "move"; } catch {}
+      if (dragFrom.current != null && dragFrom.current !== vi && overVi !== vi) setOverVi(vi);
+    },
     onDrop: (e) => {
       e.preventDefault();
       const from = dragFrom.current;
-      if (from == null || from === vi) return;
-      setOrder(prev => { const n = [...prev]; const [r] = n.splice(from, 1); n.splice(vi, 0, r); try { localStorage.setItem(storageKey, JSON.stringify(n)); } catch {} return n; });
-      dragFrom.current = null;
+      if (from == null || from === vi) { reset(); return; }
+      let movedKey = null, partnerKey = null;
+      setOrder(prev => {
+        const cur = sanitize(prev);                         // validate on read
+        if (from < 0 || from >= cur.length) return cur;     // guard against a stale index
+        const n = [...cur];
+        movedKey = n[from]; partnerKey = n[Math.min(vi, n.length - 1)];
+        const [r] = n.splice(from, 1);
+        n.splice(Math.max(0, Math.min(vi, n.length)), 0, r);
+        const clean = sanitize(n);                          // validate before write
+        persist(clean);
+        return clean;
+      });
+      const fk = [movedKey, partnerKey].filter(Boolean);    // snap-flash the moved card + its partner
+      if (fk.length) { setFlash(fk); if (flashT.current) clearTimeout(flashT.current); flashT.current = setTimeout(() => setFlash([]), 420); }
+      reset();
     },
-    onDragEnd: () => { setArmed(null); dragFrom.current = null; },
+    onDragEnd: reset,                                       // ALWAYS fires (drop OR cancel) → cleanup
   });
   const handleProps = (vi) => ({
     onMouseDown: () => setArmed(vi),
     onMouseUp: () => setArmed(null),
     title: "Drag to rearrange — your layout is saved to this browser",
   });
-  return { order, wrapProps, handleProps, armed };
+  // drag-state class suffix, shared by every surface (KPI / stack / lens / analytics)
+  const cls = (vi, key) => (
+    (dragVi === vi ? " dragging" : "") +
+    (overVi === vi ? " dragover" : "") +
+    (flash.includes(key) ? " snap" : "")
+  );
+  return { order, wrapProps, handleProps, armed, dragVi, overVi, cls, revealed };
 }
 
 // ─── What's New — changelog the user can refer to (button in the top nav, modal of update notes).
@@ -698,7 +757,7 @@ const WHATS_NEW = [
       "SECTOR GROUP ROTATION — ~60 industry-group ETFs scored two ways every day: Thrust % (how hard the group is running THIS WEEK, today weighted heaviest) and 1M RS % (where today sits in its own month of market-relative strength). Proven leaders still accelerating sit on top, and % off 52-week high keeps everyone honest — a ⚠️ next to the number flags a group far below its 52-week high, where the strength is a bounce out of a hole, not a breakout at highs.",
       "MARKET BREADTH — the market's weather station: how many stocks are up 25%+ vs down 25%+ over the month and the quarter, shown as a simple green/red master switch with a plain-English verdict and a one-line read: breakouts are MORE (green) or LESS (red) likely to work. It never picks a stock — it tells you whether the tape is rewarding strength at all.",
       "Click either card to pop out the full table — sortable columns (click a header; chain up to 3), preset auto-filters, and on Rotation a TOP-DOWN VIEW tab: index → size segments → equal-weight vs cap-weighted sectors with a Broad/Narrow tag showing whether the WHOLE sector is moving or just a few megacaps.",
-      "REARRANGE YOUR LENSES — drag any of the four dashboard cards (Theme Leaders, Rotation, Breadth, Risk Allocation) by its ⠿ handle to reorder them; your layout saves to your account.",
+      "REARRANGE YOUR LENSES — drag any of the four dashboard cards (Theme Leaders, Rotation, Breadth, Risk Allocation) by its ⠿ handle to reorder them; your layout saves to your account. Dragging is smoother now: the card you're moving dims, the slot it will land in lights up with a gold outline, and it snaps into place with a quick gold flash — and we fixed a bug where a dragged card could vanish until you refreshed.",
       "SCREENSHOT ANY LENS — a 📷 button on each card (and inside the pop-out tables) copies a clean image straight to your clipboard, ready to paste into notes or chat. Falls back to a PNG download where the clipboard isn't available.",
       "Both refresh automatically after each close. Educational context, not signals — your setup rules stay your setup rules.",
     ],
@@ -4931,7 +4990,12 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .dragwrap:hover .draghandle{display:inline-flex}
 .vj .dragwrap .draghandle:hover{color:var(--goldBright); border-color:var(--borderGold)}
 .vj .dragwrap .draghandle:active{cursor:grabbing}
-.vj .dragwrap.dragging{opacity:0.5}
+/* seamless drag — mirrors the dashboard .vd system (origin dim · lands-here ghost · snap-on-drop) */
+.vj .dragwrap.dragging{opacity:0.4; cursor:grabbing}
+.vj .dragwrap.dragover::after{content:""; position:absolute; inset:0; border-radius:16px; border:2px dashed var(--goldBright); background:rgba(201,152,42,0.12); box-shadow:inset 0 0 0 1px rgba(240,192,80,0.25), 0 0 18px 1px rgba(240,192,80,0.18); pointer-events:none; z-index:5}
+.vj .dragwrap.snap{animation:vivSnap .18s cubic-bezier(0.22,1,0.36,1) both}
+.vj .dragwrap.snap::before{content:""; position:absolute; inset:0; border-radius:16px; border:2px solid var(--goldBright); box-shadow:0 0 0 3px rgba(240,192,80,0.28), 0 0 22px 3px rgba(240,192,80,0.5); pointer-events:none; z-index:6; animation:vivSnapGlow .35s ease-out forwards}
+@media(prefers-reduced-motion:reduce){.vj .dragwrap.snap{animation:none} .vj .dragwrap.snap::before{animation:none; opacity:0}}
 .vj .vawinlose{display:flex; flex-direction:column; gap:14px; min-width:0}
 /* P8. Closed trades table — dense Pro chrome, scoped to the Pro .tablewrap only (guided uses .tbl-scroll) */
 .vj.expert .tradehead .sech,.vj.expert .tradehead h2{font-size:0.95rem}
@@ -8136,7 +8200,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             return (
               <div className="vagrid">
                 {vaArr.order.map((k, vi) => (
-                  <div key={k} className={"dragwrap" + (vaArr.armed === vi ? " dragging" : "")} {...vaArr.wrapProps(vi)}>
+                  <div key={k} className={"dragwrap" + vaArr.cls(vi, k)} {...vaArr.wrapProps(vi)}>
                     <span className="draghandle" {...vaArr.handleProps(vi)}>⋮⋮</span>
                     {vaCards[k]}
                   </div>
@@ -8818,13 +8882,21 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .dragwrap:hover .draghandle{display:inline-flex}
 .vd .dragwrap .draghandle:hover{color:var(--goldBright); border-color:var(--borderGold)}
 .vd .dragwrap .draghandle:active{cursor:grabbing}
-.vd .dragwrap.dragging{opacity:0.5}
 .vd .kpistrip .dragwrap{display:flex; min-width:0}
 .vd .kpistrip .dragwrap>.card{flex:1; min-width:0}
 /* ── scroll-in reveal for cards (Pro) — hidden until the IntersectionObserver adds .in-view ── */
 .vd .vrev{opacity:0; transform:translateY(14px); transition:opacity .55s ease, transform .55s cubic-bezier(0.22,1,0.36,1); transition-delay:calc(var(--i, 0)*70ms)}
 .vd .vrev.in-view{opacity:1; transform:none}
 @media(prefers-reduced-motion:reduce){.vd .vrev{opacity:1; transform:none; transition:none}}
+/* ── seamless drag: origin dims (live preview), target shows a "lands here" gold ghost, drop snaps ──
+   Placed AFTER .vrev.in-view so the dragging opacity wins on the KPI cards (equal specificity). */
+.vd .dragwrap.dragging{opacity:0.4 !important; cursor:grabbing}
+.vd .dragwrap.dragover::after{content:""; position:absolute; inset:0; border-radius:16px; border:2px dashed var(--goldBright); background:rgba(201,152,42,0.12); box-shadow:inset 0 0 0 1px rgba(240,192,80,0.25), 0 0 18px 1px rgba(240,192,80,0.18); pointer-events:none; z-index:5}
+.vd .dragwrap.snap{animation:vivSnap .18s cubic-bezier(0.22,1,0.36,1) both}
+.vd .dragwrap.snap::before{content:""; position:absolute; inset:0; border-radius:16px; border:2px solid var(--goldBright); box-shadow:0 0 0 3px rgba(240,192,80,0.28), 0 0 22px 3px rgba(240,192,80,0.5); pointer-events:none; z-index:6; animation:vivSnapGlow .35s ease-out forwards}
+@keyframes vivSnap{from{transform:scale(0.965)}to{transform:scale(1)}}
+@keyframes vivSnapGlow{from{opacity:1}to{opacity:0}}
+@media(prefers-reduced-motion:reduce){.vd .dragwrap.snap{animation:none} .vd .dragwrap.snap::before{animation:none; opacity:0}}
 .vd .equity-grid{display:grid; grid-template-columns:1.4fr 0.95fr 1.35fr; gap:0; width:100%}
 .vd .eq-left{padding-right:26px; display:flex; flex-direction:column}
 .vd .eq-left .tlrow{margin-top:auto}
@@ -10469,7 +10541,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             return (
               <div className="kpistrip">
                 {kpiArr.order.map((k, vi) => (
-                  <div key={k} className={"dragwrap reveal vrev" + (kpiArr.armed === vi ? " dragging" : "")} style={{ "--i": vi }} {...kpiArr.wrapProps(vi)}>
+                  <div key={k} className={"dragwrap reveal vrev" + (kpiArr.revealed ? " in-view" : "") + kpiArr.cls(vi, k)} style={{ "--i": vi }} {...kpiArr.wrapProps(vi)}>
                     <span className="draghandle" {...kpiArr.handleProps(vi)}>⋮⋮</span>
                     {KPI_CARDS[k]}
                   </div>
@@ -10551,7 +10623,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             const slot = (vi) => {
               const key = lensArr.order[vi];
               return (
-                <div key={key} className={"dragwrap" + (lensArr.armed === vi ? " dragging" : "")} {...lensArr.wrapProps(vi)}>
+                <div key={key} className={"dragwrap" + lensArr.cls(vi, key)} {...lensArr.wrapProps(vi)}>
                   <span className="draghandle" data-html2canvas-ignore="true" title="Drag to rearrange" onClick={(e) => e.stopPropagation()} {...lensArr.handleProps(vi)}>⠿</span>
                   {lensCards[key]}
                 </div>
@@ -10788,7 +10860,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           edge: (<EdgeLedger C={C} font={font} session={session} setPage={setPage} />), /* admin-only: renders null for members */
           };
           return stackArr.order.map((k, vi) => (
-            <div key={k} className={"dragwrap" + (stackArr.armed === vi ? " dragging" : "")} {...stackArr.wrapProps(vi)}>
+            <div key={k} className={"dragwrap" + stackArr.cls(vi, k)} {...stackArr.wrapProps(vi)}>
               <span className="draghandle" {...stackArr.handleProps(vi)}>⋮⋮</span>
               {STACK_CARDS[k]}
             </div>

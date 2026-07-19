@@ -182,6 +182,7 @@ for r in range(3, ws.max_row + 1):
   const asof = rows[rows.length - 1]?.date || null;
   const payload = {
     asof,
+    refreshed: new Date().toISOString().slice(0, 10),
     source,
     headers: COLS.map((c) => c.hdr),
     cols: COLS,                       // key <-> verbatim header pairing for the table

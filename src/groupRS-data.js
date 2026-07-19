@@ -7,6 +7,7 @@
 // truth for single-stock RS and sector grouping.
 export const GROUP_RS = {
   "asof": "2026-07-17",
+  "refreshed": "2026-07-19",
   "rows": [
     {
       "t": "KWEB",

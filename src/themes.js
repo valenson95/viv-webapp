@@ -79,6 +79,17 @@ export const THEME_SNAPSHOTS = {
     // Medical/Home-Construction/Banks green while AI/Semis/Cyber/Quantum stayed red intraday.
     day:   [["Medical",2.90],["Home Construction",2.66],["Banks",2.40],["Transports",2.26],["Real Estate",1.68],["Retail",1.59],["Materials",1.15],["Airlines",1.00],["Industrials",0.76],["HealthCare",0.72],["Utilities",0.51],["Bitcoin",0.05],["Biotechnology",-0.02],["Steel",-0.17],["China Internet",-0.25],["Robotics",-0.45],["Software",-0.50],["Oil & Gas",-1.04],["Cybersecurity",-1.16],["Semiconductors",-1.19],["Telecom",-1.26],["AI",-1.40],["Aerospace",-1.61],["Quantum",-1.85],["Solar",-1.85],["Gold Miners",-2.03],["Silver Miners",-2.03],["Social Media",-2.08],["Growth Stocks",-2.19],["Genomics",-3.28],["Bitcoin Miners",-5.91]],
   },
+  "2026-07-19": {
+    // Weekend upload, data = Fri 2026-07-17 US close (Jul 18-19 = weekend). Fresh 1M this drop (no more carry).
+    month: [["Cybersecurity",15.78],["Genomics",14.31],["Biotechnology",10.69],["HealthCare",6.32],["Banks",5.67],["Transports",3.61],["China Internet",3.59],["Retail",2.69],["Software",1.57],["Medical",1.20],["Real Estate",0.71],["Utilities",0.24],["Industrials",-0.24],["Social Media",-0.37],["Airlines",-0.56],["Home Construction",-0.95],["Bitcoin",-2.21],["Aerospace",-3.67],["Materials",-4.15],["Oil & Gas",-6.70],["Telecom",-6.92],["Growth Stocks",-7.50],["AI",-9.19],["Robotics",-9.19],["Steel",-9.25],["Semiconductors",-9.65],["Solar",-11.03],["Quantum",-12.69],["Gold Miners",-18.25],["Silver Miners",-19.60],["Bitcoin Miners",-31.32]],
+    // 1W top-5 turnover: Bitcoin + Steel IN, China Internet + Oil & Gas OUT vs 07-17. Value/financials own the week;
+    // every high-beta growth theme deep red (Semis −6.15 · AI −6.19 · Quantum −7.07 · Btc Miners −13.71).
+    week:  [["Banks",4.52],["Retail",3.98],["Bitcoin",3.18],["Transports",3.03],["Steel",2.97],["Real Estate",2.88],["Cybersecurity",2.01],["China Internet",1.51],["Home Construction",1.48],["Materials",0.74],["Software",0.35],["Oil & Gas",0.31],["Utilities",-0.42],["Solar",-0.44],["Industrials",-0.56],["HealthCare",-1.03],["Social Media",-1.13],["Medical",-1.46],["Gold Miners",-3.01],["Silver Miners",-3.08],["Biotechnology",-3.35],["Telecom",-3.42],["Aerospace",-3.71],["Growth Stocks",-4.05],["Airlines",-4.18],["Robotics",-4.42],["Genomics",-4.78],["Semiconductors",-6.15],["AI",-6.19],["Quantum",-7.07],["Bitcoin Miners",-13.71]],
+    // day = Fri 07-17 "Since Open" (momentum ex gaps). Mirror-image of the week: the beaten-up growth complex
+    // (Btc Miners/Cyber/Bitcoin/Quantum/AI/Semis) caught the intraday bid while the week's leaders were sold —
+    // oversold bounce INSIDE the down-rotation, not a leadership change yet.
+    day:   [["Bitcoin Miners",3.28],["Cybersecurity",2.44],["Bitcoin",2.16],["Quantum",2.12],["Telecom",1.97],["AI",1.82],["Growth Stocks",1.75],["Semiconductors",1.57],["Silver Miners",1.51],["Gold Miners",1.31],["Solar",1.28],["Genomics",1.22],["Software",1.16],["Biotechnology",1.12],["Steel",1.08],["China Internet",0.79],["Oil & Gas",0.73],["Industrials",0.65],["Social Media",0.64],["Robotics",0.57],["Aerospace",0.34],["HealthCare",0.02],["Transports",-0.41],["Materials",-0.53],["Real Estate",-0.57],["Retail",-0.62],["Banks",-0.82],["Airlines",-0.85],["Utilities",-1.59],["Medical",-2.00],["Home Construction",-2.44]],
+  },
 };
 
 // Normalize ANY date shape to ISO (YYYY-MM-DD) — manual positions carry M/D/YY strings,

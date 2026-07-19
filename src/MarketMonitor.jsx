@@ -97,6 +97,8 @@ export default function MarketMonitor({ C, font, session }) {
   const isDefaultChain = chain.length === 1 && chain[0].key === "date" && chain[0].dir === "desc";
 
   const asof = MARKET_MONITOR?.asof || "—";
+  const refreshedFull = MARKET_MONITOR?.refreshed;
+  const asofStamp = refreshedFull && refreshedFull !== asof ? `as of ${asof} · updated ${refreshedFull}` : `as of ${asof}`;
   const source = MARKET_MONITOR?.source || "sheet";
   const cols = MARKET_MONITOR?.cols || [];
   const allRows = MARKET_MONITOR?.rows || [];
@@ -216,7 +218,7 @@ export default function MarketMonitor({ C, font, session }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <LensCamera getEl={() => rootRef.current} name="breadth-full" C={C} />
-          <div style={asofStyle}>as of {asof}</div>
+          <div style={asofStyle}>{asofStamp}</div>
         </div>
       </section>
 
@@ -415,6 +417,10 @@ export function BreadthMini({ C, font, session }) {
   const cardRef = useRef(null);
   const rows = MARKET_MONITOR?.rows || [];
   const asof = MARKET_MONITOR?.asof || "—";
+  // HARD rule (Valen 2026-07-19): every data push must move the visible stamp. asof = the close
+  // the numbers describe; refreshed = when the snapshot was last regenerated. Show both when they differ.
+  const refreshed = MARKET_MONITOR?.refreshed;
+  const stamp = refreshed && refreshed !== asof ? `as of ${asof} · updated ${refreshed}` : `as of ${asof}`;
   const latest = rows[rows.length - 1] || {};
   const read = readBreadth(latest);
   return (
@@ -424,7 +430,7 @@ export function BreadthMini({ C, font, session }) {
           <span className="label">Market Breadth</span>
           <InfoDot tip="Are breakouts likely to work right now? Tap for counts, ratios and the full sheet." />
           <LensCamera getEl={() => cardRef.current} name="breadth" C={C} style={{ marginLeft: 6 }} />
-          <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
+          <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>
         </div>
         {/* the four-column master switch */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
