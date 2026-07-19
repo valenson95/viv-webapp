@@ -219,8 +219,11 @@ export default function GroupRS({ C, font, session }) {
   const [holdingsFor, setHoldingsFor] = useState(null); // {t, name} of the ticker whose holdings popup is open
   const rootRef = useRef(null);
 
-  // ── multi-sort chain (up to 3). Default = thrust desc → rs1m desc → off52 desc.
-  const DEFAULT_CHAIN = [{ key: "thrust", dir: "desc" }, { key: "rs1m", dir: "desc" }, { key: "off52", dir: "desc" }];
+  // ── multi-sort chain (up to 3). Default = 1M RS desc, thrust desc within tier —
+  // Jeff's OWN table order (proven from his printed tiers). Sorting thrust-first made
+  // our table LOOK completely different from his even where the data matched (Valen
+  // 2026-07-19); the default must mirror his presentation.
+  const DEFAULT_CHAIN = [{ key: "rs1m", dir: "desc" }, { key: "thrust", dir: "desc" }, { key: "off52", dir: "desc" }];
   const groupSort = useSortChain(DEFAULT_CHAIN);
   const { chain, clickSort, isDefault: isDefaultChain, reset: resetGroupSort } = groupSort;
 
