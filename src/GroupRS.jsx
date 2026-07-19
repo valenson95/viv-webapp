@@ -454,7 +454,12 @@ export default function GroupRS({ C, font, session }) {
   const LEV_TIP = "Leveraged/inverse funds tracking the stock — liquidity varies, always check the fund before using it.";
   const levCell = (arr) => {
     if (!arr || !arr.length) return <span style={{ color: C.muted }}>—</span>;
-    return <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "0.66rem", fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.01em" }}>{arr.join(", ")}</span>;
+    // Valen 2026-07-19: UPPERCASE + visible chips (they were lowercase muted and easy to miss).
+    return <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
+      {arr.map(e => (
+        <span key={e} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "0.64rem", fontWeight: 800, color: C.goldBright, letterSpacing: "0.03em", background: "rgba(201,152,42,0.10)", border: "1px solid rgba(201,152,42,0.3)", borderRadius: 6, padding: "1px 6px" }}>{e.toUpperCase()}</span>
+      ))}
+    </span>;
   };
 
   const llHead = (hChain, onSort) => (
