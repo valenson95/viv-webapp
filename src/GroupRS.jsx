@@ -691,7 +691,7 @@ export function RotationMini({ C, font, session }) {
           <LensCamera getEl={() => cardRef.current} name="rotation" C={C} style={{ marginLeft: 6 }} />
           <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>
         </div>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <table className="minitable" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr>
             <th style={{ ...hcell, textAlign: "left" }}>Ticker</th>
             <th style={{ ...hcell, textAlign: "left", width: "40%" }}>Group</th>

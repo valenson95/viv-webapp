@@ -122,7 +122,7 @@ export default function ThemeStrip({ C, font, variant }) {
         <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold }}>{title}</span>
         <span style={{ fontSize: "0.58rem", color: C.muted }}>DeepVue</span>
       </div>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: font }}>
+      <table className="minitable" style={{ width: "100%", borderCollapse: "collapse", fontFamily: font }}>
         <tbody>
           {rows.map(([name, pct], i) => {
             const g = both.has(name), pos = pct >= 0;

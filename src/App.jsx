@@ -9127,6 +9127,15 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd tbody td{display:flex; justify-content:space-between; align-items:center; text-align:right; border:none; padding:8px 14px}
 .vd tbody td::before{content:attr(data-l); color:var(--muted); font-size:0.66rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:700}
 .vd .tick{font-size:1rem}
+/* ── Lens minis + Theme strip render as REAL compact tables on mobile — exempt them from the
+   card-izing above (built for the wide positions table). They're 3–5 narrow columns that fit
+   phone width fine. Same-philosophy escape as the .lensmini sticky-header fix (L9242). ── */
+.vd .minitable{display:table}
+.vd .minitable thead{display:table-header-group}
+.vd .minitable tbody{display:table-row-group}
+.vd .minitable tr{display:table-row; border:none; border-radius:0; padding:0; margin:0}
+.vd .minitable td,.vd .minitable th{display:table-cell; width:auto; text-align:inherit}
+.vd .minitable td::before{content:none}
 
 /* ── Open Positions mobile card: structured header + compact 2-col stat grid (replaces the flat label:value stack) ── */
 .vd .posrow{display:grid; grid-template-columns:1fr 1fr; column-gap:14px; row-gap:0; align-content:start; padding:14px 16px 10px; background:var(--glass)}
@@ -13794,13 +13803,13 @@ function AppInner() {
   // ─── MOBILE LAYOUT ───
   if (isMobile) {
     return (
-      <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column", zoom: appZoom }}>
+      <div style={{ fontFamily: font, background: C.bg, height: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column", zoom: appZoom }}>
         <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
           <Wordmark size="0.88rem" style={{ lineHeight: 1 }} />
           <HeaderControls onLogout={handleLogout} inline />
         </div>
         <AppBackground />
-        <div style={{ flex: 1, overflowY: "auto", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80, position: "relative", zIndex: 1 }}>{pageContent}</div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80, position: "relative", zIndex: 1 }}>{pageContent}</div>
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(8,8,14,0.97)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
           {NAV.map(item => {
             const active = page === item.id;
