@@ -403,11 +403,17 @@ export default function GroupRS({ C, font, session }) {
       const bench = br.filter(r => r.benchmark);
       const restRaw = br.filter(r => !r.benchmark);
       const bChain = blockSorts[b].chain;
-      // no sort active → fixed default order (rs1m desc, same as before this was sortable).
-      // sort active → the chain comparator (nulls always sort last, never crashes).
+      // Default order = the source's own presentation (his FAQ, confirmed by Valen 2026-07-19):
+      // Index + Segment stay UNSORTED in the fixed small→large ladder (read emerging vs
+      // deteriorating by POSITION), while the ranking is "dual-layered from the sector level
+      // onward" — EW Sector + SPDR Sector default to 1M RS desc, thrust desc within tier.
+      // Clicking any header still sorts any block.
+      const rankedByDefault = b === "EW Sector" || b === "SPDR Sector";
       const rest = bChain.length
         ? [...restRaw].sort(chainComparator(bChain))
-        : [...restRaw].sort((a, x) => (x.rs1m ?? -1) - (a.rs1m ?? -1));
+        : rankedByDefault
+          ? [...restRaw].sort((a, x) => (x.rs1m ?? -1) - (a.rs1m ?? -1) || (x.thrust ?? -999) - (a.thrust ?? -999))
+          : restRaw;
       return { block: b, rows: [...bench, ...rest] }; // benchmark (RSP) pinned first, never sorted
     }).filter(b => b.rows.length);
 
