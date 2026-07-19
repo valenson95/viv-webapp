@@ -126,6 +126,25 @@ const redHeat = (mag) => !mag || mag <= 0.02 ? "rgba(255,255,255,0.03)" : `rgba(
 // opens it: top-N holdings, weight-sorted, TradingView-style (rank · ticker · name ·
 // weight % · slim gold bar). NOT sortable, NOT interactive beyond scroll + close;
 // closes on backdrop click. A ticker with no verifiable basket shows an honest note.
+// Foreign listings arrive from the source as "!exchange/ticker" (e.g. "!lon/MNDI",
+// "!hkg/2689"). Render them as the clean local ticker + a small exchange tag instead
+// of the raw notation. Unknown exchange codes fall back to the uppercased code.
+const EXCHANGE_TAGS = {
+  lon: "LSE", hkg: "HKEX", tyo: "TSE", tsx: "TSX", sto: "STO", hel: "HEL", cph: "CPH",
+  osl: "OSL", bvmf: "B3", snse: "SSE", idx: "IDX", bkk: "SET", nse: "NSE", bom: "BSE",
+  krx: "KRX", kosdaq: "KOSDAQ", asx: "ASX", nzx: "NZX", sha: "SSE", she: "SZSE",
+  tpe: "TWSE", sgx: "SGX", klse: "KLSE", jse: "JSE", bit: "MIL", epa: "EPA", ams: "AMS",
+  ebr: "EBR", eli: "ELI", mce: "BME", fra: "FRA", etr: "XETRA", vie: "VIE", swx: "SIX",
+  wse: "WSE", ist: "BIST", tase: "TASE", mex: "BMV", bcba: "BCBA",
+};
+const parseHoldingTicker = (raw) => {
+  if (!raw || raw[0] !== "!") return { sym: raw || "—", ex: null };
+  const slash = raw.indexOf("/");
+  if (slash < 0) return { sym: raw.slice(1), ex: null };
+  const code = raw.slice(1, slash).toLowerCase();
+  return { sym: raw.slice(slash + 1), ex: EXCHANGE_TAGS[code] || code.toUpperCase() };
+};
+
 function HoldingsPopup({ target, onClose, C, font }) {
   if (!target) return null;
   const data = ETF_HOLDINGS?.byTicker?.[target.t];
@@ -171,7 +190,12 @@ function HoldingsPopup({ target, onClose, C, font }) {
               return (
                 <div key={h.t + i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 18px", borderBottom: i < holdings.length - 1 ? `1px solid rgba(255,255,255,0.045)` : "none" }}>
                   <span style={{ flex: "none", width: 20, textAlign: "right", fontSize: "0.62rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
-                  <span style={{ flex: "none", width: 58, fontSize: "0.74rem", fontWeight: 800, color: C.white, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.t || "—"}</span>
+                  {(() => { const { sym, ex } = parseHoldingTicker(h.t); return (
+                    <span style={{ flex: "none", width: 92, display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+                      <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.white, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sym}</span>
+                      {ex && <span style={{ flex: "none", fontSize: "0.5rem", fontWeight: 700, letterSpacing: "0.04em", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 5, padding: "1px 4px", lineHeight: 1.3 }}>{ex}</span>}
+                    </span>
+                  ); })()}
                   <span style={{ flex: 1, minWidth: 0, fontSize: "0.68rem", color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.n || ""}</span>
                   <span style={{ flex: "none", width: 74, display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
                     {frac > 0 && <span style={{ flex: "none", display: "inline-block", width: Math.round(frac * 34) + 6, height: 7, borderRadius: 3, background: `linear-gradient(90deg, ${C.gold}, ${C.goldBright})` }} />}
