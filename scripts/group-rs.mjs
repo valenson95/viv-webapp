@@ -97,6 +97,111 @@ const PF_UNIVERSE = [
   ["XLY", "Consumer Discretionary", "SPDR Sector"], ["XLK", "Technology", "SPDR Sector"],
 ];
 
+// ── LIQUID LEADERS universe — a per-STOCK momentum lens over the SAME machinery as the
+// Industry Groups table (rs1m / thrust vs RSP, absolute % stats). Two curated liquid-leader
+// universes merged on ticker. Provenance is tagged NEUTRALLY member-facing: "JS" → "Curated"
+// chip, "DV" → "Screen" chip (no source names anywhere in the payload/UI). These are COMPANIES,
+// not funds — no holdings popup. `long`/`short` = the liquid leveraged/inverse ETFs that track
+// the name (lowercase); shown as a reminder cell, gated elsewhere.
+//   LL_JS = the "Curated" list (industry + long/short lev-ETFs printed alongside each name).
+//   LL_DV = the "Screen" list (tickers only; industry blank unless the name is ALSO in LL_JS).
+// Industry strings are OCR-derived display-only labels (DeepVue stays the grouping source of truth).
+const LL_JS = [
+  // [ticker, industry, longETFs[], shortETFs[]]
+  ["ADBE", "Software & IT Services", ["adbg"], []],
+  ["AAPL", "Computers, Phones & Household Electronics", ["aapu"], ["aapd"]],
+  ["MSFT", "Software & IT Services", ["msfu"], ["msfd"]],
+  ["BABA", "Software & IT Services", ["babx"], []],
+  ["AMZN", "Diversified Retail", ["amzu"], ["amzd"]],
+  ["UNH", "Healthcare Providers & Services", ["unhg"], []],
+  ["BMNR", "Fintech & Infrastructure", ["bmnu"], ["bmnz"]],
+  ["META", "Software & IT Services", ["fbl", "metu"], ["metd"]],
+  ["PLTR", "Software & IT Services", ["pltu", "ptir"], ["pltd", "pltz"]],
+  ["NVDA", "Semiconductors & Semi Equipment", ["nvdx", "nvdu", "nvdl"], ["nvd", "nvdq"]],
+  ["MSTR", "Software & IT Services", ["mstu", "mstx"], ["mstz", "smst"]],
+  ["NOW", "Software & IT Services", ["nowl"], []],
+  ["RDDT", "Software & IT Services", ["rdtl"], []],
+  ["COIN", "Fintech & Infrastructure", ["conl"], []],
+  ["LITE", "Communications & Networking", ["litx"], []],
+  ["AVGO", "Semiconductors & Semi Equipment", ["avgx"], ["avs"]],
+  ["TEM", "Biotechnology & Medical Research", ["temt"], []],
+  ["SOUN", "Software & IT Services", ["soux"], []],
+  ["DELL", "Computers, Phones & Household Electronics", ["dlll"], []],
+  ["HOOD", "Fintech & Infrastructure", ["robn"], ["hooz"]],
+  ["GOOGL", "Software & IT Services", ["ggll"], ["ggls"]],
+  ["ORCL", "Software & IT Services", ["orcx"], []],
+  ["QCOM", "Semiconductors & Semi Equipment", ["qcml"], []],
+  ["LUNR", "Aerospace & Defense", ["lunl"], []],
+  ["CRWV", "Software & IT Services", ["cwvx", "crwg"], ["cord"]],
+  ["ARM", "Semiconductors & Semi Equipment", ["armg"], []],
+  ["NBIS", "Professional & Commercial Services", ["nbil", "nbig", "nebx"], ["nbiz"]],
+  ["BE", "Machinery, Equipment & Components", ["bex"], []],
+  ["QUBT", "Software & IT Services", ["qubx"], []],
+  ["SMR", "Electrical Utilities & IPPs", ["smu"], []],
+  ["ASTS", "Telecommunications Services", ["astx"], []],
+  ["RKLB", "Aerospace & Defense", ["rklx"], ["rklz"]],
+  ["RGTI", "Semiconductors & Semi Equipment", ["rgtx"], ["rgtz"]],
+  ["MRVL", "Semiconductors & Semi Equipment", ["mvll"], []],
+  ["CRCL", "Fintech & Infrastructure", [], ["crcd"]], // long side UNCERTAIN OCR → left blank
+  ["AXTI", "Semiconductors & Semi Equipment", ["axtx"], []],
+  ["WDC", "Computers, Phones & Household Electronics", ["wdcx"], []],
+  ["SOFI", "Banking Services", ["sofx"], []],
+  ["MU", "Semiconductors & Semi Equipment", ["muu", "mull"], ["mud", "muz"]],
+  ["AAOI", "Electronic Equipment & Parts", ["aaox"], []],
+  ["TSLA", "Automobiles & Auto Parts", ["tsll", "tslr"], ["tslq", "tsls", "tslz"]],
+  ["HIMS", "Healthcare Providers & Services", ["himz"], []],
+  ["CBRS", "Integrated Hardware & Software", ["cbrg"], []],
+  ["APLD", "Fintech & Infrastructure", ["aplx"], []],
+  ["IREN", "Fintech & Infrastructure", ["ire", "irex"], []],
+  ["NFLX", "Software & IT Services", ["nfxl", "nflu"], ["nfxs"]],
+  ["APP", "Software & IT Services", ["appx"], []],
+  ["BBAI", "Software & IT Services", ["baig"], []],
+  ["TSM", "Semiconductors & Semi Equipment", ["tsmx"], []],
+  ["UPST", "Banking Services", ["upsx"], []],
+  ["INTC", "Semiconductors & Semi Equipment", ["intw"], []],
+  ["RIOT", "Internet Services & Infrastructure", ["riox"], []],
+  ["OKLO", "Electrical Utilities & IPPs", ["okll"], ["okls"]],
+  ["QBTS", "Software & IT Services", ["qbtx"], ["qbtz"]],
+  ["IONQ", "Computers, Phones & Household Electronics", ["ionx"], ["ionz"]],
+  ["CRDO", "Semiconductors & Semi Equipment", ["crdu"], []],
+  ["ALAB", "Semiconductors & Semi Equipment", ["labx"], []],
+  ["MARA", "Fintech & Infrastructure", ["mral"], []],
+  ["ONDS", "Communications & Networking", ["ondl", "ondg"], []],
+  ["SMCI", "Computers, Phones & Household Electronics", ["smcx", "smcl"], ["smcz"]],
+  ["GLW", "Electronic Equipment & Parts", ["glwg"], []],
+  ["SNDK", "Computers, Phones & Household Electronics", ["snxx", "sndu"], []],
+  ["AMD", "Semiconductors & Semi Equipment", ["amdl", "damd"], []], // short side UNCERTAIN OCR → omitted
+  ["POET", "Semiconductors & Semi Equipment", ["poel"], []],
+];
+// LL_DV — the "Screen" (DeepVue Liquid Leaders) list. DOCUMENTED BUT CURRENTLY INACTIVE.
+// FINAL SCOPE CALL (Valen, 2026-07-19): the Liquid Leaders tab uses ONLY the ~62 curated names
+// that ship with leveraged/inverse ETF mappings (LL_JS). This screen universe is kept verbatim so
+// re-adding it is trivial — to flip back, restore the merge block at the bottom of this note AND
+// bring back the src field + Curated/Screen source chips in src/GroupRS.jsx.
+const LL_DV = [
+  "ABVX", "ACHC", "ACMR", "ALAB", "AMAT", "AMD", "APGE", "ARM", "ASX", "BRKR", "BROS", "BSP",
+  "BTSG", "CAKE", "CBRS", "CHYM", "CNC", "CRNX", "CROX", "CRWD", "CSCO", "CSQR", "CVLT", "CVS",
+  "DAVE", "DDOG", "DELL", "DFTX", "DINO", "DNTH", "DOCN", "DPC", "DVA", "ETSY", "FBIN", "FDXF",
+  "FFIV", "FIG", "FLEX", "FROG", "FTNT", "GEN", "GH", "GTLB", "GWRE", "HNGE", "HONA", "HPE",
+  "HUM", "ICLR", "ILMN", "INIO", "INTC", "KMX", "KRYS", "KYMR", "LGND", "LQDA", "LTH", "MANE",
+  "MBGL", "MOH", "MPC", "MRVL", "MSM", "MTRN", "MU", "MXL", "NAVN", "NBIX", "NET", "NTAP",
+  "NTNX", "NTRA", "OKTA", "ORKA", "OSCR", "OUST", "PANW", "PBF", "PENG", "PTGX", "PYPL", "QLYS",
+  "QNT", "RAL", "RBRK", "RH", "SDOT", "SEDG", "SEZL", "SHAZ", "SIMO", "SKHY", "SN", "SNDK",
+  "SNOW", "SPCX", "STM", "STRL", "STX", "SYNA", "SYRE", "TEAM", "TECH", "TENB", "TGTX", "TKR",
+  "TWLO", "TWST", "TXG", "UMC", "UNH", "URI", "VEEE", "VKTX", "VLO", "VMI", "VOYA", "VRNS",
+  "VSH", "VSXY", "WST", "WYFI", "XENE",
+];
+void LL_DV; // referenced so the documented (inactive) screen list isn't flagged as unused.
+// ACTIVE universe = curated (LL_JS) only — a single liquid-leader universe, no source distinction.
+const LL_UNIVERSE = LL_JS.map(([t, industry, long, short]) => ({ t, industry, long, short }));
+// ── To re-add the merged "Screen" universe later, replace the LL_UNIVERSE line above with:
+//   const LL_JS_MAP = new Map(LL_JS.map(([t, industry, long, short]) => [t, { industry, long, short }]));
+//   const LL_DV_SET = new Set(LL_DV);
+//   const LL_TICKERS = [...new Set([...LL_JS.map(r => r[0]), ...LL_DV])];
+//   const LL_UNIVERSE = LL_TICKERS.map(t => { const js = LL_JS_MAP.get(t); const inDV = LL_DV_SET.has(t);
+//     const src = js && inDV ? "JS+DV" : js ? "JS" : "DV";
+//     return { t, industry: js?.industry || "", src, long: js?.long || [], short: js?.short || [] }; });
+
 // Benchmark = RSP (S&P 500 EQUAL WEIGHT) — revealed by the source table's own "benchmark" row
 // (2026-07-18 post): RS is measured vs the AVERAGE stock, which kills mega-cap distortion; SPY
 // prints there as an ordinary row. See jeff-sun-master-system.md §14b-0.
@@ -161,12 +266,20 @@ const f = (x, d = 2) => x == null || Number.isNaN(x) || !isFinite(x) ? null : +x
 import { existsSync, readFileSync } from "fs";
 const CACHE = "scripts/.grouprs-cache.json";
 const useCache = process.argv.includes("--from-cache") && existsSync(CACHE);
-let spy, spyAlt, raw, rawPF;
+let spy, spyAlt, raw, rawPF, rawLL;
 if (useCache) {
   const c = JSON.parse(readFileSync(CACHE, "utf8"));
   spy = c.benchmarks[BENCH]; spyAlt = c.benchmarks[BENCH === "RSP" ? "SPY" : "RSP"]; raw = c.raw; rawPF = c.rawPF;
-  console.log(`GROUP-RS · FROM CACHE (${c.fetched}) · ${raw.length} ETFs · bench ${BENCH}`);
+  // Re-cut the Liquid Leaders universe from the CURRENT LL_UNIVERSE using cached bars — so trimming
+  // the universe (e.g. dropping the screen list) takes effect on --from-cache without re-fetching.
+  const cacheLLbars = new Map((c.rawLL || []).map(r => [r.t, r.bars]));
+  rawLL = LL_UNIVERSE.map(u => {
+    const b = cacheLLbars.has(u.t) ? cacheLLbars.get(u.t) : null;
+    return b ? { ...u, bars: b } : { ...u, bars: null, err: "no data" };
+  });
+  console.log(`GROUP-RS · FROM CACHE (${c.fetched}) · ${raw.length} ETFs · ${rawLL.length} liquid leaders · bench ${BENCH}`);
   if (!rawPF) { console.error("cache predates the Plan & Focus universe — run once WITHOUT --from-cache."); process.exit(1); }
+  if (!c.rawLL) console.warn("  ⚠︎ cache predates the Liquid Leaders universe — Liquid Leaders tab will be EMPTY. Run once WITHOUT --from-cache to populate it.");
 } else {
   console.log(`GROUP-RS · window ${FROM} → ${today} · ${UNIVERSE.length} ETFs + RSP + SPY`);
   const benchmarks = {};
@@ -206,7 +319,21 @@ if (useCache) {
       console.log(`FAILED (${e.message}) → row kept with nulls`);
     }
   }
-  writeFileSync(CACHE, JSON.stringify({ fetched: new Date().toISOString().slice(0, 10), benchmarks, raw, rawPF }));
+  rawLL = []; // Liquid Leaders universe (per-STOCK bars vs the same RSP benchmark)
+  for (let i = 0; i < LL_UNIVERSE.length; i++) {
+    const u = LL_UNIVERSE[i];
+    process.stdout.write(`[LL ${i + 1}/${LL_UNIVERSE.length}] ${u.t}… `);
+    await sleep(1600);
+    try {
+      const b = await bars(u.t);
+      rawLL.push({ ...u, bars: b });
+      console.log(`${b.length} bars ✓`);
+    } catch (e) {
+      rawLL.push({ ...u, bars: null, err: "no data" });
+      console.log(`FAILED (${e.message}) → row kept with nulls`);
+    }
+  }
+  writeFileSync(CACHE, JSON.stringify({ fetched: new Date().toISOString().slice(0, 10), benchmarks, raw, rawPF, rawLL }));
   console.log(`raw bars cached → ${CACHE}`);
 }
 const spyByDate = new Map(spy.map(b => [b.d, b.c]));
@@ -328,9 +455,30 @@ const pfRows = metricsPF.map((x) => {
 });
 const pf = [{ t: "RSP", name: "S&P 500 Equal Weight", block: "Index", benchmark: true }, ...pfRows];
 
+// ── 5c) Liquid Leaders rows — SAME verified formulas as the groups table (computeRaw reused
+// byte-identical), per-STOCK, NO benchmark row (RSP isn't a liquid leader). Carries industry
+// (display-only label) and the long/short lev-ETF lists through to the payload. Single curated
+// universe now (no src provenance — see the LL_DV note above to re-add the merged screen list).
+const metricsLL = rawLL.map(r => ({ ...r, m: r.bars ? computeRaw(r.bars) : null }));
+const llRows = metricsLL.map((x) => {
+  const base = { t: x.t, industry: x.industry, long: x.long || [], short: x.short || [] };
+  if (!x.m) return { ...base, thrust: null, thrust_snap: null, rs1m: null, rs1m_snap: null,
+    pctIntraday: null, pct1d: null, pct1m: null, off52: null, spark: [], rsSpark: [], state: null, warns: [],
+    err: x.err || (x.bars ? "insufficient history" : "no data") };
+  const thrust = x.m.thrustOwn, rs1m = x.m.rs1mOwn;
+  const { state, warns } = decode(thrust, rs1m, x.m.pct1m, x.m.off52);
+  return {
+    ...base,
+    thrust, thrust_snap: snap5(thrust), rs1m, rs1m_snap: snap5(rs1m),
+    pctIntraday: f(x.m.pctIntraday, 2), pct1d: f(x.m.pct1d, 2), pct1m: f(x.m.pct1m, 2), off52: f(x.m.off52, 2),
+    spark: x.m.spark.map(v => f(v, 4)), rsSpark: x.m.rsSpark.map(v => f(v, 4)),
+    state, warns,
+  };
+});
+
 // asof = the latest date common to SPY and the ETFs we could fetch (honest "as of close").
 const asof = spy[spy.length - 1].d;
-const payload = { asof, refreshed: today, rows, pf };
+const payload = { asof, refreshed: today, rows, pf, ll: llRows };
 
 const banner = `// AUTO-GENERATED by scripts/group-rs.mjs — DO NOT EDIT BY HAND.
 // Refresh: node --env-file=.env.local scripts/group-rs.mjs
@@ -341,6 +489,9 @@ const banner = `// AUTO-GENERATED by scripts/group-rs.mjs — DO NOT EDIT BY HAN
 // formula, FAQ post 2064559372655866303; VERIFIED 85/85 cell-exact, range −10…110). Every number is
 // bar-derived; failed fetches are kept as rows with nulls + err. DeepVue stays the source of
 // truth for single-stock RS and sector grouping.
+// payload.ll = the Liquid Leaders per-STOCK table (same rs1m/thrust machinery vs RSP, no benchmark
+// row) over a SINGLE curated universe of ~62 leaders that ship with lev/inverse ETF mappings;
+// long/short = the liquid leveraged/inverse ETFs tracking each name.
 `;
 writeFileSync("src/groupRS-data.js", banner + `export const GROUP_RS = ${JSON.stringify(payload, null, 2)};\n`);
 
@@ -348,3 +499,7 @@ const ok = rows.filter(r => r.thrust != null).length;
 const failed = rows.filter(r => r.err).map(r => r.t);
 console.log(`\n✓ wrote src/groupRS-data.js · asof ${asof} · ${rows.length} rows (${ok} with numbers, ${failed.length} failed)`);
 if (failed.length) console.log(`  failed tickers: ${failed.join(", ")}`);
+const llOk = llRows.filter(r => r.thrust != null).length;
+const llFailed = llRows.filter(r => r.err).map(r => r.t);
+console.log(`  liquid leaders (curated only) · ${llRows.length} rows (${llOk} with numbers, ${llFailed.length} failed)`);
+if (llFailed.length) console.log(`  LL failed/blank tickers: ${llFailed.join(", ")}`);

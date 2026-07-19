@@ -250,10 +250,11 @@ function HoldingsPopup({ target, onClose, C, font }) {
 export default function GroupRS({ C, font, session }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL;
   const [filter, setFilter] = useState("all"); // all | buy | fresh | resting | warn
-  const [tab, setTab] = useState("groups");     // groups | planfocus
+  const [tab, setTab] = useState("groups");     // groups | planfocus | liquid
   const [howOpen, setHowOpen] = useState(true);
   const [methodOpen, setMethodOpen] = useState(false);
   const [holdingsFor, setHoldingsFor] = useState(null); // {t, name} of the ticker whose holdings popup is open
+  const [llFilter, setLLFilter] = useState("all");     // Liquid Leaders state filter: all | buy | fresh | resting | warn
   const rootRef = useRef(null);
 
   // ── multi-sort chain (up to 3). Default = 1M RS desc, thrust desc within tier —
@@ -273,11 +274,17 @@ export default function GroupRS({ C, font, session }) {
   const blockSortSPDR = useSortChain([]);
   const blockSorts = { "Index": blockSortIndex, "Segment": blockSortSegment, "EW Sector": blockSortEW, "SPDR Sector": blockSortSPDR };
 
+  // Liquid Leaders — its own multi-sort chain. Default = the dual-layer law: 1M RS desc → thrust
+  // desc (same presentation order as the groups table; NO benchmark row on this tab).
+  const LL_DEFAULT_CHAIN = [{ key: "rs1m", dir: "desc" }, { key: "thrust", dir: "desc" }];
+  const llSort = useSortChain(LL_DEFAULT_CHAIN);
+
   const asof = GROUP_RS?.asof || "—";
   const refreshed = GROUP_RS?.refreshed;
   const stamp = refreshed && refreshed !== asof ? `as of ${asof} · updated ${refreshed}` : `as of ${asof} close`;
   const allRows = GROUP_RS?.rows || [];
   const pf = GROUP_RS?.pf; // Plan & Focus rows — may be undefined while regenerating
+  const ll = GROUP_RS?.ll; // Liquid Leaders per-stock rows — may be undefined while regenerating
 
   const cmpChain = chainComparator(chain);
 
@@ -296,6 +303,26 @@ export default function GroupRS({ C, font, session }) {
     resting: allRows.filter(r => r.state === "resting").length,
     warn: allRows.filter(r => (r.warns || []).length > 0).length,
   }), [allRows]);
+
+  // ── Liquid Leaders — filtered (state chip) then multi-sorted. Single curated universe now
+  // (no source distinction; the LL_DV screen list is documented-but-inactive in the script).
+  const llRows = ll || [];
+  const cmpLL = chainComparator(llSort.chain);
+  const llView = useMemo(() => {
+    let r = llRows.filter(row => {
+      if (llFilter === "all") return true;
+      if (llFilter === "warn") return (row.warns || []).length > 0;
+      return row.state === llFilter;
+    });
+    return [...r].sort(cmpLL);
+  }, [llRows, llFilter, llSort.chain]);
+
+  const llCounts = useMemo(() => ({
+    buy: llRows.filter(r => r.state === "buy").length,
+    fresh: llRows.filter(r => r.state === "fresh").length,
+    resting: llRows.filter(r => r.state === "resting").length,
+    warn: llRows.filter(r => (r.warns || []).length > 0).length,
+  }), [llRows]);
 
   // ── style primitives ──────────────────────────────────────────────────────
   const cardLabel = { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.gold };
@@ -421,6 +448,73 @@ export default function GroupRS({ C, font, session }) {
     ["warn", `⚠️🪤 Flags (${counts.warn})`],
   ];
 
+  // ── LIQUID LEADERS renderers — plain functions returning JSX (called directly, NOT mounted as
+  // components, so there's no nested-component remount). Same td/th/Spark/StateChips machinery as
+  // the groups table; extra columns = the long/short lev-ETF reminder cells.
+  const LEV_TIP = "Leveraged/inverse funds tracking the stock — liquidity varies, always check the fund before using it.";
+  const levCell = (arr) => {
+    if (!arr || !arr.length) return <span style={{ color: C.muted }}>—</span>;
+    return <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "0.66rem", fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.01em" }}>{arr.join(", ")}</span>;
+  };
+
+  const llHead = (hChain, onSort) => (
+    <tr>
+      {th(hChain, onSort, "Ticker", "The stock this row measures.", "t")}
+      {sth("Industry", "A display label for the company's group. DeepVue stays the grouping source of truth.")}
+      {th(hChain, onSort, "Thrust %", "This week's momentum, ranked 0–100. Higher = money rushing in right now.", "thrust", "right")}
+      {th(hChain, onSort, "1-Month RS %", "This month's strength, ranked 0–100 vs its own history. 100 = its strongest in a month.", "rs1m", "right")}
+      {sth("1-Month price", "The stock's price shape over the last month.", "center")}
+      {th(hChain, onSort, "% Intraday", "Today's move from the open — ignoring the overnight gap.", "pctIntraday", "right")}
+      {th(hChain, onSort, "% 1-Day", "Today's change vs yesterday's close.", "pct1d", "right")}
+      {th(hChain, onSort, "% 1-Month", "Plain price change over the last month.", "pct1m", "right")}
+      {th(hChain, onSort, "% off 52W H", "How far below its 1-year high it sits. 0% = right at highs.", "off52", "right")}
+      {sth("State", "🟢 leading · 🟡 fresh surge · 😴 cooling · ⚠️ illusion · 🪤 off the floor.", "center")}
+      {sth("Long ETF", LEV_TIP, "left")}
+      {sth("Short ETF", LEV_TIP, "left")}
+    </tr>
+  );
+
+  const llRow = (row) => {
+    const blank = row.err || null;
+    return (
+      <tr key={row.t}>
+        <td style={{ ...td, fontWeight: 800, color: C.white }}>{row.t}</td>
+        <td style={{ ...td, color: C.muted, textAlign: "left", maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis" }} title={row.industry || ""}>{row.industry || <span style={{ color: C.muted }}>—</span>}</td>
+        <td style={{ ...td, textAlign: "right", background: heat(row.thrust) }}>
+          {row.thrust == null ? <span title={blank || "not computed"} style={{ color: C.muted }}>—</span> : <span title={`exact ${row.thrust}`} style={{ fontWeight: 700 }}>{row.thrust_snap}</span>}
+        </td>
+        <td style={{ ...td, textAlign: "right", background: heat(row.rs1m) }}>
+          {row.rs1m == null ? <span title={blank || "not computed"} style={{ color: C.muted }}>—</span> : <span title={`exact ${row.rs1m}`} style={{ fontWeight: 700 }}>{row.rs1m_snap}</span>}
+        </td>
+        <td style={{ ...td, textAlign: "center" }}>{row.spark?.length ? <Spark pts={row.spark} /> : <span style={{ color: C.muted }}>—</span>}</td>
+        <td style={{ ...td, textAlign: "right", color: toneCol(row.pctIntraday) }}>{row.pctIntraday == null ? "—" : sgn(row.pctIntraday) + "%"}</td>
+        <td style={{ ...td, textAlign: "right", color: toneCol(row.pct1d) }}>{row.pct1d == null ? "—" : sgn(row.pct1d) + "%"}</td>
+        <td style={{ ...td, textAlign: "right", color: toneCol(row.pct1m), position: "relative", overflow: "hidden" }}>
+          {row.pct1m != null && isFinite(row.pct1m) && row.pct1m !== 0 && (
+            <div style={{ position: "absolute", top: 4, bottom: 4, right: 0, width: `${(Math.min(1, Math.abs(row.pct1m) / 15) * 100).toFixed(1)}%`, background: row.pct1m > 0 ? "rgba(34,197,94,0.16)" : "rgba(239,68,68,0.16)", borderRadius: 3, pointerEvents: "none" }} />
+          )}
+          <span style={{ position: "relative" }}>{row.pct1m == null ? "—" : sgn(row.pct1m) + "%"}</span>
+        </td>
+        <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap", background: redHeat(off52Mag(row.off52)), color: row.off52 == null ? C.muted : row.off52 >= -0.05 ? "#86efac" : "#fca5a5" }}>
+          {(row.warns || []).includes("trap") && <span title="Far below its 52-week high — strength here is a bounce, not a breakout." style={{ marginRight: 4, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
+          {(row.warns || []).includes("artifact") && <span title="Percentile illusion — RS% looks high but the actual month is negative." style={{ marginRight: 3, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
+          {row.off52 == null ? "—" : (row.off52 >= -0.05 ? "0%" : sgn(row.off52) + "%")}
+        </td>
+        <td style={{ ...td, textAlign: "center" }}><StateChips row={row} /></td>
+        <td style={{ ...td, textAlign: "left" }}>{levCell(row.long)}</td>
+        <td style={{ ...td, textAlign: "left" }}>{levCell(row.short)}</td>
+      </tr>
+    );
+  };
+
+  const llFilterChips = [
+    ["all", `All (${llRows.length})`],
+    ["buy", `🟢 Leading (${llCounts.buy})`],
+    ["fresh", `🟡 Fresh surge (${llCounts.fresh})`],
+    ["resting", `😴 Cooling (${llCounts.resting})`],
+    ["warn", `⚠️🪤 Flagged (${llCounts.warn})`],
+  ];
+
   const howLines = [
     ["1M RS%", "where today sits in THIS GROUP'S OWN last month of market-relative strength. 100 = its strongest day of the month."],
     ["Thrust%", "the same read for the last WEEK, with today weighted heaviest. Speed, not position."],
@@ -429,6 +523,7 @@ export default function GroupRS({ C, font, session }) {
     ["😴 Strong month, cool week", "a leader taking a breather — strong month, quiet week."],
     ["⚠️ Percentile illusion", "RS% high but the actual month is NEGATIVE."],
     ["🪤 Off the floor", "big thrust but ≥15% below its 52-week high — a bounce, not a breakout."],
+    ["Tabs", "Industry Groups (the ETF groups) · Top-Down View (the index → sector ladder) · Liquid Leaders (the same reads on individual leading stocks from a curated liquid-leader universe)."],
   ];
 
   // ── Plan & Focus (only when GROUP_RS.pf is present) ────────────────────────
@@ -572,16 +667,54 @@ export default function GroupRS({ C, font, session }) {
         )}
       </section>
 
-      {/* 3 — TAB SWITCHER (only when Plan & Focus data is available) */}
-      {pf && pf.length > 0 && (
-        <section className="grs-card" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["groups", "Industry Groups"], ["planfocus", "Top-Down View"]].map(([k, l]) => (
-            <button key={k} onClick={() => setTab(k)} style={chip(tab === k)}>{l}</button>
-          ))}
-        </section>
-      )}
+      {/* 3 — TAB SWITCHER (renders each tab only when its data is present) */}
+      {(() => {
+        const tabList = [["groups", "Industry Groups"]];
+        if (pf && pf.length > 0) tabList.push(["planfocus", "Top-Down View"]);
+        if (ll && ll.length > 0) tabList.push(["liquid", "Liquid Leaders"]);
+        if (tabList.length < 2) return null;
+        return (
+          <section className="grs-card" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            {tabList.map(([k, l]) => (
+              <button key={k} onClick={() => setTab(k)} style={chip(tab === k)}>{l}</button>
+            ))}
+          </section>
+        );
+      })()}
 
-      {tab === "groups" || !pf ? (
+      {tab === "planfocus" && pf ? (
+        <PlanFocus />
+      ) : tab === "liquid" && ll && ll.length > 0 ? (
+        <>
+          {/* LIQUID LEADERS — state filters, then the wide per-stock table */}
+          <section className="grs-card" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginRight: 2 }}>Preset auto-filters</span>
+            {llFilterChips.map(([k, label]) => (
+              <button key={k} onClick={() => setLLFilter(k)} style={chip(llFilter === k)}>{label}</button>
+            ))}
+            {!llSort.isDefault && (
+              <button onClick={llSort.reset} title="Restore the default sort chain"
+                style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.66rem", fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "rgba(255,255,255,0.03)" }}>
+                × reset sort
+              </button>
+            )}
+          </section>
+          <section className="grs-card" style={{ padding: "6px 8px" }}>
+            <p style={{ margin: "8px 10px 6px", fontSize: "0.72rem", lineHeight: 1.55, color: C.muted, maxWidth: "94ch" }}>
+              Individual leading stocks — the same weekly-thrust / monthly-RS reads as the group table, on a curated universe of liquid leaders. These are companies, not funds. Educational, not advice.
+            </p>
+            <div style={{ overflowX: "auto" }}>
+              <table className="minitable">
+                <thead>{llHead(llSort.chain, llSort.clickSort)}</thead>
+                <tbody>
+                  {llView.map(row => llRow(row))}
+                  {!llView.length && (<tr><td colSpan={12} style={{ ...td, textAlign: "center", color: C.muted, padding: 24 }}>No leaders match this filter.</td></tr>)}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      ) : (
         <>
           {/* FILTER (sort lives on the column headers) */}
           <section className="grs-card" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
@@ -610,8 +743,6 @@ export default function GroupRS({ C, font, session }) {
             </div>
           </section>
         </>
-      ) : (
-        <PlanFocus />
       )}
 
       {/* METHOD — ADMIN ONLY (formulas / provenance) */}
@@ -648,6 +779,9 @@ decode (pre-registered thresholds):
                 </p>
                 <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.7, color: C.muted }}>
                   % columns use <b style={{ color: C.text }}>unadjusted closes</b> (matches real fills); distribution-paying ETFs can drift ±1–3% vs adjusted-data vendors.
+                </p>
+                <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.7, color: C.muted }}>
+                  <b style={{ color: C.text }}>Liquid Leaders (3rd tab)</b> runs the IDENTICAL rs1m / thrust machinery on individual stocks (vs RSP, no benchmark row) over a single curated universe of ~62 liquid leaders that ship with leveraged/inverse ETF mappings. The Long/Short cells list those liquid lev/inverse ETFs (always vet the fund before using it). These are companies, not funds — no holdings popup. (A wider DeepVue "screen" list is kept documented-but-inactive in the script for easy re-add.)
                 </p>
                 <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.7, color: "rgba(255,255,255,0.5)" }}>
                   DeepVue remains the source of truth for single-stock RS and sector grouping. Refresh: <code style={{ color: C.text }}>node scripts/group-rs.mjs</code>. Educational, not advice.
