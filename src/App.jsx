@@ -13,7 +13,7 @@ import ThemeStrip from "./ThemeStrip.jsx";
 import MarketContext from "./MarketContext.jsx";
 import EdgeLedger from "./EdgeLedger.jsx";
 import QuantAnalysis from "./QuantAnalysis.jsx";
-import { RotationMini } from "./GroupRS.jsx";
+import { RotationMini, InfoDot, Tip } from "./GroupRS.jsx";
 import { BreadthMini } from "./MarketMonitor.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
 import DailySetupsTab from "./DailySetups.jsx";
@@ -9228,6 +9228,10 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 /* third column = a stack of two half-height drag slots (Breadth mini + Risk Allocation by default) */
 .vd.expert .lensstack{display:flex; flex-direction:column; gap:14px; min-width:0; height:100%}
 .vd.expert .lensstack > .dragwrap{flex:1 1 0; min-width:0; display:flex; flex-direction:column; min-height:0}
+/* Sizing is POSITIONAL: whichever card is dragged to the TOP slot gets the larger share so it
+   fits without internal scroll (default top = Market Breadth: 4-col switch + verdict + breakouts line).
+   Bottom slot (default Risk Allocation) is slightly smaller — internal scroll acceptable there. */
+.vd.expert .lensstack > .dragwrap:first-child{flex:1.5 1 0}
 .vd.expert .lensstack > .dragwrap > *{flex:1 1 auto; min-height:0}
 /* a tall card (Theme Leaders) dragged into a half slot scrolls instead of overlapping the card below */
 .vd.expert .lensstack > .dragwrap > .card{overflow:auto}
@@ -10446,13 +10450,13 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             const KPI_CARDS = {
             openpl: (
             <div className="card kpi">
-              <div className="cardhead"><span className="label">Open P/L</span><span className="infodot" data-tip="How much your open positions are up or down right now. Green means you're in profit; the line below is your realized equity trend.">i</span></div>
+              <div className="cardhead"><span className="label">Open P/L</span><InfoDot tip="How much your open positions are up or down right now. Green means you're in profit; the line below is your realized equity trend." /></div>
               <div className="kpibody">
                 <div className="kpimain">
                   <div className={"kpinum " + (openPL >= 0 ? "green" : "red")}><Cu>{usdSigned(openPL)}</Cu></div>
                   <div className="kpisub">{pctSigned(openPLpct)} across {openCount} position{openCount === 1 ? "" : "s"}</div>
                 </div>
-                <div className="kpiviz tipwrap" data-tip={spark ? `Realized P/L trend · ${(journaledTrades || []).length} closed trades · dashed lines = MA5 (gold) / MA10 (red) / MA20 (violet) of the curve` : "Realized equity trend"}>
+                <Tip as="div" className="kpiviz" tip={spark ? `Realized P/L trend · ${(journaledTrades || []).length} closed trades · dashed lines = MA5 (gold) / MA10 (red) / MA20 (violet) of the curve` : "Realized equity trend"}>
                   <svg viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Realized equity trend">
                     <defs><linearGradient id="sparkgPro" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={spark && !spark.up ? "rgba(239,68,68,0.30)" : "rgba(34,197,94,0.34)"} /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient></defs>
                     <path d={sparkArea} fill="url(#sparkgPro)" />
@@ -10462,14 +10466,14 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                     {spark?.smas?.s5 && <path d={spark.smas.s5} fill="none" stroke="rgba(240,192,80,0.85)" strokeWidth="1.1" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
                     <path d={sparkLine} fill="none" stroke={spark && !spark.up ? "var(--red)" : "var(--green)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                   </svg>
-                </div>
+                </Tip>
               </div>
             </div>
             ),
             /* K2: Risk in Market */
             risk: (
             <div className="card kpi">
-              <div className="cardhead"><span className="label">Risk in Market</span><span className="infodot" data-tip="The total you'd lose if every open position hit its stop at once. Keep it inside your risk rule.">i</span></div>
+              <div className="cardhead"><span className="label">Risk in Market</span><InfoDot tip="The total you'd lose if every open position hit its stop at once. Keep it inside your risk rule." /></div>
               <div className="kpibody">
                 <div className="kpimain">
                   <div className={"kpinum " + (rtsTotal > 0 ? "red" : "green")}>{usd0(rtsTotal)}</div>
@@ -10488,7 +10492,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             /* K3: Equity */
             equity: (
             <div className="card kpi">
-              <div className="cardhead"><span className="label">Equity</span><span className="infodot" data-tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number.">i</span>{isAdmin && <EyeToggle on={privacyOn} onClick={() => setPrivacyOn(p => !p)} title={privacyOn ? "Account size hidden (stream-safe) — reveal" : "Hide account size for streaming"} />}<button className="ghostchip" onClick={() => setCfgOpen(o => !o)} aria-expanded={cfgOpen} title="Edit your starting capital and sizing inputs">⚙ Configure</button></div>
+              <div className="cardhead"><span className="label">Equity</span><InfoDot tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number." />{isAdmin && <EyeToggle on={privacyOn} onClick={() => setPrivacyOn(p => !p)} title={privacyOn ? "Account size hidden (stream-safe) — reveal" : "Hide account size for streaming"} />}<button className="ghostchip" onClick={() => setCfgOpen(o => !o)} aria-expanded={cfgOpen} title="Edit your starting capital and sizing inputs">⚙ Configure</button></div>
               <div className="kpibody">
                 <div className="kpimain">
                   <div className="kpinum gold">{privacyOn ? "•••••••" : usd0(compEquity)}</div>
@@ -10503,7 +10507,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             <div className="card kpi">
               <div className="cardhead">
                 <span className="label">Risk Budget</span>
-                <span className="infodot" data-tip="Your total risk budget: equity × Target ROTE. Available is what's left to deploy once current risk is subtracted.">i</span>
+                <InfoDot tip="Your total risk budget: equity × Target ROTE. Available is what's left to deploy once current risk is subtracted." />
                 <button className="ghostchip" onClick={() => setCfgOpen(o => !o)} aria-expanded={cfgOpen} title="Show sizing configuration">⚙ Configure</button>
               </div>
               <div className="kpibody">
@@ -10524,7 +10528,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             /* K5: Current ROTE */
             rote: (
             <div className="card kpi">
-              <div className="cardhead"><span className="label">Current ROTE</span><span className="infodot" data-tip="Your risk currently on the table as a percent of total equity, measured against the Target ROTE cap you've set.">i</span></div>
+              <div className="cardhead"><span className="label">Current ROTE</span><InfoDot tip="Your risk currently on the table as a percent of total equity, measured against the Target ROTE cap you've set." /></div>
               <div className="kpibody">
                 <div className="kpimain">
                   {/* stream privacy (admin): ROTE % + target masked behind the same single eye as Equity */}
@@ -10556,7 +10560,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           {/* P2b. CONFIG ROW — relocated sizing controls; same state/handlers as Guided's "Live Risk Budget & Sizing" */}
           {cfgOpen && (
             <div className="card cfgrow" style={{ marginTop: 14 }}>
-              <div className="cardhead"><span className="label">Sizing Configuration</span><span className="infodot" data-tip="Adjust the inputs that drive your risk budget and position sizing.">i</span></div>
+              <div className="cardhead"><span className="label">Sizing Configuration</span><InfoDot tip="Adjust the inputs that drive your risk budget and position sizing." /></div>
               <div className="cfggrid">
                 <div className="cfgitem">
                   <div className="label" style={{ marginBottom: 9 }}>Starting capital</div>
@@ -10603,14 +10607,14 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           {(() => {
             const allocCard = (
               <div className="card">
-                <div className="cardhead"><span className="label">Risk Allocation</span><span className="infodot" data-tip="A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.">i</span></div>
+                <div className="cardhead"><span className="label">Risk Allocation</span><InfoDot tip="A picture of your risk budget — red is risk already in the market, green is what's still free to deploy." /></div>
                 <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                   <AllocDonut pct={allocPct} over={over} size={92} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="alloclegend" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
-                      <span className="leg tipwrap" data-tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></span>
-                      <span className="leg tipwrap" data-tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></span>
-                      <span className="leg tipwrap" data-tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></span>
+                      <Tip className="leg" tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></Tip>
+                      <Tip className="leg" tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></Tip>
+                      <Tip className="leg" tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></Tip>
                     </div>
                     <div className="allocnote" style={{ marginTop: 8 }}>{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
                   </div>

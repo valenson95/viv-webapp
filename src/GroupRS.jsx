@@ -113,6 +113,43 @@ export function InfoDot({ tip, size = 14 }) {
   );
 }
 
+// ── Tip — same portal-to-body, viewport-aware tooltip as InfoDot, but WRAPS arbitrary
+// children (a text span, a viz block) instead of drawing the ⓘ glyph. Use to replace the
+// CSS `.term[data-tip]` / `.tipwrap[data-tip]` pattern anywhere it can clip or spill onto a
+// sibling card. Fixed positioning + flip logic mirror InfoDot exactly; unmounts on mouseleave.
+export function Tip({ tip, children, as: Tag = "span", className, style }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState(null);
+  const show = () => {
+    const el = ref.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight, m = 8;
+    // anchor on the element's horizontal centre, same edge-aware logic as InfoDot
+    const cx = r.left + r.width / 2;
+    const p = {};
+    if (cx < 170) p.left = Math.max(m, cx);
+    else if (vw - cx < 170) p.right = Math.max(m, vw - cx);
+    else { p.left = cx; p.cx = true; }
+    if (r.bottom + 150 < vh || r.top < 150) { p.top = r.bottom + 8; p.up = false; }
+    else { p.top = r.top - 8; p.up = true; }
+    setPos(p);
+  };
+  return (
+    <Tag ref={ref} onMouseEnter={show} onMouseLeave={() => setPos(null)} className={className} style={style}>
+      {children}
+      {tip && pos && createPortal(
+        <div style={{ position: "fixed", top: pos.top, left: pos.left, right: pos.right,
+          transform: (pos.cx ? "translateX(-50%)" : "") + (pos.up ? " translateY(-100%)" : ""),
+          zIndex: 1300, maxWidth: Math.min(300, window.innerWidth - 16), width: "max-content",
+          background: "#13131c", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, padding: "9px 12px",
+          fontSize: "0.66rem", fontWeight: 500, lineHeight: 1.55, color: "#E7E9EE", textTransform: "none", letterSpacing: 0,
+          whiteSpace: "normal", textAlign: "left", boxShadow: "0 10px 30px rgba(0,0,0,0.55)", pointerEvents: "none", fontVariantNumeric: "normal" }}>
+          {tip}
+        </div>, document.body)}
+    </Tag>
+  );
+}
+
 // green heat 0..1 (deepest green = highest value)
 const greenHeat = (frac) => frac == null ? "rgba(255,255,255,0.03)" : `rgba(34,197,94,${(0.06 + 0.42 * Math.max(0, Math.min(1, frac))).toFixed(3)})`;
 // off-52W-high heat is RED and tracks MAGNITUDE: 0% ≈ neutral, −60% ≈ strong red.
