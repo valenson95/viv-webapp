@@ -9159,6 +9159,9 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .lensstack > .dragwrap > .card{overflow:auto}
 .vd.expert .lensmini{cursor:pointer; transition:border-color .16s, transform .16s}
 .vd.expert .lensmini:hover{border-color:var(--borderGold); transform:translateY(-2px)}
+/* the positions-table sticky last column (.vd thead th:last-child, bg #0c0c14) must not paint a
+   dark box on the mini's header — same escape the Journal tables needed (.vj precedent, L4641) */
+.vd .lensmini thead th:last-child{position:static; background:transparent}
 /* P4. Positions table — Pro only tightens container/density + sticky head; the table markup is shared with Guided */
 .vd.expert .poscard{padding:16px 16px 18px}
 .vd.expert .poshead h2{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}

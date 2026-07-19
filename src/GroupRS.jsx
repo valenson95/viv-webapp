@@ -515,11 +515,11 @@ export function RotationMini({ C, font, session }) {
                 <td style={{ padding: "3px 4px", textAlign: "right" }}><span style={cellChip(greenHeat(r.thrust == null ? null : r.thrust / 100))}>{r.thrust == null ? "—" : Math.round(r.thrust)}</span></td>
                 <td style={{ padding: "3px 4px", textAlign: "right" }}><span style={cellChip(greenHeat(r.rs1m == null ? null : r.rs1m / 100))}>{r.rs1m == null ? "—" : Math.round(r.rs1m)}</span></td>
                 <td style={{ padding: "3px 4px", textAlign: "right", whiteSpace: "nowrap" }}>
-                  {/* Valen 2026-07-19: OFF-FLOOR flag is now a plain ⚠️ inline after the value — no
-                      separate column (the empty header box is gone). Numbers stay right-aligned. */}
+                  {/* Valen 2026-07-19: OFF-FLOOR flag = plain ⚠️ to the LEFT of the value so the
+                      right-aligned % column stays a clean edge. No separate column. */}
+                  {(r.warns || []).includes("trap") && <span title="Far below its 52-week high — strength here is a bounce, not a breakout." style={{ marginRight: 4, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
+                  {(r.warns || []).includes("artifact") && <span title="Percentile illusion — RS% looks high but the actual month is negative." style={{ marginRight: 3, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
                   <span style={cellChip(redHeat(off52Mag(r.off52)))}>{r.off52 == null ? "—" : (r.off52 >= -0.05 ? "0%" : Math.round(r.off52) + "%")}</span>
-                  {(r.warns || []).includes("trap") && <span title="Far below its 52-week high — strength here is a bounce, not a breakout." style={{ marginLeft: 4, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
-                  {(r.warns || []).includes("artifact") && <span title="Percentile illusion — RS% looks high but the actual month is negative." style={{ marginLeft: 3, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
                 </td>
               </tr>
             ))}
