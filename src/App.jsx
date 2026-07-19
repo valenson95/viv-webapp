@@ -10527,8 +10527,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <div className="cardhead"><span className="label">Current ROTE</span><span className="infodot" data-tip="Your risk currently on the table as a percent of total equity, measured against the Target ROTE cap you've set.">i</span></div>
               <div className="kpibody">
                 <div className="kpimain">
-                  <div className="kpinum">{pct2(totals.currentRotePct)}</div>
-                  <div className="kpisub">Target {pct2(totals.tgtRotePct)}</div>
+                  {/* stream privacy (admin): ROTE % + target masked behind the same single eye as Equity */}
+                  <div className="kpinum">{privacyOn ? "••••" : pct2(totals.currentRotePct)}</div>
+                  <div className="kpisub">Target {privacyOn ? "••••" : pct2(totals.tgtRotePct)}</div>
                 </div>
                 <div className="kpiviz">
                   <svg viewBox="0 0 70 40" role="img" aria-label="current ROTE versus target">
@@ -10796,13 +10797,13 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                   </div>
                   <div className="out">
                     <div className="outlabel">R per trade <span className="plain">(full)</span></div>
-                    <div className="outval">{(rNumStocks || 0) > 0 ? usd0(rPerTrade) : "—"}</div>
-                    <div className="outsub"><span className="g">{(rNumStocks || 0) > 0 ? pct2(budget.tgtRote * 100 / rNumStocks) : "—"}</span> ROTE each</div>
+                    <div className="outval">{privacyOn ? "•••••" : (rNumStocks || 0) > 0 ? usd0(rPerTrade) : "—"}</div>
+                    <div className="outsub"><span className="g">{privacyOn ? "••••" : (rNumStocks || 0) > 0 ? pct2(budget.tgtRote * 100 / rNumStocks) : "—"}</span> ROTE each</div>
                   </div>
                   <div className="out">
                     <div className="outlabel">Current ROTE</div>
-                    <div className="outval">{pct2(totals.currentRotePct)}</div>
-                    <div className="outsub">Target: <span className="g">{pct2(totals.tgtRotePct)}</span> max</div>
+                    <div className="outval">{privacyOn ? "••••" : pct2(totals.currentRotePct)}</div>
+                    <div className="outsub">Target: <span className="g">{privacyOn ? "••••" : pct2(totals.tgtRotePct)}</span> max</div>
                   </div>
                   <div className="out">
                     <div className="outlabel">Available</div>
