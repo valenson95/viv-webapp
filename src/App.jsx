@@ -759,6 +759,7 @@ const WHATS_NEW = [
       "Tap the card for the FULL EARNINGS VIEW: a surprise radar showing last week's reports — estimate → actual → surprise, and how the stock ACTUALLY reacted (open gap, session, total move) — plus a day navigator where past days show reported results and coming days show estimates.",
       "Tap any ticker for details: the scheduled day and timing, estimates, market cap — and for liquid leaders, their long and short leveraged funds. A reminder flags anything reporting within ~5 days: fresh entries there have no cushion before a report that can gap the stock.",
       "Educational context, not signals — dates are company schedules and can shift until confirmed.",
+      "Polish: the dashboard card stays compact (top 5 names per day — tap for everything), the full view opens on today, and the app no longer flickers when you switch back to the tab.",
     ],
   },
   {
@@ -12758,7 +12759,11 @@ function AppInner() {
       // header, so sync silently fails while public endpoints work. Going direct to www avoids the redirect.
       const onVst = typeof window !== "undefined" && /(^|\.)valensontrades\.com$/i.test(window.location.hostname);
       const syncUrl = onVst ? "https://www.valensontrades.com/api/ibkr-sync" : "/api/ibkr-sync";
-      const res = await fetch(syncUrl, { headers: { Authorization: `Bearer ${session?.access_token || ""}` } });
+      // Always use the CURRENT token from the supabase client — the session object held in React
+      // state is intentionally kept stable across silent token refreshes (anti-flicker), so its
+      // access_token may be stale by the time the user clicks sync.
+      const { data: { session: freshSess } } = await supabase.auth.getSession();
+      const res = await fetch(syncUrl, { headers: { Authorization: `Bearer ${freshSess?.access_token || session?.access_token || ""}` } });
       const json = await res.json();
       if (!json.ok) { setIbkrStatus("error"); setIbkrError(json.error || "Sync failed."); return; }
       setIbkrData(buildIbkrPreview(json, positions, journaledTrades, softDeletedExecIds, ignoreTickers));
@@ -13118,7 +13123,12 @@ function AppInner() {
       if (!s) setAuthLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
+      // ANTI-FLICKER: TOKEN_REFRESHED / SIGNED_IN fire on every window refocus (OBS scene
+      // switches, tab changes) with a NEW session object for the SAME user. Swapping the state
+      // object re-runs every [session]-keyed effect → full data refetch → the visible "blink".
+      // Keep the previous object when the user is unchanged; API calls fetch a fresh token
+      // from the supabase client at call time.
+      setSession((prev) => (prev && s && prev.user?.id === s.user?.id ? prev : s));
       if (!s) { setAuthLoading(false); dataLoaded.current = false; loadFailed.current = false; }
     });
     return () => subscription.unsubscribe();

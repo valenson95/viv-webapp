@@ -612,8 +612,8 @@ export default function EarningsCalendar({ C, font, session }) {
         .earn .sr-pct{flex:0 0 56px;text-align:right;font-size:0.66rem;font-weight:800;font-variant-numeric:tabular-nums}
         .earn .sr-h{font-size:0.5rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:rgba(255,255,255,0.4)}
         /* surprise radar + day navigator side by side; collapse to one column on narrow screens */
-        .earn .earn-duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-bottom:12px}
-        .earn .earn-duo>.earn-card{margin-bottom:0}
+        .earn .earn-duo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:stretch;margin-bottom:12px}
+        .earn .earn-duo>.earn-card{margin-bottom:0;min-width:0}
         @media (max-width:1100px){.earn .earn-duo{grid-template-columns:1fr}}
         /* compressed surprise table inside the half-width duo column (hscroll handles overflow) */
         .earn .sr-card .sr-row{padding:5px 6px;gap:6px}
@@ -708,7 +708,7 @@ export default function EarningsCalendar({ C, font, session }) {
         {!radarHasRows ? (
           <div className="ec-empty" style={{ fontSize: "0.74rem", padding: "14px 10px" }}>No reporters in this window.</div>
         ) : (
-          <RadarStrip radar={radar} today={today} onChipClick={openChip} C={C} />
+          <RadarStrip radar={radar} today={today} onChipClick={openChip} C={C} autoScrollToday />
         )}
       </section>
 
@@ -876,7 +876,9 @@ export function EarningsRadarMini({ C, font, session }) {
   const winStart = addISO(weekStart(today), -7);
   const winEnd = addISO(weekStart(today), 13);
   const winDays = tradingDays.filter((d) => d >= winStart && d <= winEnd);
-  const radar = buildRadar(daysMap, winDays);
+  // Dashboard card stays short: max 5 chips/day (leaders sort first, so leaders survive the cut).
+  // The full popup view shows everything.
+  const radar = buildRadar(daysMap, winDays).map((x) => ({ ...x, rows: x.rows.slice(0, 5) }));
   const hasAny = radar.some((x) => x.rows.length);
   const stamp = `as of ${asof} · updated ${refreshed}`;
   return (
