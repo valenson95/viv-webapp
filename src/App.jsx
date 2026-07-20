@@ -751,6 +751,16 @@ function PlaybookTracker({ trades, uid, setPage }) {
 
 const WHATS_NEW = [
   {
+    tag: "Fix",
+    date: "July 20, 2026",
+    title: "👁 Privacy eye — you're in control",
+    items: [
+      "Some members found their Equity and ROTE masked with dots and no way to reveal them — that's fixed. Dollar amounts now SHOW by default for everyone.",
+      "A new 👁 eye button sits on the Equity card and the Equity curve: tap it to hide your dollar amounts (screenshot-safe), tap again to reveal. Your choice sticks.",
+      "Share-your-win still masks amounts for the screenshot, but now restores your own setting right after — it no longer leaves you hidden.",
+    ],
+  },
+  {
     tag: "New",
     date: "July 20, 2026",
     title: "📅 Earnings, on your radar",
@@ -5563,8 +5573,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   // Affects Total P/L tile, Equity Curve Y-axis, Tracker monthly Comm column, and Closed Trades P/L $ column.
   // Persists in localStorage so the user can leave it on while screenshotting/sharing without re-toggling.
   const [privacyMode, setPrivacyMode] = useState(() => {
-    // Admin (streams tutorials) defaults to privacy ON; an explicit choice persists and wins.
-    try { const s = localStorage.getItem("viv-privacy-mode"); if (s === "1") return true; if (s === "0") return false; return isAdmin; } catch { return isAdmin; }
+    // Default = SHOWING for everyone (Valen 2026-07-20); an explicit eye-toggle choice persists and wins.
+    try { const s = localStorage.getItem("viv-privacy-mode"); if (s === "1") return true; if (s === "0") return false; return false; } catch { return false; }
   });
   useEffect(() => { try { localStorage.setItem("viv-privacy-mode", privacyMode ? "1" : "0"); } catch {} }, [privacyMode]);
   // Link Historical Trades wizard — backfill `positionId` on legacy/unlinked journal trades.
@@ -5694,6 +5704,10 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   const shareWin = useCallback(async () => {
     if (winShareBusy) return;
     setWinShareBusy(true);
+    // Remember the user's own privacy choice — the flow masks $ only for the screenshot and
+    // MUST restore after (a member once got permanently stuck masked with no visible toggle).
+    let prevPrivacy = false;
+    try { prevPrivacy = localStorage.getItem("viv-privacy-mode") === "1"; } catch {}
     setPrivacyMode(true);                                   // 1. privacy on so dollar amounts are hidden
     await new Promise(r => setTimeout(r, 400));             // let React re-render the % values
     try {
@@ -5717,6 +5731,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
         }, "image/png"));
       }
     } catch (e) { console.error("Win share failed:", e); }
+    setPrivacyMode(prevPrivacy);                             // restore the user's own choice
     setWinShareBusy(false);
     window.open(SKOOL_URL, "_blank", "noopener,noreferrer");  // 3. open Skool to paste the image
   }, [winShareBusy, buildCanvasFromRef]);
@@ -8602,7 +8617,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
         {/* EQUITY CURVE + RETURN DISTRIBUTION */}
         <div className="chartrow">
           <div className="chartcol eqcol">
-            <div className="toolbar" style={{ display: "flex", alignItems: "center", gap: 10 }}><h2 className="sech guide" onMouseEnter={guideEnter("eq", "Equity curve", "Your account value over time. A line climbing left to right means your account is growing. Toggle dollars / percent.", "/audio/equity-curve.mp3")} onMouseLeave={guideLeave("eq")}>Equity curve</h2>{isAdmin && <EyeToggle on={privacyMode} onClick={() => setPrivacyMode(p => !p)} title={privacyMode ? "Account size hidden (stream-safe) — reveal $" : "Hide account size for streaming"} />}</div>
+            <div className="toolbar" style={{ display: "flex", alignItems: "center", gap: 10 }}><h2 className="sech guide" onMouseEnter={guideEnter("eq", "Equity curve", "Your account value over time. A line climbing left to right means your account is growing. Toggle dollars / percent.", "/audio/equity-curve.mp3")} onMouseLeave={guideLeave("eq")}>Equity curve</h2><EyeToggle on={privacyMode} onClick={() => setPrivacyMode(p => !p)} title={privacyMode ? "Amounts hidden — tap to reveal $" : "Hide dollar amounts (screenshot-safe)"} /></div>
             <div className="card reveal" id="eqCaptureCard">
               {equityCardBody}
             </div>
@@ -10085,7 +10100,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
   // Stream privacy (admin) — hide account size on the Equity KPI card. Shares the "viv-privacy-mode"
   // key with the Journal, so the eye stays in sync across pages. Admin fresh device = ON.
   const [privacyOn, setPrivacyOn] = useState(() => {
-    try { const s = localStorage.getItem("viv-privacy-mode"); if (s === "1") return true; if (s === "0") return false; return isAdmin; } catch { return isAdmin; }
+    // Default = SHOWING for everyone (Valen 2026-07-20, after a member got stuck masked).
+    // An explicit eye-toggle choice persists and wins; the eye renders for all accounts.
+    try { const s = localStorage.getItem("viv-privacy-mode"); if (s === "1") return true; if (s === "0") return false; return false; } catch { return false; }
   });
   useEffect(() => { try { localStorage.setItem("viv-privacy-mode", privacyOn ? "1" : "0"); } catch {} }, [privacyOn]);
   // Edge Ledger (admin) — collapsed by default; the choice persists.
@@ -10520,7 +10537,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             /* K3: Equity */
             equity: (
             <div className="card kpi">
-              <div className="cardhead"><span className="label">Equity</span><InfoDot tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number." />{isAdmin && <EyeToggle on={privacyOn} onClick={() => setPrivacyOn(p => !p)} title={privacyOn ? "Account size hidden (stream-safe) — reveal" : "Hide account size for streaming"} />}<button className="ghostchip" onClick={() => setCfgOpen(o => !o)} aria-expanded={cfgOpen} title="Edit your starting capital and sizing inputs">⚙ Configure</button></div>
+              <div className="cardhead"><span className="label">Equity</span><InfoDot tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number." /><EyeToggle on={privacyOn} onClick={() => setPrivacyOn(p => !p)} title={privacyOn ? "Amounts hidden — tap to reveal" : "Hide dollar amounts (screenshot-safe)"} /><button className="ghostchip" onClick={() => setCfgOpen(o => !o)} aria-expanded={cfgOpen} title="Edit your starting capital and sizing inputs">⚙ Configure</button></div>
               <div className="kpibody">
                 <div className="kpimain">
                   <div className="kpinum gold">{privacyOn ? "•••••••" : usd0(compEquity)}</div>
