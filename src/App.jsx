@@ -753,6 +753,16 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 20, 2026",
+    title: "⬇ Export your Model Book",
+    items: [
+      "Two new export buttons in the Model Book (they appear once your 🔒 My Book has entries): PDF and CSV — your entries only, yours to keep.",
+      "EXPORT PDF: a branded study book — cover page, then one page per entry with the BEFORE and AFTER charts side by side, score, the factors you ticked, and your thesis & lesson. Opens a print view; hit Save as PDF (tip: Landscape orientation gives the charts more room).",
+      "EXPORT CSV: a flat spreadsheet with every checklist item as its own TRUE/FALSE column plus outcomes, metrics and notes — built for running through any analysis tool to hunt the commonalities in your winners (member-requested!).",
+    ],
+  },
+  {
+    tag: "New",
+    date: "July 20, 2026",
     title: "📋 Daily Setups scorecard, grader-style",
     items: [
       "The scorecard on every Daily Setup now uses the SAME sectioned layout as the Setup Grader — Prior move / Base quality / Trigger day, each tick with its plain-English meaning and ★-maker / Bonus tags. One format everywhere, no translating between views.",

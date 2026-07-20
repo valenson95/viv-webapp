@@ -64,6 +64,122 @@ export const OUTCOMES = ["Huge Winner", "Winner", "Subpar", "Loser"];
 // Member Model Book editor passes { makerGate: false } → equal-weight ticks, no confluence gate.
 export function starsFromTicked(ticked, opts) { return scoreTicked(ticked, opts); }
 
+// ── My Book CSV export (member-requested: run your own entries through any analysis tool) ──
+// One flat row per entry; every v2 checklist tick is its own named TRUE/FALSE column so
+// commonalities are countable without parsing. Legacy-checklist (v1) rows keep tick columns
+// BLANK (their ticks scored against a different list — blank = "not measured", never guessed).
+const CSV_TICK_COLS = [ // fixed v2 si-ii order — stays in lockstep with SECTIONS in SetupGrader.jsx
+  ["0-0", "prior_pole_30pct"], ["0-1", "pole_linear"], ["0-2", "young_trend"],
+  ["1-0", "tightening_series"], ["1-1", "volume_dry_up"], ["1-2", "orderly_base"], ["1-3", "higher_lows"],
+  ["1-4", "day_before_quiet"], ["1-5", "inside_bar_bonus"], ["1-6", "ma_convergence_bonus"], ["1-7", "surfing_ma"],
+  ["2-0", "day1_range_expansion"], ["2-1", "max2_updays"], ["2-2", "closed_70pct_range"], ["2-3", "volume_expansion"], ["2-4", "gapped_up"],
+];
+const csvCell = (v) => { const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+export function buildMyBookCsv(rows, { makerGate } = {}) {
+  const head = ["ticker", "entry_date", "exit_date", "pattern", "theme", "outcome", "stars", "score_pct", "checklist_version",
+    ...CSV_TICK_COLS.map(([, name]) => name),
+    "captured_pct", "run_up_pct", "days_held", "r_multiple", "characteristics", "thesis", "lesson", "chart_before_url", "chart_after_url"];
+  const lines = [head.join(",")];
+  for (const r of rows) {
+    const v2 = versionOf(r.ticked) !== 1;
+    const tset = new Set(r.ticked || []);
+    const g = scoreTicked(r.ticked, makerGate === false ? { makerGate: false } : undefined);
+    lines.push([
+      r.ticker, r.entry_date, r.exit_date, r.pattern, r.theme, r.outcome, g.stars, g.pct != null ? Math.round(g.pct * 100) + "%" : "", v2 ? "v2" : "v1",
+      ...CSV_TICK_COLS.map(([k]) => (v2 ? (tset.has(k) ? "TRUE" : "FALSE") : "")),
+      r.run_pct, r.run_up_pct, r.days_held, r.r_mult, (r.characteristics || []).join(" | "), r.thesis, r.lesson, r.before_img, r.after_img,
+    ].map(csvCell).join(","));
+  }
+  return lines.join("\r\n");
+}
+export function downloadMyBookCsv(rows, opts) {
+  const blob = new Blob(["﻿" + buildMyBookCsv(rows, opts)], { type: "text/csv;charset=utf-8" }); // BOM: Excel opens UTF-8 cleanly
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `VIV-ModelBook-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+// ── My Book PDF export — a branded study book: one entry per page, BEFORE → AFTER charts,
+// score + ticked factors + the member's own thesis/lesson. Opens a print view in a new tab;
+// the browser's native "Save as PDF" does the rendering (no libraries, charts included).
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+export function openMyBookPdf(rows, { makerGate } = {}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const entry = (r) => {
+    const g = scoreTicked(r.ticked, makerGate === false ? { makerGate: false } : undefined);
+    const tset = new Set(r.ticked || []);
+    const ticks = sectionsFor(r.ticked).filter((s) => !s.reminder).flatMap((sec, si) =>
+      sec.items.map((it, ii) => tset.has(si + "-" + ii) ? `<span class="tick">✓ ${esc(it.c)}</span>` : "").filter(Boolean));
+    const stat = (k, v) => v || v === 0 ? `<div class="st"><div class="sk">${k}</div><div class="sv">${esc(v)}</div></div>` : "";
+    return `<section class="entry">
+      <div class="ehead">
+        <div><span class="tk">${esc(r.ticker)}</span><span class="pat">${esc(r.pattern || "")}</span></div>
+        <div class="emeta">${esc(r.entry_date || "")}${r.exit_date ? " → " + esc(r.exit_date) : ""} · <b class="${/win/i.test(r.outcome || "") ? "good" : /los/i.test(r.outcome || "") ? "bad" : ""}">${esc(r.outcome || "—")}</b> · ${"★".repeat(g.stars || 0)}${"☆".repeat(Math.max(0, 5 - (g.stars || 0)))} ${g.pct != null ? Math.round(g.pct * 100) + "%" : ""}</div>
+      </div>
+      <div class="charts">
+        <figure><figcaption>BEFORE — the setup</figcaption>${r.before_img ? `<img src="${esc(r.before_img)}"/>` : '<div class="noimg">no chart</div>'}</figure>
+        <figure><figcaption>AFTER — the outcome</figcaption>${r.after_img ? `<img src="${esc(r.after_img)}"/>` : '<div class="noimg">no chart</div>'}</figure>
+      </div>
+      <div class="stats">${stat("Captured %", r.run_pct)}${stat("Run-up % (peak)", r.run_up_pct)}${stat("Days held", r.days_held)}${stat("R multiple", r.r_mult)}${stat("Theme", r.theme)}</div>
+      ${ticks.length ? `<div class="ticks">${ticks.join("")}</div>` : ""}
+      ${r.thesis ? `<div class="note"><b>Thesis:</b> ${esc(r.thesis)}</div>` : ""}
+      ${r.lesson ? `<div class="note"><b>Lesson:</b> ${esc(r.lesson)}</div>` : ""}
+    </section>`;
+  };
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>My Model Book — ${today}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+    <style>
+      *{box-sizing:border-box;margin:0}
+      body{background:#08080e;color:#e8e6e0;font-family:'Plus Jakarta Sans',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      @page{size:A4;margin:0}
+      .page,.entry{padding:34px 38px;page-break-after:always;min-height:96vh}
+      .cover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
+      .cover .brand{color:#c9982a;font-size:0.8rem;font-weight:800;letter-spacing:0.3em;text-transform:uppercase}
+      .cover h1{font-size:2.6rem;font-weight:800;letter-spacing:-0.03em;margin:14px 0 8px}
+      .cover .sub{color:#9a968c;font-size:0.95rem}
+      .toolbar{position:fixed;top:14px;right:14px;display:flex;gap:8px;z-index:9}
+      .toolbar button{background:linear-gradient(120deg,#c9982a,#f0c050);border:none;color:#08080e;font-family:inherit;font-weight:800;font-size:0.85rem;padding:10px 20px;border-radius:99px;cursor:pointer}
+      @media print{.toolbar{display:none}}
+      .ehead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(201,152,42,0.35);padding-bottom:10px;margin-bottom:14px}
+      .tk{font-size:1.7rem;font-weight:800;letter-spacing:-0.02em}
+      .pat{margin-left:12px;color:#c9982a;font-weight:700;font-size:0.85rem}
+      .emeta{color:#9a968c;font-size:0.8rem;font-weight:700}
+      .good{color:#22c55e}.bad{color:#ef4444}
+      .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+      figure{min-width:0}
+      figure img{width:100%;max-height:52vh;object-fit:contain;border:1px solid rgba(255,255,255,0.12);border-radius:10px;background:#000}
+      figcaption{font-size:0.62rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#c9982a;margin-bottom:5px}
+      .noimg{border:1px dashed rgba(255,255,255,0.2);border-radius:10px;padding:30px;text-align:center;color:#666;font-size:0.8rem}
+      .stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+      .st{border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:7px 14px;background:rgba(255,255,255,0.03)}
+      .sk{font-size:0.56rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#9a968c}
+      .sv{font-size:0.95rem;font-weight:800;margin-top:1px}
+      .ticks{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+      .tick{font-size:0.66rem;font-weight:700;color:#e8e6e0;border:1px solid rgba(201,152,42,0.4);background:rgba(201,152,42,0.08);border-radius:99px;padding:4px 10px}
+      .note{font-size:0.8rem;line-height:1.55;color:#cfccc3;margin-bottom:8px}
+      .note b{color:#c9982a}
+      .foot{color:#66635b;font-size:0.6rem;margin-top:10px}
+    </style></head><body>
+    <div class="toolbar"><button onclick="window.print()">⬇ Save as PDF</button></div>
+    <div class="page cover">
+      <div class="brand">Valen Insiders Vault</div>
+      <h1>My Model Book</h1>
+      <div class="sub">${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${today}</div>
+      <div class="sub" style="margin-top:26px;max-width:60ch;line-height:1.6">Your own pattern library — the setup, the factors that were present, and the outcome. Study the pairs; the commonalities are the edge. Educational, not advice.</div>
+    </div>
+    ${rows.map(entry).join("")}
+    <script>window.onload=()=>{const imgs=[...document.images];Promise.all(imgs.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r})))};</script>
+    </body></html>`;
+  // Blob URL instead of document.write into about:blank — Safari/strict browsers render the
+  // latter as a blank page. A blob document is a first-class page in every browser.
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+  const w = window.open(url, "_blank");
+  if (!w) { URL.revokeObjectURL(url); return alert("Pop-up blocked — allow pop-ups for this site to export the PDF."); }
+  setTimeout(() => URL.revokeObjectURL(url), 60000); // long grace: the tab must finish loading images
+}
+
 // The elite layer — ONLY factors the Setup Grader checklist does NOT already score
 // (no double-counting: dead volume / inside days / EMA pinch / freshness are grader ★-makers).
 export const ELITE = [
@@ -455,6 +571,16 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         </div>
         {!editing && !studyEditing && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {mineCount > 0 && (
+              <>
+                <button onClick={() => openMyBookPdf(rows.filter(r => r.created_by === uid && !isStudyRow(r)), isAdmin ? undefined : { makerGate: false })}
+                  title="Your book as a branded PDF — one page per entry with the BEFORE and AFTER charts, score, factors and your notes. Opens a print view; use Save as PDF."
+                  style={{ background: "rgba(255,255,255,0.04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ Export PDF</button>
+                <button onClick={() => downloadMyBookCsv(rows.filter(r => r.created_by === uid && !isStudyRow(r)), isAdmin ? undefined : { makerGate: false })}
+                  title="Download YOUR entries as a CSV — every checklist tick as its own TRUE/FALSE column, plus outcomes, metrics and your notes. Feed it to any analysis tool to hunt commonalities."
+                  style={{ background: "rgba(255,255,255,0.04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ CSV</button>
+              </>
+            )}
             <button onClick={() => (studyMode && fScope === "mine" && isAdmin) ? setStudyEditing({}) : setEditing({})} style={{ background: `linear-gradient(120deg, ${C.goldMid}, ${C.goldBright}, ${C.goldDeep})`, color: "#0a0a0a", border: "none", fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", boxShadow: "0 6px 18px rgba(201,152,42,0.25)" }}>{(studyMode && fScope === "mine" && isAdmin) ? "＋ New study" : isAdmin ? "+ Add entry" : "+ Add to my book"}</button>
           </div>
         )}
