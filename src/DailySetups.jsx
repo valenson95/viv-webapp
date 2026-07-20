@@ -506,10 +506,12 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                   </div>
                 </div>
 
-                {/* auditable scorecard: all ticks flat, no subheaders (Valen's spec). VERSION-AWARE:
-                    a post's own checklist labels/denominator (legacy vs v2) come from sectionsFor. */}
+                {/* auditable scorecard — SAME sectioned format as the Setup-Grader checklist
+                    (Valen 2026-07-20: members must see one consistent layout in both places).
+                    VERSION-AWARE: labels/denominator (legacy vs v2) come from sectionsFor. */}
                 {expanded && (() => {
                   const sec2 = scoreTicked(r.ticked); // version-aware passed/total for the header count
+                  const secs = sectionsFor(r.ticked).filter((s) => !s.reminder);
                   return (
                   <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
                     <div style={{ ...cardHead, paddingBottom: 9, marginBottom: 11 }}>
@@ -517,19 +519,39 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                       <span title="Scored criteria — ★ marks a confluence factor (★-maker), a Bonus tick is tracked but not scored; a gold dot ● marks a tick VIV auto-read off the chart. Every grade is auditable: each star traces to its ticks." style={{ width: 15, height: 15, borderRadius: "50%", border: `1px solid ${C.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 700, fontStyle: "italic", color: faint, cursor: "help", flex: "none" }}>i</span>
                       <span style={{ background: C.goldDim, color: C.goldBright, fontSize: "0.62rem", fontWeight: 800, padding: "2px 9px", borderRadius: 980, marginLeft: "auto" }}>{sec2.passed}/{sec2.total} criteria</span>
                     </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {sectionsFor(r.ticked).flatMap((sec, si) => sec.reminder ? [] : sec.items.map((it, ii) => {
-                        const k = si + "-" + ii, isOn = tickedSet.has(k);
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 12, alignItems: "stretch" }}>
+                      {secs.map((sec, siLocal) => {
+                        const si = sectionsFor(r.ticked).indexOf(sec);
+                        const onCount = sec.items.filter((_, ii) => tickedSet.has(si + "-" + ii)).length;
                         return (
-                          <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.72rem", fontWeight: 600, padding: "5px 11px", borderRadius: 980, border: `1px solid ${isOn ? "rgba(34,197,94,0.28)" : C.border}`, background: isOn ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.03)", color: isOn ? C.text : faint }}>
-                            <span style={{ fontWeight: 800, color: isOn ? C.green : "rgba(255,255,255,0.22)" }}>{isOn ? "✓" : "✗"}</span>
-                            {it.c}
-                            {it.star && <span title="★-maker (confluence factor)" style={{ fontSize: "0.62rem", color: isOn ? C.goldMid : "rgba(255,255,255,0.2)" }}>★</span>}
-                            {it.bonus && <span title="Bonus factor — tracked but not scored" style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: isOn ? C.goldBright : "rgba(255,255,255,0.25)", border: `1px solid ${isOn ? C.goldBright : "rgba(255,255,255,0.2)"}`, padding: "0 5px", borderRadius: 99 }}>Bonus</span>}
-                            {isOn && autoSet.has(k) && <span title="Auto-read from the chart by VIV" style={{ fontSize: "0.56rem", color: C.goldBright }}>●</span>}
-                          </span>
+                          <div key={sec.title} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: "rgba(255,255,255,0.018)", padding: "12px 14px", minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                              <span style={{ width: 20, height: 20, borderRadius: 6, background: C.goldDim, color: C.goldBright, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.66rem", fontWeight: 800, flex: "none" }}>{siLocal + 1}</span>
+                              <span style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold }}>{sec.title}</span>
+                              <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 800, color: onCount ? C.goldBright : faint, border: `1px solid ${C.border}`, padding: "1px 8px", borderRadius: 980, fontVariantNumeric: "tabular-nums" }}>{onCount}/{sec.items.length}</span>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                              {sec.items.map((it, ii) => {
+                                const k = si + "-" + ii, isOn = tickedSet.has(k);
+                                return (
+                                  <div key={k} style={{ display: "flex", gap: 9, alignItems: "flex-start", minWidth: 0 }}>
+                                    <span style={{ flex: "none", width: 16, height: 16, marginTop: 1, borderRadius: 5, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.62rem", fontWeight: 800, border: `1px solid ${isOn ? "rgba(34,197,94,0.5)" : C.border}`, background: isOn ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.03)", color: isOn ? C.green : "rgba(255,255,255,0.18)" }}>{isOn ? "✓" : ""}</span>
+                                    <div style={{ minWidth: 0 }}>
+                                      <div style={{ fontSize: "0.74rem", fontWeight: 700, color: isOn ? C.text : "rgba(255,255,255,0.62)", lineHeight: 1.35 }}>
+                                        {it.c}
+                                        {it.star && <span title="★-maker (confluence factor)" style={{ fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.05em", color: isOn ? C.goldBright : "rgba(255,255,255,0.3)", border: `1px solid ${isOn ? C.goldBright : "rgba(255,255,255,0.2)"}`, padding: "0 5px", borderRadius: 99, marginLeft: 6, whiteSpace: "nowrap" }}>★ MAKER</span>}
+                                        {it.bonus && <span title="Bonus factor — tracked but not scored" style={{ fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: isOn ? C.goldBright : "rgba(255,255,255,0.3)", border: `1px solid ${isOn ? C.goldBright : "rgba(255,255,255,0.2)"}`, padding: "0 5px", borderRadius: 99, marginLeft: 6, whiteSpace: "nowrap" }}>Bonus</span>}
+                                        {isOn && autoSet.has(k) && <span title="Auto-read from the chart by VIV" style={{ fontSize: "0.6rem", color: C.goldBright, marginLeft: 5 }}>●</span>}
+                                      </div>
+                                      {it.s && <div style={{ fontSize: "0.66rem", color: faint, lineHeight: 1.45, marginTop: 1 }}>{it.s}</div>}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         );
-                      }))}
+                      })}
                     </div>
                   </div>
                   );

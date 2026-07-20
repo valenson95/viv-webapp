@@ -751,6 +751,14 @@ function PlaybookTracker({ trades, uid, setPage }) {
 
 const WHATS_NEW = [
   {
+    tag: "New",
+    date: "July 20, 2026",
+    title: "📋 Daily Setups scorecard, grader-style",
+    items: [
+      "The scorecard on every Daily Setup now uses the SAME sectioned layout as the Setup Grader — Prior move / Base quality / Trigger day, each tick with its plain-English meaning and ★-maker / Bonus tags. One format everywhere, no translating between views.",
+    ],
+  },
+  {
     tag: "Fix",
     date: "July 20, 2026",
     title: "👁 Privacy eye — you're in control",
