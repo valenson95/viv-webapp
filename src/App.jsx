@@ -13,6 +13,7 @@ import ThemeStrip from "./ThemeStrip.jsx";
 import MarketContext from "./MarketContext.jsx";
 import EdgeLedger from "./EdgeLedger.jsx";
 import QuantAnalysis from "./QuantAnalysis.jsx";
+import { EarningsRadarMini } from "./EarningsCalendar.jsx";
 import { RotationMini, InfoDot, Tip } from "./GroupRS.jsx";
 import { BreadthMini } from "./MarketMonitor.jsx";
 import SetupGraderTab from "./SetupGrader.jsx";
@@ -749,6 +750,17 @@ function PlaybookTracker({ trades, uid, setPage }) {
 }
 
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "July 20, 2026",
+    title: "📅 Earnings, on your radar",
+    items: [
+      "EARNINGS — ON YOUR RADAR: a new dashboard card mapping the next three weeks of earnings day by day — mornings and nights split, your liquid leaders in gold, the day's biggest other reporters filling in quietly. Scroll back a week to see what already hit.",
+      "Tap the card for the FULL EARNINGS VIEW: a surprise radar showing last week's reports — estimate → actual → surprise, and how the stock ACTUALLY reacted (open gap, session, total move) — plus a day navigator where past days show reported results and coming days show estimates.",
+      "Tap any ticker for details: the scheduled day and timing, estimates, market cap — and for liquid leaders, their long and short leveraged funds. A reminder flags anything reporting within ~5 days: fresh entries there have no cushion before a report that can gap the stock.",
+      "Educational context, not signals — dates are company schedules and can shift until confirmed.",
+    ],
+  },
   {
     tag: "New",
     date: "July 19, 2026",
@@ -9233,6 +9245,10 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 /* P3b. LENS ROW — Row A = 3 lenses (auto-fit so it wraps to stacked cards on narrow), Row B = 2 cols */
 .vd.expert .lensrowA{display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px; align-items:stretch}
 .vd.expert .lensrowA > *{min-width:0; height:100%}
+/* NEW second lens row — fixed 3-col template so a lone mini occupies ONE column (empty space to
+   its right is fine) instead of stretching absurdly wide; collapses to full width on phones. */
+.vd.expert .lensrowB{display:grid; grid-template-columns:1fr; gap:14px; align-items:start; margin-top:14px}
+.vd.expert .lensrowB > *{min-width:0}
 /* each full-column slot is a drag-wrapper that passes height through to its card */
 .vd.expert .lensrowA > .dragwrap{display:flex; flex-direction:column; min-width:0}
 .vd.expert .lensrowA > .dragwrap > *{flex:1 1 auto; min-height:0}
@@ -10649,14 +10665,22 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             };
             return (
               // 3 grid columns; column 3 is a stack of two slots. Whole row wraps under ~940px (auto-fit minmax 300px)
-              <div className="lensrowA" style={{ marginTop: 14 }}>
-                {slot(0)}
-                {slot(1)}
-                <div className="lensstack">
-                  {slot(2)}
-                  {slot(3)}
+              <>
+                <div className="lensrowA" style={{ marginTop: 14 }}>
+                  {slot(0)}
+                  {slot(1)}
+                  <div className="lensstack">
+                    {slot(2)}
+                    {slot(3)}
+                  </div>
                 </div>
-              </div>
+                {/* FULL-WIDTH row below the lens row — the Earnings "On Your Radar" strip (a horizontal
+                    leaders-by-day timeline), so it spans the whole width. Whole card opens the full
+                    Earnings calendar in a popup. NOT in the drag system. Visible to all users. */}
+                <div className="lensrowB">
+                  <EarningsRadarMini C={C} font={font} session={session} />
+                </div>
+              </>
             );
           })()}
           {/* admin-only Edge Ledger: wrapped so the 14px row rhythm holds (its own card has no top
@@ -12177,6 +12201,10 @@ function QuantShell({ setPage, session }) {
   );
 }
 
+// EARNINGS CALENDAR nav shell removed 2026-07-20 — the Earnings view now opens only from the
+// dashboard "On Your Radar" mini popup (EarningsRadarMini), matching the retired Rotation/Breadth
+// nav precedent. No standalone nav page.
+
 // GROUP RS / MARKET MONITOR shells removed 2026-07-19 — Rotation & Breadth now open from the
 // dashboard lens-card popups (RotationMini/BreadthMini → GroupRS/MarketMonitor). No nav page.
 
@@ -12612,9 +12640,9 @@ function AppInner() {
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
-  // Guard: the retired Rotation/Breadth nav pages ("grouprs"/"monitor") now live in dashboard
-  // popups. If any lingering state lands on them, fall back to the dashboard (never a blank route).
-  useEffect(() => { if (page === "grouprs" || page === "monitor") setPage("dashboard"); }, [page]);
+  // Guard: the retired Rotation/Breadth/Earnings nav pages ("grouprs"/"monitor"/"earnings") now live
+  // in dashboard popups. If any lingering state lands on them, fall back to the dashboard (never a blank route).
+  useEffect(() => { if (page === "grouprs" || page === "monitor" || page === "earnings") setPage("dashboard"); }, [page]);
   // Pull the member's setup grades from Supabase (cross-device) once logged in; localStorage stays the offline cache.
   useEffect(() => { if (session?.user?.id) initGrades(session.user.id); }, [session?.user?.id]);
   const [sidebarOpen, setSidebarOpen] = useState(false);

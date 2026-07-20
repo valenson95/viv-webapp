@@ -247,10 +247,10 @@ function HoldingsPopup({ target, onClose, C, font }) {
     </div>, document.body);
 }
 
-export default function GroupRS({ C, font, session }) {
+export default function GroupRS({ C, font, session, initialTab = "groups" }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL;
   const [filter, setFilter] = useState("all"); // all | buy | fresh | resting | warn
-  const [tab, setTab] = useState("groups");     // groups | planfocus | liquid
+  const [tab, setTab] = useState(initialTab);   // groups | planfocus | liquid
   const [howOpen, setHowOpen] = useState(true);
   const [methodOpen, setMethodOpen] = useState(false);
   const [holdingsFor, setHoldingsFor] = useState(null); // {t, name} of the ticker whose holdings popup is open
