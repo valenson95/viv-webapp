@@ -12,7 +12,7 @@
 // long/short = the liquid leveraged/inverse ETFs tracking each name.
 export const GROUP_RS = {
   "asof": "2026-07-17",
-  "refreshed": "2026-07-19",
+  "refreshed": "2026-07-20",
   "rows": [
     {
       "t": "KWEB",
