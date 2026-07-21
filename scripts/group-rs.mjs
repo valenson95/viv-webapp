@@ -77,6 +77,8 @@ const UNIVERSE = [
   ["OIH", "Large-Cap Oil Services"],
   ["XES", "Oil & Gas Equip & Services"],
   ["ESPO", "E-Sports"],
+  ["ARKF", "ARK Fintech"],          // appeared in Jeff's 2026-07-21 groups post
+  ["PALL", "Palladium"],            // appeared in Jeff's 2026-07-21 groups post
 ];
 // Plan & Focus map — the source's SECOND artifact (jeff-sun-master-system.md §14b): four FIXED
 // blocks (Index → Segment → EW Sector → SPDR Sector), RSP pinned as the labeled benchmark row.
@@ -220,7 +222,10 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const shift = (ds, n) => { const d = new Date(ds + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 // Stamp dates on VALEN'S clock (MYT) — members read the app from Malaysia; a UTC stamp goes
 // stale-looking at midnight MYT while the US session is still running (Valen 2026-07-21).
-const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(new Date());
+// NOTE: this node build lacks tz ICU (Intl timeZone silently falls back to LOCAL) — so use
+// local date parts directly; this script always runs on Valen's Mac, whose local clock IS MYT.
+const _d = new Date(), _p = (n) => String(n).padStart(2, "0");
+const today = `${_d.getFullYear()}-${_p(_d.getMonth() + 1)}-${_p(_d.getDate())}`;
 const FROM = shift(today, -420); // ~420 calendar days back → comfortably >252 trading bars
 
 // bars() — identical shape to study-fill.mjs; returns [{d,t,o,h,l,c,v}] oldest→newest.
@@ -267,7 +272,45 @@ const f = (x, d = 2) => x == null || Number.isNaN(x) || !isFinite(x) ? null : +x
 // ETF, throttled. `--from-cache` skips ALL fetching and reuses scripts/.grouprs-cache.json.
 import { existsSync, readFileSync } from "fs";
 const CACHE = "scripts/.grouprs-cache.json";
-const useCache = process.argv.includes("--from-cache") && existsSync(CACHE);
+
+// ── --fast: near-instant refresh. Appends only the MISSING completed sessions to the cached
+// bars via /api/grouped (ONE bulk call per market day — the whole US market in one response)
+// then computes from cache. Falls back automatically: no cache → full per-ticker fetch.
+// A ticker added to a universe AFTER the cache was built still needs one full run to backfill.
+const fastMode = process.argv.includes("--fast") && existsSync(CACHE);
+if (process.argv.includes("--fast") && !existsSync(CACHE)) console.log("--fast: no cache yet → falling back to FULL fetch this once.");
+if (fastMode) {
+  const c = JSON.parse(readFileSync(CACHE, "utf8"));
+  const lastCached = c.benchmarks.RSP[c.benchmarks.RSP.length - 1].d;
+  // Last COMPLETED US close, in UTC terms (EDT close = 20:00 UTC; +15min settle).
+  const now = new Date();
+  let target = now.toISOString().slice(0, 10);
+  const utcMins = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const step = (s) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
+  if (utcMins < 1215) target = step(target); // before ~20:15 UTC → today's close not printed yet
+  while ([0, 6].includes(new Date(target + "T12:00:00Z").getUTCDay())) target = step(target);
+  const wanted = new Set(["RSP", "SPY", ...UNIVERSE.map(u => u[0]), ...PF_UNIVERSE.map(u => u[0]), ...LL_UNIVERSE.map(u => u.t)]);
+  const symbolsCSV = [...wanted].join(",");
+  const days = [];
+  for (let d = lastCached; d < target;) { d = (() => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); })(); if (![0, 6].includes(new Date(d + "T12:00:00Z").getUTCDay())) days.push(d); }
+  console.log(`GROUP-RS · FAST · cache thru ${lastCached} · target ${target} · ${days.length} missing session(s)`);
+  for (const d of days) {
+    const r = await fetch(`https://www.valensontrades.com/api/grouped?date=${d}&symbols=${symbolsCSV}`);
+    const j = await r.json();
+    if (!j.ok) { console.log(`  ${d}: grouped fetch failed (${j.error}) — skipping`); continue; }
+    if (!j.count) { console.log(`  ${d}: no bars (holiday) — skipped`); continue; }
+    const px = new Map(j.results.map(x => [x.T, x]));
+    const append = (t, bars) => { const x = px.get(t); if (x && bars && bars[bars.length - 1]?.d !== d) bars.push({ d, t: x.t, o: x.o, h: x.h, l: x.l, c: x.c, v: x.v }); };
+    for (const B of ["RSP", "SPY"]) append(B, c.benchmarks[B]);
+    for (const r2 of c.raw) append(r2.t, r2.bars);
+    for (const r2 of c.rawPF || []) append(r2.t, r2.bars);
+    for (const r2 of c.rawLL || []) append(r2.t, r2.bars);
+    console.log(`  ${d}: appended ${j.count} tickers ✓`);
+  }
+  c.fetched = today;
+  writeFileSync(CACHE, JSON.stringify(c));
+}
+const useCache = (process.argv.includes("--from-cache") || fastMode) && existsSync(CACHE);
 let spy, spyAlt, raw, rawPF, rawLL;
 if (useCache) {
   const c = JSON.parse(readFileSync(CACHE, "utf8"));
@@ -483,12 +526,16 @@ const llRows = metricsLL.map((x) => {
 // stamp it "(intraday HH:MM ET)" so members never mistake a mid-session read for the close.
 let asof = spy[spy.length - 1].d;
 {
-  const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
-  const mins = et.getHours() * 60 + et.getMinutes();
-  const wkday = et.getDay() >= 1 && et.getDay() <= 5;
-  const etISO = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
-  if (asof === etISO && wkday && mins >= 570 && mins < 960)
-    asof += ` (intraday ${String(et.getHours()).padStart(2, "0")}:${String(et.getMinutes()).padStart(2, "0")} ET)`;
+  // ICU-free intraday check: during US RTH, UTC 13:30–20:00 on the asof date itself.
+  // (Assumes EDT; in winter the window shifts 1h — acceptable for a warning label.)
+  const now = new Date();
+  const utcMins = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const utcISO = now.toISOString().slice(0, 10);
+  const wkday = now.getUTCDay() >= 1 && now.getUTCDay() <= 5;
+  if (asof === utcISO && wkday && utcMins >= 810 && utcMins < 1200) {
+    const etH = (now.getUTCHours() + 20) % 24; // EDT = UTC−4
+    asof += ` (intraday ${String(etH).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")} ET)`;
+  }
 }
 const payload = { asof, refreshed: today, rows, pf, ll: llRows };
 

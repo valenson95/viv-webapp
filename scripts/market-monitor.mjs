@@ -182,7 +182,9 @@ for r in range(3, ws.max_row + 1):
   const asof = rows[rows.length - 1]?.date || null;
   const payload = {
     asof,
-    refreshed: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(new Date()), // MYT — Valen's/members' clock
+    // MYT stamp via LOCAL date parts — this node lacks tz ICU (Intl timeZone falls back to
+    // local silently); the script always runs on Valen's Mac whose local clock IS MYT.
+    refreshed: (() => { const d = new Date(), p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; })(),
     source,
     headers: COLS.map((c) => c.hdr),
     cols: COLS,                       // key <-> verbatim header pairing for the table
