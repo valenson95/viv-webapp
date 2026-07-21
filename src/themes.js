@@ -79,8 +79,9 @@ export const THEME_SNAPSHOTS = {
     // Medical/Home-Construction/Banks green while AI/Semis/Cyber/Quantum stayed red intraday.
     day:   [["Medical",2.90],["Home Construction",2.66],["Banks",2.40],["Transports",2.26],["Real Estate",1.68],["Retail",1.59],["Materials",1.15],["Airlines",1.00],["Industrials",0.76],["HealthCare",0.72],["Utilities",0.51],["Bitcoin",0.05],["Biotechnology",-0.02],["Steel",-0.17],["China Internet",-0.25],["Robotics",-0.45],["Software",-0.50],["Oil & Gas",-1.04],["Cybersecurity",-1.16],["Semiconductors",-1.19],["Telecom",-1.26],["AI",-1.40],["Aerospace",-1.61],["Quantum",-1.85],["Solar",-1.85],["Gold Miners",-2.03],["Silver Miners",-2.03],["Social Media",-2.08],["Growth Stocks",-2.19],["Genomics",-3.28],["Bitcoin Miners",-5.91]],
   },
-  "2026-07-20": {
-    // Intraday drop, US Mon session — 2nd read ~11:55 ET (supersedes the 10:30 ET read; 1W + 1M only,
+  "2026-07-21": {
+    // Valen's MYT view date (his label convention) — data = US Mon 07-20 session, 2nd intraday read
+    // ~11:55 ET (supersedes the 10:30 ET read; 1W + 1M only,
     // no Since Open panel; day omitted on purpose — widget falls back correctly). Growth selling deepened
     // intraday (Genomics 1W −9.71→−10.98); China Internet = the only theme accelerating on BOTH horizons.
     month: [["Cybersecurity",15.41],["Genomics",9.25],["China Internet",8.12],["Biotechnology",7.55],["Banks",6.32],["HealthCare",6.21],["Transports",5.93],["Retail",5.19],["Medical",4.50],["Software",4.28],["Social Media",3.14],["Real Estate",2.87],["Bitcoin",1.46],["Airlines",1.09],["Utilities",1.08],["Home Construction",-0.40],["Industrials",-0.82],["Materials",-3.83],["Oil & Gas",-5.52],["Aerospace",-5.57],["Telecom",-5.63],["Steel",-8.02],["AI",-8.07],["Growth Stocks",-8.49],["Robotics",-8.89],["Solar",-9.85],["Semiconductors",-10.44],["Quantum",-13.09],["Gold Miners",-16.15],["Silver Miners",-16.92],["Bitcoin Miners",-23.33]],
