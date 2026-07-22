@@ -79,6 +79,12 @@ export const THEME_SNAPSHOTS = {
     // Medical/Home-Construction/Banks green while AI/Semis/Cyber/Quantum stayed red intraday.
     day:   [["Medical",2.90],["Home Construction",2.66],["Banks",2.40],["Transports",2.26],["Real Estate",1.68],["Retail",1.59],["Materials",1.15],["Airlines",1.00],["Industrials",0.76],["HealthCare",0.72],["Utilities",0.51],["Bitcoin",0.05],["Biotechnology",-0.02],["Steel",-0.17],["China Internet",-0.25],["Robotics",-0.45],["Software",-0.50],["Oil & Gas",-1.04],["Cybersecurity",-1.16],["Semiconductors",-1.19],["Telecom",-1.26],["AI",-1.40],["Aerospace",-1.61],["Quantum",-1.85],["Solar",-1.85],["Gold Miners",-2.03],["Silver Miners",-2.03],["Social Media",-2.08],["Growth Stocks",-2.19],["Genomics",-3.28],["Bitcoin Miners",-5.91]],
   },
+  "2026-07-22": {
+    // Morning drop (his MYT view date) — data = US Tue 07-21 close. Bitcoin seizes #1 1W (+3.86,
+    // 1M +5.64 from flat); monthly leaders (Cyber/Biotech/HC/Genomics) all week-negative = pausing.
+    month: [["Cybersecurity",12.32],["Biotechnology",8.97],["HealthCare",7.64],["Genomics",7.39],["China Internet",7.13],["Banks",5.87],["Bitcoin",5.64],["Transports",5.45],["Software",3.12],["Real Estate",3.04],["Retail",2.41],["Social Media",2.34],["Medical",1.80],["Utilities",0.36],["Oil & Gas",-0.47],["Industrials",-1.23],["Airlines",-1.60],["Telecom",-2.49],["Materials",-3.30],["Aerospace",-3.86],["Home Construction",-4.37],["Steel",-4.43],["AI",-8.74],["Robotics",-9.10],["Silver Miners",-9.66],["Gold Miners",-10.11],["Growth Stocks",-10.22],["Solar",-11.43],["Semiconductors",-11.47],["Quantum",-13.49],["Bitcoin Miners",-22.16]],
+    week:  [["Bitcoin",3.86],["China Internet",2.50],["Real Estate",1.68],["Steel",1.58],["Banks",1.19],["Bitcoin Miners",1.12],["Oil & Gas",0.91],["Transports",0.45],["Retail",0.44],["Social Media",-0.47],["HealthCare",-0.54],["Software",-0.58],["Silver Miners",-0.93],["Cybersecurity",-1.06],["Utilities",-1.08],["Biotechnology",-1.48],["Materials",-1.55],["Industrials",-1.78],["Gold Miners",-1.80],["Solar",-2.37],["Telecom",-2.47],["Medical",-2.70],["Home Construction",-2.92],["Aerospace",-3.89],["AI",-3.91],["Growth Stocks",-4.10],["Genomics",-4.20],["Semiconductors",-4.39],["Airlines",-4.94],["Robotics",-5.50],["Quantum",-5.93]],
+  },
   "2026-07-21": {
     // Valen's MYT view date (his label convention) — data = US Mon 07-20 session, 2nd intraday read
     // ~11:55 ET (supersedes the 10:30 ET read; 1W + 1M only,

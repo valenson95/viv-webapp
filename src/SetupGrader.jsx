@@ -200,6 +200,22 @@ export const versionOf = (ticked) => {
   return arr.some(k => /^\d+-\d+$/.test(k)) ? 1 : 2;
 };
 export const sectionsFor = (ticked) => versionOf(ticked) === 1 ? LEGACY_SECTIONS : SECTIONS;
+
+// v1 → v2 tick carry-over map — ONLY items whose concept survives verbatim (10 of 16). Used when
+// re-opening a legacy grade in the v2 editor so a member's previous inputs are never shown blank.
+// VERSION-BRIDGE LAW: any future checklist change MUST ship an updated map like this one.
+export const LEGACY_TO_V2 = {
+  "1-0": "0-0", // Big prior thrust        → Prior pole ≥30%
+  "1-1": "0-1", // Sharp high-vol advance  → Pole linear
+  "1-2": "0-2", // Fresh, not extended     → Young trend
+  "2-0": "1-3", // Higher lows             → Higher lows into pivot
+  "2-1": "1-0", // Tightening range        → Tightening series
+  "2-2": "1-1", // Volume drying up        → Volume drying up
+  "2-3": "1-5", // Inside bars at pivot    → Inside bar(s) (bonus)
+  "2-4": "1-7", // Surfing rising 10/20    → Surfing rising 10/20/50
+  "2-5": "1-6", // EMAs 9/21/50 converging → SMA 10/20/50 converging (bonus)
+  "2-6": "1-2", // Orderly, no wild wicks  → Orderly base
+};
 // stampV2: strip any existing sentinel, keep only scored/bonus "si-ii" keys, append the marker once.
 export const stampV2 = (ticked) => [...(ticked || []).filter(k => /^\d+-\d+$/.test(k)), V2_SENTINEL];
 
@@ -294,11 +310,16 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   const loadSeq = useRef(""); // last loadTicker target — guards async prefill against ticker switches
   const [editDate, setEditDate] = useState(null); // set when editing an existing post — republish keeps its date
   const [legacyLoaded, setLegacyLoaded] = useState(null); // saved grade made on the PREVIOUS checklist — show its frozen score + a re-grade notice, start v2 unticked
-  // Apply a saved/loaded grade to the live editor. v2 grades restore their ticks; a LEGACY (v1)
-  // grade must NOT map its old ticks onto the new items (meanings differ) — start the v2 checklist
-  // unticked and surface the frozen score via the notice instead.
+  // Apply a saved/loaded grade to the live editor. v2 grades restore their ticks. A LEGACY (v1)
+  // grade CARRIES OVER every tick whose concept survives verbatim in v2 (member JH bug 2026-07-22:
+  // blank-on-reopen read as data loss). Carried ticks land in the AUTO set → gold dot = "carried
+  // from your previous grade, review me"; any click clears the dot. Items with no v2 equivalent
+  // (old Leadership section → now the unscored context strip; duration) stay blank honestly.
   const applyLoadedTicks = (tickedArr, autoArr) => {
-    if (versionOf(tickedArr) === 1) { setOn(new Set()); setAuto(new Set()); }
+    if (versionOf(tickedArr) === 1) {
+      const carried = (tickedArr || []).map((k) => LEGACY_TO_V2[k]).filter(Boolean);
+      setOn(new Set(carried)); setAuto(new Set(carried));
+    }
     else { setOn(new Set(tickedArr || [])); setAuto(new Set(autoArr || [])); }
   };
 
@@ -823,7 +844,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
           <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.blue, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", padding: "3px 9px", borderRadius: 99 }}>Previous checklist</span>
           <span style={{ fontSize: "0.8rem", color: C.text }}>
             {ticker ? `${ticker.toUpperCase().trim()} was ` : "This name was "}
-            graded <b style={{ color: letterColor(C, legacyLoaded.letter) }}>{legacyLoaded.letter} · {legacyLoaded.stars}★</b> ({legacyLoaded.passed}/{legacyLoaded.total}) on the previous checklist — <b style={{ color: C.goldBright }}>re-grade below to update</b>. The saved grade stays untouched until you Save.
+            graded <b style={{ color: letterColor(C, legacyLoaded.letter) }}>{legacyLoaded.letter} · {legacyLoaded.stars}★</b> ({legacyLoaded.passed}/{legacyLoaded.total}) on the previous checklist — <b style={{ color: C.goldBright }}>your ticks were carried over</b> where the item still exists (gold dot ● = carried, click to confirm/change); items new to this checklist start blank. The saved grade stays untouched until you Save.
           </span>
         </div>
       )}

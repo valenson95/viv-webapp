@@ -751,6 +751,16 @@ function PlaybookTracker({ trades, uid, setPage }) {
 
 const WHATS_NEW = [
   {
+    tag: "Fix",
+    date: "July 22, 2026",
+    title: "✅ Your old grades carry over",
+    items: [
+      "Re-opening a setup you graded on the previous checklist no longer shows empty boxes — every tick whose item still exists is carried over automatically (member-reported, thank you!).",
+      "Carried ticks show a gold dot ● — that means \"brought over from your earlier grade, give it a quick look.\" Clicking a tick confirms it and clears the dot.",
+      "Items that are new to the current checklist start blank on purpose — grade those fresh from the chart. Your saved grade never changes until you hit Save.",
+    ],
+  },
+  {
     tag: "New",
     date: "July 20, 2026",
     title: "⬇ Export your Model Book",
