@@ -43,7 +43,10 @@ export async function initGrades(uid) {
       const sym = r.symbol;
       const localRow = local[sym];
       if (!localRow || new Date(r.updated_at) >= new Date(localRow.updatedAt || 0)) {
-        merged[sym] = { sym, stars: r.stars, letter: r.letter, pct: +r.pct || 0, starHit: r.star_hit, starmakers: r.starmakers, ticked: r.ticked || [], auto: r.auto || [], archived: !!r.archived, chart_img: r.chart_img || "", note: r.note || "", updatedAt: r.updated_at };
+        // Server wins the row — but never let a server copy WITHOUT chart/note (column missing
+        // pre-migration, or older client) blank out a chart/annotation the local cache still has.
+        merged[sym] = { sym, stars: r.stars, letter: r.letter, pct: +r.pct || 0, starHit: r.star_hit, starmakers: r.starmakers, ticked: r.ticked || [], auto: r.auto || [], archived: !!r.archived, chart_img: r.chart_img || localRow?.chart_img || "", note: r.note || localRow?.note || "", updatedAt: r.updated_at };
+        if ((!r.chart_img && localRow?.chart_img) || (!r.note && localRow?.note)) pushUp.push(merged[sym]); // heal the server copy once the columns exist
       } else {
         pushUp.push(localRow); // local edit is newer than the server copy — sync it up
       }
