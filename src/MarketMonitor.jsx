@@ -31,6 +31,97 @@ const GREEN = { fg: "#7ef0a0", bg: "rgba(34,197,94,0.12)", bd: "rgba(34,197,94,0
 const AMBER = { fg: "#f0c050", bg: "rgba(201,152,42,0.14)", bd: "rgba(201,152,42,0.4)" };
 const RED = { fg: "#fca5a5", bg: "rgba(239,68,68,0.12)", bd: "rgba(239,68,68,0.35)" };
 
+// ── EXACT sheet-cell colouring — thresholds lifted verbatim from the source workbook's own
+//    conditional-formatting rules (extracted 2026-07-23); hues adapted for the dark theme.
+const CF = {
+  gStrong: { background: "rgba(51,153,102,0.55)", color: "#eafff3", fontWeight: 800 },
+  g:       { background: "rgba(34,197,94,0.26)",  color: "#b7f7c8" },
+  olive:   { background: "rgba(106,168,79,0.62)", color: "#f2ffe9", fontWeight: 800 },
+  rStrong: { background: "rgba(224,102,102,0.55)", color: "#ffecec", fontWeight: 800 },
+  r:       { background: "rgba(224,102,102,0.26)", color: "#ffd9d9" },
+  pink:    { background: "rgba(244,204,204,0.14)", color: "#eec9c9" },
+  yellow:  { background: "rgba(255,255,0,0.18)",  color: "#fff3a8", fontWeight: 700 },
+};
+function sheetCF(row, key) {
+  const v = row[key]; if (v == null) return null;
+  const b = row.up4, c = row.down4, f = row.up25q, g = row.down25q,
+        h = row.up25m, i = row.down25m, l = row.up13d34, m = row.down13d34;
+  switch (key) {
+    case "up4":     return c > b ? CF.pink : v >= 300 ? CF.gStrong : b > c ? CF.g : null;
+    case "down4":   return v > 299 ? CF.rStrong : b > c ? CF.g : c > b ? CF.pink : null;
+    case "r5":      return v > 2 ? CF.g : v < 0.5 ? CF.r : null;
+    case "r10":     return v >= 2 ? CF.g : v < 0.5 ? CF.r : null;
+    case "up25q":   return v <= 200 ? CF.olive : f > g ? CF.g : f < g ? CF.r : null;
+    case "down25q": return v <= 200 ? CF.yellow : f > g ? CF.g : f < g ? CF.r : null;
+    case "up25m": case "down25m":     return h > i ? CF.g : h < i ? CF.r : null;
+    case "up50m":   return v >= 20 ? CF.rStrong : v < 2 ? CF.g : null;
+    case "down50m": return v > 19 ? CF.g : null;
+    case "up13d34": case "down13d34": return l > m ? CF.g : l < m ? CF.r : null;
+    case "t2108":   return v < 20 ? CF.g : v > 79.99 ? CF.r : null;
+    default: return null;
+  }
+}
+function cellTip(row, key) {
+  const v = row[key]; if (v == null) return undefined;
+  if (key === "up25q" && v <= 200) return "≤200 stocks up 25% on the quarter = capitulation zone — contrarian, historically extremely bullish";
+  if (key === "down25q" && v <= 200) return "≤200 decliners on the quarter = extended tape — caution";
+  if (key === "up50m" && v >= 20) return "≥20 stocks up 50% in a month = froth / climax — contrarian warning";
+  if (key === "down50m" && v > 19) return ">19 stocks down 50% in a month = capitulation — contrarian bullish";
+  if (key === "down4" && v > 299) return "300+ stocks down 4% = selling extreme";
+  if (key === "up4" && v >= 300) return "300+ stocks up 4% = breakout thrust day";
+  if (key === "t2108") return v < 20 ? "T2108 under 20 = washed out — opportunity zone" : v > 79.99 ? "T2108 over 80 = overbought" : undefined;
+  return undefined;
+}
+
+// ── Traffic-light calendar: each session GREEN (up-25%/qtr leaders outnumber decliners) or RED.
+function TrafficCalendar({ C, rows }) {
+  const days = rows.filter(r => r.date && r.up25q != null && r.down25q != null)
+    .map(r => ({ date: r.date, v: r.up25q > r.down25q ? "g" : r.up25q < r.down25q ? "r" : "n", f: r.up25q, g: r.down25q }));
+  if (!days.length) return null;
+  const last = days[days.length - 1];
+  let streak = 1;
+  for (let i = days.length - 2; i >= 0 && days[i].v === last.v; i--) streak++;
+  const months = {};
+  days.forEach(d => { (months[d.date.slice(0, 7)] = months[d.date.slice(0, 7)] || []).push(d); });
+  const mkeys = Object.keys(months).sort();
+  const MN = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+  const green = last.v === "g";
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <span style={{ fontSize: "0.85rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, color: green ? "#0a2413" : "#2a0c0c", background: green ? "#4ade80" : "#f87171" }}>
+          {green ? "● GREEN" : "● RED"} · {streak} session{streak > 1 ? "s" : ""} and counting
+        </span>
+        <span style={{ fontSize: "0.68rem", color: C.muted }}>
+          {green ? "Environment is paying longs — setups are allowed to work." : "Environment is against longs — protect first, anticipate nothing."}
+        </span>
+      </div>
+      <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 4 }}>
+        {mkeys.map(mk => {
+          const [Y, M] = mk.split("-").map(Number);
+          const first = new Date(Date.UTC(Y, M - 1, 1)).getUTCDay();
+          return (
+            <div key={mk} style={{ flex: "none" }}>
+              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: C.muted, marginBottom: 5, textAlign: "center" }}>{MN[M - 1]}</div>
+              <div style={{ display: "grid", gridTemplateRows: "repeat(5, 13px)", gridAutoColumns: "13px", gap: 2 }}>
+                {months[mk].map(d => {
+                  const dt = new Date(d.date + "T00:00:00Z"); const wd = dt.getUTCDay();
+                  if (wd < 1 || wd > 5) return null;
+                  const col = Math.floor((dt.getUTCDate() + first - 1) / 7);
+                  return <div key={d.date} title={`${d.date} — ${d.v === "g" ? "GREEN" : d.v === "r" ? "RED" : "flat"} · up 25%/qtr ${d.f} vs down ${d.g}`}
+                    style={{ gridRow: wd, gridColumn: col + 1, borderRadius: 3,
+                      background: d.v === "g" ? "rgba(34,197,94,0.78)" : d.v === "r" ? "rgba(239,68,68,0.72)" : "rgba(255,255,255,0.16)",
+                      outline: d.date === last.date ? `2px solid ${C.goldBright}` : "none", outlineOffset: 1 }} />;
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 function readBreadth(L) {
   const mUp = L.up25m, mDn = L.down25m, qUp = L.up25q, qDn = L.down25q, up4 = L.up4, down4 = L.down4;
   const mGreen = mUp != null && mDn != null ? mUp > mDn : false;
@@ -283,12 +374,21 @@ export default function MarketMonitor({ C, font, session }) {
                 </div>
               ))}
               <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.55 }}>
-                The four-column GREEN/RED colouring on "The one question" is our plain-arithmetic reading (up-count &gt; down-count per horizon) of the documented "all 4 columns green" rule; the source's exact colouring formula is not published. 5-day / 10-day ratio &amp; T2108 interpretation bands are not documented in the corpus — shown raw.
+                Sheet-table cell colouring now uses the EXACT thresholds extracted from the source workbook's own conditional-formatting rules (2026-07-23 · corpus stockbee-sources/22): pair comparisons on 4%/25%q/25%m/13%-34d, 5d ratio &gt;2 / &lt;0.5, 10d ≥2 / &lt;0.5, up4 ≥300 thrust, down4 ≥300 extreme, up25q ≤200 capitulation (olive), down25q ≤200 extended (yellow), up50m ≥20 froth / &lt;2 quiet, down50m &gt;19 capitulation, T2108 &lt;20 / &gt;80. Traffic-light calendar = the primary pair (up25q vs down25q) per session.
               </div>
             </div>
           )}
         </section>
       )}
+
+      {/* 4.5 — TRAFFIC-LIGHT CALENDAR (one glance: is the environment ON, and for how long) */}
+      <section className="mm-card">
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+          <span style={cardLabel}>Market traffic light — the year at a glance</span>
+          <InfoDot tip="Each square is one trading day. Green = more stocks up 25%+ over the quarter than down (the primary breadth read) — the environment pays longs. Red = the reverse — capital preservation mode. Streaks matter more than any single day." />
+        </div>
+        <TrafficCalendar C={C} rows={allRows} />
+      </section>
 
       {/* 5 — TREND MINI-CHARTS */}
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px,1fr))", gap: 14, marginBottom: 14 }}>
@@ -352,17 +452,13 @@ export default function MarketMonitor({ C, font, session }) {
                     const v = row[col.key];
                     if (col.key === "date")
                       return <td key={col.key} className="mm-datecol" style={{ ...td, textAlign: "left", fontWeight: 700, color: C.white }}>{v || "—"}</td>;
-                    if (col.key === "up4")
-                      return <td key={col.key} style={{ ...td, background: upHeat(v), fontWeight: 700 }}>{num(v)}</td>;
-                    if (col.key === "down4")
-                      return <td key={col.key} style={{ ...td, background: dnHeat(v), fontWeight: 700 }}>{num(v)}</td>;
-                    if (isRatio(col.key))
-                      return <td key={col.key} style={{ ...td, background: v == null ? "transparent" : v > 1 ? "rgba(34,197,94,0.10)" : v < 1 ? "rgba(239,68,68,0.10)" : "transparent", color: v == null ? C.muted : v >= 1 ? "#86efac" : "#fca5a5" }}>{rat(v)}</td>;
                     if (col.key === "sp")
                       return <td key={col.key} style={td}>{v == null ? "—" : (+v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>;
-                    if (col.key === "t2108")
-                      return <td key={col.key} style={{ ...td, color: C.blue }}>{rat(v)}</td>;
-                    return <td key={col.key} style={td}>{num(v)}</td>;
+                    const cf = sheetCF(row, col.key);
+                    const tip = cellTip(row, col.key);
+                    if (isRatio(col.key) || col.key === "t2108")
+                      return <td key={col.key} title={tip} style={{ ...td, ...(col.key === "t2108" && !cf ? { color: C.blue } : {}), ...(cf || {}) }}>{rat(v)}</td>;
+                    return <td key={col.key} title={tip} style={{ ...td, ...(cf || {}), ...(col.key === "up4" || col.key === "down4" ? { fontWeight: 700 } : {}) }}>{num(v)}</td>;
                   })}
                 </tr>
               ))}

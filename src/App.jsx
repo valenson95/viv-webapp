@@ -751,6 +751,16 @@ function PlaybookTracker({ trades, uid, setPage }) {
 
 const WHATS_NEW = [
   {
+    tag: "New",
+    date: "July 24, 2026",
+    title: "🚦 Market traffic light + smarter breadth colours",
+    items: [
+      "The Market Breadth page now opens with a traffic-light calendar — one square per trading day, green when the environment is paying longs, red when it isn't, with the current streak counted for you.",
+      "The breadth sheet's cells now light up with the exact professional colour rules — including the rare contrarian signals: a capitulation zone (historically where major bottoms form) and a froth warning (too many stocks up 50% in a month).",
+      "Hover any highlighted cell to see what the signal means in plain English.",
+    ],
+  },
+  {
     tag: "Fix",
     date: "July 22, 2026",
     title: "✅ Your old grades carry over",
