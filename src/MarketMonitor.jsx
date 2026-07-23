@@ -204,6 +204,7 @@ export default function MarketMonitor({ C, font, session }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL;
   const [showAll, setShowAll] = useState(false);
   const [signalOpen, setSignalOpen] = useState(false);
+  const [cheatOpen, setCheatOpen] = useState(false);
   const [methodOpen, setMethodOpen] = useState(false);
 
   // multi-sort chain (default: date desc)
@@ -422,6 +423,49 @@ export default function MarketMonitor({ C, font, session }) {
         <TrafficCalendar C={C} rows={allRows} />
       </section>
 
+      {/* 4.6 — LEVELS CHEAT SHEET (the numbers that mean something — click to expand) */}
+      <section className="mm-card">
+        <div onClick={() => setCheatOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
+          <span style={{ ...cardLabel, flex: 1 }}>📌 Levels cheat sheet — what the numbers mean</span>
+          <span style={{ fontSize: "0.7rem", color: C.muted }}>{cheatOpen ? "▴" : "▾ open"}</span>
+        </div>
+        {cheatOpen && (
+          <div style={{ marginTop: 12, overflowX: "auto" }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 640 }}>
+              <thead><tr>
+                {["Signal", "Level", "Read"].map(h => <th key={h} style={{ textAlign: "left", padding: "7px 10px", fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, borderBottom: `1px solid ${C.border}` }}>{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {[
+                  ["Master switch", "up-25%/quarter > down-25%/quarter", "🟢 Environment pays longs — the traffic-light rule", "g"],
+                  ["Master switch", "down-25%/quarter > up-25%/quarter", "🔴 Sellers own the tape — protect capital", "r"],
+                  ["Thrust day", "300+ stocks up 4% today", "Buyers stampeded — breakout days cluster here", "g"],
+                  ["Selling extreme", "300+ stocks down 4% today", "Panic day — no fresh longs into it", "r"],
+                  ["Buyer streak", "5-day or 10-day ratio above 2", "Sustained accumulation", "g"],
+                  ["Seller streak", "5-day or 10-day ratio below 0.5", "Sustained distribution", "r"],
+                  ["CAPITULATION", "≤200 stocks up 25% on the quarter", "⭐ Almost nothing is up = maximum washout — major BOTTOMS form here (Mar-2020 printed 160)", "gold"],
+                  ["Extended tape", "≤200 stocks down 25% on the quarter", "Almost nothing is down = late-cycle — tighten up", "y"],
+                  ["Froth warning", "20+ stocks up 50% in a month", "Speculative climax — the party is loud; contrarian caution", "r"],
+                  ["Quiet fuel", "Under 2 stocks up 50% in a month", "No froth — room for new leaders", "g"],
+                  ["Deep capitulation", "20+ stocks down 50% in a month", "Forced selling exhausting itself — contrarian bullish", "gold"],
+                  ["Bottom zone", "T2108 below 20", "⭐ Under 1-in-5 stocks above their 40-day average — historically where bottoms form", "gold"],
+                  ["Overheated", "T2108 above 80", "Stretched participation — chase risk", "r"],
+                ].map((r, i) => (
+                  <tr key={i}>
+                    <td style={{ padding: "7px 10px", fontSize: "0.72rem", fontWeight: 800, color: r[3] === "gold" ? C.goldBright : r[3] === "g" ? "#7ef0a0" : r[3] === "y" ? "#f0dc8a" : "#fca5a5", whiteSpace: "nowrap", borderBottom: `1px solid ${C.border}` }}>{r[0]}</td>
+                    <td style={{ padding: "7px 10px", fontSize: "0.72rem", fontWeight: 700, color: C.white, whiteSpace: "nowrap", borderBottom: `1px solid ${C.border}` }}>{r[1]}</td>
+                    <td style={{ padding: "7px 10px", fontSize: "0.72rem", color: C.text, lineHeight: 1.45, borderBottom: `1px solid ${C.border}` }}>{r[2]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
+              The ⭐ rows are contrarian: they fire at maximum pain and mark where risk/reward flips BULLISH while everything feels terrible. The froth row is the mirror — it fires when everything feels easy. Educational, not advice.
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* 5 — TREND MINI-CHARTS */}
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px,1fr))", gap: 14, marginBottom: 14 }}>
         <div className="mm-card" style={{ marginBottom: 0 }}>
@@ -438,7 +482,7 @@ export default function MarketMonitor({ C, font, session }) {
         <div className="mm-card" style={{ marginBottom: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
             <span style={cardLabel}>T2108 · last {win.length}</span>
-            <InfoDot tip="The share of stocks above their 40-day average. High = stretched, low = washed out." />
+            <InfoDot tip="The share of stocks above their 40-day average. BELOW 20 = washed out — historically where market BOTTOMS form (opportunity zone, shows green in the sheet). Above 80 = stretched / overheated (shows red). In between = no signal." />
           </div>
           <SingleSpark a={t2108Series} col={C.blue} lo={0} hi={100} />
           <div style={{ fontSize: "0.64rem", color: C.muted, marginTop: 8 }}>0–100 scale · broad participation read</div>
