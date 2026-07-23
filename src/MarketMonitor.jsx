@@ -84,6 +84,10 @@ function TrafficCalendar({ C, rows }) {
   const months = {};
   days.forEach(d => { (months[d.date.slice(0, 7)] = months[d.date.slice(0, 7)] || []).push(d); });
   const mkeys = Object.keys(months).sort();
+  { // pad with the not-yet-traded months through December of the latest data year
+    const [ly, lm] = mkeys[mkeys.length - 1].split("-").map(Number);
+    for (let m = lm + 1; m <= 12; m++) mkeys.push(`${ly}-${String(m).padStart(2, "0")}`);
+  }
   const MN = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
   const green = last.v === "g";
   return (
@@ -96,23 +100,38 @@ function TrafficCalendar({ C, rows }) {
           {green ? "Environment is paying longs — setups are allowed to work." : "Environment is against longs — protect first, anticipate nothing."}
         </span>
       </div>
-      <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 4 }}>
+      <div style={{ display: "flex", gap: 18, overflowX: "auto", paddingBottom: 4 }}>
         {mkeys.map(mk => {
           const [Y, M] = mk.split("-").map(Number);
           const first = new Date(Date.UTC(Y, M - 1, 1)).getUTCDay();
+          const dim = new Date(Date.UTC(Y, M, 0)).getUTCDate();
+          const byDate = {}; (months[mk] || []).forEach(d => { byDate[d.date] = d; });
+          const cells = [];
+          for (let dayN = 1; dayN <= dim; dayN++) {
+            const dt = new Date(Date.UTC(Y, M - 1, dayN)); const wd = dt.getUTCDay();
+            if (wd < 1 || wd > 5) continue;
+            const iso = `${Y}-${String(M).padStart(2, "0")}-${String(dayN).padStart(2, "0")}`;
+            const d = byDate[iso];
+            const col = Math.floor((dayN + first - 1) / 7);
+            cells.push(
+              <div key={iso}
+                title={d ? `${iso} — ${d.v === "g" ? "GREEN" : d.v === "r" ? "RED" : "flat"} · up 25%/qtr ${d.f} vs down ${d.g}` : `${iso} — no session data`}
+                style={{
+                  gridRow: wd, gridColumn: col + 1, width: 27, height: 23, borderRadius: 4,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "0.62rem", fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                  background: d ? (d.v === "g" ? "rgba(34,197,94,0.8)" : d.v === "r" ? "rgba(239,68,68,0.78)" : "rgba(255,255,255,0.16)") : "rgba(255,255,255,0.025)",
+                  color: d ? "#08080e" : "rgba(255,255,255,0.28)",
+                  border: d ? "none" : `1px solid ${C.border}`,
+                  outline: d && d.date === last.date ? `2px solid ${C.goldBright}` : "none", outlineOffset: 1,
+                }}>{dayN}</div>
+            );
+          }
           return (
             <div key={mk} style={{ flex: "none" }}>
-              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: C.muted, marginBottom: 5, textAlign: "center" }}>{MN[M - 1]}</div>
-              <div style={{ display: "grid", gridTemplateRows: "repeat(5, 13px)", gridAutoColumns: "13px", gap: 2 }}>
-                {months[mk].map(d => {
-                  const dt = new Date(d.date + "T00:00:00Z"); const wd = dt.getUTCDay();
-                  if (wd < 1 || wd > 5) return null;
-                  const col = Math.floor((dt.getUTCDate() + first - 1) / 7);
-                  return <div key={d.date} title={`${d.date} — ${d.v === "g" ? "GREEN" : d.v === "r" ? "RED" : "flat"} · up 25%/qtr ${d.f} vs down ${d.g}`}
-                    style={{ gridRow: wd, gridColumn: col + 1, borderRadius: 3,
-                      background: d.v === "g" ? "rgba(34,197,94,0.78)" : d.v === "r" ? "rgba(239,68,68,0.72)" : "rgba(255,255,255,0.16)",
-                      outline: d.date === last.date ? `2px solid ${C.goldBright}` : "none", outlineOffset: 1 }} />;
-                })}
+              <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", color: C.text, marginBottom: 6, textAlign: "center" }}>{MN[M - 1]}<span style={{ color: C.muted, fontWeight: 700 }}> ’{String(Y).slice(2)}</span></div>
+              <div style={{ display: "grid", gridTemplateRows: "repeat(5, 23px)", gridAutoColumns: "27px", gap: 3 }}>
+                {cells}
               </div>
             </div>
           );
