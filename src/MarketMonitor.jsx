@@ -462,6 +462,12 @@ export default function MarketMonitor({ C, font, session }) {
           <table>
             <thead>
               <tr>
+                <th className="mm-datecol" style={{ borderBottom: `1px solid ${C.border}` }} />
+                <th colSpan={6} style={{ padding: "7px 9px", fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", textAlign: "center", color: "#9ad8f0", background: "rgba(56,170,220,0.12)", borderBottom: `1px solid rgba(56,170,220,0.35)` }}>Primary breadth indicators</th>
+                <th colSpan={6} style={{ padding: "7px 9px", fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", textAlign: "center", color: "#f0dc8a", background: "rgba(240,200,80,0.10)", borderBottom: `1px solid rgba(240,200,80,0.35)` }}>Secondary breadth indicators</th>
+                <th colSpan={3} style={{ padding: "7px 9px", fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", textAlign: "center", color: C.muted, background: "rgba(255,255,255,0.03)", borderBottom: `1px solid ${C.border}` }}>Context</th>
+              </tr>
+              <tr>
                 {cols.map(col => {
                   const ci = chain.findIndex(c => c.key === col.key);
                   const active = ci >= 0;
