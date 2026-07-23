@@ -137,6 +137,19 @@ function TrafficCalendar({ C, rows }) {
           );
         })}
       </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+        <span style={{ fontSize: "0.7rem", fontWeight: 700, color: C.text }}>
+          <span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "rgba(34,197,94,0.8)", marginRight: 6, verticalAlign: "-1px" }} />
+          Green = bullish — buyers in control, trade your setups
+        </span>
+        <span style={{ fontSize: "0.7rem", fontWeight: 700, color: C.text }}>
+          <span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "rgba(239,68,68,0.78)", marginRight: 6, verticalAlign: "-1px" }} />
+          Red = bearish — sellers in control, protect capital
+        </span>
+        <span style={{ fontSize: "0.7rem", color: C.muted }}>
+          Think of it as the market's weather report — <b style={{ color: C.goldBright }}>plan your trading accordingly</b>: press when it's been green, stay light when it's red.
+        </span>
+      </div>
     </>
   );
 }
