@@ -41,6 +41,9 @@ const FB_CSS = `
 @keyframes vivfbBadge{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.6)}70%{box-shadow:0 0 0 7px rgba(239,68,68,0)}}
 .vivfb-badge{animation:vivfbBadge 2s infinite}
 .vivfb-toast{animation:vivfbUp .32s cubic-bezier(0.22,1,0.36,1)}
+@keyframes vivfbDrawerIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+.vivfb-drawer{animation:vivfbDrawerIn .32s cubic-bezier(0.22,1,0.36,1)}
+@media (max-width: 640px){ .vivfb-drawer{ width:100vw !important; border-radius:0 !important; } }
 `;
 
 export default function FeedbackWidget({ session, isAdmin, displayName, C, font, isMobile }) {
@@ -153,6 +156,18 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
     return () => clearInterval(id);
   }, [open, load]);
 
+  // Esc closes the topmost layer: the full-page detail reader first, else the drawer itself.
+  // The drawer never traps the rest of the page — there's no click-away close, only ✕ / Esc.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (detail) setDetail(null); else setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, detail]);
+
   const post = async () => {
     const body = draft.trim(); if (!body || busy) return;
     setBusy(true);
@@ -224,60 +239,61 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
       </button>
 
       {!open ? null : (
-        <div className="vivfb-back" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }} style={{
-          position: "fixed", inset: 0, zIndex: 1400, background: "radial-gradient(1000px 600px at 70% -10%, rgba(201,152,42,0.08), transparent 60%), rgba(4,4,8,0.72)",
-          backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "44px 16px", overflowY: "auto", fontFamily: font,
+        // Right-side slide-in drawer — NOT a full-page backdrop. There is deliberately no
+        // inset:0 overlay: the site behind stays fully visible AND interactive (scrollable,
+        // clickable) so members can reference it while writing feedback. Close = ✕ or Esc only.
+        <div className="vivfb-drawer" style={{
+          position: "fixed", top: 0, right: 0, height: "100vh", zIndex: 1400,
+          width: "min(440px, 92vw)", display: "flex", flexDirection: "column",
+          background: "linear-gradient(180deg, rgba(18,18,26,0.97), rgba(8,8,14,0.99))",
+          borderLeft: `1px solid ${C.borderGold}`, boxShadow: "-24px 0 70px rgba(0,0,0,0.55)",
+          backdropFilter: "blur(30px) saturate(160%)", WebkitBackdropFilter: "blur(30px) saturate(160%)",
+          fontFamily: font,
         }}>
-          <div className="vivfb-modal" style={{
-            width: "min(680px, 100%)", position: "relative", borderRadius: 22, overflow: "hidden",
-            background: "linear-gradient(180deg, rgba(18,18,26,0.92), rgba(8,8,14,0.97))",
-            border: `1px solid ${C.borderGold}`, boxShadow: "0 40px 100px rgba(0,0,0,0.72)",
-            backdropFilter: "blur(30px) saturate(160%)", WebkitBackdropFilter: "blur(30px) saturate(160%)",
-          }}>
-            {/* top gold hairline */}
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${C.gold}, ${C.goldBright}, ${C.gold}, transparent)`, opacity: 0.8 }} />
+          {/* top gold hairline */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${C.gold}, ${C.goldBright}, ${C.gold}, transparent)`, opacity: 0.8 }} />
 
-            {/* header */}
-            <div style={{ position: "relative", padding: "22px 24px 20px", borderBottom: `1px solid ${C.border}`, overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: -60, right: -20, width: 220, height: 160, background: "radial-gradient(circle, rgba(201,152,42,0.16), transparent 70%)", pointerEvents: "none" }} />
-              <div style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: "1.28rem", fontWeight: 800, color: C.white, letterSpacing: "-0.02em", lineHeight: 1.1 }}>Community <span style={{ color: C.gold }}>Feedback</span></div>
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 9, padding: "4px 11px 4px 9px", borderRadius: 99, border: `1px solid ${C.borderGold}`, background: C.goldDim }}>
-                    <span className="vivfb-dot" style={{ width: 7, height: 7, borderRadius: "50%", background: C.goldBright }} />
-                    <span style={{ fontSize: "0.68rem", fontWeight: 700, color: C.goldBright, letterSpacing: "0.02em" }}>{openCount} open · shape what we build</span>
-                  </div>
+          {/* header */}
+          <div style={{ position: "relative", flex: "0 0 auto", padding: "22px 22px 18px", borderBottom: `1px solid ${C.border}`, overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: -60, right: -20, width: 220, height: 160, background: "radial-gradient(circle, rgba(201,152,42,0.16), transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: "1.2rem", fontWeight: 800, color: C.white, letterSpacing: "-0.02em", lineHeight: 1.1 }}>Community <span style={{ color: C.gold }}>Feedback</span></div>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 9, padding: "4px 11px 4px 9px", borderRadius: 99, border: `1px solid ${C.borderGold}`, background: C.goldDim }}>
+                  <span className="vivfb-dot" style={{ width: 7, height: 7, borderRadius: "50%", background: C.goldBright }} />
+                  <span style={{ fontSize: "0.68rem", fontWeight: 700, color: C.goldBright, letterSpacing: "0.02em" }}>{openCount} open · shape what we build</span>
                 </div>
-                <button onClick={() => setOpen(false)} style={{ marginLeft: "auto", ...glass, border: `1px solid ${C.border}`, color: C.muted, width: 36, height: 36, borderRadius: 11, fontSize: "1.25rem", cursor: "pointer", lineHeight: 1 }}>&times;</button>
               </div>
+              <button onClick={() => setOpen(false)} title="Close (Esc)" style={{ marginLeft: "auto", ...glass, border: `1px solid ${C.border}`, color: C.muted, width: 36, height: 36, borderRadius: 11, fontSize: "1.25rem", cursor: "pointer", lineHeight: 1, flex: "0 0 auto" }}>&times;</button>
             </div>
+          </div>
 
-            {/* composer — matte card */}
-            <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}` }}>
-              <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                {CATEGORIES.map(c => {
-                  const active = cat === c, ac = catColor(c);
-                  return <button key={c} onClick={() => setCat(c)} style={{ fontSize: "0.72rem", fontWeight: 700, padding: "6px 13px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
-                    border: `1px solid ${active ? ac : C.border}`, background: active ? `${ac}1f` : "rgba(255,255,255,0.03)", color: active ? ac : C.muted }}>{c}</button>;
-                })}
-              </div>
-              <textarea className="vivfb-in" value={draft} onChange={e => setDraft(e.target.value)} placeholder="Share a suggestion, report a bug, or request a feature…" rows={3}
-                style={{ width: "100%", resize: "vertical", background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 14, color: C.white, fontFamily: font, fontSize: "0.9rem", padding: "13px 15px", outline: "none", lineHeight: 1.55, transition: "border-color .14s, box-shadow .14s" }} />
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 11 }}>
-                <button onClick={post} disabled={!draft.trim() || busy} style={{ background: draft.trim() ? gold : "rgba(255,255,255,0.06)", color: draft.trim() ? "#08080e" : C.muted, border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.82rem", padding: "11px 24px", borderRadius: 99, cursor: draft.trim() ? "pointer" : "default", boxShadow: draft.trim() ? "0 8px 22px rgba(201,152,42,0.32)" : "none", transition: "all .14s" }}>{busy ? "Posting…" : "Post"}</button>
-              </div>
+          {/* composer — matte card */}
+          <div style={{ flex: "0 0 auto", padding: "16px 22px", borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+              {CATEGORIES.map(c => {
+                const active = cat === c, ac = catColor(c);
+                return <button key={c} onClick={() => setCat(c)} style={{ fontSize: "0.72rem", fontWeight: 700, padding: "6px 13px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
+                  border: `1px solid ${active ? ac : C.border}`, background: active ? `${ac}1f` : "rgba(255,255,255,0.03)", color: active ? ac : C.muted }}>{c}</button>;
+              })}
             </div>
-
-            {/* filters */}
-            <div style={{ display: "flex", gap: 8, padding: "14px 24px 2px" }}>
-              {[["all", "All"], ["open", "Open"], ["resolved", "Resolved"]].map(([k, l]) => (
-                <button key={k} onClick={() => setFilter(k)} style={chip(filter === k, C.goldBright)}>{l}</button>
-              ))}
+            <textarea className="vivfb-in" value={draft} onChange={e => setDraft(e.target.value)} placeholder="Share a suggestion, report a bug, or request a feature…" rows={3}
+              style={{ width: "100%", resize: "vertical", background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 14, color: C.white, fontFamily: font, fontSize: "0.9rem", padding: "13px 15px", outline: "none", lineHeight: 1.55, transition: "border-color .14s, box-shadow .14s" }} />
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 11 }}>
+              <button onClick={post} disabled={!draft.trim() || busy} style={{ background: draft.trim() ? gold : "rgba(255,255,255,0.06)", color: draft.trim() ? "#08080e" : C.muted, border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.82rem", padding: "11px 24px", borderRadius: 99, cursor: draft.trim() ? "pointer" : "default", boxShadow: draft.trim() ? "0 8px 22px rgba(201,152,42,0.32)" : "none", transition: "all .14s" }}>{busy ? "Posting…" : "Post"}</button>
             </div>
+          </div>
 
-            {/* feed */}
-            <div className="vivfb-feed" style={{ padding: "14px 24px 26px", maxHeight: "54vh", overflowY: "auto" }}>
-              {loading && <div style={{ color: C.muted, fontSize: "0.84rem", padding: "24px 0", textAlign: "center" }}>Loading…</div>}
+          {/* filters */}
+          <div style={{ flex: "0 0 auto", display: "flex", gap: 8, padding: "14px 22px 2px" }}>
+            {[["all", "All"], ["open", "Open"], ["resolved", "Resolved"]].map(([k, l]) => (
+              <button key={k} onClick={() => setFilter(k)} style={chip(filter === k, C.goldBright)}>{l}</button>
+            ))}
+          </div>
+
+          {/* feed — the drawer's own scroll region; header/composer/filters stay put */}
+          <div className="vivfb-feed" style={{ flex: "1 1 auto", minHeight: 0, padding: "14px 22px 26px", overflowY: "auto" }}>
+            {loading && <div style={{ color: C.muted, fontSize: "0.84rem", padding: "24px 0", textAlign: "center" }}>Loading…</div>}
               {error === "setup" && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "24px 4px", textAlign: "center", lineHeight: 1.6 }}>💬 Feedback is being set up — check back shortly.</div>}
               {error && error !== "setup" && <div style={{ color: C.red, fontSize: "0.8rem", padding: "16px 0" }}>{error}</div>}
               {!loading && !error && sorted.length === 0 && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "26px 4px", textAlign: "center" }}>No feedback yet — be the first to post.</div>}
@@ -339,11 +355,10 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
                 );
               })}
             </div>
-          </div>
         </div>
       )}
 
-      {/* Full-page detail — a feedback item opened for easy reading. Sits ABOVE the feedback modal
+      {/* Full-page detail — a feedback item opened for easy reading. Sits ABOVE the feedback drawer
           (z 1400) at z 1500; reuses the same vote/comment/resolve/delete handlers (no duplicated logic). */}
       {detailItem && (() => {
         const f = detailItem;
