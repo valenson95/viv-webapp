@@ -13,6 +13,7 @@ import ThemeStrip from "./ThemeStrip.jsx";
 import MarketContext from "./MarketContext.jsx";
 import EdgeLedger from "./EdgeLedger.jsx";
 import QuantAnalysis from "./QuantAnalysis.jsx";
+import BurstLog from "./BurstLog.jsx";
 import { EarningsRadarMini } from "./EarningsCalendar.jsx";
 import { RotationMini, InfoDot, Tip } from "./GroupRS.jsx";
 import { BreadthMini } from "./MarketMonitor.jsx";
@@ -3990,7 +3991,7 @@ if (expert) return (
           <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
       </div>
 
@@ -4038,7 +4039,7 @@ return (
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
       </div>
 
@@ -8031,7 +8032,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
           </div>
 
@@ -8369,7 +8370,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
 
@@ -10513,7 +10514,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+              {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
           </div>
 
@@ -10804,7 +10805,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
 
@@ -11720,7 +11721,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-            {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+            {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
 
@@ -11900,7 +11901,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
-          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
 
@@ -12172,7 +12173,7 @@ function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a className="on" style={{ cursor: "pointer" }}>Model Book</a>
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip to relaunch */}
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
         <ModelBookPage C={C} font={font} session={session} isAdmin={isAdmin} journaledTrades={journaledTrades} />
@@ -12197,7 +12198,7 @@ function DailySetupsShell({ setPage, session, displayName }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a className="on" style={{ cursor: "pointer" }}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
         <DailySetupsTab C={C} font={font} session={session} isAdmin={isAdmin} setPage={setPage} />
@@ -12224,7 +12225,7 @@ function MentorShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a className="on" style={{ cursor: "pointer" }}>Mentor</a>
-            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+            {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
         <div className="reveal in-view" style={{ marginBottom: 10 }}>
@@ -12257,10 +12258,38 @@ function QuantShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a className="on" style={{ cursor: "pointer" }}>Quant</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
         <QuantAnalysis C={C} font={font} session={session} />
+      </div>
+    </div>
+  );
+}
+
+function BurstLogShell({ setPage, session }) {
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const prowide = useUiMode() === "pro";
+  if (!isAdmin) return null;
+  return (
+    <div className={"vj" + (prowide ? " prowide" : "")}>
+      <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
+      <div className="shell">
+        <div className="navbar">
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="tabs">
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>
+            <a className="on" style={{ cursor: "pointer" }}>Bursts</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
+          </div>
+        </div>
+        <BurstLog C={C} font={font} />
       </div>
     </div>
   );
@@ -13897,6 +13926,7 @@ function AppInner() {
       {page === "modelbook" && <ModelBookShell setPage={setPage} session={session} displayName={displayName} journaledTrades={journaledTrades} />}
       {page === "mentor" && <MentorShell setPage={setPage} session={session} />}
       {page === "quant" && isAdmin && <QuantShell setPage={setPage} session={session} />}
+      {page === "burstlog" && isAdmin && <BurstLogShell setPage={setPage} session={session} />}
       {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} uiTheme={uiTheme} setUiTheme={setUiTheme} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
       <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />

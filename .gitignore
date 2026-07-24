@@ -15,3 +15,4 @@ dist/
 *.log
 .vercel
 scripts/.grouprs-cache.json
+scripts/.burstlog-cache.json
