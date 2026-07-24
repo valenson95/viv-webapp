@@ -7,449 +7,11 @@
 // fabricated). Report dates are SCHEDULED and can shift until confirmed. reactionsComputedFor =
 // per-day count of the top-by-cap ∪ liquid-leader reporters that got a reaction.
 export const EARNINGS = {
-  "asof": "2026-08-06",
-  "refreshed": "2026-07-23",
+  "asof": "2026-08-07",
+  "refreshed": "2026-07-24",
   "source": "nasdaq",
   "note": null,
   "days": {
-    "2026-07-14": {
-      "rows": [
-        {
-          "t": "JPM",
-          "name": "J P Morgan Chase & Co",
-          "time": null,
-          "epsEst": 5.59,
-          "epsActual": 6.14,
-          "surprisePct": 9.84,
-          "yearAgoEps": null,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 925047726836,
-          "rank": 1,
-          "rx": {
-            "gapPct": 0.86,
-            "dayPct": 0.31,
-            "totalPct": 1.17
-          }
-        },
-        {
-          "t": "BAC",
-          "name": "Bank of America Corporation",
-          "time": null,
-          "epsEst": 1.13,
-          "epsActual": 1.21,
-          "surprisePct": 7.08,
-          "yearAgoEps": null,
-          "noEsts": 6,
-          "revEst": null,
-          "mcap": 434453279654,
-          "rank": 2,
-          "rx": {
-            "gapPct": 1.15,
-            "dayPct": 0.44,
-            "totalPct": 1.6
-          }
-        },
-        {
-          "t": "GS",
-          "name": "Goldman Sachs Group, Inc. (The)",
-          "time": null,
-          "epsEst": 14.47,
-          "epsActual": 20.98,
-          "surprisePct": 44.99,
-          "yearAgoEps": null,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 320248255941,
-          "rank": 3,
-          "rx": {
-            "gapPct": 0.74,
-            "dayPct": 0.32,
-            "totalPct": 1.06
-          }
-        },
-        {
-          "t": "WFC",
-          "name": "Wells Fargo & Company",
-          "time": null,
-          "epsEst": 1.73,
-          "epsActual": 1.96,
-          "surprisePct": 13.29,
-          "yearAgoEps": null,
-          "noEsts": 8,
-          "revEst": null,
-          "mcap": 268501026204,
-          "rank": 4,
-          "rx": {
-            "gapPct": 0.76,
-            "dayPct": 1.83,
-            "totalPct": 2.6
-          }
-        },
-        {
-          "t": "C",
-          "name": "Citigroup Inc.",
-          "time": null,
-          "epsEst": 2.72,
-          "epsActual": 3.15,
-          "surprisePct": 15.81,
-          "yearAgoEps": null,
-          "noEsts": 7,
-          "revEst": null,
-          "mcap": 226568842702,
-          "rank": 5,
-          "rx": {
-            "gapPct": 0.61,
-            "dayPct": 0.6,
-            "totalPct": 1.22
-          }
-        },
-        {
-          "t": "FAST",
-          "name": "Fastenal Company",
-          "time": null,
-          "epsEst": 0.33,
-          "epsActual": 0.33,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 7,
-          "revEst": null,
-          "mcap": 51648865761,
-          "rank": 6,
-          "rx": {
-            "gapPct": 0.25,
-            "dayPct": -1.08,
-            "totalPct": -0.83
-          }
-        },
-        {
-          "t": "ERIC",
-          "name": "Ericsson",
-          "time": null,
-          "epsEst": 0.13,
-          "epsActual": 0.13,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 32331263139,
-          "rank": 7,
-          "rx": {
-            "gapPct": 1.87,
-            "dayPct": -2.52,
-            "totalPct": -0.69
-          }
-        },
-        {
-          "t": "PAC",
-          "name": "Grupo Aeroportuario Del Pacifico, S.A. de C.V.",
-          "time": null,
-          "epsEst": 3.17,
-          "epsActual": 2.8,
-          "surprisePct": -11.67,
-          "yearAgoEps": null,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 12952356178,
-          "rank": 8,
-          "rx": {
-            "gapPct": -0.96,
-            "dayPct": 1.8,
-            "totalPct": 0.82
-          }
-        },
-        {
-          "t": "BMNR",
-          "name": "BitMine Immersion Technologies, Inc.",
-          "time": null,
-          "epsEst": 0.07,
-          "epsActual": -0.13,
-          "surprisePct": -285.71,
-          "yearAgoEps": null,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 10393590769,
-          "rank": 9,
-          "rx": {
-            "gapPct": 3.04,
-            "dayPct": -5.93,
-            "totalPct": -3.07
-          }
-        },
-        {
-          "t": "AEHR",
-          "name": "Aehr Test Systems",
-          "time": null,
-          "epsEst": -0.06,
-          "epsActual": 0.05,
-          "surprisePct": 183.33,
-          "yearAgoEps": null,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 3175412377,
-          "rank": 10,
-          "rx": {
-            "gapPct": 36.31,
-            "dayPct": -10.56,
-            "totalPct": 21.91
-          }
-        },
-        {
-          "t": "KMTS",
-          "name": "Kestra Medical Technologies, Ltd.",
-          "time": null,
-          "epsEst": -0.59,
-          "epsActual": -0.67,
-          "surprisePct": -13.56,
-          "yearAgoEps": null,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 1303319533,
-          "rank": 11,
-          "rx": {
-            "gapPct": -0.33,
-            "dayPct": 2.14,
-            "totalPct": 1.8
-          }
-        },
-        {
-          "t": "PXED",
-          "name": "Phoenix Education Partners, Inc.",
-          "time": null,
-          "epsEst": 1.28,
-          "epsActual": 1.43,
-          "surprisePct": 11.72,
-          "yearAgoEps": null,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 1084305070,
-          "rank": 12,
-          "rx": {
-            "gapPct": -10.91,
-            "dayPct": -2.11,
-            "totalPct": -12.79
-          }
-        },
-        {
-          "t": "EQBK",
-          "name": "Equity Bancshares, Inc.",
-          "time": null,
-          "epsEst": 1.24,
-          "epsActual": 1.41,
-          "surprisePct": 13.71,
-          "yearAgoEps": null,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 1040914435,
-          "rank": 13,
-          "rx": {
-            "gapPct": 2.08,
-            "dayPct": -1.58,
-            "totalPct": 0.47
-          }
-        },
-        {
-          "t": "ANGO",
-          "name": "AngioDynamics, Inc.",
-          "time": null,
-          "epsEst": -0.11,
-          "epsActual": -0.07,
-          "surprisePct": 36.36,
-          "yearAgoEps": null,
-          "noEsts": 2,
-          "revEst": null,
-          "mcap": 587746572,
-          "rank": 14,
-          "rx": {
-            "gapPct": 0.69,
-            "dayPct": 10.54,
-            "totalPct": 11.31
-          }
-        },
-        {
-          "t": "UNTY",
-          "name": "Unity Bancorp, Inc.",
-          "time": null,
-          "epsEst": 1.44,
-          "epsActual": 1.42,
-          "surprisePct": -1.39,
-          "yearAgoEps": null,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 574741230,
-          "rank": 15,
-          "rx": {
-            "gapPct": 1.08,
-            "dayPct": 0.85,
-            "totalPct": 1.94
-          }
-        },
-        {
-          "t": "GLDG",
-          "name": "GoldMining Inc.",
-          "time": null,
-          "epsEst": -0.02,
-          "epsActual": -0.03,
-          "surprisePct": -50,
-          "yearAgoEps": null,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 184104724,
-          "rank": 16,
-          "rx": {
-            "gapPct": 1.18,
-            "dayPct": -1.27,
-            "totalPct": -0.11
-          }
-        },
-        {
-          "t": "ETS",
-          "name": "Elite Express Holding Inc.",
-          "time": null,
-          "epsEst": null,
-          "epsActual": -0.15,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": null,
-          "revEst": null,
-          "mcap": 43596550,
-          "rank": 17,
-          "rx": {
-            "gapPct": 0,
-            "dayPct": 5.23,
-            "totalPct": 5.23
-          }
-        },
-        {
-          "t": "LOOP",
-          "name": "Loop Industries, Inc.",
-          "time": null,
-          "epsEst": -0.05,
-          "epsActual": -0.07,
-          "surprisePct": -40,
-          "yearAgoEps": null,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 36285278,
-          "rank": 18,
-          "rx": {
-            "gapPct": -11.42,
-            "dayPct": -1.64,
-            "totalPct": -12.87
-          }
-        },
-        {
-          "t": "CRMT",
-          "name": "America's Car-Mart, Inc.",
-          "time": null,
-          "epsEst": null,
-          "epsActual": 0.48,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": null,
-          "revEst": null,
-          "mcap": 32476583,
-          "rank": 19,
-          "rx": {
-            "gapPct": -1.64,
-            "dayPct": 1.9,
-            "totalPct": 0.23
-          }
-        },
-        {
-          "t": "LEDS",
-          "name": "SemiLEDS Corporation",
-          "time": null,
-          "epsEst": null,
-          "epsActual": 0.18,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": null,
-          "revEst": null,
-          "mcap": 20766242,
-          "rank": 20,
-          "rx": {
-            "gapPct": 6.25,
-            "dayPct": 7.98,
-            "totalPct": 14.73
-          }
-        },
-        {
-          "t": "JCTC",
-          "name": "Jewett-Cameron Trading Company",
-          "time": null,
-          "epsEst": null,
-          "epsActual": -0.23,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": null,
-          "revEst": null,
-          "mcap": 9187495,
-          "rank": 21,
-          "rx": {
-            "gapPct": 1.13,
-            "dayPct": 0.37,
-            "totalPct": 1.51
-          }
-        },
-        {
-          "t": "RMCF",
-          "name": "Rocky Mountain Chocolate Factory, Inc.",
-          "time": null,
-          "epsEst": null,
-          "epsActual": -0.12,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": null,
-          "revEst": null,
-          "mcap": 8873212,
-          "rank": 22,
-          "rx": {
-            "gapPct": 0.98,
-            "dayPct": -2.91,
-            "totalPct": -1.96
-          }
-        },
-        {
-          "t": "HIHO",
-          "name": "Highway Holdings Limited",
-          "time": null,
-          "epsEst": null,
-          "epsActual": -0.24,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": null,
-          "revEst": null,
-          "mcap": 4950543,
-          "rank": 23,
-          "rx": {
-            "gapPct": -2.03,
-            "dayPct": -0.74,
-            "totalPct": -2.75
-          }
-        },
-        {
-          "t": "VIVS",
-          "name": "VivoSim Labs, Inc.",
-          "time": null,
-          "epsEst": null,
-          "epsActual": -2.21,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": null,
-          "revEst": null,
-          "mcap": 1572332,
-          "rank": 24,
-          "rx": {
-            "gapPct": 78.49,
-            "dayPct": -42.76,
-            "totalPct": 2.17
-          }
-        }
-      ],
-      "totalCount": 24,
-      "reactionsComputedFor": 24
-    },
     "2026-07-15": {
       "rows": [
         {
@@ -462,7 +24,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 694333777674,
+          "mcap": 694468673857,
           "rank": 1,
           "rx": {
             "gapPct": -1.01,
@@ -480,7 +42,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 603272645102,
+          "mcap": 615356874297,
           "rank": 2,
           "rx": {
             "gapPct": 0.76,
@@ -498,7 +60,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 341324434399,
+          "mcap": 344636732515,
           "rank": 3,
           "rx": {
             "gapPct": -0.14,
@@ -516,7 +78,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 161170136739,
+          "mcap": 164024889797,
           "rank": 4,
           "rx": {
             "gapPct": 1.6,
@@ -534,7 +96,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 120314877938,
+          "mcap": 119520180347,
           "rank": 5,
           "rx": {
             "gapPct": 0.14,
@@ -552,7 +114,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 109058766460,
+          "mcap": 110088335028,
           "rank": 6,
           "rx": {
             "gapPct": 0.25,
@@ -570,7 +132,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 100543752560,
+          "mcap": 101399085226,
           "rank": 7,
           "rx": {
             "gapPct": 0.48,
@@ -588,7 +150,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 18,
           "revEst": null,
-          "mcap": 85325053458,
+          "mcap": 84381672046,
           "rank": 8,
           "rx": {
             "gapPct": 1.04,
@@ -606,7 +168,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 80191432321,
+          "mcap": 80571562358,
           "rank": 9,
           "rx": {
             "gapPct": 3.31,
@@ -624,7 +186,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 38203509964,
+          "mcap": 38060693105,
           "rank": 10,
           "rx": {
             "gapPct": -3.58,
@@ -642,7 +204,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 36415028620,
+          "mcap": 36718169894,
           "rank": 11,
           "rx": {
             "gapPct": 0.95,
@@ -660,7 +222,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 27654184272,
+          "mcap": 27557999085,
           "rank": 12,
           "rx": {
             "gapPct": 7.14,
@@ -678,7 +240,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 12107500410,
+          "mcap": 12207170150,
           "rank": 13,
           "rx": {
             "gapPct": -0.88,
@@ -696,7 +258,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 7106699784,
+          "mcap": 7097128471,
           "rank": 14,
           "rx": {
             "gapPct": 0.99,
@@ -714,7 +276,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 6126996328,
+          "mcap": 6120953925,
           "rank": 15,
           "rx": {
             "gapPct": 2.05,
@@ -732,7 +294,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 1980878396,
+          "mcap": 1929904451,
           "rank": 16,
           "rx": {
             "gapPct": 0,
@@ -750,7 +312,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 1365185270,
+          "mcap": 1347566461,
           "rank": 17,
           "rx": {
             "gapPct": 1.69,
@@ -768,7 +330,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 1287361526,
+          "mcap": 1264335723,
           "rank": 18,
           "rx": {
             "gapPct": 0.57,
@@ -786,7 +348,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 857404008,
+          "mcap": 847382261,
           "rank": 19,
           "rx": {
             "gapPct": -0.3,
@@ -804,7 +366,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 788076298,
+          "mcap": 714494874,
           "rank": 20,
           "rx": {
             "gapPct": -13.95,
@@ -822,7 +384,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 428052594,
+          "mcap": 425125977,
           "rank": 21,
           "rx": {
             "gapPct": 1.29,
@@ -840,7 +402,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 267623963,
+          "mcap": 278581760,
           "rank": 22,
           "rx": {
             "gapPct": -0.92,
@@ -858,7 +420,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 171763988,
+          "mcap": 172253551,
           "rank": 23,
           "rx": {
             "gapPct": 0,
@@ -876,30 +438,12 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 115904986,
+          "mcap": 114474630,
           "rank": 24,
           "rx": {
             "gapPct": 0.83,
             "dayPct": 0.74,
             "totalPct": 1.58
-          }
-        },
-        {
-          "t": "CCEL",
-          "name": "Cryo-Cell International, Inc.",
-          "time": null,
-          "epsEst": null,
-          "epsActual": 0.07,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": null,
-          "revEst": null,
-          "mcap": 28219275,
-          "rank": 25,
-          "rx": {
-            "gapPct": -4.9,
-            "dayPct": 2.35,
-            "totalPct": -2.66
           }
         },
         {
@@ -912,7 +456,25 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 27452666,
+          "mcap": 28646260,
+          "rank": 25,
+          "rx": {
+            "gapPct": -10.29,
+            "dayPct": -9.29,
+            "totalPct": -18.63
+          }
+        },
+        {
+          "t": "CCEL",
+          "name": "Cryo-Cell International, Inc.",
+          "time": null,
+          "epsEst": null,
+          "epsActual": 0.07,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": null,
+          "revEst": null,
+          "mcap": 28541781,
           "rank": 26,
           "rx": null
         },
@@ -926,7 +488,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 18405370,
+          "mcap": 18012984,
           "rank": 27,
           "rx": null
         },
@@ -940,7 +502,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 3709827,
+          "mcap": 3038175,
           "rank": 28,
           "rx": null
         },
@@ -954,7 +516,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 2417029,
+          "mcap": 2133044,
           "rank": 29,
           "rx": null
         }
@@ -974,7 +536,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 2202241847287,
+          "mcap": 2184607730614,
           "rank": 1,
           "rx": {
             "gapPct": -4.3,
@@ -992,7 +554,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 396268810685,
+          "mcap": 391691762889,
           "rank": 2,
           "rx": {
             "gapPct": 0.79,
@@ -1010,7 +572,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 353497548179,
+          "mcap": 354005953810,
           "rank": 3,
           "rx": {
             "gapPct": 0.36,
@@ -1028,7 +590,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 12,
           "revEst": null,
-          "mcap": 285937737551,
+          "mcap": 285354785996,
           "rank": 4,
           "rx": {
             "gapPct": -11.93,
@@ -1046,7 +608,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 173606444798,
+          "mcap": 175174075985,
           "rank": 5,
           "rx": {
             "gapPct": 2.2,
@@ -1064,7 +626,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 142739281440,
+          "mcap": 137750927200,
           "rank": 6,
           "rx": {
             "gapPct": -0.01,
@@ -1082,7 +644,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 123978244471,
+          "mcap": 120358294766,
           "rank": 7,
           "rx": {
             "gapPct": -9.27,
@@ -1100,7 +662,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 98822568306,
+          "mcap": 100001428013,
           "rank": 8,
           "rx": {
             "gapPct": 0.16,
@@ -1118,7 +680,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 50731397149,
+          "mcap": 51268325193,
           "rank": 9,
           "rx": {
             "gapPct": -2.29,
@@ -1136,7 +698,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 30447499824,
+          "mcap": 30633567878,
           "rank": 10,
           "rx": {
             "gapPct": -0.69,
@@ -1154,7 +716,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 19088910674,
+          "mcap": 18984026549,
           "rank": 11,
           "rx": {
             "gapPct": -0.54,
@@ -1172,7 +734,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 11703515956,
+          "mcap": 12183795529,
           "rank": 12,
           "rx": {
             "gapPct": -0.68,
@@ -1190,30 +752,12 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 8509012712,
+          "mcap": 8557119175,
           "rank": 13,
           "rx": {
             "gapPct": 0.32,
             "dayPct": -0.76,
             "totalPct": -0.44
-          }
-        },
-        {
-          "t": "FNB",
-          "name": "F.N.B. Corporation",
-          "time": null,
-          "epsEst": 0.42,
-          "epsActual": 0.42,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 6795351786,
-          "rank": 14,
-          "rx": {
-            "gapPct": -3.49,
-            "dayPct": 1.86,
-            "totalPct": -1.69
           }
         },
         {
@@ -1226,12 +770,30 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 6784695680,
-          "rank": 15,
+          "mcap": 6990166095,
+          "rank": 14,
           "rx": {
             "gapPct": 2.6,
             "dayPct": 0.03,
             "totalPct": 2.63
+          }
+        },
+        {
+          "t": "FNB",
+          "name": "F.N.B. Corporation",
+          "time": null,
+          "epsEst": 0.42,
+          "epsActual": 0.42,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 6713480078,
+          "rank": 15,
+          "rx": {
+            "gapPct": -3.49,
+            "dayPct": 1.86,
+            "totalPct": -1.69
           }
         },
         {
@@ -1244,7 +806,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 4983345525,
+          "mcap": 4969017332,
           "rank": 16,
           "rx": {
             "gapPct": -0.58,
@@ -1262,7 +824,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 4152113908,
+          "mcap": 4133098162,
           "rank": 17,
           "rx": {
             "gapPct": -7.81,
@@ -1280,7 +842,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 4114570145,
+          "mcap": 4121819212,
           "rank": 18,
           "rx": {
             "gapPct": -7.42,
@@ -1298,7 +860,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 3313266534,
+          "mcap": 3352433870,
           "rank": 19,
           "rx": {
             "gapPct": -4.56,
@@ -1316,7 +878,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 2739784838,
+          "mcap": 2714662755,
           "rank": 20,
           "rx": {
             "gapPct": -2.44,
@@ -1334,7 +896,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 2403499435,
+          "mcap": 2402569288,
           "rank": 21,
           "rx": {
             "gapPct": 2.52,
@@ -1352,7 +914,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 1423604953,
+          "mcap": 1413974891,
           "rank": 22,
           "rx": {
             "gapPct": 0.21,
@@ -1370,7 +932,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 841998892,
+          "mcap": 807063635,
           "rank": 23,
           "rx": {
             "gapPct": 1.28,
@@ -1388,7 +950,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 608429703,
+          "mcap": 613656430,
           "rank": 24,
           "rx": {
             "gapPct": 4.1,
@@ -1406,7 +968,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 471397469,
+          "mcap": 459307914,
           "rank": 25,
           "rx": {
             "gapPct": -0.75,
@@ -1424,7 +986,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 275802696,
+          "mcap": 278794357,
           "rank": 26,
           "rx": null
         },
@@ -1438,7 +1000,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 132983416,
+          "mcap": 127637349,
           "rank": 27,
           "rx": null
         },
@@ -1452,7 +1014,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 29695098,
+          "mcap": 28839082,
           "rank": 28,
           "rx": null
         }
@@ -1472,7 +1034,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 11,
           "revEst": null,
-          "mcap": 77095585382,
+          "mcap": 77606594186,
           "rank": 1,
           "rx": {
             "gapPct": -0.37,
@@ -1490,7 +1052,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 64013277150,
+          "mcap": 64449334896,
           "rank": 2,
           "rx": {
             "gapPct": 0,
@@ -1508,7 +1070,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 52257923858,
+          "mcap": 52266986973,
           "rank": 3,
           "rx": {
             "gapPct": -0.31,
@@ -1526,7 +1088,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 26301157361,
+          "mcap": 26335292543,
           "rank": 4,
           "rx": {
             "gapPct": -0.41,
@@ -1544,7 +1106,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 8606105370,
+          "mcap": 8715961195,
           "rank": 5,
           "rx": {
             "gapPct": -0.15,
@@ -1562,7 +1124,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 1160714061,
+          "mcap": 1203008734,
           "rank": 6,
           "rx": {
             "gapPct": -0.65,
@@ -1580,7 +1142,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 840115686,
+          "mcap": 839349855,
           "rank": 7,
           "rx": {
             "gapPct": 0.13,
@@ -1598,7 +1160,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 634814388,
+          "mcap": 618794784,
           "rank": 8,
           "rx": {
             "gapPct": -0.38,
@@ -1616,7 +1178,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 6879417,
+          "mcap": 6699432,
           "rank": 9,
           "rx": {
             "gapPct": 3.36,
@@ -1640,7 +1202,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 33676568619,
+          "mcap": 34414938058,
           "rank": 1,
           "rx": {
             "gapPct": 3.72,
@@ -1658,7 +1220,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 30663958474,
+          "mcap": 30543300741,
           "rank": 2,
           "rx": {
             "gapPct": 0.48,
@@ -1676,7 +1238,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 26863488981,
+          "mcap": 26937944328,
           "rank": 3,
           "rx": {
             "gapPct": -1.73,
@@ -1694,7 +1256,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 13184983340,
+          "mcap": 13010658617,
           "rank": 4,
           "rx": {
             "gapPct": 4.29,
@@ -1712,30 +1274,12 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 12374677552,
+          "mcap": 12305801796,
           "rank": 5,
           "rx": {
             "gapPct": 1.01,
             "dayPct": -2.27,
             "totalPct": -1.28
-          }
-        },
-        {
-          "t": "DPZ",
-          "name": "Domino's Pizza Inc",
-          "time": null,
-          "epsEst": 4.11,
-          "epsActual": 4.07,
-          "surprisePct": -0.97,
-          "yearAgoEps": null,
-          "noEsts": 7,
-          "revEst": null,
-          "mcap": 10795893400,
-          "rank": 6,
-          "rx": {
-            "gapPct": -0.48,
-            "dayPct": -0.32,
-            "totalPct": -0.8
           }
         },
         {
@@ -1748,12 +1292,30 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 10719471861,
-          "rank": 7,
+          "mcap": 10692492759,
+          "rank": 6,
           "rx": {
             "gapPct": -0.96,
             "dayPct": -1.95,
             "totalPct": -2.89
+          }
+        },
+        {
+          "t": "DPZ",
+          "name": "Domino's Pizza Inc",
+          "time": null,
+          "epsEst": 4.11,
+          "epsActual": 4.07,
+          "surprisePct": -0.97,
+          "yearAgoEps": null,
+          "noEsts": 7,
+          "revEst": null,
+          "mcap": 10580531305,
+          "rank": 7,
+          "rx": {
+            "gapPct": -0.48,
+            "dayPct": -0.32,
+            "totalPct": -0.8
           }
         },
         {
@@ -1766,7 +1328,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 10156689964,
+          "mcap": 10306723617,
           "rank": 8,
           "rx": {
             "gapPct": -5.38,
@@ -1784,7 +1346,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 8505333179,
+          "mcap": 8600728043,
           "rank": 9,
           "rx": {
             "gapPct": 0,
@@ -1802,7 +1364,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 4799942488,
+          "mcap": 4734347100,
           "rank": 10,
           "rx": {
             "gapPct": 2.94,
@@ -1820,7 +1382,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 3091133652,
+          "mcap": 3074514654,
           "rank": 11,
           "rx": {
             "gapPct": 0.91,
@@ -1838,7 +1400,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 2389922744,
+          "mcap": 2256629366,
           "rank": 12,
           "rx": {
             "gapPct": -8.24,
@@ -1856,7 +1418,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 2084680654,
+          "mcap": 2099235257,
           "rank": 13,
           "rx": {
             "gapPct": -4.45,
@@ -1874,7 +1436,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 1963730204,
+          "mcap": 2008360436,
           "rank": 14,
           "rx": {
             "gapPct": -1.63,
@@ -1892,7 +1454,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 996938594,
+          "mcap": 1007111437,
           "rank": 15,
           "rx": {
             "gapPct": -0.26,
@@ -1910,30 +1472,12 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 830985788,
+          "mcap": 829275941,
           "rank": 16,
           "rx": {
             "gapPct": 1.22,
             "dayPct": 0.73,
             "totalPct": 1.95
-          }
-        },
-        {
-          "t": "PKE",
-          "name": "Park Aerospace Corp.",
-          "time": null,
-          "epsEst": null,
-          "epsActual": 0.17,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": null,
-          "revEst": null,
-          "mcap": 762597458,
-          "rank": 17,
-          "rx": {
-            "gapPct": 12.25,
-            "dayPct": -4.36,
-            "totalPct": 7.35
           }
         },
         {
@@ -1946,12 +1490,30 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 748896493,
-          "rank": 18,
+          "mcap": 732309427,
+          "rank": 17,
           "rx": {
             "gapPct": 3.94,
             "dayPct": 4.05,
             "totalPct": 8.15
+          }
+        },
+        {
+          "t": "PKE",
+          "name": "Park Aerospace Corp.",
+          "time": null,
+          "epsEst": null,
+          "epsActual": 0.17,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": null,
+          "revEst": null,
+          "mcap": 728448056,
+          "rank": 18,
+          "rx": {
+            "gapPct": 12.25,
+            "dayPct": -4.36,
+            "totalPct": 7.35
           }
         },
         {
@@ -1964,7 +1526,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 539573013,
+          "mcap": 543337476,
           "rank": 19,
           "rx": {
             "gapPct": 1.51,
@@ -1982,7 +1544,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 451002697,
+          "mcap": 447954238,
           "rank": 20,
           "rx": {
             "gapPct": -0.67,
@@ -2000,7 +1562,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 411876448,
+          "mcap": 407462501,
           "rank": 21,
           "rx": {
             "gapPct": 0.24,
@@ -2018,7 +1580,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 320626546,
+          "mcap": 319422993,
           "rank": 22,
           "rx": {
             "gapPct": -0.75,
@@ -2036,7 +1598,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 284815957,
+          "mcap": 283526614,
           "rank": 23,
           "rx": {
             "gapPct": -1.37,
@@ -2054,7 +1616,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 233041778,
+          "mcap": 233861002,
           "rank": 24,
           "rx": {
             "gapPct": 0.84,
@@ -2072,7 +1634,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 173929212,
+          "mcap": 192564485,
           "rank": 25,
           "rx": {
             "gapPct": 1.48,
@@ -2090,22 +1652,8 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 166476875,
+          "mcap": 165836305,
           "rank": 26,
-          "rx": null
-        },
-        {
-          "t": "HIT",
-          "name": "Health In Tech, Inc.",
-          "time": null,
-          "epsEst": -0.03,
-          "epsActual": 0.01,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 74080634,
-          "rank": 27,
           "rx": null
         },
         {
@@ -2118,8 +1666,8 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 19211164,
-          "rank": 28,
+          "mcap": 25271197,
+          "rank": 27,
           "rx": null
         },
         {
@@ -2132,12 +1680,12 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 4950543,
-          "rank": 29,
+          "mcap": 5320677,
+          "rank": 28,
           "rx": null
         }
       ],
-      "totalCount": 29,
+      "totalCount": 28,
       "reactionsComputedFor": 25
     },
     "2026-07-21": {
@@ -2152,7 +1700,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 293607298848,
+          "mcap": 292099859021,
           "rank": 1,
           "rx": {
             "gapPct": 1.43,
@@ -2170,30 +1718,12 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 173843985280,
+          "mcap": 175304859106,
           "rank": 2,
           "rx": {
             "gapPct": 1.38,
             "dayPct": -0.53,
             "totalPct": 0.84
-          }
-        },
-        {
-          "t": "IBKR",
-          "name": "Interactive Brokers Group, Inc.",
-          "time": null,
-          "epsEst": 0.64,
-          "epsActual": 0.69,
-          "surprisePct": 7.81,
-          "yearAgoEps": null,
-          "noEsts": 2,
-          "revEst": null,
-          "mcap": 160169720320,
-          "rank": 3,
-          "rx": {
-            "gapPct": -0.87,
-            "dayPct": -0.1,
-            "totalPct": -0.97
           }
         },
         {
@@ -2206,12 +1736,30 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 156862102413,
-          "rank": 4,
+          "mcap": 163094536353,
+          "rank": 3,
           "rx": {
             "gapPct": -0.07,
             "dayPct": 4.05,
             "totalPct": 3.97
+          }
+        },
+        {
+          "t": "IBKR",
+          "name": "Interactive Brokers Group, Inc.",
+          "time": null,
+          "epsEst": 0.64,
+          "epsActual": 0.69,
+          "surprisePct": 7.81,
+          "yearAgoEps": null,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 158609074877,
+          "rank": 4,
+          "rx": {
+            "gapPct": -0.87,
+            "dayPct": -0.1,
+            "totalPct": -0.97
           }
         },
         {
@@ -2224,30 +1772,12 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 137612765609,
+          "mcap": 133125224182,
           "rank": 5,
           "rx": {
             "gapPct": -2.62,
             "dayPct": -0.66,
             "totalPct": -3.26
-          }
-        },
-        {
-          "t": "COF",
-          "name": "Capital One Financial Corporation",
-          "time": null,
-          "epsEst": 4.85,
-          "epsActual": 5.81,
-          "surprisePct": 19.79,
-          "yearAgoEps": null,
-          "noEsts": 7,
-          "revEst": null,
-          "mcap": 127035537372,
-          "rank": 6,
-          "rx": {
-            "gapPct": 0.64,
-            "dayPct": -2.97,
-            "totalPct": -2.36
           }
         },
         {
@@ -2260,12 +1790,30 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 126698019939,
-          "rank": 7,
+          "mcap": 125932921714,
+          "rank": 6,
           "rx": {
             "gapPct": -0.3,
             "dayPct": 0.38,
             "totalPct": 0.07
+          }
+        },
+        {
+          "t": "COF",
+          "name": "Capital One Financial Corporation",
+          "time": null,
+          "epsEst": 4.85,
+          "epsActual": 5.81,
+          "surprisePct": 19.79,
+          "yearAgoEps": null,
+          "noEsts": 7,
+          "revEst": null,
+          "mcap": 124041682694,
+          "rank": 7,
+          "rx": {
+            "gapPct": 0.64,
+            "dayPct": -2.97,
+            "totalPct": -2.36
           }
         },
         {
@@ -2278,7 +1826,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 89062825488,
+          "mcap": 88064759927,
           "rank": 8,
           "rx": {
             "gapPct": 0.76,
@@ -2296,7 +1844,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 87489063437,
+          "mcap": 83984411055,
           "rank": 9,
           "rx": {
             "gapPct": -0.88,
@@ -2314,7 +1862,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 78524377500,
+          "mcap": 78614670000,
           "rank": 10,
           "rx": {
             "gapPct": 0.73,
@@ -2332,7 +1880,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 72762329420,
+          "mcap": 74622866297,
           "rank": 11,
           "rx": {
             "gapPct": 2.11,
@@ -2350,7 +1898,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 71700416306,
+          "mcap": 72065095062,
           "rank": 12,
           "rx": {
             "gapPct": 1.23,
@@ -2368,7 +1916,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 40894672000,
+          "mcap": 41508065000,
           "rank": 13,
           "rx": {
             "gapPct": -1.2,
@@ -2386,7 +1934,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 17,
           "revEst": null,
-          "mcap": 40699346058,
+          "mcap": 40415766445,
           "rank": 14,
           "rx": {
             "gapPct": 0.05,
@@ -2404,7 +1952,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 31148804400,
+          "mcap": 33782066780,
           "rank": 15,
           "rx": {
             "gapPct": 2.61,
@@ -2422,7 +1970,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 27726850825,
+          "mcap": 27593187187,
           "rank": 16,
           "rx": {
             "gapPct": 1.11,
@@ -2440,7 +1988,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 24882979540,
+          "mcap": 25056455650,
           "rank": 17,
           "rx": {
             "gapPct": -0.83,
@@ -2458,7 +2006,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 24289295175,
+          "mcap": 24491117320,
           "rank": 18,
           "rx": {
             "gapPct": -1,
@@ -2476,7 +2024,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 14,
           "revEst": null,
-          "mcap": 20599526757,
+          "mcap": 20025300523,
           "rank": 19,
           "rx": {
             "gapPct": 0.42,
@@ -2494,30 +2042,12 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 18275301351,
+          "mcap": 18028708079,
           "rank": 20,
           "rx": {
             "gapPct": -0.79,
             "dayPct": -0.56,
             "totalPct": -1.35
-          }
-        },
-        {
-          "t": "NLY",
-          "name": "Annaly Capital Management Inc.",
-          "time": null,
-          "epsEst": 0.75,
-          "epsActual": 0.79,
-          "surprisePct": 5.33,
-          "yearAgoEps": null,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 16590687991,
-          "rank": 21,
-          "rx": {
-            "gapPct": 0.13,
-            "dayPct": -1.15,
-            "totalPct": -1.02
           }
         },
         {
@@ -2530,12 +2060,30 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 16393835800,
-          "rank": 22,
+          "mcap": 16594179070,
+          "rank": 21,
           "rx": {
             "gapPct": 1.47,
             "dayPct": -0.41,
             "totalPct": 1.05
+          }
+        },
+        {
+          "t": "NLY",
+          "name": "Annaly Capital Management Inc.",
+          "time": null,
+          "epsEst": 0.75,
+          "epsActual": 0.79,
+          "surprisePct": 5.33,
+          "yearAgoEps": null,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 16422217429,
+          "rank": 22,
+          "rx": {
+            "gapPct": 0.13,
+            "dayPct": -1.15,
+            "totalPct": -1.02
           }
         },
         {
@@ -2548,7 +2096,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 13777098380,
+          "mcap": 13856709221,
           "rank": 23,
           "rx": {
             "gapPct": -0.29,
@@ -2566,7 +2114,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 13618819645,
+          "mcap": 13692385180,
           "rank": 24,
           "rx": {
             "gapPct": -0.29,
@@ -2584,7 +2132,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 12561543636,
+          "mcap": 12598331216,
           "rank": 25,
           "rx": {
             "gapPct": 0.16,
@@ -2602,22 +2150,8 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 12325355703,
+          "mcap": 12416090542,
           "rank": 26,
-          "rx": null
-        },
-        {
-          "t": "VMI",
-          "name": "Valmont Industries, Inc.",
-          "time": null,
-          "epsEst": 5.76,
-          "epsActual": 6.14,
-          "surprisePct": 6.6,
-          "yearAgoEps": null,
-          "noEsts": 6,
-          "revEst": null,
-          "mcap": 9810688533,
-          "rank": 27,
           "rx": null
         },
         {
@@ -2630,22 +2164,22 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 9786328083,
-          "rank": 28,
+          "mcap": 9907118811,
+          "rank": 27,
           "rx": null
         },
         {
-          "t": "RRC",
-          "name": "Range Resources Corporation",
+          "t": "VMI",
+          "name": "Valmont Industries, Inc.",
           "time": null,
-          "epsEst": 0.52,
-          "epsActual": 0.74,
-          "surprisePct": 42.31,
+          "epsEst": 5.76,
+          "epsActual": 6.14,
+          "surprisePct": 6.6,
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 8894739938,
-          "rank": 29,
+          "mcap": 9464154863,
+          "rank": 28,
           "rx": null
         },
         {
@@ -2658,36 +2192,22 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 8789421480,
+          "mcap": 9107150878,
+          "rank": 29,
+          "rx": null
+        },
+        {
+          "t": "RRC",
+          "name": "Range Resources Corporation",
+          "time": null,
+          "epsEst": 0.52,
+          "epsActual": 0.74,
+          "surprisePct": 42.31,
+          "yearAgoEps": null,
+          "noEsts": 6,
+          "revEst": null,
+          "mcap": 9055081206,
           "rank": 30,
-          "rx": null
-        },
-        {
-          "t": "HWC",
-          "name": "Hancock Whitney Corporation",
-          "time": null,
-          "epsEst": 1.55,
-          "epsActual": 1.55,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 6219946668,
-          "rank": 31,
-          "rx": null
-        },
-        {
-          "t": "AUB",
-          "name": "Atlantic Union Bankshares Corporation",
-          "time": null,
-          "epsEst": 0.92,
-          "epsActual": 0.94,
-          "surprisePct": 2.17,
-          "yearAgoEps": null,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 6126781918,
-          "rank": 32,
           "rx": null
         },
         {
@@ -2700,7 +2220,35 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 5992818662,
+          "mcap": 6265415671,
+          "rank": 31,
+          "rx": null
+        },
+        {
+          "t": "HWC",
+          "name": "Hancock Whitney Corporation",
+          "time": null,
+          "epsEst": 1.55,
+          "epsActual": 1.55,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 6200468755,
+          "rank": 32,
+          "rx": null
+        },
+        {
+          "t": "AUB",
+          "name": "Atlantic Union Bankshares Corporation",
+          "time": null,
+          "epsEst": 0.92,
+          "epsActual": 0.94,
+          "surprisePct": 2.17,
+          "yearAgoEps": null,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 6059517552,
           "rank": 33,
           "rx": null
         },
@@ -2714,7 +2262,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 5745052783,
+          "mcap": 5766548648,
           "rank": 34,
           "rx": null
         },
@@ -2728,22 +2276,8 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 5622667495,
+          "mcap": 5073920597,
           "rank": 35,
-          "rx": null
-        },
-        {
-          "t": "PEGA",
-          "name": "Pegasystems Inc.",
-          "time": null,
-          "epsEst": 0.23,
-          "epsActual": 0.18,
-          "surprisePct": -21.74,
-          "yearAgoEps": null,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 5170570618,
-          "rank": 36,
           "rx": null
         },
         {
@@ -2756,7 +2290,21 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 5065561340,
+          "mcap": 4942989464,
+          "rank": 36,
+          "rx": null
+        },
+        {
+          "t": "PEGA",
+          "name": "Pegasystems Inc.",
+          "time": null,
+          "epsEst": 0.23,
+          "epsActual": 0.18,
+          "surprisePct": -21.74,
+          "yearAgoEps": null,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 4272884521,
           "rank": 37,
           "rx": null
         },
@@ -2770,7 +2318,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 4230922830,
+          "mcap": 4187835639,
           "rank": 38,
           "rx": null
         },
@@ -2784,7 +2332,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 4196122911,
+          "mcap": 4149099780,
           "rank": 39,
           "rx": null
         },
@@ -2798,22 +2346,8 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 3883771013,
+          "mcap": 3934746710,
           "rank": 40,
-          "rx": null
-        },
-        {
-          "t": "FFBC",
-          "name": "First Financial Bancorp.",
-          "time": null,
-          "epsEst": 0.81,
-          "epsActual": 0.8,
-          "surprisePct": -1.23,
-          "yearAgoEps": null,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 3742830771,
-          "rank": 41,
           "rx": null
         },
         {
@@ -2826,7 +2360,21 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 3568407369,
+          "mcap": 3565644621,
+          "rank": 41,
+          "rx": null
+        },
+        {
+          "t": "FFBC",
+          "name": "First Financial Bancorp.",
+          "time": null,
+          "epsEst": 0.81,
+          "epsActual": 0.8,
+          "surprisePct": -1.23,
+          "yearAgoEps": null,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 3563401541,
           "rank": 42,
           "rx": null
         },
@@ -2840,7 +2388,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 2235468884,
+          "mcap": 2202507339,
           "rank": 43,
           "rx": null
         },
@@ -2854,7 +2402,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 2082510166,
+          "mcap": 1992679971,
           "rank": 44,
           "rx": null
         },
@@ -2868,7 +2416,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 1885217175,
+          "mcap": 1937369060,
           "rank": 45,
           "rx": null
         },
@@ -2882,7 +2430,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 1613429126,
+          "mcap": 1621961684,
           "rank": 46,
           "rx": null
         },
@@ -2896,7 +2444,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 1419187363,
+          "mcap": 1439666776,
           "rank": 47,
           "rx": null
         },
@@ -2910,7 +2458,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 1378255966,
+          "mcap": 1397639284,
           "rank": 48,
           "rx": null
         },
@@ -2924,7 +2472,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 1227952539,
+          "mcap": 1117886741,
           "rank": 49,
           "rx": null
         },
@@ -2938,7 +2486,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 1030934700,
+          "mcap": 998458875,
           "rank": 50,
           "rx": null
         },
@@ -2952,7 +2500,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": null,
           "revEst": null,
-          "mcap": 973346973,
+          "mcap": 977540927,
           "rank": 51,
           "rx": null
         },
@@ -2966,7 +2514,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 966516144,
+          "mcap": 934666059,
           "rank": 52,
           "rx": null
         },
@@ -2980,22 +2528,8 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 927243450,
+          "mcap": 912137980,
           "rank": 53,
-          "rx": null
-        },
-        {
-          "t": "CCBG",
-          "name": "Capital City Bank Group",
-          "time": null,
-          "epsEst": 0.91,
-          "epsActual": 0.95,
-          "surprisePct": 4.4,
-          "yearAgoEps": null,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 886366028,
-          "rank": 54,
           "rx": null
         },
         {
@@ -3008,7 +2542,21 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 842022115,
+          "mcap": 885038257,
+          "rank": 54,
+          "rx": null
+        },
+        {
+          "t": "CCBG",
+          "name": "Capital City Bank Group",
+          "time": null,
+          "epsEst": 0.91,
+          "epsActual": 0.95,
+          "surprisePct": 4.4,
+          "yearAgoEps": null,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 870974760,
           "rank": 55,
           "rx": null
         },
@@ -3022,22 +2570,8 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 810668723,
+          "mcap": 812829982,
           "rank": 56,
-          "rx": null
-        },
-        {
-          "t": "NPB",
-          "name": "Northpointe Bancshares, Inc.",
-          "time": null,
-          "epsEst": 0.68,
-          "epsActual": 0.6,
-          "surprisePct": -11.76,
-          "yearAgoEps": null,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 647026264,
-          "rank": 57,
           "rx": null
         },
         {
@@ -3050,7 +2584,21 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 636702215,
+          "mcap": 640218057,
+          "rank": 57,
+          "rx": null
+        },
+        {
+          "t": "NPB",
+          "name": "Northpointe Bancshares, Inc.",
+          "time": null,
+          "epsEst": 0.68,
+          "epsActual": 0.6,
+          "surprisePct": -11.76,
+          "yearAgoEps": null,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 584433130,
           "rank": 58,
           "rx": null
         },
@@ -3064,7 +2612,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 635554139,
+          "mcap": 582622467,
           "rank": 59,
           "rx": null
         },
@@ -3078,7 +2626,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 610366904,
+          "mcap": 578022198,
           "rank": 60,
           "rx": null
         }
@@ -3091,493 +2639,563 @@ export const EARNINGS = {
         {
           "t": "GOOG",
           "name": "Alphabet Inc.",
-          "time": "amc",
-          "epsEst": 2.87,
-          "epsActual": 2.31,
-          "surprisePct": null,
+          "time": null,
+          "epsEst": 2.88,
+          "epsActual": 9.11,
+          "surprisePct": 216.32,
           "yearAgoEps": null,
           "noEsts": 12,
           "revEst": null,
-          "mcap": 4206069400000,
+          "mcap": 4144762440000,
           "rank": 1,
-          "rx": null
+          "rx": {
+            "gapPct": -5.93,
+            "dayPct": -1.02,
+            "totalPct": -6.89
+          }
         },
         {
           "t": "GOOGL",
           "name": "Alphabet Inc.",
-          "time": "amc",
-          "epsEst": 2.87,
-          "epsActual": 2.31,
-          "surprisePct": null,
+          "time": null,
+          "epsEst": 2.88,
+          "epsActual": 9.11,
+          "surprisePct": 216.32,
           "yearAgoEps": null,
           "noEsts": 12,
           "revEst": null,
-          "mcap": 4206069400000,
+          "mcap": 4144762440000,
           "rank": 2,
-          "rx": null
+          "rx": {
+            "gapPct": -6.13,
+            "dayPct": -1.07,
+            "totalPct": -7.13
+          }
         },
         {
           "t": "TSLA",
           "name": "Tesla, Inc.",
-          "time": "amc",
-          "epsEst": 0.31,
-          "epsActual": 0.27,
-          "surprisePct": null,
+          "time": null,
+          "epsEst": 0.32,
+          "epsActual": 0.04,
+          "surprisePct": -87.5,
           "yearAgoEps": null,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 1423156446438,
+          "mcap": 1404678284993,
           "rank": 3,
-          "rx": null
+          "rx": {
+            "gapPct": -8.83,
+            "dayPct": -6.25,
+            "totalPct": -14.52
+          }
         },
         {
           "t": "PM",
           "name": "Philip Morris International Inc",
-          "time": "bmo",
+          "time": null,
           "epsEst": 2.04,
-          "epsActual": 1.91,
-          "surprisePct": null,
+          "epsActual": 2.2,
+          "surprisePct": 7.84,
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 293071405402,
+          "mcap": 302827983778,
           "rank": 4,
           "rx": {
-            "gapPct": 2.12,
-            "dayPct": 1.18,
-            "totalPct": 3.33
-          }
-        },
-        {
-          "t": "GEV",
-          "name": "GE Vernova Inc.",
-          "time": "bmo",
-          "epsEst": 3.16,
-          "epsActual": 1.86,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 8,
-          "revEst": null,
-          "mcap": 289897817806,
-          "rank": 5,
-          "rx": {
-            "gapPct": -5.36,
-            "dayPct": -3.52,
-            "totalPct": -8.69
+            "gapPct": -1.21,
+            "dayPct": -0.43,
+            "totalPct": -1.64
           }
         },
         {
           "t": "TXN",
           "name": "Texas Instruments Incorporated",
-          "time": "amc",
+          "time": null,
           "epsEst": 1.91,
-          "epsActual": 1.41,
-          "surprisePct": null,
+          "epsActual": 2.14,
+          "surprisePct": 12.04,
           "yearAgoEps": null,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 265110030018,
+          "mcap": 267740198184,
+          "rank": 5,
+          "rx": {
+            "gapPct": -5.74,
+            "dayPct": 2.77,
+            "totalPct": -3.13
+          }
+        },
+        {
+          "t": "GEV",
+          "name": "GE Vernova Inc.",
+          "time": null,
+          "epsEst": 3.17,
+          "epsActual": 2.47,
+          "surprisePct": -22.08,
+          "yearAgoEps": null,
+          "noEsts": 8,
+          "revEst": null,
+          "mcap": 264697256675,
           "rank": 6,
-          "rx": null
+          "rx": {
+            "gapPct": -0.38,
+            "dayPct": 5.08,
+            "totalPct": 4.69
+          }
+        },
+        {
+          "t": "SAN",
+          "name": "Banco Santander, S.A.",
+          "time": null,
+          "epsEst": 0.29,
+          "epsActual": 0.27,
+          "surprisePct": -6.9,
+          "yearAgoEps": null,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 228727356985,
+          "rank": 7,
+          "rx": {
+            "gapPct": -2.98,
+            "dayPct": -0.9,
+            "totalPct": -3.86
+          }
         },
         {
           "t": "IBM",
           "name": "International Business Machines Corporation",
-          "time": "amc",
+          "time": null,
           "epsEst": 2.93,
-          "epsActual": 2.8,
+          "epsActual": 2.93,
           "surprisePct": null,
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 197845851440,
-          "rank": 7,
-          "rx": null
+          "mcap": 193400194066,
+          "rank": 8,
+          "rx": {
+            "gapPct": -1.52,
+            "dayPct": 1.98,
+            "totalPct": 0.43
+          }
         },
         {
           "t": "T",
           "name": "AT&T Inc.",
-          "time": "bmo",
+          "time": null,
           "epsEst": 0.59,
-          "epsActual": 0.54,
-          "surprisePct": null,
+          "epsActual": 0.65,
+          "surprisePct": 10.17,
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 154670022467,
-          "rank": 8,
+          "mcap": 160089726758,
+          "rank": 9,
           "rx": {
-            "gapPct": 5.03,
-            "dayPct": -1.45,
-            "totalPct": 3.5
+            "gapPct": 0.91,
+            "dayPct": -1.25,
+            "totalPct": -0.35
+          }
+        },
+        {
+          "t": "EQNR",
+          "name": "Equinor ASA",
+          "time": null,
+          "epsEst": 1.38,
+          "epsActual": 1.33,
+          "surprisePct": -3.62,
+          "yearAgoEps": null,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 99910830359,
+          "rank": 10,
+          "rx": {
+            "gapPct": 3.15,
+            "dayPct": -0.56,
+            "totalPct": 2.58
           }
         },
         {
           "t": "NOW",
           "name": "ServiceNow, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 0.4,
-          "epsActual": 0.44,
-          "surprisePct": null,
+          "epsActual": 0.31,
+          "surprisePct": -22.5,
           "yearAgoEps": null,
-          "noEsts": 10,
+          "noEsts": 11,
           "revEst": null,
-          "mcap": 105223860000,
-          "rank": 9,
-          "rx": null
-        },
-        {
-          "t": "EQNR",
-          "name": "Equinor ASA",
-          "time": "bmo",
-          "epsEst": 1.38,
-          "epsActual": 0.64,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 2,
-          "revEst": null,
-          "mcap": 93985188018,
-          "rank": 10,
+          "mcap": 98419260000,
+          "rank": 11,
           "rx": {
-            "gapPct": 4.82,
-            "dayPct": 1.42,
-            "totalPct": 6.3
+            "gapPct": 4.76,
+            "dayPct": -8.06,
+            "totalPct": -3.69
           }
         },
         {
           "t": "CSX",
           "name": "CSX Corporation",
-          "time": "amc",
+          "time": null,
           "epsEst": 0.5,
-          "epsActual": 0.44,
-          "surprisePct": null,
+          "epsActual": 0.54,
+          "surprisePct": 8,
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 92702547526,
-          "rank": 11,
-          "rx": null
+          "mcap": 92776873080,
+          "rank": 12,
+          "rx": {
+            "gapPct": 4.07,
+            "dayPct": 1.64,
+            "totalPct": 5.77
+          }
         },
         {
           "t": "CME",
           "name": "CME Group Inc.",
-          "time": "bmo",
+          "time": null,
           "epsEst": 2.91,
-          "epsActual": 2.96,
-          "surprisePct": null,
+          "epsActual": 2.99,
+          "surprisePct": 2.75,
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 86016861791,
-          "rank": 12,
+          "mcap": 90314443646,
+          "rank": 13,
           "rx": {
-            "gapPct": 4.29,
-            "dayPct": 0.67,
-            "totalPct": 5
+            "gapPct": 0.45,
+            "dayPct": 1.59,
+            "totalPct": 2.04
           }
         },
         {
           "t": "MCO",
           "name": "Moody's Corporation",
-          "time": "bmo",
+          "time": null,
           "epsEst": 4.24,
-          "epsActual": 3.56,
-          "surprisePct": null,
+          "epsActual": 4.68,
+          "surprisePct": 10.38,
           "yearAgoEps": null,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 85737519000,
-          "rank": 13,
+          "mcap": 85550590000,
+          "rank": 14,
           "rx": {
-            "gapPct": 0.55,
-            "dayPct": -0.77,
-            "totalPct": -0.22
+            "gapPct": -1.98,
+            "dayPct": -1.62,
+            "totalPct": -3.57
           }
         },
         {
           "t": "KMI",
           "name": "Kinder Morgan, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 0.31,
-          "epsActual": 0.28,
-          "surprisePct": null,
+          "epsActual": 0.37,
+          "surprisePct": 19.35,
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 72039858012,
-          "rank": 14,
-          "rx": null
+          "mcap": 72284588845,
+          "rank": 15,
+          "rx": {
+            "gapPct": 1.57,
+            "dayPct": -0.7,
+            "totalPct": 0.86
+          }
         },
         {
           "t": "URI",
           "name": "United Rentals, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 11.67,
-          "epsActual": 10.47,
-          "surprisePct": null,
+          "epsActual": 12.76,
+          "surprisePct": 9.34,
           "yearAgoEps": null,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 63494791382,
-          "rank": 15,
-          "rx": null
+          "mcap": 64842945288,
+          "rank": 16,
+          "rx": {
+            "gapPct": 5.89,
+            "dayPct": 3.99,
+            "totalPct": 10.11
+          }
         },
         {
           "t": "TEL",
           "name": "TE Connectivity plc",
-          "time": "bmo",
-          "epsEst": 2.84,
-          "epsActual": 2.27,
-          "surprisePct": null,
+          "time": null,
+          "epsEst": 2.85,
+          "epsActual": 2.94,
+          "surprisePct": 3.16,
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 61009140949,
-          "rank": 16,
+          "mcap": 58460890624,
+          "rank": 17,
           "rx": {
-            "gapPct": -4.63,
-            "dayPct": 0.48,
-            "totalPct": -4.18
+            "gapPct": -1.08,
+            "dayPct": 0.34,
+            "totalPct": -0.74
           }
         },
         {
           "t": "WAB",
           "name": "Westinghouse Air Brake Technologies Corporation",
-          "time": "bmo",
+          "time": null,
           "epsEst": 2.63,
-          "epsActual": 2.27,
-          "surprisePct": null,
+          "epsActual": 2.76,
+          "surprisePct": 4.94,
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 44715070991,
-          "rank": 17,
+          "mcap": 49206430340,
+          "rank": 18,
           "rx": {
-            "gapPct": 4.77,
-            "dayPct": 5.03,
-            "totalPct": 10.04
+            "gapPct": 1.21,
+            "dayPct": 1.53,
+            "totalPct": 2.76
           }
         },
         {
           "t": "WCN",
           "name": "Waste Connections, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 1.35,
-          "epsActual": 1.29,
-          "surprisePct": null,
+          "epsActual": 1.5,
+          "surprisePct": 11.11,
           "yearAgoEps": null,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 43030837880,
-          "rank": 18,
-          "rx": null
-        },
-        {
-          "t": "NTRS",
-          "name": "Northern Trust Corporation",
-          "time": "bmo",
-          "epsEst": 2.68,
-          "epsActual": 2.13,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 34244845565,
+          "mcap": 42734572210,
           "rank": 19,
           "rx": {
-            "gapPct": -1.98,
-            "dayPct": -1.51,
-            "totalPct": -3.46
+            "gapPct": 1.55,
+            "dayPct": -1.48,
+            "totalPct": 0.05
           }
         },
         {
           "t": "CCI",
           "name": "Crown Castle Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 0.95,
-          "epsActual": 1.02,
-          "surprisePct": null,
+          "epsActual": 1.13,
+          "surprisePct": 18.95,
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 33257641105,
+          "mcap": 33825028683,
           "rank": 20,
-          "rx": null
+          "rx": {
+            "gapPct": 0.35,
+            "dayPct": -4.12,
+            "totalPct": -3.78
+          }
+        },
+        {
+          "t": "NTRS",
+          "name": "Northern Trust Corporation",
+          "time": null,
+          "epsEst": 2.68,
+          "epsActual": 2.97,
+          "surprisePct": 10.82,
+          "yearAgoEps": null,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 33060543114,
+          "rank": 21,
+          "rx": {
+            "gapPct": -2,
+            "dayPct": 1.64,
+            "totalPct": -0.4
+          }
         },
         {
           "t": "RJF",
           "name": "Raymond James Financial, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 2.91,
-          "epsActual": 2.18,
-          "surprisePct": null,
+          "epsActual": 3.14,
+          "surprisePct": 7.9,
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 32726707900,
-          "rank": 21,
-          "rx": null
-        },
-        {
-          "t": "LVS",
-          "name": "Las Vegas Sands Corp.",
-          "time": "amc",
-          "epsEst": 0.77,
-          "epsActual": 0.79,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 7,
-          "revEst": null,
-          "mcap": 30130119168,
+          "mcap": 32742298542,
           "rank": 22,
-          "rx": null
+          "rx": {
+            "gapPct": 0.8,
+            "dayPct": -1.9,
+            "totalPct": -1.11
+          }
         },
         {
           "t": "TDY",
           "name": "Teledyne Technologies Incorporated",
-          "time": "bmo",
+          "time": null,
           "epsEst": 5.78,
-          "epsActual": 5.2,
-          "surprisePct": null,
+          "epsActual": 6.28,
+          "surprisePct": 8.65,
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 29997190272,
+          "mcap": 30137104269,
           "rank": 23,
           "rx": {
-            "gapPct": 0.93,
-            "dayPct": -0.46,
-            "totalPct": 0.47
+            "gapPct": 0.05,
+            "dayPct": 0.06,
+            "totalPct": 0.11
+          }
+        },
+        {
+          "t": "LVS",
+          "name": "Las Vegas Sands Corp.",
+          "time": null,
+          "epsEst": 0.77,
+          "epsActual": 0.59,
+          "surprisePct": -23.38,
+          "yearAgoEps": null,
+          "noEsts": 7,
+          "revEst": null,
+          "mcap": 29984338956,
+          "rank": 24,
+          "rx": {
+            "gapPct": -1.88,
+            "dayPct": 3.67,
+            "totalPct": 1.72
           }
         },
         {
           "t": "OTIS",
           "name": "Otis Worldwide Corporation",
-          "time": "bmo",
+          "time": null,
           "epsEst": 1,
-          "epsActual": 1.05,
-          "surprisePct": null,
+          "epsActual": 1.01,
+          "surprisePct": 1,
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 27608371668,
-          "rank": 24,
+          "mcap": 27017448911,
+          "rank": 25,
           "rx": {
-            "gapPct": -2.21,
-            "dayPct": 0.07,
-            "totalPct": -2.14
+            "gapPct": 0.06,
+            "dayPct": 0.45,
+            "totalPct": 0.51
           }
         },
         {
           "t": "AVB",
           "name": "AvalonBay Communities, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 2.8,
-          "epsActual": 2.82,
-          "surprisePct": null,
+          "epsActual": 2.86,
+          "surprisePct": 2.14,
           "yearAgoEps": null,
-          "noEsts": 6,
+          "noEsts": 7,
           "revEst": null,
-          "mcap": 26521715955,
-          "rank": 25,
+          "mcap": 26468853369,
+          "rank": 26,
           "rx": null
         },
         {
           "t": "EQR",
           "name": "Equity Residential",
-          "time": "amc",
+          "time": null,
           "epsEst": 1.01,
-          "epsActual": 0.99,
-          "surprisePct": null,
+          "epsActual": 1.02,
+          "surprisePct": 0.99,
           "yearAgoEps": null,
-          "noEsts": 8,
+          "noEsts": 9,
           "revEst": null,
           "mcap": 25603334330,
-          "rank": 26,
-          "rx": null
-        },
-        {
-          "t": "LUV",
-          "name": "Southwest Airlines Company",
-          "time": "amc",
-          "epsEst": 0.52,
-          "epsActual": 0.43,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 8,
-          "revEst": null,
-          "mcap": 23798392086,
           "rank": 27,
           "rx": null
         },
         {
           "t": "PHM",
           "name": "PulteGroup, Inc.",
-          "time": "bmo",
+          "time": null,
           "epsEst": 2.38,
-          "epsActual": 3.03,
-          "surprisePct": null,
+          "epsActual": 2.48,
+          "surprisePct": 4.2,
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 23669834224,
+          "mcap": 24144145243,
           "rank": 28,
+          "rx": null
+        },
+        {
+          "t": "LUV",
+          "name": "Southwest Airlines Company",
+          "time": null,
+          "epsEst": 0.52,
+          "epsActual": 0.94,
+          "surprisePct": 80.77,
+          "yearAgoEps": null,
+          "noEsts": 8,
+          "revEst": null,
+          "mcap": 23294955162,
+          "rank": 29,
           "rx": null
         },
         {
           "t": "ROL",
           "name": "Rollins, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 0.34,
-          "epsActual": 0.3,
-          "surprisePct": null,
+          "epsActual": 0.32,
+          "surprisePct": -5.88,
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 21116996259,
-          "rank": 29,
+          "mcap": 20929225431,
+          "rank": 30,
           "rx": null
         },
         {
           "t": "PKG",
           "name": "Packaging Corporation of America",
-          "time": "amc",
+          "time": null,
           "epsEst": 2.31,
-          "epsActual": 2.48,
-          "surprisePct": null,
+          "epsActual": 2.35,
+          "surprisePct": 1.73,
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 20333202232,
-          "rank": 30,
+          "mcap": 20331420259,
+          "rank": 31,
           "rx": null
         },
         {
           "t": "RS",
           "name": "Reliance, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 5.38,
-          "epsActual": 4.43,
-          "surprisePct": null,
+          "epsActual": 6.27,
+          "surprisePct": 16.54,
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 19573024305,
-          "rank": 31,
+          "mcap": 19715449682,
+          "rank": 32,
           "rx": null
         },
         {
           "t": "RCI",
           "name": "Rogers Communication, Inc.",
-          "time": "bmo",
+          "time": null,
           "epsEst": 0.8,
-          "epsActual": 0.82,
-          "surprisePct": null,
+          "epsActual": 0.83,
+          "surprisePct": 3.75,
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 19345001932,
-          "rank": 32,
+          "mcap": 18382726665,
+          "rank": 33,
           "rx": null
         },
         {
@@ -3590,190 +3208,190 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 17074101617,
-          "rank": 33,
+          "mcap": 17138560710,
+          "rank": 34,
           "rx": null
         },
         {
           "t": "MEDP",
           "name": "Medpace Holdings, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 4.08,
-          "epsActual": 3.1,
-          "surprisePct": null,
+          "epsActual": 4.25,
+          "surprisePct": 4.17,
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 15184329851,
-          "rank": 34,
+          "mcap": 15082942955,
+          "rank": 35,
           "rx": null
         },
         {
           "t": "PNFP",
           "name": "Pinnacle Financial Partners, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 2.46,
-          "epsActual": 2,
-          "surprisePct": null,
+          "epsActual": 2.5,
+          "surprisePct": 1.63,
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 14625628333,
-          "rank": 35,
+          "mcap": 14711759216,
+          "rank": 36,
           "rx": null
         },
         {
           "t": "GL",
           "name": "Globe Life Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 3.67,
-          "epsActual": 3.27,
-          "surprisePct": null,
+          "epsActual": 3.61,
+          "surprisePct": -1.63,
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 14313035243,
-          "rank": 36,
-          "rx": null
-        },
-        {
-          "t": "RNR",
-          "name": "RenaissanceRe Holdings Ltd.",
-          "time": "amc",
-          "epsEst": 11.44,
-          "epsActual": 12.29,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 13692880108,
+          "mcap": 14286636024,
           "rank": 37,
           "rx": null
         },
         {
           "t": "RPM",
           "name": "RPM International Inc.",
-          "time": "bmo",
+          "time": null,
           "epsEst": 1.84,
-          "epsActual": 1.72,
-          "surprisePct": null,
+          "epsActual": 1.89,
+          "surprisePct": 2.72,
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 12957921286,
+          "mcap": 13710917796,
           "rank": 38,
           "rx": null
         },
         {
-          "t": "ICLR",
-          "name": "ICON plc",
+          "t": "RNR",
+          "name": "RenaissanceRe Holdings Ltd.",
           "time": null,
-          "epsEst": 2.26,
-          "epsActual": 3.16,
-          "surprisePct": null,
+          "epsEst": 11.44,
+          "epsActual": 12.92,
+          "surprisePct": 12.94,
           "yearAgoEps": null,
-          "noEsts": 3,
+          "noEsts": 4,
           "revEst": null,
-          "mcap": 12757647692,
+          "mcap": 13629356877,
           "rank": 39,
           "rx": null
         },
         {
           "t": "ELS",
           "name": "Equity Lifestyle Properties, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 0.72,
-          "epsActual": 0.69,
-          "surprisePct": null,
+          "epsActual": 0.74,
+          "surprisePct": 2.78,
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 12586547190,
+          "mcap": 12699030970,
           "rank": 40,
           "rx": null
         },
         {
           "t": "KNX",
           "name": "Knight Transportation, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 0.49,
-          "epsActual": 0.35,
-          "surprisePct": null,
+          "epsActual": 0.63,
+          "surprisePct": 28.57,
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 12464914740,
+          "mcap": 12356043760,
           "rank": 41,
           "rx": null
         },
         {
           "t": "GGG",
           "name": "Graco Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 0.81,
-          "epsActual": 0.75,
-          "surprisePct": null,
+          "epsActual": 0.91,
+          "surprisePct": 12.35,
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 12137252784,
+          "mcap": 12261728917,
           "rank": 42,
           "rx": null
         },
         {
           "t": "SF",
           "name": "Stifel Financial Corporation",
-          "time": "bmo",
+          "time": null,
           "epsEst": 1.35,
-          "epsActual": 1.14,
-          "surprisePct": null,
+          "epsActual": 1.42,
+          "surprisePct": 5.19,
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 11905511292,
+          "mcap": 12166294299,
           "rank": 43,
-          "rx": null
-        },
-        {
-          "t": "EGP",
-          "name": "EastGroup Properties, Inc.",
-          "time": "amc",
-          "epsEst": 2.37,
-          "epsActual": 2.21,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 11898182387,
-          "rank": 44,
-          "rx": null
-        },
-        {
-          "t": "MOH",
-          "name": "Molina Healthcare Inc",
-          "time": "amc",
-          "epsEst": 1.37,
-          "epsActual": 5.48,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 11802734000,
-          "rank": 45,
           "rx": null
         },
         {
           "t": "SEIC",
           "name": "SEI Investments Company",
-          "time": "amc",
+          "time": null,
           "epsEst": 1.45,
-          "epsActual": 1.78,
-          "surprisePct": null,
+          "epsActual": 1.66,
+          "surprisePct": 14.48,
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 11744656106,
+          "mcap": 11876956380,
+          "rank": 44,
+          "rx": null
+        },
+        {
+          "t": "EGP",
+          "name": "EastGroup Properties, Inc.",
+          "time": null,
+          "epsEst": 2.37,
+          "epsActual": 2.36,
+          "surprisePct": -0.42,
+          "yearAgoEps": null,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 11628868690,
+          "rank": 45,
+          "rx": null
+        },
+        {
+          "t": "MOH",
+          "name": "Molina Healthcare Inc",
+          "time": null,
+          "epsEst": 1.37,
+          "epsActual": 1.51,
+          "surprisePct": 10.22,
+          "yearAgoEps": null,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 11552654000,
           "rank": 46,
+          "rx": null
+        },
+        {
+          "t": "ONB",
+          "name": "Old National Bancorp",
+          "time": null,
+          "epsEst": 0.62,
+          "epsActual": 0.65,
+          "surprisePct": 4.84,
+          "yearAgoEps": null,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 10196383470,
+          "rank": 47,
           "rx": null
         },
         {
@@ -3781,68 +3399,54 @@ export const EARNINGS = {
           "name": "Dr. Reddy's Laboratories Ltd",
           "time": null,
           "epsEst": 0.17,
-          "epsActual": 0.2,
-          "surprisePct": null,
+          "epsActual": 0.06,
+          "surprisePct": -64.71,
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 10483291543,
-          "rank": 47,
-          "rx": null
-        },
-        {
-          "t": "ONB",
-          "name": "Old National Bancorp",
-          "time": "bmo",
-          "epsEst": 0.62,
-          "epsActual": 0.53,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 10111381410,
+          "mcap": 9498396319,
           "rank": 48,
           "rx": null
         },
         {
           "t": "FR",
           "name": "First Industrial Realty Trust, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 0.8,
-          "epsActual": 0.76,
-          "surprisePct": null,
+          "epsActual": 0.82,
+          "surprisePct": 2.5,
           "yearAgoEps": null,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 9075771227,
+          "mcap": 8976343409,
           "rank": 49,
           "rx": null
         },
         {
           "t": "FAF",
           "name": "First American Corporation (The)",
-          "time": "amc",
+          "time": null,
           "epsEst": 1.8,
-          "epsActual": 1.53,
-          "surprisePct": null,
+          "epsActual": 2.08,
+          "surprisePct": 15.56,
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 7301135000,
+          "mcap": 7185988000,
           "rank": 50,
           "rx": null
         },
         {
           "t": "EPRT",
           "name": "Essential Properties Realty Trust, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 0.48,
-          "epsActual": 0.46,
-          "surprisePct": null,
+          "epsActual": 0.5,
+          "surprisePct": 4.17,
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 7192340463,
+          "mcap": 7062592890,
           "rank": 51,
           "rx": null
         },
@@ -3856,125 +3460,125 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 6771636362,
+          "mcap": 6770702085,
           "rank": 52,
           "rx": null
         },
         {
           "t": "WH",
           "name": "Wyndham Hotels & Resorts, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 1.42,
-          "epsActual": 1.33,
-          "surprisePct": null,
+          "epsActual": 1.48,
+          "surprisePct": 4.23,
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 5668435697,
+          "mcap": 5665441278,
           "rank": 53,
           "rx": null
         },
         {
-          "t": "WEX",
-          "name": "WEX Inc.",
-          "time": "amc",
-          "epsEst": 4.41,
-          "epsActual": 3.22,
-          "surprisePct": null,
+          "t": "SON",
+          "name": "Sonoco Products Company",
+          "time": null,
+          "epsEst": 1.47,
+          "epsActual": 1.51,
+          "surprisePct": 2.72,
           "yearAgoEps": null,
-          "noEsts": 7,
+          "noEsts": 4,
           "revEst": null,
-          "mcap": 5580184297,
+          "mcap": 5452608198,
           "rank": 54,
           "rx": null
         },
         {
           "t": "RLI",
           "name": "RLI Corp.",
-          "time": "amc",
+          "time": null,
           "epsEst": 0.71,
-          "epsActual": 0.84,
-          "surprisePct": null,
+          "epsActual": 0.83,
+          "surprisePct": 16.9,
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 5534687526,
+          "mcap": 5423442146,
           "rank": 55,
           "rx": null
         },
         {
-          "t": "SON",
-          "name": "Sonoco Products Company",
-          "time": "amc",
-          "epsEst": 1.47,
-          "epsActual": 1.37,
-          "surprisePct": null,
+          "t": "WEX",
+          "name": "WEX Inc.",
+          "time": null,
+          "epsEst": 4.41,
+          "epsActual": 4.5,
+          "surprisePct": 2.04,
           "yearAgoEps": null,
-          "noEsts": 4,
+          "noEsts": 7,
           "revEst": null,
-          "mcap": 5409105975,
+          "mcap": 5397136502,
           "rank": 56,
           "rx": null
         },
         {
           "t": "IRDM",
           "name": "Iridium Communications Inc",
-          "time": "bmo",
+          "time": null,
           "epsEst": 0.26,
-          "epsActual": 0.2,
-          "surprisePct": null,
+          "epsActual": 0.19,
+          "surprisePct": -26.92,
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 4994578627,
+          "mcap": 4954402084,
           "rank": 57,
-          "rx": null
-        },
-        {
-          "t": "FULT",
-          "name": "Fulton Financial Corporation",
-          "time": "amc",
-          "epsEst": 0.53,
-          "epsActual": 0.55,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 4705708887,
-          "rank": 58,
           "rx": null
         },
         {
           "t": "TNL",
           "name": "Travel   Leisure Co.",
-          "time": "bmo",
+          "time": null,
           "epsEst": 1.93,
-          "epsActual": 1.65,
-          "surprisePct": null,
+          "epsActual": 1.88,
+          "surprisePct": -2.59,
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 4578625534,
+          "mcap": 4719074170,
+          "rank": 58,
+          "rx": null
+        },
+        {
+          "t": "FULT",
+          "name": "Fulton Financial Corporation",
+          "time": null,
+          "epsEst": 0.53,
+          "epsActual": 0.6,
+          "surprisePct": 13.21,
+          "yearAgoEps": null,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 4671304842,
           "rank": 59,
           "rx": null
         },
         {
           "t": "TCBI",
           "name": "Texas Capital Bancshares, Inc.",
-          "time": "amc",
+          "time": null,
           "epsEst": 1.85,
-          "epsActual": 1.63,
-          "surprisePct": null,
+          "epsActual": 1.88,
+          "surprisePct": 1.62,
           "yearAgoEps": null,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 4526492827,
+          "mcap": 4494176332,
           "rank": 60,
           "rx": null
         }
       ],
-      "totalCount": 124,
-      "reactionsComputedFor": 11
+      "totalCount": 129,
+      "reactionsComputedFor": 25
     },
     "2026-07-23": {
       "rows": [
@@ -3988,7 +3592,7 @@ export const EARNINGS = {
           "yearAgoEps": -0.26,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 529991700000,
+          "mcap": 515768120000,
           "rank": 1,
           "rx": null
         },
@@ -4002,23 +3606,31 @@ export const EARNINGS = {
           "yearAgoEps": 1.56,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 260812179501,
+          "mcap": 262441666449,
           "rank": 2,
-          "rx": null
+          "rx": {
+            "gapPct": 5.19,
+            "dayPct": 2.03,
+            "totalPct": 7.33
+          }
         },
         {
           "t": "TMUS",
           "name": "T-Mobile US, Inc.",
           "time": "bmo",
-          "epsEst": 2.52,
+          "epsEst": 2.49,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 2.84,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 206452193862,
+          "mcap": 206636168664,
           "rank": 3,
-          "rx": null
+          "rx": {
+            "gapPct": -7.96,
+            "dayPct": -3.03,
+            "totalPct": -10.75
+          }
         },
         {
           "t": "TMO",
@@ -4030,9 +3642,13 @@ export const EARNINGS = {
           "yearAgoEps": 5.36,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 194528972069,
+          "mcap": 195643836464,
           "rank": 4,
-          "rx": null
+          "rx": {
+            "gapPct": 8.97,
+            "dayPct": -0.24,
+            "totalPct": 8.71
+          }
         },
         {
           "t": "SAP",
@@ -4044,7 +3660,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.7,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 189607343167,
+          "mcap": 182740004510,
           "rank": 5,
           "rx": null
         },
@@ -4052,15 +3668,19 @@ export const EARNINGS = {
           "t": "TTE",
           "name": "TotalEnergies SE",
           "time": "bmo",
-          "epsEst": 3.07,
+          "epsEst": 2.96,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.57,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 178079900369,
+          "mcap": 180985248456,
           "rank": 6,
-          "rx": null
+          "rx": {
+            "gapPct": 2.51,
+            "dayPct": -0.93,
+            "totalPct": 1.55
+          }
         },
         {
           "t": "UNP",
@@ -4072,9 +3692,13 @@ export const EARNINGS = {
           "yearAgoEps": 3.03,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 174035154127,
+          "mcap": 173696737595,
           "rank": 7,
-          "rx": null
+          "rx": {
+            "gapPct": 5.93,
+            "dayPct": -1.8,
+            "totalPct": 4.02
+          }
         },
         {
           "t": "LMT",
@@ -4086,9 +3710,13 @@ export const EARNINGS = {
           "yearAgoEps": 7.29,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 116916499981,
+          "mcap": 118592697411,
           "rank": 8,
-          "rx": null
+          "rx": {
+            "gapPct": 5.96,
+            "dayPct": 4.33,
+            "totalPct": 10.54
+          }
         },
         {
           "t": "NEM",
@@ -4100,37 +3728,45 @@ export const EARNINGS = {
           "yearAgoEps": 1.43,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 98737955142,
+          "mcap": 102218177153,
           "rank": 9,
-          "rx": null
-        },
-        {
-          "t": "BX",
-          "name": "Blackstone Inc.",
-          "time": "bmo",
-          "epsEst": 1.32,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.21,
-          "noEsts": 8,
-          "revEst": null,
-          "mcap": 92228528039,
-          "rank": 10,
           "rx": null
         },
         {
           "t": "FCX",
           "name": "Freeport-McMoran, Inc.",
           "time": "bmo",
-          "epsEst": 0.6,
+          "epsEst": 0.62,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.54,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 89933745154,
+          "mcap": 93441391225,
+          "rank": 10,
+          "rx": {
+            "gapPct": -3.63,
+            "dayPct": 1.37,
+            "totalPct": -2.31
+          }
+        },
+        {
+          "t": "BX",
+          "name": "Blackstone Inc.",
+          "time": "bmo",
+          "epsEst": 1.33,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.21,
+          "noEsts": 8,
+          "revEst": null,
+          "mcap": 91240497896,
           "rank": 11,
-          "rx": null
+          "rx": {
+            "gapPct": -1.12,
+            "dayPct": 2.51,
+            "totalPct": 1.37
+          }
         },
         {
           "t": "CMCSA",
@@ -4142,9 +3778,13 @@ export const EARNINGS = {
           "yearAgoEps": 1.25,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 85092689201,
+          "mcap": 84056280974,
           "rank": 12,
-          "rx": null
+          "rx": {
+            "gapPct": 2.08,
+            "dayPct": -8.7,
+            "totalPct": -6.8
+          }
         },
         {
           "t": "NSC",
@@ -4156,9 +3796,13 @@ export const EARNINGS = {
           "yearAgoEps": 3.29,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 74407992531,
+          "mcap": 74327138691,
           "rank": 13,
-          "rx": null
+          "rx": {
+            "gapPct": 3.64,
+            "dayPct": 1.62,
+            "totalPct": 5.32
+          }
         },
         {
           "t": "HON",
@@ -4170,9 +3814,13 @@ export const EARNINGS = {
           "yearAgoEps": 5.5,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 72825753082,
+          "mcap": 73817420214,
           "rank": 14,
-          "rx": null
+          "rx": {
+            "gapPct": 2.15,
+            "dayPct": 3.47,
+            "totalPct": 5.7
+          }
         },
         {
           "t": "DLR",
@@ -4184,22 +3832,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.87,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 67541595505,
+          "mcap": 67202587999,
           "rank": 15,
-          "rx": null
-        },
-        {
-          "t": "DB",
-          "name": "Deutsche Bank AG",
-          "time": null,
-          "epsEst": 0.91,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.54,
-          "noEsts": 2,
-          "revEst": null,
-          "mcap": 66545118000,
-          "rank": 16,
           "rx": null
         },
         {
@@ -4212,8 +3846,8 @@ export const EARNINGS = {
           "yearAgoEps": 6.53,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 62431850988,
-          "rank": 17,
+          "mcap": 63049653529,
+          "rank": 16,
           "rx": null
         },
         {
@@ -4226,9 +3860,13 @@ export const EARNINGS = {
           "yearAgoEps": 0.05,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 61040007968,
-          "rank": 18,
-          "rx": null
+          "mcap": 59030224075,
+          "rank": 17,
+          "rx": {
+            "gapPct": -1.65,
+            "dayPct": -3.76,
+            "totalPct": -5.35
+          }
         },
         {
           "t": "STM",
@@ -4240,23 +3878,31 @@ export const EARNINGS = {
           "yearAgoEps": 0.06,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 58152100185,
-          "rank": 19,
-          "rx": null
+          "mcap": 58454281357,
+          "rank": 18,
+          "rx": {
+            "gapPct": -17.29,
+            "dayPct": -1.67,
+            "totalPct": -18.67
+          }
         },
         {
           "t": "ARGX",
           "name": "argenx SE",
           "time": "bmo",
-          "epsEst": 6.13,
+          "epsEst": 6.27,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 3.74,
-          "noEsts": 8,
+          "noEsts": 9,
           "revEst": null,
-          "mcap": 54288890649,
-          "rank": 20,
-          "rx": null
+          "mcap": 52860202967,
+          "rank": 19,
+          "rx": {
+            "gapPct": 2.26,
+            "dayPct": 6.15,
+            "totalPct": 8.56
+          }
         },
         {
           "t": "NDAQ",
@@ -4268,9 +3914,13 @@ export const EARNINGS = {
           "yearAgoEps": 0.85,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 51034401612,
-          "rank": 21,
-          "rx": null
+          "mcap": 51407658538,
+          "rank": 20,
+          "rx": {
+            "gapPct": 2.37,
+            "dayPct": -2.83,
+            "totalPct": -0.53
+          }
         },
         {
           "t": "EW",
@@ -4282,22 +3932,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.67,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 48683890000,
-          "rank": 22,
-          "rx": null
-        },
-        {
-          "t": "AMP",
-          "name": "AMERIPRISE FINANCIAL SERVICES, LLC",
-          "time": "bmo",
-          "epsEst": 10.72,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 9.11,
-          "noEsts": 6,
-          "revEst": null,
-          "mcap": 47498922273,
-          "rank": 23,
+          "mcap": 48580246000,
+          "rank": 21,
           "rx": null
         },
         {
@@ -4310,9 +3946,31 @@ export const EARNINGS = {
           "yearAgoEps": 0.31,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 46872645882,
-          "rank": 24,
-          "rx": null
+          "mcap": 48534226239,
+          "rank": 22,
+          "rx": {
+            "gapPct": -1.66,
+            "dayPct": -1.52,
+            "totalPct": -3.15
+          }
+        },
+        {
+          "t": "AMP",
+          "name": "AMERIPRISE FINANCIAL SERVICES, LLC",
+          "time": "bmo",
+          "epsEst": 10.72,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 9.11,
+          "noEsts": 6,
+          "revEst": null,
+          "mcap": 47359581793,
+          "rank": 23,
+          "rx": {
+            "gapPct": 0.86,
+            "dayPct": -2.12,
+            "totalPct": -1.27
+          }
         },
         {
           "t": "INFY",
@@ -4324,22 +3982,26 @@ export const EARNINGS = {
           "yearAgoEps": 0.19,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 45268978616,
-          "rank": 25,
-          "rx": null
+          "mcap": 44336015795,
+          "rank": 24,
+          "rx": {
+            "gapPct": -4.94,
+            "dayPct": 2.69,
+            "totalPct": -2.38
+          }
         },
         {
           "t": "HIG",
           "name": "The Hartford Insurance Group, Inc.",
           "time": "amc",
-          "epsEst": 3.13,
+          "epsEst": 3.12,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 3.41,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 38921093824,
-          "rank": 26,
+          "mcap": 38608584689,
+          "rank": 25,
           "rx": null
         },
         {
@@ -4352,8 +4014,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.38,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 36832962766,
-          "rank": 27,
+          "mcap": 37035675824,
+          "rank": 26,
           "rx": null
         },
         {
@@ -4364,10 +4026,10 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 4.87,
-          "noEsts": 7,
+          "noEsts": 6,
           "revEst": null,
-          "mcap": 35390708628,
-          "rank": 28,
+          "mcap": 33979883949,
+          "rank": 27,
           "rx": null
         },
         {
@@ -4380,8 +4042,8 @@ export const EARNINGS = {
           "yearAgoEps": 4.27,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 34302845414,
-          "rank": 29,
+          "mcap": 33711170239,
+          "rank": 28,
           "rx": null
         },
         {
@@ -4394,22 +4056,22 @@ export const EARNINGS = {
           "yearAgoEps": 2.44,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 28470116148,
-          "rank": 30,
+          "mcap": 28888913145,
+          "rank": 29,
           "rx": null
         },
         {
           "t": "TECK",
           "name": "Teck Resources Ltd",
           "time": "bmo",
-          "epsEst": 0.75,
+          "epsEst": 0.76,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.27,
-          "noEsts": 12,
+          "noEsts": 13,
           "revEst": null,
-          "mcap": 28064226218,
-          "rank": 31,
+          "mcap": 28235548494,
+          "rank": 30,
           "rx": null
         },
         {
@@ -4422,7 +4084,21 @@ export const EARNINGS = {
           "yearAgoEps": 1.84,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 25379442028,
+          "mcap": 25320804524,
+          "rank": 31,
+          "rx": null
+        },
+        {
+          "t": "FCNCA",
+          "name": "First Citizens BancShares, Inc.",
+          "time": "bmo",
+          "epsEst": 40.45,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 44.78,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 24072749573,
           "rank": 32,
           "rx": null
         },
@@ -4436,22 +4112,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.21,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 24219650000,
+          "mcap": 23895690000,
           "rank": 33,
-          "rx": null
-        },
-        {
-          "t": "FCNCA",
-          "name": "First Citizens BancShares, Inc.",
-          "time": "bmo",
-          "epsEst": 40.45,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 44.78,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 23998477070,
-          "rank": 34,
           "rx": null
         },
         {
@@ -4464,8 +4126,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.62,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 22896449374,
-          "rank": 35,
+          "mcap": 23227431697,
+          "rank": 34,
           "rx": null
         },
         {
@@ -4478,8 +4140,8 @@ export const EARNINGS = {
           "yearAgoEps": -0.42,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 21960991616,
-          "rank": 36,
+          "mcap": 22523169938,
+          "rank": 35,
           "rx": null
         },
         {
@@ -4492,8 +4154,8 @@ export const EARNINGS = {
           "yearAgoEps": 4.72,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 20927974064,
-          "rank": 37,
+          "mcap": 21040384222,
+          "rank": 36,
           "rx": null
         },
         {
@@ -4506,8 +4168,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.23,
           "noEsts": null,
           "revEst": null,
-          "mcap": 19252134661,
-          "rank": 38,
+          "mcap": 19282452983,
+          "rank": 37,
           "rx": null
         },
         {
@@ -4520,8 +4182,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.02,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 16827236496,
-          "rank": 39,
+          "mcap": 17082988326,
+          "rank": 38,
           "rx": null
         },
         {
@@ -4534,8 +4196,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.27,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 16357447929,
-          "rank": 40,
+          "mcap": 16140697294,
+          "rank": 39,
           "rx": null
         },
         {
@@ -4548,8 +4210,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.81,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 15544686618,
-          "rank": 41,
+          "mcap": 15397840726,
+          "rank": 40,
           "rx": null
         },
         {
@@ -4562,8 +4224,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.93,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 14347791668,
-          "rank": 42,
+          "mcap": 14231131664,
+          "rank": 41,
           "rx": null
         },
         {
@@ -4576,8 +4238,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.24,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 12187256588,
-          "rank": 43,
+          "mcap": 12271793242,
+          "rank": 42,
           "rx": null
         },
         {
@@ -4590,8 +4252,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.04,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 11798993715,
-          "rank": 44,
+          "mcap": 12026723747,
+          "rank": 43,
           "rx": null
         },
         {
@@ -4604,8 +4266,8 @@ export const EARNINGS = {
           "yearAgoEps": -0.76,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 11355259496,
-          "rank": 45,
+          "mcap": 11440637387,
+          "rank": 44,
           "rx": null
         },
         {
@@ -4618,8 +4280,8 @@ export const EARNINGS = {
           "yearAgoEps": 3.09,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 11117911129,
-          "rank": 46,
+          "mcap": 11222462218,
+          "rank": 45,
           "rx": null
         },
         {
@@ -4632,8 +4294,8 @@ export const EARNINGS = {
           "yearAgoEps": 3.32,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 10623392812,
-          "rank": 47,
+          "mcap": 10693036645,
+          "rank": 46,
           "rx": null
         },
         {
@@ -4646,22 +4308,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.83,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 10189013157,
-          "rank": 48,
-          "rx": null
-        },
-        {
-          "t": "AAL",
-          "name": "American Airlines Group, Inc.",
-          "time": "bmo",
-          "epsEst": 0.03,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.95,
-          "noEsts": 7,
-          "revEst": null,
-          "mcap": 10105964893,
-          "rank": 49,
+          "mcap": 10101595504,
+          "rank": 47,
           "rx": null
         },
         {
@@ -4674,8 +4322,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.3,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 9989487438,
-          "rank": 50,
+          "mcap": 9980697314,
+          "rank": 48,
           "rx": null
         },
         {
@@ -4688,8 +4336,22 @@ export const EARNINGS = {
           "yearAgoEps": 1.45,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 9986565498,
-          "rank": 51,
+          "mcap": 9883701594,
+          "rank": 49,
+          "rx": null
+        },
+        {
+          "t": "AAL",
+          "name": "American Airlines Group, Inc.",
+          "time": "bmo",
+          "epsEst": 0.03,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.95,
+          "noEsts": 7,
+          "revEst": null,
+          "mcap": 9781886176,
+          "rank": 50,
           "rx": null
         },
         {
@@ -4702,8 +4364,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.76,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 9509758523,
-          "rank": 52,
+          "mcap": 9446070643,
+          "rank": 51,
           "rx": null
         },
         {
@@ -4716,8 +4378,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.79,
           "noEsts": null,
           "revEst": null,
-          "mcap": 9288555608,
-          "rank": 53,
+          "mcap": 9150470044,
+          "rank": 52,
           "rx": null
         },
         {
@@ -4730,8 +4392,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.59,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 8383170940,
-          "rank": 54,
+          "mcap": 8299655236,
+          "rank": 53,
           "rx": null
         },
         {
@@ -4744,22 +4406,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.23,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 8134650097,
-          "rank": 55,
-          "rx": null
-        },
-        {
-          "t": "KNSL",
-          "name": "Kinsale Capital Group, Inc.",
-          "time": "amc",
-          "epsEst": 5.09,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 4.78,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 7828904538,
-          "rank": 56,
+          "mcap": 8045989061,
+          "rank": 54,
           "rx": null
         },
         {
@@ -4772,8 +4420,22 @@ export const EARNINGS = {
           "yearAgoEps": -0.1,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 7706325232,
-          "rank": 57,
+          "mcap": 7772589241,
+          "rank": 55,
+          "rx": null
+        },
+        {
+          "t": "KNSL",
+          "name": "Kinsale Capital Group, Inc.",
+          "time": "amc",
+          "epsEst": 5.1,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 4.78,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 7510176379,
+          "rank": 56,
           "rx": null
         },
         {
@@ -4786,8 +4448,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.05,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 7571253408,
-          "rank": 58,
+          "mcap": 7394394318,
+          "rank": 57,
           "rx": null
         },
         {
@@ -4800,8 +4462,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.51,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 7279552874,
-          "rank": 59,
+          "mcap": 7220208693,
+          "rank": 58,
           "rx": null
         },
         {
@@ -4814,12 +4476,27 @@ export const EARNINGS = {
           "yearAgoEps": 5.17,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 7155948069,
+          "mcap": 7149752759,
+          "rank": 59,
+          "rx": null
+        },
+        {
+          "t": "GBCI",
+          "name": "Glacier Bancorp, Inc.",
+          "time": "amc",
+          "epsEst": 0.76,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.45,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 6659399605,
           "rank": 60,
           "rx": null
         }
       ],
-      "totalCount": 161
+      "totalCount": 158,
+      "reactionsComputedFor": 18
     },
     "2026-07-24": {
       "rows": [
@@ -4833,7 +4510,7 @@ export const EARNINGS = {
           "yearAgoEps": 4.08,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 239353292940,
+          "mcap": 237954523732,
           "rank": 1,
           "rx": null
         },
@@ -4847,7 +4524,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.05,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 183364074226,
+          "mcap": 186450379581,
           "rank": 2,
           "rx": null
         },
@@ -4861,7 +4538,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.22,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 182805969080,
+          "mcap": 184935504124,
           "rank": 3,
           "rx": null
         },
@@ -4875,7 +4552,7 @@ export const EARNINGS = {
           "yearAgoEps": 6.84,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 82766210982,
+          "mcap": 82495566426,
           "rank": 4,
           "rx": null
         },
@@ -4889,7 +4566,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.79,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 78968070536,
+          "mcap": 80368381012,
           "rank": 5,
           "rx": null
         },
@@ -4903,7 +4580,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.35,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 77502912571,
+          "mcap": 77642161768,
           "rank": 6,
           "rx": null
         },
@@ -4917,7 +4594,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.74,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 69654736426,
+          "mcap": 71269398700,
           "rank": 7,
           "rx": null
         },
@@ -4925,13 +4602,13 @@ export const EARNINGS = {
           "t": "CHTR",
           "name": "Charter Communications, Inc.",
           "time": "bmo",
-          "epsEst": 10.17,
+          "epsEst": 9.96,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 9.18,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 17760833983,
+          "mcap": 17959581871,
           "rank": 8,
           "rx": null
         },
@@ -4945,7 +4622,7 @@ export const EARNINGS = {
           "yearAgoEps": 4.02,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 16925059130,
+          "mcap": 16826862950,
           "rank": 9,
           "rx": null
         },
@@ -4959,7 +4636,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.63,
           "noEsts": null,
           "revEst": null,
-          "mcap": 15478529208,
+          "mcap": 15159308911,
           "rank": 10,
           "rx": null
         },
@@ -4973,7 +4650,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.48,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 7645790401,
+          "mcap": 7918811577,
           "rank": 11,
           "rx": null
         },
@@ -4987,7 +4664,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.87,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 6525320670,
+          "mcap": 6627494544,
           "rank": 12,
           "rx": null
         },
@@ -5001,7 +4678,7 @@ export const EARNINGS = {
           "yearAgoEps": -0.14,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 6181368259,
+          "mcap": 6202209015,
           "rank": 13,
           "rx": null
         },
@@ -5015,7 +4692,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.47,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 5118990482,
+          "mcap": 5108308115,
           "rank": 14,
           "rx": null
         },
@@ -5029,7 +4706,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.94,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 4638313882,
+          "mcap": 4787305242,
           "rank": 15,
           "rx": null
         },
@@ -5043,7 +4720,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.58,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 3535119155,
+          "mcap": 3504706912,
           "rank": 16,
           "rx": null
         },
@@ -5057,7 +4734,7 @@ export const EARNINGS = {
           "yearAgoEps": -8.09,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 3364060165,
+          "mcap": 3435060430,
           "rank": 17,
           "rx": null
         },
@@ -5071,7 +4748,7 @@ export const EARNINGS = {
           "yearAgoEps": -8.09,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 3364060165,
+          "mcap": 3435060430,
           "rank": 18,
           "rx": null
         },
@@ -5085,7 +4762,7 @@ export const EARNINGS = {
           "yearAgoEps": -8.09,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 3364060165,
+          "mcap": 3435060430,
           "rank": 19,
           "rx": null
         },
@@ -5099,22 +4776,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.6,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 2120742513,
+          "mcap": 2115196362,
           "rank": 20,
-          "rx": null
-        },
-        {
-          "t": "BXBL",
-          "name": "BOXABL, Inc.",
-          "time": null,
-          "epsEst": null,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.01,
-          "noEsts": 8,
-          "revEst": null,
-          "mcap": 1928618419,
-          "rank": 21,
           "rx": null
         },
         {
@@ -5127,7 +4790,21 @@ export const EARNINGS = {
           "yearAgoEps": 1.61,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 1790706394,
+          "mcap": 1777562515,
+          "rank": 21,
+          "rx": null
+        },
+        {
+          "t": "BXBL",
+          "name": "BOXABL, Inc.",
+          "time": null,
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.01,
+          "noEsts": 8,
+          "revEst": null,
+          "mcap": 1468735625,
           "rank": 22,
           "rx": null
         },
@@ -5141,7 +4818,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.17,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 1427205031,
+          "mcap": 1410990980,
           "rank": 23,
           "rx": null
         },
@@ -5155,7 +4832,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.5,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 1356742825,
+          "mcap": 1338907978,
           "rank": 24,
           "rx": null
         },
@@ -5169,7 +4846,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.65,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 1040932725,
+          "mcap": 1030041909,
           "rank": 25,
           "rx": null
         },
@@ -5183,7 +4860,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.72,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 1032086855,
+          "mcap": 1018401068,
           "rank": 26,
           "rx": null
         },
@@ -5197,7 +4874,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.67,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 1020036029,
+          "mcap": 1009073513,
           "rank": 27,
           "rx": null
         },
@@ -5211,7 +4888,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.25,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 876185789,
+          "mcap": 866301901,
           "rank": 28,
           "rx": null
         },
@@ -5225,7 +4902,7 @@ export const EARNINGS = {
           "yearAgoEps": -0.16,
           "noEsts": null,
           "revEst": null,
-          "mcap": 648590299,
+          "mcap": 652229975,
           "rank": 29,
           "rx": null
         },
@@ -5239,7 +4916,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.91,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 517986461,
+          "mcap": 501364172,
           "rank": 30,
           "rx": null
         },
@@ -5253,7 +4930,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.25,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 488111842,
+          "mcap": 483999899,
           "rank": 31,
           "rx": null
         },
@@ -5267,7 +4944,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.32,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 407675423,
+          "mcap": 423497237,
           "rank": 32,
           "rx": null
         },
@@ -5281,22 +4958,8 @@ export const EARNINGS = {
           "yearAgoEps": -0.46,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 307656152,
+          "mcap": 317708905,
           "rank": 33,
-          "rx": null
-        },
-        {
-          "t": "OVLY",
-          "name": "Oak Valley Bancorp (CA)",
-          "time": null,
-          "epsEst": null,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.67,
-          "noEsts": 8,
-          "revEst": null,
-          "mcap": 280420555,
-          "rank": 34,
           "rx": null
         },
         {
@@ -5309,8 +4972,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.89,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 204598773,
-          "rank": 35,
+          "mcap": 202054833,
+          "rank": 34,
           "rx": null
         },
         {
@@ -5323,8 +4986,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.13,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 201267145,
-          "rank": 36,
+          "mcap": 199059095,
+          "rank": 35,
           "rx": null
         },
         {
@@ -5337,8 +5000,8 @@ export const EARNINGS = {
           "yearAgoEps": -1.6,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 169831884,
-          "rank": 37,
+          "mcap": 177385756,
+          "rank": 36,
           "rx": null
         },
         {
@@ -5351,8 +5014,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.36,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 139146225,
-          "rank": 38,
+          "mcap": 139268122,
+          "rank": 37,
           "rx": null
         },
         {
@@ -5365,8 +5028,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.73,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 134592899,
-          "rank": 39,
+          "mcap": 138306538,
+          "rank": 38,
           "rx": null
         },
         {
@@ -5379,8 +5042,8 @@ export const EARNINGS = {
           "yearAgoEps": -1.62,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 81578780,
-          "rank": 40,
+          "mcap": 82403850,
+          "rank": 39,
           "rx": null
         },
         {
@@ -5393,8 +5056,8 @@ export const EARNINGS = {
           "yearAgoEps": -0.96,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 70233224,
-          "rank": 41,
+          "mcap": 74534420,
+          "rank": 40,
           "rx": null
         },
         {
@@ -5407,12 +5070,12 @@ export const EARNINGS = {
           "yearAgoEps": 1.42,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 62573155,
-          "rank": 42,
+          "mcap": 64427608,
+          "rank": 41,
           "rx": null
         }
       ],
-      "totalCount": 42
+      "totalCount": 41
     },
     "2026-07-27": {
       "rows": [
@@ -5426,7 +5089,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.18,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 257853912830,
+          "mcap": 259162885808,
           "rank": 1,
           "rx": null
         },
@@ -5440,7 +5103,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.28,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 173916143047,
+          "mcap": 172977276828,
           "rank": 2,
           "rx": null
         },
@@ -5454,7 +5117,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.22,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 95057226240,
+          "mcap": 92952750160,
           "rank": 3,
           "rx": null
         },
@@ -5468,7 +5131,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.6,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 53109189540,
+          "mcap": 53724090105,
           "rank": 4,
           "rx": null
         },
@@ -5482,7 +5145,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.26,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 39208410756,
+          "mcap": 38554897005,
           "rank": 5,
           "rx": null
         },
@@ -5496,7 +5159,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 36761975338,
+          "mcap": 36347142993,
           "rank": 6,
           "rx": null
         },
@@ -5510,7 +5173,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.97,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 27922503798,
+          "mcap": 27724504769,
           "rank": 7,
           "rx": null
         },
@@ -5524,7 +5187,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.16,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 23668476915,
+          "mcap": 23383340568,
           "rank": 8,
           "rx": null
         },
@@ -5538,22 +5201,8 @@ export const EARNINGS = {
           "yearAgoEps": 3.42,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 23060803019,
+          "mcap": 22602114541,
           "rank": 9,
-          "rx": null
-        },
-        {
-          "t": "BRO",
-          "name": "Brown & Brown, Inc.",
-          "time": "amc",
-          "epsEst": 1.08,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.03,
-          "noEsts": 6,
-          "revEst": null,
-          "mcap": 22587484124,
-          "rank": 10,
           "rx": null
         },
         {
@@ -5566,7 +5215,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.15,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 22560980845,
+          "mcap": 22433156591,
+          "rank": 10,
+          "rx": null
+        },
+        {
+          "t": "BRO",
+          "name": "Brown & Brown, Inc.",
+          "time": "amc",
+          "epsEst": 1.08,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.03,
+          "noEsts": 6,
+          "revEst": null,
+          "mcap": 22163799323,
           "rank": 11,
           "rx": null
         },
@@ -5580,7 +5243,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.22,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 16540533126,
+          "mcap": 16600022530,
           "rank": 12,
           "rx": null
         },
@@ -5594,7 +5257,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.76,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 14669389313,
+          "mcap": 14745792383,
           "rank": 13,
           "rx": null
         },
@@ -5608,7 +5271,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.65,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 14106047258,
+          "mcap": 13819502463,
           "rank": 14,
           "rx": null
         },
@@ -5620,9 +5283,9 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.64,
-          "noEsts": 5,
+          "noEsts": 6,
           "revEst": null,
-          "mcap": 12856912389,
+          "mcap": 12847164920,
           "rank": 15,
           "rx": null
         },
@@ -5636,7 +5299,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.34,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 12633566916,
+          "mcap": 12529478354,
           "rank": 16,
           "rx": null
         },
@@ -5650,7 +5313,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.3,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 11759879036,
+          "mcap": 11650003680,
           "rank": 17,
           "rx": null
         },
@@ -5664,7 +5327,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.5,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 11439809739,
+          "mcap": 11227861284,
           "rank": 18,
           "rx": null
         },
@@ -5678,7 +5341,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.35,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 10649744462,
+          "mcap": 10534922420,
           "rank": 19,
           "rx": null
         },
@@ -5692,7 +5355,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.56,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 10030489010,
+          "mcap": 9941506391,
           "rank": 20,
           "rx": null
         },
@@ -5706,7 +5369,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.37,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 9313103180,
+          "mcap": 9347208187,
           "rank": 21,
           "rx": null
         },
@@ -5720,7 +5383,7 @@ export const EARNINGS = {
           "yearAgoEps": 5.35,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 9075004378,
+          "mcap": 9040498658,
           "rank": 22,
           "rx": null
         },
@@ -5734,7 +5397,7 @@ export const EARNINGS = {
           "yearAgoEps": -0.12,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 8587374647,
+          "mcap": 8595947733,
           "rank": 23,
           "rx": null
         },
@@ -5746,9 +5409,9 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 2.47,
-          "noEsts": 3,
+          "noEsts": 4,
           "revEst": null,
-          "mcap": 7627045455,
+          "mcap": 7684639110,
           "rank": 24,
           "rx": null
         },
@@ -5756,13 +5419,13 @@ export const EARNINGS = {
           "t": "NE",
           "name": "Noble Corporation plc",
           "time": "amc",
-          "epsEst": 0.18,
+          "epsEst": 0.13,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.13,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 6796657214,
+          "mcap": 6914721213,
           "rank": 25,
           "rx": null
         },
@@ -5776,7 +5439,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.3,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 5478445378,
+          "mcap": 5522037648,
           "rank": 26,
           "rx": null
         },
@@ -5790,7 +5453,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.19,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 5328550537,
+          "mcap": 5417932675,
           "rank": 27,
           "rx": null
         },
@@ -5804,7 +5467,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.47,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 5031304883,
+          "mcap": 5085368602,
           "rank": 28,
           "rx": null
         },
@@ -5818,7 +5481,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.13,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 4599989605,
+          "mcap": 4494175891,
           "rank": 29,
           "rx": null
         },
@@ -5832,7 +5495,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.68,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 4261837032,
+          "mcap": 4233492811,
           "rank": 30,
           "rx": null
         },
@@ -5846,7 +5509,7 @@ export const EARNINGS = {
           "yearAgoEps": -0.97,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 3939427759,
+          "mcap": 3836933205,
           "rank": 31,
           "rx": null
         },
@@ -5860,7 +5523,7 @@ export const EARNINGS = {
           "yearAgoEps": -1.24,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 3685552259,
+          "mcap": 3708786631,
           "rank": 32,
           "rx": null
         },
@@ -5874,7 +5537,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.9,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 3409665089,
+          "mcap": 3369672733,
           "rank": 33,
           "rx": null
         },
@@ -5888,7 +5551,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.06,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 3344013835,
+          "mcap": 3357484981,
           "rank": 34,
           "rx": null
         },
@@ -5902,7 +5565,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.55,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 3172726033,
+          "mcap": 3204890733,
           "rank": 35,
           "rx": null
         },
@@ -5916,7 +5579,7 @@ export const EARNINGS = {
           "yearAgoEps": -0.05,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 3081520437,
+          "mcap": 3044277890,
           "rank": 36,
           "rx": null
         },
@@ -5930,7 +5593,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.19,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 2838167148,
+          "mcap": 2736370989,
           "rank": 37,
           "rx": null
         },
@@ -5944,7 +5607,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.88,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 2708692883,
+          "mcap": 2690489301,
           "rank": 38,
           "rx": null
         },
@@ -5952,13 +5615,13 @@ export const EARNINGS = {
           "t": "HTO",
           "name": "H2O America",
           "time": "amc",
-          "epsEst": null,
+          "epsEst": 0.7,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.75,
-          "noEsts": null,
+          "noEsts": 1,
           "revEst": null,
-          "mcap": 2678612613,
+          "mcap": 2674846991,
           "rank": 39,
           "rx": null
         },
@@ -5972,7 +5635,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.26,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 2446000000,
+          "mcap": 2426800000,
           "rank": 40,
           "rx": null
         },
@@ -5986,7 +5649,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.34,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 2362154529,
+          "mcap": 2407530714,
           "rank": 41,
           "rx": null
         },
@@ -6000,22 +5663,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.3,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 2260561358,
+          "mcap": 2244466746,
           "rank": 42,
-          "rx": null
-        },
-        {
-          "t": "HAPN",
-          "name": "Happen, Inc.",
-          "time": "amc",
-          "epsEst": 0.42,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.33,
-          "noEsts": 2,
-          "revEst": null,
-          "mcap": 2220505306,
-          "rank": 43,
           "rx": null
         },
         {
@@ -6028,7 +5677,21 @@ export const EARNINGS = {
           "yearAgoEps": 1.73,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 2204400616,
+          "mcap": 2209985147,
+          "rank": 43,
+          "rx": null
+        },
+        {
+          "t": "HAPN",
+          "name": "Happen, Inc.",
+          "time": "amc",
+          "epsEst": 0.42,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.33,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 2169750899,
           "rank": 44,
           "rx": null
         },
@@ -6042,7 +5705,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.86,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 1802711525,
+          "mcap": 1786558869,
           "rank": 45,
           "rx": null
         },
@@ -6056,7 +5719,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.19,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 1752671086,
+          "mcap": 1730938476,
           "rank": 46,
           "rx": null
         },
@@ -6070,7 +5733,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.93,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 1598862678,
+          "mcap": 1585309034,
           "rank": 47,
           "rx": null
         },
@@ -6084,7 +5747,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.04,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 1547382826,
+          "mcap": 1527451958,
           "rank": 48,
           "rx": null
         },
@@ -6098,7 +5761,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.05,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 1352950557,
+          "mcap": 1301957232,
           "rank": 49,
           "rx": null
         },
@@ -6126,7 +5789,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.63,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 1197301277,
+          "mcap": 1178019306,
           "rank": 51,
           "rx": null
         },
@@ -6134,13 +5797,13 @@ export const EARNINGS = {
           "t": "NBN",
           "name": "Northeast Bank",
           "time": "bmo",
-          "epsEst": 3.37,
+          "epsEst": 3.4,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 3,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
-          "mcap": 1071452700,
+          "mcap": 1045599300,
           "rank": 52,
           "rx": null
         },
@@ -6154,7 +5817,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.59,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 1024805040,
+          "mcap": 1030867920,
           "rank": 53,
           "rx": null
         },
@@ -6168,7 +5831,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.45,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 818057512,
+          "mcap": 812564815,
           "rank": 54,
           "rx": null
         },
@@ -6182,7 +5845,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.43,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 682537565,
+          "mcap": 669993284,
           "rank": 55,
           "rx": null
         },
@@ -6196,7 +5859,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.85,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 608861240,
+          "mcap": 600952149,
           "rank": 56,
           "rx": null
         },
@@ -6210,7 +5873,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.85,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 583545681,
+          "mcap": 578163622,
           "rank": 57,
           "rx": null
         },
@@ -6224,7 +5887,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.78,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 547494642,
+          "mcap": 542393760,
           "rank": 58,
           "rx": null
         },
@@ -6238,7 +5901,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.28,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 484088230,
+          "mcap": 486567267,
           "rank": 59,
           "rx": null
         },
@@ -6252,12 +5915,12 @@ export const EARNINGS = {
           "yearAgoEps": 0.29,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 467073047,
+          "mcap": 460759061,
           "rank": 60,
           "rx": null
         }
       ],
-      "totalCount": 72
+      "totalCount": 71
     },
     "2026-07-28": {
       "rows": [
@@ -6271,7 +5934,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.98,
           "noEsts": 11,
           "revEst": null,
-          "mcap": 674089588460,
+          "mcap": 669542865363,
           "rank": 1,
           "rx": null
         },
@@ -6285,7 +5948,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.87,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 352811411328,
+          "mcap": 353801366489,
           "rank": 2,
           "rx": null
         },
@@ -6299,7 +5962,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.94,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 284193234688,
+          "mcap": 280444224835,
           "rank": 3,
           "rx": null
         },
@@ -6313,7 +5976,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.34,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 199974141935,
+          "mcap": 203622347635,
           "rank": 4,
           "rx": null
         },
@@ -6327,7 +5990,7 @@ export const EARNINGS = {
           "yearAgoEps": -1.24,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 161444317389,
+          "mcap": 164479281363,
           "rank": 5,
           "rx": null
         },
@@ -6341,7 +6004,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.6,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 139776189158,
+          "mcap": 132589863320,
           "rank": 6,
           "rx": null
         },
@@ -6355,7 +6018,7 @@ export const EARNINGS = {
           "yearAgoEps": 4.43,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 127652960000,
+          "mcap": 127001760000,
           "rank": 7,
           "rx": null
         },
@@ -6369,7 +6032,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.23,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 102381185553,
+          "mcap": 102574379731,
           "rank": 8,
           "rx": null
         },
@@ -6383,7 +6046,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.55,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 98889730499,
+          "mcap": 98464727359,
           "rank": 9,
           "rx": null
         },
@@ -6397,7 +6060,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.62,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 95704481217,
+          "mcap": 97188319097,
           "rank": 10,
           "rx": null
         },
@@ -6411,7 +6074,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.92,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 93639433851,
+          "mcap": 94924476258,
           "rank": 11,
           "rx": null
         },
@@ -6425,22 +6088,8 @@ export const EARNINGS = {
           "yearAgoEps": 3.38,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 78543579864,
+          "mcap": 78901201514,
           "rank": 12,
-          "rx": null
-        },
-        {
-          "t": "AMX",
-          "name": "America Movil, S.A.B. de C.V.",
-          "time": null,
-          "epsEst": 0.52,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.38,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 78524377500,
-          "rank": 13,
           "rx": null
         },
         {
@@ -6453,22 +6102,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.58,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 78251523000,
-          "rank": 14,
-          "rx": null
-        },
-        {
-          "t": "RCL",
-          "name": "Royal Caribbean Cruises Ltd.",
-          "time": "bmo",
-          "epsEst": 3.97,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 4.38,
-          "noEsts": 7,
-          "revEst": null,
-          "mcap": 77213334166,
-          "rank": 15,
+          "mcap": 78809661000,
+          "rank": 13,
           "rx": null
         },
         {
@@ -6481,8 +6116,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.73,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 76839274993,
-          "rank": 16,
+          "mcap": 78122924759,
+          "rank": 14,
           "rx": null
         },
         {
@@ -6495,8 +6130,22 @@ export const EARNINGS = {
           "yearAgoEps": 2.6,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 76122268544,
-          "rank": 17,
+          "mcap": 77366203038,
+          "rank": 15,
+          "rx": null
+        },
+        {
+          "t": "RCL",
+          "name": "Royal Caribbean Cruises Ltd.",
+          "time": "bmo",
+          "epsEst": 3.97,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 4.38,
+          "noEsts": 7,
+          "revEst": null,
+          "mcap": 76663534461,
+          "rank": 16,
           "rx": null
         },
         {
@@ -6509,22 +6158,22 @@ export const EARNINGS = {
           "yearAgoEps": 1.89,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 74355788028,
-          "rank": 18,
+          "mcap": 75110040534,
+          "rank": 17,
           "rx": null
         },
         {
           "t": "HLT",
           "name": "Hilton Worldwide Holdings Inc.",
           "time": "bmo",
-          "epsEst": 2.27,
+          "epsEst": 2.28,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 2.2,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 73744413626,
-          "rank": 19,
+          "mcap": 73810431654,
+          "rank": 18,
           "rx": null
         },
         {
@@ -6537,8 +6186,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.31,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 68962475229,
-          "rank": 20,
+          "mcap": 70388936825,
+          "rank": 19,
           "rx": null
         },
         {
@@ -6551,8 +6200,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.37,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 66443636411,
-          "rank": 21,
+          "mcap": 69001387484,
+          "rank": 20,
           "rx": null
         },
         {
@@ -6565,8 +6214,8 @@ export const EARNINGS = {
           "yearAgoEps": -0.03,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 64358269574,
-          "rank": 22,
+          "mcap": 62071340875,
+          "rank": 21,
           "rx": null
         },
         {
@@ -6579,22 +6228,22 @@ export const EARNINGS = {
           "yearAgoEps": 0.57,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 58553030274,
-          "rank": 23,
+          "mcap": 57836067173,
+          "rank": 22,
           "rx": null
         },
         {
           "t": "F",
           "name": "Ford Motor Company",
           "time": "amc",
-          "epsEst": 0.36,
+          "epsEst": 0.33,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.37,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 56861563830,
-          "rank": 24,
+          "mcap": 57459267725,
+          "rank": 23,
           "rx": null
         },
         {
@@ -6607,8 +6256,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.92,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 55742428491,
-          "rank": 25,
+          "mcap": 56920968364,
+          "rank": 24,
           "rx": null
         },
         {
@@ -6621,8 +6270,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.4,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 49265591784,
-          "rank": 26,
+          "mcap": 48965675916,
+          "rank": 25,
           "rx": null
         },
         {
@@ -6635,8 +6284,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.42,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 44407829354,
-          "rank": 27,
+          "mcap": 44602017791,
+          "rank": 26,
           "rx": null
         },
         {
@@ -6649,8 +6298,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.58,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 35131123073,
-          "rank": 28,
+          "mcap": 34460295064,
+          "rank": 27,
           "rx": null
         },
         {
@@ -6663,8 +6312,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.53,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 33650378000,
-          "rank": 29,
+          "mcap": 33132988000,
+          "rank": 28,
           "rx": null
         },
         {
@@ -6677,7 +6326,21 @@ export const EARNINGS = {
           "yearAgoEps": -0.16,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 33375739230,
+          "mcap": 32536284330,
+          "rank": 29,
+          "rx": null
+        },
+        {
+          "t": "DTE",
+          "name": "DTE Energy Company",
+          "time": "bmo",
+          "epsEst": 1.14,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.36,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 30902605896,
           "rank": 30,
           "rx": null
         },
@@ -6691,21 +6354,21 @@ export const EARNINGS = {
           "yearAgoEps": 2.05,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 30749029235,
+          "mcap": 30643398767,
           "rank": 31,
           "rx": null
         },
         {
-          "t": "DTE",
-          "name": "DTE Energy Company",
+          "t": "CNP",
+          "name": "CenterPoint Energy, Inc.",
           "time": "bmo",
-          "epsEst": 1.25,
+          "epsEst": 0.37,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 1.36,
-          "noEsts": 4,
+          "yearAgoEps": 0.29,
+          "noEsts": 5,
           "revEst": null,
-          "mcap": 30170346234,
+          "mcap": 28574122886,
           "rank": 32,
           "rx": null
         },
@@ -6713,28 +6376,14 @@ export const EARNINGS = {
           "t": "FE",
           "name": "FirstEnergy Corp.",
           "time": "amc",
-          "epsEst": 0.54,
+          "epsEst": 0.5,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.52,
-          "noEsts": 3,
+          "noEsts": 4,
           "revEst": null,
-          "mcap": 27990284558,
+          "mcap": 28534009863,
           "rank": 33,
-          "rx": null
-        },
-        {
-          "t": "CNP",
-          "name": "CenterPoint Energy, Inc.",
-          "time": "bmo",
-          "epsEst": 0.36,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.29,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 27946120186,
-          "rank": 34,
           "rx": null
         },
         {
@@ -6747,7 +6396,21 @@ export const EARNINGS = {
           "yearAgoEps": 1.26,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 27810138681,
+          "mcap": 27605722277,
+          "rank": 34,
+          "rx": null
+        },
+        {
+          "t": "PPG",
+          "name": "PPG Industries, Inc.",
+          "time": "amc",
+          "epsEst": 2.26,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 2.22,
+          "noEsts": 8,
+          "revEst": null,
+          "mcap": 26166231000,
           "rank": 35,
           "rx": null
         },
@@ -6761,36 +6424,22 @@ export const EARNINGS = {
           "yearAgoEps": 0.41,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 26125077638,
+          "mcap": 25820383354,
           "rank": 36,
-          "rx": null
-        },
-        {
-          "t": "PPG",
-          "name": "PPG Industries, Inc.",
-          "time": "amc",
-          "epsEst": 2.26,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 2.22,
-          "noEsts": 8,
-          "revEst": null,
-          "mcap": 25791759000,
-          "rank": 37,
           "rx": null
         },
         {
           "t": "HUBB",
           "name": "Hubbell Inc",
           "time": "bmo",
-          "epsEst": 5.32,
+          "epsEst": 5.31,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 4.93,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 25360354036,
-          "rank": 38,
+          "mcap": 25197072945,
+          "rank": 37,
           "rx": null
         },
         {
@@ -6803,22 +6452,22 @@ export const EARNINGS = {
           "yearAgoEps": 1.31,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 23449562038,
-          "rank": 39,
+          "mcap": 23129949641,
+          "rank": 38,
           "rx": null
         },
         {
-          "t": "INIO",
-          "name": "INNIO N.V.",
+          "t": "CMS",
+          "name": "CMS Energy Corporation",
           "time": "bmo",
-          "epsEst": 0.05,
+          "epsEst": 0.57,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 2,
+          "yearAgoEps": 0.71,
+          "noEsts": 5,
           "revEst": null,
-          "mcap": 22777500000,
-          "rank": 40,
+          "mcap": 22853872156,
+          "rank": 39,
           "rx": null
         },
         {
@@ -6831,22 +6480,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.05,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 22575340785,
-          "rank": 41,
-          "rx": null
-        },
-        {
-          "t": "CMS",
-          "name": "CMS Energy Corporation",
-          "time": "bmo",
-          "epsEst": 0.63,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.71,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 22396671145,
-          "rank": 42,
+          "mcap": 22623791838,
+          "rank": 40,
           "rx": null
         },
         {
@@ -6859,8 +6494,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.93,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 22148141808,
-          "rank": 43,
+          "mcap": 22386373096,
+          "rank": 41,
           "rx": null
         },
         {
@@ -6873,8 +6508,22 @@ export const EARNINGS = {
           "yearAgoEps": 1.1,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 21190891444,
-          "rank": 44,
+          "mcap": 22288951861,
+          "rank": 42,
+          "rx": null
+        },
+        {
+          "t": "INIO",
+          "name": "INNIO N.V.",
+          "time": "bmo",
+          "epsEst": 0.05,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 20576250000,
+          "rank": 43,
           "rx": null
         },
         {
@@ -6887,8 +6536,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.28,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 16756662869,
-          "rank": 45,
+          "mcap": 16801210690,
+          "rank": 44,
           "rx": null
         },
         {
@@ -6901,8 +6550,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.7,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 16529454819,
-          "rank": 46,
+          "mcap": 16379826206,
+          "rank": 45,
           "rx": null
         },
         {
@@ -6915,8 +6564,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.55,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 15742169450,
-          "rank": 47,
+          "mcap": 15947358448,
+          "rank": 46,
           "rx": null
         },
         {
@@ -6929,8 +6578,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.04,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 14774402890,
-          "rank": 48,
+          "mcap": 14991187929,
+          "rank": 47,
           "rx": null
         },
         {
@@ -6943,8 +6592,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.93,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 14658584000,
-          "rank": 49,
+          "mcap": 14537120000,
+          "rank": 48,
           "rx": null
         },
         {
@@ -6957,8 +6606,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.07,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 14121023649,
-          "rank": 50,
+          "mcap": 14026755671,
+          "rank": 49,
           "rx": null
         },
         {
@@ -6971,8 +6620,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.36,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 13343228533,
-          "rank": 51,
+          "mcap": 13520547185,
+          "rank": 50,
           "rx": null
         },
         {
@@ -6985,8 +6634,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.49,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 12552757223,
-          "rank": 52,
+          "mcap": 12695389067,
+          "rank": 51,
           "rx": null
         },
         {
@@ -6999,7 +6648,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.08,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 11638137878,
+          "mcap": 11307369748,
+          "rank": 52,
+          "rx": null
+        },
+        {
+          "t": "BXP",
+          "name": "BXP, Inc.",
+          "time": "amc",
+          "epsEst": 1.71,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.71,
+          "noEsts": 6,
+          "revEst": null,
+          "mcap": 10750370927,
           "rank": 53,
           "rx": null
         },
@@ -7013,22 +6676,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.96,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 10926500730,
+          "mcap": 10696285187,
           "rank": 54,
-          "rx": null
-        },
-        {
-          "t": "BXP",
-          "name": "BXP, Inc.",
-          "time": "amc",
-          "epsEst": 1.71,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.71,
-          "noEsts": 6,
-          "revEst": null,
-          "mcap": 10893900579,
-          "rank": 55,
           "rx": null
         },
         {
@@ -7041,8 +6690,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.39,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 9935508661,
-          "rank": 56,
+          "mcap": 10184381194,
+          "rank": 55,
           "rx": null
         },
         {
@@ -7055,7 +6704,21 @@ export const EARNINGS = {
           "yearAgoEps": 1.03,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 9468055371,
+          "mcap": 9499640623,
+          "rank": 56,
+          "rx": null
+        },
+        {
+          "t": "OSK",
+          "name": "Oshkosh Corporation",
+          "time": "bmo",
+          "epsEst": 2.6,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 3.41,
+          "noEsts": 6,
+          "revEst": null,
+          "mcap": 9268522083,
           "rank": 57,
           "rx": null
         },
@@ -7069,22 +6732,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.97,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 9414271470,
+          "mcap": 8822033804,
           "rank": 58,
-          "rx": null
-        },
-        {
-          "t": "OSK",
-          "name": "Oshkosh Corporation",
-          "time": "bmo",
-          "epsEst": 2.6,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 3.41,
-          "noEsts": 6,
-          "revEst": null,
-          "mcap": 9128231638,
-          "rank": 59,
           "rx": null
         },
         {
@@ -7097,12 +6746,26 @@ export const EARNINGS = {
           "yearAgoEps": 0.52,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 8808816400,
+          "mcap": 8763813932,
+          "rank": 59,
+          "rx": null
+        },
+        {
+          "t": "AXS",
+          "name": "Axis Capital Holdings Limited",
+          "time": "amc",
+          "epsEst": 3.23,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 3.29,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 8378645771,
           "rank": 60,
           "rx": null
         }
       ],
-      "totalCount": 153
+      "totalCount": 152
     },
     "2026-07-29": {
       "rows": [
@@ -7114,9 +6777,9 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 3.65,
-          "noEsts": 15,
+          "noEsts": 14,
           "revEst": null,
-          "mcap": 2954659903516,
+          "mcap": 2899615202359,
           "rank": 1,
           "rx": null
         },
@@ -7130,7 +6793,7 @@ export const EARNINGS = {
           "yearAgoEps": 7.14,
           "noEsts": 13,
           "revEst": null,
-          "mcap": 1634262307348,
+          "mcap": 1592022943570,
           "rank": 2,
           "rx": null
         },
@@ -7144,7 +6807,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.33,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 402683862000,
+          "mcap": 399294814590,
           "rank": 3,
           "rx": null
         },
@@ -7158,7 +6821,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.48,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 344865508642,
+          "mcap": 347263965589,
           "rank": 4,
           "rx": null
         },
@@ -7172,7 +6835,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.95,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 341765087606,
+          "mcap": 346995135350,
           "rank": 5,
           "rx": null
         },
@@ -7186,22 +6849,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.16,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 308288728162,
+          "mcap": 301553258417,
           "rank": 6,
-          "rx": null
-        },
-        {
-          "t": "SAN",
-          "name": "Banco Santander, S.A.",
-          "time": null,
-          "epsEst": 0.29,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.22,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 225570645995,
-          "rank": 7,
           "rx": null
         },
         {
@@ -7214,8 +6863,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.81,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 194143297765,
-          "rank": 8,
+          "mcap": 193774227432,
+          "rank": 7,
           "rx": null
         },
         {
@@ -7228,13 +6877,13 @@ export const EARNINGS = {
           "yearAgoEps": 2.29,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 182869000000,
-          "rank": 9,
+          "mcap": 185114020000,
+          "rank": 8,
           "rx": null
         },
         {
           "t": "BBVA",
-          "name": "Banco Bilbao Viscaya Argentaria S.A.",
+          "name": "Banco Bilbao Vizcaya Argentaria S.A.",
           "time": "amc",
           "epsEst": 0.59,
           "epsActual": null,
@@ -7242,8 +6891,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.52,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 146492136842,
-          "rank": 10,
+          "mcap": 149746249001,
+          "rank": 9,
           "rx": null
         },
         {
@@ -7256,8 +6905,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.5,
           "noEsts": 11,
           "revEst": null,
-          "mcap": 119041665000,
-          "rank": 11,
+          "mcap": 118506006000,
+          "rank": 10,
           "rx": null
         },
         {
@@ -7270,8 +6919,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.95,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 116961134472,
-          "rank": 12,
+          "mcap": 115678211027,
+          "rank": 11,
           "rx": null
         },
         {
@@ -7284,8 +6933,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.58,
           "noEsts": 11,
           "revEst": null,
-          "mcap": 115831710617,
-          "rank": 13,
+          "mcap": 113597133025,
+          "rank": 12,
           "rx": null
         },
         {
@@ -7298,8 +6947,8 @@ export const EARNINGS = {
           "yearAgoEps": 9.91,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 101373892034,
-          "rank": 14,
+          "mcap": 101458708888,
+          "rank": 13,
           "rx": null
         },
         {
@@ -7312,8 +6961,8 @@ export const EARNINGS = {
           "yearAgoEps": 3.74,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 99445292666,
-          "rank": 15,
+          "mcap": 100913728581,
+          "rank": 14,
           "rx": null
         },
         {
@@ -7326,8 +6975,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.26,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 99139095304,
-          "rank": 16,
+          "mcap": 97890897776,
+          "rank": 15,
           "rx": null
         },
         {
@@ -7340,8 +6989,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.42,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 95777717863,
-          "rank": 17,
+          "mcap": 94084768355,
+          "rank": 16,
           "rx": null
         },
         {
@@ -7354,8 +7003,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.05,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 86459482101,
-          "rank": 18,
+          "mcap": 86935372271,
+          "rank": 17,
           "rx": null
         },
         {
@@ -7368,8 +7017,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.81,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 81606018427,
-          "rank": 19,
+          "mcap": 81306676834,
+          "rank": 18,
           "rx": null
         },
         {
@@ -7382,7 +7031,21 @@ export const EARNINGS = {
           "yearAgoEps": 3.49,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 76759555471,
+          "mcap": 75249566441,
+          "rank": 19,
+          "rx": null
+        },
+        {
+          "t": "AEM",
+          "name": "Agnico Eagle Mines Limited",
+          "time": "amc",
+          "epsEst": 2.92,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.94,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 74442737784,
           "rank": 20,
           "rx": null
         },
@@ -7396,22 +7059,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.78,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 72902065500,
+          "mcap": 71708715786,
           "rank": 21,
-          "rx": null
-        },
-        {
-          "t": "AEM",
-          "name": "Agnico Eagle Mines Limited",
-          "time": "amc",
-          "epsEst": 2.98,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.94,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 72088244068,
-          "rank": 22,
           "rx": null
         },
         {
@@ -7424,7 +7073,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.26,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 71930487829,
+          "mcap": 68826442685,
+          "rank": 22,
+          "rx": null
+        },
+        {
+          "t": "DB",
+          "name": "Deutsche Bank AG",
+          "time": "amc",
+          "epsEst": 0.91,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.54,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 66959026000,
           "rank": 23,
           "rx": null
         },
@@ -7438,7 +7101,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.75,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 64195680181,
+          "mcap": 63868682042,
           "rank": 24,
           "rx": null
         },
@@ -7452,7 +7115,7 @@ export const EARNINGS = {
           "yearAgoEps": 4.28,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 54375295443,
+          "mcap": 54717609652,
           "rank": 25,
           "rx": null
         },
@@ -7466,7 +7129,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.12,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 53348606590,
+          "mcap": 53600369717,
           "rank": 26,
           "rx": null
         },
@@ -7480,7 +7143,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.78,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 51735970842,
+          "mcap": 53123868227,
           "rank": 27,
           "rx": null
         },
@@ -7494,7 +7157,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.05,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 51384061970,
+          "mcap": 52602040983,
           "rank": 28,
           "rx": null
         },
@@ -7508,7 +7171,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.27,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 48828873166,
+          "mcap": 48415016282,
           "rank": 29,
           "rx": null
         },
@@ -7522,7 +7185,7 @@ export const EARNINGS = {
           "yearAgoEps": 6.27,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 48545666910,
+          "mcap": 47736452400,
           "rank": 30,
           "rx": null
         },
@@ -7536,7 +7199,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.87,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 47459888359,
+          "mcap": 47245973681,
           "rank": 31,
           "rx": null
         },
@@ -7550,7 +7213,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.64,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 46674365284,
+          "mcap": 46531473358,
           "rank": 32,
           "rx": null
         },
@@ -7564,7 +7227,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.17,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 45639421150,
+          "mcap": 46383846105,
           "rank": 33,
           "rx": null
         },
@@ -7578,7 +7241,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.33,
           "noEsts": 12,
           "revEst": null,
-          "mcap": 42740696880,
+          "mcap": 41304034800,
           "rank": 34,
           "rx": null
         },
@@ -7592,22 +7255,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.19,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 40487748378,
+          "mcap": 40142224815,
           "rank": 35,
-          "rx": null
-        },
-        {
-          "t": "TEVA",
-          "name": "Teva Pharmaceutical Industries Limited",
-          "time": "bmo",
-          "epsEst": 0.05,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.64,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 36504785572,
-          "rank": 36,
           "rx": null
         },
         {
@@ -7620,21 +7269,35 @@ export const EARNINGS = {
           "yearAgoEps": 0.76,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 36422645314,
-          "rank": 37,
+          "mcap": 36956835426,
+          "rank": 36,
           "rx": null
         },
         {
           "t": "VMC",
           "name": "Vulcan Materials Company",
           "time": "bmo",
-          "epsEst": 2.54,
+          "epsEst": 2.5,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 2.45,
-          "noEsts": 8,
+          "noEsts": 6,
           "revEst": null,
-          "mcap": 35909664424,
+          "mcap": 36049799700,
+          "rank": 37,
+          "rx": null
+        },
+        {
+          "t": "TEVA",
+          "name": "Teva Pharmaceutical Industries Limited",
+          "time": "bmo",
+          "epsEst": 0.05,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.64,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 35107473206,
           "rank": 38,
           "rx": null
         },
@@ -7642,27 +7305,27 @@ export const EARNINGS = {
           "t": "BIIB",
           "name": "Biogen Inc.",
           "time": "bmo",
-          "epsEst": 3.12,
+          "epsEst": 3.16,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 5.47,
-          "noEsts": 19,
+          "noEsts": 14,
           "revEst": null,
-          "mcap": 29993956690,
+          "mcap": 29193763516,
           "rank": 39,
           "rx": null
         },
         {
-          "t": "FICO",
-          "name": "Fair Isaac Corporation",
+          "t": "KGC",
+          "name": "Kinross Gold Corporation",
           "time": "amc",
-          "epsEst": 10.37,
+          "epsEst": 0.67,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 6.86,
-          "noEsts": 4,
+          "yearAgoEps": 0.44,
+          "noEsts": 6,
           "revEst": null,
-          "mcap": 28463126570,
+          "mcap": 28908529506,
           "rank": 40,
           "rx": null
         },
@@ -7681,6 +7344,20 @@ export const EARNINGS = {
           "rx": null
         },
         {
+          "t": "FICO",
+          "name": "Fair Isaac Corporation",
+          "time": "amc",
+          "epsEst": 10.37,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 6.86,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 28326995952,
+          "rank": 42,
+          "rx": null
+        },
+        {
           "t": "GEHC",
           "name": "GE HealthCare Technologies Inc.",
           "time": "bmo",
@@ -7690,21 +7367,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.06,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 28221486403,
-          "rank": 42,
-          "rx": null
-        },
-        {
-          "t": "KGC",
-          "name": "Kinross Gold Corporation",
-          "time": "amc",
-          "epsEst": 0.67,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.44,
-          "noEsts": 6,
-          "revEst": null,
-          "mcap": 28070911861,
+          "mcap": 27934904578,
           "rank": 43,
           "rx": null
         },
@@ -7718,7 +7381,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.83,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 27175258705,
+          "mcap": 26965777531,
           "rank": 44,
           "rx": null
         },
@@ -7732,7 +7395,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.48,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 25685246927,
+          "mcap": 26134392125,
           "rank": 45,
           "rx": null
         },
@@ -7746,7 +7409,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.88,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 25582014260,
+          "mcap": 25192879395,
           "rank": 46,
           "rx": null
         },
@@ -7760,7 +7423,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.29,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 24684972456,
+          "mcap": 24440975259,
           "rank": 47,
           "rx": null
         },
@@ -7774,7 +7437,7 @@ export const EARNINGS = {
           "yearAgoEps": 25.46,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 24563536770,
+          "mcap": 24334160466,
           "rank": 48,
           "rx": null
         },
@@ -7788,7 +7451,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.76,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 24242478655,
+          "mcap": 24106629732,
           "rank": 49,
           "rx": null
         },
@@ -7802,36 +7465,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.31,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 23582901878,
+          "mcap": 24034964086,
           "rank": 50,
-          "rx": null
-        },
-        {
-          "t": "UTHR",
-          "name": "United Therapeutics Corporation",
-          "time": null,
-          "epsEst": 6.83,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 6.41,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 22744232943,
-          "rank": 51,
-          "rx": null
-        },
-        {
-          "t": "SOFI",
-          "name": "SoFi Technologies, Inc.",
-          "time": "bmo",
-          "epsEst": 0.11,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.08,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 22627554768,
-          "rank": 52,
           "rx": null
         },
         {
@@ -7844,8 +7479,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.45,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 22583423199,
-          "rank": 53,
+          "mcap": 23343896112,
+          "rank": 51,
           "rx": null
         },
         {
@@ -7858,8 +7493,22 @@ export const EARNINGS = {
           "yearAgoEps": 1.57,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 21568069863,
-          "rank": 54,
+          "mcap": 22823685440,
+          "rank": 52,
+          "rx": null
+        },
+        {
+          "t": "SOFI",
+          "name": "SoFi Technologies, Inc.",
+          "time": "bmo",
+          "epsEst": 0.11,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.08,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 21896392284,
+          "rank": 53,
           "rx": null
         },
         {
@@ -7872,8 +7521,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.31,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 20674924932,
-          "rank": 55,
+          "mcap": 20461683671,
+          "rank": 54,
           "rx": null
         },
         {
@@ -7884,24 +7533,24 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 4.03,
-          "noEsts": 6,
+          "noEsts": 7,
           "revEst": null,
-          "mcap": 18893925233,
-          "rank": 56,
+          "mcap": 18833518139,
+          "rank": 55,
           "rx": null
         },
         {
           "t": "LII",
           "name": "Lennox International, Inc.",
           "time": "bmo",
-          "epsEst": 7.65,
+          "epsEst": 7.63,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 7.82,
           "noEsts": 13,
           "revEst": null,
-          "mcap": 18439807044,
-          "rank": 57,
+          "mcap": 18540726951,
+          "rank": 56,
           "rx": null
         },
         {
@@ -7914,7 +7563,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.58,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 18346553397,
+          "mcap": 18219545775,
+          "rank": 57,
+          "rx": null
+        },
+        {
+          "t": "INVH",
+          "name": "Invitation Homes Inc.",
+          "time": "amc",
+          "epsEst": 0.48,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.48,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 17524237702,
           "rank": 58,
           "rx": null
         },
@@ -7928,26 +7591,26 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 18177828672,
+          "mcap": 17266885565,
           "rank": 59,
           "rx": null
         },
         {
-          "t": "INVH",
-          "name": "Invitation Homes Inc.",
-          "time": "amc",
-          "epsEst": 0.48,
+          "t": "IEX",
+          "name": "IDEX Corporation",
+          "time": "bmo",
+          "epsEst": 2.1,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 0.48,
+          "yearAgoEps": 2.07,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 17732152387,
+          "mcap": 16517199004,
           "rank": 60,
           "rx": null
         }
       ],
-      "totalCount": 286
+      "totalCount": 285
     },
     "2026-07-30": {
       "rows": [
@@ -7961,7 +7624,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.57,
           "noEsts": 11,
           "revEst": null,
-          "mcap": 4813634055440,
+          "mcap": 4786462446840,
           "rank": 1,
           "rx": null
         },
@@ -7975,7 +7638,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.68,
           "noEsts": 14,
           "revEst": null,
-          "mcap": 2662922440882,
+          "mcap": 2633878245405,
           "rank": 2,
           "rx": null
         },
@@ -7989,36 +7652,22 @@ export const EARNINGS = {
           "yearAgoEps": 4.15,
           "noEsts": 12,
           "revEst": null,
-          "mcap": 475633189147,
+          "mcap": 470048939183,
           "rank": 3,
           "rx": null
         },
         {
           "t": "SHEL",
           "name": "Shell PLC",
-          "time": null,
+          "time": "bmo",
           "epsEst": 2.88,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.42,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 246080907199,
+          "mcap": 247700764166,
           "rank": 4,
-          "rx": null
-        },
-        {
-          "t": "SMFG",
-          "name": "Sumitomo Mitsui Financial Group Inc",
-          "time": null,
-          "epsEst": 0.44,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.4,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 165347919657,
-          "rank": 5,
           "rx": null
         },
         {
@@ -8031,8 +7680,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.98,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 160827450554,
-          "rank": 6,
+          "mcap": 163844814126,
+          "rank": 5,
           "rx": null
         },
         {
@@ -8045,8 +7694,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.15,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 128974157169,
-          "rank": 7,
+          "mcap": 130717051185,
+          "rank": 6,
           "rx": null
         },
         {
@@ -8059,8 +7708,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.46,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 124423401080,
-          "rank": 8,
+          "mcap": 124076248968,
+          "rank": 7,
           "rx": null
         },
         {
@@ -8073,8 +7722,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.44,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 121885361243,
-          "rank": 9,
+          "mcap": 120516050430,
+          "rank": 8,
           "rx": null
         },
         {
@@ -8087,7 +7736,21 @@ export const EARNINGS = {
           "yearAgoEps": 3.13,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 120597628510,
+          "mcap": 118550482041,
+          "rank": 9,
+          "rx": null
+        },
+        {
+          "t": "SO",
+          "name": "Southern Company (The)",
+          "time": "bmo",
+          "epsEst": 1.01,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.91,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 108093039235,
           "rank": 10,
           "rx": null
         },
@@ -8101,22 +7764,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.9,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 106699870900,
+          "mcap": 106797425068,
           "rank": 11,
-          "rx": null
-        },
-        {
-          "t": "SO",
-          "name": "Southern Company (The)",
-          "time": "bmo",
-          "epsEst": 1.01,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.91,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 105892815576,
-          "rank": 12,
           "rx": null
         },
         {
@@ -8129,8 +7778,8 @@ export const EARNINGS = {
           "yearAgoEps": 3.88,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 103871758088,
-          "rank": 13,
+          "mcap": 104691873907,
+          "rank": 12,
           "rx": null
         },
         {
@@ -8143,8 +7792,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.64,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 96099711850,
-          "rank": 14,
+          "mcap": 96738248141,
+          "rank": 13,
           "rx": null
         },
         {
@@ -8157,8 +7806,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.25,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 95918447241,
-          "rank": 15,
+          "mcap": 96509684228,
+          "rank": 14,
           "rx": null
         },
         {
@@ -8171,8 +7820,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.28,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 93474439774,
-          "rank": 16,
+          "mcap": 92322340579,
+          "rank": 15,
           "rx": null
         },
         {
@@ -8185,8 +7834,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.11,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 89098220628,
-          "rank": 17,
+          "mcap": 90167132048,
+          "rank": 16,
           "rx": null
         },
         {
@@ -8199,7 +7848,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.14,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 88345261881,
+          "mcap": 89821833702,
+          "rank": 17,
+          "rx": null
+        },
+        {
+          "t": "RACE",
+          "name": "Ferrari N.V.",
+          "time": "bmo",
+          "epsEst": 2.83,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 2.7,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 86936128280,
           "rank": 18,
           "rx": null
         },
@@ -8213,50 +7876,36 @@ export const EARNINGS = {
           "yearAgoEps": 1,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 87192441301,
+          "mcap": 85773802054,
           "rank": 19,
-          "rx": null
-        },
-        {
-          "t": "RACE",
-          "name": "Ferrari N.V.",
-          "time": "bmo",
-          "epsEst": 2.83,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 2.7,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 86552459244,
-          "rank": 20,
           "rx": null
         },
         {
           "t": "EPD",
           "name": "Enterprise Products Partners L.P.",
           "time": "bmo",
-          "epsEst": 0.74,
+          "epsEst": 0.73,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.66,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 83425264530,
-          "rank": 21,
+          "mcap": 84139225559,
+          "rank": 20,
           "rx": null
         },
         {
           "t": "ICE",
           "name": "Intercontinental Exchange Inc.",
           "time": "bmo",
-          "epsEst": 1.88,
+          "epsEst": 1.84,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.81,
-          "noEsts": 8,
+          "noEsts": 7,
           "revEst": null,
-          "mcap": 78419617682,
-          "rank": 22,
+          "mcap": 80602495912,
+          "rank": 21,
           "rx": null
         },
         {
@@ -8269,8 +7918,8 @@ export const EARNINGS = {
           "yearAgoEps": 7.2,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 76844018038,
-          "rank": 23,
+          "mcap": 75352055279,
+          "rank": 22,
           "rx": null
         },
         {
@@ -8283,21 +7932,35 @@ export const EARNINGS = {
           "yearAgoEps": 0.59,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 71678012146,
-          "rank": 24,
+          "mcap": 72619154235,
+          "rank": 23,
           "rx": null
         },
         {
           "t": "AEP",
           "name": "American Electric Power Company, Inc.",
           "time": "bmo",
-          "epsEst": 1.48,
+          "epsEst": 1.49,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.43,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 70994824575,
+          "mcap": 72404056608,
+          "rank": 24,
+          "rx": null
+        },
+        {
+          "t": "MPWR",
+          "name": "Monolithic Power Systems, Inc.",
+          "time": "amc",
+          "epsEst": 4.84,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 2.95,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 68705848500,
           "rank": 25,
           "rx": null
         },
@@ -8311,22 +7974,8 @@ export const EARNINGS = {
           "yearAgoEps": 10.72,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 70786266016,
+          "mcap": 68269080858,
           "rank": 26,
-          "rx": null
-        },
-        {
-          "t": "MPWR",
-          "name": "Monolithic Power Systems, Inc.",
-          "time": "amc",
-          "epsEst": 4.84,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 2.95,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 67959563800,
-          "rank": 27,
           "rx": null
         },
         {
@@ -8339,8 +7988,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.94,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 66759914948,
-          "rank": 28,
+          "mcap": 66974103566,
+          "rank": 27,
           "rx": null
         },
         {
@@ -8353,7 +8002,21 @@ export const EARNINGS = {
           "yearAgoEps": 3.09,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 66000328524,
+          "mcap": 66136163742,
+          "rank": 28,
+          "rx": null
+        },
+        {
+          "t": "VALE",
+          "name": "VALE S.A.",
+          "time": null,
+          "epsEst": 0.39,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.5,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 63402288142,
           "rank": 29,
           "rx": null
         },
@@ -8367,22 +8030,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.33,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 63767718000,
+          "mcap": 62298250000,
           "rank": 30,
-          "rx": null
-        },
-        {
-          "t": "VALE",
-          "name": "VALE S.A.",
-          "time": null,
-          "epsEst": 0.39,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.5,
-          "noEsts": 2,
-          "revEst": null,
-          "mcap": 60840579530,
-          "rank": 31,
           "rx": null
         },
         {
@@ -8395,8 +8044,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.2,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 58147210800,
-          "rank": 32,
+          "mcap": 59210634600,
+          "rank": 31,
           "rx": null
         },
         {
@@ -8409,8 +8058,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.33,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 54097553738,
-          "rank": 33,
+          "mcap": 54311804066,
+          "rank": 32,
           "rx": null
         },
         {
@@ -8423,8 +8072,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.32,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 50082078890,
-          "rank": 34,
+          "mcap": 50607255705,
+          "rank": 33,
           "rx": null
         },
         {
@@ -8437,8 +8086,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.75,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 49142499763,
-          "rank": 35,
+          "mcap": 50060176016,
+          "rank": 34,
           "rx": null
         },
         {
@@ -8451,8 +8100,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.03,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 49018696531,
-          "rank": 36,
+          "mcap": 49491545694,
+          "rank": 35,
           "rx": null
         },
         {
@@ -8465,22 +8114,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.39,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 46955021636,
-          "rank": 37,
-          "rx": null
-        },
-        {
-          "t": "COIN",
-          "name": "Coinbase Global, Inc.",
-          "time": "amc",
-          "epsEst": 0.19,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.12,
-          "noEsts": 8,
-          "revEst": null,
-          "mcap": 46320844397,
-          "rank": 38,
+          "mcap": 47783820231,
+          "rank": 36,
           "rx": null
         },
         {
@@ -8493,8 +8128,22 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 44381056984,
-          "rank": 39,
+          "mcap": 43920453200,
+          "rank": 37,
+          "rx": null
+        },
+        {
+          "t": "COIN",
+          "name": "Coinbase Global, Inc.",
+          "time": "amc",
+          "epsEst": 0.13,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.12,
+          "noEsts": 7,
+          "revEst": null,
+          "mcap": 43757854258,
+          "rank": 38,
           "rx": null
         },
         {
@@ -8507,8 +8156,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.41,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 41887334569,
-          "rank": 40,
+          "mcap": 41908533805,
+          "rank": 39,
           "rx": null
         },
         {
@@ -8521,8 +8170,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.44,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 40563172298,
-          "rank": 41,
+          "mcap": 40673420779,
+          "rank": 40,
           "rx": null
         },
         {
@@ -8535,7 +8184,21 @@ export const EARNINGS = {
           "yearAgoEps": -0.04,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 38621715705,
+          "mcap": 38027535464,
+          "rank": 41,
+          "rx": null
+        },
+        {
+          "t": "ALNY",
+          "name": "Alnylam Pharmaceuticals, Inc.",
+          "time": "bmo",
+          "epsEst": 1.44,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -0.52,
+          "noEsts": 8,
+          "revEst": null,
+          "mcap": 35646521865,
           "rank": 42,
           "rx": null
         },
@@ -8549,36 +8212,8 @@ export const EARNINGS = {
           "yearAgoEps": -0.41,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 37588884113,
+          "mcap": 35541184902,
           "rank": 43,
-          "rx": null
-        },
-        {
-          "t": "ALNY",
-          "name": "Alnylam Pharmaceuticals, Inc.",
-          "time": "bmo",
-          "epsEst": 1.44,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": -0.52,
-          "noEsts": 8,
-          "revEst": null,
-          "mcap": 36231306935,
-          "rank": 44,
-          "rx": null
-        },
-        {
-          "t": "RDDT",
-          "name": "Reddit, Inc.",
-          "time": "amc",
-          "epsEst": 0.99,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.45,
-          "noEsts": 10,
-          "revEst": null,
-          "mcap": 35762148090,
-          "rank": 45,
           "rx": null
         },
         {
@@ -8591,8 +8226,8 @@ export const EARNINGS = {
           "yearAgoEps": 32.6,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 35728160550,
-          "rank": 46,
+          "mcap": 35048291679,
+          "rank": 44,
           "rx": null
         },
         {
@@ -8605,8 +8240,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.21,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 34611164564,
-          "rank": 47,
+          "mcap": 34955998297,
+          "rank": 45,
           "rx": null
         },
         {
@@ -8619,8 +8254,8 @@ export const EARNINGS = {
           "yearAgoEps": 6.72,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 33786610155,
-          "rank": 48,
+          "mcap": 33559075932,
+          "rank": 46,
           "rx": null
         },
         {
@@ -8633,8 +8268,22 @@ export const EARNINGS = {
           "yearAgoEps": 5.43,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 32980030325,
-          "rank": 49,
+          "mcap": 33180683497,
+          "rank": 47,
+          "rx": null
+        },
+        {
+          "t": "RDDT",
+          "name": "Reddit, Inc.",
+          "time": "amc",
+          "epsEst": 0.99,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.45,
+          "noEsts": 10,
+          "revEst": null,
+          "mcap": 32787100687,
+          "rank": 48,
           "rx": null
         },
         {
@@ -8647,8 +8296,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.77,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 31659149871,
-          "rank": 50,
+          "mcap": 32692279112,
+          "rank": 49,
           "rx": null
         },
         {
@@ -8661,8 +8310,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.01,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 30426072663,
-          "rank": 51,
+          "mcap": 30998948508,
+          "rank": 50,
           "rx": null
         },
         {
@@ -8675,8 +8324,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.97,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 30079342368,
-          "rank": 52,
+          "mcap": 30929736978,
+          "rank": 51,
           "rx": null
         },
         {
@@ -8689,8 +8338,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.68,
           "noEsts": 12,
           "revEst": null,
-          "mcap": 29751135554,
-          "rank": 53,
+          "mcap": 29942512465,
+          "rank": 52,
           "rx": null
         },
         {
@@ -8703,8 +8352,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.47,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 29365106462,
-          "rank": 54,
+          "mcap": 29520477971,
+          "rank": 53,
           "rx": null
         },
         {
@@ -8717,8 +8366,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.21,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 29264328612,
-          "rank": 55,
+          "mcap": 29198246748,
+          "rank": 54,
           "rx": null
         },
         {
@@ -8731,22 +8380,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.19,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 29129789000,
-          "rank": 56,
-          "rx": null
-        },
-        {
-          "t": "DXCM",
-          "name": "DexCom, Inc.",
-          "time": "amc",
-          "epsEst": 0.61,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.48,
-          "noEsts": 9,
-          "revEst": null,
-          "mcap": 28844005031,
-          "rank": 57,
+          "mcap": 28878631000,
+          "rank": 55,
           "rx": null
         },
         {
@@ -8759,22 +8394,36 @@ export const EARNINGS = {
           "yearAgoEps": 1.39,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 27767120578,
-          "rank": 58,
+          "mcap": 28237280987,
+          "rank": 56,
           "rx": null
         },
         {
           "t": "ES",
           "name": "Eversource Energy",
           "time": "amc",
-          "epsEst": 0.94,
+          "epsEst": 0.92,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.96,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 27472645826,
-          "rank": 59,
+          "mcap": 28002918662,
+          "rank": 57,
+          "rx": null
+        },
+        {
+          "t": "DXCM",
+          "name": "DexCom, Inc.",
+          "time": "amc",
+          "epsEst": 0.61,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.48,
+          "noEsts": 9,
+          "revEst": null,
+          "mcap": 27562906747,
+          "rank": 58,
           "rx": null
         },
         {
@@ -8787,12 +8436,26 @@ export const EARNINGS = {
           "yearAgoEps": 2.86,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 27278464428,
+          "mcap": 27060289604,
+          "rank": 59,
+          "rx": null
+        },
+        {
+          "t": "LPLA",
+          "name": "LPL Financial Holdings Inc.",
+          "time": "amc",
+          "epsEst": 5.39,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 4.51,
+          "noEsts": 6,
+          "revEst": null,
+          "mcap": 26184789034,
           "rank": 60,
           "rx": null
         }
       ],
-      "totalCount": 325
+      "totalCount": 320
     },
     "2026-07-31": {
       "rows": [
@@ -8800,13 +8463,13 @@ export const EARNINGS = {
           "t": "XOM",
           "name": "ExxonMobil Holdings Corporation",
           "time": "bmo",
-          "epsEst": 3.88,
+          "epsEst": 3.79,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.64,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 628829933947,
+          "mcap": 640187089171,
           "rank": 1,
           "rx": null
         },
@@ -8820,7 +8483,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.97,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 452475641458,
+          "mcap": 447528621559,
           "rank": 2,
           "rx": null
         },
@@ -8834,7 +8497,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.77,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 380534578653,
+          "mcap": 384338530321,
           "rank": 3,
           "rx": null
         },
@@ -8848,8 +8511,22 @@ export const EARNINGS = {
           "yearAgoEps": 4.09,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 233626645181,
+          "mcap": 235310507503,
           "rank": 4,
+          "rx": null
+        },
+        {
+          "t": "SMFG",
+          "name": "Sumitomo Mitsui Financial Group Inc",
+          "time": "bmo",
+          "epsEst": 0.44,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.4,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 166368585827,
+          "rank": 5,
           "rx": null
         },
         {
@@ -8862,8 +8539,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.72,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 162402767103,
-          "rank": 5,
+          "mcap": 163395866386,
+          "rank": 6,
           "rx": null
         },
         {
@@ -8876,22 +8553,22 @@ export const EARNINGS = {
           "yearAgoEps": 2.95,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 156465485000,
-          "rank": 6,
+          "mcap": 158003153000,
+          "rank": 7,
           "rx": null
         },
         {
           "t": "ENB",
           "name": "Enbridge Inc",
           "time": "bmo",
-          "epsEst": 0.44,
+          "epsEst": 0.43,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.47,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 121471335442,
-          "rank": 7,
+          "mcap": 122739875996,
+          "rank": 8,
           "rx": null
         },
         {
@@ -8904,8 +8581,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.17,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 92622806052,
-          "rank": 8,
+          "mcap": 93504928014,
+          "rank": 9,
           "rx": null
         },
         {
@@ -8918,8 +8595,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.41,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 73526610813,
-          "rank": 9,
+          "mcap": 74734180362,
+          "rank": 10,
           "rx": null
         },
         {
@@ -8932,8 +8609,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.92,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 72417132555,
-          "rank": 10,
+          "mcap": 73321346475,
+          "rank": 11,
           "rx": null
         },
         {
@@ -8946,8 +8623,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.75,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 61429959900,
-          "rank": 11,
+          "mcap": 62520484599,
+          "rank": 12,
           "rx": null
         },
         {
@@ -8960,36 +8637,36 @@ export const EARNINGS = {
           "yearAgoEps": 1.34,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 60343445784,
-          "rank": 12,
+          "mcap": 60697461943,
+          "rank": 13,
           "rx": null
         },
         {
           "t": "ARES",
           "name": "Ares Management Corporation",
           "time": "bmo",
-          "epsEst": 1.3,
+          "epsEst": 1.29,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.03,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 39838996268,
-          "rank": 13,
+          "mcap": 39439880641,
+          "rank": 14,
           "rx": null
         },
         {
           "t": "CCJ",
           "name": "Cameco Corporation",
           "time": "bmo",
-          "epsEst": 0.31,
+          "epsEst": 0.26,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.51,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 38716310009,
-          "rank": 14,
+          "mcap": 39307747490,
+          "rank": 15,
           "rx": null
         },
         {
@@ -9002,8 +8679,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.55,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 29400748177,
-          "rank": 15,
+          "mcap": 29646985163,
+          "rank": 16,
           "rx": null
         },
         {
@@ -9016,8 +8693,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.86,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 25985242227,
-          "rank": 16,
+          "mcap": 25627840028,
+          "rank": 17,
           "rx": null
         },
         {
@@ -9030,8 +8707,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.24,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 25199895532,
-          "rank": 17,
+          "mcap": 24857068962,
+          "rank": 18,
           "rx": null
         },
         {
@@ -9044,8 +8721,8 @@ export const EARNINGS = {
           "yearAgoEps": -2.13,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 23672268212,
-          "rank": 18,
+          "mcap": 23041378060,
+          "rank": 19,
           "rx": null
         },
         {
@@ -9058,8 +8735,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.94,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 22687349892,
-          "rank": 19,
+          "mcap": 23014332062,
+          "rank": 20,
           "rx": null
         },
         {
@@ -9072,35 +8749,21 @@ export const EARNINGS = {
           "yearAgoEps": -0.22,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 21929105915,
-          "rank": 20,
+          "mcap": 21846933226,
+          "rank": 21,
           "rx": null
         },
         {
           "t": "LYB",
           "name": "LyondellBasell Industries NV",
           "time": "bmo",
-          "epsEst": 3.48,
+          "epsEst": 3.56,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.62,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 19751200260,
-          "rank": 21,
-          "rx": null
-        },
-        {
-          "t": "MGA",
-          "name": "Magna International, Inc.",
-          "time": "bmo",
-          "epsEst": 1.53,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.44,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 18693400704,
+          "mcap": 20115947053,
           "rank": 22,
           "rx": null
         },
@@ -9114,8 +8777,22 @@ export const EARNINGS = {
           "yearAgoEps": 2.68,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 18517757391,
+          "mcap": 18712314849,
           "rank": 23,
+          "rx": null
+        },
+        {
+          "t": "MGA",
+          "name": "Magna International, Inc.",
+          "time": "bmo",
+          "epsEst": 1.53,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.44,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 18498269895,
+          "rank": 24,
           "rx": null
         },
         {
@@ -9128,8 +8805,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.49,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 16955760596,
-          "rank": 24,
+          "mcap": 16825851306,
+          "rank": 25,
           "rx": null
         },
         {
@@ -9142,8 +8819,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.6,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 16032054238,
-          "rank": 25,
+          "mcap": 16126277301,
+          "rank": 26,
           "rx": null
         },
         {
@@ -9156,21 +8833,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.22,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 14314990675,
-          "rank": 26,
-          "rx": null
-        },
-        {
-          "t": "BEPC",
-          "name": "Brookfield Renewable Corporation",
-          "time": "bmo",
-          "epsEst": -0.77,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": null,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 12878202616,
+          "mcap": 13758647322,
           "rank": 27,
           "rx": null
         },
@@ -9178,13 +8841,13 @@ export const EARNINGS = {
           "t": "MOG.A",
           "name": "Moog Inc.",
           "time": "bmo",
-          "epsEst": 2.64,
+          "epsEst": 2.67,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 2.37,
-          "noEsts": 2,
+          "noEsts": 3,
           "revEst": null,
-          "mcap": 12843474551,
+          "mcap": 12765218638,
           "rank": 28,
           "rx": null
         },
@@ -9198,8 +8861,22 @@ export const EARNINGS = {
           "yearAgoEps": 2.37,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 12843474551,
+          "mcap": 12765218638,
           "rank": 29,
+          "rx": null
+        },
+        {
+          "t": "BEPC",
+          "name": "Brookfield Renewable Corporation",
+          "time": "bmo",
+          "epsEst": -0.82,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 12343024164,
+          "rank": 30,
           "rx": null
         },
         {
@@ -9213,7 +8890,7 @@ export const EARNINGS = {
           "noEsts": 9,
           "revEst": null,
           "mcap": 11636977312,
-          "rank": 30,
+          "rank": 31,
           "rx": null
         },
         {
@@ -9226,8 +8903,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.91,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 10849619251,
-          "rank": 31,
+          "mcap": 10802969085,
+          "rank": 32,
           "rx": null
         },
         {
@@ -9240,8 +8917,8 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 10407689985,
-          "rank": 32,
+          "mcap": 10766575847,
+          "rank": 33,
           "rx": null
         },
         {
@@ -9254,8 +8931,8 @@ export const EARNINGS = {
           "yearAgoEps": 3.47,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 7154582039,
-          "rank": 33,
+          "mcap": 7198164775,
+          "rank": 34,
           "rx": null
         },
         {
@@ -9268,8 +8945,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.37,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 6870698052,
-          "rank": 34,
+          "mcap": 6962138026,
+          "rank": 35,
           "rx": null
         },
         {
@@ -9282,8 +8959,8 @@ export const EARNINGS = {
           "yearAgoEps": 5.46,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 6641437528,
-          "rank": 35,
+          "mcap": 6892064125,
+          "rank": 36,
           "rx": null
         },
         {
@@ -9296,8 +8973,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.12,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 6457815264,
-          "rank": 36,
+          "mcap": 6399394784,
+          "rank": 37,
           "rx": null
         },
         {
@@ -9310,8 +8987,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.66,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 6046893075,
-          "rank": 37,
+          "mcap": 6124432182,
+          "rank": 38,
           "rx": null
         },
         {
@@ -9324,8 +9001,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.27,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 5176759176,
-          "rank": 38,
+          "mcap": 5208246416,
+          "rank": 39,
           "rx": null
         },
         {
@@ -9338,8 +9015,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.13,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 4171206005,
-          "rank": 39,
+          "mcap": 4171634286,
+          "rank": 40,
           "rx": null
         },
         {
@@ -9352,8 +9029,8 @@ export const EARNINGS = {
           "yearAgoEps": 8.3,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 3921023907,
-          "rank": 40,
+          "mcap": 3933228566,
+          "rank": 41,
           "rx": null
         },
         {
@@ -9366,8 +9043,8 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 3282880733,
-          "rank": 41,
+          "mcap": 3206695737,
+          "rank": 42,
           "rx": null
         },
         {
@@ -9380,8 +9057,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.18,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 3164354814,
-          "rank": 42,
+          "mcap": 3048119451,
+          "rank": 43,
           "rx": null
         },
         {
@@ -9394,8 +9071,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.24,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 2213873692,
-          "rank": 43,
+          "mcap": 2290360691,
+          "rank": 44,
           "rx": null
         },
         {
@@ -9408,8 +9085,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.18,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 1923748538,
-          "rank": 44,
+          "mcap": 1897099208,
+          "rank": 45,
           "rx": null
         },
         {
@@ -9422,8 +9099,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.09,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 1455818520,
-          "rank": 45,
+          "mcap": 1406098576,
+          "rank": 46,
           "rx": null
         },
         {
@@ -9436,12 +9113,12 @@ export const EARNINGS = {
           "yearAgoEps": -0.08,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 893385508,
-          "rank": 46,
+          "mcap": 933960606,
+          "rank": 47,
           "rx": null
         }
       ],
-      "totalCount": 46
+      "totalCount": 47
     },
     "2026-08-03": {
       "rows": [
@@ -9455,7 +9132,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.13,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 318027406869,
+          "mcap": 298633152975,
           "rank": 1,
           "rx": null
         },
@@ -9469,7 +9146,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.32,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 262513765550,
+          "mcap": 265955401717,
           "rank": 2,
           "rx": null
         },
@@ -9483,7 +9160,7 @@ export const EARNINGS = {
           "yearAgoEps": 4,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 122334210994,
+          "mcap": 119940825912,
           "rank": 3,
           "rx": null
         },
@@ -9497,7 +9174,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.65,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 96987312426,
+          "mcap": 97512052785,
           "rank": 4,
           "rx": null
         },
@@ -9511,7 +9188,7 @@ export const EARNINGS = {
           "yearAgoEps": 10.31,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 92403218772,
+          "mcap": 91214876826,
           "rank": 5,
           "rx": null
         },
@@ -9525,7 +9202,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.46,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 89719152720,
+          "mcap": 91101140760,
           "rank": 6,
           "rx": null
         },
@@ -9533,13 +9210,13 @@ export const EARNINGS = {
           "t": "OKE",
           "name": "ONEOK, Inc.",
           "time": "amc",
-          "epsEst": 1.41,
+          "epsEst": 1.44,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.34,
-          "noEsts": 7,
+          "noEsts": 6,
           "revEst": null,
-          "mcap": 57866439599,
+          "mcap": 57816027804,
           "rank": 7,
           "rx": null
         },
@@ -9553,7 +9230,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.67,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 56206396741,
+          "mcap": 57112225557,
           "rank": 8,
           "rx": null
         },
@@ -9567,7 +9244,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.85,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 41201363700,
+          "mcap": 39615114825,
           "rank": 9,
           "rx": null
         },
@@ -9581,7 +9258,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.53,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 35686704572,
+          "mcap": 36184421625,
           "rank": 10,
           "rx": null
         },
@@ -9589,13 +9266,13 @@ export const EARNINGS = {
           "t": "TKO",
           "name": "TKO Group Holdings, Inc.",
           "time": "amc",
-          "epsEst": 1.72,
+          "epsEst": 1.7,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.17,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 34727646530,
+          "mcap": 34718090215,
           "rank": 11,
           "rx": null
         },
@@ -9609,7 +9286,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.21,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 33982948170,
+          "mcap": 34311881727,
           "rank": 12,
           "rx": null
         },
@@ -9623,21 +9300,21 @@ export const EARNINGS = {
           "yearAgoEps": 1.87,
           "noEsts": null,
           "revEst": null,
-          "mcap": 23579055157,
+          "mcap": 23601689733,
           "rank": 13,
           "rx": null
         },
         {
           "t": "STRL",
           "name": "Sterling Infrastructure, Inc.",
-          "time": null,
+          "time": "amc",
           "epsEst": 5,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 2.55,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 21308326458,
+          "mcap": 22073634150,
           "rank": 14,
           "rx": null
         },
@@ -9651,7 +9328,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.91,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 20088982384,
+          "mcap": 20092503678,
           "rank": 15,
           "rx": null
         },
@@ -9665,7 +9342,7 @@ export const EARNINGS = {
           "yearAgoEps": 3.17,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 18754062666,
+          "mcap": 18881338286,
           "rank": 16,
           "rx": null
         },
@@ -9679,7 +9356,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.07,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 18609777216,
+          "mcap": 18793367745,
           "rank": 17,
           "rx": null
         },
@@ -9693,22 +9370,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.41,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 15985147547,
+          "mcap": 16131244526,
           "rank": 18,
-          "rx": null
-        },
-        {
-          "t": "JAZZ",
-          "name": "Jazz Pharmaceuticals plc",
-          "time": "amc",
-          "epsEst": 5.06,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": -9.07,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 15969497390,
-          "rank": 19,
           "rx": null
         },
         {
@@ -9721,22 +9384,22 @@ export const EARNINGS = {
           "yearAgoEps": 1.02,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 15857579595,
-          "rank": 20,
+          "mcap": 16048138065,
+          "rank": 19,
           "rx": null
         },
         {
-          "t": "GRAB",
-          "name": "Grab Holdings Limited",
+          "t": "JAZZ",
+          "name": "Jazz Pharmaceuticals plc",
           "time": "amc",
-          "epsEst": 0.01,
+          "epsEst": 5.06,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 0.01,
-          "noEsts": 1,
+          "yearAgoEps": -9.07,
+          "noEsts": 4,
           "revEst": null,
-          "mcap": 14351686241,
-          "rank": 21,
+          "mcap": 15730162227,
+          "rank": 20,
           "rx": null
         },
         {
@@ -9749,7 +9412,21 @@ export const EARNINGS = {
           "yearAgoEps": 1.23,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 14235363584,
+          "mcap": 14027054386,
+          "rank": 21,
+          "rx": null
+        },
+        {
+          "t": "GRAB",
+          "name": "Grab Holdings Limited",
+          "time": "amc",
+          "epsEst": 0.01,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.01,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 13736613973,
           "rank": 22,
           "rx": null
         },
@@ -9763,8 +9440,22 @@ export const EARNINGS = {
           "yearAgoEps": 0.17,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 12833488058,
+          "mcap": 13267470746,
           "rank": 23,
+          "rx": null
+        },
+        {
+          "t": "AEIS",
+          "name": "Advanced Energy Industries, Inc.",
+          "time": "amc",
+          "epsEst": 1.82,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.22,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 12067507773,
+          "rank": 24,
           "rx": null
         },
         {
@@ -9777,21 +9468,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.87,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 11570964077,
-          "rank": 24,
-          "rx": null
-        },
-        {
-          "t": "AEIS",
-          "name": "Advanced Energy Industries, Inc.",
-          "time": "amc",
-          "epsEst": 1.73,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.22,
-          "noEsts": 2,
-          "revEst": null,
-          "mcap": 11550290837,
+          "mcap": 11579428572,
           "rank": 25,
           "rx": null
         },
@@ -9805,7 +9482,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.25,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 11444371574,
+          "mcap": 11287811179,
           "rank": 26,
           "rx": null
         },
@@ -9819,7 +9496,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.29,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 9995406069,
+          "mcap": 9928781821,
           "rank": 27,
           "rx": null
         },
@@ -9833,7 +9510,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.29,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 9637990352,
+          "mcap": 9874357898,
           "rank": 28,
           "rx": null
         },
@@ -9847,7 +9524,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.32,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 9365781258,
+          "mcap": 9258841178,
           "rank": 29,
           "rx": null
         },
@@ -9861,7 +9538,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.32,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 8903530699,
+          "mcap": 8768369281,
           "rank": 30,
           "rx": null
         },
@@ -9875,7 +9552,7 @@ export const EARNINGS = {
           "yearAgoEps": -3.31,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 8861825891,
+          "mcap": 8700965365,
           "rank": 31,
           "rx": null
         },
@@ -9889,7 +9566,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.33,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 8819778383,
+          "mcap": 8650736987,
           "rank": 32,
           "rx": null
         },
@@ -9903,7 +9580,7 @@ export const EARNINGS = {
           "yearAgoEps": 4.87,
           "noEsts": null,
           "revEst": null,
-          "mcap": 8663488379,
+          "mcap": 8630709120,
           "rank": 33,
           "rx": null
         },
@@ -9917,7 +9594,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.17,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 8258859141,
+          "mcap": 8064442994,
           "rank": 34,
           "rx": null
         },
@@ -9931,7 +9608,7 @@ export const EARNINGS = {
           "yearAgoEps": -0.16,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 7556653859,
+          "mcap": 7407509375,
           "rank": 35,
           "rx": null
         },
@@ -9945,21 +9622,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.56,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 7518267307,
+          "mcap": 7243644584,
           "rank": 36,
           "rx": null
         },
         {
           "t": "JBTM",
           "name": "JBT Marel Corporation",
-          "time": null,
+          "time": "amc",
           "epsEst": 2.02,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.49,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 6896902378,
+          "mcap": 7041650895,
           "rank": 37,
           "rx": null
         },
@@ -9973,22 +9650,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.92,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 6633408562,
+          "mcap": 6533842368,
           "rank": 38,
-          "rx": null
-        },
-        {
-          "t": "TWST",
-          "name": "Twist Bioscience Corporation",
-          "time": "bmo",
-          "epsEst": -0.5,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": -0.47,
-          "noEsts": 2,
-          "revEst": null,
-          "mcap": 5969328160,
-          "rank": 39,
           "rx": null
         },
         {
@@ -10001,8 +9664,36 @@ export const EARNINGS = {
           "yearAgoEps": 0.06,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 5893819863,
+          "mcap": 5942262218,
+          "rank": 39,
+          "rx": null
+        },
+        {
+          "t": "TWST",
+          "name": "Twist Bioscience Corporation",
+          "time": "bmo",
+          "epsEst": -0.5,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -0.47,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 5866580492,
           "rank": 40,
+          "rx": null
+        },
+        {
+          "t": "MMYT",
+          "name": "MakeMyTrip Limited",
+          "time": "bmo",
+          "epsEst": -0.06,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.37,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 5745591524,
+          "rank": 41,
           "rx": null
         },
         {
@@ -10015,8 +9706,22 @@ export const EARNINGS = {
           "yearAgoEps": 0.38,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 5558269694,
-          "rank": 41,
+          "mcap": 5543138288,
+          "rank": 42,
+          "rx": null
+        },
+        {
+          "t": "HESM",
+          "name": "Hess Midstream LP",
+          "time": "bmo",
+          "epsEst": 0.69,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.74,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 5232865418,
+          "rank": 43,
           "rx": null
         },
         {
@@ -10029,22 +9734,8 @@ export const EARNINGS = {
           "yearAgoEps": -0.3,
           "noEsts": null,
           "revEst": null,
-          "mcap": 5168068753,
-          "rank": 42,
-          "rx": null
-        },
-        {
-          "t": "HESM",
-          "name": "Hess Midstream LP",
-          "time": "bmo",
-          "epsEst": 0.7,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.74,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 5130184714,
-          "rank": 43,
+          "mcap": 5215112291,
+          "rank": 44,
           "rx": null
         },
         {
@@ -10057,36 +9748,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.61,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 4763583293,
-          "rank": 44,
-          "rx": null
-        },
-        {
-          "t": "UCTT",
-          "name": "Ultra Clean Holdings, Inc.",
-          "time": "amc",
-          "epsEst": 0.44,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.15,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 4713701213,
+          "mcap": 4856901781,
           "rank": 45,
-          "rx": null
-        },
-        {
-          "t": "CRSP",
-          "name": "CRISPR Therapeutics AG",
-          "time": null,
-          "epsEst": -1.1,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": -1.29,
-          "noEsts": 7,
-          "revEst": null,
-          "mcap": 4644009335,
-          "rank": 46,
           "rx": null
         },
         {
@@ -10099,8 +9762,36 @@ export const EARNINGS = {
           "yearAgoEps": 1.9,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 4587595329,
+          "mcap": 4624246535,
+          "rank": 46,
+          "rx": null
+        },
+        {
+          "t": "CRSP",
+          "name": "CRISPR Therapeutics AG",
+          "time": null,
+          "epsEst": -1.1,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -1.29,
+          "noEsts": 7,
+          "revEst": null,
+          "mcap": 4556240934,
           "rank": 47,
+          "rx": null
+        },
+        {
+          "t": "UCTT",
+          "name": "Ultra Clean Holdings, Inc.",
+          "time": "amc",
+          "epsEst": 0.44,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.15,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 4548284594,
+          "rank": 48,
           "rx": null
         },
         {
@@ -10113,8 +9804,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.06,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 4107987004,
-          "rank": 48,
+          "mcap": 4031188236,
+          "rank": 49,
           "rx": null
         },
         {
@@ -10127,8 +9818,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.13,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 4024113591,
-          "rank": 49,
+          "mcap": 3934841447,
+          "rank": 50,
           "rx": null
         },
         {
@@ -10141,36 +9832,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.34,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 3885176892,
-          "rank": 50,
-          "rx": null
-        },
-        {
-          "t": "TDW",
-          "name": "Tidewater Inc.",
-          "time": null,
-          "epsEst": 0.32,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.23,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 3883466615,
+          "mcap": 3894565156,
           "rank": 51,
-          "rx": null
-        },
-        {
-          "t": "IRT",
-          "name": "Independence Realty Trust, Inc.",
-          "time": "amc",
-          "epsEst": null,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.28,
-          "noEsts": null,
-          "revEst": null,
-          "mcap": 3882735780,
-          "rank": 52,
           "rx": null
         },
         {
@@ -10183,21 +9846,35 @@ export const EARNINGS = {
           "yearAgoEps": 1.85,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 3802504466,
+          "mcap": 3894449754,
+          "rank": 52,
+          "rx": null
+        },
+        {
+          "t": "IRT",
+          "name": "Independence Realty Trust, Inc.",
+          "time": "amc",
+          "epsEst": 0.27,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.28,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 3854446266,
           "rank": 53,
           "rx": null
         },
         {
-          "t": "PAY",
-          "name": "Paymentus Holdings, Inc.",
-          "time": "amc",
-          "epsEst": 0.17,
+          "t": "TDW",
+          "name": "Tidewater Inc.",
+          "time": null,
+          "epsEst": 0.32,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 0.12,
-          "noEsts": 4,
+          "yearAgoEps": 1.23,
+          "noEsts": 1,
           "revEst": null,
-          "mcap": 3725880162,
+          "mcap": 3831249430,
           "rank": 54,
           "rx": null
         },
@@ -10211,21 +9888,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.43,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 3645977973,
+          "mcap": 3758263527,
           "rank": 55,
           "rx": null
         },
         {
-          "t": "PLMR",
-          "name": "Palomar Holdings, Inc.",
-          "time": null,
-          "epsEst": 1.9,
+          "t": "PAY",
+          "name": "Paymentus Holdings, Inc.",
+          "time": "amc",
+          "epsEst": 0.17,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 1.57,
+          "yearAgoEps": 0.12,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 3613537772,
+          "mcap": 3654180240,
           "rank": 56,
           "rx": null
         },
@@ -10239,8 +9916,22 @@ export const EARNINGS = {
           "yearAgoEps": 0.17,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 3434453151,
+          "mcap": 3489820899,
           "rank": 57,
+          "rx": null
+        },
+        {
+          "t": "PLMR",
+          "name": "Palomar Holdings, Inc.",
+          "time": null,
+          "epsEst": 1.94,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.57,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 3457429972,
+          "rank": 58,
           "rx": null
         },
         {
@@ -10253,8 +9944,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.39,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 3389042305,
-          "rank": 58,
+          "mcap": 3347363076,
+          "rank": 59,
           "rx": null
         },
         {
@@ -10267,26 +9958,12 @@ export const EARNINGS = {
           "yearAgoEps": -0.1,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 3342007030,
-          "rank": 59,
-          "rx": null
-        },
-        {
-          "t": "PPLI",
-          "name": "People Incorporated",
-          "time": "amc",
-          "epsEst": -0.51,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 2.57,
-          "noEsts": 2,
-          "revEst": null,
-          "mcap": 3279744699,
+          "mcap": 3323876162,
           "rank": 60,
           "rx": null
         }
       ],
-      "totalCount": 141
+      "totalCount": 143
     },
     "2026-08-04": {
       "rows": [
@@ -10300,7 +9977,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.27,
           "noEsts": 13,
           "revEst": null,
-          "mcap": 887747905891,
+          "mcap": 900629650939,
           "rank": 1,
           "rx": null
         },
@@ -10314,7 +9991,7 @@ export const EARNINGS = {
           "yearAgoEps": 4.72,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 409953134029,
+          "mcap": 409649113592,
           "rank": 2,
           "rx": null
         },
@@ -10328,7 +10005,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.13,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 311840030638,
+          "mcap": 314828518180,
           "rank": 3,
           "rx": null
         },
@@ -10342,7 +10019,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.67,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 219831588686,
+          "mcap": 220196757438,
           "rank": 4,
           "rx": null
         },
@@ -10356,7 +10033,7 @@ export const EARNINGS = {
           "yearAgoEps": 6.02,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 197662758270,
+          "mcap": 197560213698,
           "rank": 5,
           "rx": null
         },
@@ -10370,21 +10047,21 @@ export const EARNINGS = {
           "yearAgoEps": 3.19,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 187509601249,
+          "mcap": 187268029257,
           "rank": 6,
           "rx": null
         },
         {
-          "t": "SCCO",
-          "name": "Southern Copper Corporation",
-          "time": null,
-          "epsEst": 1.97,
+          "t": "GILD",
+          "name": "Gilead Sciences, Inc.",
+          "time": "amc",
+          "epsEst": -7.09,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 1.22,
-          "noEsts": 2,
+          "yearAgoEps": 2.01,
+          "noEsts": 5,
           "revEst": null,
-          "mcap": 156862102413,
+          "mcap": 161826217377,
           "rank": 7,
           "rx": null
         },
@@ -10398,7 +10075,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.78,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 142144137575,
+          "mcap": 141460204275,
           "rank": 8,
           "rx": null
         },
@@ -10412,7 +10089,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.22,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 139013191418,
+          "mcap": 137819878627,
           "rank": 9,
           "rx": null
         },
@@ -10420,14 +10097,28 @@ export const EARNINGS = {
           "t": "BP",
           "name": "BP p.l.c.",
           "time": "bmo",
-          "epsEst": 1.3,
+          "epsEst": 1.99,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.9,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 110106939980,
+          "mcap": 111228745906,
           "rank": 10,
+          "rx": null
+        },
+        {
+          "t": "DUK",
+          "name": "Duke Energy Corporation",
+          "time": "bmo",
+          "epsEst": 1.29,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.25,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 99749335965,
+          "rank": 11,
           "rx": null
         },
         {
@@ -10440,21 +10131,7 @@ export const EARNINGS = {
           "yearAgoEps": -0.48,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 101522777292,
-          "rank": 11,
-          "rx": null
-        },
-        {
-          "t": "DUK",
-          "name": "Duke Energy Corporation",
-          "time": "bmo",
-          "epsEst": 1.28,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.25,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 98158959682,
+          "mcap": 97597551002,
           "rank": 12,
           "rx": null
         },
@@ -10468,7 +10145,7 @@ export const EARNINGS = {
           "yearAgoEps": 3.96,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 93349658408,
+          "mcap": 92199428066,
           "rank": 13,
           "rx": null
         },
@@ -10482,7 +10159,7 @@ export const EARNINGS = {
           "yearAgoEps": 6.43,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 91134879300,
+          "mcap": 91176276020,
           "rank": 14,
           "rx": null
         },
@@ -10496,7 +10173,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.52,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 77999526000,
+          "mcap": 78206763000,
           "rank": 15,
           "rx": null
         },
@@ -10510,21 +10187,21 @@ export const EARNINGS = {
           "yearAgoEps": 2.32,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 76400236343,
+          "mcap": 76698508320,
           "rank": 16,
           "rx": null
         },
         {
           "t": "SU",
           "name": "Suncor Energy  Inc.",
-          "time": null,
+          "time": "amc",
           "epsEst": 2.14,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.51,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 75383491624,
+          "mcap": 76355591735,
           "rank": 17,
           "rx": null
         },
@@ -10538,7 +10215,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.32,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 69683475359,
+          "mcap": 70096414472,
           "rank": 18,
           "rx": null
         },
@@ -10546,13 +10223,13 @@ export const EARNINGS = {
           "t": "APO",
           "name": "Apollo Global Management, Inc.",
           "time": "bmo",
-          "epsEst": 2.03,
+          "epsEst": 2.01,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.72,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 68259673539,
+          "mcap": 68628644748,
           "rank": 19,
           "rx": null
         },
@@ -10566,7 +10243,7 @@ export const EARNINGS = {
           "yearAgoEps": 9.03,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 67427374971,
+          "mcap": 66823851610,
           "rank": 20,
           "rx": null
         },
@@ -10580,7 +10257,7 @@ export const EARNINGS = {
           "yearAgoEps": 9.97,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 64285854962,
+          "mcap": 63927035257,
           "rank": 21,
           "rx": null
         },
@@ -10594,7 +10271,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.03,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 57322307786,
+          "mcap": 57444075833,
           "rank": 22,
           "rx": null
         },
@@ -10608,7 +10285,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.29,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 54814544813,
+          "mcap": 56718029975,
           "rank": 23,
           "rx": null
         },
@@ -10622,7 +10299,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.78,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 54495305756,
+          "mcap": 54341739744,
           "rank": 24,
           "rx": null
         },
@@ -10636,22 +10313,8 @@ export const EARNINGS = {
           "yearAgoEps": -0.23,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 52417090215,
+          "mcap": 52394522582,
           "rank": 25,
-          "rx": null
-        },
-        {
-          "t": "ROK",
-          "name": "Rockwell Automation, Inc.",
-          "time": "bmo",
-          "epsEst": 3.37,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 2.82,
-          "noEsts": 10,
-          "revEst": null,
-          "mcap": 51722358833,
-          "rank": 26,
           "rx": null
         },
         {
@@ -10664,7 +10327,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.84,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 50865077019,
+          "mcap": 51764731442,
+          "rank": 26,
+          "rx": null
+        },
+        {
+          "t": "ROK",
+          "name": "Rockwell Automation, Inc.",
+          "time": "bmo",
+          "epsEst": 3.37,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 2.82,
+          "noEsts": 10,
+          "revEst": null,
+          "mcap": 50985725265,
           "rank": 27,
           "rx": null
         },
@@ -10678,7 +10355,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 48109860851,
+          "mcap": 48224235369,
           "rank": 28,
           "rx": null
         },
@@ -10692,7 +10369,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 47158001306,
+          "mcap": 46689475655,
           "rank": 29,
           "rx": null
         },
@@ -10706,7 +10383,7 @@ export const EARNINGS = {
           "yearAgoEps": 3.63,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 43579700523,
+          "mcap": 42991233365,
           "rank": 30,
           "rx": null
         },
@@ -10720,7 +10397,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.93,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 41544652627,
+          "mcap": 42084443938,
           "rank": 31,
           "rx": null
         },
@@ -10728,28 +10405,14 @@ export const EARNINGS = {
           "t": "PRU",
           "name": "Prudential Financial, Inc.",
           "time": "amc",
-          "epsEst": 3.4,
+          "epsEst": 3.39,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 3.58,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 41150730000,
+          "mcap": 41240950000,
           "rank": 32,
-          "rx": null
-        },
-        {
-          "t": "SYY",
-          "name": "Sysco Corporation",
-          "time": "bmo",
-          "epsEst": 1.51,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.48,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 38837991422,
-          "rank": 33,
           "rx": null
         },
         {
@@ -10762,7 +10425,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.77,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 38585026157,
+          "mcap": 39656417171,
+          "rank": 33,
+          "rx": null
+        },
+        {
+          "t": "SYY",
+          "name": "Sysco Corporation",
+          "time": "bmo",
+          "epsEst": 1.51,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.48,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 39268355769,
           "rank": 34,
           "rx": null
         },
@@ -10776,7 +10453,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.95,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 36088211005,
+          "mcap": 36409278751,
           "rank": 35,
           "rx": null
         },
@@ -10790,7 +10467,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.92,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 35866155574,
+          "mcap": 36141666070,
           "rank": 36,
           "rx": null
         },
@@ -10804,8 +10481,22 @@ export const EARNINGS = {
           "yearAgoEps": 0.43,
           "noEsts": null,
           "revEst": null,
-          "mcap": 33372535015,
+          "mcap": 33217386084,
           "rank": 37,
+          "rx": null
+        },
+        {
+          "t": "NRG",
+          "name": "NRG Energy, Inc.",
+          "time": "bmo",
+          "epsEst": 1.77,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.68,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 29533886071,
+          "rank": 38,
           "rx": null
         },
         {
@@ -10818,8 +10509,8 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 29052095147,
-          "rank": 38,
+          "mcap": 29043721579,
+          "rank": 39,
           "rx": null
         },
         {
@@ -10832,8 +10523,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.24,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 28462118167,
-          "rank": 39,
+          "mcap": 28491131540,
+          "rank": 40,
           "rx": null
         },
         {
@@ -10846,35 +10537,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.41,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 28308906699,
-          "rank": 40,
+          "mcap": 28153208276,
+          "rank": 41,
           "rx": null
         },
         {
           "t": "CPNG",
           "name": "Coupang, Inc.",
-          "time": null,
+          "time": "amc",
           "epsEst": -0.26,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.02,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 28290211808,
-          "rank": 41,
-          "rx": null
-        },
-        {
-          "t": "NRG",
-          "name": "NRG Energy, Inc.",
-          "time": "bmo",
-          "epsEst": 1.83,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.68,
-          "noEsts": 2,
-          "revEst": null,
-          "mcap": 27765819452,
+          "mcap": 28056853462,
           "rank": 42,
           "rx": null
         },
@@ -10888,7 +10565,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.34,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 23356680531,
+          "mcap": 23208886551,
           "rank": 43,
           "rx": null
         },
@@ -10902,22 +10579,8 @@ export const EARNINGS = {
           "yearAgoEps": -1.82,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 23204868642,
+          "mcap": 23079205972,
           "rank": 44,
-          "rx": null
-        },
-        {
-          "t": "FIS",
-          "name": "Fidelity National Information Services, Inc.",
-          "time": "bmo",
-          "epsEst": 1.47,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.36,
-          "noEsts": 8,
-          "revEst": null,
-          "mcap": 21491835099,
-          "rank": 45,
           "rx": null
         },
         {
@@ -10930,7 +10593,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.66,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 21375925000,
+          "mcap": 20965700000,
+          "rank": 45,
+          "rx": null
+        },
+        {
+          "t": "FIS",
+          "name": "Fidelity National Information Services, Inc.",
+          "time": "bmo",
+          "epsEst": 1.47,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.36,
+          "noEsts": 8,
+          "revEst": null,
+          "mcap": 20954280782,
           "rank": 46,
           "rx": null
         },
@@ -10944,7 +10621,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.96,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 20604385833,
+          "mcap": 20520091196,
           "rank": 47,
           "rx": null
         },
@@ -10958,7 +10635,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.15,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 19469442851,
+          "mcap": 19709428116,
           "rank": 48,
           "rx": null
         },
@@ -10972,22 +10649,8 @@ export const EARNINGS = {
           "yearAgoEps": 3.36,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 18961833028,
+          "mcap": 19077962130,
           "rank": 49,
-          "rx": null
-        },
-        {
-          "t": "TOST",
-          "name": "Toast, Inc.",
-          "time": null,
-          "epsEst": 0.23,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.13,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 17614600000,
-          "rank": 50,
           "rx": null
         },
         {
@@ -11000,8 +10663,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.44,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 17601573571,
-          "rank": 51,
+          "mcap": 17628549163,
+          "rank": 50,
           "rx": null
         },
         {
@@ -11014,36 +10677,22 @@ export const EARNINGS = {
           "yearAgoEps": 0.47,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 17231630701,
+          "mcap": 17350552939,
+          "rank": 51,
+          "rx": null
+        },
+        {
+          "t": "TOST",
+          "name": "Toast, Inc.",
+          "time": "amc",
+          "epsEst": 0.23,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.13,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 16941800000,
           "rank": 52,
-          "rx": null
-        },
-        {
-          "t": "NWS",
-          "name": "News Corporation",
-          "time": null,
-          "epsEst": 0.15,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.19,
-          "noEsts": 1,
-          "revEst": null,
-          "mcap": 17085813380,
-          "rank": 53,
-          "rx": null
-        },
-        {
-          "t": "NWSA",
-          "name": "News Corporation",
-          "time": null,
-          "epsEst": 0.2,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.19,
-          "noEsts": 2,
-          "revEst": null,
-          "mcap": 17085813380,
-          "rank": 54,
           "rx": null
         },
         {
@@ -11056,8 +10705,8 @@ export const EARNINGS = {
           "yearAgoEps": 3.55,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 16771609648,
-          "rank": 55,
+          "mcap": 16668673764,
+          "rank": 53,
           "rx": null
         },
         {
@@ -11070,22 +10719,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.9,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 16653719263,
-          "rank": 56,
-          "rx": null
-        },
-        {
-          "t": "TPG",
-          "name": "TPG Inc.",
-          "time": "bmo",
-          "epsEst": 0.61,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.69,
-          "noEsts": 6,
-          "revEst": null,
-          "mcap": 16463940817,
-          "rank": 57,
+          "mcap": 16600469961,
+          "rank": 54,
           "rx": null
         },
         {
@@ -11098,7 +10733,49 @@ export const EARNINGS = {
           "yearAgoEps": -0.95,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 16136100030,
+          "mcap": 16177198647,
+          "rank": 55,
+          "rx": null
+        },
+        {
+          "t": "TPG",
+          "name": "TPG Inc.",
+          "time": "bmo",
+          "epsEst": 0.6,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.69,
+          "noEsts": 6,
+          "revEst": null,
+          "mcap": 16060412856,
+          "rank": 56,
+          "rx": null
+        },
+        {
+          "t": "SUN",
+          "name": "Sunoco LP",
+          "time": "bmo",
+          "epsEst": 2.19,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.33,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 15556286495,
+          "rank": 57,
+          "rx": null
+        },
+        {
+          "t": "J",
+          "name": "Jacobs Solutions Inc.",
+          "time": "amc",
+          "epsEst": 1.84,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.62,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 15409554710,
           "rank": 58,
           "rx": null
         },
@@ -11112,26 +10789,26 @@ export const EARNINGS = {
           "yearAgoEps": 0.46,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 15580885265,
+          "mcap": 15298223187,
           "rank": 59,
           "rx": null
         },
         {
-          "t": "SUN",
-          "name": "Sunoco LP",
-          "time": "bmo",
-          "epsEst": 2.19,
+          "t": "DVA",
+          "name": "DaVita Inc.",
+          "time": "amc",
+          "epsEst": 4.01,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 0.33,
+          "yearAgoEps": 2.95,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 15359656673,
+          "mcap": 14899536000,
           "rank": 60,
           "rx": null
         }
       ],
-      "totalCount": 388
+      "totalCount": 384
     },
     "2026-08-05": {
       "rows": [
@@ -11145,7 +10822,7 @@ export const EARNINGS = {
           "yearAgoEps": 6.31,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 1106932266026,
+          "mcap": 1095254672592,
           "rank": 1,
           "rx": null
         },
@@ -11159,7 +10836,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.02,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 235373861365,
+          "mcap": 236835507277,
           "rank": 2,
           "rx": null
         },
@@ -11173,7 +10850,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.97,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 218651209078,
+          "mcap": 213381971759,
           "rank": 3,
           "rx": null
         },
@@ -11187,7 +10864,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.51,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 189020233819,
+          "mcap": 191874201864,
           "rank": 4,
           "rx": null
         },
@@ -11201,7 +10878,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.61,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 166948208303,
+          "mcap": 166479350219,
           "rank": 5,
           "rx": null
         },
@@ -11213,9 +10890,9 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.25,
-          "noEsts": 12,
+          "noEsts": 13,
           "revEst": null,
-          "mcap": 159989620854,
+          "mcap": 153299435742,
           "rank": 6,
           "rx": null
         },
@@ -11229,7 +10906,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.63,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 145647109380,
+          "mcap": 143163678584,
           "rank": 7,
           "rx": null
         },
@@ -11243,7 +10920,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.26,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 144014118600,
+          "mcap": 138568531200,
           "rank": 8,
           "rx": null
         },
@@ -11257,7 +10934,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.81,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 141117560154,
+          "mcap": 137902223341,
           "rank": 9,
           "rx": null
         },
@@ -11271,7 +10948,7 @@ export const EARNINGS = {
           "yearAgoEps": 8.26,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 99629925631,
+          "mcap": 97850905676,
           "rank": 10,
           "rx": null
         },
@@ -11285,7 +10962,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.38,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 85106476695,
+          "mcap": 84761672578,
           "rank": 11,
           "rx": null
         },
@@ -11299,7 +10976,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.65,
           "noEsts": 12,
           "revEst": null,
-          "mcap": 81932548485,
+          "mcap": 77440288461,
           "rank": 12,
           "rx": null
         },
@@ -11313,7 +10990,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.38,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 76474510722,
+          "mcap": 75905590289,
           "rank": 13,
           "rx": null
         },
@@ -11327,22 +11004,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.69,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 71645184137,
+          "mcap": 71778840017,
           "rank": 14,
-          "rx": null
-        },
-        {
-          "t": "ALL",
-          "name": "Allstate Corporation (The)",
-          "time": "amc",
-          "epsEst": 5.61,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 5.94,
-          "noEsts": 9,
-          "revEst": null,
-          "mcap": 64803144918,
-          "rank": 15,
           "rx": null
         },
         {
@@ -11355,7 +11018,21 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 63432321565,
+          "mcap": 65853741255,
+          "rank": 15,
+          "rx": null
+        },
+        {
+          "t": "ALL",
+          "name": "Allstate Corporation (The)",
+          "time": "amc",
+          "epsEst": 5.61,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 5.94,
+          "noEsts": 9,
+          "revEst": null,
+          "mcap": 64826312802,
           "rank": 16,
           "rx": null
         },
@@ -11369,7 +11046,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.05,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 60602689525,
+          "mcap": 60639989226,
           "rank": 17,
           "rx": null
         },
@@ -11383,7 +11060,7 @@ export const EARNINGS = {
           "yearAgoEps": 2.02,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 60077692055,
+          "mcap": 60013348377,
           "rank": 18,
           "rx": null
         },
@@ -11397,7 +11074,7 @@ export const EARNINGS = {
           "yearAgoEps": 4,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 58965620454,
+          "mcap": 58481163415,
           "rank": 19,
           "rx": null
         },
@@ -11411,8 +11088,22 @@ export const EARNINGS = {
           "yearAgoEps": 0.39,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 56196860607,
+          "mcap": 57191495308,
           "rank": 20,
+          "rx": null
+        },
+        {
+          "t": "EBAY",
+          "name": "eBay Inc.",
+          "time": "amc",
+          "epsEst": 1.2,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.07,
+          "noEsts": 6,
+          "revEst": null,
+          "mcap": 49373990532,
+          "rank": 21,
           "rx": null
         },
         {
@@ -11425,21 +11116,7 @@ export const EARNINGS = {
           "yearAgoEps": null,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 51352070331,
-          "rank": 21,
-          "rx": null
-        },
-        {
-          "t": "EBAY",
-          "name": "eBay Inc.",
-          "time": "amc",
-          "epsEst": 1.2,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 1.07,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 50306288956,
+          "mcap": 48842925938,
           "rank": 22,
           "rx": null
         },
@@ -11453,36 +11130,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.62,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 47855174732,
+          "mcap": 46116718521,
           "rank": 23,
-          "rx": null
-        },
-        {
-          "t": "TRI",
-          "name": "Thomson Reuters Corp",
-          "time": "bmo",
-          "epsEst": 0.96,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.88,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 39653348822,
-          "rank": 24,
-          "rx": null
-        },
-        {
-          "t": "RVMD",
-          "name": "Revolution Medicines, Inc.",
-          "time": null,
-          "epsEst": -1.92,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": -1.31,
-          "noEsts": 9,
-          "revEst": null,
-          "mcap": 38966805520,
-          "rank": 25,
           "rx": null
         },
         {
@@ -11495,8 +11144,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.1,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 38711864022,
-          "rank": 26,
+          "mcap": 39452254864,
+          "rank": 24,
           "rx": null
         },
         {
@@ -11509,7 +11158,35 @@ export const EARNINGS = {
           "yearAgoEps": 0.1,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 38711864022,
+          "mcap": 39452254864,
+          "rank": 25,
+          "rx": null
+        },
+        {
+          "t": "RVMD",
+          "name": "Revolution Medicines, Inc.",
+          "time": null,
+          "epsEst": -1.92,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -1.31,
+          "noEsts": 9,
+          "revEst": null,
+          "mcap": 38911530440,
+          "rank": 26,
+          "rx": null
+        },
+        {
+          "t": "TRI",
+          "name": "Thomson Reuters Corp",
+          "time": "bmo",
+          "epsEst": 0.96,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.88,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 38032554337,
           "rank": 27,
           "rx": null
         },
@@ -11523,7 +11200,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.48,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 37357198946,
+          "mcap": 37044798031,
           "rank": 28,
           "rx": null
         },
@@ -11537,7 +11214,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.97,
           "noEsts": null,
           "revEst": null,
-          "mcap": 37057365808,
+          "mcap": 37018440003,
           "rank": 29,
           "rx": null
         },
@@ -11551,7 +11228,7 @@ export const EARNINGS = {
           "yearAgoEps": 0.84,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 35429494476,
+          "mcap": 35567906138,
           "rank": 30,
           "rx": null
         },
@@ -11565,22 +11242,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.14,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 33640117358,
+          "mcap": 33812867019,
           "rank": 31,
-          "rx": null
-        },
-        {
-          "t": "GFS",
-          "name": "GlobalFoundries Inc.",
-          "time": "bmo",
-          "epsEst": 0.32,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.35,
-          "noEsts": 6,
-          "revEst": null,
-          "mcap": 33045620834,
-          "rank": 32,
           "rx": null
         },
         {
@@ -11593,7 +11256,21 @@ export const EARNINGS = {
           "yearAgoEps": 2.57,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 32270554591,
+          "mcap": 32937045240,
+          "rank": 32,
+          "rx": null
+        },
+        {
+          "t": "GFS",
+          "name": "GlobalFoundries Inc.",
+          "time": "bmo",
+          "epsEst": 0.32,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.35,
+          "noEsts": 6,
+          "revEst": null,
+          "mcap": 32544845303,
           "rank": 33,
           "rx": null
         },
@@ -11601,28 +11278,14 @@ export const EARNINGS = {
           "t": "EXPE",
           "name": "Expedia Group, Inc.",
           "time": "amc",
-          "epsEst": 4.55,
+          "epsEst": 4.73,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 3.59,
-          "noEsts": 6,
-          "revEst": null,
-          "mcap": 31798649080,
-          "rank": 34,
-          "rx": null
-        },
-        {
-          "t": "KHC",
-          "name": "The Kraft Heinz Company",
-          "time": "bmo",
-          "epsEst": 0.53,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.69,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 30581205284,
-          "rank": 35,
+          "mcap": 31335363863,
+          "rank": 34,
           "rx": null
         },
         {
@@ -11635,22 +11298,22 @@ export const EARNINGS = {
           "yearAgoEps": 0.99,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 30541135556,
-          "rank": 36,
+          "mcap": 31254012184,
+          "rank": 35,
           "rx": null
         },
         {
-          "t": "ATO",
-          "name": "Atmos Energy Corporation",
-          "time": "amc",
-          "epsEst": 1.36,
+          "t": "KHC",
+          "name": "The Kraft Heinz Company",
+          "time": "bmo",
+          "epsEst": 0.53,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 1.16,
-          "noEsts": 3,
+          "yearAgoEps": 0.69,
+          "noEsts": 7,
           "revEst": null,
-          "mcap": 29219314841,
-          "rank": 37,
+          "mcap": 30782787482,
+          "rank": 36,
           "rx": null
         },
         {
@@ -11663,7 +11326,21 @@ export const EARNINGS = {
           "yearAgoEps": 1.68,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 28894078052,
+          "mcap": 29872825200,
+          "rank": 37,
+          "rx": null
+        },
+        {
+          "t": "ATO",
+          "name": "Atmos Energy Corporation",
+          "time": "amc",
+          "epsEst": 1.36,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.16,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 29790180632,
           "rank": 38,
           "rx": null
         },
@@ -11677,7 +11354,7 @@ export const EARNINGS = {
           "yearAgoEps": 3.23,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 26674845113,
+          "mcap": 27058663807,
           "rank": 39,
           "rx": null
         },
@@ -11691,21 +11368,21 @@ export const EARNINGS = {
           "yearAgoEps": -0.05,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 25832014091,
+          "mcap": 25590931365,
           "rank": 40,
           "rx": null
         },
         {
           "t": "CPAY",
           "name": "Corpay, Inc.",
-          "time": null,
+          "time": "amc",
           "epsEst": 6.17,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 4.81,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 23932266642,
+          "mcap": 23464928921,
           "rank": 41,
           "rx": null
         },
@@ -11719,21 +11396,21 @@ export const EARNINGS = {
           "yearAgoEps": 1.77,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 23332443922,
+          "mcap": 23291917444,
           "rank": 42,
           "rx": null
         },
         {
-          "t": "GPN",
-          "name": "Global Payments Inc.",
-          "time": null,
-          "epsEst": 3.46,
+          "t": "UTHR",
+          "name": "United Therapeutics Corporation",
+          "time": "bmo",
+          "epsEst": 6.83,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 3.1,
-          "noEsts": 10,
+          "yearAgoEps": 6.41,
+          "noEsts": 5,
           "revEst": null,
-          "mcap": 21902628605,
+          "mcap": 22372399562,
           "rank": 43,
           "rx": null
         },
@@ -11747,8 +11424,22 @@ export const EARNINGS = {
           "yearAgoEps": 0.22,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 21650361151,
+          "mcap": 22222995786,
           "rank": 44,
+          "rx": null
+        },
+        {
+          "t": "GPN",
+          "name": "Global Payments Inc.",
+          "time": null,
+          "epsEst": 3.46,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 3.1,
+          "noEsts": 10,
+          "revEst": null,
+          "mcap": 21601730748,
+          "rank": 45,
           "rx": null
         },
         {
@@ -11761,8 +11452,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.89,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 20919542424,
-          "rank": 45,
+          "mcap": 20819062955,
+          "rank": 46,
           "rx": null
         },
         {
@@ -11775,8 +11466,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.34,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 20667326199,
-          "rank": 46,
+          "mcap": 20552155266,
+          "rank": 47,
           "rx": null
         },
         {
@@ -11789,8 +11480,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.37,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 18890255531,
-          "rank": 47,
+          "mcap": 19564688044,
+          "rank": 48,
           "rx": null
         },
         {
@@ -11803,35 +11494,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.87,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 18346272584,
-          "rank": 48,
-          "rx": null
-        },
-        {
-          "t": "SITM",
-          "name": "SiTime Corporation",
-          "time": "amc",
-          "epsEst": 0.8,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": -0.62,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 17679148203,
+          "mcap": 18531349813,
           "rank": 49,
           "rx": null
         },
         {
-          "t": "CRCL",
-          "name": "Circle Internet Group, Inc.",
-          "time": "bmo",
-          "epsEst": 0.25,
+          "t": "TLN",
+          "name": "Talen Energy Corporation",
+          "time": "amc",
+          "epsEst": 2.91,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": -2.93,
-          "noEsts": 8,
+          "yearAgoEps": -1.19,
+          "noEsts": 4,
           "revEst": null,
-          "mcap": 17668784212,
+          "mcap": 18075922121,
           "rank": 50,
           "rx": null
         },
@@ -11845,21 +11522,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.27,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 17566304842,
+          "mcap": 17917965854,
           "rank": 51,
           "rx": null
         },
         {
-          "t": "TLN",
-          "name": "Talen Energy Corporation",
+          "t": "SITM",
+          "name": "SiTime Corporation",
           "time": "amc",
-          "epsEst": 2.91,
+          "epsEst": 0.8,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": -1.19,
-          "noEsts": 4,
+          "yearAgoEps": -0.62,
+          "noEsts": 3,
           "revEst": null,
-          "mcap": 17536149348,
+          "mcap": 17693826408,
           "rank": 52,
           "rx": null
         },
@@ -11873,36 +11550,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.07,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 17202683899,
+          "mcap": 17156252904,
           "rank": 53,
-          "rx": null
-        },
-        {
-          "t": "HST",
-          "name": "Host Hotels & Resorts, Inc.",
-          "time": "amc",
-          "epsEst": 0.62,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.58,
-          "noEsts": 8,
-          "revEst": null,
-          "mcap": 16738449628,
-          "rank": 54,
-          "rx": null
-        },
-        {
-          "t": "CDW",
-          "name": "CDW Corporation",
-          "time": null,
-          "epsEst": 2.66,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 2.47,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 16572177664,
-          "rank": 55,
           "rx": null
         },
         {
@@ -11915,22 +11564,78 @@ export const EARNINGS = {
           "yearAgoEps": 1.81,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 16464969454,
+          "mcap": 17080252319,
+          "rank": 54,
+          "rx": null
+        },
+        {
+          "t": "NWS",
+          "name": "News Corporation",
+          "time": "amc",
+          "epsEst": 0.15,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.19,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 16943477222,
+          "rank": 55,
+          "rx": null
+        },
+        {
+          "t": "NWSA",
+          "name": "News Corporation",
+          "time": "amc",
+          "epsEst": 0.2,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.19,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 16943477222,
           "rank": 56,
           "rx": null
         },
         {
-          "t": "CG",
-          "name": "The Carlyle Group Inc.",
-          "time": "bmo",
-          "epsEst": 0.91,
+          "t": "HST",
+          "name": "Host Hotels & Resorts, Inc.",
+          "time": "amc",
+          "epsEst": 0.62,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 0.91,
-          "noEsts": 6,
+          "yearAgoEps": 0.58,
+          "noEsts": 8,
           "revEst": null,
-          "mcap": 16058459188,
+          "mcap": 16779542385,
           "rank": 57,
+          "rx": null
+        },
+        {
+          "t": "CDW",
+          "name": "CDW Corporation",
+          "time": "bmo",
+          "epsEst": 2.66,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 2.47,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 16586230543,
+          "rank": 58,
+          "rx": null
+        },
+        {
+          "t": "CRCL",
+          "name": "Circle Internet Group, Inc.",
+          "time": "bmo",
+          "epsEst": 0.18,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -2.93,
+          "noEsts": 7,
+          "revEst": null,
+          "mcap": 16445790145,
+          "rank": 59,
           "rx": null
         },
         {
@@ -11943,40 +11648,12 @@ export const EARNINGS = {
           "yearAgoEps": 0.2,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 15828014720,
-          "rank": 58,
-          "rx": null
-        },
-        {
-          "t": "RRX",
-          "name": "Regal Rexnord Corporation",
-          "time": "bmo",
-          "epsEst": 2.6,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 2.48,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 14199955617,
-          "rank": 59,
-          "rx": null
-        },
-        {
-          "t": "ALB",
-          "name": "Albemarle Corporation",
-          "time": "amc",
-          "epsEst": 3.32,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.11,
-          "noEsts": 6,
-          "revEst": null,
-          "mcap": 13989408302,
+          "mcap": 16386650533,
           "rank": 60,
           "rx": null
         }
       ],
-      "totalCount": 468
+      "totalCount": 485
     },
     "2026-08-06": {
       "rows": [
@@ -11990,22 +11667,8 @@ export const EARNINGS = {
           "yearAgoEps": 4.47,
           "noEsts": null,
           "revEst": null,
-          "mcap": 284846803854,
+          "mcap": 284215004355,
           "rank": 1,
-          "rx": null
-        },
-        {
-          "t": "GILD",
-          "name": "Gilead Sciences, Inc.",
-          "time": null,
-          "epsEst": -7.09,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 2.01,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 161751723185,
-          "rank": 2,
           "rx": null
         },
         {
@@ -12018,8 +11681,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.42,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 143149545823,
-          "rank": 3,
+          "mcap": 144721145092,
+          "rank": 2,
           "rx": null
         },
         {
@@ -12032,8 +11695,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.3,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 124179134149,
-          "rank": 4,
+          "mcap": 123588367574,
+          "rank": 3,
           "rx": null
         },
         {
@@ -12046,8 +11709,8 @@ export const EARNINGS = {
           "yearAgoEps": 7.69,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 120989977157,
-          "rank": 5,
+          "mcap": 122400883850,
+          "rank": 4,
           "rx": null
         },
         {
@@ -12060,8 +11723,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.64,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 119478552704,
-          "rank": 6,
+          "mcap": 121734080937,
+          "rank": 5,
           "rx": null
         },
         {
@@ -12074,8 +11737,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.64,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 119478552704,
-          "rank": 7,
+          "mcap": 121734080937,
+          "rank": 6,
           "rx": null
         },
         {
@@ -12088,22 +11751,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.91,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 111629987757,
-          "rank": 8,
-          "rx": null
-        },
-        {
-          "t": "NET",
-          "name": "Cloudflare, Inc.",
-          "time": "amc",
-          "epsEst": -0.03,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": -0.13,
-          "noEsts": 9,
-          "revEst": null,
-          "mcap": 96252401618,
-          "rank": 9,
+          "mcap": 112310170478,
+          "rank": 7,
           "rx": null
         },
         {
@@ -12116,22 +11765,36 @@ export const EARNINGS = {
           "yearAgoEps": 1.91,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 94711258320,
-          "rank": 10,
+          "mcap": 99291148319,
+          "rank": 8,
           "rx": null
         },
         {
           "t": "CNQ",
           "name": "Canadian Natural Resources Limited",
           "time": "bmo",
-          "epsEst": 1.48,
+          "epsEst": 1.43,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.51,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 93849315514,
-          "rank": 11,
+          "mcap": 95307261471,
+          "rank": 9,
+          "rx": null
+        },
+        {
+          "t": "NET",
+          "name": "Cloudflare, Inc.",
+          "time": "amc",
+          "epsEst": -0.03,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -0.13,
+          "noEsts": 9,
+          "revEst": null,
+          "mcap": 95075358918,
+          "rank": 10,
           "rx": null
         },
         {
@@ -12144,8 +11807,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.52,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 92382646071,
-          "rank": 12,
+          "mcap": 93566035884,
+          "rank": 11,
           "rx": null
         },
         {
@@ -12158,8 +11821,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.06,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 90695096555,
-          "rank": 13,
+          "mcap": 87484335651,
+          "rank": 12,
           "rx": null
         },
         {
@@ -12172,8 +11835,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.03,
           "noEsts": 10,
           "revEst": null,
-          "mcap": 86849779404,
-          "rank": 14,
+          "mcap": 84408824466,
+          "rank": 13,
           "rx": null
         },
         {
@@ -12186,8 +11849,8 @@ export const EARNINGS = {
           "yearAgoEps": 3.13,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 67440685055,
-          "rank": 15,
+          "mcap": 67116993670,
+          "rank": 14,
           "rx": null
         },
         {
@@ -12200,8 +11863,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.77,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 66033942993,
-          "rank": 16,
+          "mcap": 66615428117,
+          "rank": 15,
           "rx": null
         },
         {
@@ -12214,8 +11877,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.63,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 64759341013,
-          "rank": 17,
+          "mcap": 64809483747,
+          "rank": 16,
           "rx": null
         },
         {
@@ -12228,8 +11891,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.78,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 62905444285,
-          "rank": 18,
+          "mcap": 62900354436,
+          "rank": 17,
           "rx": null
         },
         {
@@ -12242,8 +11905,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.87,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 60147514499,
-          "rank": 19,
+          "mcap": 61055458208,
+          "rank": 18,
           "rx": null
         },
         {
@@ -12256,7 +11919,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.89,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 59219353457,
+          "mcap": 60827473663,
+          "rank": 19,
+          "rx": null
+        },
+        {
+          "t": "LNG",
+          "name": "Cheniere Energy, Inc.",
+          "time": "bmo",
+          "epsEst": 2.67,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 7.3,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 56034169503,
           "rank": 20,
           "rx": null
         },
@@ -12270,22 +11947,8 @@ export const EARNINGS = {
           "yearAgoEps": -0.38,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 55075596242,
+          "mcap": 55390430003,
           "rank": 21,
-          "rx": null
-        },
-        {
-          "t": "LNG",
-          "name": "Cheniere Energy, Inc.",
-          "time": "bmo",
-          "epsEst": 2.63,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 7.3,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 55026225018,
-          "rank": 22,
           "rx": null
         },
         {
@@ -12298,7 +11961,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.63,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 50044351725,
+          "mcap": 50470105058,
+          "rank": 22,
+          "rx": null
+        },
+        {
+          "t": "MCHP",
+          "name": "Microchip Technology Incorporated",
+          "time": null,
+          "epsEst": 0.59,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.17,
+          "noEsts": 7,
+          "revEst": null,
+          "mcap": 46166571617,
           "rank": 23,
           "rx": null
         },
@@ -12312,22 +11989,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.65,
           "noEsts": null,
           "revEst": null,
-          "mcap": 45425148676,
+          "mcap": 45571282537,
           "rank": 24,
-          "rx": null
-        },
-        {
-          "t": "MCHP",
-          "name": "Microchip Technology Incorporated",
-          "time": null,
-          "epsEst": 0.59,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.17,
-          "noEsts": 7,
-          "revEst": null,
-          "mcap": 45276037891,
-          "rank": 25,
           "rx": null
         },
         {
@@ -12340,7 +12003,21 @@ export const EARNINGS = {
           "yearAgoEps": 1.29,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 45231376005,
+          "mcap": 45319111530,
+          "rank": 25,
+          "rx": null
+        },
+        {
+          "t": "BDX",
+          "name": "Becton, Dickinson and Company",
+          "time": "bmo",
+          "epsEst": 3.14,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 3.68,
+          "noEsts": 6,
+          "revEst": null,
+          "mcap": 42201771799,
           "rank": 26,
           "rx": null
         },
@@ -12354,21 +12031,21 @@ export const EARNINGS = {
           "yearAgoEps": 1.81,
           "noEsts": 6,
           "revEst": null,
-          "mcap": 42543747173,
+          "mcap": 41488636793,
           "rank": 27,
           "rx": null
         },
         {
-          "t": "BDX",
-          "name": "Becton, Dickinson and Company",
-          "time": "bmo",
-          "epsEst": 3.14,
+          "t": "ED",
+          "name": "Consolidated Edison Inc",
+          "time": "amc",
+          "epsEst": 0.76,
           "epsActual": null,
           "surprisePct": null,
-          "yearAgoEps": 3.68,
-          "noEsts": 6,
+          "yearAgoEps": 0.67,
+          "noEsts": 4,
           "revEst": null,
-          "mcap": 42389139290,
+          "mcap": 41308494633,
           "rank": 28,
           "rx": null
         },
@@ -12382,22 +12059,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.49,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 41102501619,
+          "mcap": 41088896024,
           "rank": 29,
-          "rx": null
-        },
-        {
-          "t": "ED",
-          "name": "Consolidated Edison Inc",
-          "time": "amc",
-          "epsEst": 0.76,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.67,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 40468246906,
-          "rank": 30,
           "rx": null
         },
         {
@@ -12410,8 +12073,8 @@ export const EARNINGS = {
           "yearAgoEps": -0.13,
           "noEsts": 1,
           "revEst": null,
-          "mcap": 40011319872,
-          "rank": 31,
+          "mcap": 40376006381,
+          "rank": 30,
           "rx": null
         },
         {
@@ -12424,8 +12087,8 @@ export const EARNINGS = {
           "yearAgoEps": -0.74,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 38264285763,
-          "rank": 32,
+          "mcap": 37840368232,
+          "rank": 31,
           "rx": null
         },
         {
@@ -12438,8 +12101,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.29,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 36499364779,
-          "rank": 33,
+          "mcap": 36729765819,
+          "rank": 32,
           "rx": null
         },
         {
@@ -12452,7 +12115,21 @@ export const EARNINGS = {
           "yearAgoEps": 0.94,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 33686789515,
+          "mcap": 33399297272,
+          "rank": 33,
+          "rx": null
+        },
+        {
+          "t": "CQP",
+          "name": "Cheniere Energy Partners, LP",
+          "time": null,
+          "epsEst": 0.94,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.91,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 31250534181,
           "rank": 34,
           "rx": null
         },
@@ -12466,50 +12143,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.76,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 31588838691,
+          "mcap": 31102534074,
           "rank": 35,
-          "rx": null
-        },
-        {
-          "t": "CQP",
-          "name": "Cheniere Energy Partners, LP",
-          "time": null,
-          "epsEst": 0.94,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.91,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 30863290882,
-          "rank": 36,
-          "rx": null
-        },
-        {
-          "t": "TWLO",
-          "name": "Twilio Inc.",
-          "time": "amc",
-          "epsEst": 0.59,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.42,
-          "noEsts": 9,
-          "revEst": null,
-          "mcap": 29781066809,
-          "rank": 37,
-          "rx": null
-        },
-        {
-          "t": "RMD",
-          "name": "ResMed Inc.",
-          "time": "amc",
-          "epsEst": 2.9,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 2.55,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 28402039987,
-          "rank": 38,
           "rx": null
         },
         {
@@ -12522,7 +12157,49 @@ export const EARNINGS = {
           "yearAgoEps": 0.04,
           "noEsts": null,
           "revEst": null,
-          "mcap": 28255971686,
+          "mcap": 29020411802,
+          "rank": 36,
+          "rx": null
+        },
+        {
+          "t": "RMD",
+          "name": "ResMed Inc.",
+          "time": "amc",
+          "epsEst": 2.9,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 2.55,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 27982827037,
+          "rank": 37,
+          "rx": null
+        },
+        {
+          "t": "TWLO",
+          "name": "Twilio Inc.",
+          "time": "amc",
+          "epsEst": 0.59,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.42,
+          "noEsts": 9,
+          "revEst": null,
+          "mcap": 27832290447,
+          "rank": 38,
+          "rx": null
+        },
+        {
+          "t": "AMRZ",
+          "name": "Amrize Ltd",
+          "time": "amc",
+          "epsEst": 0.92,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.78,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 27433274342,
           "rank": 39,
           "rx": null
         },
@@ -12536,22 +12213,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.47,
           "noEsts": 9,
           "revEst": null,
-          "mcap": 26987984231,
+          "mcap": 26780015177,
           "rank": 40,
-          "rx": null
-        },
-        {
-          "t": "AMRZ",
-          "name": "Amrize Ltd",
-          "time": "amc",
-          "epsEst": 0.92,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.78,
-          "noEsts": 3,
-          "revEst": null,
-          "mcap": 26951697492,
-          "rank": 41,
           "rx": null
         },
         {
@@ -12564,8 +12227,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.74,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 26913332909,
-          "rank": 42,
+          "mcap": 26692250817,
+          "rank": 41,
           "rx": null
         },
         {
@@ -12578,22 +12241,8 @@ export const EARNINGS = {
           "yearAgoEps": -1.7,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 23543651228,
-          "rank": 43,
-          "rx": null
-        },
-        {
-          "t": "TEAM",
-          "name": "Atlassian Corporation",
-          "time": "amc",
-          "epsEst": 0.32,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": -0.05,
-          "noEsts": 7,
-          "revEst": null,
-          "mcap": 22991368297,
-          "rank": 44,
+          "mcap": 23114481375,
+          "rank": 42,
           "rx": null
         },
         {
@@ -12606,8 +12255,8 @@ export const EARNINGS = {
           "yearAgoEps": 3.77,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 22790594374,
-          "rank": 45,
+          "mcap": 23041158190,
+          "rank": 43,
           "rx": null
         },
         {
@@ -12620,8 +12269,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.52,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 22584586405,
-          "rank": 46,
+          "mcap": 22371571553,
+          "rank": 44,
           "rx": null
         },
         {
@@ -12634,7 +12283,35 @@ export const EARNINGS = {
           "yearAgoEps": 1.52,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 22584586405,
+          "mcap": 22371571553,
+          "rank": 45,
+          "rx": null
+        },
+        {
+          "t": "TEAM",
+          "name": "Atlassian Corporation",
+          "time": "amc",
+          "epsEst": 0.32,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -0.05,
+          "noEsts": 7,
+          "revEst": null,
+          "mcap": 21671775415,
+          "rank": 46,
+          "rx": null
+        },
+        {
+          "t": "MTSI",
+          "name": "MACOM Technology Solutions Holdings, Inc.",
+          "time": null,
+          "epsEst": 1.04,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.64,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 21562711648,
           "rank": 47,
           "rx": null
         },
@@ -12648,7 +12325,7 @@ export const EARNINGS = {
           "yearAgoEps": 1.27,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 21626989633,
+          "mcap": 21274033128,
           "rank": 48,
           "rx": null
         },
@@ -12662,22 +12339,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.27,
           "noEsts": 7,
           "revEst": null,
-          "mcap": 21626989633,
+          "mcap": 21274033128,
           "rank": 49,
-          "rx": null
-        },
-        {
-          "t": "MTSI",
-          "name": "MACOM Technology Solutions Holdings, Inc.",
-          "time": null,
-          "epsEst": 1.04,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.64,
-          "noEsts": 5,
-          "revEst": null,
-          "mcap": 21593992915,
-          "rank": 50,
           "rx": null
         },
         {
@@ -12690,36 +12353,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.11,
           "noEsts": 4,
           "revEst": null,
-          "mcap": 20866001906,
-          "rank": 51,
-          "rx": null
-        },
-        {
-          "t": "VTRS",
-          "name": "Viatris Inc.",
-          "time": "bmo",
-          "epsEst": 0.62,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.62,
-          "noEsts": 4,
-          "revEst": null,
-          "mcap": 20484481184,
-          "rank": 52,
-          "rx": null
-        },
-        {
-          "t": "BCE",
-          "name": "BCE, Inc.",
-          "time": "bmo",
-          "epsEst": 0.47,
-          "epsActual": null,
-          "surprisePct": null,
-          "yearAgoEps": 0.46,
-          "noEsts": 7,
-          "revEst": null,
-          "mcap": 20258469140,
-          "rank": 53,
+          "mcap": 21154492275,
+          "rank": 50,
           "rx": null
         },
         {
@@ -12732,8 +12367,8 @@ export const EARNINGS = {
           "yearAgoEps": 0.13,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 20188745665,
-          "rank": 54,
+          "mcap": 20652854760,
+          "rank": 51,
           "rx": null
         },
         {
@@ -12746,22 +12381,50 @@ export const EARNINGS = {
           "yearAgoEps": 1.79,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 19931718624,
-          "rank": 55,
+          "mcap": 20174788364,
+          "rank": 52,
+          "rx": null
+        },
+        {
+          "t": "BCE",
+          "name": "BCE, Inc.",
+          "time": "bmo",
+          "epsEst": 0.46,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.46,
+          "noEsts": 6,
+          "revEst": null,
+          "mcap": 19964682208,
+          "rank": 53,
           "rx": null
         },
         {
           "t": "EVRG",
           "name": "Evergy, Inc.",
           "time": "bmo",
-          "epsEst": 0.87,
+          "epsEst": 0.81,
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.82,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
-          "mcap": 19575166083,
-          "rank": 56,
+          "mcap": 19953207444,
+          "rank": 54,
+          "rx": null
+        },
+        {
+          "t": "VTRS",
+          "name": "Viatris Inc.",
+          "time": "bmo",
+          "epsEst": 0.62,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.62,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 19809040645,
+          "rank": 55,
           "rx": null
         },
         {
@@ -12774,8 +12437,8 @@ export const EARNINGS = {
           "yearAgoEps": 2.63,
           "noEsts": 3,
           "revEst": null,
-          "mcap": 18766810930,
-          "rank": 57,
+          "mcap": 18130490128,
+          "rank": 56,
           "rx": null
         },
         {
@@ -12788,8 +12451,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.1,
           "noEsts": 8,
           "revEst": null,
-          "mcap": 18160096684,
-          "rank": 58,
+          "mcap": 18071411559,
+          "rank": 57,
           "rx": null
         },
         {
@@ -12802,8 +12465,8 @@ export const EARNINGS = {
           "yearAgoEps": 1.64,
           "noEsts": 5,
           "revEst": null,
-          "mcap": 17119206000,
-          "rank": 59,
+          "mcap": 17254200000,
+          "rank": 58,
           "rx": null
         },
         {
@@ -12816,12 +12479,661 @@ export const EARNINGS = {
           "yearAgoEps": 0.51,
           "noEsts": 2,
           "revEst": null,
-          "mcap": 16521201148,
+          "mcap": 16395545526,
+          "rank": 59,
+          "rx": null
+        },
+        {
+          "t": "LAMR",
+          "name": "Lamar Advertising Company",
+          "time": "bmo",
+          "epsEst": 2.21,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 2.22,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 16125408300,
           "rank": 60,
           "rx": null
         }
       ],
-      "totalCount": 543
+      "totalCount": 538
+    },
+    "2026-08-07": {
+      "rows": [
+        {
+          "t": "BRK.A",
+          "name": "Berkshire Hathaway Inc.",
+          "time": null,
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 1053785375381,
+          "rank": 1,
+          "rx": null
+        },
+        {
+          "t": "BRK.B",
+          "name": "Berkshire Hathaway Inc.",
+          "time": null,
+          "epsEst": 5.24,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 5.17,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 1053785375381,
+          "rank": 2,
+          "rx": null
+        },
+        {
+          "t": "VST",
+          "name": "Vistra Corp.",
+          "time": "bmo",
+          "epsEst": 2.43,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.01,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 56221804714,
+          "rank": 3,
+          "rx": null
+        },
+        {
+          "t": "TTWO",
+          "name": "Take-Two Interactive Software, Inc.",
+          "time": "bmo",
+          "epsEst": 0.08,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.43,
+          "noEsts": 9,
+          "revEst": null,
+          "mcap": 43368019144,
+          "rank": 4,
+          "rx": null
+        },
+        {
+          "t": "AU",
+          "name": "AngloGold Ashanti PLC",
+          "time": null,
+          "epsEst": 2.02,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.25,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 40871290811,
+          "rank": 5,
+          "rx": null
+        },
+        {
+          "t": "PPL",
+          "name": "PPL Corporation",
+          "time": "bmo",
+          "epsEst": 0.35,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.32,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 27159848068,
+          "rank": 6,
+          "rx": null
+        },
+        {
+          "t": "ECHO",
+          "name": "EchoStar Corporation",
+          "time": null,
+          "epsEst": -0.28,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -1.06,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 26743988673,
+          "rank": 7,
+          "rx": null
+        },
+        {
+          "t": "PAA",
+          "name": "Plains All American Pipeline, L.P.",
+          "time": "bmo",
+          "epsEst": 0.4,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.36,
+          "noEsts": 5,
+          "revEst": null,
+          "mcap": 17250249649,
+          "rank": 8,
+          "rx": null
+        },
+        {
+          "t": "EMA",
+          "name": "Emera Incorporated",
+          "time": "bmo",
+          "epsEst": 0.53,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.57,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 16594005053,
+          "rank": 9,
+          "rx": null
+        },
+        {
+          "t": "TU",
+          "name": "TELUS Corporation",
+          "time": null,
+          "epsEst": 0.17,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.16,
+          "noEsts": 4,
+          "revEst": null,
+          "mcap": 15916918864,
+          "rank": 10,
+          "rx": null
+        },
+        {
+          "t": "IESC",
+          "name": "IES Holdings, Inc.",
+          "time": null,
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 3.95,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 13432684615,
+          "rank": 11,
+          "rx": null
+        },
+        {
+          "t": "FLR",
+          "name": "Fluor Corporation",
+          "time": "bmo",
+          "epsEst": 0.73,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.43,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 7205569935,
+          "rank": 12,
+          "rx": null
+        },
+        {
+          "t": "MBGL",
+          "name": "Mobility Global Inc.",
+          "time": "bmo",
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 6521600000,
+          "rank": 13,
+          "rx": null
+        },
+        {
+          "t": "TXNM",
+          "name": "TXNM Energy, Inc.",
+          "time": null,
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.25,
+          "noEsts": null,
+          "revEst": null,
+          "mcap": 6454233083,
+          "rank": 14,
+          "rx": null
+        },
+        {
+          "t": "ESNT",
+          "name": "Essent Group Ltd.",
+          "time": "bmo",
+          "epsEst": 1.77,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.93,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 5995465072,
+          "rank": 15,
+          "rx": null
+        },
+        {
+          "t": "ACMR",
+          "name": "ACM Research, Inc.",
+          "time": "bmo",
+          "epsEst": 0.21,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.4,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 5927788293,
+          "rank": 16,
+          "rx": null
+        },
+        {
+          "t": "ROAD",
+          "name": "Construction Partners, Inc.",
+          "time": "bmo",
+          "epsEst": 1.06,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.81,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 5893181506,
+          "rank": 17,
+          "rx": null
+        },
+        {
+          "t": "MDA",
+          "name": "MDA Space Ltd.",
+          "time": "bmo",
+          "epsEst": 0.24,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 4371304148,
+          "rank": 18,
+          "rx": null
+        },
+        {
+          "t": "MKTX",
+          "name": "MarketAxess Holdings, Inc.",
+          "time": "bmo",
+          "epsEst": 1.88,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 2,
+          "noEsts": 9,
+          "revEst": null,
+          "mcap": 4014181216,
+          "rank": 19,
+          "rx": null
+        },
+        {
+          "t": "UA",
+          "name": "Under Armour, Inc.",
+          "time": "bmo",
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.02,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 3095118716,
+          "rank": 20,
+          "rx": null
+        },
+        {
+          "t": "UAA",
+          "name": "Under Armour, Inc.",
+          "time": "bmo",
+          "epsEst": 0.02,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.02,
+          "noEsts": 8,
+          "revEst": null,
+          "mcap": 3095118716,
+          "rank": 21,
+          "rx": null
+        },
+        {
+          "t": "HE",
+          "name": "Hawaiian Electric Industries, Inc.",
+          "time": "amc",
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.2,
+          "noEsts": null,
+          "revEst": null,
+          "mcap": 2347844486,
+          "rank": 22,
+          "rx": null
+        },
+        {
+          "t": "TILE",
+          "name": "Interface, Inc.",
+          "time": "bmo",
+          "epsEst": 0.63,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.6,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 1900179164,
+          "rank": 23,
+          "rx": null
+        },
+        {
+          "t": "LPG",
+          "name": "Dorian LPG Ltd.",
+          "time": null,
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.27,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 1880298830,
+          "rank": 24,
+          "rx": null
+        },
+        {
+          "t": "PAX",
+          "name": "Patria Investments Limited",
+          "time": null,
+          "epsEst": 0.29,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.24,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 1764034748,
+          "rank": 25,
+          "rx": null
+        },
+        {
+          "t": "TRLV",
+          "name": "Trulieve Cannabis Corp.",
+          "time": "bmo",
+          "epsEst": 0.06,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 1667302947,
+          "rank": 26,
+          "rx": null
+        },
+        {
+          "t": "KRP",
+          "name": "Kimbell Royalty Partners",
+          "time": "bmo",
+          "epsEst": 0.25,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.02,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 1630629547,
+          "rank": 27,
+          "rx": null
+        },
+        {
+          "t": "SLVM",
+          "name": "Sylvamo Corporation",
+          "time": "bmo",
+          "epsEst": 0.2,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.37,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 1505999554,
+          "rank": 28,
+          "rx": null
+        },
+        {
+          "t": "WEN",
+          "name": "Wendy's Company (The)",
+          "time": "bmo",
+          "epsEst": 0.16,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.29,
+          "noEsts": 7,
+          "revEst": null,
+          "mcap": 1409556736,
+          "rank": 29,
+          "rx": null
+        },
+        {
+          "t": "IRMD",
+          "name": "iRadimed Corporation",
+          "time": null,
+          "epsEst": 0.42,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.45,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 1202627933,
+          "rank": 30,
+          "rx": null
+        },
+        {
+          "t": "OPY",
+          "name": "Oppenheimer Holdings, Inc.",
+          "time": null,
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.91,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 1183662873,
+          "rank": 31,
+          "rx": null
+        },
+        {
+          "t": "ABR",
+          "name": "Arbor Realty Trust",
+          "time": null,
+          "epsEst": 0.07,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.24,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 969500463,
+          "rank": 32,
+          "rx": null
+        },
+        {
+          "t": "ASIX",
+          "name": "AdvanSix Inc.",
+          "time": "bmo",
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 1.17,
+          "noEsts": null,
+          "revEst": null,
+          "mcap": 589054937,
+          "rank": 33,
+          "rx": null
+        },
+        {
+          "t": "DCBO",
+          "name": "Docebo Inc.",
+          "time": "bmo",
+          "epsEst": 0.24,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.24,
+          "noEsts": 2,
+          "revEst": null,
+          "mcap": 499065173,
+          "rank": 34,
+          "rx": null
+        },
+        {
+          "t": "JOUT",
+          "name": "Johnson Outdoors Inc.",
+          "time": null,
+          "epsEst": 0.68,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.75,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 488958623,
+          "rank": 35,
+          "rx": null
+        },
+        {
+          "t": "OCGN",
+          "name": "Ocugen, Inc.",
+          "time": null,
+          "epsEst": -0.05,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -0.05,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 436693194,
+          "rank": 36,
+          "rx": null
+        },
+        {
+          "t": "CTEV",
+          "name": "Claritev Corporation",
+          "time": "bmo",
+          "epsEst": -4.1,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.32,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 425853769,
+          "rank": 37,
+          "rx": null
+        },
+        {
+          "t": "GTN",
+          "name": "Gray Media, Inc.",
+          "time": "bmo",
+          "epsEst": -0.08,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -0.42,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 410953820,
+          "rank": 38,
+          "rx": null
+        },
+        {
+          "t": "GTN.A",
+          "name": "Gray Media, Inc.",
+          "time": "bmo",
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -0.42,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 410953820,
+          "rank": 39,
+          "rx": null
+        },
+        {
+          "t": "AIRS",
+          "name": "AirSculpt Technologies, Inc.",
+          "time": null,
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": null,
+          "revEst": null,
+          "mcap": 340030182,
+          "rank": 40,
+          "rx": null
+        },
+        {
+          "t": "ESCA",
+          "name": "Escalade, Incorporated",
+          "time": null,
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.13,
+          "noEsts": null,
+          "revEst": null,
+          "mcap": 264987704,
+          "rank": 41,
+          "rx": null
+        },
+        {
+          "t": "MITT",
+          "name": "TPG Mortgage Investment Trust, Inc.",
+          "time": null,
+          "epsEst": 0.26,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": 0.18,
+          "noEsts": 1,
+          "revEst": null,
+          "mcap": 235345715,
+          "rank": 42,
+          "rx": null
+        },
+        {
+          "t": "IMMR",
+          "name": "Immersion Corporation",
+          "time": null,
+          "epsEst": 0.05,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": null,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 217138965,
+          "rank": 43,
+          "rx": null
+        },
+        {
+          "t": "TUSK",
+          "name": "Mammoth Energy Services, Inc.",
+          "time": "bmo",
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -0.74,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 136804637,
+          "rank": 44,
+          "rx": null
+        },
+        {
+          "t": "ZSTK",
+          "name": "ZeroStack Corp.",
+          "time": null,
+          "epsEst": null,
+          "epsActual": null,
+          "surprisePct": null,
+          "yearAgoEps": -4.3,
+          "noEsts": 3,
+          "revEst": null,
+          "mcap": 3962217,
+          "rank": 45,
+          "rx": null
+        }
+      ],
+      "totalCount": 45
     }
   }
 };
