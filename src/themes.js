@@ -79,6 +79,17 @@ export const THEME_SNAPSHOTS = {
     // Medical/Home-Construction/Banks green while AI/Semis/Cyber/Quantum stayed red intraday.
     day:   [["Medical",2.90],["Home Construction",2.66],["Banks",2.40],["Transports",2.26],["Real Estate",1.68],["Retail",1.59],["Materials",1.15],["Airlines",1.00],["Industrials",0.76],["HealthCare",0.72],["Utilities",0.51],["Bitcoin",0.05],["Biotechnology",-0.02],["Steel",-0.17],["China Internet",-0.25],["Robotics",-0.45],["Software",-0.50],["Oil & Gas",-1.04],["Cybersecurity",-1.16],["Semiconductors",-1.19],["Telecom",-1.26],["AI",-1.40],["Aerospace",-1.61],["Quantum",-1.85],["Solar",-1.85],["Gold Miners",-2.03],["Silver Miners",-2.03],["Social Media",-2.08],["Growth Stocks",-2.19],["Genomics",-3.28],["Bitcoin Miners",-5.91]],
   },
+  "2026-07-24": {
+    // His MYT view date — data = US Thu 07-23 session. GATE CHANGE on 1W again: metals/crypto sweep
+    // OUT (only Bitcoin Miners survive at #1, +11.56 vs 1M −17.91 = violent V-turn), defensives/quality
+    // in (HealthCare/Aerospace/Utilities/Real Estate). NH/NL flipped negative (70H/73L); down-4% day
+    // count 489 vs 154 up + sheet down4=319 ≥300 = documented selling extreme. Selective tape.
+    month: [["Cybersecurity",8.20],["Genomics",7.80],["China Internet",7.27],["Biotechnology",6.11],["HealthCare",5.80],["Transports",5.06],["Social Media",3.95],["Bitcoin",3.79],["Banks",2.89],["Utilities",2.49],["Industrials",2.13],["Aerospace",0.97],["Retail",0.70],["Real Estate",0.69],["Medical",0.65],["Steel",0.05],["Software",-0.25],["Oil & Gas",-0.41],["Materials",-1.14],["Home Construction",-2.87],["Gold Miners",-3.40],["Telecom",-3.86],["Silver Miners",-4.14],["Airlines",-5.97],["AI",-6.35],["Robotics",-6.36],["Semiconductors",-6.73],["Solar",-9.75],["Growth Stocks",-10.45],["Quantum",-12.16],["Bitcoin Miners",-17.91]],
+    week:  [["Bitcoin Miners",11.56],["HealthCare",1.58],["Aerospace",1.26],["Utilities",1.09],["Real Estate",1.06],["Industrials",0.83],["Transports",0.65],["Steel",0.57],["Medical",0.45],["China Internet",0.34],["Gold Miners",0.19],["Bitcoin",0.19],["Biotechnology",0.16],["Banks",-0.01],["Silver Miners",-0.33],["Oil & Gas",-0.64],["Materials",-0.69],["Retail",-1.59],["Home Construction",-2.67],["Semiconductors",-3.35],["Telecom",-3.45],["Social Media",-4.13],["Solar",-4.14],["AI",-4.24],["Quantum",-4.25],["Robotics",-4.38],["Airlines",-4.96],["Growth Stocks",-5.11],["Genomics",-5.43],["Software",-6.97],["Cybersecurity",-9.15]],
+    // day = Thursday's "Since Open" (momentum ex gaps): miners + defense/industrial quality green,
+    // Software/Oil&Gas/Cyber worst; semis mildly green intraday but 1W −3.35 = bounce, not repair.
+    day:   [["Bitcoin Miners",3.72],["Aerospace",2.48],["Industrials",1.59],["Biotechnology",1.48],["Utilities",1.18],["HealthCare",1.03],["Genomics",0.99],["Gold Miners",0.78],["Silver Miners",0.76],["Semiconductors",0.51],["Quantum",0.50],["Home Construction",0.45],["Airlines",0.45],["Banks",0.28],["Real Estate",0.27],["Medical",0.16],["Growth Stocks",-0.11],["Materials",-0.26],["Steel",-0.35],["Transports",-0.36],["Bitcoin",-0.39],["Telecom",-0.59],["AI",-0.60],["Solar",-0.64],["Robotics",-0.69],["Social Media",-0.77],["China Internet",-0.91],["Retail",-1.13],["Cybersecurity",-1.99],["Oil & Gas",-2.80],["Software",-2.82]],
+  },
   "2026-07-23": {
     // His MYT view date — data = US Wed 07-22 session (Since Open = Wed intraday). GATE CHANGE on 1W:
     // crypto+metals sweep (Bitcoin Miners/Bitcoin/Gold/Silver/Steel); China Internet/Real Estate/Banks

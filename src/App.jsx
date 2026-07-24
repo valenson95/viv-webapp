@@ -753,6 +753,15 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 24, 2026",
+    title: "📊 Theme Leaders: Since Open column",
+    items: [
+      "Click the Theme Leaders card and the full tracker now shows a third column — Since Open: the latest session's move excluding the opening gap, so you can see what buyers actually did during the day (a big 'Today' number with a flat Since Open = a gap that sold).",
+      "Fresh theme, rotation and breadth data for the July 23 US session is live.",
+    ],
+  },
+  {
+    tag: "New",
+    date: "July 24, 2026",
     title: "🚦 Market traffic light + smarter breadth colours",
     items: [
       "The Market Breadth page now opens with a traffic-light calendar — one square per trading day, green when the environment is paying longs, red when it isn't, with the current streak counted for you.",
