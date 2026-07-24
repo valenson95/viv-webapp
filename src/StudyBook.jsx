@@ -1063,7 +1063,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   // ── click-to-zoom lightbox: click any chart to enlarge, ←/→ cycles Context→BEFORE→AFTER, Esc closes ──
   const [zoom, setZoom] = useState(null); // null | "before_img" | "after_img" | "outcome_img"
   const [showAll, setShowAll] = useState(false); // raw computed-metrics grid folded by default (Valen 2026-07-24) — key strip stays
-  const SLOT_TITLES = { before_img: "CONTEXT — HTF", after_img: "BEFORE — the setup", outcome_img: "AFTER — the outcome", trigger_ltf_img: "TRIGGER — 5-min entry detail" };
+  const SLOT_TITLES = { before_img: "BEFORE", after_img: "AFTER", outcome_img: "AFTER — the shared outcome", trigger_ltf_img: "TRIGGER — 5-min entry detail" };
   const zoomSlots = ["before_img", "after_img", "trigger_ltf_img", "outcome_img"].filter(k => row[k]); // only attached charts
   useEffect(() => {
     if (!zoom) return;
@@ -1096,7 +1096,14 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       {row[slot] && (
         <div style={{ position: "relative", marginTop: 8 }}>
           {capBadge && <span title={capBadge.tip} style={badgeStyle}>{capBadge.text}</span>}
-          <img src={row[slot]} alt="" onClick={() => setZoom(slot)} title="Click to zoom (← → cycles Context/BEFORE/AFTER · Esc closes)" style={{ display: "block", width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)", cursor: "zoom-in" }} />
+          {/* Remove control (Valen 2026-07-24) — clears this slot so the correct chart can be re-attached.
+              Sets the field to "" (persists as null/empty on save, never undefined); the image stays in storage. */}
+          <button type="button" onClick={(e) => { e.stopPropagation(); setRow(r => ({ ...r, [slot]: "" })); }}
+            title="Remove this chart — the slot reopens for the correct one (the image stays in storage)"
+            style={{ position: "absolute", top: 6, left: 6, zIndex: 2, background: "rgba(8,8,14,0.82)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.04em", padding: "3px 8px", borderRadius: 7, cursor: "pointer", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#e05555"; e.currentTarget.style.borderColor = "#e05555"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = C.border; }}>✕ Remove</button>
+          <img src={row[slot]} alt="" onClick={() => setZoom(slot)} title="Click to zoom (← → cycles BEFORE/AFTER/TRIGGER · Esc closes)" style={{ display: "block", width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)", cursor: "zoom-in" }} />
         </div>
       )}
     </div>
@@ -1150,8 +1157,10 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
 
       <div style={sect}>This leg — charts{multiLeg ? ` · leg ${legIdx} of ${sibs.length}` : ""}</div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-        {chartSlot("before_img", "Context — HTF", "Weekly/monthly — the pole, the base in context, where it sits in the longer trend")}
-        {chartSlot("after_img", "BEFORE — the setup", "Daily/intraday with the RIGHT EDGE = trigger day — exactly what your eyes saw at the decision moment")}
+        {/* Per-leg BEFORE/AFTER (Valen 2026-07-24): a leg's AFTER = the next leg's BEFORE. Field mapping is
+            unchanged — before_img = BEFORE, after_img = AFTER — only the labels reflect his chained model. */}
+        {chartSlot("before_img", "BEFORE", "The setup going into this leg — the base it breaks from (= the previous leg's AFTER).")}
+        {chartSlot("after_img", "AFTER", "How this leg resolved — where it ran to (= the next leg's BEFORE).")}
         {chartSlot("trigger_ltf_img", "TRIGGER — 5-min entry detail", "Optional: the trigger day on 5-min — ORH, the reclaim, how the entry actually traded")}
       </div>
 

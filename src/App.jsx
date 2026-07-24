@@ -754,6 +754,14 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 24, 2026",
+    title: "🗑 Studies: remove a chart from a slot to re-attach",
+    items: [
+      "Each attached study chart now has a ✕ Remove control — clear a slot to swap in the correct chart. The image stays in storage.",
+    ],
+  },
+  {
+    tag: "New",
+    date: "July 24, 2026",
     title: "📊 Theme Leaders: Since Open column",
     items: [
       "Click the Theme Leaders card and the full tracker now shows a third column — Since Open: the latest session's move excluding the opening gap, so you can see what buyers actually did during the day (a big 'Today' number with a flat Since Open = a gap that sold).",
