@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { GROUP_RS } from "./groupRS-data.js";
 import { ETF_HOLDINGS } from "./etfHoldings-data.js";
@@ -96,8 +96,17 @@ export function InfoDot({ tip, size = 14 }) {
     else { p.top = r.top - 8; p.up = true; }
     setPos(p);
   };
+  // Tap support (touch devices have no hover): tap toggles the tooltip, anchored exactly as the
+  // hover path computes it; a subsequent tap ANYWHERE else hides it via a one-shot document listener.
+  const toggle = (e) => { e.stopPropagation(); if (pos) setPos(null); else show(); };
+  useEffect(() => {
+    if (!pos) return;
+    const hide = () => setPos(null);
+    document.addEventListener("click", hide, { once: true });
+    return () => document.removeEventListener("click", hide);
+  }, [pos]);
   return (
-    <span ref={ref} onMouseEnter={show} onMouseLeave={() => setPos(null)} onClick={e => e.stopPropagation()}
+    <span ref={ref} onMouseEnter={show} onMouseLeave={() => setPos(null)} onClick={toggle}
       style={{ width: size, height: size, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.16)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.56rem", fontWeight: 700, fontStyle: "italic", color: "rgba(255,255,255,0.5)", cursor: "help", flex: "none", verticalAlign: "middle" }}>
       i
       {pos && createPortal(
@@ -134,8 +143,16 @@ export function Tip({ tip, children, as: Tag = "span", className, style }) {
     else { p.top = r.top - 8; p.up = true; }
     setPos(p);
   };
+  // Tap support (touch devices have no hover) — identical toggle+dismiss pattern as InfoDot.
+  const toggle = (e) => { e.stopPropagation(); if (pos) setPos(null); else show(); };
+  useEffect(() => {
+    if (!pos) return;
+    const hide = () => setPos(null);
+    document.addEventListener("click", hide, { once: true });
+    return () => document.removeEventListener("click", hide);
+  }, [pos]);
   return (
-    <Tag ref={ref} onMouseEnter={show} onMouseLeave={() => setPos(null)} className={className} style={style}>
+    <Tag ref={ref} onMouseEnter={show} onMouseLeave={() => setPos(null)} onClick={toggle} className={className} style={style}>
       {children}
       {tip && pos && createPortal(
         <div style={{ position: "fixed", top: pos.top, left: pos.left, right: pos.right,

@@ -113,7 +113,7 @@ export default async function handler(req, res) {
   const { symbols } = req.query;
   if (!symbols) return res.status(400).json({ error: "Missing ?symbols= parameter" });
 
-  const tickers = symbols.split(",").map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 15);
+  const tickers = symbols.split(",").map(s => s.trim().toUpperCase().replace(/[^A-Z0-9.\-]/g, "")).filter(Boolean).slice(0, 15);
   const results = {};
   await Promise.all(tickers.map(async (sym) => {
     const theme = await fetchTheme(sym);

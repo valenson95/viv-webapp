@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing ?symbols= parameter" });
   }
 
-  const tickers = symbols.split(",").map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 20); // cap at 20
+  const tickers = symbols.split(",").map(s => s.trim().toUpperCase().replace(/[^A-Z0-9.\-]/g, "")).filter(Boolean).slice(0, 20); // cap at 20
   const results = {};
 
   // Fetch all in parallel

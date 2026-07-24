@@ -14,6 +14,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 const STORAGE_PREFIX = "viv-practice-v1-";
 const storageKeyFor = (uid) => `${STORAGE_PREFIX}${uid || "anon"}`;
 
+// Scoped mobile CSS (pattern mirrors Feedback.jsx's FB_CSS): the top row (log form + stats card)
+// is a fixed 1.35fr/1fr grid that squeezes the form to ~195px on a 390px phone — stack it full-width
+// below 760px instead. The Entry/Stop/Target 3-up grid is left alone once the outer column is full width.
+const PM_CSS = `
+@media (max-width: 760px){ .pm-toprow{ grid-template-columns: 1fr !important; } }
+`;
+
 // ── pure helpers (module scope, never components) ──
 const toNum = (v) => {
   if (v === "" || v == null) return NaN;
@@ -121,6 +128,7 @@ export default function PracticeMode({ C, font, session }) {
 
   return (
     <div style={{ fontFamily: font, color: C.text, maxWidth: 1080, margin: "0 auto" }}>
+      <style dangerouslySetInnerHTML={{ __html: PM_CSS }} />
       {/* header */}
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Sandbox</div>
@@ -141,8 +149,8 @@ export default function PracticeMode({ C, font, session }) {
         </span>
       </div>
 
-      {/* log form + stats side by side on wide screens */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.35fr) minmax(0,1fr)", gap: 18, alignItems: "start" }}>
+      {/* log form + stats side by side on wide screens; stacks full-width below 760px via .pm-toprow */}
+      <div className="pm-toprow" style={{ display: "grid", gridTemplateColumns: "minmax(0,1.35fr) minmax(0,1fr)", gap: 18, alignItems: "start" }}>
         <IdeaForm C={C} font={font} card={card} label={label} input={input} onAdd={addIdea} />
         <StatsCard C={C} card={card} stats={stats} closedCount={closed.length} />
       </div>
@@ -270,8 +278,8 @@ function IdeaForm({ C, font, card, label, input, onAdd }) {
         </div>
       </div>
 
-      {/* entry / stop / target */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+      {/* entry / stop / target — stays 3-up even on mobile once .pm-toprow stacks the outer column full-width (~110px/input, fine) */}
+      <div className="pm-eps" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
         <div>
           <label style={label}>Entry</label>
           <input style={input} value={entry} placeholder="100.00" inputMode="decimal" onChange={(ev) => setEntry(ev.target.value)} />

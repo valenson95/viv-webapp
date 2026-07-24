@@ -754,6 +754,16 @@ function PlaybookTracker({ trades, uid, setPage }) {
 const WHATS_NEW = [
   {
     tag: "New",
+    date: "July 25, 2026",
+    title: "📱 Mobile polish + locked-stop guard",
+    items: [
+      "iPhone: text fields no longer zoom-jump when you tap into them, and Daily Setups plus Practice mode now fit the phone screen properly.",
+      "ⓘ info dots open on tap on mobile, and the Feedback drawer now layers correctly above other windows.",
+      "Your trade's original stop is now guarded — changing an already-locked stop asks you to confirm first, so your R history stays intact.",
+    ],
+  },
+  {
+    tag: "New",
     date: "July 24, 2026",
     title: "🧪 Practice mode: paper-trade any setup",
     items: [
@@ -12608,6 +12618,9 @@ function NavIcon({ name, size = 17, color = "currentColor" }) {
 // plumbing needed) and only kicks in below 640px. Anything still feeling chunky on phone is a candidate
 // for a more targeted media-query rule here, NOT a state-tracked layout split (which would cost a re-render).
 const mobileCSS = `
+/* Mobile shell height — 100dvh tracks the real viewport as iOS Safari's URL bar shows/hides;
+   100vh first as the fallback for browsers without dvh support (double declaration = fallback chain). */
+.mobshell{height:100vh;height:100dvh;}
 @media (max-width: 640px) {
   /* Global font baseline — slightly smaller body text on phones */
   body, .viv-mobile-root { font-size: 14px; }
@@ -12623,14 +12636,10 @@ const mobileCSS = `
   /* Large card paddings → compact (selectors MUST match React's serialized inline style:
      kebab-case, no quotes — e.g. style="padding: 32px 28px") */
   [style*='padding: 32px 28px'],
-  [style*='padding: 30px 32px'],
-  [style*='padding: 28px 32px'],
   [style*='padding: 24px 32px'],
   [style*='padding: 24px 28px'] { padding: 14px 14px !important; }
-  [style*='padding: 22px 28px'],
   [style*='padding: 20px 24px'],
-  [style*='padding: 18px 24px'],
-  [style*='padding: 18px 22px'] { padding: 12px 14px !important; }
+  [style*='padding: 18px 24px'] { padding: 12px 14px !important; }
   [style*='padding: 16px 18px'],
   [style*='padding: 14px 16px'] { padding: 10px 12px !important; }
 
@@ -12651,10 +12660,18 @@ const mobileCSS = `
   /* Tables: compact rows + smaller font (most tables already scroll horizontally) */
   table th, table td { padding: 5px 4px !important; font-size: 0.62rem !important; }
 
-  /* StatTile cluster — minmax 168px is too tight for phone; let them stack 2-up */
-  [style*='grid-template-columns: repeat(auto-fit, minmax(168px'],
+  /* iOS: sub-16px inputs trigger Safari zoom-on-focus */
+  input, textarea, select { font-size: 16px !important; }
+
+  /* StatTile cluster — small-minmax tile/card grids stack 2-up on phone (not 1-up sparse).
+     Only many-small-items grids are listed here; few-large-pane grids (charts, side-by-side tables,
+     ranked-list columns) are left to auto-fit's natural 1-up collapse so they aren't squished. */
   [style*='grid-template-columns: repeat(auto-fit, minmax(150px'],
-  [style*='grid-template-columns: repeat(auto-fit, minmax(160px'] {
+  [style*='grid-template-columns: repeat(auto-fit, minmax(210px'],
+  [style*='grid-template-columns: repeat(auto-fit, minmax(220px'],
+  [style*='grid-template-columns: repeat(auto-fit, minmax(230px'],
+  [style*='grid-template-columns: repeat(auto-fit, minmax(250px'],
+  [style*='grid-template-columns: repeat(auto-fit, minmax(260px'] {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px !important;
   }
@@ -12666,9 +12683,7 @@ const mobileCSS = `
 }
 @media (max-width: 420px) {
   /* Tiniest phones — make stat tiles single-column so labels and big numbers stay readable */
-  [style*='grid-template-columns: repeat(auto-fit, minmax(168px'],
-  [style*='grid-template-columns: repeat(auto-fit, minmax(150px'],
-  [style*='grid-template-columns: repeat(auto-fit, minmax(160px'] {
+  [style*='grid-template-columns: repeat(auto-fit, minmax(150px'] {
     grid-template-columns: 1fr 1fr !important;
   }
 }
@@ -13945,6 +13960,16 @@ function AppInner() {
     if (!session) return;
     const t = journaledTrades.find(x => x.id === id);
     if (!t) return;
+    // Locked-stop guard: an unchanged stop is a no-op (never clobbers a recorded trail);
+    // revising or clearing an already-locked original stop requires explicit confirmation (it rewrites R history).
+    let stopEdit = "stop" in patch;
+    const stNew = stopEdit ? (parseFloat(patch.stop) || 0) : 0;
+    const stOld = parseFloat(t.stop) || 0;
+    if (stopEdit && stNew === stOld) stopEdit = false;
+    if (stopEdit && stOld > 0 && !window.confirm(
+      `This trade's original stop ($${stOld}) is locked — it drives your R history. ` +
+      (stNew > 0 ? `Replace it with $${stNew} and recalculate R?` : `Clearing it removes the R calculation. Continue?`)
+    )) stopEdit = false;
     const upd = {};
     if ("setup" in patch) upd.setup = patch.setup || "";
     if ("tags" in patch) upd.tags = patch.tags || [];
@@ -13969,11 +13994,11 @@ function AppInner() {
     const sh = "shares" in patch ? (parseFloat(patch.shares) || 0) : (parseFloat(t.shares) || 0);
     const isShort = (("tradeType" in patch ? patch.tradeType : t.tradeType) || "Long") === "Short";
     // Stop for R: the NEW stop if editing it, else the EXISTING locked stop (never invented).
-    const st = "stop" in patch ? (parseFloat(patch.stop) || 0) : (parseFloat(t.stop) || 0);
+    const st = stopEdit ? stNew : stOld;
 
     let rMult = t.rMult, plPct = t.plPct, plDollar = t.plDollar;
     const factsChanged = ["entryP", "exitP", "shares", "tradeType"].some(k => k in patch);
-    if ("stop" in patch || factsChanged) {
+    if (stopEdit || factsChanged) {
       plPct = ep > 0 ? (isShort ? ((ep - xp) / ep) * 100 : ((xp - ep) / ep) * 100) : 0;
       plDollar = isShort ? (ep - xp) * sh : (xp - ep) * sh;
       const initRisk = ep > 0 && st > 0 ? (isShort ? (st - ep) / ep : (ep - st) / ep) : 0;
@@ -13982,10 +14007,12 @@ function AppInner() {
       upd.pl_dollar = plDollar;
       upd.r_mult = rMult;
     }
-    if ("stop" in patch) {
-      const stNew = parseFloat(patch.stop) || 0;
+    if (stopEdit) {
       upd.stop_price = stNew > 0 ? stNew : null;            // locked INITIAL stop → drives R, never overwritten by trailing
-      upd.current_stop_price = stNew > 0 ? stNew : null;    // display value (user trails this up later)
+      // Only overwrite the display/trail value when there's no genuine trail recorded yet
+      // (empty, or still equal to the old original) — a real trail up is preserved.
+      const curOld = parseFloat(t.currentStop) || 0;
+      if (!curOld || curOld === stOld) upd.current_stop_price = stNew > 0 ? stNew : null;
       upd.needs_stop = !(stNew > 0);                        // stop entered → clear the flag
       if (stNew > 0 && !t.stopLockedAt) upd.stop_locked_at = new Date().toISOString();
     }
@@ -13997,8 +14024,8 @@ function AppInner() {
       ...("notes" in patch ? { notes: upd.notes } : {}),
       ...("reason" in patch ? { reason: upd.exit_reason } : {}),
       ...localPatch,
-      ...(("stop" in patch || factsChanged) ? { plPct, plDollar, rMult } : {}),
-      ...("stop" in patch ? { stop: upd.stop_price, currentStop: upd.current_stop_price, needsStop: upd.needs_stop, stopLockedAt: upd.stop_locked_at || x.stopLockedAt } : {}),
+      ...((stopEdit || factsChanged) ? { plPct, plDollar, rMult } : {}),
+      ...(stopEdit ? { stop: upd.stop_price, ...("current_stop_price" in upd ? { currentStop: upd.current_stop_price } : {}), needsStop: upd.needs_stop, stopLockedAt: upd.stop_locked_at || x.stopLockedAt } : {}),
     } : x));
     const { error } = await supabase.from("trades").update(upd).eq("id", id).eq("user_id", session.user.id);
     if (error) console.error("IBKR trade edit failed:", error.message);
@@ -14104,7 +14131,7 @@ function AppInner() {
       {page === "daily" && <DailySetupsShell setPage={setPage} session={session} displayName={displayName} />}
       {page === "modelbook" && <ModelBookShell setPage={setPage} session={session} displayName={displayName} journaledTrades={journaledTrades} />}
       {page === "practice" && <PracticeShell setPage={setPage} session={session} />}
-      {page === "mentor" && <MentorShell setPage={setPage} session={session} />}
+      {page === "mentor" && isAdmin && <MentorShell setPage={setPage} session={session} />}
       {page === "quant" && isAdmin && <QuantShell setPage={setPage} session={session} />}
       {page === "burstlog" && isAdmin && <BurstLogShell setPage={setPage} session={session} />}
       {page === "settings" && <SettingsPage setPage={setPage} onLogout={handleLogout} setupTypes={setupTypes} setSetupTypes={setSetupTypes} tags={tags} setTags={setTags} exitReasons={exitReasons} setExitReasons={setExitReasons} fontSize={fontSize} setFontSize={setFontSize} uiTheme={uiTheme} setUiTheme={setUiTheme} userEmail={userEmail} displayName={displayName} onDisplayNameChange={handleDisplayNameChange} session={session} onIbkrSync={runIbkrSync} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} intradayFeatureEnabled={intradayFeatureEnabled} onToggleIntradayFeature={toggleIntradayFeature} intradayColumnAvailable={intradayColumnAvailable} isMobile={isMobile} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onSetSyncMode={handleSetSyncMode} />}
@@ -14116,14 +14143,17 @@ function AppInner() {
 
   // ─── MOBILE LAYOUT ───
   if (isMobile) {
+    // zoom (member font-size preference) is applied ONLY to the scrollable content wrapper below —
+    // NOT the outer .mobshell container — so the sticky header and fixed bottom tab bar keep true
+    // viewport coordinates (non-standard `zoom` re-anchors fixed/sticky descendants → misplaced nav).
     return (
-      <div style={{ fontFamily: font, background: C.bg, height: "100vh", WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column", zoom: appZoom }}>
+      <div className="mobshell" style={{ fontFamily: font, background: C.bg, WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
           <Wordmark size="0.88rem" style={{ lineHeight: 1 }} />
           <HeaderControls onLogout={handleLogout} inline />
         </div>
         <AppBackground />
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80, position: "relative", zIndex: 1 }}>{pageContent}</div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80, position: "relative", zIndex: 1, zoom: appZoom }}>{pageContent}</div>
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(8,8,14,0.97)", borderTop: `1px solid ${C.border}`, display: "flex", zIndex: 100, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
           {NAV.map(item => {
             const active = page === item.id;

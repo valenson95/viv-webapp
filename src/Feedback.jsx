@@ -42,7 +42,7 @@ const FB_CSS = `
 .vivfb-badge{animation:vivfbBadge 2s infinite}
 .vivfb-toast{animation:vivfbUp .32s cubic-bezier(0.22,1,0.36,1)}
 @keyframes vivfbDrawerIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
-.vivfb-drawer{animation:vivfbDrawerIn .32s cubic-bezier(0.22,1,0.36,1)}
+.vivfb-drawer{animation:vivfbDrawerIn .32s cubic-bezier(0.22,1,0.36,1); height:100vh; height:100dvh;}
 @media (max-width: 640px){ .vivfb-drawer{ width:100vw !important; border-radius:0 !important; } }
 `;
 
@@ -243,7 +243,7 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
         // inset:0 overlay: the site behind stays fully visible AND interactive (scrollable,
         // clickable) so members can reference it while writing feedback. Close = ✕ or Esc only.
         <div className="vivfb-drawer" style={{
-          position: "fixed", top: 0, right: 0, height: "100vh", zIndex: 1400,
+          position: "fixed", top: 0, right: 0, zIndex: 1350,
           width: "min(440px, 92vw)", display: "flex", flexDirection: "column",
           background: "linear-gradient(180deg, rgba(18,18,26,0.97), rgba(8,8,14,0.99))",
           borderLeft: `1px solid ${C.borderGold}`, boxShadow: "-24px 0 70px rgba(0,0,0,0.55)",
@@ -359,14 +359,16 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
       )}
 
       {/* Full-page detail — a feedback item opened for easy reading. Sits ABOVE the feedback drawer
-          (z 1400) at z 1500; reuses the same vote/comment/resolve/delete handlers (no duplicated logic). */}
+          (z 1350) at z 1360; reuses the same vote/comment/resolve/delete handlers (no duplicated logic).
+          Ladder (app-wide, ascending): trade-details page 1300 < feedback drawer 1350 < full-page
+          reader 1360 < edit-trade modal 1400 < toasts 1600 (transient, allowed on top of everything). */}
       {detailItem && (() => {
         const f = detailItem;
         const resolved = f.status === "resolved";
         const cc = catColor(f.category);
         return (
           <div className="vivfb-back" onClick={(e) => { if (e.target === e.currentTarget) setDetail(null); }} style={{
-            position: "fixed", inset: 0, zIndex: 1500, background: "radial-gradient(1000px 600px at 70% -10%, rgba(201,152,42,0.09), transparent 60%), rgba(3,3,6,0.82)",
+            position: "fixed", inset: 0, zIndex: 1360, background: "radial-gradient(1000px 600px at 70% -10%, rgba(201,152,42,0.09), transparent 60%), rgba(3,3,6,0.82)",
             backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: isMobile ? "20px 12px 40px" : "48px 16px", overflowY: "auto", fontFamily: font,
           }}>
             <div className="vivfb-modal" style={{

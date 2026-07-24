@@ -11,6 +11,10 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 // ─────────────────────────────────────────────────────────────
 
 const TFS = [{ k: "1min", lbl: "1m" }, { k: "5min", lbl: "5m" }, { k: "15min", lbl: "15m" }, { k: "60min", lbl: "1h" }, { k: "1day", lbl: "D" }];
+// MODULE scope (never nested in a component — past bug): a component defined inside a render body
+// is a new type every render, forcing a full remount of everything using it. C is a prop here (not
+// module-scope in this file), so it's passed through explicitly.
+const Pill = ({ C, label, children }) => <span style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 9, padding: "7px 12px", fontSize: "0.76rem", color: C.muted, fontWeight: 600 }}>{label} {children}</span>;
 // Normalize any trade date to ISO YYYY-MM-DD before it hits `new Date()`. A naive slice(0,10)
 // left legacy manual/dashboard "M/D/YY" rows (e.g. "7/16/26") as non-ISO strings: Safari/JSC
 // refuses to parse those (Invalid Date → the details chart silently blanked), and where they DID
@@ -208,7 +212,6 @@ export default function TradeReplayChart({ trade, C, font }) {
 
   // ── pills from trade data ──
   const entryP = Number(trade.entryP) || 0, exitP = Number(trade.exitP) || 0, stopP = Number(trade.stop) || 0, pl = Number(trade.plDollar) || 0, r = trade.rMult, sh = Number(trade.shares) || 0, up = pl >= 0;
-  const Pill = ({ label, children }) => <span style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 9, padding: "7px 12px", fontSize: "0.76rem", color: C.muted, fontWeight: 600 }}>{label} {children}</span>;
   const b = (t, c) => <b style={{ color: c || "#fff", fontWeight: 800 }}>{t}</b>;
   const tBtn = (k, label, title) => <button title={title} onClick={() => { setTool(k); if (k !== "trend") { draftRef.current = null; mouseRef.current = null; redraw(); } }} style={{ background: tool === k ? C.goldDim : "transparent", color: tool === k ? C.goldBright : C.muted, border: `1px solid ${tool === k ? C.borderGold : "transparent"}`, borderRadius: 7, padding: "5px 9px", fontFamily: font, fontSize: "0.7rem", fontWeight: 700, cursor: "pointer" }}>{label}</button>;
 
@@ -216,12 +219,12 @@ export default function TradeReplayChart({ trade, C, font }) {
     <div style={{ fontFamily: font }}>
       {/* stat pills */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        <Pill label="Entry">{b("$" + entryP.toFixed(2))} · {sh.toLocaleString()} sh</Pill>
-        {stopP ? <Pill label="Stop">{b("$" + stopP.toFixed(2), RED)}</Pill> : null}
-        <Pill label="Exit">{b("$" + exitP.toFixed(2))}</Pill>
-        <Pill label="P&L">{b(kfmt(pl), up ? GRN : RED)}</Pill>
-        {r != null ? <Pill label="Realized R">{b((Number(r) >= 0 ? "+" : "") + Number(r).toFixed(2) + "R", Number(r) >= 0 ? GRN : RED)}</Pill> : null}
-        <Pill label="TF">{b(TFS.find(x => x.k === tf)?.lbl || tf, C.goldBright)}</Pill>
+        <Pill C={C} label="Entry">{b("$" + entryP.toFixed(2))} · {sh.toLocaleString()} sh</Pill>
+        {stopP ? <Pill C={C} label="Stop">{b("$" + stopP.toFixed(2), RED)}</Pill> : null}
+        <Pill C={C} label="Exit">{b("$" + exitP.toFixed(2))}</Pill>
+        <Pill C={C} label="P&L">{b(kfmt(pl), up ? GRN : RED)}</Pill>
+        {r != null ? <Pill C={C} label="Realized R">{b((Number(r) >= 0 ? "+" : "") + Number(r).toFixed(2) + "R", Number(r) >= 0 ? GRN : RED)}</Pill> : null}
+        <Pill C={C} label="TF">{b(TFS.find(x => x.k === tf)?.lbl || tf, C.goldBright)}</Pill>
       </div>
       {/* timeframe + drawing tools strip */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>

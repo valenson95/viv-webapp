@@ -113,10 +113,10 @@ function toFills(xml) {
 
 export default async function handler(req, res) {
   // Only Vercel Cron (or someone with the secret) may trigger this.
-  if (CRON_SECRET && req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
+  if (!CRON_SECRET || req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
     return res.status(401).json({ ok: false, error: "unauthorized" });
   }
-  if (!SB_URL || !SB_SERVICE || !INGEST_URL || !WORKER_SECRET) {
+  if (!SB_URL || !SB_SERVICE || !INGEST_URL || !WORKER_SECRET || !CRON_SECRET) {
     return res.status(500).json({ ok: false, error: "missing env vars" });
   }
   const sb = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });

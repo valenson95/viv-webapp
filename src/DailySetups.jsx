@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { listSetups, deleteSetup, markTaken } from "./dailySetups.js";
 import { sectionsFor, scoreTicked, versionOf } from "./SetupGrader.jsx";
@@ -70,6 +70,8 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   const [boardSort, setBoardSort] = useState({ k: "stage", d: 1 }); // board column sort — key + direction
   const [boardOpen, setBoardOpen] = useState(false); // collapsed by default: top rows only
   const [openDays, setOpenDays] = useState(() => new Set()); // date groups the user expanded — ALL collapsed by default (member ask 2026-07-10)
+  const [loadFailed, setLoadFailed] = useState(false); // true only when every attempt genuinely errored — distinguishes "broken" from "empty"
+  const deadRef = useRef(false); // unmount guard for the delayed retry chain — mirrors TradeReplayChart's `let dead=false` cleanup
 
   // Mobile cold-start hardening: a stalled first fetch used to leave rows=null forever ("Loading the
   // feed…" that only a manual refresh cleared — member tohzhiyangrv). Now the fetch races an 8s timeout
@@ -80,16 +82,18 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
     ]);
     try {
       const { rows: r, tableMissing: tm, loadError } = await withTimeout(listSetups(), 8000);
-      if (loadError && attempt < 1) { setTimeout(() => load(attempt + 1), 1200); return; } // one silent retry
-      setRows(r || []); setTableMissing(tm);
+      if (deadRef.current) return;
+      if (loadError && attempt < 1) { setTimeout(() => { if (!deadRef.current) load(attempt + 1); }, 1200); return; } // one silent retry
+      setRows(r || []); setTableMissing(tm); setLoadFailed(!!loadError); // loadError surviving the retry = a genuine failure, not an empty feed
     } catch {
-      if (attempt < 1) { setTimeout(() => load(attempt + 1), 1200); return; }
-      setRows([]); // give up gracefully → empty state, never a permanent spinner
+      if (deadRef.current) return;
+      if (attempt < 1) { setTimeout(() => { if (!deadRef.current) load(attempt + 1); }, 1200); return; }
+      setRows([]); setLoadFailed(true); // give up gracefully → distinct "couldn't load" state, never a permanent spinner
     }
   }, []);
   // Re-run when the auth session settles: the initial mount can fire before Supabase auth is ready on a
   // cold mobile load, which returns nothing; re-fetching once `session` lands fixes the "needs refresh" case.
-  useEffect(() => { load(); }, [load, session]);
+  useEffect(() => { deadRef.current = false; load(); return () => { deadRef.current = true; }; }, [load, session]);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") setLightbox(null); };
     window.addEventListener("keydown", h);
@@ -98,7 +102,9 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
 
   const remove = async (r) => {
     if (!window.confirm(`Remove ${r.ticker} (${r.trade_date}) from the feed?`)) return;
-    await deleteSetup(r.id); load();
+    const res = await deleteSetup(r.id);
+    if (!res.ok) window.alert(res.error);
+    load();
   };
   const takenToggle = async (r) => {
     const res = await markTaken(r.id, !r.taken_at);
@@ -247,7 +253,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
 
       {/* THE FUNNEL — half the row; its stage-distribution graph fills the other half (Jameson 2026-07-17) */}
       {rows && rows.length > 0 && boardRows.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 16, alignItems: "start", marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(380px, 100%), 1fr))", gap: 16, alignItems: "start", marginBottom: 16 }}>
         <div style={{ ...cardChrome, padding: "16px 18px" }}>
           <div style={{ ...cardHead, marginBottom: 12 }}>
             <span style={{ ...microLabel, flex: 1 }}>The Funnel</span>
@@ -450,6 +456,16 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
 
       {rows === null ? (
         <div style={{ color: C.muted, fontSize: "0.84rem", padding: "30px 8px" }}>Loading the feed…</div>
+      ) : rows.length === 0 && loadFailed ? (
+        <div style={{ ...cardChrome, padding: "34px 20px", textAlign: "center", color: C.muted, fontSize: "0.86rem" }}>
+          Couldn't load the feed — check your connection.
+          <div>
+            <button onClick={() => { setLoadFailed(false); load(0); }}
+              style={{ marginTop: 14, background: "rgba(255,255,255,0.03)", border: `1px dashed ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "6px 18px", borderRadius: 10, cursor: "pointer" }}>
+              Retry
+            </button>
+          </div>
+        </div>
       ) : rows.length === 0 ? (
         <div style={{ ...cardChrome, padding: "34px 20px", textAlign: "center", color: C.muted, fontSize: "0.86rem" }}>
           No setups published yet — the first daily post lands here.

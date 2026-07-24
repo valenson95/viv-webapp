@@ -987,7 +987,7 @@ export function StudyHypotheses({ C, rows }) {
 
       {/* ── Deep-dive modal (blurred backdrop; closes on backdrop click only; inside clicks don't). Portaled
           to body to escape the panel's backdrop-filter stacking context. z 1300 (above editor 1250, below
-          the chart lightbox 1400). Esc is left to the lightbox — not bound here. ── */}
+          the chart lightbox 1550). Esc is left to the lightbox — not bound here. ── */}
       {modalHyp && createPortal(
         <div onClick={e => { if (e.target === e.currentTarget) setModalId(null); }}
           style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(4,4,8,0.6)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "5vh 4vw", display: "flex", justifyContent: "center", alignItems: "flex-start" }}>
@@ -1375,10 +1375,12 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
         <button onClick={guardedCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
       </div>
 
-      {/* click-to-zoom lightbox — ← → toggles HTF↔LTF, click backdrop or Esc to close */}
+      {/* click-to-zoom lightbox — ← → toggles HTF↔LTF, click backdrop or Esc to close. z 1550: the
+          StudyEditor that hosts this opens from a ModelBook backdrop at z 1250, so the lightbox must
+          paint above the editor — matches the app-wide "lightboxes above modals" convention (1500+). */}
       {zoom && row[zoom] && (
         <div onClick={e => { if (e.target === e.currentTarget) setZoom(null); }}
-          style={{ position: "fixed", inset: 0, zIndex: 1400, background: "rgba(4,4,8,0.9)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          style={{ position: "fixed", inset: 0, zIndex: 1550, background: "rgba(4,4,8,0.9)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10, color: C.white, fontFamily: font }}>
             {zoomSlots.length > 1 && <button onClick={() => setZoom(zoomSlots[(zoomSlots.indexOf(zoom) - 1 + zoomSlots.length) % zoomSlots.length])} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 10, fontSize: "1.3rem", cursor: "pointer" }} aria-label="Previous">‹</button>}
             <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>{SLOT_TITLES[zoom] || zoom}{zoomSlots.length > 1 ? " · ← → to cycle" : ""}</span>
