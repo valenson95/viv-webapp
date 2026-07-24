@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { GROUP_RS } from "./groupRS-data.js";
 import { sectorFor } from "./sectors.js";
 
@@ -565,7 +566,54 @@ const HYP_READS = {
   H13: { short: "Reversion (short)", distOnly: true, read: (s) => { const p = _outNum(s, "ext_at_peak"), d = _mnum(s, "drop_after_peak_5"); if (p == null && d == null) return null;
     return { answer: `${p != null ? `peaked at ${p.toFixed(1)}×` : ""}${p != null && d != null ? " · " : ""}${d != null ? `dropped ${d.toFixed(1)}% in 5d` : ""}`, state: "adds" }; } },
 };
-HYPOTHESES.forEach(h => Object.assign(h, HYP_READS[h.id] || {}));
+// Display metadata (Valen 2026-07-24): `title` = the one punchy plain-English sentence shown as BOTH the
+// heat-table row text and the deep-dive modal title. `howTracked` / `verdictLine` = the modal's "how it's
+// tracked" + "verdict logic" lines. No mentor names — doctrine/observed-prior wording only.
+const HYP_META = {
+  H1: { title: "The tighter a stock coils before it breaks out, the more explosive the move.",
+    howTracked: "Eyeball 'tight' tick + the computed tight-days count (narrow-range days in the last 10). Per leg — read off the setup (BEFORE) chart.",
+    verdictLine: "Supports when a tight-coil entry becomes a winner (or a loose one fails); challenges when a tight coil fails (or a loose one wins)." },
+  H2: { title: "Breakouts from short coils (under ~10 days) work; long month-plus bases tend to fail.",
+    howTracked: "Sub-tag on the tight tick — coil-length band (<10d / 10–20d / >20d). Per leg — off the BEFORE chart.",
+    verdictLine: "Per-band win/loss split — the <10-day band should carry the higher winner share." },
+  H3: { title: "Catch a trend early — the 1st and 2nd legs pay; by the 3rd leg you're on borrowed time.",
+    howTracked: "Manual eyeball leg tag (1st / 2nd / 3rd). Per leg — judged off the chart, never auto-set.",
+    verdictLine: "Per-band split — the 1st/2nd-leg bands should out-win the 3rd+." },
+  H4: { title: "A second leg that only pulls back to the 10-day line, never the 20, is about to launch again.",
+    howTracked: "Eyeball shallow-retrace tick + a depth sub-tag (10MA / 20MA / 50MA / deeper / no touch). Per leg — off the BEFORE chart.",
+    verdictLine: "Per-band split — the 10MA-hold band should carry the higher winner share." },
+  H5: { title: "The smaller the company, the bigger the % move — as long as it's still liquid enough to trade.",
+    howTracked: "Computed: market cap at trigger, average $ volume, turnover %. Per leg — no chart needed.",
+    verdictLine: "Descriptive distribution — per cap band, the median % move (smaller bands should show bigger moves). No pass/fail verdict." },
+  H6: { title: "A real winner never gives back even half of its breakout day's gain.",
+    howTracked: "Computed: did any low in days 2–5 dip below the day-1 midpoint. Per leg — no chart needed.",
+    verdictLine: "Supports when a held-above-half entry wins (or an invaded one fails); challenges the reverse." },
+  H7: { title: "If it hasn't followed through by day 3, it's dead — winners go bang-bang-bang.",
+    howTracked: "Computed: new high above the day-1 high by day 2 or 3. Per leg — no chart needed.",
+    verdictLine: "Supports when a follow-through entry wins (or a stall fails); challenges the reverse." },
+  H8: { title: "The more ignored a stock is before it moves, the bigger the move tends to be.",
+    howTracked: "Computed: sessions since the last 20%/5-day burst + how far under the 52-week high. Campaign-level (root leg only) — no chart needed.",
+    verdictLine: "Among monsters, a long-dormant name supports; a monster with no dormancy challenges. Non-monsters just add data." },
+  H9: { title: "A breakout from a range needs a catalyst to hold; without one it usually fails.",
+    howTracked: "Eyeball catalyst tick (news/earnings ≤2 days before). Per leg — from the chart / notes.",
+    verdictLine: "For range breakouts (1st legs): supports when a catalyst entry wins; continuation legs just add data." },
+  H10: { title: "How many legs a trend prints before it finally closes below the 10- vs the 20-day line.",
+    howTracked: "Whole-trend leg counts (10MA / 20MA) set on the root leg off the shared AFTER chart, plus computed sessions-to-first-close-below. Campaign-level.",
+    verdictLine: "Descriptive distribution vs the leg-count prior — no pass/fail verdict." },
+  H11: { title: "Enter fresh near the 50-day line; once a move stretches far past it, it's late — trim, don't chase.",
+    howTracked: "Computed: extension-from-50MA at entry and at the burst peak (×ATR%). Per leg — no chart needed.",
+    verdictLine: "Descriptive — entry bands split winners vs losers (fresh ≤4× should out-win); peak bands show where winners top out." },
+  H12a: { title: "A setup whose sector is getting the money right now (top-5 by thrust) has better odds of working.",
+    howTracked: "Computed at view time from the rotation engine — the group's thrust rank at the trigger. Per leg. Coverage limited to dated snapshots.",
+    verdictLine: "Supports when an in-theme (top-5 thrust) entry wins (or an off-theme one fails); challenges the reverse." },
+  H12b: { title: "A setup in a relative-strength-leader sector (RS 1-month ≥ 80) has better odds of working.",
+    howTracked: "Computed at view time from the rotation engine — the group's 1-month RS at the trigger. Per leg. Coverage limited to dated snapshots.",
+    verdictLine: "Supports when a leader-RS entry wins (or a laggard fails); challenges the reverse." },
+  H13: { title: "When a move stretches to an extreme above the 50-day line, measure how hard it snaps back — that's the short.",
+    howTracked: "Computed: peak extension (×ATR%) + max give-back over the next 5 / 10 sessions. Per leg — no chart needed.",
+    verdictLine: "Descriptive distribution — per peak-extension band, the median snap-back. No pass/fail verdict." },
+};
+HYPOTHESES.forEach(h => Object.assign(h, HYP_READS[h.id] || {}, HYP_META[h.id] || {}));
 
 // SINGLE SOURCE OF TRUTH — the per-entry verdict used by BOTH the strip and the tally table, so they
 // can never disagree. Truth table: predicted-good state + winner ⇒ supports · good + failure ⇒ challenges
@@ -637,39 +685,33 @@ function hypSubcat(hyp, winners, fails) {
   return { sub, rows, enough, W: pWin.length, F: pFail.length, E, list: [...pWin, ...pFail] };
 }
 
-export function StudyHypotheses({ C, rows }) {
-  const [open, setOpen] = React.useState(null); // hypothesis id whose study list is expanded
-  const [tallyOpen, setTallyOpen] = React.useState(null); // `${id}:${bucket}` whose ticker list is expanded
-  const [era, setEra] = React.useState("all"); // "all" | "new" — one filter applied at the top of the data flow
-  // ONE era filter feeds the entire panel (tally + cards + distributions). Trigger date = row.entry_date.
-  const inEra = (r) => era === "all" || String(r.entry_date || "") >= H_ERA_START;
-  const eraRows = (rows || []).filter(inEra);
-  // Campaign structure from ALL rows (era-stable) so root identity never flips with the filter.
-  const campById = buildCampaigns(rows).byId;
-  const mapPt = (r) => { const c = campById[r.id] || {}; return { s: r.metrics.study, ticker: r.ticker, date: r.entry_date, cid: c.campaign_id || `solo:${r.id}`, root: c.isRoot !== false }; };
-  const resolved = eraRows.filter(r => r.metrics?.study && outcomeClass(r.metrics.study)).map(mapPt);
-  const winners = resolved.filter(x => ["big winner", "monster"].includes(outcomeClass(x.s)));
-  const fails = resolved.filter(x => outcomeClass(x.s) === "failure");
-  // H10 distribution is outcome-independent — it reads leg counts off every loaded study, not just resolved.
-  const allStudies = eraRows.filter(r => r.metrics?.study).map(mapPt);
-  // DEDUP (statistical correctness): campaign-level hypotheses (H8 neglect, H10 leg-lifespan) count ONCE per
-  // campaign (root leg only) so a 3-leg name can't vote 3×; per-leg hypotheses count every leg. campCount =
-  // distinct campaigns in a sample — surfaces the clustered (non-independent) legs-of-one-name honestly.
-  const forLevel = (list, hyp) => hyp.level === "campaign" ? list.filter(x => x.root) : list;
-  const campCount = (list) => new Set(list.map(x => x.cid)).size;
-  const totalCamps = campCount(allStudies);
-  const srcChip = (source) => {
-    const gold = source === "DOCTRINE";
-    return { border: `1px solid ${gold ? C.goldBright : C.blue}`, color: gold ? C.goldBright : C.blue,
-      background: gold ? C.goldDim : C.blueDim, borderRadius: 99, fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".08em", padding: "2px 8px", whiteSpace: "nowrap" };
-  };
+// Campaign dedup helpers (module scope so both the panel table AND the deep-dive modal share them).
+const hypForLevel = (list, hyp) => hyp.level === "campaign" ? list.filter(x => x.root) : list;
+const hypCampCount = (list) => new Set(list.map(x => x.cid)).size;
+// Row heat (mirrors the rotation-breadth heat convention): color by support ratio, GATED on sample size so
+// a 2-vote row never reads green. <8 usable votes ⇒ muted "collecting"; else opacity scales with distance
+// from 0.5. Distribution-only hypotheses are handled by the caller (neutral slate, never a green/red verdict).
+function hypHeat(supports, challenges, C) {
+  const usable = supports + challenges;
+  if (usable < 8) return { bg: "transparent", fg: C.muted, verdict: `collecting — ${usable}/30`, weak: true };
+  const r = supports / usable, d = Math.abs(r - 0.5) * 2, op = (0.12 + d * 0.30).toFixed(2), pct = Math.round(r * 100);
+  if (r >= 0.70) return { bg: `rgba(34,197,94,${op})`, fg: "#7ef0a0", verdict: `supports · ${pct}%` };
+  if (r >= 0.55) return { bg: `rgba(34,197,94,${op})`, fg: "#7ef0a0", verdict: `leans support · ${pct}%` };
+  if (r > 0.45) return { bg: "rgba(224,169,85,0.12)", fg: "#e0a955", verdict: `contested · ${pct}%` };
+  if (r > 0.30) return { bg: `rgba(239,68,68,${op})`, fg: "#e05555", verdict: `leans against · ${pct}%` };
+  return { bg: `rgba(239,68,68,${op})`, fg: "#e05555", verdict: `against · ${pct}%` };
+}
+
+// ── The FULL live readout for ONE hypothesis (Valen 2026-07-24) — relocated from the old always-visible
+// cards into the deep-dive modal. Header (title/thesis/points) is rendered by the modal shell; this is the
+// readout only. Module scope + own expand state (never a component nested in a component). ──
+export function HypReadout({ C, hyp, winners, fails, allStudies }) {
+  const [open, setOpen] = useState(null);
   const liftColor = (l) => l >= 2 ? "#7ef0a0" : l < 0.7 ? "#e05555" : C.muted;
-  const subhead = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "0 0 12px" };
-  const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" };
   const outLabel = (s) => MB_OUTCOME[outcomeClass(s)] || outcomeClass(s);
   const outColor = (s) => outcomeClass(s) === "failure" ? "#e05555" : "#7ef0a0";
   const expandList = (list, valFn) => (
-    <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8, maxHeight: 220, overflowY: "auto" }}>
+    <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8, maxHeight: 240, overflowY: "auto" }}>
       {list.length === 0 ? <div style={{ fontSize: "0.66rem", color: C.muted }}>No studies counted yet.</div> :
         [...list].sort((a, b) => (["big winner", "monster"].includes(outcomeClass(b.s)) ? 1 : 0) - (["big winner", "monster"].includes(outcomeClass(a.s)) ? 1 : 0)).map((x, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: "0.68rem", borderBottom: i === list.length - 1 ? "none" : "1px solid rgba(255,255,255,0.04)" }}>
@@ -681,6 +723,206 @@ export function StudyHypotheses({ C, rows }) {
         ))}
     </div>
   );
+  // ── H10 distribution — leg-count histogram vs prior, MA10 & MA20 side by side ──
+  if (hyp.kind === "distribution") {
+    const base = hypForLevel(allStudies, hyp);
+    const dists = hyp.stores.map(([store, maLabel]) => ({ store, maLabel, ...legDist(store, hyp.bands, base) }));
+    const med10 = medianCompanion(base, "d_below_ma10", "ma10_censored");
+    const med20 = medianCompanion(base, "d_below_ma20", "ma20_censored");
+    const distBox = { flex: "1 1 240px", minWidth: 220, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "rgba(0,0,0,0.25)" };
+    return (
+      <div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {dists.map(d => (
+            <div key={d.store} style={distBox}>
+              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Legs to first close below {d.maLabel} · n={d.n}</div>
+              {hyp.bands.map(b => {
+                const c = d.counts[b], pct = d.n ? Math.round(c / d.n * 100) : 0, prior = hyp.priorDist[b];
+                return (
+                  <div key={b} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "2px 0" }}>
+                    <span style={{ width: 26, flex: "none", color: C.text, fontWeight: 700 }}>{b}</span>
+                    <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: C.goldBright }} /></div>
+                    <span style={{ width: 66, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{c} · {pct}%</span>
+                    <span style={{ width: 58, flex: "none", textAlign: "right", color: "rgba(255,255,255,0.32)", fontSize: "0.6rem" }} title="Doctrine prior — the reference distribution, not measured data">{prior == null ? "prior —" : `prior ${prior}%`}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: "0.66rem", color: C.text, marginTop: 9 }}>
+          Median sessions to first close below MA — <b style={{ color: C.goldBright }}>10MA {med10.med == null ? "—" : med10.med}</b> (n={med10.n}, {med10.cens} censored) · <b style={{ color: C.goldBright }}>20MA {med20.med == null ? "—" : med20.med}</b> (n={med20.n}, {med20.cens} censored)
+        </div>
+        <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
+          n={hypCampCount(base)} campaigns (leg-lifespan is whole-trend — counted once per campaign, root leg) · {dists[0].n}/{dists[1].n} measured (10MA/20MA) · {dists[0].blank}/{dists[1].blank} blank · censored shown separately — believe nothing &lt;30, promote at 50
+        </div>
+        <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{open === hyp.id ? "▴ hide the studies counted" : "▾ show the studies counted"}</div>
+        {open === hyp.id && (() => {
+          const withLegs = base.filter(x => (x.s.checks?.legs_ma10 ?? "") !== "" || (x.s.checks?.legs_ma20 ?? "") !== "");
+          return (
+            <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8, maxHeight: 240, overflowY: "auto" }}>
+              {withLegs.length === 0 ? <div style={{ fontSize: "0.66rem", color: C.muted }}>No leg counts recorded yet.</div> :
+                withLegs.map((x, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: "0.68rem", borderBottom: i === withLegs.length - 1 ? "none" : "1px solid rgba(255,255,255,0.04)" }}>
+                    <span style={{ width: 56, flex: "none", fontWeight: 800, color: C.white }}>{x.ticker}</span>
+                    <span style={{ width: 88, flex: "none", color: C.muted, fontSize: "0.62rem" }}>{x.date}</span>
+                    <span style={{ flex: 1, color: C.text }}>10MA: <b style={{ color: C.goldBright }}>{x.s.checks?.legs_ma10 || "—"}</b> legs · 20MA: <b style={{ color: C.goldBright }}>{x.s.checks?.legs_ma20 || "—"}</b> legs</span>
+                  </div>
+                ))}
+            </div>
+          );
+        })()}
+      </div>
+    );
+  }
+  // ── H11 extension — ENTRY winners/failures per band + EXIT peak distribution ──
+  if (hyp.kind === "extension") {
+    const en = extEntry(hyp.bands, hyp.entryKey, hypForLevel(winners, hyp), hypForLevel(fails, hyp));
+    const px = extPeakDist(hyp.bands, hyp.peakKey, hypForLevel(winners, hyp));
+    const half = { flex: "1 1 260px", minWidth: 240, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "rgba(0,0,0,0.25)" };
+    const exitOpen = open === `${hyp.id}-x`;
+    return (
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={half}>
+          <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Entry ext (×ATR% from 50MA) — winners vs losers</div>
+          {en.rows.map(row => {
+            const rowOpen = open === `${hyp.id}-e-${row.band}`;
+            return (
+              <div key={row.band}>
+                <div onClick={() => setOpen(rowOpen ? null : `${hyp.id}-e-${row.band}`)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0" }}>
+                  <span style={{ width: 44, flex: "none", color: C.text, fontWeight: 700 }}>{row.band}</span>
+                  <span style={{ flex: 1, color: C.muted, fontSize: "0.66rem" }}>{row.wc}W · {row.fc}F</span>
+                  <b style={{ width: 52, flex: "none", textAlign: "right", fontWeight: 800, color: en.enough ? liftColor(row.lift) : C.muted }}>{en.enough ? (row.lift === Infinity ? "∞" : row.lift.toFixed(2) + "×") : "·"}</b>
+                  <span style={{ flex: "none", color: C.muted, fontSize: "0.62rem" }}>{rowOpen ? "▴" : "▾"}</span>
+                </div>
+                {rowOpen && expandList(row.list, s => { const v = s.m?.[hyp.entryKey]; return v == null || v === "" ? "—" : `${(+v).toFixed(2)}× at entry`; })}
+              </div>
+            );
+          })}
+          {!en.enough && <div style={{ fontSize: "0.66rem", color: "#e0a955", marginTop: 6 }}>collecting — n={en.W + en.F} of 30</div>}
+          <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6 }}>n={en.W} winners / {en.F} losers / {en.E} excluded blank across {hypCampCount(en.rows.flatMap(r => r.list))} campaigns — believe nothing &lt;30, promote at 50</div>
+        </div>
+        <div style={half}>
+          <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Where winners topped — the trim band · n={px.n}</div>
+          {hyp.bands.map(band => { const c = px.counts[band], pct = px.n ? Math.round(c / px.n * 100) : 0;
+            return (
+              <div key={band} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "2px 0" }}>
+                <span style={{ width: 44, flex: "none", color: C.text, fontWeight: 700 }}>{band}</span>
+                <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: band === "≥7×" ? "#7ef0a0" : C.goldBright }} /></div>
+                <span style={{ width: 66, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{c} · {pct}%</span>
+              </div>
+            ); })}
+          <div style={{ fontSize: "0.66rem", color: C.text, marginTop: 7 }}>Median winner peak ext — <b style={{ color: C.goldBright }}>{px.med == null ? "—" : px.med.toFixed(2) + "×"}</b></div>
+          <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 4 }}>n={px.n} winners with peak ext / {px.blank} excluded blank across {hypCampCount(px.set)} campaigns — believe nothing &lt;30, promote at 50</div>
+          <div onClick={() => setOpen(exitOpen ? null : `${hyp.id}-x`)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{exitOpen ? "▴ hide the winners counted" : "▾ show the winners counted"}</div>
+          {exitOpen && expandList(px.set, s => { const v = s.outcome?.[hyp.peakKey]; return v == null || v === "" ? "—" : `${(+v).toFixed(2)}× at peak`; })}
+        </div>
+      </div>
+    );
+  }
+  // ── H5 / H13 band × move-size distribution ──
+  if (hyp.kind === "bandmove") {
+    const base = hypForLevel(allStudies, hyp);
+    const bs = bandStats(base, hyp);
+    const fmts = hyp.fmts || hyp.cols.map(() => _pct);
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted, padding: "2px 0 5px" }}>
+          <span style={{ width: 78, flex: "none" }}>Band</span>
+          <span style={{ width: 30, flex: "none", textAlign: "right" }}>n</span>
+          <div style={{ flex: 1 }} />
+          {hyp.cols.map(([lab], ci) => <span key={ci} style={{ width: 92, flex: "none", textAlign: "right" }}>{lab}</span>)}
+          <span style={{ width: 14, flex: "none" }} />
+        </div>
+        {bs.perBand.map(pb => {
+          const barVal = pb.meds[bs.barCol], pct = Math.round(Math.abs(barVal ?? 0) / bs.maxBar * 100), bandOpen = open === `${hyp.id}-b-${pb.band}`;
+          return (
+            <div key={pb.band}>
+              <div onClick={() => pb.n && setOpen(bandOpen ? null : `${hyp.id}-b-${pb.band}`)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0", cursor: pb.n ? "pointer" : "default" }}>
+                <span style={{ width: 78, flex: "none", color: C.text, fontWeight: 700 }}>{pb.band}</span>
+                <span style={{ width: 30, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{pb.n}</span>
+                <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: (barVal ?? 0) < 0 ? "#e05555" : C.goldBright }} /></div>
+                {pb.meds.map((m, ci) => <span key={ci} style={{ width: 92, flex: "none", textAlign: "right", color: ci === bs.barCol ? C.white : C.muted, fontWeight: ci === bs.barCol ? 700 : 400, fontSize: "0.66rem" }}>{fmts[ci](m)}</span>)}
+                <span style={{ width: 14, flex: "none", color: C.muted, fontSize: "0.6rem" }}>{pb.n ? (bandOpen ? "▴" : "▾") : ""}</span>
+              </div>
+              {bandOpen && expandList(pb.items, hyp.expand)}
+            </div>
+          );
+        })}
+        <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 7, letterSpacing: ".01em" }}>
+          n={bs.set.length} measured across {hypCampCount(bs.set)} campaigns · {bs.excluded} excluded ({hyp.excludedLabel || "blank"}) — believe nothing &lt;30, promote at 50
+        </div>
+      </div>
+    );
+  }
+  // ── H1/H3/H4… binary lift + subcat split ──
+  const isSub = hyp.kind === "subcat";
+  const lw = hypForLevel(winners, hyp), lf = hypForLevel(fails, hyp);
+  const r = isSub ? hypSubcat(hyp, lw, lf) : hypBinary(hyp, lw, lf);
+  const measured = r.W + r.F, cardCamps = hypCampCount(r.list);
+  return (
+    <div>
+      {isSub ? (
+        <div>
+          <div style={{ display: "grid", gap: 2 }}>
+            {r.rows.map(row => (
+              <div key={row.val} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0" }}>
+                <span style={{ width: 92, flex: "none", color: C.text }}>{row.label}</span>
+                <span style={{ flex: 1, color: C.muted, fontSize: "0.66rem" }}>{row.wc}W · {row.fc}F</span>
+                <b style={{ width: 52, flex: "none", textAlign: "right", fontWeight: 800, color: r.enough ? liftColor(row.lift) : C.muted }}>{r.enough ? (row.lift === Infinity ? "∞" : row.lift.toFixed(2) + "×") : "·"}</b>
+              </div>
+            ))}
+          </div>
+          {!r.enough && <div style={{ fontSize: "0.66rem", color: "#e0a955", marginTop: 6 }}>collecting — n={measured} of 30</div>}
+        </div>
+      ) : (
+        <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: "0.72rem", padding: "4px 0" }}>
+          <span style={{ flex: 1, color: C.text }}>Winners <b style={{ color: C.white }}>{r.wT}/{r.W}</b> have it · Losers <b style={{ color: C.white }}>{r.fT}/{r.F}</b> have it</span>
+          {r.enough
+            ? <b style={{ flex: "none", fontWeight: 800, color: liftColor(r.lift) }}>{r.lift === Infinity ? "∞" : r.lift.toFixed(2)}× lift</b>
+            : <span style={{ flex: "none", color: "#e0a955", fontSize: "0.68rem" }}>collecting — n={measured} of 30</span>}
+          <span style={{ flex: "none", color: C.muted, fontSize: "0.7rem" }}>{open === hyp.id ? "▴" : "▾"}</span>
+        </div>
+      )}
+      <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
+        {hyp.level === "campaign"
+          ? `n=${cardCamps} campaigns (deduped to root leg) · ${r.W}W / ${r.F}F / ${r.E} blank — believe nothing <30, promote at 50`
+          : `n=${r.W} winners / ${r.F} losers / ${r.E} excluded blank across ${cardCamps} campaigns — believe nothing <30, promote at 50`}
+      </div>
+      {isSub
+        ? <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{open === hyp.id ? "▴ hide the studies counted" : "▾ show the studies counted"}</div>
+        : null}
+      {open === hyp.id && expandList(r.list, isSub ? (s => (SUBCATS[hyp.parent].options.find(([v]) => String(s.checks?.[SUBCATS[hyp.parent].store]) === v)?.[1]) || "—") : hyp.value)}
+    </div>
+  );
+}
+
+export function StudyHypotheses({ C, rows }) {
+  const [era, setEra] = React.useState("all"); // "all" | "new" — one filter applied at the top of the data flow
+  const [modalId, setModalId] = React.useState(null); // hypothesis id whose deep-dive modal is open
+  // ONE era filter feeds the entire panel (table + modal readout). Trigger date = row.entry_date.
+  const inEra = (r) => era === "all" || String(r.entry_date || "") >= H_ERA_START;
+  const eraRows = (rows || []).filter(inEra);
+  // Campaign structure from ALL rows (era-stable) so root identity never flips with the filter.
+  const campById = buildCampaigns(rows).byId;
+  const mapPt = (r) => { const c = campById[r.id] || {}; return { s: r.metrics.study, ticker: r.ticker, date: r.entry_date, cid: c.campaign_id || `solo:${r.id}`, root: c.isRoot !== false }; };
+  const resolved = eraRows.filter(r => r.metrics?.study && outcomeClass(r.metrics.study)).map(mapPt);
+  const winners = resolved.filter(x => ["big winner", "monster"].includes(outcomeClass(x.s)));
+  const fails = resolved.filter(x => outcomeClass(x.s) === "failure");
+  const allStudies = eraRows.filter(r => r.metrics?.study).map(mapPt);
+  const totalCamps = hypCampCount(allStudies);
+  const srcChip = (source) => { const gold = source === "DOCTRINE";
+    return { border: `1px solid ${gold ? C.goldBright : C.blue}`, color: gold ? C.goldBright : C.blue,
+      background: gold ? C.goldDim : C.blueDim, borderRadius: 99, fontSize: "0.52rem", fontWeight: 800, letterSpacing: ".08em", padding: "1px 7px", whiteSpace: "nowrap", flex: "none" }; };
+  const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" };
+  // Per-hypothesis verdict counts — the SAME shared entryVerdict + campaign dedup used everywhere.
+  const rowsData = HYPOTHESES.map(h => {
+    let supports = 0, challenges = 0, data = 0; const camps = new Set();
+    hypForLevel(allStudies, h).forEach(x => { const v = entryVerdict(h, x.s, x); if (!v) return; camps.add(x.cid);
+      if (v.bucket === "supports") supports++; else if (v.bucket === "challenges") challenges++; else data++; });
+    return { h, supports, challenges, data, camps: camps.size, n: supports + challenges };
+  });
+  const modalHyp = modalId ? HYPOTHESES.find(h => h.id === modalId) : null;
   return (
     <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", marginBottom: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
       <div style={sheen} />
@@ -694,314 +936,83 @@ export function StudyHypotheses({ C, rows }) {
           ))}
         </div>
       </div>
-      <div style={{ fontSize: "0.6rem", color: C.muted, marginBottom: 12 }}>Blank fields never vote — old studies only count where the data is real.</div>
-      {/* ── Hypothesis tally — one row per H1–H11, same per-entry verdict as the strip (single source of
-          truth via entryVerdict). Every count click-expands to the exact tickers behind it. ── */}
-      {(() => {
-        const tally = HYPOTHESES.map(h => {
-          const b = { supports: [], challenges: [], data: [] };
-          forLevel(allStudies, h).forEach(x => { const v = entryVerdict(h, x.s, x); if (v) b[v.bucket].push({ ...x, v }); });
-          const vN = b.supports.length + b.challenges.length;
-          return { h, ...b, vN, camps: campCount([...b.supports, ...b.challenges, ...b.data]) };
-        });
-        const statusOf = (t) => {
-          if (t.h.distOnly) return { txt: "distribution — see card", col: C.muted };
-          if (t.vN < 30) return { txt: `collecting — ${t.vN}/30`, col: "#e0a955" };
-          const s = t.supports.length, c = t.challenges.length;
-          if (s > c && s >= 2 * c) return { txt: "leaning 🟢", col: "#7ef0a0" };
-          if (c > s && c >= 2 * s) return { txt: "leaning 🔴", col: "#e05555" };
-          return { txt: "contested", col: C.muted };
-        };
-        const cellBtn = (t, bucket, count, col) => (
-          <button type="button" onClick={() => count && setTallyOpen(tallyOpen === `${t.h.id}:${bucket}` ? null : `${t.h.id}:${bucket}`)}
-            style={{ width: 44, flex: "none", textAlign: "center", background: "transparent", border: "none", fontFamily: "inherit", fontSize: "0.72rem", fontWeight: 800, color: count ? col : "rgba(255,255,255,0.25)", cursor: count ? "pointer" : "default", textDecoration: count ? "underline dotted" : "none" }}>{count}</button>
-        );
-        return (
-          <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, marginBottom: 14, overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", background: "rgba(255,255,255,0.03)", fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted }}>
-              <span style={{ flex: 1 }}>Hypothesis</span><span style={{ width: 44, textAlign: "center" }}>🟢</span><span style={{ width: 44, textAlign: "center" }}>🔴</span><span style={{ width: 44, textAlign: "center" }}>⚪</span><span style={{ width: 34, textAlign: "center" }}>n</span><span style={{ width: 128, textAlign: "right" }}>Status</span>
-            </div>
-            {tally.map(t => { const st = statusOf(t); const oKey = tallyOpen && tallyOpen.startsWith(t.h.id + ":") ? tallyOpen.split(":")[1] : null;
-              return (
-                <div key={t.h.id} style={{ borderTop: `1px solid ${C.border}` }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", fontSize: "0.72rem" }}>
-                    <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-                      <b style={{ color: C.white, whiteSpace: "nowrap" }}>{t.h.short}</b>
-                      <span style={srcChip(t.h.source)}>{t.h.source}</span>
-                    </span>
-                    {cellBtn(t, "supports", t.supports.length, "#7ef0a0")}
-                    {cellBtn(t, "challenges", t.challenges.length, "#e05555")}
-                    {cellBtn(t, "data", t.data.length, C.muted)}
-                    <span title={`${t.h.level === "campaign" ? "campaign-level — deduped to root leg · " : ""}${t.camps} campaign${t.camps === 1 ? "" : "s"} in the sample`} style={{ width: 34, flex: "none", textAlign: "center", color: C.muted, fontSize: "0.66rem", cursor: "help" }}>{t.vN}</span>
-                    <span style={{ width: 128, flex: "none", textAlign: "right", fontWeight: 700, color: st.col, fontSize: "0.64rem" }}>{st.txt}</span>
-                  </div>
-                  {oKey && (
-                    <div style={{ padding: "2px 12px 9px", maxHeight: 180, overflowY: "auto" }}>
-                      {t[oKey].length === 0 ? <div style={{ fontSize: "0.64rem", color: C.muted }}>none</div> :
-                        t[oKey].map((x, i) => (
-                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: "0.66rem", borderBottom: i === t[oKey].length - 1 ? "none" : "1px solid rgba(255,255,255,0.04)" }}>
-                            <span style={{ width: 52, flex: "none", fontWeight: 800, color: C.white }}>{x.ticker}</span>
-                            <span style={{ width: 84, flex: "none", color: C.muted, fontSize: "0.6rem" }}>{x.date}</span>
-                            <span style={{ flex: 1, color: C.text }}>{x.v.answer}</span>
-                            <span style={{ flex: "none", fontSize: "0.6rem", fontWeight: 700, color: x.v.tone === "supports" ? "#7ef0a0" : x.v.tone === "challenges" ? "#e05555" : C.muted }}>{x.v.chip} {x.v.verb}</span>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              ); })}
-          </div>
-        );
-      })()}
-      <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5, marginBottom: 14 }}>
-        Pre-registered claims the study wing exists to resolve. <b style={{ color: C.goldBright }}>DOCTRINE</b> = an observed prior; <b style={{ color: C.blue }}>MINE</b> = Valen's own read. Readout: winners (huge ∪ winner) vs losers on each field. Lift shows once both classes clear 5 — believe nothing before n≥30, promote at 50.
-      </div>
-      <div style={{ display: "grid", gap: 12 }}>
-        {HYPOTHESES.map(hyp => {
-          // ── H10 distribution card — leg-count histogram vs the doctrine prior, MA10 & MA20 side by side ──
-          if (hyp.kind === "distribution") {
-            const base = forLevel(allStudies, hyp); // campaign-level ⇒ root legs only (count once per trend)
-            const dists = hyp.stores.map(([store, maLabel]) => ({ store, maLabel, ...legDist(store, hyp.bands, base) }));
-            const med10 = medianCompanion(base, "d_below_ma10", "ma10_censored");
-            const med20 = medianCompanion(base, "d_below_ma20", "ma20_censored");
-            const distBox = { flex: "1 1 240px", minWidth: 220, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "rgba(0,0,0,0.25)" };
-            return (
-              <div key={hyp.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(0,0,0,0.22)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
-                  <span style={{ fontSize: "0.58rem", fontWeight: 800, color: C.muted, letterSpacing: ".06em" }}>{hyp.id}</span>
-                  <span style={{ fontSize: "0.82rem", fontWeight: 800, color: C.white }}>{hyp.claim}</span>
-                  <span style={srcChip(hyp.source)}>{hyp.source}</span>
-                </div>
-                <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{hyp.prior}</div>
-                <div style={{ display: "grid", gap: 3, marginBottom: 10 }}>
-                  {hyp.points.map(([lab, meaning], i) => (
-                    <div key={i} style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.4 }}>
-                      <b style={{ color: C.goldBright }}>{lab}</b> <span style={{ color: C.muted }}>— {meaning}</span>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  {dists.map(d => (
-                    <div key={d.store} style={distBox}>
-                      <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Legs to first close below {d.maLabel} · n={d.n}</div>
-                      {hyp.bands.map(b => {
-                        const c = d.counts[b], pct = d.n ? Math.round(c / d.n * 100) : 0, prior = hyp.priorDist[b];
-                        return (
-                          <div key={b} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "2px 0" }}>
-                            <span style={{ width: 26, flex: "none", color: C.text, fontWeight: 700 }}>{b}</span>
-                            <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}>
-                              <div style={{ width: `${pct}%`, height: "100%", background: C.goldBright }} />
-                            </div>
-                            <span style={{ width: 66, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{c} · {pct}%</span>
-                            <span style={{ width: 58, flex: "none", textAlign: "right", color: "rgba(255,255,255,0.32)", fontSize: "0.6rem" }} title="Doctrine prior — the reference distribution, not measured data">{prior == null ? "prior —" : `prior ${prior}%`}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-                <div style={{ fontSize: "0.66rem", color: C.text, marginTop: 9 }}>
-                  Median sessions to first close below MA — <b style={{ color: C.goldBright }}>10MA {med10.med == null ? "—" : med10.med}</b> (n={med10.n}, {med10.cens} censored) · <b style={{ color: C.goldBright }}>20MA {med20.med == null ? "—" : med20.med}</b> (n={med20.n}, {med20.cens} censored)
-                </div>
-                <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
-                  n={campCount(base)} campaigns (leg-lifespan is whole-trend — counted once per campaign, root leg) · {dists[0].n}/{dists[1].n} measured (10MA/20MA) · {dists[0].blank}/{dists[1].blank} blank · censored shown separately — believe nothing &lt;30, promote at 50
-                </div>
-                <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{open === hyp.id ? "▴ hide the studies counted" : "▾ show the studies counted"}</div>
-                {open === hyp.id && (() => {
-                  const withLegs = base.filter(x => (x.s.checks?.legs_ma10 ?? "") !== "" || (x.s.checks?.legs_ma20 ?? "") !== "");
-                  return (
-                    <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8, maxHeight: 220, overflowY: "auto" }}>
-                      {withLegs.length === 0 ? <div style={{ fontSize: "0.66rem", color: C.muted }}>No leg counts recorded yet.</div> :
-                        withLegs.map((x, i) => (
-                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: "0.68rem", borderBottom: i === withLegs.length - 1 ? "none" : "1px solid rgba(255,255,255,0.04)" }}>
-                            <span style={{ width: 56, flex: "none", fontWeight: 800, color: C.white }}>{x.ticker}</span>
-                            <span style={{ width: 88, flex: "none", color: C.muted, fontSize: "0.62rem" }}>{x.date}</span>
-                            <span style={{ flex: 1, color: C.text }}>10MA: <b style={{ color: C.goldBright }}>{x.s.checks?.legs_ma10 || "—"}</b> legs · 20MA: <b style={{ color: C.goldBright }}>{x.s.checks?.legs_ma20 || "—"}</b> legs</span>
-                          </div>
-                        ))}
-                    </div>
-                  );
-                })()}
-              </div>
-            );
-          }
-          // ── H11 extension card — ENTRY winners/failures per ext band + EXIT peak distribution (winners only) ──
-          if (hyp.kind === "extension") {
-            const en = extEntry(hyp.bands, hyp.entryKey, forLevel(winners, hyp), forLevel(fails, hyp));
-            const px = extPeakDist(hyp.bands, hyp.peakKey, forLevel(winners, hyp));
-            const half = { flex: "1 1 260px", minWidth: 240, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "rgba(0,0,0,0.25)" };
-            const exitOpen = open === `${hyp.id}-x`;
-            return (
-              <div key={hyp.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(0,0,0,0.22)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
-                  <span style={{ fontSize: "0.58rem", fontWeight: 800, color: C.muted, letterSpacing: ".06em" }}>{hyp.id}</span>
-                  <span style={{ fontSize: "0.82rem", fontWeight: 800, color: C.white }}>{hyp.claim}</span>
-                  <span style={srcChip(hyp.source)}>{hyp.source}</span>
-                </div>
-                <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{hyp.prior}</div>
-                <div style={{ display: "grid", gap: 3, marginBottom: 10 }}>
-                  {hyp.points.map(([lab, meaning], i) => (
-                    <div key={i} style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.4 }}>
-                      <b style={{ color: C.goldBright }}>{lab}</b> <span style={{ color: C.muted }}>— {meaning}</span>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  {/* ENTRY side — winners vs failures per ext-at-trigger band (click a band to expand) */}
-                  <div style={half}>
-                    <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Entry ext (×ATR% from 50MA) — winners vs losers</div>
-                    {en.rows.map(row => {
-                      const rowOpen = open === `${hyp.id}-e-${row.band}`;
-                      return (
-                        <div key={row.band}>
-                          <div onClick={() => setOpen(rowOpen ? null : `${hyp.id}-e-${row.band}`)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0" }}>
-                            <span style={{ width: 44, flex: "none", color: C.text, fontWeight: 700 }}>{row.band}</span>
-                            <span style={{ flex: 1, color: C.muted, fontSize: "0.66rem" }}>{row.wc}W · {row.fc}F</span>
-                            <b style={{ width: 52, flex: "none", textAlign: "right", fontWeight: 800, color: en.enough ? liftColor(row.lift) : C.muted }}>{en.enough ? (row.lift === Infinity ? "∞" : row.lift.toFixed(2) + "×") : "·"}</b>
-                            <span style={{ flex: "none", color: C.muted, fontSize: "0.62rem" }}>{rowOpen ? "▴" : "▾"}</span>
-                          </div>
-                          {rowOpen && expandList(row.list, s => { const v = s.m?.[hyp.entryKey]; return v == null || v === "" ? "—" : `${(+v).toFixed(2)}× at entry`; })}
-                        </div>
-                      );
-                    })}
-                    {!en.enough && <div style={{ fontSize: "0.66rem", color: "#e0a955", marginTop: 6 }}>collecting — n={en.W + en.F} of 30</div>}
-                    <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6 }}>n={en.W} winners / {en.F} losers / {en.E} excluded blank across {campCount(en.rows.flatMap(r => r.list))} campaigns — believe nothing &lt;30, promote at 50</div>
-                  </div>
-                  {/* EXIT side — where winners topped (ext-at-peak distribution, winners only) */}
-                  <div style={half}>
-                    <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Where winners topped — the trim band · n={px.n}</div>
-                    {hyp.bands.map(band => { const c = px.counts[band], pct = px.n ? Math.round(c / px.n * 100) : 0;
-                      return (
-                        <div key={band} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "2px 0" }}>
-                          <span style={{ width: 44, flex: "none", color: C.text, fontWeight: 700 }}>{band}</span>
-                          <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}>
-                            <div style={{ width: `${pct}%`, height: "100%", background: band === "≥7×" ? "#7ef0a0" : C.goldBright }} />
-                          </div>
-                          <span style={{ width: 66, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{c} · {pct}%</span>
-                        </div>
-                      ); })}
-                    <div style={{ fontSize: "0.66rem", color: C.text, marginTop: 7 }}>Median winner peak ext — <b style={{ color: C.goldBright }}>{px.med == null ? "—" : px.med.toFixed(2) + "×"}</b></div>
-                    <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 4 }}>n={px.n} winners with peak ext / {px.blank} excluded blank across {campCount(px.set)} campaigns — believe nothing &lt;30, promote at 50</div>
-                    <div onClick={() => setOpen(exitOpen ? null : `${hyp.id}-x`)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{exitOpen ? "▴ hide the winners counted" : "▾ show the winners counted"}</div>
-                    {exitOpen && expandList(px.set, s => { const v = s.outcome?.[hyp.peakKey]; return v == null || v === "" ? "—" : `${(+v).toFixed(2)}× at peak`; })}
-                  </div>
-                </div>
-              </div>
-            );
-          }
-          // ── H5 / H13 band × move-size distribution card — bucket by a band, show per-band median moves ──
-          if (hyp.kind === "bandmove") {
-            const base = forLevel(allStudies, hyp);
-            const bs = bandStats(base, hyp);
-            const fmts = hyp.fmts || hyp.cols.map(() => _pct);
-            return (
-              <div key={hyp.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(0,0,0,0.22)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
-                  <span style={{ fontSize: "0.58rem", fontWeight: 800, color: C.muted, letterSpacing: ".06em" }}>{hyp.id}</span>
-                  <span style={{ fontSize: "0.82rem", fontWeight: 800, color: C.white }}>{hyp.claim}</span>
-                  <span style={srcChip(hyp.source)}>{hyp.source}</span>
-                </div>
-                <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.45, marginBottom: 6 }}>{hyp.prior}</div>
-                {hyp.caption && <div style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.45)", fontStyle: "italic", marginBottom: 8 }}>{hyp.caption}</div>}
-                <div style={{ display: "grid", gap: 3, marginBottom: 10 }}>
-                  {hyp.points.map(([lab, meaning], i) => (
-                    <div key={i} style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.4 }}><b style={{ color: C.goldBright }}>{lab}</b> <span style={{ color: C.muted }}>— {meaning}</span></div>
-                  ))}
-                </div>
-                {/* column header */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted, padding: "2px 0 5px" }}>
-                  <span style={{ width: 78, flex: "none" }}>Band</span>
-                  <span style={{ width: 30, flex: "none", textAlign: "right" }}>n</span>
-                  <div style={{ flex: 1 }} />
-                  {hyp.cols.map(([lab], ci) => <span key={ci} style={{ width: 92, flex: "none", textAlign: "right" }}>{lab}</span>)}
-                  <span style={{ width: 14, flex: "none" }} />
-                </div>
-                {bs.perBand.map(pb => {
-                  const barVal = pb.meds[bs.barCol], pct = Math.round(Math.abs(barVal ?? 0) / bs.maxBar * 100), bandOpen = open === `${hyp.id}-b-${pb.band}`;
-                  return (
-                    <div key={pb.band}>
-                      <div onClick={() => pb.n && setOpen(bandOpen ? null : `${hyp.id}-b-${pb.band}`)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0", cursor: pb.n ? "pointer" : "default" }}>
-                        <span style={{ width: 78, flex: "none", color: C.text, fontWeight: 700 }}>{pb.band}</span>
-                        <span style={{ width: 30, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{pb.n}</span>
-                        <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}>
-                          <div style={{ width: `${pct}%`, height: "100%", background: (barVal ?? 0) < 0 ? "#e05555" : C.goldBright }} />
-                        </div>
-                        {pb.meds.map((m, ci) => <span key={ci} style={{ width: 92, flex: "none", textAlign: "right", color: ci === bs.barCol ? C.white : C.muted, fontWeight: ci === bs.barCol ? 700 : 400, fontSize: "0.66rem" }}>{fmts[ci](m)}</span>)}
-                        <span style={{ width: 14, flex: "none", color: C.muted, fontSize: "0.6rem" }}>{pb.n ? (bandOpen ? "▴" : "▾") : ""}</span>
-                      </div>
-                      {bandOpen && expandList(pb.items, hyp.expand)}
-                    </div>
-                  );
-                })}
-                <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 7, letterSpacing: ".01em" }}>
-                  n={bs.set.length} measured across {campCount(bs.set)} campaigns · {bs.excluded} excluded ({hyp.excludedLabel || "blank"}) — believe nothing &lt;30, promote at 50
-                </div>
-              </div>
-            );
-          }
-          const isSub = hyp.kind === "subcat";
-          const lw = forLevel(winners, hyp), lf = forLevel(fails, hyp); // campaign-level ⇒ root legs only
-          const r = isSub ? hypSubcat(hyp, lw, lf) : hypBinary(hyp, lw, lf);
-          const measured = r.W + r.F;
-          const cardCamps = campCount(r.list); // distinct campaigns behind this readout (clustered-obs honesty)
+      <div style={{ fontSize: "0.6rem", color: C.muted, marginBottom: 12 }}>Blank fields never vote — old studies only count where the data is real. Click any row for the deep dive.</div>
+      {/* ── Clean heat table — one row per hypothesis, colored by support-vs-against ratio (gated on sample
+          size so a thin sample never reads green). Click a row → the full deep-dive modal. ── */}
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", background: "rgba(255,255,255,0.03)", fontSize: "0.52rem", fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted }}>
+          <span style={{ flex: 1, minWidth: 0 }}>Hypothesis</span>
+          <span style={{ width: 34, flex: "none", textAlign: "center" }}>🟢</span>
+          <span style={{ width: 34, flex: "none", textAlign: "center" }}>🔴</span>
+          <span style={{ width: 34, flex: "none", textAlign: "center" }}>⚪</span>
+          <span style={{ width: 28, flex: "none", textAlign: "center" }}>n</span>
+          <span style={{ width: 116, flex: "none", textAlign: "right" }}>Verdict</span>
+        </div>
+        {rowsData.map(t => {
+          const dist = !!t.h.distOnly;
+          const heat = dist ? null : hypHeat(t.supports, t.challenges, C);
+          const rowBg = dist ? "rgba(148,163,184,0.06)" : (heat.weak ? "transparent" : heat.bg);
+          const verdictTxt = dist ? "distribution — open to view" : heat.verdict;
+          const verdictCol = dist ? "#94a3b8" : heat.fg;
           return (
-            <div key={hyp.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(0,0,0,0.22)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
-                <span style={{ fontSize: "0.58rem", fontWeight: 800, color: C.muted, letterSpacing: ".06em" }}>{hyp.id}</span>
-                <span style={{ fontSize: "0.82rem", fontWeight: 800, color: C.white }}>{hyp.claim}</span>
-                <span style={srcChip(hyp.source)}>{hyp.source}</span>
-              </div>
-              <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.45, marginBottom: hyp.caption ? 6 : 8 }}>{hyp.prior}</div>
-              {hyp.caption && <div style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.45)", fontStyle: "italic", marginBottom: 8 }}>{hyp.caption}</div>}
-              <div style={{ display: "grid", gap: 3, marginBottom: 10 }}>
-                {hyp.points.map(([lab, meaning], i) => (
-                  <div key={i} style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.4 }}>
-                    <b style={{ color: C.goldBright }}>{lab}</b> <span style={{ color: C.muted }}>— {meaning}</span>
-                  </div>
-                ))}
-              </div>
-              {/* live readout */}
-              {isSub ? (
-                <div>
-                  <div style={{ display: "grid", gap: 2 }}>
-                    {r.rows.map(row => (
-                      <div key={row.val} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0" }}>
-                        <span style={{ width: 92, flex: "none", color: C.text }}>{row.label}</span>
-                        <span style={{ flex: 1, color: C.muted, fontSize: "0.66rem" }}>{row.wc}W · {row.fc}F</span>
-                        <b style={{ width: 52, flex: "none", textAlign: "right", fontWeight: 800, color: r.enough ? liftColor(row.lift) : C.muted }}>
-                          {r.enough ? (row.lift === Infinity ? "∞" : row.lift.toFixed(2) + "×") : "·"}</b>
-                      </div>
-                    ))}
-                  </div>
-                  {!r.enough && <div style={{ fontSize: "0.66rem", color: "#e0a955", marginTop: 6 }}>collecting — n={measured} of 30</div>}
-                </div>
-              ) : (
-                <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: "0.72rem", padding: "4px 0" }}>
-                  <span style={{ flex: 1, color: C.text }}>
-                    Winners <b style={{ color: C.white }}>{r.wT}/{r.W}</b> have it · Losers <b style={{ color: C.white }}>{r.fT}/{r.F}</b> have it
-                  </span>
-                  {r.enough
-                    ? <b style={{ flex: "none", fontWeight: 800, color: liftColor(r.lift) }}>{r.lift === Infinity ? "∞" : r.lift.toFixed(2)}× lift</b>
-                    : <span style={{ flex: "none", color: "#e0a955", fontSize: "0.68rem" }}>collecting — n={measured} of 30</span>}
-                  <span style={{ flex: "none", color: C.muted, fontSize: "0.7rem" }}>{open === hyp.id ? "▴" : "▾"}</span>
-                </div>
-              )}
-              {/* SampleTag — always shown. Per-leg ⇒ "across C campaigns" (legs of one name are correlated);
-                  campaign-level ⇒ the sample IS campaigns (deduped to the root leg). */}
-              <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
-                {hyp.level === "campaign"
-                  ? `n=${cardCamps} campaigns (deduped to root leg) · ${r.W}W / ${r.F}F / ${r.E} blank — believe nothing <30, promote at 50`
-                  : `n=${r.W} winners / ${r.F} losers / ${r.E} excluded blank across ${cardCamps} campaigns — believe nothing <30, promote at 50`}
-              </div>
-              {/* click-to-expand study list */}
-              {isSub
-                ? <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{open === hyp.id ? "▴ hide the studies counted" : "▾ show the studies counted"}</div>
-                : null}
-              {open === hyp.id && expandList(r.list, isSub ? (s => (SUBCATS[hyp.parent].options.find(([v]) => String(s.checks?.[SUBCATS[hyp.parent].store]) === v)?.[1]) || "—") : hyp.value)}
+            <div key={t.h.id} onClick={() => setModalId(t.h.id)}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: `1px solid ${C.border}`, background: rowBg, fontSize: "0.72rem", cursor: "pointer", transition: "filter .12s" }}
+              onMouseEnter={e => e.currentTarget.style.filter = "brightness(1.28)"} onMouseLeave={e => e.currentTarget.style.filter = "none"}>
+              <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap", color: C.text, lineHeight: 1.35 }}>
+                <span style={{ fontSize: "0.5rem", fontWeight: 800, color: C.muted, letterSpacing: ".04em" }}>{t.h.id}</span>
+                <span style={{ fontWeight: 600, color: C.white }}>{t.h.title || t.h.claim}</span>
+                <span style={srcChip(t.h.source)}>{t.h.source}</span>
+              </span>
+              <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 800, color: dist ? C.muted : (t.supports ? "#7ef0a0" : "rgba(255,255,255,0.25)") }}>{dist ? "—" : t.supports}</span>
+              <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 800, color: dist ? C.muted : (t.challenges ? "#e05555" : "rgba(255,255,255,0.25)") }}>{dist ? "—" : t.challenges}</span>
+              <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 800, color: t.data ? C.muted : "rgba(255,255,255,0.25)" }}>{t.data}</span>
+              <span title={`${t.h.level === "campaign" ? "campaign-level — deduped to root leg · " : ""}${t.camps} campaign${t.camps === 1 ? "" : "s"} in the sample`} style={{ width: 28, flex: "none", textAlign: "center", color: C.muted, fontSize: "0.66rem", cursor: "help" }}>{dist ? t.data : t.n}</span>
+              <span style={{ width: 116, flex: "none", textAlign: "right", fontWeight: 700, color: verdictCol, fontSize: "0.62rem" }}>{verdictTxt}</span>
             </div>
           );
         })}
       </div>
+      <div style={{ fontSize: "0.58rem", color: C.muted, marginTop: 8 }}><b style={{ color: C.goldBright }}>DOCTRINE</b> = an observed prior · <b style={{ color: C.blue }}>MINE</b> = Valen's own read · green = supports, red = challenges (colored only past 8 resolved votes), slate = descriptive distribution.</div>
+
+      {/* ── Deep-dive modal (blurred backdrop; closes on backdrop click only; inside clicks don't). Portaled
+          to body to escape the panel's backdrop-filter stacking context. z 1300 (above editor 1250, below
+          the chart lightbox 1400). Esc is left to the lightbox — not bound here. ── */}
+      {modalHyp && createPortal(
+        <div onClick={e => { if (e.target === e.currentTarget) setModalId(null); }}
+          style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(4,4,8,0.6)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "5vh 4vw", display: "flex", justifyContent: "center", alignItems: "flex-start" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "min(840px,100%)", background: "linear-gradient(180deg, rgba(18,18,26,0.96), rgba(8,8,14,0.98))", border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "20px 22px", boxShadow: "0 40px 100px rgba(0,0,0,0.72)" }}>
+            {(() => {
+              const h = modalHyp, mine = h.source === "MINE";
+              return (<>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 4 }}>
+                  <span style={{ fontSize: "0.56rem", fontWeight: 800, color: C.muted, letterSpacing: ".06em", marginTop: 6 }}>{h.id}</span>
+                  <span style={{ flex: 1, fontSize: "1.02rem", fontWeight: 800, color: C.white, lineHeight: 1.35 }}>{h.title || h.claim}</span>
+                  <span style={srcChip(h.source)}>{h.source}</span>
+                  <button onClick={() => setModalId(null)} style={{ flex: "none", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, width: 30, height: 30, borderRadius: 9, fontSize: "1.05rem", cursor: "pointer", lineHeight: 1 }} aria-label="Close">×</button>
+                </div>
+                <div style={{ fontSize: "0.62rem", color: mine ? C.blue : C.goldBright, fontWeight: 700, marginBottom: 14 }}>{mine ? "MINE — Valen's own observed prior" : "DOCTRINE — an observed prior from the corpus"}</div>
+
+                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 6 }}>The thesis</div>
+                <div style={{ fontSize: "0.82rem", color: C.text, lineHeight: 1.55, marginBottom: h.caption ? 6 : 16 }}>{h.prior}</div>
+                {h.caption && <div style={{ fontSize: "0.66rem", color: "rgba(255,255,255,0.5)", fontStyle: "italic", marginBottom: 16 }}>{h.caption}</div>}
+
+                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 6 }}>How it's tracked</div>
+                <div style={{ display: "grid", gap: 3, marginBottom: 6 }}>
+                  {h.points.map(([lab, meaning], i) => (
+                    <div key={i} style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.4 }}><b style={{ color: C.goldBright }}>{lab}</b> <span style={{ color: C.muted }}>— {meaning}</span></div>
+                  ))}
+                </div>
+                {h.howTracked && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5, marginBottom: 16 }}>{h.howTracked}</div>}
+
+                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 6 }}>Verdict logic</div>
+                <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.5, marginBottom: 16 }}>{h.verdictLine || "Supports when the predicted-good state coincides with a winner; challenges when it doesn't."}</div>
+
+                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 8 }}>The live readout</div>
+                <HypReadout C={C} hyp={h} winners={winners} fails={fails} allStudies={allStudies} />
+              </>);
+            })()}
+          </div>
+        </div>, document.body)}
     </div>
   );
 }
