@@ -4,7 +4,7 @@ import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
 import { SECTIONS, sectionsFor, scoreTicked, versionOf, stampV2 } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
-import { isStudyRow, StudyEditor, StudyScoreboard, outcomeClass, studyQuality } from "./StudyBook.jsx";
+import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, HypothesisRead, outcomeClass, studyQuality } from "./StudyBook.jsx";
 
 // A study starred for the Model Book shows as a card; its star count comes from the study's
 // auto quality grade (tick-%) rather than the 16-criteria Model Book ticks it doesn't have.
@@ -673,6 +673,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {studyMode && fScope === "mine" && isAdmin && (
         <div style={{ marginBottom: 20 }}>
           <StudyScoreboard C={C} rows={studyRows} />
+          <StudyHypotheses C={C} rows={studyRows} />
           {/* Editor opens as a blurred-backdrop POPUP (Valen 2026-07-17) — click a row anywhere in the
               list and edit right there, no scrolling back up. Backdrop click / Cancel closes; clicks
               inside never close (members are editing). Portaled to body so no card backdrop-filter
@@ -862,6 +863,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                   </div>
                 </div>
               )}
+              {/* Hypothesis read — ADMIN-ONLY, study-payload rows only (his private 🔒 My Book side). Members
+                  (isAdmin false) and published non-study cards render nothing new. Valen 2026-07-24. */}
+              {isStudyRow(r) && isAdmin && <HypothesisRead C={C} study={r.metrics.study} />}
               {r.thesis && <div style={{ marginBottom: 12 }}><div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>The thesis</div><div style={{ fontSize: "0.88rem", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.thesis}</div></div>}
               {r.lesson && <div style={{ marginBottom: 14 }}><div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>The lesson</div><div style={{ fontSize: "0.88rem", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.lesson}</div></div>}
               {(isAdmin || (r.created_by === uid && !r.is_published)) && (

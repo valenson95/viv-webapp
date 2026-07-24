@@ -33,13 +33,14 @@ export const STUDY_SETUPS = {
         // Eyeball layer stays QUALITATIVE (mentor verbatim) — the 0.6×ATR quantification is a
         // winner-dna.md ⚠️-knob and lives in metrics.tight_days (study-fill.mjs), not in his ticks.
         // 3rd element "bonus" = tracked in the lift table but excluded from the quality score.
-        ["tight", "Tightening series — ≥3 visibly narrow-range days pre-trigger"],
+        ["tight", "Tightening series — ≥3 visibly narrow-range days pre-trigger"], // sub-categorized by coil length (checks.coil_len) — Valen 2026-07-24
         ["vol_dry", "Volume drying up in the base (lower than usual)"],
         ["orderly", "Orderly base — no big red bars inside"],
         ["higher_lows", "Higher lows forming into the pivot"],
         ["prior_nr", "Day before trigger = narrow-range or negative day"],
         ["inside", "Inside bar(s) right before the trigger — coil tell", "bonus"],
         ["ma_conv", "SMA 10/20/50 converging at the pivot", "bonus"],
+        ["shallow_retrace", "Pullback held the 10MA (never closed below)", "bonus"], // sub-categorized by how deep it cut (checks.retrace_ma) — Valen 2026-07-24
         ["ma_surf", "Surfing rising 10/20/50-day MA into the pivot"],
       ]},
       { title: "Trigger day", items: [
@@ -48,6 +49,7 @@ export const STUDY_SETUPS = {
         ["closehi", "Closed ≥70% of the day's range"],
         ["vol_exp", "Volume expansion — trigger bar volume above prior day"],
         ["gapped", "Gapped up on the trigger day"], // sub-categorized by gap % (checks.gap_band) — Valen 2026-07-14
+        ["catalyst", "Catalyst present (news/earnings ≤2d before trigger)", "bonus"], // Valen 2026-07-24
       ]},
     ],
     metrics: [
@@ -59,6 +61,47 @@ export const STUDY_SETUPS = {
       ["re_pct", "Trigger day % move"], ["gap_pct", "Gap % (open vs prior close)"], ["vol_ratio", "Volume ÷ prior day"],
       ["rvol_eod", "RVol 50d EOD"], ["rvol_30m", "RVOL 1st 30min (vs same window, 20d)"], ["vol30_adv_pct", "1st-30min vol as % of ADV"], ["run_rate", "Run rate at entry (×)"],
       ["closing_range", "Closing range % (C−L)/(H−L)"], ["entry_px", "Entry (5-min ORH — standing rule)"], ["pivot_px", "Pivot (annotated) $ — gates the sim"], ["stop_width_adr", "LoD stop width from entry (×ADR)"],
+      // Task-2 computed characteristics (study-fill.mjs) — cap/liquidity, neglect, burst-shape tells.
+      ["adv_dollar", "ADV $ (20d avg vol × trigger close)"], ["turnover_pct", "Turnover % ($ADV ÷ cap)"], ["dormant_days", "Dormant days (since last ≥20%/5d burst)"],
+      ["invaded_half", "Invaded day-1 half? (low d2–5 < midpoint)"], ["d3_moved", "Follow-through by D3? (new high by d2/d3)"],
+      ["d_below_ma10", "Sessions to 1st close below 10MA"], ["d_below_ma20", "Sessions to 1st close below 20MA"],
+      ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
+      ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
+    ],
+  },
+  // Momentum Burst — the short 3–5 day mover (Valen 2026-07-24). Reuses the EXACT same tick keys as
+  // Momentum Breakout so hypothesis readouts aggregate the field across both setup types.
+  "Momentum Burst": {
+    buckets: [
+      { title: "Coil", items: [
+        ["tight", "Tightening series — ≥3 visibly narrow-range days pre-trigger"], // sub-cat coil_len
+        ["orderly", "Orderly base — no big red bars inside"],
+        ["higher_lows", "Higher lows forming into the pivot"],
+        ["up2", "≤2 up-days before the trigger (not buying day 3)"],
+        ["prior_nr", "Day before trigger = narrow-range or negative day"],
+        ["shallow_retrace", "Pullback held the 10MA (never closed below)", "bonus"], // sub-cat retrace_ma
+      ]},
+      { title: "Trigger", items: [
+        ["re", "Day-1 range expansion ≥4% — bar visibly bigger than last 5–10"],
+        ["closehi", "Closed ≥70% of the day's range"],
+        ["gapped", "Gapped up on the trigger day"], // sub-cat gap_band
+      ]},
+      { title: "Context", items: [
+        ["young", "Young trend — 1st–3rd burst, not late/extended"], // sub-cat young_leg
+        ["linear", "Prior advance linear — clean, no whipsaw"],
+        ["catalyst", "Catalyst present (news/earnings ≤2d before trigger)", "bonus"],
+      ]},
+    ],
+    metrics: [
+      ["rs", "AS/RS rank"], ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"],
+      ["tight_days", "Tight days (NR streak)"], ["pole_pct", "Pole run-up %"], ["ext_50ma", "Ext from 50MA (×ATR%)"],
+      ["from_high_pct", "% below 52wk high"], ["up_days_before", "Up-days in a row before trigger"],
+      ["re_pct", "Trigger day % move"], ["gap_pct", "Gap % (open vs prior close)"], ["vol_ratio", "Volume ÷ prior day"],
+      ["rvol_eod", "RVol 50d EOD"], ["rvol_30m", "RVOL 1st 30min (vs same window, 20d)"], ["vol30_adv_pct", "1st-30min vol as % of ADV"],
+      ["closing_range", "Closing range % (C−L)/(H−L)"], ["entry_px", "Entry (5-min ORH — standing rule)"], ["pivot_px", "Pivot (annotated) $ — gates the sim"], ["stop_width_adr", "LoD stop width from entry (×ADR)"],
+      ["adv_dollar", "ADV $ (20d avg vol × trigger close)"], ["turnover_pct", "Turnover % ($ADV ÷ cap)"], ["dormant_days", "Dormant days (since last ≥20%/5d burst)"],
+      ["invaded_half", "Invaded day-1 half? (low d2–5 < midpoint)"], ["d3_moved", "Follow-through by D3? (new high by d2/d3)"],
+      ["d_below_ma10", "Sessions to 1st close below 10MA"], ["d_below_ma20", "Sessions to 1st close below 20MA"],
       ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
       ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
@@ -132,7 +175,7 @@ export const DATA_FLAGS = [
 // Outcome anatomy — burst shape + campaign shape, shared by all setups.
 const OUTCOME_METRICS = [
   ["mfe_d1", "MFE % day 1"], ["mfe_d3", "MFE % day 3"], ["mfe_d5", "MFE % day 5"], ["mfe_d20", "MFE % day 20"],
-  ["day2_pct", "Day-2 % move (follow-through size)"], ["burst_days", "Burst length (up-closes AFTER trigger; +1 = Bonde count)"], ["burst_pct", "Burst magnitude % (from pre-trigger close)"],
+  ["day2_pct", "Day-2 % move (follow-through size)"], ["burst_days", "Burst length (up-closes AFTER trigger; +1 = doctrine burst count)"], ["burst_pct", "Burst magnitude % (from pre-trigger close)"],
   ["mae", "MAE % (before MFE)"], ["giveback_pct", "Giveback after burst %"],
   ["days_above_10ma", "Days above 10MA (campaign length)"], ["trail_r", "Trail-exit total R (10/20MA sim)"],
   ["ext_at_peak", "Ext from 50MA at burst peak (×ATR%)"],
@@ -147,6 +190,9 @@ const OUTCOME_METRICS = [
 export const SUBCATS = {
   young: { store: "young_leg", options: [["1", "1st leg"], ["2", "2nd leg"], ["3", "3rd leg"]] },
   gapped: { store: "gap_band", options: [["<2", "<2%"], ["2-5", "2–5%"], ["5-10", "5–10%"], [">10", ">10%"]] },
+  // Valen 2026-07-24: coil duration band on the tightening tick; retrace depth on the shallow-retrace bonus tick.
+  tight: { store: "coil_len", options: [["<10", "<10d"], ["10-20", "10–20d"], [">20", ">20d"]] },
+  shallow_retrace: { store: "retrace_ma", options: [["10ma", "10MA"], ["20ma", "20MA"], ["50ma", "50MA"], ["deeper", "deeper"], ["none", "no touch"]] },
 };
 
 // Quality is AUTO-COMPUTED from how many checklist criteria are ticked (Valen 2026-07-14) —
@@ -284,6 +330,519 @@ export function StudyScoreboard({ C, rows }) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════
+// 🧪 HYPOTHESES (Valen 2026-07-24) — the pre-registered claims the whole study wing exists to
+// resolve. Each card states a claim + its source (DOCTRINE = an observed prior from the corpus /
+// MINE = Valen's own observation), the data points that test it (with a one-line meaning each),
+// and a LIVE readout over the loaded studies: winners (big winner ∪ monster) vs failures, counts,
+// a lift ratio once both classes clear 5, and an always-on SampleTag. Believe nothing before
+// n≥30 per class; promote at 50. Fields are read straight off study.checks / study.m — no ticks
+// are ever written here. Full definitions + thresholds mirror AI-OS/trading/context/winner-dna.md.
+// ══════════════════════════════════════════════════════════════════
+const _num = (v) => (v == null || v === "" || Number.isNaN(+v)) ? null : +v;
+const _mnum = (s, k) => _num(s.m?.[k]);
+const _mbool = (s, k) => { const v = s.m?.[k]; if (v === true || v === "true") return true; if (v === false || v === "false") return false; return null; };
+const _setupHasTick = (s, k) => !!(STUDY_SETUPS[s.setup]?.buckets.some(b => b.items.some(([kk]) => kk === k)));
+const _tick = (s, k) => _setupHasTick(s, k) ? !!s.checks?.[k] : null; // null = the study's setup doesn't carry this tick
+const _fmt$B = (v) => v == null ? "—" : v >= 1e9 ? "$" + (v / 1e9).toFixed(1) + "B" : v >= 1e6 ? "$" + Math.round(v / 1e6) + "M" : "$" + Math.round(v / 1e3) + "k";
+
+export const HYPOTHESES = [
+  { id: "H1", claim: "Tight coil ignites", source: "DOCTRINE", kind: "binary",
+    prior: "The narrower the pre-breakout range, the more explosive the move.",
+    points: [["tight_days", "how many narrow-range days in the last 10 — the stored energy"], ["tightening tick", "your eyeball read of the coil"], ["inside-bar tell", "coil RMV state — the tightest read, if ticked"]],
+    test: (s) => _tick(s, "tight"), value: (s) => { const d = _mnum(s, "tight_days"); return d == null ? "—" : d + " tight-days"; } },
+  { id: "H2", claim: "Short coils beat long bases", source: "DOCTRINE", kind: "subcat", parent: "tight",
+    prior: "Breakouts from <10-day coils work; 1–2 month bases fail more.",
+    points: [["coil_len subcat", "which duration band the base fell in"]] },
+  { id: "H3", claim: "Young legs win (cougar rule)", source: "DOCTRINE", kind: "subcat", parent: "young",
+    prior: "70% of trends die after 2 legs; 20% get a 3rd; 5% a 4th.",
+    points: [["young_leg subcat", "which leg the entry caught — 1st/2nd cheap, 3rd+ borrowed time"]] },
+  { id: "H4", claim: "Shallow retrace = strength", source: "MINE", kind: "subcat", parent: "shallow_retrace",
+    prior: "My own observation, no corpus prior: 2nd legs that only retrace to the 10MA (not the 20) tend to launch again.",
+    points: [["shallow_retrace tick", "the pullback never closed below the 10MA"], ["retrace_ma subcat", "how deep the pullback cut before the push"]] },
+  { id: "H5", claim: "Small cap + real liquidity = explosive AND tradeable", source: "DOCTRINE", kind: "binary",
+    prior: "Capitalization is the most important magnitude factor; most 20% movers are <$1B — but it still has to be liquid enough to trade.",
+    points: [["mcap_t", "size of the company at trigger — smaller moves further"], ["adv_dollar", "my $20M execution floor"], ["turnover_pct", "$ traded vs cap — high turnover = violent mover profile"]],
+    test: (s) => { const cap = _mnum(s, "mcap_t"), adv = _mnum(s, "adv_dollar"); return (cap == null || adv == null) ? null : (cap < 1e9 && adv >= 20e6); },
+    value: (s) => `${_fmt$B(_mnum(s, "mcap_t"))} cap · ${_fmt$B(_mnum(s, "adv_dollar"))} ADV` },
+  { id: "H6", claim: "Winners never invade half of day 1", source: "DOCTRINE", kind: "binary",
+    prior: "Real movers don't give back half the breakout day's gain.",
+    points: [["invaded_half", "did price dip below day-1 midpoint in days 2–5 — if yes and it still won, the rule weakens"]],
+    test: (s) => { const v = _mbool(s, "invaded_half"); return v == null ? null : !v; }, // factor = HELD above half
+    value: (s) => { const v = _mbool(s, "invaded_half"); return v == null ? "—" : v ? "invaded" : "held" } },
+  { id: "H7", claim: "Follow-through by day 3 or dead", source: "DOCTRINE", kind: "binary",
+    prior: "Winners go bang-bang-bang; at most one pause day.",
+    points: [["d3_moved", "new high above day-1 high by D3"]],
+    test: (s) => _mbool(s, "d3_moved"), value: (s) => { const v = _mbool(s, "d3_moved"); return v == null ? "—" : v ? "moved by D3" : "stalled" } },
+  { id: "H8", claim: "Neglect precedes the monster", source: "DOCTRINE", kind: "binary",
+    prior: "The more ignored the name, the bigger the move (dormancy ≥ ~20 sessions = neglected).",
+    points: [["dormant_days", "sessions since its last 20%/5d burst — dormancy"], ["off_52wk (from_high_pct)", "how far under the 52-week high it ignited"]],
+    test: (s) => { const d = _mnum(s, "dormant_days"); return d == null ? null : d >= 20; },
+    value: (s) => { const d = _mnum(s, "dormant_days"), h = _mnum(s, "from_high_pct"); return `${d == null ? "—" : d + "d dormant"}${h == null ? "" : ` · ${h.toFixed(0)}% off high`}` } },
+  { id: "H9", claim: "Range breakouts need a catalyst", source: "DOCTRINE", kind: "binary",
+    prior: "Consolidation breakouts without a catalyst tend to fail; continuation legs don't need one.",
+    points: [["catalyst tick", "was there fuel — news/earnings ≤2d before the trigger"], ["rvol_30m / volume", "the volume signature confirming the fuel"]],
+    test: (s) => _tick(s, "catalyst"), value: (s) => { const r = _mnum(s, "rvol_30m"); return r == null ? "—" : `RVOL30 ${r.toFixed(1)}×` } },
+  { id: "H10", claim: "Trend lifespan in legs", source: "MINE", kind: "distribution",
+    prior: "How many legs a trend prints — from its FIRST leg — before its first daily close below the 10MA vs the 20MA. Doubles as the direct test of the leg-count distribution prior (≈70% of trends die after 2 legs · 20% get a 3rd · 5% a 4th · 1% a 5th).",
+    points: [["legs_ma10 / legs_ma20", "total legs from the first leg of the trend to the first daily close below the 10MA / 20MA — counted off the AFTER chart, blank until set"], ["d_below_ma10 / d_below_ma20", "sessions from trigger to that first close below the MA (computed companion; censored when the trend never breaks inside the post-trigger window — censored ≠ a short trend)"]],
+    bands: ["1", "2", "3", "4", "5+"],
+    stores: [["legs_ma10", "10MA"], ["legs_ma20", "20MA"]],
+    priorDist: { "1": null, "2": 70, "3": 20, "4": 5, "5+": 1 } },
+  { id: "H11", claim: "Extension from the 50MA — fresh entries win, stretched peaks die", source: "MINE", kind: "extension",
+    prior: "Breakouts triggered at a low ATR%-multiple from the 50MA outperform extended ones, and burst peaks cluster in a trim band. My own extension-tracker measurement: ≥7× multiples mark the trim-into-strength zone — strength faded from there ~76% of the time.",
+    points: [["ext-at-trigger (ext_50ma)", "how stretched the entry already was — ≤4× = fresh, >4× = chasing"], ["ext-at-peak (ext_at_peak)", "where the burst topped — the trim-band calibration"]],
+    bands: ["<2×", "2–4×", "4–7×", "≥7×"], entryKey: "ext_50ma", peakKey: "ext_at_peak" },
+];
+
+// H11 extension helpers — band an ATR%-multiple, split ENTRY-extension winners/failures per band,
+// and distribute PEAK-extension across winners only (the trim-band calibration). Blank = excluded.
+function extBand(v) { if (v == null || v === "" || Number.isNaN(+v)) return null; const x = +v; return x < 2 ? "<2×" : x < 4 ? "2–4×" : x < 7 ? "4–7×" : "≥7×"; }
+function extEntry(bands, key, winners, fails) {
+  const b = (x) => extBand(x.s.m?.[key]);
+  const mWin = winners.filter(x => b(x) != null), mFail = fails.filter(x => b(x) != null);
+  const rows = bands.map(band => {
+    const w = mWin.filter(x => b(x) === band), f = mFail.filter(x => b(x) === band);
+    const pW = mWin.length ? w.length / mWin.length : 0, pF = mFail.length ? f.length / mFail.length : 0;
+    return { band, list: [...w, ...f], wc: w.length, fc: f.length, lift: pF > 0 ? pW / pF : (pW > 0 ? Infinity : 0) };
+  });
+  return { rows, W: mWin.length, F: mFail.length, E: (winners.length - mWin.length) + (fails.length - mFail.length), enough: mWin.length >= 5 && mFail.length >= 5 };
+}
+function extPeakDist(bands, key, winners) {
+  const set = winners.filter(x => { const v = x.s.outcome?.[key]; return v != null && v !== "" && !Number.isNaN(+v); });
+  const counts = {}; bands.forEach(band => (counts[band] = 0));
+  set.forEach(x => { const band = extBand(x.s.outcome[key]); if (counts[band] != null) counts[band]++; });
+  const vals = set.map(x => +x.s.outcome[key]).sort((a, b) => a - b);
+  const med = vals.length ? (vals.length % 2 ? vals[(vals.length - 1) / 2] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2) : null;
+  return { set, counts, n: set.length, blank: winners.length - set.length, med };
+}
+
+// H10 distribution helpers — leg-count histogram (all loaded studies, blank excluded) and the
+// censored-aware median of the computed days-to-first-close-below-MA companion.
+function legDist(store, bands, all) {
+  const set = all.filter(x => x.s.checks?.[store] != null && x.s.checks?.[store] !== "");
+  const counts = {}; bands.forEach(b => (counts[b] = 0));
+  set.forEach(x => { const v = String(x.s.checks[store]); if (counts[v] != null) counts[v]++; });
+  return { set, counts, n: set.length, blank: all.length - set.length };
+}
+function medianCompanion(all, key, censKey) {
+  const vals = all.map(x => x.s.m?.[key]).filter(v => v != null && v !== "" && !Number.isNaN(+v)).map(Number).sort((a, b) => a - b);
+  const cens = all.filter(x => x.s.m?.[censKey] === true || x.s.m?.[censKey] === "true").length;
+  const med = vals.length ? (vals.length % 2 ? vals[(vals.length - 1) / 2] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2) : null;
+  return { med, n: vals.length, cens };
+}
+
+// Hypothesis era — new eyeball fields / computed metrics land from here; older studies simply lack them
+// and their blanks never vote. The panel toggle can restrict to this era for a purist read (Valen 2026-07-24).
+const H_ERA_START = "2026-07-24";
+const _subLabel = (parent, v) => (SUBCATS[parent].options.find(([o]) => o === String(v)) || [, String(v)])[1];
+const _outNum = (s, k) => { const v = s.outcome?.[k]; return (v == null || v === "" || Number.isNaN(+v)) ? null : +v; };
+
+// Per-entry hypothesis read (Valen 2026-07-24) — for ONE study, what does it say about each hypothesis?
+// `short` = label · `read(s)` → { answer, state } | null (null ⇒ this entry carries no data for it ⇒ omit).
+// `state` classifies the FACTOR before outcome: good / bad / neutral / adds (distribution or magnitude —
+// no per-entry pass/fail). `distOnly` = a distribution hypothesis (never a supports/challenges verdict).
+const HYP_READS = {
+  H1: { short: "Tight coil", read: (s) => { const t = _tick(s, "tight"), d = _mnum(s, "tight_days"); if (!t && d == null) return null;
+    return { answer: `${d != null ? d + " NR days in the last 10" : "coil read"}${t ? " · ticked tight" : ""}`, state: t ? "good" : (d != null && d >= 3 ? "good" : "bad") }; } },
+  H2: { short: "Coil age", read: (s) => { const v = s.checks?.coil_len; if (!v) return null;
+    return { answer: `${_subLabel("tight", v)} band`, state: v === "<10" ? "good" : v === ">20" ? "bad" : "neutral" }; } },
+  H3: { short: "Leg caught", read: (s) => { const v = s.checks?.young_leg; if (!v) return null;
+    return { answer: _subLabel("young", v), state: (v === "1" || v === "2") ? "good" : "bad" }; } },
+  H4: { short: "Retrace depth", read: (s) => { const v = s.checks?.retrace_ma, t = _tick(s, "shallow_retrace"); if (!v && !t) return null;
+    const nice = { "10ma": "held the 10MA", "20ma": "cut to the 20MA", "50ma": "cut to the 50MA", deeper: "deeper than the 50MA", none: "never touched an MA" };
+    return { answer: v ? (nice[v] || v) : "held the 10MA", state: v ? (v === "10ma" || v === "none" ? "good" : v === "20ma" ? "neutral" : "bad") : (t ? "good" : "bad") }; } },
+  H5: { short: "Cap/liquidity", distOnly: true, read: (s) => { const cap = _mnum(s, "mcap_t"), adv = _mnum(s, "adv_dollar"), trn = _mnum(s, "turnover_pct"); if (cap == null && adv == null) return null;
+    return { answer: `${cap != null ? _fmt$B(cap) + " cap" : ""}${adv != null ? `${cap != null ? " · " : ""}${_fmt$B(adv)}/day` : ""}${trn != null ? ` · ${trn.toFixed(1)}% turnover` : ""}`, state: "adds" }; } },
+  H6: { short: "Half-day rule", read: (s) => { const v = _mbool(s, "invaded_half"); if (v == null) return null;
+    return { answer: v ? "invaded day-1 half" : "never invaded half", state: v ? "bad" : "good" }; } },
+  H7: { short: "D3 follow-through", read: (s) => { const v = _mbool(s, "d3_moved"); if (v == null) return null;
+    return { answer: v ? "new high by day 3" : "stalled past day 3", state: v ? "good" : "bad" }; } },
+  H8: { short: "Neglect", read: (s) => { const d = _mnum(s, "dormant_days"), h = _mnum(s, "from_high_pct"); if (d == null && h == null) return null;
+    const cls = outcomeClass(s);
+    return { answer: `${d != null ? d + " sessions dormant" : ""}${d != null && h != null ? " · " : ""}${h != null ? Math.abs(h).toFixed(0) + "% under 52wk high" : ""}`,
+      state: (cls === "monster" && d != null) ? (d >= 20 ? "good" : "bad") : "adds" }; } },
+  H9: { short: "Catalyst", read: (s) => { const t = _tick(s, "catalyst"); if (!t) return null; const leg = s.checks?.young_leg;
+    return { answer: "catalyst present", state: (leg === "2" || leg === "3") ? "adds" : "good" }; } },
+  H10: { short: "Trend lifespan", distOnly: true, read: (s) => { const a = s.checks?.legs_ma10, b = s.checks?.legs_ma20; if (!a && !b) return null;
+    const nice = (v) => v === "5+" ? "5+ legs" : `${v} legs`;
+    return { answer: `${a ? `${nice(a)} to the 10MA break` : ""}${a && b ? " · " : ""}${b ? `${nice(b)} to the 20MA` : ""}`, state: "adds" }; } },
+  H11: { short: "Extension", read: (s) => { const e = _mnum(s, "ext_50ma"), p = _outNum(s, "ext_at_peak"); if (e == null && p == null) return null;
+    return { answer: `${e != null ? `entered at ${e.toFixed(1)}×` : ""}${e != null && p != null ? " · " : ""}${p != null ? `peaked at ${p.toFixed(1)}×` : ""}`, state: e != null ? (e <= 4 ? "good" : "bad") : "adds" }; } },
+};
+HYPOTHESES.forEach(h => Object.assign(h, HYP_READS[h.id] || {}));
+
+// SINGLE SOURCE OF TRUTH — the per-entry verdict used by BOTH the strip and the tally table, so they
+// can never disagree. Truth table: predicted-good state + winner ⇒ supports · good + failure ⇒ challenges
+// · bad + failure ⇒ supports (failed as predicted) · bad + winner ⇒ challenges (won despite it). No
+// resolved big-win/failure outcome, or a neutral/adds factor state ⇒ ⚪ (adds a data point / pending).
+function entryVerdict(hyp, s) {
+  if (!hyp.read) return null;
+  const r = hyp.read(s); if (!r) return null;
+  const cls = outcomeClass(s), win = cls === "big winner" || cls === "monster", fail = cls === "failure";
+  if (r.state === "adds" || r.state === "neutral")
+    return { answer: r.answer, chip: "⚪", tone: "data", verb: r.state === "neutral" ? "neutral band — adds data" : "adds a data point", bucket: "data" };
+  if (!win && !fail)
+    return { answer: r.answer, chip: "⚪", tone: "data", verb: cls == null ? "outcome pending" : "neutral outcome — adds data", bucket: "data" };
+  const supports = (r.state === "good" && win) || (r.state === "bad" && fail);
+  return { answer: r.answer, chip: supports ? "🟢" : "🔴", tone: supports ? "supports" : "challenges", verb: supports ? "supports" : "challenges", bucket: supports ? "supports" : "challenges" };
+}
+
+// Per-entry strip — ADMIN-SIDE ONLY (📚 Studies + his personal 🔒 My Book rows). Hypothesis-first: what
+// THIS ticker does to each hypothesis (proving or challenging). Source chips shown (admin — provenance).
+export function HypothesisRead({ C, study }) {
+  if (!study) return null;
+  const lines = HYPOTHESES.map(h => { const v = entryVerdict(h, study); return v ? { h, ...v } : null; }).filter(Boolean);
+  if (!lines.length) return null;
+  const toneColor = (t) => t === "supports" ? "#7ef0a0" : t === "challenges" ? "#e05555" : C.muted;
+  const chip = (source) => { const gold = source === "DOCTRINE"; return { border: `1px solid ${gold ? C.goldBright : C.blue}`, color: gold ? C.goldBright : C.blue, background: gold ? C.goldDim : C.blueDim, borderRadius: 99, fontSize: "0.5rem", fontWeight: 800, letterSpacing: ".06em", padding: "1px 6px", whiteSpace: "nowrap" }; };
+  return (
+    <div style={{ border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "11px 13px", background: "rgba(0,0,0,0.22)", marginBottom: 12 }}>
+      <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 9 }}>🧪 What this study says about the hypotheses</div>
+      <div style={{ display: "grid", gap: 6 }}>
+        {lines.map(({ h, answer, chip: ch, tone, verb }) => (
+          <div key={h.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: "0.73rem", lineHeight: 1.4, flexWrap: "wrap" }}>
+            <span style={{ flex: "none", fontSize: "0.82rem" }}>{ch}</span>
+            <b style={{ flex: "none", color: C.white }}>{h.short}</b>
+            <span style={{ flex: 1, color: C.text, minWidth: 130 }}>{answer}</span>
+            <span style={chip(h.source)}>{h.source}</span>
+            <span style={{ flex: "none", fontWeight: 700, color: toneColor(tone) }}>→ {verb}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Live readout for a binary-predicate hypothesis over resolved winners/failures.
+function hypBinary(hyp, winners, fails) {
+  const mWin = winners.filter(x => hyp.test(x.s) !== null), mFail = fails.filter(x => hyp.test(x.s) !== null);
+  const wT = mWin.filter(x => hyp.test(x.s) === true), fT = mFail.filter(x => hyp.test(x.s) === true);
+  const pW = mWin.length ? wT.length / mWin.length : 0, pF = mFail.length ? fT.length / mFail.length : 0;
+  const E = (winners.length - mWin.length) + (fails.length - mFail.length);
+  return { mWin, mFail, wT: wT.length, fT: fT.length, pW, pF, lift: pF > 0 ? pW / pF : (pW > 0 ? Infinity : 0),
+    enough: mWin.length >= 5 && mFail.length >= 5, W: mWin.length, F: mFail.length, E, list: [...mWin, ...mFail] };
+}
+// Per-option readout for a subcat hypothesis (pool = studies whose setup carries the parent tick,
+// the parent is ticked, and the sub-band is set). Un-set band among ticked parents = excluded blank.
+function hypSubcat(hyp, winners, fails) {
+  const sub = SUBCATS[hyp.parent];
+  const inPool = (x) => { const s = x.s; return _setupHasTick(s, hyp.parent) && !!s.checks?.[hyp.parent] && s.checks?.[sub.store] != null && s.checks?.[sub.store] !== ""; };
+  const blank = (x) => { const s = x.s; return _setupHasTick(s, hyp.parent) && !!s.checks?.[hyp.parent] && (s.checks?.[sub.store] == null || s.checks?.[sub.store] === ""); };
+  const pWin = winners.filter(inPool), pFail = fails.filter(inPool);
+  const enough = pWin.length >= 5 && pFail.length >= 5;
+  const rows = sub.options.map(([val, label]) => {
+    const w = pWin.filter(x => String(x.s.checks[sub.store]) === val), f = pFail.filter(x => String(x.s.checks[sub.store]) === val);
+    const pW = pWin.length ? w.length / pWin.length : 0, pF = pFail.length ? f.length / pFail.length : 0;
+    return { val, label, wc: w.length, fc: f.length, lift: pF > 0 ? pW / pF : (pW > 0 ? Infinity : 0) };
+  });
+  const E = winners.filter(blank).length + fails.filter(blank).length;
+  return { sub, rows, enough, W: pWin.length, F: pFail.length, E, list: [...pWin, ...pFail] };
+}
+
+export function StudyHypotheses({ C, rows }) {
+  const [open, setOpen] = React.useState(null); // hypothesis id whose study list is expanded
+  const [tallyOpen, setTallyOpen] = React.useState(null); // `${id}:${bucket}` whose ticker list is expanded
+  const [era, setEra] = React.useState("all"); // "all" | "new" — one filter applied at the top of the data flow
+  // ONE era filter feeds the entire panel (tally + cards + distributions). Trigger date = row.entry_date.
+  const inEra = (r) => era === "all" || String(r.entry_date || "") >= H_ERA_START;
+  const eraRows = (rows || []).filter(inEra);
+  const resolved = eraRows.filter(r => r.metrics?.study && outcomeClass(r.metrics.study))
+    .map(r => ({ s: r.metrics.study, ticker: r.ticker, date: r.entry_date }));
+  const winners = resolved.filter(x => ["big winner", "monster"].includes(outcomeClass(x.s)));
+  const fails = resolved.filter(x => outcomeClass(x.s) === "failure");
+  // H10 distribution is outcome-independent — it reads leg counts off every loaded study, not just resolved.
+  const allStudies = eraRows.filter(r => r.metrics?.study).map(r => ({ s: r.metrics.study, ticker: r.ticker, date: r.entry_date }));
+  const srcChip = (source) => {
+    const gold = source === "DOCTRINE";
+    return { border: `1px solid ${gold ? C.goldBright : C.blue}`, color: gold ? C.goldBright : C.blue,
+      background: gold ? C.goldDim : C.blueDim, borderRadius: 99, fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".08em", padding: "2px 8px", whiteSpace: "nowrap" };
+  };
+  const liftColor = (l) => l >= 2 ? "#7ef0a0" : l < 0.7 ? "#e05555" : C.muted;
+  const subhead = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "0 0 12px" };
+  const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" };
+  const outLabel = (s) => MB_OUTCOME[outcomeClass(s)] || outcomeClass(s);
+  const outColor = (s) => outcomeClass(s) === "failure" ? "#e05555" : "#7ef0a0";
+  const expandList = (list, valFn) => (
+    <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8, maxHeight: 220, overflowY: "auto" }}>
+      {list.length === 0 ? <div style={{ fontSize: "0.66rem", color: C.muted }}>No studies counted yet.</div> :
+        [...list].sort((a, b) => (["big winner", "monster"].includes(outcomeClass(b.s)) ? 1 : 0) - (["big winner", "monster"].includes(outcomeClass(a.s)) ? 1 : 0)).map((x, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: "0.68rem", borderBottom: i === list.length - 1 ? "none" : "1px solid rgba(255,255,255,0.04)" }}>
+            <span style={{ width: 56, flex: "none", fontWeight: 800, color: C.white }}>{x.ticker}</span>
+            <span style={{ width: 88, flex: "none", color: C.muted, fontSize: "0.62rem" }}>{x.date}</span>
+            <span style={{ flex: 1, color: C.text }}>{valFn(x.s)}</span>
+            <span style={{ flex: "none", fontWeight: 700, color: outColor(x.s), fontSize: "0.62rem" }}>{outLabel(x.s)}</span>
+          </div>
+        ))}
+    </div>
+  );
+  return (
+    <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", marginBottom: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
+      <div style={sheen} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 12, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+        <span style={{ flex: 1, fontSize: "0.62rem", fontWeight: 700, letterSpacing: ".13em", textTransform: "uppercase", color: C.muted }}>🧪 Hypotheses</span>
+        <span style={{ fontSize: "0.6rem", color: C.muted }}>{resolved.length} resolved · {winners.length}W / {fails.length}F</span>
+        <div style={{ display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 99, overflow: "hidden" }}>
+          {[["all", "All studies"], ["new", `From ${H_ERA_START}`]].map(([val, label]) => (
+            <button key={val} type="button" onClick={() => setEra(val)}
+              style={{ background: era === val ? `linear-gradient(135deg,${C.goldBright},${C.goldMid})` : "transparent", color: era === val ? "#08080e" : C.muted, border: "none", fontFamily: "inherit", fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".04em", padding: "4px 11px", cursor: "pointer" }}>{label}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ fontSize: "0.6rem", color: C.muted, marginBottom: 12 }}>Blank fields never vote — old studies only count where the data is real.</div>
+      {/* ── Hypothesis tally — one row per H1–H11, same per-entry verdict as the strip (single source of
+          truth via entryVerdict). Every count click-expands to the exact tickers behind it. ── */}
+      {(() => {
+        const tally = HYPOTHESES.map(h => {
+          const b = { supports: [], challenges: [], data: [] };
+          allStudies.forEach(x => { const v = entryVerdict(h, x.s); if (v) b[v.bucket].push({ ...x, v }); });
+          return { h, ...b, vN: b.supports.length + b.challenges.length };
+        });
+        const statusOf = (t) => {
+          if (t.h.distOnly) return { txt: "distribution — see card", col: C.muted };
+          if (t.vN < 30) return { txt: `collecting — ${t.vN}/30`, col: "#e0a955" };
+          const s = t.supports.length, c = t.challenges.length;
+          if (s > c && s >= 2 * c) return { txt: "leaning 🟢", col: "#7ef0a0" };
+          if (c > s && c >= 2 * s) return { txt: "leaning 🔴", col: "#e05555" };
+          return { txt: "contested", col: C.muted };
+        };
+        const cellBtn = (t, bucket, count, col) => (
+          <button type="button" onClick={() => count && setTallyOpen(tallyOpen === `${t.h.id}:${bucket}` ? null : `${t.h.id}:${bucket}`)}
+            style={{ width: 44, flex: "none", textAlign: "center", background: "transparent", border: "none", fontFamily: "inherit", fontSize: "0.72rem", fontWeight: 800, color: count ? col : "rgba(255,255,255,0.25)", cursor: count ? "pointer" : "default", textDecoration: count ? "underline dotted" : "none" }}>{count}</button>
+        );
+        return (
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, marginBottom: 14, overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", background: "rgba(255,255,255,0.03)", fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted }}>
+              <span style={{ flex: 1 }}>Hypothesis</span><span style={{ width: 44, textAlign: "center" }}>🟢</span><span style={{ width: 44, textAlign: "center" }}>🔴</span><span style={{ width: 44, textAlign: "center" }}>⚪</span><span style={{ width: 34, textAlign: "center" }}>n</span><span style={{ width: 128, textAlign: "right" }}>Status</span>
+            </div>
+            {tally.map(t => { const st = statusOf(t); const oKey = tallyOpen && tallyOpen.startsWith(t.h.id + ":") ? tallyOpen.split(":")[1] : null;
+              return (
+                <div key={t.h.id} style={{ borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", fontSize: "0.72rem" }}>
+                    <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                      <b style={{ color: C.white, whiteSpace: "nowrap" }}>{t.h.short}</b>
+                      <span style={srcChip(t.h.source)}>{t.h.source}</span>
+                    </span>
+                    {cellBtn(t, "supports", t.supports.length, "#7ef0a0")}
+                    {cellBtn(t, "challenges", t.challenges.length, "#e05555")}
+                    {cellBtn(t, "data", t.data.length, C.muted)}
+                    <span style={{ width: 34, flex: "none", textAlign: "center", color: C.muted, fontSize: "0.66rem" }}>{t.vN}</span>
+                    <span style={{ width: 128, flex: "none", textAlign: "right", fontWeight: 700, color: st.col, fontSize: "0.64rem" }}>{st.txt}</span>
+                  </div>
+                  {oKey && (
+                    <div style={{ padding: "2px 12px 9px", maxHeight: 180, overflowY: "auto" }}>
+                      {t[oKey].length === 0 ? <div style={{ fontSize: "0.64rem", color: C.muted }}>none</div> :
+                        t[oKey].map((x, i) => (
+                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: "0.66rem", borderBottom: i === t[oKey].length - 1 ? "none" : "1px solid rgba(255,255,255,0.04)" }}>
+                            <span style={{ width: 52, flex: "none", fontWeight: 800, color: C.white }}>{x.ticker}</span>
+                            <span style={{ width: 84, flex: "none", color: C.muted, fontSize: "0.6rem" }}>{x.date}</span>
+                            <span style={{ flex: 1, color: C.text }}>{x.v.answer}</span>
+                            <span style={{ flex: "none", fontSize: "0.6rem", fontWeight: 700, color: x.v.tone === "supports" ? "#7ef0a0" : x.v.tone === "challenges" ? "#e05555" : C.muted }}>{x.v.chip} {x.v.verb}</span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              ); })}
+          </div>
+        );
+      })()}
+      <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5, marginBottom: 14 }}>
+        Pre-registered claims the study wing exists to resolve. <b style={{ color: C.goldBright }}>DOCTRINE</b> = an observed prior; <b style={{ color: C.blue }}>MINE</b> = Valen's own read. Readout: winners (huge ∪ winner) vs losers on each field. Lift shows once both classes clear 5 — believe nothing before n≥30, promote at 50.
+      </div>
+      <div style={{ display: "grid", gap: 12 }}>
+        {HYPOTHESES.map(hyp => {
+          // ── H10 distribution card — leg-count histogram vs the doctrine prior, MA10 & MA20 side by side ──
+          if (hyp.kind === "distribution") {
+            const dists = hyp.stores.map(([store, maLabel]) => ({ store, maLabel, ...legDist(store, hyp.bands, allStudies) }));
+            const med10 = medianCompanion(allStudies, "d_below_ma10", "ma10_censored");
+            const med20 = medianCompanion(allStudies, "d_below_ma20", "ma20_censored");
+            const distBox = { flex: "1 1 240px", minWidth: 220, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "rgba(0,0,0,0.25)" };
+            return (
+              <div key={hyp.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(0,0,0,0.22)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
+                  <span style={{ fontSize: "0.58rem", fontWeight: 800, color: C.muted, letterSpacing: ".06em" }}>{hyp.id}</span>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 800, color: C.white }}>{hyp.claim}</span>
+                  <span style={srcChip(hyp.source)}>{hyp.source}</span>
+                </div>
+                <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{hyp.prior}</div>
+                <div style={{ display: "grid", gap: 3, marginBottom: 10 }}>
+                  {hyp.points.map(([lab, meaning], i) => (
+                    <div key={i} style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.4 }}>
+                      <b style={{ color: C.goldBright }}>{lab}</b> <span style={{ color: C.muted }}>— {meaning}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {dists.map(d => (
+                    <div key={d.store} style={distBox}>
+                      <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Legs to first close below {d.maLabel} · n={d.n}</div>
+                      {hyp.bands.map(b => {
+                        const c = d.counts[b], pct = d.n ? Math.round(c / d.n * 100) : 0, prior = hyp.priorDist[b];
+                        return (
+                          <div key={b} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "2px 0" }}>
+                            <span style={{ width: 26, flex: "none", color: C.text, fontWeight: 700 }}>{b}</span>
+                            <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}>
+                              <div style={{ width: `${pct}%`, height: "100%", background: C.goldBright }} />
+                            </div>
+                            <span style={{ width: 66, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{c} · {pct}%</span>
+                            <span style={{ width: 58, flex: "none", textAlign: "right", color: "rgba(255,255,255,0.32)", fontSize: "0.6rem" }} title="Doctrine prior — the reference distribution, not measured data">{prior == null ? "prior —" : `prior ${prior}%`}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: "0.66rem", color: C.text, marginTop: 9 }}>
+                  Median sessions to first close below MA — <b style={{ color: C.goldBright }}>10MA {med10.med == null ? "—" : med10.med}</b> (n={med10.n}, {med10.cens} censored) · <b style={{ color: C.goldBright }}>20MA {med20.med == null ? "—" : med20.med}</b> (n={med20.n}, {med20.cens} censored)
+                </div>
+                <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
+                  n={dists[0].n}/{dists[1].n} measured (10MA/20MA) · {dists[0].blank}/{dists[1].blank} blank · censored companions shown separately, never as short trends — believe nothing &lt;30, promote at 50
+                </div>
+                <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{open === hyp.id ? "▴ hide the studies counted" : "▾ show the studies counted"}</div>
+                {open === hyp.id && (() => {
+                  const withLegs = allStudies.filter(x => (x.s.checks?.legs_ma10 ?? "") !== "" || (x.s.checks?.legs_ma20 ?? "") !== "");
+                  return (
+                    <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8, maxHeight: 220, overflowY: "auto" }}>
+                      {withLegs.length === 0 ? <div style={{ fontSize: "0.66rem", color: C.muted }}>No leg counts recorded yet.</div> :
+                        withLegs.map((x, i) => (
+                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: "0.68rem", borderBottom: i === withLegs.length - 1 ? "none" : "1px solid rgba(255,255,255,0.04)" }}>
+                            <span style={{ width: 56, flex: "none", fontWeight: 800, color: C.white }}>{x.ticker}</span>
+                            <span style={{ width: 88, flex: "none", color: C.muted, fontSize: "0.62rem" }}>{x.date}</span>
+                            <span style={{ flex: 1, color: C.text }}>10MA: <b style={{ color: C.goldBright }}>{x.s.checks?.legs_ma10 || "—"}</b> legs · 20MA: <b style={{ color: C.goldBright }}>{x.s.checks?.legs_ma20 || "—"}</b> legs</span>
+                          </div>
+                        ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          }
+          // ── H11 extension card — ENTRY winners/failures per ext band + EXIT peak distribution (winners only) ──
+          if (hyp.kind === "extension") {
+            const en = extEntry(hyp.bands, hyp.entryKey, winners, fails);
+            const px = extPeakDist(hyp.bands, hyp.peakKey, winners);
+            const half = { flex: "1 1 260px", minWidth: 240, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "rgba(0,0,0,0.25)" };
+            const exitOpen = open === `${hyp.id}-x`;
+            return (
+              <div key={hyp.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(0,0,0,0.22)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
+                  <span style={{ fontSize: "0.58rem", fontWeight: 800, color: C.muted, letterSpacing: ".06em" }}>{hyp.id}</span>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 800, color: C.white }}>{hyp.claim}</span>
+                  <span style={srcChip(hyp.source)}>{hyp.source}</span>
+                </div>
+                <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{hyp.prior}</div>
+                <div style={{ display: "grid", gap: 3, marginBottom: 10 }}>
+                  {hyp.points.map(([lab, meaning], i) => (
+                    <div key={i} style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.4 }}>
+                      <b style={{ color: C.goldBright }}>{lab}</b> <span style={{ color: C.muted }}>— {meaning}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {/* ENTRY side — winners vs failures per ext-at-trigger band (click a band to expand) */}
+                  <div style={half}>
+                    <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Entry ext (×ATR% from 50MA) — winners vs losers</div>
+                    {en.rows.map(row => {
+                      const rowOpen = open === `${hyp.id}-e-${row.band}`;
+                      return (
+                        <div key={row.band}>
+                          <div onClick={() => setOpen(rowOpen ? null : `${hyp.id}-e-${row.band}`)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0" }}>
+                            <span style={{ width: 44, flex: "none", color: C.text, fontWeight: 700 }}>{row.band}</span>
+                            <span style={{ flex: 1, color: C.muted, fontSize: "0.66rem" }}>{row.wc}W · {row.fc}F</span>
+                            <b style={{ width: 52, flex: "none", textAlign: "right", fontWeight: 800, color: en.enough ? liftColor(row.lift) : C.muted }}>{en.enough ? (row.lift === Infinity ? "∞" : row.lift.toFixed(2) + "×") : "·"}</b>
+                            <span style={{ flex: "none", color: C.muted, fontSize: "0.62rem" }}>{rowOpen ? "▴" : "▾"}</span>
+                          </div>
+                          {rowOpen && expandList(row.list, s => { const v = s.m?.[hyp.entryKey]; return v == null || v === "" ? "—" : `${(+v).toFixed(2)}× at entry`; })}
+                        </div>
+                      );
+                    })}
+                    {!en.enough && <div style={{ fontSize: "0.66rem", color: "#e0a955", marginTop: 6 }}>collecting — n={en.W + en.F} of 30</div>}
+                    <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6 }}>n={en.W} winners / {en.F} losers / {en.E} excluded blank — believe nothing &lt;30, promote at 50</div>
+                  </div>
+                  {/* EXIT side — where winners topped (ext-at-peak distribution, winners only) */}
+                  <div style={half}>
+                    <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Where winners topped — the trim band · n={px.n}</div>
+                    {hyp.bands.map(band => { const c = px.counts[band], pct = px.n ? Math.round(c / px.n * 100) : 0;
+                      return (
+                        <div key={band} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "2px 0" }}>
+                          <span style={{ width: 44, flex: "none", color: C.text, fontWeight: 700 }}>{band}</span>
+                          <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}>
+                            <div style={{ width: `${pct}%`, height: "100%", background: band === "≥7×" ? "#7ef0a0" : C.goldBright }} />
+                          </div>
+                          <span style={{ width: 66, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{c} · {pct}%</span>
+                        </div>
+                      ); })}
+                    <div style={{ fontSize: "0.66rem", color: C.text, marginTop: 7 }}>Median winner peak ext — <b style={{ color: C.goldBright }}>{px.med == null ? "—" : px.med.toFixed(2) + "×"}</b></div>
+                    <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 4 }}>n={px.n} winners with peak ext / {px.blank} excluded blank — believe nothing &lt;30, promote at 50</div>
+                    <div onClick={() => setOpen(exitOpen ? null : `${hyp.id}-x`)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{exitOpen ? "▴ hide the winners counted" : "▾ show the winners counted"}</div>
+                    {exitOpen && expandList(px.set, s => { const v = s.outcome?.[hyp.peakKey]; return v == null || v === "" ? "—" : `${(+v).toFixed(2)}× at peak`; })}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          const isSub = hyp.kind === "subcat";
+          const r = isSub ? hypSubcat(hyp, winners, fails) : hypBinary(hyp, winners, fails);
+          const measured = r.W + r.F;
+          return (
+            <div key={hyp.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(0,0,0,0.22)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
+                <span style={{ fontSize: "0.58rem", fontWeight: 800, color: C.muted, letterSpacing: ".06em" }}>{hyp.id}</span>
+                <span style={{ fontSize: "0.82rem", fontWeight: 800, color: C.white }}>{hyp.claim}</span>
+                <span style={srcChip(hyp.source)}>{hyp.source}</span>
+              </div>
+              <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{hyp.prior}</div>
+              <div style={{ display: "grid", gap: 3, marginBottom: 10 }}>
+                {hyp.points.map(([lab, meaning], i) => (
+                  <div key={i} style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.4 }}>
+                    <b style={{ color: C.goldBright }}>{lab}</b> <span style={{ color: C.muted }}>— {meaning}</span>
+                  </div>
+                ))}
+              </div>
+              {/* live readout */}
+              {isSub ? (
+                <div>
+                  <div style={{ display: "grid", gap: 2 }}>
+                    {r.rows.map(row => (
+                      <div key={row.val} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0" }}>
+                        <span style={{ width: 92, flex: "none", color: C.text }}>{row.label}</span>
+                        <span style={{ flex: 1, color: C.muted, fontSize: "0.66rem" }}>{row.wc}W · {row.fc}F</span>
+                        <b style={{ width: 52, flex: "none", textAlign: "right", fontWeight: 800, color: r.enough ? liftColor(row.lift) : C.muted }}>
+                          {r.enough ? (row.lift === Infinity ? "∞" : row.lift.toFixed(2) + "×") : "·"}</b>
+                      </div>
+                    ))}
+                  </div>
+                  {!r.enough && <div style={{ fontSize: "0.66rem", color: "#e0a955", marginTop: 6 }}>collecting — n={measured} of 30</div>}
+                </div>
+              ) : (
+                <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: "0.72rem", padding: "4px 0" }}>
+                  <span style={{ flex: 1, color: C.text }}>
+                    Winners <b style={{ color: C.white }}>{r.wT}/{r.W}</b> have it · Losers <b style={{ color: C.white }}>{r.fT}/{r.F}</b> have it
+                  </span>
+                  {r.enough
+                    ? <b style={{ flex: "none", fontWeight: 800, color: liftColor(r.lift) }}>{r.lift === Infinity ? "∞" : r.lift.toFixed(2)}× lift</b>
+                    : <span style={{ flex: "none", color: "#e0a955", fontSize: "0.68rem" }}>collecting — n={measured} of 30</span>}
+                  <span style={{ flex: "none", color: C.muted, fontSize: "0.7rem" }}>{open === hyp.id ? "▴" : "▾"}</span>
+                </div>
+              )}
+              {/* SampleTag — always shown */}
+              <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
+                n={r.W} winners / {r.F} losers / {r.E} excluded blank — believe nothing &lt;30, promote at 50
+              </div>
+              {/* click-to-expand study list */}
+              {isSub
+                ? <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{open === hyp.id ? "▴ hide the studies counted" : "▾ show the studies counted"}</div>
+                : null}
+              {open === hyp.id && expandList(r.list, isSub ? (s => (SUBCATS[hyp.parent].options.find(([v]) => String(s.checks?.[SUBCATS[hyp.parent].store]) === v)?.[1]) || "—") : hyp.value)}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload }) {
   const [row, setRow] = useState(() => ({
     ticker: "", entry_date: "", before_img: "", after_img: "", thesis: "", lesson: "",
@@ -307,6 +866,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   const cls = outcomeClass(s);
   // ── click-to-zoom lightbox: click any chart to enlarge, ←/→ cycles Context→BEFORE→AFTER, Esc closes ──
   const [zoom, setZoom] = useState(null); // null | "before_img" | "after_img" | "outcome_img"
+  const [showAll, setShowAll] = useState(false); // raw computed-metrics grid folded by default (Valen 2026-07-24) — key strip stays
   const SLOT_TITLES = { before_img: "CONTEXT — HTF", after_img: "BEFORE — the setup", outcome_img: "AFTER — the outcome", trigger_ltf_img: "TRIGGER — 5-min entry detail" };
   const zoomSlots = ["before_img", "after_img", "trigger_ltf_img", "outcome_img"].filter(k => row[k]); // only attached charts
   useEffect(() => {
@@ -432,26 +992,78 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
         ))}
       </div>
 
-      {/* 📊 Auto section — study-fill.mjs / Claude fills these; Valen only corrects. */}
-      <div style={sect}>📊 Auto-pulled data — filled by VIV, correct anything that looks wrong</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 8 }}>
-        {def.metrics.map(([k, t]) => (
-          <div key={k}><label style={lbl}>{t}</label><input style={inputS} value={s.m[k] ?? ""} onChange={e => setS({ m: { ...s.m, [k]: e.target.value } })} /></div>
+      {/* Hypothesis-first summary (Valen 2026-07-24): what THIS study says about each hypothesis is the
+          DEFAULT view; the key strip + full computed grids fold behind "Show all computed". Admin-side
+          (📚 Studies is admin-only). The cap/ADR badge stays on the chart. */}
+      <HypothesisRead C={C} study={s} />
+      {cls && <div style={{ marginTop: 6, marginBottom: 6, fontSize: "0.74rem" }}>Auto-class: <b style={{ color: cls === "failure" ? "#e05555" : "#7ef0a0" }}>{cls}</b></div>}
+
+      {/* Trend anatomy (Valen 2026-07-24) — H10 leg lifespan. ALWAYS visible, independent of the ticks:
+          total legs from the trend's FIRST leg to the first daily close below the 10MA / 20MA, counted
+          off the AFTER chart. Stored in checks (user layer, preserved by study-fill) but NOT a setup tick,
+          so it never affects the quality score. Blank until set. */}
+      <div style={sect}>Trend anatomy — legs before first close below the MA (count off the AFTER chart)</div>
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+        {[["legs_ma10", "Legs → first close below 10MA"], ["legs_ma20", "Legs → first close below 20MA"]].map(([store, label]) => (
+          <div key={store}>
+            <label style={lbl}>{label}</label>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {["1", "2", "3", "4", "5+"].map(opt => { const on = String(s.checks[store] || "") === opt;
+                return <button key={opt} type="button" onClick={() => setS({ checks: { ...s.checks, [store]: on ? "" : opt } })}
+                  style={{ background: on ? "rgba(212,175,55,0.18)" : "transparent", border: `1px solid ${on ? C.goldBright : C.border}`, color: on ? C.goldBright : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "5px 13px", cursor: "pointer", minWidth: 34 }}>
+                  {opt}</button>; })}
+            </div>
+          </div>
         ))}
       </div>
 
-      <div style={sect}>Outcome anatomy — the burst & the campaign</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 8 }}>
-        {OUTCOME_METRICS.map(([k, t]) => (
-          <div key={k}><label style={lbl}>{t}</label><input style={inputS} value={s.outcome[k] ?? ""} onChange={e => setS({ outcome: { ...s.outcome, [k]: e.target.value } })} /></div>
-        ))}
-        <div><label style={lbl}>Follow-through d2</label>
-          <select style={inputS} value={s.outcome.followthru ?? ""} onChange={e => setS({ outcome: { ...s.outcome, followthru: e.target.value } })}><option value="">—</option><option>yes</option><option>no</option></select></div>
-        <div><label style={lbl}>Failure mode (if failed)</label>
-          <select style={inputS} value={s.outcome.failure_mode ?? "none"} onChange={e => setS({ outcome: { ...s.outcome, failure_mode: e.target.value } })}>
-            {["none", "no-follow-through", "late-trend/extended", "market-phase", "bad-base", "liquidity/gap", "other"].map(f => <option key={f}>{f}</option>)}</select></div>
+      {/* 📊 Computed metrics — the raw numbers (key strip + full grids) live behind this toggle now that
+          the hypothesis read above is the default summary (Valen 2026-07-24). */}
+      <div style={{ ...sect, display: "flex", alignItems: "center", gap: 10 }}>
+        <span>📊 Computed metrics</span>
+        <button type="button" onClick={() => setShowAll(v => !v)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".06em", padding: "3px 11px", cursor: "pointer", textTransform: "uppercase" }}>
+          {showAll ? "Hide computed ▴" : "Show all computed ▾"}</button>
       </div>
-      {cls && <div style={{ marginTop: 8, fontSize: "0.74rem" }}>Auto-class: <b style={{ color: cls === "failure" ? "#e05555" : "#7ef0a0" }}>{cls}</b></div>}
+      {showAll && (<>
+        {/* Key strip — the load-bearing numbers, folded in with everything else. Cap/ADR rides the chart badge too. */}
+        {(() => {
+          const strip = [
+            ["Burst %", s.outcome?.burst_pct], ["MFE d5 %", s.outcome?.mfe_d5], ["MFE d20 %", s.outcome?.mfe_d20],
+            ["Entry", s.m?.entry_px], ["Stop width ×ADR", s.m?.stop_width_adr],
+          ];
+          const cap = +(s.m?.mcap_t || 0);
+          return <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            {strip.map(([lab, v]) => (
+              <div key={lab} style={{ flex: "1 1 130px", minWidth: 120, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 10px", background: "rgba(0,0,0,0.25)" }}>
+                <div style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".07em", textTransform: "uppercase", color: C.muted, marginBottom: 3 }}>{lab}</div>
+                <div style={{ fontSize: "0.8rem", fontWeight: 700, color: (v == null || v === "") ? C.muted : C.white }}>{(v == null || v === "") ? "—" : String(v)}</div>
+              </div>
+            ))}
+            <div style={{ flex: "1 1 130px", minWidth: 120, border: `1px solid ${C.borderGold}`, borderRadius: 8, padding: "7px 10px", background: C.goldDim }}>
+              <div style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".07em", textTransform: "uppercase", color: C.muted, marginBottom: 3 }}>Cap / ADR</div>
+              <div style={{ fontSize: "0.8rem", fontWeight: 700, color: C.goldBright }}>{cap > 0 ? (cap >= 1e9 ? "$" + (cap / 1e9).toFixed(1) + "B" : "$" + Math.round(cap / 1e6) + "M") : "—"}{s.m?.adr20 != null && s.m?.adr20 !== "" ? ` · ADR ${(+s.m.adr20).toFixed(1)}%` : ""}</div>
+            </div>
+          </div>;
+        })()}
+        <div style={sect}>📊 Auto-pulled data — filled by VIV, correct anything that looks wrong</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 8 }}>
+          {def.metrics.map(([k, t]) => (
+            <div key={k}><label style={lbl}>{t}</label><input style={inputS} value={s.m[k] ?? ""} onChange={e => setS({ m: { ...s.m, [k]: e.target.value } })} /></div>
+          ))}
+        </div>
+
+        <div style={sect}>Outcome anatomy — the burst & the campaign</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 8 }}>
+          {OUTCOME_METRICS.map(([k, t]) => (
+            <div key={k}><label style={lbl}>{t}</label><input style={inputS} value={s.outcome[k] ?? ""} onChange={e => setS({ outcome: { ...s.outcome, [k]: e.target.value } })} /></div>
+          ))}
+          <div><label style={lbl}>Follow-through d2</label>
+            <select style={inputS} value={s.outcome.followthru ?? ""} onChange={e => setS({ outcome: { ...s.outcome, followthru: e.target.value } })}><option value="">—</option><option>yes</option><option>no</option></select></div>
+          <div><label style={lbl}>Failure mode (if failed)</label>
+            <select style={inputS} value={s.outcome.failure_mode ?? "none"} onChange={e => setS({ outcome: { ...s.outcome, failure_mode: e.target.value } })}>
+              {["none", "no-follow-through", "late-trend/extended", "market-phase", "bad-base", "liquidity/gap", "other"].map(f => <option key={f}>{f}</option>)}</select></div>
+        </div>
+      </>)}
 
       <div style={sect}>Lesson</div>
       <label style={lbl}>What would have made me refuse this? (one sentence — the highest-value note)</label>

@@ -209,10 +209,38 @@ async function mcapAtTrigger(sym, dateISO, closePx) {
 }
 const mcap = await mcapAtTrigger(T, t.d, t.c);
 
+// ── Task-2 computed characteristics (Valen 2026-07-24) — reuse the bars already fetched, no extra API.
+// invaded_half: day-1 midpoint = open + (close−open)/2 of the trigger; true if any LOW of days 2–5
+//   undercuts it ("winners never invade half of day 1"). post[0] = day 2.
+const d1mid = t.o + (t.c - t.o) / 2;
+const d25 = post.slice(0, 4);
+const invadedHalf = d25.length ? d25.some(b => b.l < d1mid) : null;
+// d3_moved: new high above the trigger day's high by day 2 or day 3 (follow-through).
+const d3Moved = post.length ? [post[0], post[1]].some(b => b && b.h > t.h) : null;
+// dormant_days: sessions before the trigger since the last ≥20%/5-session gain (c/c5 ≥ 1.2) — a
+//   neglect proxy. If none within the lookback, store the lookback length + dormant_capped=true.
+let dormant = 0, dormantCapped = false, dFound = false;
+for (let k = ti-1; k >= 5; k--) { if (all[k].c / all[k-5].c >= 1.2) { dFound = true; break; } dormant++; }
+if (!dFound) { dormant = ti; dormantCapped = true; }
+// adv_dollar: 20-day average volume × trigger close · turnover_pct: adv_dollar ÷ cap (only if cap known).
+// off_52wk is already computed as from_high_pct above (% below 52-week high) — not duplicated.
+const advVol20 = win(20).reduce((s,b)=>s+b.v,0)/20;
+const advDollar = advVol20 * t.c;
+const turnover = mcap ? advDollar / mcap.cap * 100 : null;
+
+// H10 companions (Valen 2026-07-24): sessions from the trigger to the FIRST daily close below the
+// SMA (10 & 20). Reuses `all` + `sma`. Never breaks inside the post-trigger window → null + censored
+// flag (censored ≠ short trend — the readout treats it separately). Distinct from days_above_10ma.
+const daysBelowMA = (period) => { for (let k = ti+1; k < all.length; k++) { const s = sma(all, period, k); if (s && all[k].c < s) return { d: k - ti, cens: false }; } return { d: null, cens: true }; };
+const b10 = daysBelowMA(10), b20 = daysBelowMA(20);
+
 const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(ret(63)), ext_50ma:f(ext50,2),
   mcap_t: mcap ? Math.round(mcap.cap) : null, mcap_asof: mcap ? `${mcap.asof} (SEC shares ${(mcap.shares/1e6).toFixed(1)}M × trigger close)` : null,
   from_high_pct:f(fromHigh), breakout_num:bnum+" (approx: 4% RE-days last 90)", up_days_before:upb, re_pct:f(re), gap_pct:f(gap),
   vol_ratio:f(volr,2), rvol_eod:f(rvol,2), rvol_30m:f(rvol30,2), vol30_adv_pct:f(vol30adv,0),
+  invaded_half: invadedHalf, d3_moved: d3Moved, dormant_days: dormant, dormant_capped: dormantCapped,
+  adv_dollar: advDollar != null ? Math.round(advDollar) : null, turnover_pct: f(turnover, 2),
+  d_below_ma10: b10.d, ma10_censored: b10.cens, d_below_ma20: b20.d, ma20_censored: b20.cens,
   closing_range:f(crange,0), stop_width_adr:f(((entry-lod)/entry*100)/adr20,2),
   entry_px:`${f(entry,2)} (${entryModel})`,
   ret_1m:f(ret(21)), ret_3m:f(ret(63)), ret_6m:f(ret(126)), regime: spyOK?"Y":"N",
@@ -220,9 +248,16 @@ const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(r
   rs:"pending as-rank (needs POLYGON_API_KEY)" };
 // SUGGESTED ticks only — checks belong to VALEN's eyes now (2026-07-14 split: his buckets vs auto data).
 // Printed for cross-reference, NEVER written into the row.
+// coil_len proxy = the narrow-range streak band · shallow_retrace/retrace_ma proxy = the pullback low
+// (last 10 sessions) vs the 10/20/50-MA at trigger−1. SUGGESTIONS ONLY — never written to checks.
+const s50p = sma(all,50,ti-1);
+const pbLow = Math.min(...win(10).map(b=>b.l));
+const retraceMaSug = (s10p && pbLow>=s10p) ? "10ma" : (s20p && pbLow>=s20p) ? "20ma" : (s50p && pbLow>=s50p) ? "50ma" : "deeper";
 const suggested = { tight:tight>=3, orderly, pole:(ret(63)??0)>=30, linear:lin>=0.8, young:bnum<=3, prior_nr:priorNR,
   re:re>=4&&upb<=2, up2:upb<=2, vol_exp:volr>1, closehi:crange>=70, ma_surf:!!maSurf,
-  gapped:gap>=1, gap_band: gap>=1 ? (gap<2?"<2":gap<5?"2-5":gap<10?"5-10":">10") : null };
+  gapped:gap>=1, gap_band: gap>=1 ? (gap<2?"<2":gap<5?"2-5":gap<10?"5-10":">10") : null,
+  coil_len: tight<10 ? "<10" : tight<=20 ? "10-20" : ">20",
+  shallow_retrace: retraceMaSug==="10ma", retrace_ma: retraceMaSug };
 const outcome = { mfe_d1:f(mfe(1)), mfe_d3:f(mfe(3)), mfe_d5:f(mfe(5)), mfe_d20:f(mfe(20)), day2_pct:f(day2),
   burst_days:bdays||null, burst_pct:f(bpct), mae:f(mae), giveback_pct:f(give), days_above_10ma:exitC!=null?d10:`${d10}+ (still above)`,
   trail_r:f(trailR,2), ext_at_peak:f(extPeak,2), followthru: day2==null?"":(day2>0?"yes":"no"),
