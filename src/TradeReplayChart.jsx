@@ -11,7 +11,20 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 // ─────────────────────────────────────────────────────────────
 
 const TFS = [{ k: "1min", lbl: "1m" }, { k: "5min", lbl: "5m" }, { k: "15min", lbl: "15m" }, { k: "60min", lbl: "1h" }, { k: "1day", lbl: "D" }];
-const iso = (d) => (d ? String(d).slice(0, 10) : "");
+// Normalize any trade date to ISO YYYY-MM-DD before it hits `new Date()`. A naive slice(0,10)
+// left legacy manual/dashboard "M/D/YY" rows (e.g. "7/16/26") as non-ISO strings: Safari/JSC
+// refuses to parse those (Invalid Date → the details chart silently blanked), and where they DID
+// parse they went off-by-one for UTC+8 viewers (local vs UTC midnight). Normalizing first makes
+// the window math and the `.toISOString()` calls below correct and browser-independent.
+const iso = (d) => {
+  if (!d) return "";
+  const s = String(d).trim().split(/[ T]/)[0];
+  const isoM = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (isoM) return `${isoM[1]}-${isoM[2].padStart(2, "0")}-${isoM[3].padStart(2, "0")}`;
+  const md = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (md) { const y = md[3].length === 2 ? "20" + md[3] : md[3]; return `${y}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`; }
+  return s.slice(0, 10);
+};
 // ── US Eastern (market time) is the chart's baseline, whatever the viewer's clock ──
 // Bars are shifted so the axis renders ET wall-clock; fill times (stored as ET, e.g. "09:36:56")
 // parse onto the same shifted axis. Handles EDT/EST automatically via Intl.

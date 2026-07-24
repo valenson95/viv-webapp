@@ -6,7 +6,7 @@ import { supabase, supabaseUrl, supabaseAnonKey } from "./supabaseClient";
 import { captureElement } from "./captureElement.js"; // shared camera helper (equity-curve + calendar)
 import TradeCalendar from "./Calendar.jsx";
 import TradeReplayChart from "./TradeReplayChart.jsx";
-import { sectorFor, useSectors } from "./sectors.js";
+import { sectorFor, useSectors, setSectorOverrides } from "./sectors.js";
 import { themeFit, themeRanks, consistentTop, top5, latestSnapshot, THEME_COVERAGE_START } from "./themes.js";
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
@@ -6294,11 +6294,23 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   const saveEdit = () => {
     if (!editingId) return;
     const serializedNotes = serializeNotes(editNotes);
-    // IBKR-synced trade: the server owns the facts (entry/exit/price/shares/P&L). Persist only the
-    // annotations via the targeted single-row save — never the bulk writer (which skips ibkr rows).
+    // IBKR-sourced trade: route through the targeted single-row writer, NEVER the bulk manual writer
+    // (handleManualTradeSave filters out source === "ibkr" on both insert AND update, so an edit to an
+    // ibkr row in a MANUAL-mode journal was silently dropped — member Estrid's qty reduction never saved).
+    // In IBKR sync mode the broker owns the facts → only annotations (stop/setup/tags/notes/reason) go up.
+    // In MANUAL mode the member owns their book → include the factual fields (shares/prices/dates/direction)
+    // so a quantity edit actually persists. The locked stop_price rule is preserved inside handleIbkrTradeEdit.
     const editedTrade = journaledTrades.find(t => t.id === editingId);
-    if (isIbkrMode && editedTrade?.source === "ibkr" && onIbkrTradeEdit) {
-      onIbkrTradeEdit(editingId, { stop: editRow.stop, setup: editRow.setup, reason: editRow.reason, tags: editRow.tags, notes: serializedNotes });
+    if (editedTrade?.source === "ibkr" && onIbkrTradeEdit) {
+      const patch = { stop: editRow.stop, setup: editRow.setup, reason: editRow.reason, tags: editRow.tags, notes: serializedNotes };
+      if (!isIbkrMode) {
+        // manual-mode journal: facts are editable and must be written
+        Object.assign(patch, {
+          ticker: editRow.ticker, entry: editRow.entry, exit: editRow.exit,
+          entryP: editRow.entryP, exitP: editRow.exitP, shares: editRow.shares, tradeType: editRow.tradeType,
+        });
+      }
+      onIbkrTradeEdit(editingId, patch);
       setEditingId(null);
       return;
     }
@@ -7948,8 +7960,10 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <div className="modalhead"><div><div className="sech">Edit trade · {editRow.ticker}</div><div className="sub" style={{ marginTop: 4 }}>Update the factual details. R-Multiple recomputes from entry/exit and your stop.</div></div><button className="revclose" onClick={cancelEdit}>&times;</button></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 {[["ticker", "Ticker", "text"], ["entry", "Entry date", "text"], ["exit", "Exit date", "text"], ["entryP", "Entry $", "number"], ["exitP", "Exit $", "number"], ["shares", "Shares", "number"], ["stop", "Stop", "number"]].map(([k, label, type]) => {
-                  // IBKR-synced trade: facts come straight from your broker and are locked. Only the stop is yours to enter.
-                  const locked = editRow.source === "ibkr" && k !== "stop";
+                  // IBKR SYNC mode: facts come straight from your broker and are locked; only the stop is yours.
+                  // MANUAL mode: you own your book, so even a legacy ibkr-sourced row's facts are editable
+                  // (and now persist via the single-row writer). The stop is always editable.
+                  const locked = isIbkrMode && editRow.source === "ibkr" && k !== "stop";
                   return (
                   <div key={k}>
                     <div className="label" style={{ marginBottom: 6 }}>{label}{locked && <span style={{ color: "var(--muted)", fontWeight: 600 }}> · from IBKR</span>}</div>
@@ -9398,7 +9412,7 @@ function AllocDonut({ pct, over, size = 104 }) {
   );
 }
 
-function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning, displayName }) {
+function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, rNumStocks, setRNumStocks, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning, displayName }) {
   // Alias so existing `INTRADAY_FEATURE_ENABLED` references inside this component keep reading as a single
   // flag without rewriting every callsite. Reactive — flipping the Settings toggle re-renders the table.
   const INTRADAY_FEATURE_ENABLED = intradayFeatureEnabled;
@@ -9412,7 +9426,8 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
   const resetZoom = () => { localStorage.setItem("viv-pos-zoom", "1"); setPosZoom(1); };
   const [riskBreakdownOpen, setRiskBreakdownOpen] = useState(false);
   const [sizerMode, setSizerMode] = useState("R"); // "R" = risk-based (default), "%" = position size
-  const [rNumStocks, setRNumStocks] = useState(4);
+  // rNumStocks / setRNumStocks are now App-level props (persisted to profiles.num_stocks) so the
+  // "Maximum positions" value survives a refresh — was a page-local useState(4) that reset every reload.
   // ─── Secured Profit toggle ───
   // When a trail stop sits ABOVE entry, (trail − entry) × shares is locked-in profit
   // that can't be lost (assuming the stop holds). Including it in the compounding base
@@ -10575,6 +10590,17 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               >{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Retry save" : "Save"}</button>
               <button className="btn goldoutline" onClick={addAndManage}>+ Add Position</button>
             </div>
+            {(() => {
+              // Gentle inline hint: a row missing symbol / shares / entry price won't be saved (guarded in
+              // savePositionsNow) — tell the member why rather than silently dropping their placeholder.
+              const hasVal = v => v != null && String(v).trim() !== "";
+              const incomplete = (positions || []).filter(p => !(hasVal(p.sym) && hasVal(p.shares) && hasVal(p.ep))).length;
+              return incomplete > 0 ? (
+                <div style={{ marginTop: 8, fontSize: "0.72rem", color: "var(--muted)" }}>
+                  {incomplete} incomplete {incomplete === 1 ? "row needs" : "rows need"} a symbol, shares and entry price before {incomplete === 1 ? "it saves" : "they save"}.
+                </div>
+              ) : null;
+            })()}
           </div>
 
           {/* P2. KPI STRIP — hold a card's ⋮⋮ handle to rearrange; the order is saved per browser */}
@@ -13245,6 +13271,10 @@ function AppInner() {
   }, [session, lastSync, undoStatus, undoStorageKey]);
   const [fontSize, setFontSize] = useState("standard");
   const [targetRote, setTargetRote] = useState("2");
+  // Max concurrent positions — persisted to profiles.num_stocks so it survives a refresh
+  // (was a DashboardPage-local useState(4) that never loaded/saved: member terranbello had
+  // num_stocks=5 in the DB but the UI always reset to 4 on reload).
+  const [rNumStocks, setRNumStocks] = useState(4);
   const dataLoaded = useRef(false);
   const loadFailed = useRef(false); // tracks if data load had errors — blocks autosave to prevent data loss
 
@@ -13327,7 +13357,14 @@ function AppInner() {
     saveStartTime.current = Date.now();
     setPositionSaveStatus("saving");
     try {
-      const rows = posArr.map(p => {
+      // Data-quality guard: never persist a half-filled "Add position" row. A savable position needs a
+      // symbol AND shares AND an entry price — otherwise it's an unfilled placeholder the member just added.
+      // (Blank-symbol rows had been accumulating in the DB.) We keep the blank row in local state so the
+      // member can still fill it in; it simply doesn't get written until it has real data.
+      const hasVal = v => v != null && String(v).trim() !== "";
+      const isSavablePos = p => hasVal(p.sym) && hasVal(p.shares) && hasVal(p.ep);
+      const savable = posArr.filter(isSavablePos);
+      const rows = savable.map(p => {
         const row = {
           user_id: uid, symbol: p.sym || "", entry_date: p.entry || "", entry_time: p.entryTime || "", shares: p.shares || "",
           entry_price: p.ep || "", current_price: p.cp || "", stop_price: p.stop || "",
@@ -13390,9 +13427,17 @@ function AppInner() {
       const idMap = new Map();
       skipNextAutosave.current = true; // prevent ID sync from triggering another save cycle
       setPositions(prev => {
-        if (prev.length !== inserted.length) return prev; // state changed during save, skip sync
-        prev.forEach((p, i) => { if (inserted[i]) idMap.set(p.id, inserted[i].id); });
-        const next = prev.map((p, i) => ({ ...p, id: inserted[i].id })); // _lid preserved via spread
+        // Only the savable rows were inserted — align them to `inserted` by order, leaving any
+        // unfilled placeholder rows in place (with their local ids) so the member can finish them.
+        const savablePrev = prev.filter(isSavablePos);
+        if (savablePrev.length !== inserted.length) return prev; // state changed during save, skip sync
+        let j = 0;
+        const next = prev.map(p => {
+          if (!isSavablePos(p)) return p; // untouched placeholder
+          const dbId = inserted[j++].id;
+          idMap.set(p.id, dbId);
+          return { ...p, id: dbId }; // _lid preserved via spread
+        });
         positionsRef.current = next;
         return next;
       });
@@ -13451,7 +13496,25 @@ function AppInner() {
         setProfile(prof);
         if (prof.portfolio_size) setPortfolioSize(String(prof.portfolio_size));
         if (prof.font_size) setFontSize(prof.font_size);
+        setRNumStocks(prof.num_stocks != null ? prof.num_stocks : 4); // survive refresh (Bug: reset to 4)
       }
+
+      // DeepVue-annotation sector override (HARD: DeepVue owns grouping). Pull the sector the
+      // admin annotated on each published Daily Setup so the Dashboard's Open-Positions sector
+      // MATCHES what Daily Setups shows for the same ticker (most-recent published annotation wins).
+      // Read-only, RLS-safe (members can read published setups); failure is silent (falls back to SECTORS).
+      supabase.from("daily_setups").select("ticker,sector,trade_date,created_at")
+        .not("sector", "is", null).order("trade_date", { ascending: false }).order("created_at", { ascending: false })
+        .limit(500)
+        .then(({ data: setups }) => {
+          if (!setups || !setups.length) return;
+          const map = {};
+          for (const s of setups) { // rows arrive newest-first → first non-null sector per ticker wins
+            const tk = String(s.ticker || "").toUpperCase().trim();
+            if (tk && s.sector && !map[tk]) map[tk] = s.sector;
+          }
+          setSectorOverrides(map);
+        }, () => {});
 
       // Settings — MUST check for errors. If query fails, do NOT overwrite with defaults.
       const { data: settings, error: settingsErr } = await supabase.from("user_settings").select("*").eq("user_id", uid);
@@ -13708,6 +13771,7 @@ function AppInner() {
 
   useEffect(() => { if (dataLoaded.current && !loadFailed.current) saveProfile("portfolio_size", +portfolioSize || 0); }, [portfolioSize]);
   useEffect(() => { if (dataLoaded.current && !loadFailed.current) saveProfile("font_size", fontSize); }, [fontSize]);
+  useEffect(() => { if (dataLoaded.current && !loadFailed.current) saveProfile("num_stocks", rNumStocks | 0); }, [rNumStocks]);
 
   // ─── Auto-save settings to Supabase — blocked if data load failed to prevent overwriting with defaults ───
   useEffect(() => { if (dataLoaded.current && !loadFailed.current && session) saveSettingNow(session.user.id, "setup_types", setupTypes); }, [setupTypes]);
@@ -13837,19 +13901,43 @@ function AppInner() {
     if ("notes" in patch) upd.notes = patch.notes || "";
     if ("reason" in patch) upd.exit_reason = patch.reason || "";
 
-    let rMult = t.rMult;
-    if ("stop" in patch) {
-      const st = parseFloat(patch.stop) || 0;
-      const ep = parseFloat(t.entryP) || 0, xp = parseFloat(t.exitP) || 0;
-      const isShort = (t.tradeType || "Long") === "Short";
-      const plPct = ep > 0 ? (isShort ? ((ep - xp) / ep) * 100 : ((xp - ep) / ep) * 100) : 0;
+    // Factual fields are only present when a MANUAL-mode journal edits a (legacy) ibkr-sourced row.
+    // In IBKR sync mode the modal locks these, so the patch never carries them and behavior is unchanged.
+    const dbDate = v => { const s = String(v == null ? "" : v).trim(); return s ? tradeDateISO(s) : null; };
+    const localPatch = {};
+    if ("ticker" in patch) { upd.ticker = patch.ticker || ""; localPatch.ticker = upd.ticker; }
+    if ("entry" in patch) { upd.entry_date = dbDate(patch.entry); localPatch.entry = patch.entry; }
+    if ("exit" in patch) { upd.exit_date = dbDate(patch.exit); localPatch.exit = patch.exit; }
+    if ("entryP" in patch) { upd.entry_price = parseFloat(patch.entryP) || 0; localPatch.entryP = upd.entry_price; }
+    if ("exitP" in patch) { upd.exit_price = parseFloat(patch.exitP) || 0; localPatch.exitP = upd.exit_price; }
+    if ("shares" in patch) { upd.shares = parseFloat(patch.shares) || 0; localPatch.shares = upd.shares; }
+    if ("tradeType" in patch) { upd.trade_type = patch.tradeType || "Long"; localPatch.tradeType = upd.trade_type; }
+
+    // Effective values (patched-or-existing) for recomputing P&L + R when facts or the stop change.
+    const ep = "entryP" in patch ? (parseFloat(patch.entryP) || 0) : (parseFloat(t.entryP) || 0);
+    const xp = "exitP" in patch ? (parseFloat(patch.exitP) || 0) : (parseFloat(t.exitP) || 0);
+    const sh = "shares" in patch ? (parseFloat(patch.shares) || 0) : (parseFloat(t.shares) || 0);
+    const isShort = (("tradeType" in patch ? patch.tradeType : t.tradeType) || "Long") === "Short";
+    // Stop for R: the NEW stop if editing it, else the EXISTING locked stop (never invented).
+    const st = "stop" in patch ? (parseFloat(patch.stop) || 0) : (parseFloat(t.stop) || 0);
+
+    let rMult = t.rMult, plPct = t.plPct, plDollar = t.plDollar;
+    const factsChanged = ["entryP", "exitP", "shares", "tradeType"].some(k => k in patch);
+    if ("stop" in patch || factsChanged) {
+      plPct = ep > 0 ? (isShort ? ((ep - xp) / ep) * 100 : ((xp - ep) / ep) * 100) : 0;
+      plDollar = isShort ? (ep - xp) * sh : (xp - ep) * sh;
       const initRisk = ep > 0 && st > 0 ? (isShort ? (st - ep) / ep : (ep - st) / ep) : 0;
       rMult = initRisk > 0 ? +((plPct / 100) / initRisk).toFixed(2) : null;
-      upd.stop_price = st > 0 ? st : null;            // locked INITIAL stop → drives R, never overwritten by trailing
-      upd.current_stop_price = st > 0 ? st : null;    // display value (user trails this up later)
+      upd.pl_pct = plPct;
+      upd.pl_dollar = plDollar;
       upd.r_mult = rMult;
-      upd.needs_stop = !(st > 0);                     // stop entered → clear the flag
-      if (st > 0 && !t.stopLockedAt) upd.stop_locked_at = new Date().toISOString();
+    }
+    if ("stop" in patch) {
+      const stNew = parseFloat(patch.stop) || 0;
+      upd.stop_price = stNew > 0 ? stNew : null;            // locked INITIAL stop → drives R, never overwritten by trailing
+      upd.current_stop_price = stNew > 0 ? stNew : null;    // display value (user trails this up later)
+      upd.needs_stop = !(stNew > 0);                        // stop entered → clear the flag
+      if (stNew > 0 && !t.stopLockedAt) upd.stop_locked_at = new Date().toISOString();
     }
     // Optimistic local update
     setJournaledTrades(prev => prev.map(x => x.id === id ? {
@@ -13858,7 +13946,9 @@ function AppInner() {
       ...("tags" in patch ? { tags: upd.tags } : {}),
       ...("notes" in patch ? { notes: upd.notes } : {}),
       ...("reason" in patch ? { reason: upd.exit_reason } : {}),
-      ...("stop" in patch ? { stop: upd.stop_price, currentStop: upd.current_stop_price, rMult, needsStop: upd.needs_stop, stopLockedAt: upd.stop_locked_at || x.stopLockedAt } : {}),
+      ...localPatch,
+      ...(("stop" in patch || factsChanged) ? { plPct, plDollar, rMult } : {}),
+      ...("stop" in patch ? { stop: upd.stop_price, currentStop: upd.current_stop_price, needsStop: upd.needs_stop, stopLockedAt: upd.stop_locked_at || x.stopLockedAt } : {}),
     } : x));
     const { error } = await supabase.from("trades").update(upd).eq("id", id).eq("user_id", session.user.id);
     if (error) console.error("IBKR trade edit failed:", error.message);
@@ -13958,7 +14048,7 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage setPage={setPage} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
+      {page === "dashboard" && <DashboardPage setPage={setPage} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} rNumStocks={rNumStocks} setRNumStocks={setRNumStocks} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
       {page === "tools" && <PremiumToolsPage setPage={setPage} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} positions={positions} displayName={displayName} />}
       {page === "journal" && <TradeJournalPage setPage={setPage} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} />}
       {page === "daily" && <DailySetupsShell setPage={setPage} session={session} displayName={displayName} />}

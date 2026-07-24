@@ -61,10 +61,30 @@ let DYN = typeof localStorage !== "undefined" ? loadDyn() : {};
 const MISSES = new Set();   // tickers the API couldn't resolve — don't refetch every render
 let pending = null;         // single in-flight batch
 
+// ── DeepVue-annotation override (HARD RULE: DeepVue owns grouping) ────────────
+// The published Daily Setups feed carries the sector the ADMIN annotated for a
+// ticker (the real DeepVue group). That published annotation is authoritative and
+// must WIN over the self-categorized SECTORS table above — otherwise the Dashboard
+// (SECTORS) and Daily Setups (annotation) disagree for the same ticker (member
+// reports: DELL/RXT/WYFI showed "Technology · out of theme" on the Dashboard but
+// software/AI on Daily Setups). App populates this from daily_setups on load via
+// setSectorOverrides(); until then it's empty and behavior is unchanged.
+let OVERRIDE = {};
+export function setSectorOverrides(map) {
+  if (!map || typeof map !== "object") return;
+  let changed = false;
+  for (const k of Object.keys(map)) {
+    const t = String(k).toUpperCase().trim();
+    const v = map[k];
+    if (t && v && OVERRIDE[t] !== v) { OVERRIDE[t] = v; changed = true; }
+  }
+  if (changed && typeof window !== "undefined") window.dispatchEvent(new Event("viv-sectors"));
+}
+
 export function sectorFor(ticker) {
   if (!ticker) return null;
   const t = String(ticker).toUpperCase().trim();
-  return SECTORS[t] || DYN[t] || null;
+  return OVERRIDE[t] || SECTORS[t] || DYN[t] || null;
 }
 
 // Queue unknown tickers, batch-resolve via /api/sector, persist + notify ("viv-sectors" event).

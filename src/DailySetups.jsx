@@ -68,11 +68,25 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   const [boardOpen, setBoardOpen] = useState(false); // collapsed by default: top rows only
   const [openDays, setOpenDays] = useState(() => new Set()); // date groups the user expanded — ALL collapsed by default (member ask 2026-07-10)
 
-  const load = useCallback(async () => {
-    const { rows: r, tableMissing: tm } = await listSetups();
-    setRows(r); setTableMissing(tm);
+  // Mobile cold-start hardening: a stalled first fetch used to leave rows=null forever ("Loading the
+  // feed…" that only a manual refresh cleared — member tohzhiyangrv). Now the fetch races an 8s timeout
+  // and auto-retries ONCE; a final failure resolves to an empty feed instead of an infinite spinner.
+  const load = useCallback(async (attempt = 0) => {
+    const withTimeout = (p, ms) => Promise.race([
+      p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms)),
+    ]);
+    try {
+      const { rows: r, tableMissing: tm, loadError } = await withTimeout(listSetups(), 8000);
+      if (loadError && attempt < 1) { setTimeout(() => load(attempt + 1), 1200); return; } // one silent retry
+      setRows(r || []); setTableMissing(tm);
+    } catch {
+      if (attempt < 1) { setTimeout(() => load(attempt + 1), 1200); return; }
+      setRows([]); // give up gracefully → empty state, never a permanent spinner
+    }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  // Re-run when the auth session settles: the initial mount can fire before Supabase auth is ready on a
+  // cold mobile load, which returns nothing; re-fetching once `session` lands fixes the "needs refresh" case.
+  useEffect(() => { load(); }, [load, session]);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") setLightbox(null); };
     window.addEventListener("keydown", h);
@@ -435,6 +449,19 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                   {/* chart thumb */}
                   {r.chart_img && (
                     <img src={r.chart_img} alt={`${r.ticker} chart`} onClick={() => setLightbox(r.chart_img)}
+                      loading="lazy"
+                      // A chart image that fails to load (mobile/network) must not wedge the card — hide it
+                      // and show a small placeholder in its place so the rest of the setup still renders.
+                      onError={(e) => {
+                        const el = e.currentTarget;
+                        if (el.dataset.fallback) return;
+                        el.dataset.fallback = "1";
+                        el.style.display = "none";
+                        const ph = document.createElement("div");
+                        ph.textContent = "Chart unavailable";
+                        ph.style.cssText = `flex:0 0 240px;width:240px;height:135px;display:flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid ${C.border};color:${C.muted};font-size:0.72rem;background:rgba(255,255,255,0.03)`;
+                        el.parentNode && el.parentNode.insertBefore(ph, el);
+                      }}
                       style={{ flex: "0 0 240px", width: 240, height: 135, objectFit: "cover", borderRadius: 12, border: `1px solid ${C.border}`, cursor: "zoom-in" }} />
                   )}
                   {/* headline */}
