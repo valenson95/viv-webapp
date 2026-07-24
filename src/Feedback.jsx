@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "./supabaseClient";
 
@@ -38,6 +38,9 @@ const FB_CSS = `
 .vivfb-fab:hover{transform:translateY(-2px); box-shadow:0 16px 40px rgba(201,152,42,0.5)}
 .vivfb-feed::-webkit-scrollbar{width:8px}
 .vivfb-feed::-webkit-scrollbar-thumb{background:rgba(201,152,42,0.22); border-radius:99px}
+@keyframes vivfbBadge{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.6)}70%{box-shadow:0 0 0 7px rgba(239,68,68,0)}}
+.vivfb-badge{animation:vivfbBadge 2s infinite}
+.vivfb-toast{animation:vivfbUp .32s cubic-bezier(0.22,1,0.36,1)}
 `;
 
 export default function FeedbackWidget({ session, isAdmin, displayName, C, font, isMobile }) {
@@ -52,6 +55,73 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
   const [busy, setBusy] = useState(false);
   const [commentDraft, setCommentDraft] = useState({});
   const [expanded, setExpanded] = useState({});
+
+  // ── Notifications + full-page detail (100% client-side, no schema change) ──
+  const ADMIN_LASTSEEN_KEY = "viv-feedback-admin-lastseen";   // ISO ts of the last time admin opened the panel
+  const RESOLVED_SEEN_KEY = "viv-feedback-resolved-seen";     // Set<feedback_id> the member has already been toasted about
+  const [allFeedback, setAllFeedback] = useState([]);         // lightweight always-on poll → drives badges + resolved detection
+  const [detail, setDetail] = useState(null);                 // feedback id currently shown full-page (or null)
+  const [toasts, setToasts] = useState([]);                   // [{id,msg}] self-dismissing
+  const [memberPending, setMemberPending] = useState(() => new Set()); // own items just resolved — FAB badge until panel opened
+  const [adminLastSeen, setAdminLastSeen] = useState(() => { try { return localStorage.getItem(ADMIN_LASTSEEN_KEY) || "1970-01-01T00:00:00.000Z"; } catch { return "1970-01-01T00:00:00.000Z"; } });
+  const resolvedSeenRef = useRef(null);
+  if (resolvedSeenRef.current === null) { try { resolvedSeenRef.current = new Set(JSON.parse(localStorage.getItem(RESOLVED_SEEN_KEY) || "[]")); } catch { resolvedSeenRef.current = new Set(); } }
+
+  const pushToast = useCallback((msg) => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts(t => [...t, { id, msg }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 6500);
+  }, []);
+
+  // Always-on lightweight poll (runs whether or not the panel is open) so the admin's new-feedback
+  // badge and members' "resolved" toasts fire even with the panel closed. Same 12s cadence.
+  const pollMeta = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from("feedback").select("id,user_id,status,body,created_at");
+      if (error) return;
+      setAllFeedback(data || []);
+    } catch { /* offline / not set up yet — leave badges empty */ }
+  }, []);
+  useEffect(() => {
+    pollMeta();
+    const id = setInterval(pollMeta, 12000);
+    return () => clearInterval(id);
+  }, [pollMeta]);
+
+  // Admin unread = feedback from OTHER members created after the admin last opened the panel.
+  const adminUnread = isAdmin ? allFeedback.filter(f => f.user_id !== uid && new Date(f.created_at) > new Date(adminLastSeen)).length : 0;
+  const markAdminSeen = useCallback(() => {
+    const now = new Date().toISOString();
+    try { localStorage.setItem(ADMIN_LASTSEEN_KEY, now); } catch {}
+    setAdminLastSeen(now);
+  }, []);
+
+  // Member: detect their OWN feedback that just flipped to resolved → one-time toast + FAB badge.
+  useEffect(() => {
+    if (!uid || isAdmin || !allFeedback.length) return;
+    const seen = resolvedSeenRef.current;
+    const newly = allFeedback.filter(f => f.user_id === uid && f.status === "resolved" && !seen.has(f.id));
+    if (!newly.length) return;
+    newly.forEach((f, i) => {
+      seen.add(f.id);
+      const body = (f.body || "").trim();
+      const snip = body.slice(0, 40) + (body.length > 40 ? "…" : "");
+      setTimeout(() => pushToast(`✓ Your feedback was marked resolved: "${snip}"`), i * 500);
+    });
+    try { localStorage.setItem(RESOLVED_SEEN_KEY, JSON.stringify([...seen])); } catch {}
+    setMemberPending(prev => { const n = new Set(prev); newly.forEach(f => n.add(f.id)); return n; });
+  }, [allFeedback, uid, isAdmin, pushToast]);
+
+  // Opening the panel clears whichever badge applies to this viewer.
+  useEffect(() => {
+    if (!open) return;
+    if (isAdmin) markAdminSeen();
+    else setMemberPending(new Set());
+  }, [open, isAdmin, markAdminSeen]);
+  // While the admin keeps the panel open, keep marking fresh arrivals seen so the badge stays cleared.
+  useEffect(() => { if (open && isAdmin) markAdminSeen(); }, [allFeedback, open, isAdmin, markAdminSeen]);
+
+  const badgeCount = isAdmin ? adminUnread : memberPending.size;
 
   const load = useCallback(async (silent) => {
     if (!silent) setLoading(true);
@@ -118,6 +188,7 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
     .filter(f => filter === "all" ? true : filter === "open" ? f.status !== "resolved" : f.status === "resolved")
     .sort((a, b) => (a.status === "resolved" ? 1 : 0) - (b.status === "resolved" ? 1 : 0) || b.votes - a.votes || new Date(b.created_at) - new Date(a.created_at));
   const openCount = items.filter(f => f.status !== "resolved").length;
+  const detailItem = detail ? items.find(f => f.id === detail) : null;
 
   const catColor = (c) => c === "Bug" ? C.red : c === "Feature request" ? C.blue : c === "Question" ? C.purple : C.gold;
   const gold = `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`;
@@ -143,6 +214,13 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
       }}>
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#08080e" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
         Feedback
+        {badgeCount > 0 && (
+          <span className="vivfb-badge" title={isAdmin ? `${badgeCount} new feedback` : `${badgeCount} of your items resolved`} style={{
+            position: "absolute", top: -7, right: -7, minWidth: 21, height: 21, padding: "0 5px", borderRadius: 99,
+            background: "#ef4444", color: "#fff", fontSize: "0.66rem", fontWeight: 800, display: "grid", placeItems: "center",
+            border: "2px solid #08080e", lineHeight: 1, boxSizing: "border-box",
+          }}>{badgeCount > 9 ? "9+" : badgeCount}</span>
+        )}
       </button>
 
       {!open ? null : (
@@ -208,8 +286,8 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
                 const resolved = f.status === "resolved";
                 const showComments = expanded[f.id];
                 return (
-                  <div key={f.id} className="vivfb-card" style={{
-                    border: `1px solid ${resolved ? "rgba(34,197,94,0.32)" : C.border}`, borderRadius: 16, padding: "15px 17px", marginBottom: 13,
+                  <div key={f.id} className="vivfb-card" onClick={() => setDetail(f.id)} title="Open full view" style={{
+                    border: `1px solid ${resolved ? "rgba(34,197,94,0.32)" : C.border}`, borderRadius: 16, padding: "15px 17px", marginBottom: 13, cursor: "pointer",
                     background: resolved ? "rgba(34,197,94,0.05)" : "rgba(255,255,255,0.025)", boxShadow: "0 8px 26px rgba(0,0,0,0.28)",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 10 }}>
@@ -223,7 +301,7 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
                     </div>
                     <div style={{ fontSize: "0.9rem", color: C.text, lineHeight: 1.58, whiteSpace: "pre-wrap", marginBottom: 13 }}>{f.body}</div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <div onClick={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <button onClick={() => toggleVote(f)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.74rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
                         border: `1px solid ${f.myVote ? C.borderGold : C.border}`, background: f.myVote ? C.goldDim : "rgba(255,255,255,0.03)", color: f.myVote ? C.goldBright : C.muted }}>
                         ▲ {f.votes}
@@ -236,7 +314,7 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
                     </div>
 
                     {showComments && (
-                      <div style={{ marginTop: 13, paddingTop: 13, borderTop: `1px solid ${C.border}` }}>
+                      <div onClick={e => e.stopPropagation()} style={{ marginTop: 13, paddingTop: 13, borderTop: `1px solid ${C.border}` }}>
                         {f.comments.map(c => (
                           <div key={c.id} style={{ display: "flex", gap: 9, marginBottom: 10 }}>
                             <div style={{ width: 27, height: 27, borderRadius: "50%", flex: "0 0 auto", display: "grid", placeItems: "center", fontWeight: 800, fontSize: "0.62rem", background: c.is_admin ? gold : "rgba(255,255,255,0.07)", color: c.is_admin ? "#08080e" : C.muted }}>{initials(c.author_name)}</div>
@@ -262,6 +340,91 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
               })}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Full-page detail — a feedback item opened for easy reading. Sits ABOVE the feedback modal
+          (z 1400) at z 1500; reuses the same vote/comment/resolve/delete handlers (no duplicated logic). */}
+      {detailItem && (() => {
+        const f = detailItem;
+        const resolved = f.status === "resolved";
+        const cc = catColor(f.category);
+        return (
+          <div className="vivfb-back" onClick={(e) => { if (e.target === e.currentTarget) setDetail(null); }} style={{
+            position: "fixed", inset: 0, zIndex: 1500, background: "radial-gradient(1000px 600px at 70% -10%, rgba(201,152,42,0.09), transparent 60%), rgba(3,3,6,0.82)",
+            backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: isMobile ? "20px 12px 40px" : "48px 16px", overflowY: "auto", fontFamily: font,
+          }}>
+            <div className="vivfb-modal" style={{
+              width: "min(760px, 100%)", position: "relative", borderRadius: 22, overflow: "hidden",
+              background: "linear-gradient(180deg, rgba(18,18,26,0.94), rgba(8,8,14,0.98))",
+              border: `1px solid ${C.borderGold}`, boxShadow: "0 44px 110px rgba(0,0,0,0.78)",
+              backdropFilter: "blur(30px) saturate(160%)", WebkitBackdropFilter: "blur(30px) saturate(160%)",
+            }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${C.gold}, ${C.goldBright}, ${C.gold}, transparent)`, opacity: 0.85 }} />
+
+              {/* header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "20px 22px 16px", borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: gold, color: "#08080e", display: "grid", placeItems: "center", fontWeight: 800, fontSize: "0.8rem", flex: "0 0 auto", boxShadow: "0 4px 12px rgba(201,152,42,0.35)" }}>{initials(f.author_name)}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: C.white }}>{f.author_name || "Member"}</div>
+                  <div style={{ fontSize: "0.7rem", color: C.muted }}>{timeAgo(f.created_at)}</div>
+                </div>
+                <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 800, color: cc, background: `${cc}1a`, border: `1px solid ${cc}44`, padding: "4px 11px", borderRadius: 99 }}>{f.category || "Suggestion"}</span>
+                {resolved && <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.green, background: "rgba(34,197,94,0.14)", border: "1px solid rgba(34,197,94,0.4)", padding: "4px 11px", borderRadius: 99 }}>✓ Resolved</span>}
+                <button onClick={() => setDetail(null)} style={{ ...glass, border: `1px solid ${C.border}`, color: C.muted, width: 36, height: 36, borderRadius: 11, fontSize: "1.25rem", cursor: "pointer", lineHeight: 1, flex: "0 0 auto" }}>&times;</button>
+              </div>
+
+              {/* full body — no truncation, line breaks preserved */}
+              <div style={{ padding: "20px 22px", maxHeight: isMobile ? "none" : "42vh", overflowY: "auto" }}>
+                <div style={{ fontSize: "1rem", color: C.text, lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{f.body}</div>
+              </div>
+
+              {/* actions — reuse the list handlers */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "0 22px 16px" }}>
+                <button onClick={() => toggleVote(f)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.76rem", fontWeight: 800, padding: "7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
+                  border: `1px solid ${f.myVote ? C.borderGold : C.border}`, background: f.myVote ? C.goldDim : "rgba(255,255,255,0.03)", color: f.myVote ? C.goldBright : C.muted }}>▲ {f.votes}</button>
+                <span style={{ fontSize: "0.74rem", fontWeight: 700, color: C.muted }}>💬 {f.comments.length} {f.comments.length === 1 ? "comment" : "comments"}</span>
+                {isAdmin && <button onClick={() => toggleResolved(f)} style={{ fontSize: "0.74rem", fontWeight: 800, padding: "7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${resolved ? C.border : "rgba(34,197,94,0.42)"}`, background: resolved ? "rgba(255,255,255,0.03)" : "rgba(34,197,94,0.12)", color: resolved ? C.muted : C.green }}>{resolved ? "Reopen" : "Mark resolved"}</button>}
+                {(isAdmin || f.user_id === uid) && <button onClick={() => { remove(f); setDetail(null); }} title="Delete" style={{ marginLeft: "auto", fontSize: "0.74rem", fontWeight: 700, padding: "7px 13px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, background: "transparent", color: C.muted }}>Delete</button>}
+              </div>
+
+              {/* comments — always open in the full view */}
+              <div style={{ padding: "16px 22px 22px", borderTop: `1px solid ${C.border}` }}>
+                {f.comments.length === 0 && <div style={{ fontSize: "0.8rem", color: C.muted, marginBottom: 12 }}>No comments yet.</div>}
+                {f.comments.map(c => (
+                  <div key={c.id} style={{ display: "flex", gap: 9, marginBottom: 10 }}>
+                    <div style={{ width: 27, height: 27, borderRadius: "50%", flex: "0 0 auto", display: "grid", placeItems: "center", fontWeight: 800, fontSize: "0.62rem", background: c.is_admin ? gold : "rgba(255,255,255,0.07)", color: c.is_admin ? "#08080e" : C.muted }}>{initials(c.author_name)}</div>
+                    <div style={{ background: c.is_admin ? "rgba(201,152,42,0.07)" : "rgba(255,255,255,0.03)", border: `1px solid ${c.is_admin ? C.borderGold : C.border}`, borderRadius: 12, padding: "9px 13px", flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
+                        <span style={{ fontSize: "0.74rem", fontWeight: 700, color: c.is_admin ? C.gold : C.text }}>{c.author_name || "Member"}</span>
+                        {c.is_admin && <span style={{ fontSize: "0.54rem", fontWeight: 800, color: "#08080e", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, padding: "1px 7px", borderRadius: 99, letterSpacing: "0.04em" }}>TEAM</span>}
+                        <span style={{ fontSize: "0.64rem", color: C.muted, marginLeft: "auto" }}>{timeAgo(c.created_at)}</span>
+                      </div>
+                      <div style={{ fontSize: "0.84rem", color: C.text, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{c.body}</div>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <input className="vivfb-in" value={commentDraft[f.id] || ""} onChange={e => setCommentDraft(d => ({ ...d, [f.id]: e.target.value }))} onKeyDown={e => { if (e.key === "Enter") addComment(f); }}
+                    placeholder={isAdmin ? "Reply as team…" : "Add a comment…"} style={{ flex: 1, background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.84rem", padding: "11px 14px", outline: "none", transition: "border-color .14s, box-shadow .14s" }} />
+                  <button onClick={() => addComment(f)} style={{ background: gold, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "11px 18px", borderRadius: 10, cursor: "pointer" }}>Send</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Self-dismissing toasts (VIV-styled) — rendered whether or not the panel is open, so a member
+          is notified the moment their feedback is resolved. Above every feedback overlay at z 1600. */}
+      {toasts.length > 0 && (
+        <div style={{ position: "fixed", left: "50%", bottom: isMobile ? 100 : 92, transform: "translateX(-50%)", zIndex: 1600, display: "flex", flexDirection: "column", gap: 8, alignItems: "center", pointerEvents: "none", fontFamily: font, width: "min(430px, calc(100vw - 32px))" }}>
+          {toasts.map(t => (
+            <div key={t.id} className="vivfb-toast" style={{ pointerEvents: "auto", width: "100%", boxSizing: "border-box", background: "linear-gradient(180deg, rgba(20,20,30,0.98), rgba(10,10,16,0.98))", border: `1px solid ${C.borderGold}`, borderRadius: 14, padding: "12px 15px", color: C.text, fontSize: "0.82rem", fontWeight: 600, lineHeight: 1.5, boxShadow: "0 18px 50px rgba(0,0,0,0.6)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <span style={{ color: C.green, fontWeight: 800, flex: "0 0 auto" }}>✓</span>
+              <span style={{ minWidth: 0 }}>{t.msg.replace(/^✓\s*/, "")}</span>
+            </div>
+          ))}
         </div>
       )}
     </>,

@@ -754,6 +754,16 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 24, 2026",
+    title: "🔔 Feedback: alerts + full-page view",
+    items: [
+      "You're now notified the moment your feedback is marked resolved — a toast pops up and the Feedback button carries a badge until you open it.",
+      "Click any feedback item to open it full-page — the complete post, votes and the whole comment thread, easier to read than the card.",
+      "Every post you send is still upvotable and open for discussion right there in the full view.",
+    ],
+  },
+  {
+    tag: "New",
+    date: "July 24, 2026",
     title: "🟡 Theme Leaders: gold column headers",
     items: [
       "The Theme Leaders popup's Since Open / 1 Week / 1 Month column headers are now gold, so they're easier to spot at a glance.",
