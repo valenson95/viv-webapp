@@ -15,10 +15,12 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import SECTORS from "../src/sectors.js";
+import { top5 } from "../src/themes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_FILE = path.join(__dirname, ".burstlog-cache.json");
 const TYPES_FILE = path.join(__dirname, ".tickertypes-cache.json");
+const SHARES_FILE = path.join(__dirname, ".tickershares-cache.json");
 const OUT_FILE = path.join(__dirname, "..", "src", "burstLog-data.js");
 
 // ── security-type filter: Common Stock + ADR only (mirrors the DeepVue "Include Type"
@@ -105,6 +107,31 @@ async function getDay(dateStr) {
 }
 
 function themeOf(t) { return SECTORS[t] || null; }
+
+// ── shares outstanding (→ cap = shares × session close) + SIC, via /api/tickerinfo.
+// Weekly-cached per ticker; only tickers new to the cache are fetched (13s pacing).
+async function loadShares(tickers) {
+  let store = {};
+  try { store = JSON.parse(fs.readFileSync(SHARES_FILE, "utf8")); } catch {}
+  const missing = tickers.filter((t) => !(t in store) || Date.now() - (store[t].ts || 0) > 30 * 86400e3);
+  if (missing.length) console.log(`  cap lookup: fetching ${missing.length} tickers (~${Math.ceil(missing.length * 13 / 60)} min)`);
+  for (const t of missing) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch(`https://www.valensontrades.com/api/tickerinfo?symbol=${t}`);
+        const j = await r.json();
+        if (j.ok) { store[t] = { shares: j.shares, sic: j.sic, ts: Date.now() }; break; }
+        if (String(j.error || "").toLowerCase().includes("maximum requests")) { await sleep(61000); continue; }
+        store[t] = { shares: null, sic: null, ts: Date.now() }; break; // honest blank
+      } catch { await sleep(61000); }
+    }
+    fs.writeFileSync(SHARES_FILE, JSON.stringify(store));
+    await sleep(13000);
+  }
+  return store;
+}
+
+const capBucket = (b) => b == null ? "unknown" : b < 0.5 ? "<$500M" : b < 2 ? "$500M–2B" : b < 10 ? "$2–10B" : ">$10B";
 
 async function main() {
   console.log(`BURST-LOG · target ${ARG_SESSIONS} computed sessions (window ${NEED} trading days)`);
@@ -200,6 +227,33 @@ async function main() {
       if (f5 != null) r.f5 = +(((f5 / r.c) - 1) * 100).toFixed(1);
     }
   });
+
+  // ── cap + SIC + theme-gate layer (the "common denominator" read, Valen 2026-07-24)
+  const uniq = [...new Set(out.flatMap((s) => [...s.rows, ...s.rows50].map((r) => r.t)))];
+  const shares = await loadShares(uniq);
+  const med0 = (a) => { if (!a.length) return null; const b = [...a].sort((x, y) => x - y); return b.length % 2 ? b[(b.length - 1) / 2] : (b[b.length / 2 - 1] + b[b.length / 2]) / 2; };
+  for (const s of out) {
+    const gate = new Set([...top5("week", s.date), ...top5("month", s.date)]);
+    for (const list of [s.rows, s.rows50]) {
+      for (const r of list) {
+        const sh = shares[r.t]?.shares;
+        r.capB = sh ? +((sh * r.c) / 1e9).toFixed(2) : null;   // cap AT that session's close
+        if (!r.theme && shares[r.t]?.sic) r.sic = shares[r.t].sic; // SIC shown only when theme unmapped
+        r.gate = r.theme ? (gate.has(r.theme) ? 1 : 0) : null;    // 1=in-theme 0=off ⚪ null=unmapped
+      }
+    }
+    const caps = s.rows.map((r) => r.capB).filter((x) => x != null);
+    const buckets = {};
+    s.rows.forEach((r) => { const k = capBucket(r.capB); buckets[k] = (buckets[k] || 0) + 1; });
+    const themed = s.rows.filter((r) => r.gate != null);
+    s.summary = {
+      medCapB: caps.length ? +med0(caps).toFixed(2) : null,
+      capBuckets: buckets,
+      inTheme: themed.filter((r) => r.gate === 1).length,
+      themed: themed.length,
+      unmapped: s.rows.length - themed.length,
+    };
+  }
 
   // aggregates (SampleTagged) over rows old enough to have f3
   const aged = out.flatMap((s) => s.rows.filter((r) => r.f3 != null && !r.flag));
