@@ -414,9 +414,12 @@ export const HYPOTHESES = [
   { id: "H10", claim: "Trend lifespan in legs", source: "MINE", kind: "distribution",
     prior: "How many legs a trend prints — from its FIRST leg — before its first daily close below the 10MA vs the 20MA. Doubles as the direct test of the leg-count distribution prior (≈70% of trends die after 2 legs · 20% get a 3rd · 5% a 4th · 1% a 5th).",
     points: [["legs_ma10 / legs_ma20", "total legs from the first leg of the trend to the first daily close below the 10MA / 20MA — counted off the AFTER chart, blank until set"], ["d_below_ma10 / d_below_ma20", "sessions from trigger to that first close below the MA (computed companion; censored when the trend never breaks inside the post-trigger window — censored ≠ a short trend)"]],
-    bands: ["1", "2", "3", "4", "5+"],
+    // bands = the preset base range; the card unions this with every leg number actually observed (incl.
+    // custom values beyond 10) so a "12" gets its own row and nothing is bucket-collapsed. priorDist stays
+    // keyed to the doctrine integers 2/3/4/5 — new/other rows show blank (no invented priors).
+    bands: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
     stores: [["legs_ma10", "10MA"], ["legs_ma20", "20MA"]],
-    priorDist: { "1": null, "2": 70, "3": 20, "4": 5, "5+": 1 } },
+    priorDist: { "2": 70, "3": 20, "4": 5, "5": 1 } },
   { id: "H11", claim: "Extension from the 50MA — fresh entries win, stretched peaks die", source: "MINE", kind: "extension",
     prior: "Breakouts triggered at a low ATR%-multiple from the 50MA outperform extended ones, and burst peaks cluster in a trim band. My own extension-tracker measurement: ≥7× multiples mark the trim-into-strength zone — strength faded from there ~76% of the time.",
     points: [["ext-at-trigger (ext_50ma)", "how stretched the entry already was — ≤4× = fresh, >4× = chasing"], ["ext-at-peak (ext_at_peak)", "where the burst topped — the trim-band calibration"]],
@@ -726,7 +729,15 @@ export function HypReadout({ C, hyp, winners, fails, allStudies }) {
   // ── H10 distribution — leg-count histogram vs prior, MA10 & MA20 side by side ──
   if (hyp.kind === "distribution") {
     const base = hypForLevel(allStudies, hyp);
-    const dists = hyp.stores.map(([store, maLabel]) => ({ store, maLabel, ...legDist(store, hyp.bands, base) }));
+    // Dynamic band set — union of the 1..10 presets with every leg number actually observed (incl. custom
+    // values beyond 10), sorted numerically (any non-numeric legacy value sorts last). Nothing is dropped
+    // or bucket-collapsed, so a custom "12" prints its own row.
+    const stores = hyp.stores.map(([st]) => st);
+    const observed = new Set();
+    base.forEach(x => stores.forEach(st => { const v = x.s.checks?.[st]; if (v != null && v !== "") observed.add(String(v)); }));
+    const dynBands = Array.from(new Set([...(hyp.bands || []), ...observed]))
+      .sort((a, b) => ((parseInt(a, 10) || 1e9) - (parseInt(b, 10) || 1e9)) || (a < b ? -1 : 1));
+    const dists = hyp.stores.map(([store, maLabel]) => ({ store, maLabel, ...legDist(store, dynBands, base) }));
     const med10 = medianCompanion(base, "d_below_ma10", "ma10_censored");
     const med20 = medianCompanion(base, "d_below_ma20", "ma20_censored");
     const distBox = { flex: "1 1 240px", minWidth: 220, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "rgba(0,0,0,0.25)" };
@@ -736,14 +747,14 @@ export function HypReadout({ C, hyp, winners, fails, allStudies }) {
           {dists.map(d => (
             <div key={d.store} style={distBox}>
               <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Legs to first close below {d.maLabel} · n={d.n}</div>
-              {hyp.bands.map(b => {
-                const c = d.counts[b], pct = d.n ? Math.round(c / d.n * 100) : 0, prior = hyp.priorDist[b];
+              {dynBands.map(b => {
+                const c = d.counts[b] || 0, pct = d.n ? Math.round(c / d.n * 100) : 0, prior = hyp.priorDist[b];
                 return (
                   <div key={b} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "2px 0" }}>
                     <span style={{ width: 26, flex: "none", color: C.text, fontWeight: 700 }}>{b}</span>
                     <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: C.goldBright }} /></div>
                     <span style={{ width: 66, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{c} · {pct}%</span>
-                    <span style={{ width: 58, flex: "none", textAlign: "right", color: "rgba(255,255,255,0.32)", fontSize: "0.6rem" }} title="Doctrine prior — the reference distribution, not measured data">{prior == null ? "prior —" : `prior ${prior}%`}</span>
+                    <span style={{ width: 58, flex: "none", textAlign: "right", color: "rgba(255,255,255,0.32)", fontSize: "0.6rem" }} title="Doctrine prior — the reference distribution (only the doctrine legs 2–5 carry one); blank = no prior for this bucket">{prior == null ? "" : `prior ${prior}%`}</span>
                   </div>
                 );
               })}
@@ -1193,17 +1204,30 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           <label style={lbl}>Legs before first close below the MA (whole trend, off the AFTER chart)</label>
           {isRoot ? (
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 4 }}>
-              {[["legs_ma10", "→ 10MA"], ["legs_ma20", "→ 20MA"]].map(([store, label]) => (
-                <div key={store}>
-                  <div style={{ fontSize: "0.58rem", color: C.muted, marginBottom: 3 }}>{label}</div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {["1", "2", "3", "4", "5+"].map(opt => { const on = String(s.checks[store] || "") === opt;
-                      return <button key={opt} type="button" onClick={() => setS({ checks: { ...s.checks, [store]: on ? "" : opt } })}
-                        style={{ background: on ? "rgba(212,175,55,0.18)" : "transparent", border: `1px solid ${on ? C.goldBright : C.border}`, color: on ? C.goldBright : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "5px 13px", cursor: "pointer", minWidth: 34 }}>
-                        {opt}</button>; })}
+              {/* Twins: 1–10 preset chips + a custom-number field for any larger count (e.g. 12). ONE value per
+                  MA — a chip and the custom field are mutually exclusive (both write checks[store]). Blank until
+                  set; never auto-filled. Legacy non-numeric values (e.g. "5+") still display in the field. */}
+              {[["legs_ma10", "→ 10MA"], ["legs_ma20", "→ 20MA"]].map(([store, label]) => {
+                const presets = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+                const cur = String(s.checks[store] || ""), isPreset = presets.includes(cur), customOn = !!cur && !isPreset;
+                return (
+                  <div key={store} style={{ minWidth: 200 }}>
+                    <div style={{ fontSize: "0.58rem", color: C.muted, marginBottom: 3 }}>{label}</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      {presets.map(opt => { const on = cur === opt;
+                        return <button key={opt} type="button" onClick={() => setS({ checks: { ...s.checks, [store]: on ? "" : opt } })}
+                          style={{ background: on ? "rgba(212,175,55,0.18)" : "transparent", border: `1px solid ${on ? C.goldBright : C.border}`, color: on ? C.goldBright : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "5px 11px", cursor: "pointer", minWidth: 30 }}>
+                          {opt}</button>; })}
+                      <input type="text" inputMode="numeric" placeholder="or N" value={isPreset ? "" : cur}
+                        onChange={e => { const raw = e.target.value.replace(/[^\d]/g, ""); const n = parseInt(raw, 10);
+                          setS({ checks: { ...s.checks, [store]: raw && n >= 1 ? String(n) : "" } }); }}
+                        title="Type any larger leg count (e.g. 12) — selecting a preset chip clears this, and vice-versa"
+                        style={{ width: 58, background: customOn ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.05)", border: `1px solid ${customOn ? C.goldBright : C.border}`, color: customOn ? C.goldBright : C.white, borderRadius: 99, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "5px 10px", outline: "none", colorScheme: "dark" }} />
+                      {customOn && <span style={{ fontSize: "0.62rem", color: C.goldBright, fontWeight: 700 }}>= {cur} legs</span>}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div style={{ fontSize: "0.74rem", color: C.text, marginTop: 6 }}>10MA: <b style={{ color: C.goldBright }}>{rootStudy.checks?.legs_ma10 || "—"}</b> legs · 20MA: <b style={{ color: C.goldBright }}>{rootStudy.checks?.legs_ma20 || "—"}</b> legs <span style={{ color: C.muted, fontSize: "0.62rem" }}>· edit on leg 1</span></div>
