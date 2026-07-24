@@ -190,6 +190,85 @@ export const ELITE = [
   { k: "regime",      c: "Full regime tailwind",                s: "Market trending up, breadth expanding, leaders working everywhere." },
 ];
 
+// ── "Your patterns" — a member-scoped, honest TALLY of which checklist factors recur across
+// THEIR own entries, and separately across their best-graded ones. This is deliberately a plain
+// count, NOT the admin H1–H13 lift engine (no lift %, no p-values, no fabricated statistics) —
+// just "this factor appears in X of your Y best setups." Best tier = A/A+ = star tier ≥ 4,
+// matching gradeBadge (n≥5 → A+, n===4 → A). Bonus/reminder items are excluded so the tally
+// mirrors the scored checklist the member actually ticks.
+// Tick → label: use each row's OWN sectionsFor(...) filtered index so v1/v2 rows resolve to the
+// right human-readable factor; we tally by that label string (stable across checklist versions).
+export function tallyMyPatterns(myRows) {
+  const bestTier = (r) => effectiveStars(r.stars, (r.elite || []).length).n >= 4; // A / A+
+  const labelsOf = (r) => {
+    const tset = new Set(r.ticked || []);
+    return sectionsFor(r.ticked).filter((s) => !s.reminder).flatMap((sec, si) =>
+      sec.items.map((it, ii) => (!it.bonus && tset.has(si + "-" + ii)) ? it.c : null).filter(Boolean));
+  };
+  const best = myRows.filter(bestTier);
+  const tally = new Map(); // label → { all, best }
+  for (const r of myRows) {
+    const isBest = bestTier(r);
+    for (const label of new Set(labelsOf(r))) { // Set: a factor counts once per entry
+      const t = tally.get(label) || { all: 0, best: 0 };
+      t.all += 1; if (isBest) t.best += 1;
+      tally.set(label, t);
+    }
+  }
+  const factors = [...tally.entries()].map(([label, t]) => ({ label, ...t }))
+    .sort((a, b) => (b.best - a.best) || (b.all - a.all) || a.label.localeCompare(b.label));
+  return { factors, n: myRows.length, bestN: best.length };
+}
+
+function YourPatterns({ C, font, myRows }) {
+  const { factors, n, bestN } = tallyMyPatterns(myRows);
+  // Honest empty-state: nothing meaningful to say under ~3 entries with any ticked factors.
+  const hasSignal = n >= 3 && factors.length > 0;
+  const useBest = bestN > 0; // rank/show against best-graded when the member HAS best setups; else fall back to all
+  const top = factors.filter((f) => (useBest ? f.best : f.all) > 0).slice(0, 6);
+  const denom = useBest ? bestN : n;
+  const scopeLabel = useBest ? `your A / A+ setups` : `your setups`;
+  const bar = (num) => Math.max(6, Math.round((num / Math.max(1, denom)) * 100));
+  return (
+    <div style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 16, padding: "16px 18px", marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: hasSignal ? 12 : 4 }}>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>Your patterns</div>
+        <div style={{ fontSize: "0.78rem", fontWeight: 700, color: C.white }}>The factors that recur in {scopeLabel}</div>
+        <div style={{ marginLeft: "auto", fontSize: "0.68rem", fontWeight: 700, color: C.muted }}>n = {useBest ? `${bestN} best · ${n} total` : `${n}`} {n === 1 ? "study" : "studies"}</div>
+      </div>
+      {!hasSignal ? (
+        <div style={{ fontSize: "0.78rem", color: C.muted, lineHeight: 1.55 }}>
+          Add a few graded setups to your book{n > 0 ? ` (you have ${n} so far)` : ""} — once you have three or more with ticked factors, this card tallies which characteristics show up most in your best setups, so you can collate your own rules.
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "grid", gap: 7 }}>
+            {top.map((f) => {
+              const num = useBest ? f.best : f.all;
+              return (
+                <div key={f.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
+                      <span style={{ fontSize: "0.78rem", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.label}</span>
+                      <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.goldBright, whiteSpace: "nowrap" }}>{num}/{denom}{useBest && f.all > f.best ? <span style={{ color: C.muted, fontWeight: 600 }}> · {f.all}/{n} all</span> : null}</span>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                      <div style={{ width: `${bar(num)}%`, height: "100%", borderRadius: 99, background: `linear-gradient(90deg, ${C.goldMid}, ${C.goldBright})` }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: "0.68rem", color: C.muted, marginTop: 11, lineHeight: 1.5 }}>
+            Honest counts — how often each ticked factor appears in {scopeLabel} (each factor counted once per setup). No lift statistics; just your own recurring commonalities. Export the CSV above to slice them any way you like.
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // computed base stars (0-5) + elite count → the "N★ on a 5★ scale" label
 export function effectiveStars(stars, eliteCount) {
   if (stars >= 5 && eliteCount >= 4) return { n: 7, label: "7★ · Generational" };
@@ -482,7 +561,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     if (fTier !== "All" && eff !== +fTier) return false;
     return true;
   });
-  const mineCount = rows.filter(r => r.created_by === uid && !isStudyRow(r)).length; // must match the fScope==='mine' predicate
+  const myRows = rows.filter(r => r.created_by === uid && !isStudyRow(r)); // the member's OWN card entries — export + Your-patterns scope
+  const mineCount = myRows.length; // must match the fScope==='mine' predicate
   const studyRows = rows.filter(r => r.created_by === uid && isStudyRow(r));
 
   const uploadImg = async (file, slot, setRow) => {
@@ -601,10 +681,10 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {mineCount > 0 && (
               <>
-                <button onClick={() => openMyBookPdf(rows.filter(r => r.created_by === uid && !isStudyRow(r)), isAdmin ? undefined : { makerGate: false })}
+                <button onClick={() => openMyBookPdf(myRows, isAdmin ? undefined : { makerGate: false })}
                   title="Your book as a branded PDF — one page per entry with the BEFORE and AFTER charts, score, factors and your notes. Opens a print view; use Save as PDF."
                   style={{ background: "rgba(255,255,255,0.04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ Export PDF</button>
-                <button onClick={() => downloadMyBookCsv(rows.filter(r => r.created_by === uid && !isStudyRow(r)), isAdmin ? undefined : { makerGate: false })}
+                <button onClick={() => downloadMyBookCsv(myRows, isAdmin ? undefined : { makerGate: false })}
                   title="Download YOUR entries as a CSV — every checklist tick as its own TRUE/FALSE column, plus outcomes, metrics and your notes. Feed it to any analysis tool to hunt commonalities."
                   style={{ background: "rgba(255,255,255,0.04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ CSV</button>
               </>
@@ -778,6 +858,12 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               );
             })}
         </div>
+      )}
+
+      {/* Your patterns — member-scoped common-factor tally across THEIR own book (their best-graded first).
+          Shows in 🔒 My Book (their own entries) only, never over the curated VIV Official cards. */}
+      {fScope === "mine" && !studyMode && !loading && !error && myRows.length > 0 && (
+        <YourPatterns C={C} font={font} myRows={myRows} />
       )}
 
       {/* card grid */}
