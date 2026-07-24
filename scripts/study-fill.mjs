@@ -273,6 +273,8 @@ if (verdict) console.log(`TRADE SIM: ${verdict} · est R:R ${rrEst!=null?rrEst.t
 if (WRITE) {
   // Upsert semantics: an existing study row for this ticker+date gets its AUTO layers refreshed
   // (m + outcome + _computed) while Valen's layers (checks/ticks/grade/refusal/charts) are preserved.
+  // `...s0` spreads FIRST, so any unknown study keys — campaign_id (leg linkage), legs_ma10/20, etc. —
+  // survive untouched (leg_index is never stored; it's recomputed on render). No whitelist needed.
   const note = `study-fill.mjs ${new Date().toISOString().slice(0,10)} · entry = ${entryModel}, stop = LoD (Valen's standing rule) · base/pole spans = eyeball on chart`;
   if (existing) {
     const s0 = existing.metrics.study;

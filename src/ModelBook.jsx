@@ -4,7 +4,7 @@ import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
 import { SECTIONS, sectionsFor, scoreTicked, versionOf, stampV2 } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
-import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, HypothesisRead, outcomeClass, studyQuality } from "./StudyBook.jsx";
+import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, HypothesisRead, buildCampaigns, outcomeClass, studyQuality } from "./StudyBook.jsx";
 
 // A study starred for the Model Book shows as a card; its star count comes from the study's
 // auto quality grade (tick-%) rather than the 16-criteria Model Book ticks it doesn't have.
@@ -541,6 +541,31 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     if (error) { setError(String(error.message)); load(); }
   };
 
+  // "+ Add leg" (Valen 2026-07-24): link a new leg to a trend. If the clicked root has no campaign_id yet,
+  // stamp it (`<TICKER>-<root trigger date>`, stable) on the existing row first, then open the editor for a
+  // NEW child pre-filled with campaign_id/ticker/theme/setup and young_leg = previous leg's + 1 (capped at
+  // the 3rd-leg bucket, overridable). We PRE-FILL the young_leg refinement value only — we never pre-tick
+  // the `young` eyeball bucket (that stays his call). study-fill's upsert preserves campaign_id (spreads s0).
+  const addLeg = async (rootRow, legs) => {
+    const root = rootRow.metrics.study;
+    let cid = root.campaign_id;
+    if (!cid) {
+      cid = `${rootRow.ticker}-${rootRow.entry_date}`;
+      const mt = { ...rootRow.metrics, study: { ...root, campaign_id: cid } };
+      setRows(rs => rs.map(x => x.id === rootRow.id ? { ...x, metrics: mt } : x)); // optimistic
+      const { error } = await supabase.from("model_book").update({ metrics: mt }).eq("id", rootRow.id);
+      if (error) { setError(String(error.message)); return; }
+    }
+    const chain = (legs && legs.length ? legs : [rootRow]);
+    const prevYoung = parseInt(chain[chain.length - 1].metrics.study.checks?.young_leg || "0", 10);
+    const nextYoung = prevYoung ? String(Math.min(prevYoung + 1, 3)) : ""; // pre-fill refinement, cap at 3rd+ bucket
+    setStudyEditing({
+      ticker: rootRow.ticker, entry_date: "", theme: rootRow.theme || "",
+      metrics: { study: { setup: root.setup || "Momentum Breakout", direction: root.direction || "long", regime_tag: "",
+        checks: nextYoung ? { young_leg: nextYoung } : {}, m: {}, grade: { letter: "" }, outcome: {}, refusal: "", campaign_id: cid } },
+    });
+  };
+
   const chip = (active) => ({
     display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
     fontSize: "0.72rem", fontWeight: 700, padding: "7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
@@ -681,7 +706,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           {studyEditing !== null && createPortal(
             <div onClick={() => setStudyEditing(null)} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "4vh 3vw" }}>
               <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1180, margin: "0 auto", background: "rgba(10,10,16,0.92)", borderRadius: 16 }}>
-                <StudyEditor C={C} font={font} busy={busy} initial={studyEditing.id ? studyEditing : null}
+                <StudyEditor C={C} font={font} busy={busy} campaignRows={studyRows}
+                  initial={studyEditing && (studyEditing.id || studyEditing.metrics) ? studyEditing : null}
                   onSave={async (r) => { if (await save(r)) setStudyEditing(null); }}
                   onCancel={() => setStudyEditing(null)} onUpload={uploadImg} />
               </div>
@@ -690,36 +716,63 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           {studyRows.length === 0 && studyEditing === null && (
             <div style={{ color: C.muted, fontSize: "0.82rem", padding: "18px 0" }}>No studies yet — hit ＋ New study. Grade blind (grade + prediction locked before the outcome opens), then record what happened. The scoreboard finds your winner DNA as the sample grows.</div>
           )}
-          {/* grouped by ticker, dates in chronological order — one ticker can hold many
-              studies (different trigger dates); the ticker prints once per group */}
-          {[...studyRows].sort((a, b) => a.ticker === b.ticker
-              ? String(a.entry_date || "").localeCompare(String(b.entry_date || ""))
-              : (a.ticker < b.ticker ? -1 : 1))
-            .map((r, i, arr) => {
-            const s = r.metrics.study; const cls = outcomeClass(s);
-            const firstOfGroup = i === 0 || arr[i - 1].ticker !== r.ticker;
-            const groupN = arr.filter(x => x.ticker === r.ticker).length;
-            return (
-              <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: firstOfGroup && i > 0 ? 7 : 4, marginTop: firstOfGroup && i > 0 ? 12 : 0, fontSize: "0.78rem", cursor: "pointer" }}
-                onClick={() => setStudyEditing(r)}
-                onMouseEnter={e => e.currentTarget.style.borderColor = C.borderGold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
-                <b style={{ width: 64, color: firstOfGroup ? undefined : "transparent" }}>{r.ticker}{firstOfGroup && groupN > 1 ? <span style={{ color: C.muted, fontWeight: 400, fontSize: "0.64rem" }}> ×{groupN}</span> : null}</b>
-                <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
-                {/* BEFORE→AFTER flash-card strip — the pattern-recognition rep at a glance */}
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
-                  {r.after_img ? <img src={r.after_img} alt="before" title="BEFORE — the setup" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
-                  <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
-                  {s.outcome_img ? <img src={s.outcome_img} alt="after" title="AFTER — the outcome" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} /> : <span title="No AFTER chart yet — drop `TICKER DATE AFTER.png` in the study inbox" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
-                </span>
-                <span style={{ width: 150 }}>{r.pattern}</span>
-                {(() => { const q = studyQuality(s); return <span style={{ width: 70, color: q.letter === "—" ? C.muted : q.letter === "A+" ? "#7ef0a0" : C.goldBright, fontWeight: 700 }} title={`${q.on}/${q.total} criteria ticked`}>{q.letter}</span>; })()}
-                <span style={{ flex: 1, color: C.muted, fontSize: "0.7rem" }}>{s.regime_tag || ""}</span>
-                {cls && <span style={{ fontWeight: 700, color: cls === "failure" ? C.red : "#7ef0a0" }}>{cls}</span>}
-                <button title={inModelBook(r) ? "In the Model Book — click to remove" : "Add to the Model Book"} onClick={(e) => { e.stopPropagation(); toggleModelBook(r); }} style={{ background: "transparent", border: "none", color: inModelBook(r) ? C.goldBright : C.muted, cursor: "pointer", fontSize: "1rem" }}>{inModelBook(r) ? "★" : "☆"}</button>
-                <button title="Delete study" onClick={(e) => { e.stopPropagation(); remove(r); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: "0.95rem" }}>×</button>
-              </div>
-            );
-          })}
+          {/* Grouped by CAMPAIGN (Valen 2026-07-24): legs of one trend nest under a header (ticker · span ·
+              N legs · shared BEFORE→AFTER). Solo studies (no campaign_id) render as a single row exactly as
+              before — a campaign of one. "+ Add leg" links a new leg to the trend. */}
+          {buildCampaigns(studyRows).list
+            .sort((a, b) => a.root.ticker === b.root.ticker
+              ? String(a.span[0] || "").localeCompare(String(b.span[0] || ""))
+              : (a.root.ticker < b.root.ticker ? -1 : 1))
+            .map((camp) => {
+              // Plain render helper (invoked directly → inline elements, not a nested component).
+              const legRow = (r, legIndex, indent, showAddLeg) => {
+                const s = r.metrics.study; const cls = outcomeClass(s);
+                const after = indent ? camp.root.metrics.study.outcome_img : s.outcome_img; // shared AFTER on nested legs
+                return (
+                  <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 4, marginLeft: indent ? 22 : 0, fontSize: "0.78rem", cursor: "pointer" }}
+                    onClick={() => setStudyEditing(r)}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = C.borderGold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
+                    {indent
+                      ? <span style={{ width: 64, color: C.muted, fontSize: "0.66rem", fontWeight: 700 }}>leg {legIndex}</span>
+                      : <b style={{ width: 64 }}>{r.ticker}</b>}
+                    <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
+                      {r.after_img ? <img src={r.after_img} alt="before" title="BEFORE — the setup (this leg)" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
+                      <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
+                      {after ? <img src={after} alt="after" title={indent ? "AFTER — shared trend outcome" : "AFTER — the outcome"} style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} /> : <span title="No AFTER chart yet — drop `TICKER DATE AFTER.png` in the study inbox" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
+                    </span>
+                    <span style={{ width: 150 }}>{r.pattern}</span>
+                    {(() => { const q = studyQuality(s); return <span style={{ width: 70, color: q.letter === "—" ? C.muted : q.letter === "A+" ? "#7ef0a0" : C.goldBright, fontWeight: 700 }} title={`${q.on}/${q.total} criteria ticked`}>{q.letter}</span>; })()}
+                    <span style={{ flex: 1, color: C.muted, fontSize: "0.7rem" }}>{s.regime_tag || ""}</span>
+                    {cls && <span style={{ fontWeight: 700, color: cls === "failure" ? C.red : "#7ef0a0" }}>{cls}</span>}
+                    {showAddLeg && <button title="Add a linked leg to this trend" onClick={(e) => { e.stopPropagation(); addLeg(camp.root, camp.legs); }} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, cursor: "pointer", fontSize: "0.6rem", fontWeight: 800, borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" }}>+ leg</button>}
+                    <button title={inModelBook(r) ? "In the Model Book — click to remove" : "Add to the Model Book"} onClick={(e) => { e.stopPropagation(); toggleModelBook(r); }} style={{ background: "transparent", border: "none", color: inModelBook(r) ? C.goldBright : C.muted, cursor: "pointer", fontSize: "1rem" }}>{inModelBook(r) ? "★" : "☆"}</button>
+                    <button title="Delete study" onClick={(e) => { e.stopPropagation(); remove(r); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: "0.95rem" }}>×</button>
+                  </div>
+                );
+              };
+              if (camp.solo) return <div key={camp.cid} style={{ marginTop: 8 }}>{legRow(camp.root, 1, false, true)}</div>;
+              const rootS = camp.root.metrics.study;
+              return (
+                <div key={camp.cid} style={{ marginTop: 14, marginBottom: 4, border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "8px 10px", background: "rgba(201,152,42,0.04)" }}>
+                  {/* Campaign header — ticker · trend span · N legs · shared BEFORE→AFTER · + Add leg */}
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "4px 4px 8px", fontSize: "0.78rem", cursor: "pointer" }} onClick={() => setStudyEditing(camp.root)}
+                    onMouseEnter={e => e.currentTarget.style.opacity = 0.85} onMouseLeave={e => e.currentTarget.style.opacity = 1}>
+                    <b style={{ width: 64, color: C.goldBright }}>{camp.root.ticker}</b>
+                    <span style={{ color: C.muted, width: 150, fontSize: "0.7rem" }}>{camp.span[0] || "?"} → {camp.span[1] || "?"}</span>
+                    <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, borderRadius: 99, padding: "2px 9px" }}>{camp.count} legs</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
+                      {camp.root.after_img ? <img src={camp.root.after_img} alt="before" title="BEFORE — root leg" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
+                      <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
+                      {rootS.outcome_img ? <img src={rootS.outcome_img} alt="after" title="AFTER — shared trend outcome" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
+                    </span>
+                    <span style={{ flex: 1 }} />
+                    <button title="Add a linked leg to this trend" onClick={(e) => { e.stopPropagation(); addLeg(camp.root, camp.legs); }} style={{ background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, cursor: "pointer", fontSize: "0.66rem", fontWeight: 800, borderRadius: 99, padding: "4px 12px", whiteSpace: "nowrap" }}>+ Add leg</button>
+                  </div>
+                  {camp.legs.map((r, i) => legRow(r, i + 1, true, false))}
+                </div>
+              );
+            })}
         </div>
       )}
 

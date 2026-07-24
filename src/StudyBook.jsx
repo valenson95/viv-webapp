@@ -14,6 +14,25 @@ import React, { useState, useEffect } from "react";
 
 export const isStudyRow = (r) => !!(r && r.metrics && r.metrics.study);
 
+// ── Campaigns (Valen 2026-07-24): a trending name prints multiple setups across its legs. Legs of one
+// trend share a `campaign_id` (root = `<TICKER>-<root trigger date>`, children copy it). `leg_index` is
+// STRUCTURAL — recomputed here from the trigger-date sort, never hard-stored. A study with NO campaign_id
+// is a solo campaign of one (leg 1) and behaves exactly as before (backward-compat). Returns a grouped
+// list + a byId map ({campaign_id, legIndex, isRoot, count}) so list, editor and stats agree on structure.
+export function buildCampaigns(rows) {
+  const studies = (rows || []).filter(r => r.metrics?.study);
+  const groups = {};
+  studies.forEach(r => { const cid = r.metrics.study.campaign_id || `solo:${r.id}`; (groups[cid] ||= []).push(r); });
+  const byId = {};
+  const list = Object.entries(groups).map(([cid, legs]) => {
+    const sorted = [...legs].sort((a, b) => String(a.entry_date || "").localeCompare(String(b.entry_date || "")) || String(a.id).localeCompare(String(b.id)));
+    sorted.forEach((r, i) => { byId[r.id] = { campaign_id: r.metrics.study.campaign_id || null, legIndex: i + 1, isRoot: i === 0, count: sorted.length }; });
+    return { cid, solo: sorted.length === 1, count: sorted.length, legs: sorted, root: sorted[0],
+      span: [sorted[0].entry_date, sorted[sorted.length - 1].entry_date] };
+  });
+  return { list, byId };
+}
+
 // TWO LAYERS PER SETUP (Valen 2026-07-14):
 //   buckets = HIS tickable checklist — only what eyes can verify on a historical chart,
 //             organized grader-style in 3 buckets per setup. No data-context items here
@@ -458,13 +477,13 @@ const HYP_READS = {
     return { answer: v ? "invaded day-1 half" : "never invaded half", state: v ? "bad" : "good" }; } },
   H7: { short: "D3 follow-through", read: (s) => { const v = _mbool(s, "d3_moved"); if (v == null) return null;
     return { answer: v ? "new high by day 3" : "stalled past day 3", state: v ? "good" : "bad" }; } },
-  H8: { short: "Neglect", read: (s) => { const d = _mnum(s, "dormant_days"), h = _mnum(s, "from_high_pct"); if (d == null && h == null) return null;
+  H8: { short: "Neglect", level: "campaign", read: (s) => { const d = _mnum(s, "dormant_days"), h = _mnum(s, "from_high_pct"); if (d == null && h == null) return null;
     const cls = outcomeClass(s);
     return { answer: `${d != null ? d + " sessions dormant" : ""}${d != null && h != null ? " · " : ""}${h != null ? Math.abs(h).toFixed(0) + "% under 52wk high" : ""}`,
       state: (cls === "monster" && d != null) ? (d >= 20 ? "good" : "bad") : "adds" }; } },
   H9: { short: "Catalyst", read: (s) => { const t = _tick(s, "catalyst"); if (!t) return null; const leg = s.checks?.young_leg;
     return { answer: "catalyst present", state: (leg === "2" || leg === "3") ? "adds" : "good" }; } },
-  H10: { short: "Trend lifespan", distOnly: true, read: (s) => { const a = s.checks?.legs_ma10, b = s.checks?.legs_ma20; if (!a && !b) return null;
+  H10: { short: "Trend lifespan", distOnly: true, level: "campaign", read: (s) => { const a = s.checks?.legs_ma10, b = s.checks?.legs_ma20; if (!a && !b) return null;
     const nice = (v) => v === "5+" ? "5+ legs" : `${v} legs`;
     return { answer: `${a ? `${nice(a)} to the 10MA break` : ""}${a && b ? " · " : ""}${b ? `${nice(b)} to the 20MA` : ""}`, state: "adds" }; } },
   H11: { short: "Extension", read: (s) => { const e = _mnum(s, "ext_50ma"), p = _outNum(s, "ext_at_peak"); if (e == null && p == null) return null;
@@ -547,12 +566,20 @@ export function StudyHypotheses({ C, rows }) {
   // ONE era filter feeds the entire panel (tally + cards + distributions). Trigger date = row.entry_date.
   const inEra = (r) => era === "all" || String(r.entry_date || "") >= H_ERA_START;
   const eraRows = (rows || []).filter(inEra);
-  const resolved = eraRows.filter(r => r.metrics?.study && outcomeClass(r.metrics.study))
-    .map(r => ({ s: r.metrics.study, ticker: r.ticker, date: r.entry_date }));
+  // Campaign structure from ALL rows (era-stable) so root identity never flips with the filter.
+  const campById = buildCampaigns(rows).byId;
+  const mapPt = (r) => { const c = campById[r.id] || {}; return { s: r.metrics.study, ticker: r.ticker, date: r.entry_date, cid: c.campaign_id || `solo:${r.id}`, root: c.isRoot !== false }; };
+  const resolved = eraRows.filter(r => r.metrics?.study && outcomeClass(r.metrics.study)).map(mapPt);
   const winners = resolved.filter(x => ["big winner", "monster"].includes(outcomeClass(x.s)));
   const fails = resolved.filter(x => outcomeClass(x.s) === "failure");
   // H10 distribution is outcome-independent — it reads leg counts off every loaded study, not just resolved.
-  const allStudies = eraRows.filter(r => r.metrics?.study).map(r => ({ s: r.metrics.study, ticker: r.ticker, date: r.entry_date }));
+  const allStudies = eraRows.filter(r => r.metrics?.study).map(mapPt);
+  // DEDUP (statistical correctness): campaign-level hypotheses (H8 neglect, H10 leg-lifespan) count ONCE per
+  // campaign (root leg only) so a 3-leg name can't vote 3×; per-leg hypotheses count every leg. campCount =
+  // distinct campaigns in a sample — surfaces the clustered (non-independent) legs-of-one-name honestly.
+  const forLevel = (list, hyp) => hyp.level === "campaign" ? list.filter(x => x.root) : list;
+  const campCount = (list) => new Set(list.map(x => x.cid)).size;
+  const totalCamps = campCount(allStudies);
   const srcChip = (source) => {
     const gold = source === "DOCTRINE";
     return { border: `1px solid ${gold ? C.goldBright : C.blue}`, color: gold ? C.goldBright : C.blue,
@@ -581,7 +608,7 @@ export function StudyHypotheses({ C, rows }) {
       <div style={sheen} />
       <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 12, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
         <span style={{ flex: 1, fontSize: "0.62rem", fontWeight: 700, letterSpacing: ".13em", textTransform: "uppercase", color: C.muted }}>🧪 Hypotheses</span>
-        <span style={{ fontSize: "0.6rem", color: C.muted }}>{resolved.length} resolved · {winners.length}W / {fails.length}F</span>
+        <span style={{ fontSize: "0.6rem", color: C.muted }}>{resolved.length} resolved · {winners.length}W / {fails.length}F · {totalCamps} campaign{totalCamps === 1 ? "" : "s"}</span>
         <div style={{ display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 99, overflow: "hidden" }}>
           {[["all", "All studies"], ["new", `From ${H_ERA_START}`]].map(([val, label]) => (
             <button key={val} type="button" onClick={() => setEra(val)}
@@ -595,8 +622,9 @@ export function StudyHypotheses({ C, rows }) {
       {(() => {
         const tally = HYPOTHESES.map(h => {
           const b = { supports: [], challenges: [], data: [] };
-          allStudies.forEach(x => { const v = entryVerdict(h, x.s); if (v) b[v.bucket].push({ ...x, v }); });
-          return { h, ...b, vN: b.supports.length + b.challenges.length };
+          forLevel(allStudies, h).forEach(x => { const v = entryVerdict(h, x.s); if (v) b[v.bucket].push({ ...x, v }); });
+          const vN = b.supports.length + b.challenges.length;
+          return { h, ...b, vN, camps: campCount([...b.supports, ...b.challenges, ...b.data]) };
         });
         const statusOf = (t) => {
           if (t.h.distOnly) return { txt: "distribution — see card", col: C.muted };
@@ -626,7 +654,7 @@ export function StudyHypotheses({ C, rows }) {
                     {cellBtn(t, "supports", t.supports.length, "#7ef0a0")}
                     {cellBtn(t, "challenges", t.challenges.length, "#e05555")}
                     {cellBtn(t, "data", t.data.length, C.muted)}
-                    <span style={{ width: 34, flex: "none", textAlign: "center", color: C.muted, fontSize: "0.66rem" }}>{t.vN}</span>
+                    <span title={`${t.h.level === "campaign" ? "campaign-level — deduped to root leg · " : ""}${t.camps} campaign${t.camps === 1 ? "" : "s"} in the sample`} style={{ width: 34, flex: "none", textAlign: "center", color: C.muted, fontSize: "0.66rem", cursor: "help" }}>{t.vN}</span>
                     <span style={{ width: 128, flex: "none", textAlign: "right", fontWeight: 700, color: st.col, fontSize: "0.64rem" }}>{st.txt}</span>
                   </div>
                   {oKey && (
@@ -654,9 +682,10 @@ export function StudyHypotheses({ C, rows }) {
         {HYPOTHESES.map(hyp => {
           // ── H10 distribution card — leg-count histogram vs the doctrine prior, MA10 & MA20 side by side ──
           if (hyp.kind === "distribution") {
-            const dists = hyp.stores.map(([store, maLabel]) => ({ store, maLabel, ...legDist(store, hyp.bands, allStudies) }));
-            const med10 = medianCompanion(allStudies, "d_below_ma10", "ma10_censored");
-            const med20 = medianCompanion(allStudies, "d_below_ma20", "ma20_censored");
+            const base = forLevel(allStudies, hyp); // campaign-level ⇒ root legs only (count once per trend)
+            const dists = hyp.stores.map(([store, maLabel]) => ({ store, maLabel, ...legDist(store, hyp.bands, base) }));
+            const med10 = medianCompanion(base, "d_below_ma10", "ma10_censored");
+            const med20 = medianCompanion(base, "d_below_ma20", "ma20_censored");
             const distBox = { flex: "1 1 240px", minWidth: 220, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "rgba(0,0,0,0.25)" };
             return (
               <div key={hyp.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(0,0,0,0.22)" }}>
@@ -697,11 +726,11 @@ export function StudyHypotheses({ C, rows }) {
                   Median sessions to first close below MA — <b style={{ color: C.goldBright }}>10MA {med10.med == null ? "—" : med10.med}</b> (n={med10.n}, {med10.cens} censored) · <b style={{ color: C.goldBright }}>20MA {med20.med == null ? "—" : med20.med}</b> (n={med20.n}, {med20.cens} censored)
                 </div>
                 <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
-                  n={dists[0].n}/{dists[1].n} measured (10MA/20MA) · {dists[0].blank}/{dists[1].blank} blank · censored companions shown separately, never as short trends — believe nothing &lt;30, promote at 50
+                  n={campCount(base)} campaigns (leg-lifespan is whole-trend — counted once per campaign, root leg) · {dists[0].n}/{dists[1].n} measured (10MA/20MA) · {dists[0].blank}/{dists[1].blank} blank · censored shown separately — believe nothing &lt;30, promote at 50
                 </div>
                 <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{open === hyp.id ? "▴ hide the studies counted" : "▾ show the studies counted"}</div>
                 {open === hyp.id && (() => {
-                  const withLegs = allStudies.filter(x => (x.s.checks?.legs_ma10 ?? "") !== "" || (x.s.checks?.legs_ma20 ?? "") !== "");
+                  const withLegs = base.filter(x => (x.s.checks?.legs_ma10 ?? "") !== "" || (x.s.checks?.legs_ma20 ?? "") !== "");
                   return (
                     <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8, maxHeight: 220, overflowY: "auto" }}>
                       {withLegs.length === 0 ? <div style={{ fontSize: "0.66rem", color: C.muted }}>No leg counts recorded yet.</div> :
@@ -720,8 +749,8 @@ export function StudyHypotheses({ C, rows }) {
           }
           // ── H11 extension card — ENTRY winners/failures per ext band + EXIT peak distribution (winners only) ──
           if (hyp.kind === "extension") {
-            const en = extEntry(hyp.bands, hyp.entryKey, winners, fails);
-            const px = extPeakDist(hyp.bands, hyp.peakKey, winners);
+            const en = extEntry(hyp.bands, hyp.entryKey, forLevel(winners, hyp), forLevel(fails, hyp));
+            const px = extPeakDist(hyp.bands, hyp.peakKey, forLevel(winners, hyp));
             const half = { flex: "1 1 260px", minWidth: 240, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "rgba(0,0,0,0.25)" };
             const exitOpen = open === `${hyp.id}-x`;
             return (
@@ -758,7 +787,7 @@ export function StudyHypotheses({ C, rows }) {
                       );
                     })}
                     {!en.enough && <div style={{ fontSize: "0.66rem", color: "#e0a955", marginTop: 6 }}>collecting — n={en.W + en.F} of 30</div>}
-                    <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6 }}>n={en.W} winners / {en.F} losers / {en.E} excluded blank — believe nothing &lt;30, promote at 50</div>
+                    <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6 }}>n={en.W} winners / {en.F} losers / {en.E} excluded blank across {campCount(en.rows.flatMap(r => r.list))} campaigns — believe nothing &lt;30, promote at 50</div>
                   </div>
                   {/* EXIT side — where winners topped (ext-at-peak distribution, winners only) */}
                   <div style={half}>
@@ -774,7 +803,7 @@ export function StudyHypotheses({ C, rows }) {
                         </div>
                       ); })}
                     <div style={{ fontSize: "0.66rem", color: C.text, marginTop: 7 }}>Median winner peak ext — <b style={{ color: C.goldBright }}>{px.med == null ? "—" : px.med.toFixed(2) + "×"}</b></div>
-                    <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 4 }}>n={px.n} winners with peak ext / {px.blank} excluded blank — believe nothing &lt;30, promote at 50</div>
+                    <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 4 }}>n={px.n} winners with peak ext / {px.blank} excluded blank across {campCount(px.set)} campaigns — believe nothing &lt;30, promote at 50</div>
                     <div onClick={() => setOpen(exitOpen ? null : `${hyp.id}-x`)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{exitOpen ? "▴ hide the winners counted" : "▾ show the winners counted"}</div>
                     {exitOpen && expandList(px.set, s => { const v = s.outcome?.[hyp.peakKey]; return v == null || v === "" ? "—" : `${(+v).toFixed(2)}× at peak`; })}
                   </div>
@@ -783,8 +812,10 @@ export function StudyHypotheses({ C, rows }) {
             );
           }
           const isSub = hyp.kind === "subcat";
-          const r = isSub ? hypSubcat(hyp, winners, fails) : hypBinary(hyp, winners, fails);
+          const lw = forLevel(winners, hyp), lf = forLevel(fails, hyp); // campaign-level ⇒ root legs only
+          const r = isSub ? hypSubcat(hyp, lw, lf) : hypBinary(hyp, lw, lf);
           const measured = r.W + r.F;
+          const cardCamps = campCount(r.list); // distinct campaigns behind this readout (clustered-obs honesty)
           return (
             <div key={hyp.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(0,0,0,0.22)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
@@ -826,9 +857,12 @@ export function StudyHypotheses({ C, rows }) {
                   <span style={{ flex: "none", color: C.muted, fontSize: "0.7rem" }}>{open === hyp.id ? "▴" : "▾"}</span>
                 </div>
               )}
-              {/* SampleTag — always shown */}
+              {/* SampleTag — always shown. Per-leg ⇒ "across C campaigns" (legs of one name are correlated);
+                  campaign-level ⇒ the sample IS campaigns (deduped to the root leg). */}
               <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
-                n={r.W} winners / {r.F} losers / {r.E} excluded blank — believe nothing &lt;30, promote at 50
+                {hyp.level === "campaign"
+                  ? `n=${cardCamps} campaigns (deduped to root leg) · ${r.W}W / ${r.F}F / ${r.E} blank — believe nothing <30, promote at 50`
+                  : `n=${r.W} winners / ${r.F} losers / ${r.E} excluded blank across ${cardCamps} campaigns — believe nothing <30, promote at 50`}
               </div>
               {/* click-to-expand study list */}
               {isSub
@@ -843,7 +877,7 @@ export function StudyHypotheses({ C, rows }) {
   );
 }
 
-export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload }) {
+export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload, campaignRows }) {
   const [row, setRow] = useState(() => ({
     ticker: "", entry_date: "", before_img: "", after_img: "", thesis: "", lesson: "",
     ticked: [], elite: [], characteristics: [], is_published: false,
@@ -860,6 +894,17 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   const s = row.metrics.study;
   const setS = (patch) => setRow(r => ({ ...r, metrics: { ...r.metrics, study: { ...r.metrics.study, ...patch } } }));
   const def = STUDY_SETUPS[s.setup] || STUDY_SETUPS["Momentum Breakout"];
+  // ── Campaign context (Valen 2026-07-24): legs of one trend share campaign_id. leg_index is STRUCTURAL
+  // (recomputed from the sorted siblings, never stored). campaign-level fields (leg lifespan + shared AFTER
+  // chart) are editable on the ROOT leg only; other legs show them read-only. Solo (no campaign_id) = root. */
+  const cid = s.campaign_id || null;
+  const sibs = cid ? (campaignRows || []).filter(r => r.metrics?.study?.campaign_id === cid)
+    .sort((a, b) => String(a.entry_date || "").localeCompare(String(b.entry_date || "")) || String(a.id).localeCompare(String(b.id))) : [];
+  const idxInSibs = sibs.findIndex(r => r.id === row.id);
+  const legIdx = !cid ? 1 : (idxInSibs >= 0 ? idxInSibs + 1 : sibs.length + 1); // new child appends
+  const isRoot = !cid || (sibs.length ? idxInSibs === 0 : true);
+  const rootStudy = (cid && sibs.length) ? sibs[0].metrics.study : s;
+  const multiLeg = !!cid && sibs.length > 1;
   const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontFamily: font, fontSize: "0.78rem", padding: "7px 10px", outline: "none", width: "100%", colorScheme: "dark" };
   const lbl = { fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.muted, marginBottom: 4, display: "block" };
   const sect = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "14px 0 8px" };
@@ -952,11 +997,10 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
             </div></div>; })()}
       </div>
 
-      <div style={sect}>Charts — two timeframes</div>
+      <div style={sect}>This leg — charts{multiLeg ? ` · leg ${legIdx} of ${sibs.length}` : ""}</div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
         {chartSlot("before_img", "Context — HTF", "Weekly/monthly — the pole, the base in context, where it sits in the longer trend")}
         {chartSlot("after_img", "BEFORE — the setup", "Daily/intraday with the RIGHT EDGE = trigger day — exactly what your eyes saw at the decision moment")}
-        {chartSlot("outcome_img", "AFTER — the outcome", "Same chart weeks later — what the setup became. BEFORE→AFTER is the pattern-recognition rep")}
         {chartSlot("trigger_ltf_img", "TRIGGER — 5-min entry detail", "Optional: the trigger day on 5-min — ORH, the reclaim, how the entry actually traded")}
       </div>
 
@@ -998,23 +1042,43 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       <HypothesisRead C={C} study={s} />
       {cls && <div style={{ marginTop: 6, marginBottom: 6, fontSize: "0.74rem" }}>Auto-class: <b style={{ color: cls === "failure" ? "#e05555" : "#7ef0a0" }}>{cls}</b></div>}
 
-      {/* Trend anatomy (Valen 2026-07-24) — H10 leg lifespan. ALWAYS visible, independent of the ticks:
-          total legs from the trend's FIRST leg to the first daily close below the 10MA / 20MA, counted
-          off the AFTER chart. Stored in checks (user layer, preserved by study-fill) but NOT a setup tick,
-          so it never affects the quality score. Blank until set. */}
-      <div style={sect}>Trend anatomy — legs before first close below the MA (count off the AFTER chart)</div>
-      <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-        {[["legs_ma10", "Legs → first close below 10MA"], ["legs_ma20", "Legs → first close below 20MA"]].map(([store, label]) => (
-          <div key={store}>
-            <label style={lbl}>{label}</label>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {["1", "2", "3", "4", "5+"].map(opt => { const on = String(s.checks[store] || "") === opt;
-                return <button key={opt} type="button" onClick={() => setS({ checks: { ...s.checks, [store]: on ? "" : opt } })}
-                  style={{ background: on ? "rgba(212,175,55,0.18)" : "transparent", border: `1px solid ${on ? C.goldBright : C.border}`, color: on ? C.goldBright : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "5px 13px", cursor: "pointer", minWidth: 34 }}>
-                  {opt}</button>; })}
+      {/* Campaign — whole trend (Valen 2026-07-24): H10 leg-lifespan + the shared AFTER-outcome chart are
+          recorded ONCE, on the ROOT leg (counted off the shared AFTER chart). Non-root legs show them
+          read-only with an "edit on leg 1" hint. Solo studies (no campaign_id) = root ⇒ editable inline
+          as before. legs_ma10/20 live in checks but are NOT setup ticks — they never grade. */}
+      <div style={sect}>{cid ? `Campaign — whole trend · leg ${legIdx} of ${sibs.length || 1}` : "Whole-trend outcome & lifespan"}</div>
+      {cid && <div style={{ fontSize: "0.62rem", color: C.muted, marginBottom: 8 }}>Campaign <b style={{ color: C.goldBright }}>{cid}</b>{multiLeg ? ` · ${sibs[0]?.entry_date || "?"} → ${sibs[sibs.length - 1]?.entry_date || "?"}` : ""}{!isRoot ? " · shared fields edit on leg 1" : ""}</div>}
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={{ minWidth: 230 }}>
+          <label style={lbl}>Legs before first close below the MA (whole trend, off the AFTER chart)</label>
+          {isRoot ? (
+            <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 4 }}>
+              {[["legs_ma10", "→ 10MA"], ["legs_ma20", "→ 20MA"]].map(([store, label]) => (
+                <div key={store}>
+                  <div style={{ fontSize: "0.58rem", color: C.muted, marginBottom: 3 }}>{label}</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {["1", "2", "3", "4", "5+"].map(opt => { const on = String(s.checks[store] || "") === opt;
+                      return <button key={opt} type="button" onClick={() => setS({ checks: { ...s.checks, [store]: on ? "" : opt } })}
+                        style={{ background: on ? "rgba(212,175,55,0.18)" : "transparent", border: `1px solid ${on ? C.goldBright : C.border}`, color: on ? C.goldBright : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "5px 13px", cursor: "pointer", minWidth: 34 }}>
+                        {opt}</button>; })}
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        ))}
+          ) : (
+            <div style={{ fontSize: "0.74rem", color: C.text, marginTop: 6 }}>10MA: <b style={{ color: C.goldBright }}>{rootStudy.checks?.legs_ma10 || "—"}</b> legs · 20MA: <b style={{ color: C.goldBright }}>{rootStudy.checks?.legs_ma20 || "—"}</b> legs <span style={{ color: C.muted, fontSize: "0.62rem" }}>· edit on leg 1</span></div>
+          )}
+        </div>
+        <div style={{ flex: "1 1 240px", minWidth: 240 }}>
+          {isRoot ? chartSlot("outcome_img", "AFTER — the shared outcome", "Same chart weeks later — the whole trend's outcome. Shared across every leg of the campaign.")
+            : (<div>
+                <label style={lbl}>AFTER — the shared outcome</label>
+                <div style={{ fontSize: "0.62rem", color: C.muted, marginBottom: 6 }}>Shared across the campaign — edit on leg 1</div>
+                {rootStudy.outcome_img
+                  ? <img src={rootStudy.outcome_img} alt="shared after" style={{ display: "block", width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)" }} />
+                  : <div style={{ fontSize: "0.7rem", color: C.muted, border: `1px dashed ${C.border}`, borderRadius: 8, padding: "18px 12px", textAlign: "center" }}>No AFTER chart yet — add it on leg 1</div>}
+              </div>)}
+        </div>
       </div>
 
       {/* 📊 Computed metrics — the raw numbers (key strip + full grids) live behind this toggle now that
