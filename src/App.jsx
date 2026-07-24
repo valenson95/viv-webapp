@@ -4013,7 +4013,7 @@ if (expert) return (
 
       {/* NAV */}
       <div className="navbar">
-        <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+        <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
         <div className="tabs">
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -4060,7 +4060,7 @@ return (
 
       {/* NAV */}
       <div className="navbar">
-        <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+        <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
         <div className="tabs">
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -8054,7 +8054,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
 
           {/* NAV TABS */}
           <div className="navbar">
-            <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+            <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
             <div className="tabs">
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
               <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -8391,7 +8391,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
 
         {/* NAV TABS — verbatim from Dashboard, Journal active */}
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -10536,7 +10536,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
 
           {/* NAV TABS */}
           <div className="navbar">
-            <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+            <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
             <div className="tabs">
               <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -10826,7 +10826,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
 
         {/* NAV TABS */}
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
           <div className="tabs">
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -11743,7 +11743,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
 
         {/* NAV — identical to Guided */}
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -11922,7 +11922,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
 
         {/* NAV */}
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -12194,7 +12194,7 @@ function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -12220,7 +12220,7 @@ function DailySetupsShell({ setPage, session, displayName }) {
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -12246,7 +12246,7 @@ function MentorShell({ setPage, session }) {
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -12279,7 +12279,7 @@ function QuantShell({ setPage, session }) {
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
@@ -12306,7 +12306,7 @@ function BurstLogShell({ setPage, session }) {
       <style dangerouslySetInnerHTML={{ __html: JOUR_CSS }} />
       <div className="shell">
         <div className="navbar">
-          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /> Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</div>
+          <div className="brand"><img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} /><span>Valen <span style={{ color: "#c9982a" }}>Insiders</span> Vault</span></div>
           <div className="tabs">
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
