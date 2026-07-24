@@ -64,6 +64,9 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   const [view, setView] = useState("all");        // "all" | "taken"
   const [q, setQ] = useState("");                 // ticker search — cross-reference all posts of one name
   const [statusF, setStatusF] = useState(null);   // funnel chip filter — "pivot" | "coiling" | "fresh" | "triggered" | "faded"
+  const [themeF, setThemeF] = useState("");        // theme/sector filter (member ask, tohzhiyangrv) — "" = all themes
+  const [gradeF, setGradeF] = useState("");        // grade filter — "" = all grades
+  const [minStars, setMinStars] = useState(0);     // min-score filter (1-5 ★) — 0 = no minimum
   const [boardSort, setBoardSort] = useState({ k: "stage", d: 1 }); // board column sort — key + direction
   const [boardOpen, setBoardOpen] = useState(false); // collapsed by default: top rows only
   const [openDays, setOpenDays] = useState(() => new Set()); // date groups the user expanded — ALL collapsed by default (member ask 2026-07-10)
@@ -169,10 +172,31 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
     return boardSort.d < 0 ? -base : base;
   });
 
-  // filter (funnel status → ticker search → All/Taken) then group: by date (default) or one ranked list (Top graded)
+  // ── Filter option lists (member ask, tohzhiyangrv: screen the feed by Theme, Score, Grade, Ticker).
+  // DERIVED from the setups actually loaded — never a hardcoded list. Grade sorts best-to-worst
+  // (A+ → F); any grade code outside the known set falls to the end, alpha-sorted.
+  const themeOptions = Array.from(new Set((rows || []).map(r => r.sector).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const GRADE_ORDER = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "F"];
+  const gradeOptions = Array.from(new Set((rows || []).map(r => r.letter).filter(Boolean)))
+    .sort((a, b) => {
+      const ai = GRADE_ORDER.indexOf(a), bi = GRADE_ORDER.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  const filtersActive = (q.trim() ? 1 : 0) + (themeF ? 1 : 0) + (gradeF ? 1 : 0) + (minStars > 0 ? 1 : 0);
+  const clearAllFilters = () => { setQ(""); setThemeF(""); setGradeF(""); setMinStars(0); };
+  const chip = (active) => ({ background: active ? C.goldDim : "rgba(255,255,255,0.03)", color: active ? C.goldBright : C.muted, border: `1px solid ${active ? C.borderGold : C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 12px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" });
+
+  // filter (funnel status → ticker search → theme → grade → min-score → All/Taken) then group:
+  // by date (default) or one ranked list (Top graded) — every control ANDs together.
   const visRows = (rows || [])
     .filter(r => !statusF || (r.sector !== "Index" && statusOf(r) === statusF))
     .filter(r => !q.trim() || String(r.ticker || "").toUpperCase().includes(q.trim().toUpperCase()))
+    .filter(r => !themeF || r.sector === themeF)
+    .filter(r => !gradeF || r.letter === gradeF)
+    .filter(r => !minStars || (r.stars || 0) >= minStars)
     .filter(r => view !== "taken" || r.taken_at);
   const groups = [];
   if (sortBy === "grade") {
@@ -383,6 +407,38 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
               <button onClick={() => setQ("")} aria-label="Clear search" style={{ position: "absolute", right: 8, background: "transparent", border: "none", color: faint, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
             )}
           </div>
+          {(themeOptions.length > 0 || gradeOptions.length > 0) && <span style={{ width: 1, height: 18, background: C.border }} />}
+          {/* theme filter — dropdown built ONLY from themes present in the current feed */}
+          {themeOptions.length > 0 && (
+            <select value={themeF} onChange={e => setThemeF(e.target.value)} title="Filter by theme"
+              style={{ background: "rgba(255,255,255,0.04)", color: themeF ? C.goldBright : C.muted, border: `1px solid ${themeF ? C.borderGold : C.border}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "7px 10px", borderRadius: 980, outline: "none", cursor: "pointer", maxWidth: 150 }}>
+              <option value="">All themes</option>
+              {themeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          )}
+          {/* grade filter — chips for grades actually present */}
+          {gradeOptions.length > 0 && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+              <button onClick={() => setGradeF("")} style={chip(gradeF === "")}>All grades</button>
+              {gradeOptions.map(g => (
+                <button key={g} onClick={() => setGradeF(gradeF === g ? "" : g)} style={chip(gradeF === g)}>{g}</button>
+              ))}
+            </div>
+          )}
+          <span style={{ width: 1, height: 18, background: C.border }} />
+          {/* min-score filter — ≥N★ chips (click active chip again to clear the minimum) */}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            {[1, 2, 3, 4, 5].map(n => (
+              <button key={n} onClick={() => setMinStars(minStars === n ? 0 : n)} title={`Show setups scored ${n}★ or higher`} style={chip(minStars === n)}>≥{n}★</button>
+            ))}
+          </div>
+          {filtersActive > 0 && (
+            <button onClick={clearAllFilters} title="Reset ticker search, theme, grade and min-score filters"
+              style={{ background: "transparent", border: "none", color: C.muted, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span style={{ background: C.goldDim, color: C.goldBright, fontSize: "0.62rem", fontWeight: 800, padding: "2px 7px", borderRadius: 980 }}>{filtersActive}</span>
+              × clear filters
+            </button>
+          )}
         </div>
       )}
 
@@ -400,7 +456,11 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         </div>
       ) : groups.length === 0 ? (
         <div style={{ ...cardChrome, padding: "30px 20px", textAlign: "center", color: C.muted, fontSize: "0.85rem" }}>
-          No taken setups yet — ✔ Mark taken on a post when the trade is executed.
+          {filtersActive > 0 ? (
+            <>No setups match these filters. <button onClick={clearAllFilters} style={{ background: "transparent", border: "none", color: C.goldBright, fontFamily: font, fontWeight: 800, cursor: "pointer", textDecoration: "underline", fontSize: "inherit" }}>Clear filters</button></>
+          ) : (
+            "No taken setups yet — ✔ Mark taken on a post when the trade is executed."
+          )}
         </div>
       ) : groups.map((g, gi) => {
         // Emphasized day dividers — TODAY in gold, YESTERDAY named, older dates plain (member ask)
@@ -408,7 +468,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         const rel = dAgo === 0 ? "TODAY" : dAgo === 1 ? "YESTERDAY" : null;
         // COLLAPSED BY DEFAULT (member ask): the feed is a row of dates — click a date to open its
         // charts. Search / Top-graded / funnel-chip views auto-expand (a filtered feed must show hits).
-        const forceOpen = g.date === "__ranked__" || !!q.trim() || !!statusF || view === "taken";
+        const forceOpen = g.date === "__ranked__" || !!q.trim() || !!statusF || view === "taken" || !!themeF || !!gradeF || minStars > 0;
         const dayOpen = forceOpen || openDays.has(g.date);
         const toggleDay = () => { if (forceOpen) return; setOpenDays(prev => { const n = new Set(prev); n.has(g.date) ? n.delete(g.date) : n.add(g.date); return n; }); };
         return (
