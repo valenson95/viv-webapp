@@ -1192,23 +1192,34 @@ function WhatsNew() {
               </div>
               <button onClick={closeModal} aria-label="Close" style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.5rem", lineHeight: 1, cursor: "pointer", padding: 2 }}>&times;</button>
             </div>
-            {WHATS_NEW.map((e, i) => (
-              <div key={i} style={{ paddingTop: i ? 18 : 0, marginTop: i ? 18 : 0, borderTop: i ? `1px solid ${C.border}` : "none" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                  <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.goldBright, background: C.goldDim, border: `1px solid ${C.borderGold}`, borderRadius: 980, padding: "2px 9px" }}>{e.tag}</span>
-                  <span style={{ fontSize: "0.7rem", color: C.muted, fontWeight: 600 }}>{e.date}</span>
-                </div>
-                <div style={{ fontSize: "1rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em", marginBottom: 12 }}>{e.title}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {e.items.map((it, j) => (
-                    <div key={j} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.goldBright, marginTop: 7, flex: "none", boxShadow: `0 0 8px ${C.goldBright}` }} />
-                      <span style={{ fontSize: "0.82rem", color: C.text, lineHeight: 1.55 }}>{it}</span>
+            {/* Grouped by date (Valen 2026-07-24): one date header + one NEW badge per DAY, then all that
+                day's entries beneath (title + items, no repeated date). Same-day updates no longer repeat the
+                header. Pure render-time grouping — the WHATS_NEW data objects are unchanged. */}
+            {(() => {
+              const groups = [];
+              WHATS_NEW.forEach(e => { const g = groups.find(x => x.date === e.date); if (g) g.entries.push(e); else groups.push({ date: e.date, tag: e.tag, entries: [e] }); });
+              return groups.map((g, gi) => (
+                <div key={gi} style={{ paddingTop: gi ? 20 : 0, marginTop: gi ? 20 : 0, borderTop: gi ? `1px solid ${C.border}` : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                    <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.goldBright, background: C.goldDim, border: `1px solid ${C.borderGold}`, borderRadius: 980, padding: "2px 9px" }}>{g.tag}</span>
+                    <span style={{ fontSize: "0.7rem", color: C.muted, fontWeight: 600 }}>🆕 {g.date}</span>
+                  </div>
+                  {g.entries.map((e, ei) => (
+                    <div key={ei} style={{ paddingTop: ei ? 14 : 0, marginTop: ei ? 14 : 0, borderTop: ei ? `1px solid rgba(255,255,255,0.05)` : "none" }}>
+                      <div style={{ fontSize: "1rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em", marginBottom: 12 }}>{e.title}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {e.items.map((it, j) => (
+                          <div key={j} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.goldBright, marginTop: 7, flex: "none", boxShadow: `0 0 8px ${C.goldBright}` }} />
+                            <span style={{ fontSize: "0.82rem", color: C.text, lineHeight: 1.55 }}>{it}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            ))}
+              ));
+            })()}
           </div>
         </div>
       )}
@@ -3589,11 +3600,13 @@ const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vp .sech{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
 .vp .row{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
 .vp .spacer{flex:1}
-.vp .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:wrap}
+.vp .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:nowrap}
 .vp .brand{display:flex; align-items:center; gap:9px; font-weight:800; color:var(--white); font-size:0.95rem}
 .vp .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
     background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
-.vp .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
+.vp .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px; min-width:0; overflow-x:auto; scrollbar-width:none}
+.vp .navbar .tabs::-webkit-scrollbar{display:none}
+.vp .tabs a{white-space:nowrap}
 .vp .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
 .vp .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
 .vp .tabs a:hover:not(.on){color:var(--text)}
