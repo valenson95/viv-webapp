@@ -9,10 +9,6 @@ import { LensCamera } from "./capture.jsx";
 // Consistent leaders (top-5 in BOTH) highlighted green. VIV glass + gold.
 // ─────────────────────────────────────────────────────────────
 
-// Magnitude-bar colors — GREEN positive / RED negative at low alpha (VIV palette).
-const CBAR_POS = "rgba(34,197,94,0.30)";
-const CBAR_NEG = "rgba(239,68,68,0.30)";
-
 // A clickable theme name — subtle gold underline on hover → opens the constituent
 // popup. stopPropagation so it never triggers a parent card click / expander toggle.
 // MODULE scope (never nested in a component — past bug).
@@ -31,11 +27,14 @@ function ThemeName({ name, onOpen, C, prefixNode, style }) {
   );
 }
 
-// Constituent popup — lists a theme's stocks in the source's own 1M-desc order:
-// rank · ticker · magnitude bar · % (right-aligned). Portal to body, z-1320,
-// blurred backdrop, backdrop-click / × close. Honest missing + partial states.
-// Divs only (no <table>) so mobile never card-izes the rows. MODULE scope.
-function ThemeConstituentsPopup({ theme, themePct, onClose, C, font }) {
+// Constituent popup — ticker-only membership list (rank · ticker), ordered
+// best→worst per the source's captured snapshot. We only ever hold ONE view's
+// data per ticker (1M for most themes, 3M for a couple), so no per-timeframe %
+// is shown — it would look like it's answering whichever tab the member is on
+// when it isn't. Portal to body, z-1320, blurred backdrop, backdrop-click / ×
+// close. Honest missing + partial states. Divs only (no <table>) so mobile
+// never card-izes the rows. MODULE scope.
+function ThemeConstituentsPopup({ theme, onClose, C, font }) {
   if (!theme) return null;
   const data = THEME_CONSTITUENTS || {};
   const asof = data.asof || "—";
@@ -48,13 +47,10 @@ function ThemeConstituentsPopup({ theme, themePct, onClose, C, font }) {
   const cut = (total != null && total > shown) || partial;
   const countLine = shown
     ? (cut
-        ? `top ${shown} of ${total != null ? total : shown} — list partially captured, refreshed on the next drop`
-        : `${total != null ? total : shown} stocks`)
+        ? `top ${shown} of ${total != null ? total : shown} members — list partially captured, refreshed on the next drop`
+        : `${total != null ? total : shown} members`)
     : "";
-  // Scale bar widths to the theme's own largest |%| (source-style relative bars).
-  const maxAbs = Math.max(0.0001, ...rows.filter(r => r[1] != null && isFinite(r[1])).map(r => Math.abs(r[1])));
   const label = { fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.gold };
-  const pctPos = themePct != null && themePct >= 0;
 
   return createPortal(
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1320, background: "rgba(4,4,8,0.6)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", overflowY: "auto", padding: "40px 16px", fontFamily: font }}>
@@ -64,16 +60,15 @@ function ThemeConstituentsPopup({ theme, themePct, onClose, C, font }) {
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 9, minWidth: 0 }}>
               <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "rgba(255,255,255,0.96)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{theme}</span>
-              {themePct != null && <span style={{ fontSize: "0.78rem", fontWeight: 800, color: pctPos ? C.green : C.red, fontVariantNumeric: "tabular-nums" }}>{pctPos ? "+" : ""}{themePct.toFixed(2)}%</span>}
             </div>
             <button onClick={onClose} title="Close" style={{ flex: "none", width: 26, height: 26, borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", color: C.muted, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, fontFamily: font }}>×</button>
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 7 }}>
             <span style={label}>{countLine || "Constituents"}</span>
-            <span style={{ fontSize: "0.6rem", fontWeight: 700, color: C.goldBright || C.gold, fontVariantNumeric: "tabular-nums" }}>as of {asof} · 1-month view</span>
+            <span style={{ fontSize: "0.6rem", fontWeight: 700, color: C.goldBright || C.gold, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
           </div>
           <div style={{ marginTop: 5, fontSize: "0.6rem", color: "rgba(255,255,255,0.42)", lineHeight: 1.5 }}>
-            Ranked by 1-month move, strongest first. Educational, not advice.
+            Order = recent relative strength, strongest first. Educational, not advice.
           </div>
         </div>
         {/* body */}
@@ -82,22 +77,15 @@ function ThemeConstituentsPopup({ theme, themePct, onClose, C, font }) {
             Constituent list not captured yet — it&rsquo;ll appear after the next data drop.
           </div>
         ) : (
-          <div style={{ padding: "6px 0 8px", maxHeight: "62vh", overflowY: "auto" }}>
-            {rows.map(([tk, pct], i) => {
-              const has = pct != null && isFinite(pct);
-              const pos = has && pct >= 0;
-              const frac = has ? Math.max(0, Math.min(1, Math.abs(pct) / maxAbs)) : 0;
-              return (
-                <div key={tk + i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 18px", borderBottom: i < rows.length - 1 ? "1px solid rgba(255,255,255,0.045)" : "none" }}>
-                  <span style={{ flex: "none", width: 22, textAlign: "right", fontSize: "0.62rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
-                  <span style={{ flex: "none", width: 64, fontSize: "0.76rem", fontWeight: 800, color: "rgba(255,255,255,0.94)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk}</span>
-                  <span style={{ flex: 1, minWidth: 40, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.05)", overflow: "hidden", display: "block" }}>
-                    {has && frac > 0 && <span style={{ display: "block", height: "100%", width: (frac * 100) + "%", background: pos ? CBAR_POS : CBAR_NEG, borderRadius: 4 }} />}
-                  </span>
-                  <span style={{ flex: "none", width: 58, textAlign: "right", fontSize: "0.72rem", fontWeight: 700, fontVariantNumeric: "tabular-nums", color: !has ? C.muted : pos ? C.green : C.red }}>{!has ? "—" : (pos ? "+" : "") + pct.toFixed(2) + "%"}</span>
+          <div style={{ padding: "10px 18px 16px", maxHeight: "62vh", overflowY: "auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(92px, 1fr))", gap: "9px 14px" }}>
+              {rows.map(([tk], i) => (
+                <div key={tk + i} style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+                  <span style={{ flex: "none", width: 17, textAlign: "right", fontSize: "0.62rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
+                  <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "rgba(255,255,255,0.94)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk}</span>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -119,14 +107,9 @@ export default function ThemeStrip({ C, font, variant }) {
   const snap = latestSnapshot();
   if (!snap) return null;
 
-  // The theme's own latest 1M % (for the constituent-popup header), looked up from
-  // the latest snapshot's month list — omitted from the header if not present.
-  const moMap = Object.fromEntries((snap.month || []).map(([n, p]) => [n, p]));
-  const themePctOf = (name) => (name in moMap ? moMap[name] : null);
   const constituentPopup = (
     <ThemeConstituentsPopup
       theme={activeTheme}
-      themePct={activeTheme ? themePctOf(activeTheme) : null}
       onClose={() => setActiveTheme(null)}
       C={C}
       font={font}
