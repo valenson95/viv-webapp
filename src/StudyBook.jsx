@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { GROUP_RS } from "./groupRS-data.js";
+import { sectorFor } from "./sectors.js";
 
 // ══════════════════════════════════════════════════════════════════
 // STUDY BOOK — private study wing of My Book (admin). Historical EXERCISE
@@ -84,6 +86,7 @@ export const STUDY_SETUPS = {
       ["adv_dollar", "ADV $ (20d avg vol × trigger close)"], ["turnover_pct", "Turnover % ($ADV ÷ cap)"], ["dormant_days", "Dormant days (since last ≥20%/5d burst)"],
       ["invaded_half", "Invaded day-1 half? (low d2–5 < midpoint)"], ["d3_moved", "Follow-through by D3? (new high by d2/d3)"],
       ["d_below_ma10", "Sessions to 1st close below 10MA"], ["d_below_ma20", "Sessions to 1st close below 20MA"],
+      ["drop_after_peak_5", "Drop after ext peak, 5d (%)"], ["drop_after_peak_10", "Drop after ext peak, 10d (%)"],
       ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
       ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
@@ -121,6 +124,7 @@ export const STUDY_SETUPS = {
       ["adv_dollar", "ADV $ (20d avg vol × trigger close)"], ["turnover_pct", "Turnover % ($ADV ÷ cap)"], ["dormant_days", "Dormant days (since last ≥20%/5d burst)"],
       ["invaded_half", "Invaded day-1 half? (low d2–5 < midpoint)"], ["d3_moved", "Follow-through by D3? (new high by d2/d3)"],
       ["d_below_ma10", "Sessions to 1st close below 10MA"], ["d_below_ma20", "Sessions to 1st close below 20MA"],
+      ["drop_after_peak_5", "Drop after ext peak, 5d (%)"], ["drop_after_peak_10", "Drop after ext peak, 10d (%)"],
       ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
       ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
@@ -379,11 +383,15 @@ export const HYPOTHESES = [
   { id: "H4", claim: "Shallow retrace = strength", source: "MINE", kind: "subcat", parent: "shallow_retrace",
     prior: "My own observation, no corpus prior: 2nd legs that only retrace to the 10MA (not the 20) tend to launch again.",
     points: [["shallow_retrace tick", "the pullback never closed below the 10MA"], ["retrace_ma subcat", "how deep the pullback cut before the push"]] },
-  { id: "H5", claim: "Small cap + real liquidity = explosive AND tradeable", source: "DOCTRINE", kind: "binary",
-    prior: "Capitalization is the most important magnitude factor; most 20% movers are <$1B — but it still has to be liquid enough to trade.",
+  { id: "H5", claim: "Small cap + real liquidity = explosive AND tradeable", source: "DOCTRINE", kind: "bandmove", distOnly: true,
+    prior: "Capitalization is the most important magnitude factor; most 20% movers are <$1B — but it still has to be liquid enough to trade. Does a smaller cap band print a bigger % move?",
     points: [["mcap_t", "size of the company at trigger — smaller moves further"], ["adv_dollar", "my $20M execution floor"], ["turnover_pct", "$ traded vs cap — high turnover = violent mover profile"]],
-    test: (s) => { const cap = _mnum(s, "mcap_t"), adv = _mnum(s, "adv_dollar"); return (cap == null || adv == null) ? null : (cap < 1e9 && adv >= 20e6); },
-    value: (s) => `${_fmt$B(_mnum(s, "mcap_t"))} cap · ${_fmt$B(_mnum(s, "adv_dollar"))} ADV` },
+    bands: ["<$500M", "$500M–$1B", "$1–2B", "$2–10B", ">$10B"],
+    bandOf: (s) => { const c = _mnum(s, "mcap_t"); return c == null ? null : c < 5e8 ? "<$500M" : c < 1e9 ? "$500M–$1B" : c < 2e9 ? "$1–2B" : c < 1e10 ? "$2–10B" : ">$10B"; },
+    cols: [["median burst %", (s) => _outNum(s, "burst_pct"), true], ["median MFE d20 %", (s) => _outNum(s, "mfe_d20"), false], ["median turnover %", (s) => _mnum(s, "turnover_pct"), false]],
+    fmts: [_pct, _pct, (v) => v == null ? "—" : v.toFixed(1) + "%"],
+    expand: (s) => `${_fmt$B(_mnum(s, "mcap_t"))} cap · burst ${_pct(_outNum(s, "burst_pct"))} · MFE20 ${_pct(_outNum(s, "mfe_d20"))}`,
+    excludedLabel: "no mcap_t" },
   { id: "H6", claim: "Winners never invade half of day 1", source: "DOCTRINE", kind: "binary",
     prior: "Real movers don't give back half the breakout day's gain.",
     points: [["invaded_half", "did price dip below day-1 midpoint in days 2–5 — if yes and it still won, the rule weakens"]],
@@ -412,6 +420,28 @@ export const HYPOTHESES = [
     prior: "Breakouts triggered at a low ATR%-multiple from the 50MA outperform extended ones, and burst peaks cluster in a trim band. My own extension-tracker measurement: ≥7× multiples mark the trim-into-strength zone — strength faded from there ~76% of the time.",
     points: [["ext-at-trigger (ext_50ma)", "how stretched the entry already was — ≤4× = fresh, >4× = chasing"], ["ext-at-peak (ext_at_peak)", "where the burst topped — the trim-band calibration"]],
     bands: ["<2×", "2–4×", "4–7×", "≥7×"], entryKey: "ext_50ma", peakKey: "ext_at_peak" },
+  { id: "H12a", claim: "In-theme by thrust", source: "MINE", kind: "binary",
+    prior: "Does entering a setup whose GROUP is in-theme (top-5 by rotation thrust at the trigger) improve the odds it plays out?",
+    caption: "Tagged by the rotation engine's own ranking (thrust/rs1m), not a theme name — coverage limited to dated snapshots; older studies blank until reconstructed.",
+    points: [["group thrust rank", "where the ticker's rotation group sits by thrust — top-5 = money rushing in"], ["in-theme (top-5 thrust)", "the predicted-good state for this lens"]],
+    test: (s, ctx) => { const r = rotationAt(ctx?.ticker, ctx?.date); return r ? !!r.inThemeThrust : null; },
+    value: (s, ctx) => { const r = rotationAt(ctx?.ticker, ctx?.date); return r ? `${r.groupName} #${r.rank} thrust${r.inThemeThrust ? " · in-theme" : ""}` : "—"; } },
+  { id: "H12b", claim: "Leader by RS", source: "MINE", kind: "binary",
+    prior: "Does entering a setup whose GROUP is a relative-strength leader (rotation RS 1M ≥ 80) improve the odds? The a-vs-b comparison is the point — which better separates winners from failures.",
+    caption: "Rotation-RANKING lens (his rs1m), NOT DeepVue's Since-Open theme tags (not historically reconstructable). Coverage = dated snapshots only.",
+    points: [["group RS 1M", "the group's 1-month relative strength, 0–100"], ["leader (RS ≥ 80)", "the predicted-good state for this lens"]],
+    test: (s, ctx) => { const r = rotationAt(ctx?.ticker, ctx?.date); return r ? !!r.leaderRS : null; },
+    value: (s, ctx) => { const r = rotationAt(ctx?.ticker, ctx?.date); return r ? `group RS 1M ${r.rs1m == null ? "—" : r.rs1m}${r.leaderRS ? " · leader" : ""}` : "—"; } },
+  { id: "H13", claim: "Extreme extension → reversion (breakdown short)", source: "MINE", kind: "bandmove", distOnly: true,
+    prior: "The short-side mirror of the extension lens: when ext-from-50MA reaches an extreme at the burst peak, how much does price give back? More extended peak ⇒ bigger reversion?",
+    caption: "The give-back after extreme extension — sizes the breakdown-short opportunity; short ENTRY timing lives in the Parabolic Short setup.",
+    points: [["ext_at_peak", "how stretched the burst got (×ATR% from 50MA)"], ["drop_after_peak_5 / _10", "max % decline from the peak close over the next 5 / 10 sessions (≤0; censored when too few bars)"]],
+    bands: ["<7×", "7–8×", "8–10×", "10–12×", "≥12×"],
+    bandOf: (s) => { const e = _outNum(s, "ext_at_peak"); return e == null ? null : e < 7 ? "<7×" : e < 8 ? "7–8×" : e < 10 ? "8–10×" : e < 12 ? "10–12×" : "≥12×"; },
+    cols: [["median 5d drop %", (s) => _mnum(s, "drop_after_peak_5"), true], ["median 10d drop %", (s) => _mnum(s, "drop_after_peak_10"), false]],
+    fmts: [_pct, _pct],
+    expand: (s) => `peak ${_x(_outNum(s, "ext_at_peak"))} · 5d ${_pct(_mnum(s, "drop_after_peak_5"))} · 10d ${_pct(_mnum(s, "drop_after_peak_10"))}`,
+    excludedLabel: "no ext_at_peak" },
 ];
 
 // H11 extension helpers — band an ATR%-multiple, split ENTRY-extension winners/failures per band,
@@ -456,6 +486,46 @@ function medianCompanion(all, key, censKey) {
 const H_ERA_START = "2026-07-24";
 const _subLabel = (parent, v) => (SUBCATS[parent].options.find(([o]) => o === String(v)) || [, String(v)])[1];
 const _outNum = (s, k) => { const v = s.outcome?.[k]; return (v == null || v === "" || Number.isNaN(+v)) ? null : +v; };
+const _median = (arr) => { const a = arr.filter(v => v != null && !Number.isNaN(+v)).map(Number).sort((x, y) => x - y); return a.length ? (a.length % 2 ? a[(a.length - 1) / 2] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2) : null; };
+const _pct = (v) => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+const _x = (v) => v == null ? "—" : `${v.toFixed(1)}×`;
+
+// H5/H13 band×move-size distribution stats: bucket a point-list by hyp.bandOf(s), and per band take the
+// median of each hyp.cols getter. Blank-exclude points whose band is null. Returns per-band medians + the
+// bar-column scale so the "smaller cap → bigger move" / "more extended → bigger drop" shape reads at a glance.
+function bandStats(list, hyp) {
+  const set = list.filter(x => hyp.bandOf(x.s) != null);
+  const perBand = hyp.bands.map(b => {
+    const items = set.filter(x => hyp.bandOf(x.s) === b);
+    const meds = hyp.cols.map(([, get]) => _median(items.map(x => get(x.s))));
+    return { band: b, n: items.length, meds, items };
+  });
+  const barCol = Math.max(0, hyp.cols.findIndex(c => c[2]));
+  const maxBar = Math.max(1e-9, ...perBand.map(pb => Math.abs(pb.meds[barCol] ?? 0)));
+  return { perBand, set, excluded: list.length - set.length, barCol, maxBar };
+}
+
+// ── H12 rotation lens (Valen 2026-07-24). rotationAt(ticker, triggerDate) resolves the ticker's rotation
+// GROUP and that group's thrust/rs1m from the IN-APP rotation engine (GROUP_RS). COVERAGE IS BOUNDED: the
+// bundled GROUP_RS is a SINGLE snapshot (one asof date), NOT a time series — so a study is only honestly
+// taggable when its trigger date IS that snapshot's date. Any other date ⇒ null (blank, never "off-theme").
+// This is the rotation-RANKING lens (his thrust/rs1m), explicitly NOT DeepVue's proprietary Since-Open
+// theme tags. Grouping/RS is DeepVue-owned — we never fabricate a group or an RS number (hard rule).
+function rotationAt(ticker, triggerDate) {
+  const g = GROUP_RS;
+  if (!g || !g.rows || !ticker || !triggerDate) return null;
+  if (String(triggerDate) !== String(g.asof)) return null; // single snapshot only — no historical coverage yet
+  const rows = g.rows.filter(r => r.thrust != null);
+  const sec = sectorFor(ticker);
+  let group = null;
+  if (sec) { const low = String(sec).toLowerCase(); group = rows.find(r => r.name && r.name.toLowerCase() === low) || rows.find(r => r.name && (r.name.toLowerCase().includes(low) || low.includes(r.name.toLowerCase()))); }
+  let thrust, rs1m, groupName, pool;
+  if (group) { thrust = group.thrust; rs1m = group.rs1m; groupName = group.name; pool = rows; }
+  else { const s = (g.ll || []).find(r => r.t === ticker && r.thrust != null); if (!s) return null; thrust = s.thrust; rs1m = s.rs1m; groupName = s.industry || ticker; pool = (g.ll || []).filter(r => r.thrust != null); }
+  if (thrust == null) return null;
+  const rank = pool.filter(r => (r.thrust || 0) > thrust).length + 1; // 1-based thrust rank
+  return { groupName, thrust, rs1m, rank, inThemeThrust: rank <= 5, leaderRS: rs1m != null && rs1m >= 80 };
+}
 
 // Per-entry hypothesis read (Valen 2026-07-24) — for ONE study, what does it say about each hypothesis?
 // `short` = label · `read(s)` → { answer, state } | null (null ⇒ this entry carries no data for it ⇒ omit).
@@ -488,6 +558,12 @@ const HYP_READS = {
     return { answer: `${a ? `${nice(a)} to the 10MA break` : ""}${a && b ? " · " : ""}${b ? `${nice(b)} to the 20MA` : ""}`, state: "adds" }; } },
   H11: { short: "Extension", read: (s) => { const e = _mnum(s, "ext_50ma"), p = _outNum(s, "ext_at_peak"); if (e == null && p == null) return null;
     return { answer: `${e != null ? `entered at ${e.toFixed(1)}×` : ""}${e != null && p != null ? " · " : ""}${p != null ? `peaked at ${p.toFixed(1)}×` : ""}`, state: e != null ? (e <= 4 ? "good" : "bad") : "adds" }; } },
+  H12a: { short: "In-theme (thrust)", read: (s, ctx) => { const r = rotationAt(ctx?.ticker, ctx?.date); if (!r) return null;
+    return { answer: `${r.groupName} #${r.rank} by thrust · in-theme ${r.inThemeThrust ? "✓" : "✗"}`, state: r.inThemeThrust ? "good" : "bad" }; } },
+  H12b: { short: "Leader (RS)", read: (s, ctx) => { const r = rotationAt(ctx?.ticker, ctx?.date); if (!r) return null;
+    return { answer: `group RS 1M = ${r.rs1m == null ? "—" : r.rs1m} · leader ${r.leaderRS ? "✓" : "✗"}`, state: r.leaderRS ? "good" : "bad" }; } },
+  H13: { short: "Reversion (short)", distOnly: true, read: (s) => { const p = _outNum(s, "ext_at_peak"), d = _mnum(s, "drop_after_peak_5"); if (p == null && d == null) return null;
+    return { answer: `${p != null ? `peaked at ${p.toFixed(1)}×` : ""}${p != null && d != null ? " · " : ""}${d != null ? `dropped ${d.toFixed(1)}% in 5d` : ""}`, state: "adds" }; } },
 };
 HYPOTHESES.forEach(h => Object.assign(h, HYP_READS[h.id] || {}));
 
@@ -495,9 +571,9 @@ HYPOTHESES.forEach(h => Object.assign(h, HYP_READS[h.id] || {}));
 // can never disagree. Truth table: predicted-good state + winner ⇒ supports · good + failure ⇒ challenges
 // · bad + failure ⇒ supports (failed as predicted) · bad + winner ⇒ challenges (won despite it). No
 // resolved big-win/failure outcome, or a neutral/adds factor state ⇒ ⚪ (adds a data point / pending).
-function entryVerdict(hyp, s) {
+function entryVerdict(hyp, s, ctx) {
   if (!hyp.read) return null;
-  const r = hyp.read(s); if (!r) return null;
+  const r = hyp.read(s, ctx); if (!r) return null; // ctx = {ticker, date} — only H12 uses it; others ignore
   const cls = outcomeClass(s), win = cls === "big winner" || cls === "monster", fail = cls === "failure";
   if (r.state === "adds" || r.state === "neutral")
     return { answer: r.answer, chip: "⚪", tone: "data", verb: r.state === "neutral" ? "neutral band — adds data" : "adds a data point", bucket: "data" };
@@ -509,9 +585,10 @@ function entryVerdict(hyp, s) {
 
 // Per-entry strip — ADMIN-SIDE ONLY (📚 Studies + his personal 🔒 My Book rows). Hypothesis-first: what
 // THIS ticker does to each hypothesis (proving or challenging). Source chips shown (admin — provenance).
-export function HypothesisRead({ C, study }) {
+export function HypothesisRead({ C, study, ticker, date }) {
   if (!study) return null;
-  const lines = HYPOTHESES.map(h => { const v = entryVerdict(h, study); return v ? { h, ...v } : null; }).filter(Boolean);
+  const ctx = { ticker, date }; // enables the H12 rotation lens (per-entry) where date matches a snapshot
+  const lines = HYPOTHESES.map(h => { const v = entryVerdict(h, study, ctx); return v ? { h, ...v } : null; }).filter(Boolean);
   if (!lines.length) return null;
   const toneColor = (t) => t === "supports" ? "#7ef0a0" : t === "challenges" ? "#e05555" : C.muted;
   const chip = (source) => { const gold = source === "DOCTRINE"; return { border: `1px solid ${gold ? C.goldBright : C.blue}`, color: gold ? C.goldBright : C.blue, background: gold ? C.goldDim : C.blueDim, borderRadius: 99, fontSize: "0.5rem", fontWeight: 800, letterSpacing: ".06em", padding: "1px 6px", whiteSpace: "nowrap" }; };
@@ -535,8 +612,9 @@ export function HypothesisRead({ C, study }) {
 
 // Live readout for a binary-predicate hypothesis over resolved winners/failures.
 function hypBinary(hyp, winners, fails) {
-  const mWin = winners.filter(x => hyp.test(x.s) !== null), mFail = fails.filter(x => hyp.test(x.s) !== null);
-  const wT = mWin.filter(x => hyp.test(x.s) === true), fT = mFail.filter(x => hyp.test(x.s) === true);
+  // pass the whole point (x = {s, ticker, date, …}) as ctx so H12's rotation test can read ticker/date.
+  const mWin = winners.filter(x => hyp.test(x.s, x) !== null), mFail = fails.filter(x => hyp.test(x.s, x) !== null);
+  const wT = mWin.filter(x => hyp.test(x.s, x) === true), fT = mFail.filter(x => hyp.test(x.s, x) === true);
   const pW = mWin.length ? wT.length / mWin.length : 0, pF = mFail.length ? fT.length / mFail.length : 0;
   const E = (winners.length - mWin.length) + (fails.length - mFail.length);
   return { mWin, mFail, wT: wT.length, fT: fT.length, pW, pF, lift: pF > 0 ? pW / pF : (pW > 0 ? Infinity : 0),
@@ -597,7 +675,7 @@ export function StudyHypotheses({ C, rows }) {
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: "0.68rem", borderBottom: i === list.length - 1 ? "none" : "1px solid rgba(255,255,255,0.04)" }}>
             <span style={{ width: 56, flex: "none", fontWeight: 800, color: C.white }}>{x.ticker}</span>
             <span style={{ width: 88, flex: "none", color: C.muted, fontSize: "0.62rem" }}>{x.date}</span>
-            <span style={{ flex: 1, color: C.text }}>{valFn(x.s)}</span>
+            <span style={{ flex: 1, color: C.text }}>{valFn(x.s, x)}</span>
             <span style={{ flex: "none", fontWeight: 700, color: outColor(x.s), fontSize: "0.62rem" }}>{outLabel(x.s)}</span>
           </div>
         ))}
@@ -622,7 +700,7 @@ export function StudyHypotheses({ C, rows }) {
       {(() => {
         const tally = HYPOTHESES.map(h => {
           const b = { supports: [], challenges: [], data: [] };
-          forLevel(allStudies, h).forEach(x => { const v = entryVerdict(h, x.s); if (v) b[v.bucket].push({ ...x, v }); });
+          forLevel(allStudies, h).forEach(x => { const v = entryVerdict(h, x.s, x); if (v) b[v.bucket].push({ ...x, v }); });
           const vN = b.supports.length + b.challenges.length;
           return { h, ...b, vN, camps: campCount([...b.supports, ...b.challenges, ...b.data]) };
         });
@@ -811,6 +889,56 @@ export function StudyHypotheses({ C, rows }) {
               </div>
             );
           }
+          // ── H5 / H13 band × move-size distribution card — bucket by a band, show per-band median moves ──
+          if (hyp.kind === "bandmove") {
+            const base = forLevel(allStudies, hyp);
+            const bs = bandStats(base, hyp);
+            const fmts = hyp.fmts || hyp.cols.map(() => _pct);
+            return (
+              <div key={hyp.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(0,0,0,0.22)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
+                  <span style={{ fontSize: "0.58rem", fontWeight: 800, color: C.muted, letterSpacing: ".06em" }}>{hyp.id}</span>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 800, color: C.white }}>{hyp.claim}</span>
+                  <span style={srcChip(hyp.source)}>{hyp.source}</span>
+                </div>
+                <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.45, marginBottom: 6 }}>{hyp.prior}</div>
+                {hyp.caption && <div style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.45)", fontStyle: "italic", marginBottom: 8 }}>{hyp.caption}</div>}
+                <div style={{ display: "grid", gap: 3, marginBottom: 10 }}>
+                  {hyp.points.map(([lab, meaning], i) => (
+                    <div key={i} style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.4 }}><b style={{ color: C.goldBright }}>{lab}</b> <span style={{ color: C.muted }}>— {meaning}</span></div>
+                  ))}
+                </div>
+                {/* column header */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted, padding: "2px 0 5px" }}>
+                  <span style={{ width: 78, flex: "none" }}>Band</span>
+                  <span style={{ width: 30, flex: "none", textAlign: "right" }}>n</span>
+                  <div style={{ flex: 1 }} />
+                  {hyp.cols.map(([lab], ci) => <span key={ci} style={{ width: 92, flex: "none", textAlign: "right" }}>{lab}</span>)}
+                  <span style={{ width: 14, flex: "none" }} />
+                </div>
+                {bs.perBand.map(pb => {
+                  const barVal = pb.meds[bs.barCol], pct = Math.round(Math.abs(barVal ?? 0) / bs.maxBar * 100), bandOpen = open === `${hyp.id}-b-${pb.band}`;
+                  return (
+                    <div key={pb.band}>
+                      <div onClick={() => pb.n && setOpen(bandOpen ? null : `${hyp.id}-b-${pb.band}`)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0", cursor: pb.n ? "pointer" : "default" }}>
+                        <span style={{ width: 78, flex: "none", color: C.text, fontWeight: 700 }}>{pb.band}</span>
+                        <span style={{ width: 30, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{pb.n}</span>
+                        <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}>
+                          <div style={{ width: `${pct}%`, height: "100%", background: (barVal ?? 0) < 0 ? "#e05555" : C.goldBright }} />
+                        </div>
+                        {pb.meds.map((m, ci) => <span key={ci} style={{ width: 92, flex: "none", textAlign: "right", color: ci === bs.barCol ? C.white : C.muted, fontWeight: ci === bs.barCol ? 700 : 400, fontSize: "0.66rem" }}>{fmts[ci](m)}</span>)}
+                        <span style={{ width: 14, flex: "none", color: C.muted, fontSize: "0.6rem" }}>{pb.n ? (bandOpen ? "▴" : "▾") : ""}</span>
+                      </div>
+                      {bandOpen && expandList(pb.items, hyp.expand)}
+                    </div>
+                  );
+                })}
+                <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 7, letterSpacing: ".01em" }}>
+                  n={bs.set.length} measured across {campCount(bs.set)} campaigns · {bs.excluded} excluded ({hyp.excludedLabel || "blank"}) — believe nothing &lt;30, promote at 50
+                </div>
+              </div>
+            );
+          }
           const isSub = hyp.kind === "subcat";
           const lw = forLevel(winners, hyp), lf = forLevel(fails, hyp); // campaign-level ⇒ root legs only
           const r = isSub ? hypSubcat(hyp, lw, lf) : hypBinary(hyp, lw, lf);
@@ -823,7 +951,8 @@ export function StudyHypotheses({ C, rows }) {
                 <span style={{ fontSize: "0.82rem", fontWeight: 800, color: C.white }}>{hyp.claim}</span>
                 <span style={srcChip(hyp.source)}>{hyp.source}</span>
               </div>
-              <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{hyp.prior}</div>
+              <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.45, marginBottom: hyp.caption ? 6 : 8 }}>{hyp.prior}</div>
+              {hyp.caption && <div style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.45)", fontStyle: "italic", marginBottom: 8 }}>{hyp.caption}</div>}
               <div style={{ display: "grid", gap: 3, marginBottom: 10 }}>
                 {hyp.points.map(([lab, meaning], i) => (
                   <div key={i} style={{ fontSize: "0.66rem", color: C.text, lineHeight: 1.4 }}>
@@ -1039,7 +1168,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       {/* Hypothesis-first summary (Valen 2026-07-24): what THIS study says about each hypothesis is the
           DEFAULT view; the key strip + full computed grids fold behind "Show all computed". Admin-side
           (📚 Studies is admin-only). The cap/ADR badge stays on the chart. */}
-      <HypothesisRead C={C} study={s} />
+      <HypothesisRead C={C} study={s} ticker={row.ticker} date={row.entry_date} />
       {cls && <div style={{ marginTop: 6, marginBottom: 6, fontSize: "0.74rem" }}>Auto-class: <b style={{ color: cls === "failure" ? "#e05555" : "#7ef0a0" }}>{cls}</b></div>}
 
       {/* Campaign — whole trend (Valen 2026-07-24): H10 leg-lifespan + the shared AFTER-outcome chart are

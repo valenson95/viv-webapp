@@ -134,6 +134,16 @@ const give = (hiIdx!=null && post.length>hiIdx+1) ? (Math.min(...post.slice(hiId
 let extPeak = null;
 if (hiIdx != null) { const pk = ti+1+hiIdx, s50pk = sma(all,50,pk), Apk = atr14(all,pk);
   if (s50pk && Apk) extPeak = (all[pk].h - s50pk) / Apk; }
+// H13 (Valen 2026-07-24): give-back after the extension PEAK — max % decline from the peak session's
+// close to the lowest low over the next 5 / 10 sessions (≤0). REUSES hiIdx (same peak the ext_at_peak
+// metric uses) + the already-fetched daily bars — NO new API. Censored (null) when too few post-peak bars.
+let dropPeak5 = null, dropPeak10 = null;
+if (hiIdx != null) {
+  const pk = ti+1+hiIdx;
+  const seg5 = all.slice(pk+1, pk+6), seg10 = all.slice(pk+1, pk+11);
+  if (seg5.length >= 5) dropPeak5 = Math.min(0, (Math.min(...seg5.map(b=>b.l))/all[pk].c - 1)*100);
+  if (seg10.length >= 10) dropPeak10 = Math.min(0, (Math.min(...seg10.map(b=>b.l))/all[pk].c - 1)*100);
+}
 // TRADE SIM (pre-registered, Valen 2026-07-14): entry = 5-min ORH gated on the annotated pivot ·
 // stop = LoD (any touch = whole position out −1R; day-0 stop-out detected on the 5-min bars) ·
 // MANAGEMENT = sell into strength: trim 50% of the original position at +3/4/5R touch OR on the
@@ -241,6 +251,7 @@ const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(r
   invaded_half: invadedHalf, d3_moved: d3Moved, dormant_days: dormant, dormant_capped: dormantCapped,
   adv_dollar: advDollar != null ? Math.round(advDollar) : null, turnover_pct: f(turnover, 2),
   d_below_ma10: b10.d, ma10_censored: b10.cens, d_below_ma20: b20.d, ma20_censored: b20.cens,
+  drop_after_peak_5: f(dropPeak5,1), drop_after_peak_10: f(dropPeak10,1),
   closing_range:f(crange,0), stop_width_adr:f(((entry-lod)/entry*100)/adr20,2),
   entry_px:`${f(entry,2)} (${entryModel})`,
   ret_1m:f(ret(21)), ret_3m:f(ret(63)), ret_6m:f(ret(126)), regime: spyOK?"Y":"N",
