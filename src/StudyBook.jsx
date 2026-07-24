@@ -389,7 +389,7 @@ export const HYPOTHESES = [
     bands: ["<$500M", "$500M–$1B", "$1–2B", "$2–10B", ">$10B"],
     bandOf: (s) => { const c = _mnum(s, "mcap_t"); return c == null ? null : c < 5e8 ? "<$500M" : c < 1e9 ? "$500M–$1B" : c < 2e9 ? "$1–2B" : c < 1e10 ? "$2–10B" : ">$10B"; },
     cols: [["median burst %", (s) => _outNum(s, "burst_pct"), true], ["median MFE d20 %", (s) => _outNum(s, "mfe_d20"), false], ["median turnover %", (s) => _mnum(s, "turnover_pct"), false]],
-    fmts: [_pct, _pct, (v) => v == null ? "—" : v.toFixed(1) + "%"],
+    fmts: [(v) => _pct(v), (v) => _pct(v), (v) => v == null ? "—" : v.toFixed(1) + "%"],
     expand: (s) => `${_fmt$B(_mnum(s, "mcap_t"))} cap · burst ${_pct(_outNum(s, "burst_pct"))} · MFE20 ${_pct(_outNum(s, "mfe_d20"))}`,
     excludedLabel: "no mcap_t" },
   { id: "H6", claim: "Winners never invade half of day 1", source: "DOCTRINE", kind: "binary",
@@ -439,7 +439,7 @@ export const HYPOTHESES = [
     bands: ["<7×", "7–8×", "8–10×", "10–12×", "≥12×"],
     bandOf: (s) => { const e = _outNum(s, "ext_at_peak"); return e == null ? null : e < 7 ? "<7×" : e < 8 ? "7–8×" : e < 10 ? "8–10×" : e < 12 ? "10–12×" : "≥12×"; },
     cols: [["median 5d drop %", (s) => _mnum(s, "drop_after_peak_5"), true], ["median 10d drop %", (s) => _mnum(s, "drop_after_peak_10"), false]],
-    fmts: [_pct, _pct],
+    fmts: [(v) => _pct(v), (v) => _pct(v)],
     expand: (s) => `peak ${_x(_outNum(s, "ext_at_peak"))} · 5d ${_pct(_mnum(s, "drop_after_peak_5"))} · 10d ${_pct(_mnum(s, "drop_after_peak_10"))}`,
     excludedLabel: "no ext_at_peak" },
 ];
