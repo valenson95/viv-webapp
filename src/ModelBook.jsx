@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
@@ -435,6 +435,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [zoom, setZoom] = useState(null); // lightbox: { imgs: {before, after}, slot: "before"|"after" }
   const [studyMode, setStudyMode] = useState(mbDeepLink === "studies"); // 📚 Studies view (admin, inside My Book)
   const [studyEditing, setStudyEditing] = useState(null); // null | {} (new) | row (edit)
+  // StudyEditor sets this to a guard that returns true when it's safe to close (no unsaved changes, or the
+  // user confirmed discarding). The backdrop click consults it; StudyEditor's own Cancel/nav guard themselves.
+  const studyCloseGuard = useRef(() => true);
 
   // Lightbox keyboard nav — ← → flips before/after, Esc closes (Esc also closes the detail overlay)
   useEffect(() => {
@@ -704,10 +707,11 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               inside never close (members are editing). Portaled to body so no card backdrop-filter
               becomes its containing block. No Esc-close here: the editor's chart lightbox owns Esc. */}
           {studyEditing !== null && createPortal(
-            <div onClick={() => setStudyEditing(null)} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "4vh 3vw" }}>
+            <div onClick={() => { if (studyCloseGuard.current()) setStudyEditing(null); }} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "4vh 3vw" }}>
               <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1180, margin: "0 auto", background: "rgba(10,10,16,0.92)", borderRadius: 16 }}>
-                <StudyEditor C={C} font={font} busy={busy} campaignRows={studyRows}
+                <StudyEditor key={studyEditing.id || (studyEditing.metrics ? "child" : "new")} C={C} font={font} busy={busy} campaignRows={studyRows}
                   initial={studyEditing && (studyEditing.id || studyEditing.metrics) ? studyEditing : null}
+                  closeGuard={studyCloseGuard} onNavigate={(t) => setStudyEditing(t)}
                   onSave={async (r) => { if (await save(r)) setStudyEditing(null); }}
                   onCancel={() => setStudyEditing(null)} onUpload={uploadImg} />
               </div>

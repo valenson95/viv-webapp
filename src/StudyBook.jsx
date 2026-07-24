@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { GROUP_RS } from "./groupRS-data.js";
 import { sectorFor } from "./sectors.js";
@@ -1028,8 +1028,8 @@ export function StudyHypotheses({ C, rows }) {
   );
 }
 
-export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload, campaignRows }) {
-  const [row, setRow] = useState(() => ({
+export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload, campaignRows, closeGuard, onNavigate }) {
+  const [row, setRowRaw] = useState(() => ({
     ticker: "", entry_date: "", before_img: "", after_img: "", thesis: "", lesson: "",
     ticked: [], elite: [], characteristics: [], is_published: false,
     ...(initial || {}),
@@ -1042,6 +1042,11 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       checks: {}, m: {}, grade: { letter: "" }, outcome: {}, refusal: "",
     } },
   }));
+  // Unsaved-changes tracking (Valen 2026-07-24): EVERY working-state edit flows through setRow (ticks, subcats,
+  // leg selectors, chart remove/upload via onUpload, grade-affecting ticks, refusal, notes) — so wrapping it
+  // is the single point that flips `dirty`. Fresh open = a remount (keyed in ModelBook) ⇒ dirty starts false.
+  const [dirty, setDirty] = useState(false);
+  const setRow = (u) => { setDirty(true); setRowRaw(u); };
   const s = row.metrics.study;
   const setS = (patch) => setRow(r => ({ ...r, metrics: { ...r.metrics, study: { ...r.metrics.study, ...patch } } }));
   const def = STUDY_SETUPS[s.setup] || STUDY_SETUPS["Momentum Breakout"];
@@ -1077,6 +1082,44 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [zoom, zoomSlots.length]);
+  // ── Unsaved-changes guard + leg/campaign navigation (Valen 2026-07-24) ──
+  // guardedClose / go both run the dirty check first: clean ⇒ proceed; dirty ⇒ window.confirm, proceed only
+  // if the user discards. onCancel/backdrop close, and every arrow/button navigation, route through it.
+  const confirmDiscard = () => !dirty || window.confirm("You have unsaved changes — discard them?");
+  const guardedCancel = () => { if (confirmDiscard()) onCancel && onCancel(); };
+  // Expose the guard to the backdrop (in ModelBook) via the shared ref; reset to always-true on unmount so a
+  // closed editor never prompts. Re-set whenever `dirty` flips so the backdrop always sees the live value.
+  useEffect(() => {
+    if (!closeGuard) return;
+    closeGuard.current = () => confirmDiscard();
+    return () => { closeGuard.current = () => true; };
+  }, [dirty, closeGuard]);
+  // Campaign map across ALL study rows — date-ordered campaigns, each with date-ordered legs. buildCampaigns
+  // is the single source of structure (same as the list + stats). navPos = where THIS study sits.
+  const navCampaigns = React.useMemo(() => buildCampaigns(campaignRows || []).list
+    .sort((a, b) => String(a.span?.[0] || "").localeCompare(String(b.span?.[0] || "")) || String(a.cid).localeCompare(String(b.cid))), [campaignRows]);
+  const navPos = (() => { if (row.id == null) return null;
+    for (let ci = 0; ci < navCampaigns.length; ci++) { const li = navCampaigns[ci].legs.findIndex(l => l.id === row.id); if (li >= 0) return { ci, li }; }
+    return null; })();
+  const legTarget = (d) => navPos ? (navCampaigns[navPos.ci].legs[navPos.li + d] || null) : null;
+  const campTarget = (d) => navPos ? (navCampaigns[navPos.ci + d] ? navCampaigns[navPos.ci + d].legs[0] : null) : null;
+  const go = (target) => { if (target && confirmDiscard()) onNavigate && onNavigate(target); }; // switch the open editor in place
+  // Arrow keys: ← / → = prev / next LEG in this campaign · ↓ / ↑ = first leg of next / prev CAMPAIGN.
+  // HARD gates: fire ONLY when the chart lightbox is CLOSED (it owns ← → and Esc), and NEVER while typing in
+  // an input/textarea/select (so leg numbers, notes and the thesis aren't hijacked).
+  useEffect(() => {
+    const onKey = (e) => {
+      if (zoom) return; // lightbox owns the arrows while open
+      const el = e.target, tag = (el?.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || el?.isContentEditable) return;
+      if (e.key === "ArrowRight") { e.preventDefault(); go(legTarget(1)); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); go(legTarget(-1)); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); go(campTarget(1)); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); go(campTarget(-1)); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoom, dirty, navCampaigns, navPos && navPos.ci, navPos && navPos.li, row.id]);
   // ── Point-in-time cap + ADR% badge (Valen 2026-07-17): top-right of every study chart.
   // mcap_t = SEC shares (newest filing ≤ trigger) × trigger close, computed by study-fill;
   // blank = not measured, never guessed. "≈" marks the cap as filing-interval approximate.
@@ -1117,20 +1160,37 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       pattern: s.setup === "Parabolic" ? `Parabolic ${s.direction === "short" ? "Short" : "Long"}` : s.setup,
       outcome: cls ? MB_OUTCOME[cls] : null, thesis: row.thesis,
       lesson: [s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n") || null };
+    setDirty(false); // saved — no longer dirty (the popup also closes on success, which remounts fresh)
     onSave(body);
   };
   return (
     <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 16, padding: 18, marginBottom: 18, fontFamily: font, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" }} />
-      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
         <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>📚 Study {row.ticker ? `· ${row.ticker}` : "· new"}</span>
+        {/* Leg / campaign navigation (Valen 2026-07-24): ‹ › = prev/next leg in this campaign · ⌃ ⌄ = prev/next
+            campaign (first leg). Arrow keys do the same when the lightbox is closed and you're not typing. Each
+            hop runs the unsaved-changes guard first. Only shown once the study is saved (has a position). */}
+        {navPos && (() => {
+          const navBtn = (label, target, title) => (
+            <button type="button" title={title} disabled={!target} onClick={() => go(target)}
+              style={{ background: "transparent", border: `1px solid ${target ? C.border : "transparent"}`, color: target ? C.muted : "rgba(255,255,255,0.18)", borderRadius: 7, fontFamily: font, fontSize: "0.8rem", fontWeight: 800, padding: "2px 9px", cursor: target ? "pointer" : "default", lineHeight: 1 }}>{label}</button>
+          );
+          return <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+            {navBtn("‹", legTarget(-1), "Previous leg (←)")}
+            {navBtn("›", legTarget(1), "Next leg (→)")}
+            <span style={{ fontSize: "0.6rem", color: C.muted, whiteSpace: "nowrap", margin: "0 4px" }}>Leg {navPos.li + 1} of {navCampaigns[navPos.ci].legs.length} · campaign {navPos.ci + 1} of {navCampaigns.length}</span>
+            {navBtn("⌃", campTarget(-1), "Previous campaign (↑)")}
+            {navBtn("⌄", campTarget(1), "Next campaign (↓)")}
+          </span>;
+        })()}
         {/* Star toggle = "show this study in the Model Book too". No duplication — the study stays
             in 📚 for the lift stats; when starred it ALSO appears as a Model Book card. Saved with the study. */}
         <button title={s.in_model_book ? "In the Model Book — click to remove" : "Add to the Model Book (the winners' textbook). Saved when you save the study."}
           onClick={() => setS({ in_model_book: !s.in_model_book })}
           style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${s.in_model_book ? C.borderGold : C.border}`, color: s.in_model_book ? C.goldBright : C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.78rem", fontWeight: 700, padding: "4px 12px", cursor: "pointer" }}>
           {s.in_model_book ? "★" : "☆"} Model Book</button>
-        <button title="Collapse (changes not saved)" onClick={onCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.72rem", padding: "4px 12px", cursor: "pointer" }}>✕ collapse</button>
+        <button title="Collapse (asks first if you have unsaved changes)" onClick={guardedCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.72rem", padding: "4px 12px", cursor: "pointer" }}>✕ collapse</button>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div style={{ width: 110 }}><label style={lbl}>Ticker</label><input style={inputS} value={row.ticker} onChange={e => setRow(r => ({ ...r, ticker: e.target.value.toUpperCase() }))} /></div>
@@ -1312,7 +1372,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
 
       <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
         <button disabled={busy} onClick={doSave} style={{ background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 22px", borderRadius: 99, cursor: "pointer" }}>{busy ? "Saving…" : "Save study"}</button>
-        <button onClick={onCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
+        <button onClick={guardedCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
       </div>
 
       {/* click-to-zoom lightbox — ← → toggles HTF↔LTF, click backdrop or Esc to close */}
