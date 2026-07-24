@@ -754,6 +754,14 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 24, 2026",
+    title: "🥇 Theme Leaders: leader-of-each-timeframe band",
+    items: [
+      "The Theme Leaders popup now opens with a gold summary band showing the #1 theme for Since Open, 1 Week, and 1 Month at a glance — before you scroll the full ranked columns.",
+    ],
+  },
+  {
+    tag: "New",
+    date: "July 24, 2026",
     title: "🗑 Studies: remove a chart from a slot to re-attach",
     items: [
       "Each attached study chart now has a ✕ Remove control — clear a slot to swap in the correct chart. The image stays in storage.",
