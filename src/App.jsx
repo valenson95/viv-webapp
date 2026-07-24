@@ -754,9 +754,9 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 24, 2026",
-    title: "🥇 Theme Leaders: leader-of-each-timeframe band",
+    title: "🟡 Theme Leaders: gold column headers",
     items: [
-      "The Theme Leaders popup now opens with a gold summary band showing the #1 theme for Since Open, 1 Week, and 1 Month at a glance — before you scroll the full ranked columns.",
+      "The Theme Leaders popup's Since Open / 1 Week / 1 Month column headers are now gold, so they're easier to spot at a glance.",
     ],
   },
   {

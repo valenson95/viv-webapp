@@ -152,7 +152,7 @@ export default function ThemeStrip({ C, font, variant }) {
       const fs = size === "lg" ? "0.9rem" : "0.74rem";
       return (
         <div>
-          <h4 style={{ fontSize: size === "lg" ? "0.66rem" : "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: C.muted, marginBottom: 9 }}>{title}</h4>
+          <h4 style={{ fontSize: size === "lg" ? "0.66rem" : "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: size === "lg" ? (C.goldBright || C.gold) : C.muted, marginBottom: 9 }}>{title}</h4>
           <div style={{ display: "flex", flexDirection: "column", gap: size === "lg" ? 9 : 7 }}>
             {rows.map(([name, pct], i) => {
               const pos = pct >= 0;
@@ -220,37 +220,6 @@ export default function ThemeStrip({ C, font, variant }) {
                     <b style={{ color: "rgba(255,255,255,0.82)" }}>Since Open</b> = the latest session&rsquo;s move <i>excluding the opening gap</i> — what buyers actually did during the day.
                   </div>
                 )}
-                {(() => {
-                  // Leader-of-each-timeframe band — top row of the already-sorted day/week/month
-                  // arrays, same [name, pct] tuples the 3 columns below render. Skip a timeframe
-                  // when its array is empty (handles thin early snapshots gracefully).
-                  const leaders = [
-                    ["Since Open", dayRows[0]],
-                    ["1 Week", wkRows[0]],
-                    ["1 Month", moRows[0]],
-                  ].filter(([, row]) => Array.isArray(row));
-                  if (!leaders.length) return null;
-                  return (
-                    <div style={{ marginTop: 16 }}>
-                      <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Leaders</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {leaders.map(([label, row]) => {
-                          const [name, pct] = row;
-                          const pos = pct >= 0;
-                          return (
-                            <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10, background: "rgba(201,152,42,0.08)", borderLeft: `2px solid ${C.gold}` }}>
-                              <span aria-hidden="true" style={{ fontSize: "0.7rem", flex: "none" }}>🥇</span>
-                              <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: C.goldBright || C.gold, width: 88, flex: "none" }}>{label}</span>
-                              <span style={{ flex: 1, minWidth: 0, fontSize: "0.86rem", fontWeight: 800, color: C.goldBright || C.gold, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
-                              <span style={{ flex: "none", fontSize: "0.8rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", color: pos ? C.green : C.red }}>{pos ? "+" : ""}{pct.toFixed(2)}%</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div style={{ height: 1, background: C.border, margin: "14px 0 0" }} />
-                    </div>
-                  );
-                })()}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 24, marginTop: 14 }}>
                   {dayRows.length > 0 && <Col title={`Since Open (${dayRows.length})`} rows={dayRows} size="lg" />}
                   <Col title={`1 Week (${wkRows.length})`} rows={wkRows} size="lg" />
