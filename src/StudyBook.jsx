@@ -1099,6 +1099,201 @@ export function StudyHypotheses({ C, rows }) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  📖 Detailed study view (Valen 2026-07-25) — long-form scrollable page opened from the StudyEditor header.
+//  Charts column (big canonical slots + unlimited extras) scrolls; the stats/hypothesis rail stays pinned.
+//  Reads/writes the editor's own row via setRow (so it flips the SAME dirty flag) and saves via the SAME doSave.
+// ══════════════════════════════════════════════════════════════════
+// Scoped CSS (same embed pattern as Feedback.jsx): desktop = charts | 360px rail, rail sticky; ≤760px = single
+// column with the rail rendered FIRST (order:-1) and un-pinned, so mobile leads with the stats read.
+const DV_CSS = `
+.sbdv-grid{ display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:22px; align-items:start; }
+.sbdv-rail{ position:sticky; top:0; max-height:100vh; overflow-y:auto; }
+.sbdv-scroll::-webkit-scrollbar,.sbdv-rail::-webkit-scrollbar{ width:8px }
+.sbdv-scroll::-webkit-scrollbar-thumb,.sbdv-rail::-webkit-scrollbar-thumb{ background:rgba(201,152,42,0.22); border-radius:99px }
+@media (max-width:760px){
+  .sbdv-grid{ grid-template-columns:1fr; }
+  .sbdv-rail{ position:static; max-height:none; overflow:visible; order:-1; }
+  .sbdv-charts{ order:0; }
+}
+`;
+// z-ladder (whole 📚 surface): ModelBook study backdrop 1250 · HypothesisRead deep-dive modal 1300 ·
+// 📖 detailed view 1340 (above the editor + deep-dive, below the app edit modal 1400 and the lightbox 1550) ·
+// app edit modal 1400 · chart lightbox 1550.
+export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, onClose, capBadge, badgeStyle }) {
+  const s = row.metrics.study;
+  const cls = outcomeClass(s);
+  const q = studyQuality(s);
+  const def = STUDY_SETUPS[s.setup] || STUDY_SETUPS["Momentum Breakout"];
+  const [lbox, setLbox] = useState(null); // { src, title } | null — the detailed view's own lightbox (z 1550)
+  // Esc closes the LIGHTBOX only (never the overlay — the overlay has an explicit ✕ Back button, matching the
+  // editor's rule that the lightbox owns Esc). Bound only while a lightbox image is open.
+  useEffect(() => {
+    if (!lbox) return;
+    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); setLbox(null); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lbox]);
+
+  // ── virtual-field setters (all route through setRow ⇒ flip the editor's dirty flag) ──
+  const setSlotCap = (k, v) => setRow(r => ({ ...r, slot_captions: { ...(r.slot_captions || {}), [k]: v } }));
+  const extras = row.extra_charts || [];
+  const setExtra = (i, patch) => setRow(r => { const arr = [...(r.extra_charts || [])]; arr[i] = { ...arr[i], ...patch }; return { ...r, extra_charts: arr }; });
+  const removeExtra = (i) => { if (!window.confirm("Remove this chart? (the image stays in storage)")) return; setRow(r => ({ ...r, extra_charts: (r.extra_charts || []).filter((_, j) => j !== i) })); };
+  // "+ Add chart" — reuses the EXACT slot upload helper (onUpload = uploadImg, bucket `trade-charts`). uploadImg
+  // calls back with `r => ({...r,[slot]:url})`; probing it with {} lifts out the URL, which we append as an extra.
+  const addExtra = (file) => {
+    if (!file) return;
+    const slot = "extra_" + Date.now();
+    onUpload(file, slot, (updater) => { const url = updater({})[slot]; if (url) setRow(r => ({ ...r, extra_charts: [...(r.extra_charts || []), { img: url, label: "", caption: "" }] })); });
+  };
+
+  const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontFamily: font, fontSize: "0.78rem", padding: "7px 10px", outline: "none", width: "100%", colorScheme: "dark" };
+  const capLbl = { fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.muted, margin: "8px 0 4px", display: "block" };
+  const chartLbl = { fontSize: "0.66rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, marginBottom: 8, display: "block" };
+  const imgStyle = { display: "block", width: "100%", maxWidth: "100%", maxHeight: 560, objectFit: "contain", borderRadius: 10, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)", cursor: "zoom-in" };
+
+  // The 4 canonical slots (spec order + labels). before_img/after_img are DB columns; trigger_ltf_img/outcome_img
+  // are the editor's lifted virtuals — all readable as row[key]. Edited in the quick editor; display-only here.
+  const CANON = [
+    ["before_img", "context", "Context (HTF)"],
+    ["after_img", "before", "BEFORE — the setup"],
+    ["trigger_ltf_img", "trigger", "TRIGGER — 5-min entry"],
+    ["outcome_img", "after", "AFTER — the outcome"],
+  ];
+  const tickedChips = def.buckets.flatMap(b => b.items).filter(([k]) => s.checks?.[k]); // eyeballed checks that are ON
+
+  const statCard = (label, val) => (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 10px", background: "rgba(0,0,0,0.25)" }}>
+      <div style={{ fontSize: "0.52rem", fontWeight: 800, letterSpacing: ".07em", textTransform: "uppercase", color: C.muted, marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: "0.86rem", fontWeight: 700, color: (val == null || val === "") ? C.muted : C.white }}>{(val == null || val === "") ? "—" : String(val)}</div>
+    </div>
+  );
+  const cap = +(s.m?.mcap_t || 0);
+  const capText = cap > 0 ? (cap >= 1e9 ? "$" + (cap / 1e9).toFixed(1) + "B" : "$" + Math.round(cap / 1e6) + "M") : null;
+  const adr = s.m?.adr20;
+
+  const btn = { fontFamily: font, borderRadius: 99, cursor: "pointer", fontWeight: 800 };
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 1340, background: "rgba(10,10,16,0.98)", fontFamily: font, display: "flex", flexDirection: "column" }}>
+      <style dangerouslySetInnerHTML={{ __html: DV_CSS }} />
+      {/* Header — Back + Save top-right. Sits OUTSIDE the one scroll container (below), so the rail's sticky
+          top:0 pins right under it and Save stays reachable without scrolling. No Esc-close on the overlay. */}
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "12px 20px", borderBottom: `1px solid ${C.border}`, background: "rgba(8,8,14,0.9)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
+        <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>📖 Detailed study{row.ticker ? ` · ${row.ticker}` : ""}</span>
+        <button disabled={busy} onClick={onSave} style={{ ...btn, marginLeft: "auto", background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, color: "#08080e", border: "none", fontSize: "0.76rem", padding: "8px 18px" }}>{busy ? "Saving…" : "💾 Save"}</button>
+        <button onClick={onClose} style={{ ...btn, background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontWeight: 700, fontSize: "0.74rem", padding: "8px 14px" }}>✕ Back to editor</button>
+      </div>
+
+      {/* THE one scroll container. Charts column scrolls; the rail (inside) is sticky top:0. */}
+      <div className="sbdv-scroll" style={{ flex: 1, overflowY: "auto", padding: "20px 22px" }}>
+        <div className="sbdv-grid">
+          {/* ── charts column ── */}
+          <div className="sbdv-charts" style={{ minWidth: 0 }}>
+            {CANON.filter(([k]) => row[k]).map(([k, capKey, label]) => (
+              <div key={k} style={{ marginBottom: 22 }}>
+                <label style={chartLbl}>{label}</label>
+                <div style={{ position: "relative" }}>
+                  {capBadge && <span title={capBadge.tip} style={badgeStyle}>{capBadge.text}</span>}
+                  <img src={row[k]} alt={label} onClick={() => setLbox({ src: row[k], title: label })} title="Click to zoom (Esc closes)" style={imgStyle} />
+                </div>
+                {/* Optional caption for the canonical slot — stored in the virtual slot_captions map. */}
+                <label style={capLbl}>Caption</label>
+                <textarea value={(row.slot_captions || {})[capKey] || ""} onChange={e => setSlotCap(capKey, e.target.value)} placeholder="Optional caption…" style={{ ...inputS, minHeight: 42, resize: "vertical" }} />
+              </div>
+            ))}
+            {!CANON.some(([k]) => row[k]) && (
+              <div style={{ fontSize: "0.74rem", color: C.muted, border: `1px dashed ${C.border}`, borderRadius: 10, padding: "20px 14px", textAlign: "center", marginBottom: 22 }}>No canonical charts attached yet — add them in the quick editor.</div>
+            )}
+
+            {/* ── unlimited extra charts (virtual metrics.study.extra_charts) — editable here ── */}
+            {extras.length > 0 && <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "6px 0 12px" }}>Extra charts</div>}
+            {extras.map((ex, i) => (
+              <div key={i} style={{ marginBottom: 22, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                  <input value={ex.label || ""} onChange={e => setExtra(i, { label: e.target.value })} placeholder="Chart label (e.g. WEEKLY, VOLUME)" style={{ ...inputS, textTransform: "uppercase", fontWeight: 800, letterSpacing: ".06em", color: C.goldBright, fontSize: "0.66rem" }} />
+                  <button onClick={() => removeExtra(i)} title="Remove this chart (the image stays in storage)"
+                    style={{ ...btn, flexShrink: 0, background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontWeight: 700, fontSize: "0.62rem", padding: "6px 12px" }}
+                    onMouseEnter={e => { e.currentTarget.style.color = "#e05555"; e.currentTarget.style.borderColor = "#e05555"; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = C.border; }}>✕ Remove</button>
+                </div>
+                {ex.img && <img src={ex.img} alt={ex.label || "extra chart"} onClick={() => setLbox({ src: ex.img, title: ex.label || "Extra chart" })} title="Click to zoom (Esc closes)" style={imgStyle} />}
+                <textarea value={ex.caption || ""} onChange={e => setExtra(i, { caption: e.target.value })} placeholder="Caption…" style={{ ...inputS, minHeight: 42, resize: "vertical", marginTop: 8, fontSize: "0.8rem", color: C.text }} />
+              </div>
+            ))}
+
+            <label style={{ ...btn, display: "inline-flex", alignItems: "center", gap: 8, background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontWeight: 700, fontSize: "0.74rem", padding: "9px 18px", cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1 }}>
+              + Add chart
+              <input type="file" accept="image/*" disabled={busy} onChange={e => { addExtra(e.target.files[0]); e.target.value = ""; }} style={{ display: "none" }} />
+            </label>
+          </div>
+
+          {/* ── sticky stats + hypothesis rail ── */}
+          <div className="sbdv-rail">
+            <div style={{ border: `1px solid ${C.borderGold}`, borderRadius: 14, padding: 16, background: C.glass }}>
+              <div style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white }}>{row.ticker || "—"}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", margin: "6px 0 4px" }}>
+                <span style={{ fontSize: "0.74rem", fontWeight: 700, color: C.goldBright }}>{s.setup}{s.setup === "Parabolic" && s.direction === "short" ? " · Short" : ""}</span>
+                {row.entry_date && <span style={{ fontSize: "0.7rem", color: C.muted }}>· {row.entry_date}</span>}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 6 }}>
+                {cls && <span style={{ fontSize: "0.68rem", fontWeight: 800, color: cls === "failure" ? "#e05555" : "#7ef0a0", border: `1px solid ${cls === "failure" ? "#e05555" : "#7ef0a0"}`, borderRadius: 99, padding: "2px 10px" }}>{MB_OUTCOME[cls] || cls}</span>}
+                {q.letter !== "—" && <span style={{ fontSize: "0.68rem", fontWeight: 800, color: q.letter === "A+" ? "#7ef0a0" : C.goldBright, border: `1px solid ${C.borderGold}`, borderRadius: 99, padding: "2px 10px" }} title={`Auto-grade from ${q.on}/${q.total} ticks`}>Grade {q.letter}</span>}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
+              {statCard("Captured %", row.run_pct)}
+              {statCard("Run-up %", row.run_up_pct)}
+              {statCard("Days held", row.days_held)}
+              {statCard("R multiple", row.r_mult)}
+              {statCard("Theme", row.theme || s.m?.theme)}
+              {statCard("Cap / ADR", (capText || adr != null && adr !== "") ? `${capText || "—"}${adr != null && adr !== "" && !Number.isNaN(+adr) ? ` · ADR ${(+adr).toFixed(1)}%` : ""}` : null)}
+            </div>
+
+            {tickedChips.length > 0 && (<>
+              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "16px 0 8px" }}>👁 Ticked factors</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {tickedChips.map(([k, t]) => (
+                  <span key={k} style={{ fontSize: "0.64rem", fontWeight: 700, color: C.goldBright, border: `1px solid ${C.borderGold}`, borderRadius: 99, padding: "3px 10px" }}>{t}</span>
+                ))}
+              </div>
+            </>)}
+
+            {row.thesis && (<>
+              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "16px 0 6px" }}>Thesis</div>
+              <div style={{ fontSize: "0.78rem", color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{row.thesis}</div>
+            </>)}
+            {(row.lesson || s.refusal) && (<>
+              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "16px 0 6px" }}>Lesson</div>
+              <div style={{ fontSize: "0.78rem", color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{[s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n")}</div>
+            </>)}
+
+            {/* 🧪 Hypothesis verdicts — the exact same component mounted in the quick editor (admin-gated surface). */}
+            <div style={{ marginTop: 16 }}>
+              <HypothesisRead C={C} study={s} ticker={row.ticker} date={row.entry_date} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* click-to-zoom lightbox (z 1550 — above this overlay, matching the editor's lightbox). Esc / backdrop / ✕ close. */}
+      {lbox && (
+        <div onClick={e => { if (e.target === e.currentTarget) setLbox(null); }}
+          style={{ position: "fixed", inset: 0, zIndex: 1550, background: "rgba(4,4,8,0.9)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10, color: C.white }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>{lbox.title}</span>
+            <button onClick={() => setLbox(null)} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.muted, width: 40, height: 40, borderRadius: 10, fontSize: "1.1rem", cursor: "pointer" }} aria-label="Close">✕</button>
+          </div>
+          <div style={{ position: "relative" }}>
+            {capBadge && <span title={capBadge.tip} style={{ ...badgeStyle, top: 10, right: 10, fontSize: "0.72rem", padding: "5px 11px" }}>{capBadge.text}</span>}
+            <img src={lbox.src} alt={lbox.title} style={{ maxWidth: "96vw", maxHeight: "82vh", objectFit: "contain", borderRadius: 10, border: `1px solid ${C.borderGold}`, cursor: "zoom-out", display: "block" }} onClick={() => setLbox(null)} />
+          </div>
+        </div>
+      )}
+    </div>, document.body);
+}
+
 export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload, campaignRows, closeGuard, onNavigate }) {
   const [row, setRowRaw] = useState(() => ({
     ticker: "", entry_date: "", before_img: "", after_img: "", thesis: "", lesson: "",
@@ -1108,6 +1303,10 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     // to top level here so chartSlot/uploadImg/zoom treat all three charts identically.
     outcome_img: initial?.metrics?.study?.outcome_img || "",
     trigger_ltf_img: initial?.metrics?.study?.trigger_ltf_img || "", // 4th virtual slot: trigger-day 5-min entry detail (Valen 2026-07-17)
+    // Detailed-view virtuals (Valen 2026-07-25): unlimited extra charts + optional per-canonical-slot captions.
+    // Same lift/fold pattern as outcome_img — held at top level while editing, folded into metrics.study on save.
+    extra_charts: initial?.metrics?.study?.extra_charts || [], // [{ img, label, caption }]
+    slot_captions: initial?.metrics?.study?.slot_captions || {}, // { context, before, trigger, after }
     metrics: { ...(initial?.metrics || {}), study: initial?.metrics?.study || {
       setup: "Momentum Breakout", direction: "long", regime_tag: "",
       checks: {}, m: {}, grade: { letter: "" }, outcome: {}, refusal: "",
@@ -1139,6 +1338,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   // ── click-to-zoom lightbox: click any chart to enlarge, ←/→ cycles Context→BEFORE→AFTER, Esc closes ──
   const [zoom, setZoom] = useState(null); // null | "before_img" | "after_img" | "outcome_img"
   const [showAll, setShowAll] = useState(false); // raw computed-metrics grid folded by default (Valen 2026-07-24) — key strip stays
+  const [detailOpen, setDetailOpen] = useState(false); // 📖 Detailed view overlay (Valen 2026-07-25) — quick editor stays the default; state persists behind it
   const SLOT_TITLES = { before_img: "BEFORE", after_img: "AFTER", outcome_img: "AFTER — the shared outcome", trigger_ltf_img: "TRIGGER — 5-min entry detail" };
   const zoomSlots = ["before_img", "after_img", "trigger_ltf_img", "outcome_img"].filter(k => row[k]); // only attached charts
   useEffect(() => {
@@ -1180,7 +1380,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   // an input/textarea/select (so leg numbers, notes and the thesis aren't hijacked).
   useEffect(() => {
     const onKey = (e) => {
-      if (zoom) return; // lightbox owns the arrows while open
+      if (zoom || detailOpen) return; // lightbox owns the arrows while open; the 📖 detailed view owns them while open
       const el = e.target, tag = (el?.tagName || "").toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select" || el?.isContentEditable) return;
       if (e.key === "ArrowRight") { e.preventDefault(); go(legTarget(1)); }
@@ -1190,7 +1390,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [zoom, dirty, navCampaigns, navPos && navPos.ci, navPos && navPos.li, row.id]);
+  }, [zoom, detailOpen, dirty, navCampaigns, navPos && navPos.ci, navPos && navPos.li, row.id]);
   // ── Point-in-time cap + ADR% badge (Valen 2026-07-17): top-right of every study chart.
   // mcap_t = SEC shares (newest filing ≤ trigger) × trigger close, computed by study-fill;
   // blank = not measured, never guessed. "≈" marks the cap as filing-interval approximate.
@@ -1225,9 +1425,11 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   const doSave = () => {
     if (!row.ticker.trim()) { alert("Ticker first."); return; }
     const q = studyQuality(s); // grade is derived from ticks at save time — stored for the grid + calibration
-    const { outcome_img, trigger_ltf_img, ...bodyRow } = row; // virtual slots → folded back into metrics.study (no DB columns)
+    const { outcome_img, trigger_ltf_img, extra_charts, slot_captions, ...bodyRow } = row; // virtual slots → folded back into metrics.study (no DB columns)
+    // NOTE: `...s` (= row.metrics.study) spreads FIRST so any unknown study field survives (same guarantee study-fill.mjs
+    // relies on for campaign_id); the folded virtuals below then overwrite with the freshly-edited working values.
     const body = { ...bodyRow,
-      metrics: { ...row.metrics, study: { ...s, outcome_img: outcome_img || "", trigger_ltf_img: trigger_ltf_img || "", grade: { letter: q.letter === "—" ? "" : q.letter, auto: true, on: q.on, total: q.total } } },
+      metrics: { ...row.metrics, study: { ...s, outcome_img: outcome_img || "", trigger_ltf_img: trigger_ltf_img || "", extra_charts: extra_charts || [], slot_captions: slot_captions || {}, grade: { letter: q.letter === "—" ? "" : q.letter, auto: true, on: q.on, total: q.total } } },
       pattern: s.setup === "Parabolic" ? `Parabolic ${s.direction === "short" ? "Short" : "Long"}` : s.setup,
       outcome: cls ? MB_OUTCOME[cls] : null, thesis: row.thesis,
       lesson: [s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n") || null };
@@ -1261,6 +1463,10 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           onClick={() => setS({ in_model_book: !s.in_model_book })}
           style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${s.in_model_book ? C.borderGold : C.border}`, color: s.in_model_book ? C.goldBright : C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.78rem", fontWeight: 700, padding: "4px 12px", cursor: "pointer" }}>
           {s.in_model_book ? "★" : "☆"} Model Book</button>
+        {/* 📖 Detailed view (Valen 2026-07-25): long-form scrollable study page — big charts + unlimited extras +
+            a sticky stats/hypothesis rail. The quick editor stays the default; this opens over it, state intact. */}
+        <button title="Open the long-form detailed view — big charts, extra charts, captions, sticky stats rail" onClick={() => setDetailOpen(true)}
+          style={{ background: "transparent", border: `1px solid ${C.borderGold}`, color: C.goldBright, borderRadius: 8, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "4px 12px", cursor: "pointer" }}>📖 Detailed view</button>
         <button title="Collapse (asks first if you have unsaved changes)" onClick={guardedCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.72rem", padding: "4px 12px", cursor: "pointer" }}>✕ collapse</button>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -1464,6 +1670,11 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           </div>
         </div>
       )}
+
+      {/* 📖 Detailed view overlay — mounts only while open, over the (still-mounted) quick editor. Shares the
+          editor's row/setRow so edits here flip the SAME dirty flag and save through the SAME doSave path. */}
+      {detailOpen && <StudyDetailView C={C} font={font} busy={busy} row={row} setRow={setRow}
+        onUpload={onUpload} onSave={doSave} onClose={() => setDetailOpen(false)} capBadge={capBadge} badgeStyle={badgeStyle} />}
     </div>
   );
 }
