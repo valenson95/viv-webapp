@@ -446,6 +446,9 @@ export const HYPOTHESES = [
     fmts: [(v) => _pct(v), (v) => _pct(v)],
     expand: (s) => `peak ${_x(_outNum(s, "ext_at_peak"))} · 5d ${_pct(_mnum(s, "drop_after_peak_5"))} · 10d ${_pct(_mnum(s, "drop_after_peak_10"))}`,
     excludedLabel: "no ext_at_peak" },
+  { id: "H14", claim: "Big 1st leg (≥30%) → 2nd-leg pullback holds the 10MA", source: "MINE", kind: "cross",
+    prior: "My own observation, no corpus prior: when leg 1 (the pole into the base) ran ≥30%, the pullback into leg 2 never closes below the 10MA; smaller first legs sink to the 20MA or deeper.",
+    points: [["young_leg subcat", "gates this to 2nd-leg entries only — the pullback the claim is about"], ["pole tick", "did leg 1 (the pole into THIS base) run ≥30% — the eyeballed split; on a 2nd-leg study that pole IS leg 1"], ["retrace_ma subcat", "how deep the 2nd-leg pullback cut before the push — the claim's target"]] },
 ];
 
 // H11 extension helpers — band an ATR%-multiple, split ENTRY-extension winners/failures per band,
@@ -483,6 +486,22 @@ function medianCompanion(all, key, censKey) {
   const cens = all.filter(x => x.s.m?.[censKey] === true || x.s.m?.[censKey] === "true").length;
   const med = vals.length ? (vals.length % 2 ? vals[(vals.length - 1) / 2] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2) : null;
   return { med, n: vals.length, cens };
+}
+
+// H14 cross helper (Valen 2026-07-25): pole (leg1 ≥30% into the base) × retrace depth, gated to 2nd-leg
+// pullbacks only (young_leg === "2") with both pole and retrace_ma actually recorded. "none" (never touched
+// the 10MA at all) collapses into the SAME held-10MA column as "10ma" — the claim is "never closed below
+// the 10MA" and no-touch satisfies that a fortiori. "50ma"/"deeper" collapse into one column too.
+function h14Cross(all) {
+  const eligible = all.filter(x => { const s = x.s; return s.checks?.young_leg === "2" && _tick(s, "pole") != null && !!s.checks?.retrace_ma; });
+  const col = (rm) => (rm === "10ma" || rm === "none") ? "held10" : rm === "20ma" ? "cut20" : "deeper";
+  const rows = [true, false].map(pole => {
+    const set = eligible.filter(x => _tick(x.s, "pole") === pole);
+    const counts = { held10: 0, cut20: 0, deeper: 0 };
+    set.forEach(x => counts[col(x.s.checks.retrace_ma)]++);
+    return { pole, n: set.length, counts, list: set };
+  });
+  return { rows, eligible, n: eligible.length };
 }
 
 // Hypothesis era — new eyeball fields / computed metrics land from here; older studies simply lack them
@@ -535,6 +554,9 @@ function rotationAt(ticker, triggerDate) {
 // `short` = label · `read(s)` → { answer, state } | null (null ⇒ this entry carries no data for it ⇒ omit).
 // `state` classifies the FACTOR before outcome: good / bad / neutral / adds (distribution or magnitude —
 // no per-entry pass/fail). `distOnly` = a distribution hypothesis (never a supports/challenges verdict).
+// `state` can ALSO be the literal "supports" / "challenges" (H14, Valen 2026-07-25) — for a hypothesis whose
+// claim is a relationship BETWEEN two observed fields (not a predictor of future trade outcome), the read
+// decides the verdict itself and entryVerdict passes it straight through, bypassing the win/fail cross.
 const HYP_READS = {
   H1: { short: "Tight coil", read: (s) => { const t = _tick(s, "tight"), d = _mnum(s, "tight_days"); if (!t && d == null) return null;
     return { answer: `${d != null ? d + " NR days in the last 10" : "coil read"}${t ? " · ticked tight" : ""}`, state: t ? "good" : (d != null && d >= 3 ? "good" : "bad") }; } },
@@ -568,6 +590,13 @@ const HYP_READS = {
     return { answer: `group RS 1M = ${r.rs1m == null ? "—" : r.rs1m} · leader ${r.leaderRS ? "✓" : "✗"}`, state: r.leaderRS ? "good" : "bad" }; } },
   H13: { short: "Reversion (short)", distOnly: true, read: (s) => { const p = _outNum(s, "ext_at_peak"), d = _mnum(s, "drop_after_peak_5"); if (p == null && d == null) return null;
     return { answer: `${p != null ? `peaked at ${p.toFixed(1)}×` : ""}${p != null && d != null ? " · " : ""}${d != null ? `dropped ${d.toFixed(1)}% in 5d` : ""}`, state: "adds" }; } },
+  H14: { short: "Leg1 size → pullback depth", read: (s) => { const leg = s.checks?.young_leg, rm = s.checks?.retrace_ma, pole = _tick(s, "pole");
+    if (leg !== "2" || pole == null || !rm) return null; // not eligible — never vote (blank = not measured)
+    const held = rm === "10ma" || rm === "none"; // "none" = never even touched the 10MA — a fortiori holds it
+    const nice = { "10ma": "held 10MA", "20ma": "cut to 20MA", "50ma": "cut to 50MA", deeper: "cut deeper", none: "no touch (held)" };
+    const label = nice[rm] || rm;
+    return pole ? { answer: `leg1 ≥30% → ${label}`, state: held ? "supports" : "challenges" }
+                : { answer: `leg1 <30% (control) → ${label}`, state: "adds" }; } },
 };
 // Display metadata (Valen 2026-07-24): `title` = the one punchy plain-English sentence shown as BOTH the
 // heat-table row text and the deep-dive modal title. `howTracked` / `verdictLine` = the modal's "how it's
@@ -615,6 +644,9 @@ const HYP_META = {
   H13: { title: "When a move stretches to an extreme above the 50-day line, measure how hard it snaps back — that's the short.",
     howTracked: "Computed: peak extension (×ATR%) + max give-back over the next 5 / 10 sessions. Per leg — no chart needed.",
     verdictLine: "Descriptive distribution — per peak-extension band, the median snap-back. No pass/fail verdict." },
+  H14: { title: "When leg 1 runs ≥30% into the base, the leg-2 pullback holds the 10-day line; smaller first legs sink to the 20-day line or deeper.",
+    howTracked: "Gated to 2nd-leg entries only (young_leg subcat). Eyeball pole tick — did leg 1 (the pole into THIS base) run ≥30% — crossed with the retrace-depth sub-tag (10MA / 20MA / 50MA / deeper / no touch). Per leg — off the BEFORE chart.",
+    verdictLine: "Among 2nd-leg pullbacks with both fields recorded: pole ≥30% + held the 10MA supports — and \"no touch\" counts as held too (never closing below the 10MA is satisfied a fortiori by never touching it). Pole ≥30% + cut to the 20MA/50MA/deeper challenges. Pole <30% is the CONTROL arm — it's the contrast case, not the tested condition, so it only adds data and never votes supports/challenges." },
 };
 HYPOTHESES.forEach(h => Object.assign(h, HYP_READS[h.id] || {}, HYP_META[h.id] || {}));
 
@@ -622,9 +654,14 @@ HYPOTHESES.forEach(h => Object.assign(h, HYP_READS[h.id] || {}, HYP_META[h.id] |
 // can never disagree. Truth table: predicted-good state + winner ⇒ supports · good + failure ⇒ challenges
 // · bad + failure ⇒ supports (failed as predicted) · bad + winner ⇒ challenges (won despite it). No
 // resolved big-win/failure outcome, or a neutral/adds factor state ⇒ ⚪ (adds a data point / pending).
+// H14 (Valen 2026-07-25) is a different SHAPE of claim — a relationship between two observed chart fields
+// (leg-1 size vs leg-2 retrace depth), not a predictor of future win/loss — so its read() decides
+// supports/challenges directly and entryVerdict just passes that verdict through, outcome untouched.
 function entryVerdict(hyp, s, ctx) {
   if (!hyp.read) return null;
   const r = hyp.read(s, ctx); if (!r) return null; // ctx = {ticker, date} — only H12 uses it; others ignore
+  if (r.state === "supports" || r.state === "challenges")
+    return { answer: r.answer, chip: r.state === "supports" ? "🟢" : "🔴", tone: r.state, verb: r.state, bucket: r.state };
   const cls = outcomeClass(s), win = cls === "big winner" || cls === "monster", fail = cls === "failure";
   if (r.state === "adds" || r.state === "neutral")
     return { answer: r.answer, chip: "⚪", tone: "data", verb: r.state === "neutral" ? "neutral band — adds data" : "adds a data point", bucket: "data" };
@@ -862,6 +899,40 @@ export function HypReadout({ C, hyp, winners, fails, allStudies }) {
         })}
         <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 7, letterSpacing: ".01em" }}>
           n={bs.set.length} measured across {hypCampCount(bs.set)} campaigns · {bs.excluded} excluded ({hyp.excludedLabel || "blank"}) — believe nothing &lt;30, promote at 50
+        </div>
+      </div>
+    );
+  }
+  // ── H14 cross — pole (leg1 ≥30%) × retrace depth, gated to 2nd-leg pullbacks only. Not outcome-split
+  // (this claim isn't about win/loss) — just eligible studies, rows = pole true/false. ──
+  if (hyp.kind === "cross") {
+    const base = hypForLevel(allStudies, hyp);
+    const cr = h14Cross(base);
+    const cols = [["10MA (incl. no touch)", "held10"], ["20MA", "cut20"], ["50MA / deeper", "deeper"]];
+    const niceRM = { "10ma": "held 10MA", "20ma": "cut to 20MA", "50ma": "cut to 50MA", deeper: "cut deeper", none: "no touch" };
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted, padding: "2px 0 5px" }}>
+          <span style={{ width: 112, flex: "none" }}>Leg 1</span>
+          <span style={{ width: 30, flex: "none", textAlign: "right" }}>n</span>
+          {cols.map(([lab]) => <span key={lab} style={{ flex: 1, textAlign: "right" }}>{lab}</span>)}
+        </div>
+        {cr.rows.map(row => {
+          const rowKey = `${hyp.id}-${row.pole}`, rowOpen = open === rowKey;
+          return (
+            <div key={rowKey}>
+              <div onClick={() => row.n && setOpen(rowOpen ? null : rowKey)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0", cursor: row.n ? "pointer" : "default" }}>
+                <span style={{ width: 112, flex: "none", color: C.text, fontWeight: 700 }}>{row.pole ? "leg1 ≥30%" : "leg1 <30% (control)"}</span>
+                <span style={{ width: 30, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{row.n}</span>
+                {cols.map(([, key]) => { const c = row.counts[key], pct = row.n ? Math.round(c / row.n * 100) : 0;
+                  return <span key={key} style={{ flex: 1, textAlign: "right", color: (key === "held10" && row.pole) ? "#7ef0a0" : C.muted, fontWeight: (key === "held10" && row.pole) ? 700 : 400, fontSize: "0.66rem" }}>{c} · {pct}%</span>; })}
+              </div>
+              {rowOpen && expandList(row.list, s => niceRM[s.checks?.retrace_ma] || s.checks?.retrace_ma || "—")}
+            </div>
+          );
+        })}
+        <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 7, letterSpacing: ".01em" }}>
+          n={cr.n} 2nd-leg pullbacks with both pole + retrace depth recorded, across {hypCampCount(cr.eligible)} campaigns — "no touch" counts with 10MA-held · believe nothing &lt;30, promote at 50
         </div>
       </div>
     );
