@@ -755,6 +755,15 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 25, 2026",
+    title: "🧭 Rotation — index & macro leverage vehicles",
+    items: [
+      "Liquid Leaders now tracks the big non-stock exposures too: semiconductors, small caps, Bitcoin, Ethereum, crude oil, silver, biotech and volatility — each with its liquid 2x/3x long and short vehicles in the pointer columns.",
+      "Same discipline as every row: the signal is computed on the underlying index or commodity; the leveraged ticker is only the vehicle. Educational, not advice.",
+    ],
+  },
+  {
+    tag: "New",
+    date: "July 25, 2026",
     title: "📖 Model Book PDF export — now actually readable",
     items: [
       "The export was printing light text on a white page (browsers drop dark backgrounds when saving to PDF) — fixed: the dark VIV theme now prints properly on every page.",

@@ -174,6 +174,18 @@ const LL_JS = [
   ["SNDK", "Computers, Phones & Household Electronics", ["snxx", "sndu"], []],
   ["AMD", "Semiconductors & Semi Equipment", ["amdl", "damd"], []], // short side UNCERTAIN OCR → omitted
   ["POET", "Semiconductors & Semi Equipment", ["poel"], []],
+  // ── Index & Macro lev vehicles (added 2026-07-25 from the tracked-30 liquid-lev list: the
+  //    non-single-stock levs). The computed row = the unlevered index/commodity proxy; the lev
+  //    tickers ride in the long/short pointer columns like every other row. VIX has no clean
+  //    unlevered equity proxy → VIXY (1x VIX futures ETF) is the computed row.
+  ["SOXX", "Index — Semiconductors", ["soxl"], ["soxs"]],
+  ["IWM", "Index — Small Caps (Russell 2000)", ["tna"], ["tza"]],
+  ["IBIT", "Crypto — Bitcoin", ["bitx"], []],
+  ["ETHA", "Crypto — Ethereum", ["ethu"], []],
+  ["USO", "Commodity — Crude Oil", ["uco"], ["sco"]],
+  ["SLV", "Commodity — Silver", ["agq"], ["zsl"]],
+  ["XBI", "Index — Biotech", [], ["labd"]],
+  ["VIXY", "Volatility — VIX Futures", ["uvxy", "uvix"], []],
 ];
 // LL_DV — the "Screen" (DeepVue Liquid Leaders) list. DOCUMENTED BUT CURRENTLY INACTIVE.
 // FINAL SCOPE CALL (Valen, 2026-07-19): the Liquid Leaders tab uses ONLY the ~62 curated names

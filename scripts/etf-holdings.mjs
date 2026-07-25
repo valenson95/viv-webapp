@@ -86,12 +86,17 @@ async function fetchHoldings(ticker) {
 // Each holding: {t ticker, n name, w weight% | null}. w may be null when a fund lists
 // its holdings (in weight order) but the source doesn't publish per-holding weights —
 // we keep the ranked names (honest) and the UI simply shows no bar for those.
+// Corporate ticker renames the source's holdings route hasn't caught up with — normalize so
+// the popup never shows a dead symbol (member-reported 2026-07-25: Block Inc SQ → XYZ, Jan 2025).
+const TICKER_RENAMES = { SQ: "XYZ" };
+
 function classify(raw) {
   if (!raw || !raw.length) return { note: "Holdings aren't published for this fund." };
   const mapped = raw.map((h) => {
     const w = parseFloat(String(h.as ?? "").replace("%", ""));
+    const sym = String(h.s || "").replace(/^\$/, "").trim();
     return {
-      t: String(h.s || "").replace(/^\$/, "").trim(),
+      t: TICKER_RENAMES[sym] || sym,
       n: String(h.n || "").trim(),
       w: isFinite(w) ? w : null,
     };
