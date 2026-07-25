@@ -131,8 +131,12 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>My Model Book — ${today}</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
     <style>
-      *{box-sizing:border-box;margin:0}
-      body{background:#08080e;color:#e8e6e0;font-family:'Plus Jakarta Sans',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      body{background:#08080e;color:#e8e6e0;font-family:'Plus Jakarta Sans',sans-serif}
+      /* Browsers drop the BODY background when printing (member-reported: white pages + light text).
+         A position:fixed underlay repeats on EVERY printed page, so the dark theme survives Save-as-PDF
+         even with "background graphics" unchecked — print-color-adjust:exact (on *) forces it painted. */
+      body::before{content:"";position:fixed;inset:0;z-index:-1;background:#08080e}
       @page{size:A4;margin:0}
       .page,.entry{padding:34px 38px;page-break-after:always;min-height:96vh}
       .cover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
@@ -161,8 +165,26 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
       .note{font-size:0.8rem;line-height:1.55;color:#cfccc3;margin-bottom:8px}
       .note b{color:#c9982a}
       .foot{color:#66635b;font-size:0.6rem;margin-top:10px}
+      .toolbar .ghost{background:transparent;border:1px solid rgba(201,152,42,0.6);color:#c9982a}
+      /* ── Light / ink-friendly theme (member picks in the toolbar; whichever shows is what prints) ── */
+      body.light{background:#fdfcf9;color:#16150f}
+      body.light::before{background:#fdfcf9}
+      body.light .cover .brand,body.light .pat,body.light figcaption,body.light .note b{color:#8a6a1c}
+      body.light .cover .sub,body.light .emeta,body.light .sk{color:#6a675e}
+      body.light .ehead{border-bottom-color:rgba(138,106,28,0.45)}
+      body.light figure img{border-color:rgba(0,0,0,0.18)}
+      body.light .noimg{border-color:rgba(0,0,0,0.25);color:#8a857a}
+      body.light .st{border-color:rgba(0,0,0,0.14);background:rgba(0,0,0,0.035)}
+      body.light .tick{color:#43391d;border-color:rgba(138,106,28,0.45);background:rgba(201,152,42,0.10)}
+      body.light .note{color:#2e2c25}
+      body.light .good{color:#15803d}body.light .bad{color:#b91c1c}
+      body.light .foot{color:#8a857a}
+      body.light .toolbar .ghost{color:#8a6a1c;border-color:rgba(138,106,28,0.6)}
     </style></head><body>
-    <div class="toolbar"><button onclick="window.print()">⬇ Save as PDF</button></div>
+    <div class="toolbar">
+      <button class="ghost" onclick="const l=document.body.classList.toggle('light');this.textContent=l?'🌙 Dark theme':'☀ Light theme'">☀ Light theme</button>
+      <button onclick="window.print()">⬇ Save as PDF</button>
+    </div>
     <div class="page cover">
       <div class="brand">Valen Insiders Vault</div>
       <h1>My Model Book</h1>

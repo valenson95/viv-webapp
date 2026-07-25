@@ -755,6 +755,15 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 25, 2026",
+    title: "📖 Model Book PDF export — now actually readable",
+    items: [
+      "The export was printing light text on a white page (browsers drop dark backgrounds when saving to PDF) — fixed: the dark VIV theme now prints properly on every page.",
+      "New ☀ Light theme toggle in the export preview — flip to an ink-friendly black-on-white version before hitting Save as PDF. Whichever theme is showing is what prints. (Member-requested 🙏)",
+    ],
+  },
+  {
+    tag: "New",
+    date: "July 25, 2026",
     title: "📱 Mobile polish + locked-stop guard",
     items: [
       "iPhone: text fields no longer zoom-jump when you tap into them, and Daily Setups plus Practice mode now fit the phone screen properly.",
