@@ -16,7 +16,18 @@ const T = TICKER.toUpperCase();
 const PROXY = "https://www.valensontrades.com/api/candles";
 
 const shift = (ds, n) => { const d = new Date(ds+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
+// --bars-json <file>: pre-window fallback (proxy = rolling ~2yr). Serves DAILY bars from a local
+// JSON {SYM:[{d,t,o,h,l,c,v}...]} (e.g. Yahoo EOD via scratchpad fetch, split-checked). Intraday
+// requests throw → the existing daily-open entry fallback engages. Metrics compute identically.
+const BJ = (() => { const i = process.argv.indexOf("--bars-json"); return i > 0 ? process.argv[i+1] : null; })();
+const FILE_BARS = BJ ? JSON.parse(readFileSync(BJ, "utf8")) : null;
 async function bars(sym, from, to, res="1day") {
+  if (FILE_BARS) {
+    if (res !== "1day") throw new Error(`${sym}: no intraday in bars file`);
+    const a = (FILE_BARS[sym] || []).filter(b => b.d >= from && b.d <= to);
+    if (!a.length) throw new Error(`${sym}: no bars in file range`);
+    return a;
+  }
   const r = await fetch(`${PROXY}?symbol=${sym}&from=${from}&to=${to}&res=${res}`);
   const j = await r.json();
   if (!j.ok || !j.candles?.length) throw new Error(`${sym}: ${j.error || "no bars"}`);
