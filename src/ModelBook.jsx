@@ -4,7 +4,7 @@ import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
 import { SECTIONS, sectionsFor, scoreTicked, versionOf, stampV2 } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
-import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, HypothesisRead, buildCampaigns, outcomeClass, studyQuality, STUDY_SETUPS, SUBCATS } from "./StudyBook.jsx";
+import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, HypothesisRead, buildCampaigns, outcomeClass, studyQuality, STUDY_SETUPS, SUBCATS, HYPOTHESES, entryVerdict } from "./StudyBook.jsx";
 import { ChartSeqEditor, buildChartList, deriveChartFields, chartFaces, sectionizeCharts } from "./ChartSeq.jsx";
 
 // A study starred for the Model Book shows as a card; its star count comes from the study's
@@ -14,6 +14,14 @@ import { ChartSeqEditor, buildChartList, deriveChartFields, chartFaces, sectioni
 const STUDY_LETTER_N = { "A+": 5, A: 4, B: 3, C: 2 };
 const inModelBook = (r) => isStudyRow(r) && !!r.metrics?.study?.in_model_book;
 const cardStars = (r) => isStudyRow(r) ? (STUDY_LETTER_N[studyQuality(r.metrics.study).letter] || 0) : r.stars;
+// Outcome-class chip (Valen 2026-07-26) — presentation of the PRE-REGISTERED outcomeClass(): emoji + word,
+// colored by tier (green tiers / red / muted), never color alone. Keys mirror StudyBook.outcomeClass.
+const OC_CHIP = {
+  monster:       { emoji: "🦖", label: "Monster",      color: "#7ef0a0" },
+  "big winner":  { emoji: "🏆", label: "Big winner",   color: "#6fd090" },
+  "works small": { emoji: "🌱", label: "Works small",  color: "#b7d69a" },
+  failure:       { emoji: "💀", label: "Failure",      color: "#e05555" },
+};
 // tolerant date → ISO (journal trades carry ISO or M/D/YY)
 const mbISO = (d) => {
   if (!d) return "";
@@ -722,7 +730,11 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                   style={{ background: "rgba(255,255,255,0.04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ CSV</button>
               </>
             )}
-            <button onClick={() => (studyMode && fScope === "mine" && isAdmin) ? setStudyEditing({}) : setEditing({})} style={{ background: `linear-gradient(120deg, ${C.goldMid}, ${C.goldBright}, ${C.goldDeep})`, color: "#0a0a0a", border: "none", fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", boxShadow: "0 6px 18px rgba(201,152,42,0.25)" }}>{(studyMode && fScope === "mine" && isAdmin) ? "＋ New study" : isAdmin ? "+ Add entry" : "+ Add to my book"}</button>
+            {/* ONE INTAKE (Valen 2026-07-26): for ADMIN in a personal scope (📖 Legacy OR 📚 Studies — both
+                fScope==="mine") "+ Add entry" opens the STUDY editor (studyMode on so its portal mounts).
+                Members (never admin) keep their untouched draft flow → MBEditor. Admin in All/Official still
+                opens MBEditor for a curated card. Editing an EXISTING legacy row still uses MBEditor (elsewhere). */}
+            <button onClick={() => { if (isAdmin && fScope === "mine") { setStudyMode(true); setStudyEditing({}); } else setEditing({}); }} style={{ background: `linear-gradient(120deg, ${C.goldMid}, ${C.goldBright}, ${C.goldDeep})`, color: "#0a0a0a", border: "none", fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", boxShadow: "0 6px 18px rgba(201,152,42,0.25)" }}>{(isAdmin && fScope === "mine") ? "＋ New study" : isAdmin ? "+ Add entry" : "+ Add to my book"}</button>
           </div>
         )}
       </div>
@@ -731,7 +743,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
       {/* filters */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 18px", alignItems: "center" }}>
-        {[["All", "All"], ["official", "⭐ VIV Official"], ["mine", `🔒 My Book${mineCount ? ` (${mineCount})` : ""}`]].map(([k, label]) => (
+        {/* "Legacy" framing is ADMIN-only (his pre-studies entries); members see their own personal
+            collection here and for them it stays "My Book". */}
+        {[["All", "All"], ["official", "⭐ VIV Official"], ["mine", `${isAdmin ? "📖 Legacy" : "🔒 My Book"}${mineCount ? ` (${mineCount})` : ""}`]].map(([k, label]) => (
           <button key={k} onClick={() => { setFScope(k); if (k !== "mine") setStudyMode(false); }} style={chip(fScope === k)}>{label}</button>
         ))}
         {isAdmin && (
@@ -803,8 +817,10 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           Rows are model_book rows with metrics.study; excluded from the card grid until promoted. */}
       {studyMode && fScope === "mine" && isAdmin && (
         <div style={{ marginBottom: 20 }}>
-          <StudyScoreboard C={C} rows={studyRows} />
+          {/* Order (Valen 2026-07-26): 🧪 hypothesis tally FIRST, then the scoreboard (stats → outcome-class
+              glossary → factor lift). The tally is the headline read; lift sits last behind the zero-F guard. */}
           <StudyHypotheses C={C} rows={studyRows} />
+          <StudyScoreboard C={C} rows={studyRows} />
           {/* Editor opens as a blurred-backdrop POPUP (Valen 2026-07-17) — click a row anywhere in the
               list and edit right there, no scrolling back up. Backdrop click / Cancel closes; clicks
               inside never close (members are editing). Portaled to body so no card backdrop-filter
@@ -834,6 +850,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               // Plain render helper (invoked directly → inline elements, not a nested component).
               const legRow = (r, legIndex, indent, showAddLeg) => {
                 const s = r.metrics.study; const cls = outcomeClass(s);
+                const oc = OC_CHIP[cls]; // outcome-class chip (undefined when pending)
+                const hctx = { ticker: r.ticker, date: r.entry_date }; // ctx for the per-hypothesis vote strip
                 // chartFaces (Valen 2026-07-26) — reads the unified list (converts legacy rows), so a study whose
                 // charts aren't slot-shaped still shows thumbs. Nested legs share the trend's outcome = the root's back face.
                 const faces = chartFaces(r, true);
@@ -858,8 +876,16 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                     </span>
                     <span style={{ width: 150 }}>{r.pattern}</span>
                     {(() => { const q = studyQuality(s); return <span style={{ width: 70, color: q.letter === "—" ? C.muted : q.letter === "A+" ? "#7ef0a0" : C.goldBright, fontWeight: 700 }} title={`${q.on}/${q.total} criteria ticked`}>{q.letter}</span>; })()}
-                    <span style={{ flex: 1, color: C.muted, fontSize: "0.7rem" }}>{s.regime_tag || ""}</span>
-                    {cls && <span style={{ fontWeight: 700, color: cls === "failure" ? C.red : "#7ef0a0" }}>{cls === "failure" ? "▼ " : "▲ "}{cls}</span>}
+                    {/* (a) OUTCOME-CLASS chip — emoji + word, colored by tier (never color alone) */}
+                    <span title={oc ? `Outcome class: ${oc.label}` : "Outcome pending — grade the result to classify"} style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 108, flexShrink: 0, whiteSpace: "nowrap", fontSize: "0.66rem", fontWeight: 800, color: oc ? oc.color : C.muted }}>{oc ? `${oc.emoji} ${oc.label}` : "— pending"}</span>
+                    <span style={{ flex: 1, minWidth: 0, color: C.muted, fontSize: "0.7rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.regime_tag || ""}</span>
+                    {/* (b) H-VOTE DOT STRIP — 14 hypotheses in order; read-only reuse of entryVerdict. green=supports ·
+                        red=challenges · grey=adds-data · hollow=no vote. Wraps gracefully on narrow screens. */}
+                    <span style={{ display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center", flex: "none", maxWidth: 130, justifyContent: "flex-end" }}>
+                      {HYPOTHESES.map(h => { const v = entryVerdict(h, s, hctx); const b = v ? v.bucket : null;
+                        const col = b === "supports" ? "#7ef0a0" : b === "challenges" ? "#e05555" : b === "data" ? "rgba(255,255,255,0.4)" : "transparent";
+                        return <span key={h.id} title={`${h.id} · ${b === "data" ? "adds data" : b || "no vote"}`} style={{ width: 7, height: 7, borderRadius: "50%", background: col, border: b ? "none" : `1px solid ${C.border}`, boxSizing: "border-box", flex: "none" }} />; })}
+                    </span>
                     {showAddLeg && <button title="Add a linked leg to this trend" onClick={(e) => { e.stopPropagation(); addLeg(camp.root, camp.legs); }} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, cursor: "pointer", fontSize: "0.6rem", fontWeight: 800, borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" }}>+ leg</button>}
                     <button title={inModelBook(r) ? "In the Model Book — click to remove" : "Add to the Model Book"} onClick={(e) => { e.stopPropagation(); toggleModelBook(r); }} style={{ background: "transparent", border: "none", color: inModelBook(r) ? C.goldBright : C.muted, cursor: "pointer", fontSize: "1rem" }}>{inModelBook(r) ? "★" : "☆"}</button>
                     <button title="Delete study" onClick={(e) => { e.stopPropagation(); remove(r); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: "0.95rem" }}>×</button>
@@ -897,10 +923,13 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         </div>
       )}
 
-      {/* Your patterns — member-scoped common-factor tally across THEIR own book (their best-graded first).
-          Shows in 🔒 My Book (their own entries) only, never over the curated VIV Official cards. */}
-      {fScope === "mine" && !studyMode && !loading && !error && myRows.length > 0 && (
-        <YourPatterns C={C} font={font} myRows={myRows} />
+      {/* Hypotheses everywhere (Valen 2026-07-26): MEMBERS keep "Your patterns" (their honest own-factor
+          tally) in 📖 Legacy. For ADMIN the same personal scope mounts the 🧪 Hypotheses tally instead —
+          one evidence engine across both his personal surfaces (reuses the same StudyHypotheses instance). */}
+      {fScope === "mine" && !studyMode && !loading && !error && (
+        isAdmin
+          ? <StudyHypotheses C={C} rows={studyRows} />
+          : (myRows.length > 0 ? <YourPatterns C={C} font={font} myRows={myRows} /> : null)
       )}
 
       {/* card grid — mobile-safe auto-fit (min() caps the track so a card never overflows a narrow screen) */}

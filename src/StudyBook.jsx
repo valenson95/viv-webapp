@@ -259,9 +259,13 @@ export function liftTable(rows) {
   const push = (group, label, val /* s -> true|false|null */) => {
     const w = win.map(val).filter(x => x !== null), f = fail.map(val).filter(x => x !== null);
     if (!w.length && !f.length) return;
-    const pW = w.length ? w.filter(Boolean).length / w.length : 0;
-    const pF = f.length ? f.filter(Boolean).length / f.length : 0;
-    out.push({ setup: group, label, pW, pF, lift: pF > 0 ? pW / pF : (pW > 0 ? Infinity : 0) });
+    // wc/fc = winners/failures WITH the factor · denW/denF = winners/failures where it was MEASURED
+    // (non-null). These are the exact counts pW/pF already divide — surfaced only so the table can
+    // show both denominators (the zero-failure guard). pW/pF/lift are byte-for-byte unchanged.
+    const wc = w.filter(Boolean).length, fc = f.filter(Boolean).length;
+    const pW = w.length ? wc / w.length : 0;
+    const pF = f.length ? fc / f.length : 0;
+    out.push({ setup: group, label, pW, pF, lift: pF > 0 ? pW / pF : (pW > 0 ? Infinity : 0), wc, denW: w.length, fc, denF: f.length });
   };
   const seen = new Set();
   entries.forEach(s => (STUDY_SETUPS[s.setup]?.buckets || []).forEach(b => b.items.forEach(([k, label]) => {
@@ -292,6 +296,8 @@ export function liftTable(rows) {
 export function StudyScoreboard({ C, rows }) {
   const { rows: lifts, nWin, nFail, n } = liftTable(rows);
   const small = n < 30;
+  const campN = buildCampaigns(rows).list.length; // distinct campaigns (reuse the grouping machinery, don't re-derive)
+  const guard = nFail < 5; // PRE-REGISTERED FLOOR: a zero/near-zero failure cell makes every ratio divide-by-~0
   const bySetup = {};
   rows.forEach(r => { const s = r.metrics.study.setup; bySetup[s] = (bySetup[s] || 0) + 1; });
   // Uniform card chrome — 16px radius, glass, top-left sheen, uppercase micro-label + divider head.
@@ -311,6 +317,7 @@ export function StudyScoreboard({ C, rows }) {
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
         <div style={box}><b style={boxNum}>{rows.length}</b><span style={boxLbl}>Studies</span></div>
+        <div style={box}><b style={boxNum}>{campN}</b><span style={boxLbl}>Campaigns</span></div>
         {Object.entries(bySetup).map(([k, v]) => (
           <div key={k} style={box}><b style={boxNum}>{v}</b><span style={boxLbl}>{k}</span></div>
         ))}
@@ -333,19 +340,35 @@ export function StudyScoreboard({ C, rows }) {
       {lifts.length > 0 && (
         <>
           <div style={subhead}>Factor lift</div>
-          <div style={small
-            ? { fontSize: "0.72rem", color: "#e0a955", margin: "0 0 10px", padding: "9px 12px", background: "rgba(224,169,85,0.08)", border: "1px solid rgba(224,169,85,0.25)", borderRadius: 8, lineHeight: 1.5 }
-            : { fontSize: "0.72rem", color: C.muted, margin: "0 0 10px", lineHeight: 1.5 }}>
-            {small ? `⚠ n=${n} — early read, believe nothing before n≥30 per class (promote at n≥50). Add FAILURES too — without them lift can't be computed (winners-only = survivor bias).`
-                   : `n=${n} resolved — lift = % of winners with the factor ÷ % of failures with it. ≥2 = edge candidate · ~1 = noise.`}
-          </div>
+          {/* THE ZERO-FAILURE GUARD (pre-registered law: a zero/near-zero cell ⇒ suppress the ratio).
+              Under 5 resolved failures every ratio divides by ~0 and renders a fake "∞× / perfect" — so
+              we replace it with a loud banner + raw fractions (both denominators, no %, no ∞), rows
+              desaturated. At ≥5 failures the ratio returns, but ALWAYS with both denominators shown. */}
+          {guard ? (
+            <div style={{ fontSize: "0.72rem", color: "#f0a0a0", fontWeight: 600, margin: "0 0 10px", padding: "10px 13px", background: "rgba(224,90,85,0.10)", border: "1px solid rgba(224,90,85,0.55)", borderRadius: 8, lineHeight: 1.55 }}>
+              ⚠ LIFT UNAVAILABLE — {nWin} winners / {nFail} failures resolved. Ratios are mathematically meaningless until failures are graded (they divide by zero at 0F). Log ~1 failure per 2–3 winners. Showing raw counts only.
+            </div>
+          ) : (
+            <div style={small
+              ? { fontSize: "0.72rem", color: "#e0a955", margin: "0 0 10px", padding: "9px 12px", background: "rgba(224,169,85,0.08)", border: "1px solid rgba(224,169,85,0.25)", borderRadius: 8, lineHeight: 1.5 }
+              : { fontSize: "0.72rem", color: C.muted, margin: "0 0 10px", lineHeight: 1.5 }}>
+              {small ? `⚠ n=${n} resolved · ${campN} campaigns — early read, believe nothing before n≥30 per class (promote at n≥50). Add FAILURES too — without them lift can't be computed (winners-only = survivor bias).`
+                     : `n=${n} resolved · ${campN} campaigns — lift = % of winners with the factor ÷ % of failures with it (both denominators shown). ≥2 = edge candidate · ~1 = noise.`}
+            </div>
+          )}
           <div style={{ maxHeight: 280, overflowY: "auto", paddingTop: 2 }}>
             {lifts.slice(0, 16).map((l, i, arr) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", borderBottom: i === arr.length - 1 ? "none" : "1px solid rgba(255,255,255,0.05)", fontSize: "0.74rem" }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", borderBottom: i === arr.length - 1 ? "none" : "1px solid rgba(255,255,255,0.05)", fontSize: "0.74rem", opacity: guard ? 0.55 : 1 }}>
                 <span style={{ width: 170, flex: "none", color: C.muted, fontSize: "0.66rem" }}>{l.setup}</span>
                 <span style={{ flex: 1, color: C.text }}>{l.label}</span>
-                <span style={{ width: 118, flex: "none", textAlign: "right", whiteSpace: "nowrap", color: C.muted, fontSize: "0.68rem" }}>{Math.round(l.pW * 100)}%W · {Math.round(l.pF * 100)}%F</span>
-                <b style={{ width: 56, flex: "none", textAlign: "right", fontWeight: 800, color: l.lift >= 2 ? "#7ef0a0" : l.lift < 0.7 ? "#e05555" : C.muted }}>{l.lift === Infinity ? "∞" : l.lift.toFixed(2)}×</b>
+                {guard ? (
+                  <span style={{ flex: "none", textAlign: "right", whiteSpace: "nowrap", color: C.muted, fontSize: "0.66rem" }}>winners {l.wc}/{l.denW} · failures {l.fc}/{l.denF}</span>
+                ) : (
+                  <>
+                    <span style={{ width: 150, flex: "none", textAlign: "right", whiteSpace: "nowrap", color: C.muted, fontSize: "0.66rem" }}>{Math.round(l.pW * 100)}%W ({l.wc}/{l.denW}) · {Math.round(l.pF * 100)}%F ({l.fc}/{l.denF})</span>
+                    <b style={{ width: 56, flex: "none", textAlign: "right", fontWeight: 800, color: l.lift >= 2 ? "#7ef0a0" : l.lift < 0.7 ? "#e05555" : C.muted }}>{l.lift === Infinity ? "∞" : l.lift.toFixed(2)}×</b>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -658,7 +681,9 @@ HYPOTHESES.forEach(h => Object.assign(h, HYP_READS[h.id] || {}, HYP_META[h.id] |
 // H14 (Valen 2026-07-25) is a different SHAPE of claim — a relationship between two observed chart fields
 // (leg-1 size vs leg-2 retrace depth), not a predictor of future win/loss — so its read() decides
 // supports/challenges directly and entryVerdict just passes that verdict through, outcome untouched.
-function entryVerdict(hyp, s, ctx) {
+// EXPORTED (Valen 2026-07-26) read-only so the Studies list rows can render a per-hypothesis vote strip
+// off the SAME verdict engine — presentation reuse, no recomputation.
+export function entryVerdict(hyp, s, ctx) {
   if (!hyp.read) return null;
   const r = hyp.read(s, ctx); if (!r) return null; // ctx = {ticker, date} — only H12 uses it; others ignore
   if (r.state === "supports" || r.state === "challenges")
@@ -750,6 +775,25 @@ function hypHeat(supports, challenges, C) {
   if (r > 0.45) return { bg: "rgba(224,169,85,0.12)", fg: "#e0a955", verdict: `contested · ${pct}%` };
   if (r > 0.30) return { bg: `rgba(239,68,68,${op})`, fg: "#e05555", verdict: `leans against · ${pct}%` };
   return { bg: `rgba(239,68,68,${op})`, fg: "#e05555", verdict: `against · ${pct}%` };
+}
+
+// Evidence-QUALITY chip (Valen 2026-07-26) — PRESENTATION over the EXISTING vote counts (never re-counts).
+// filled dots 1–4 = INSUFFICIENT / LOW / MODERATE / HIGH. His pre-registered "believe nothing under 30"
+// anchors HIGH; the 8-vote floor mirrors hypHeat's mute threshold. Distribution hyps carry no verdict,
+// so they show a neutral slate n-chip off the data-point count instead of a supports/challenges split.
+function evidenceChip(supports, challenges, dataCount, dist, C) {
+  if (dist) {
+    const nn = dataCount || 0;
+    const filled = nn >= 30 ? 4 : nn >= 15 ? 3 : nn >= 8 ? 2 : 1;
+    return { filled, label: nn >= 30 ? "HIGH" : nn >= 8 ? "BUILDING" : "THIN", color: "#94a3b8",
+      reason: `${nn} data point${nn === 1 ? "" : "s"} — descriptive distribution, no supports/challenges verdict` };
+  }
+  const nn = supports + challenges, oneClass = supports === 0 || challenges === 0;
+  if (nn >= 30) return { filled: 4, label: "HIGH", color: "#7ef0a0", reason: `${nn} resolved votes — past the believe-nothing-under-30 floor` };
+  if ((nn >= 8 && supports >= 3 && challenges >= 3) || (nn >= 15 && oneClass))
+    return { filled: 3, label: "MODERATE", color: "#e0a955", reason: (nn >= 15 && oneClass) ? `${nn} votes but all one-sided` : `${nn} votes with ${supports}–${challenges} both sides represented` };
+  if (nn >= 8) return { filled: 2, label: "LOW", color: "#c99a5a", reason: oneClass ? `all ${nn} votes one-sided` : `only an ${supports}–${challenges} split` };
+  return { filled: 1, label: "INSUFFICIENT", color: C.muted, reason: `only ${nn} resolved vote${nn === 1 ? "" : "s"}` };
 }
 
 // ── The FULL live readout for ONE hypothesis (Valen 2026-07-24) — relocated from the old always-visible
@@ -1038,28 +1082,41 @@ export function StudyHypotheses({ C, rows }) {
           <span style={{ width: 34, flex: "none", textAlign: "center" }}>🔴</span>
           <span style={{ width: 34, flex: "none", textAlign: "center" }}>⚪</span>
           <span style={{ width: 28, flex: "none", textAlign: "center" }}>n</span>
-          <span style={{ width: 116, flex: "none", textAlign: "right" }}>Verdict</span>
+          <span style={{ width: 124, flex: "none", textAlign: "right" }}>Verdict</span>
         </div>
         {rowsData.map(t => {
           const dist = !!t.h.distOnly;
           const heat = dist ? null : hypHeat(t.supports, t.challenges, C);
+          const insufficient = !dist && (t.supports + t.challenges) < 8; // < the 8-vote mute floor
+          const ev = evidenceChip(t.supports, t.challenges, t.data, dist, C); // presentation over existing counts
+          // Tri-state (four-state) headline mapped from the SAME counts + mute logic — replaces the status word.
+          let headline, headCol;
+          if (dist) { headline = "distribution — open to view"; headCol = "#94a3b8"; }
+          else if (insufficient) { headline = "INSUFFICIENT DATA"; headCol = C.muted; }
+          else { const r = t.supports / (t.supports + t.challenges), pct = Math.round(r * 100);
+            if (r >= 0.55) { headline = `SUPPORTED (leaning) · ${pct}%`; headCol = "#7ef0a0"; }
+            else if (r > 0.45) { headline = `TESTED — UNDECIDED · ${pct}%`; headCol = "#e0a955"; }
+            else { headline = `CHALLENGED (leaning) · ${pct}%`; headCol = "#e05555"; } }
+          // Keep the existing HEAT background; only desaturate the genuinely-insufficient rows.
           const rowBg = dist ? "rgba(148,163,184,0.06)" : (heat.weak ? "transparent" : heat.bg);
-          const verdictTxt = dist ? "distribution — open to view" : heat.verdict;
-          const verdictCol = dist ? "#94a3b8" : heat.fg;
           return (
             <div key={t.h.id} onClick={() => setModalId(t.h.id)}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: `1px solid ${C.border}`, background: rowBg, fontSize: "0.72rem", cursor: "pointer", transition: "filter .12s" }}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: `1px solid ${C.border}`, background: rowBg, fontSize: "0.72rem", cursor: "pointer", transition: "filter .12s", opacity: insufficient ? 0.62 : 1 }}
               onMouseEnter={e => e.currentTarget.style.filter = "brightness(1.28)"} onMouseLeave={e => e.currentTarget.style.filter = "none"}>
               <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap", color: C.text, lineHeight: 1.35 }}>
                 <span style={{ fontSize: "0.5rem", fontWeight: 800, color: C.muted, letterSpacing: ".04em" }}>{t.h.id}</span>
                 <span style={{ fontWeight: 600, color: C.white }}>{t.h.title || t.h.claim}</span>
                 <span style={srcChip(t.h.source)}>{t.h.source}</span>
+                <span title={ev.reason} style={{ display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", cursor: "help" }}>
+                  <span style={{ letterSpacing: "1px", fontSize: "0.5rem", lineHeight: 1 }}>{[0, 1, 2, 3].map(k => <span key={k} style={{ color: k < ev.filled ? ev.color : "rgba(255,255,255,0.18)" }}>●</span>)}</span>
+                  <span style={{ fontSize: "0.48rem", fontWeight: 800, letterSpacing: ".06em", color: ev.color }}>{ev.label}</span>
+                </span>
               </span>
               <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 800, color: dist ? C.muted : (t.supports ? "#7ef0a0" : "rgba(255,255,255,0.25)") }}>{dist ? "—" : t.supports}</span>
               <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 800, color: dist ? C.muted : (t.challenges ? "#e05555" : "rgba(255,255,255,0.25)") }}>{dist ? "—" : t.challenges}</span>
               <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 800, color: t.data ? C.muted : "rgba(255,255,255,0.25)" }}>{t.data}</span>
               <span title={`${t.h.level === "campaign" ? "campaign-level — deduped to root leg · " : ""}${t.camps} campaign${t.camps === 1 ? "" : "s"} in the sample`} style={{ width: 28, flex: "none", textAlign: "center", color: C.muted, fontSize: "0.66rem", cursor: "help" }}>{dist ? t.data : t.n}</span>
-              <span style={{ width: 116, flex: "none", textAlign: "right", fontWeight: 700, color: verdictCol, fontSize: "0.62rem" }}>{verdictTxt}</span>
+              <span style={{ width: 124, flex: "none", textAlign: "right", fontWeight: 700, color: headCol, fontSize: "0.62rem", lineHeight: 1.3 }}>{headline}</span>
             </div>
           );
         })}
