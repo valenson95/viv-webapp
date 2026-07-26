@@ -754,6 +754,15 @@ function PlaybookTracker({ trades, uid, setPage }) {
 const WHATS_NEW = [
   {
     tag: "New",
+    date: "July 26, 2026",
+    title: "🧭 Market lenses on every dashboard",
+    items: [
+      "Sector Rotation, Market Breadth and the Earnings radar now show on the Guided dashboard too — including on your phone. They were Pro-view only before (member-requested).",
+      "Tap any card for the full table.",
+    ],
+  },
+  {
+    tag: "New",
     date: "July 25, 2026",
     title: "🧭 Rotation — index & macro leverage vehicles",
     items: [
@@ -775,18 +784,9 @@ const WHATS_NEW = [
     date: "July 25, 2026",
     title: "📱 Mobile polish + locked-stop guard",
     items: [
-      "iPhone: text fields no longer zoom-jump when you tap into them, and Daily Setups plus Practice mode now fit the phone screen properly.",
+      "iPhone: text fields no longer zoom-jump when you tap into them, and Daily Setups now fits the phone screen properly.",
       "ⓘ info dots open on tap on mobile, and the Feedback drawer now layers correctly above other windows.",
       "Your trade's original stop is now guarded — changing an already-locked stop asks you to confirm first, so your R history stays intact.",
-    ],
-  },
-  {
-    tag: "New",
-    date: "July 24, 2026",
-    title: "🧪 Practice mode: paper-trade any setup",
-    items: [
-      "New Practice tab: log a hypothetical idea, close it at any price, and see the R multiple and P&L it would have made — fully separate from your real journal, positions and stats.",
-      "Nothing you do in Practice ever touches your real account. Clear the whole sandbox any time.",
     ],
   },
   {
@@ -4068,7 +4068,7 @@ if (expert) return (
           <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
           {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
       </div>
@@ -4116,7 +4116,7 @@ return (
           <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
@@ -8125,7 +8125,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
               {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
           </div>
@@ -8463,7 +8463,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
             {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -9402,6 +9402,9 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .ctxrow .alloclegend{gap:16px; font-size:0.74rem}
 .vd.expert .ctxrow .allocnote{font-size:0.72rem; color:var(--faint); margin-top:12px; padding-top:12px; border-top:1px solid var(--border)}
 /* P3b. LENS ROW — Row A = 3 lenses (auto-fit so it wraps to stacked cards on narrow), Row B = 2 cols */
+/* GUIDED market-lens duo — mobile-safe minmax (min(300px,100%) so a 390px phone can't overflow); static, no drag */
+.vd .lensduo{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap:14px; margin-top:14px}
+.vd .lensduo > *{min-width:0}
 .vd.expert .lensrowA{display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px; align-items:stretch}
 .vd.expert .lensrowA > *{min-width:0; height:100%}
 /* NEW second lens row — fixed 3-col template so a lone mini occupies ONE column (empty space to
@@ -10610,7 +10613,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
               {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
           </div>
@@ -10912,7 +10915,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -11083,6 +11086,17 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           ));
         })()}
+
+        {/* MARKET LENSES (guided) — static, non-draggable duo (drag is a pro-only system). Rotation +
+            Breadth side-by-side, then the full-width Earnings radar. Each mini renders its own
+            click-through popup, so members get the same command-center on mobile/guided. */}
+        <div className="lensduo">
+          <RotationMini C={C} font={font} session={session} />
+          <BreadthMini C={C} font={font} session={session} />
+        </div>
+        <div className="lensduo" style={{ gridTemplateColumns: "1fr" }}>
+          <EarningsRadarMini C={C} font={font} session={session} />
+        </div>
 
         {/* TABLE */}
         <div className="toolbar">
@@ -11830,7 +11844,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
             {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
@@ -12010,7 +12024,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -12263,6 +12277,14 @@ async function fetchSetupPost(tk) {
 
 const ADMIN_EMAIL = "vc-lv@live.com";
 
+// Practice mode is allowlist-only (owner's call 2026-07-26): the member who requested it + admin.
+// Add a uid here to grant another member access.
+const PRACTICE_UIDS = ["9fa2a5e2-b311-4e15-9280-98f08dd4d2ab"];
+const practiceAllowed = (session) => {
+  const e = (session?.user?.email || "").toLowerCase();
+  return e === ADMIN_EMAIL.toLowerCase() || PRACTICE_UIDS.includes(session?.user?.id || "");
+};
+
 // ═══════════════════════════════════════
 // ─── AUTH PAGE (Login / Register / Forgot Password) ───
 // ═══════════════════════════════════════
@@ -12283,7 +12305,7 @@ function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a className="on" style={{ cursor: "pointer" }}>Model Book</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+            {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip to relaunch */}
             {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -12310,7 +12332,7 @@ function DailySetupsShell({ setPage, session, displayName }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a className="on" style={{ cursor: "pointer" }}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
             {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
@@ -12337,7 +12359,7 @@ function MentorShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
             <a className="on" style={{ cursor: "pointer" }}>Mentor</a>
             {isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>}{isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
@@ -12371,7 +12393,7 @@ function QuantShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
             <a className="on" style={{ cursor: "pointer" }}>Quant</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
@@ -12399,7 +12421,7 @@ function BurstLogShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>
+          {practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a>}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>
             <a className="on" style={{ cursor: "pointer" }}>Bursts</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
@@ -12885,6 +12907,8 @@ function AppInner() {
   // Guard: the retired Rotation/Breadth/Earnings nav pages ("grouprs"/"monitor"/"earnings") now live
   // in dashboard popups. If any lingering state lands on them, fall back to the dashboard (never a blank route).
   useEffect(() => { if (page === "grouprs" || page === "monitor" || page === "earnings") setPage("dashboard"); }, [page]);
+  // Guard: a non-allowed member with stale localStorage page state on "practice" (now allowlist-only) lands on the dashboard.
+  useEffect(() => { if (page === "practice" && !practiceAllowed(session)) setPage("dashboard"); }, [page, session]);
   // Pull the member's setup grades from Supabase (cross-device) once logged in; localStorage stays the offline cache.
   useEffect(() => { if (session?.user?.id) initGrades(session.user.id); }, [session?.user?.id]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -14148,7 +14172,7 @@ function AppInner() {
       {page === "journal" && <TradeJournalPage setPage={setPage} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} />}
       {page === "daily" && <DailySetupsShell setPage={setPage} session={session} displayName={displayName} />}
       {page === "modelbook" && <ModelBookShell setPage={setPage} session={session} displayName={displayName} journaledTrades={journaledTrades} />}
-      {page === "practice" && <PracticeShell setPage={setPage} session={session} />}
+      {page === "practice" && practiceAllowed(session) && <PracticeShell setPage={setPage} session={session} />}
       {page === "mentor" && isAdmin && <MentorShell setPage={setPage} session={session} />}
       {page === "quant" && isAdmin && <QuantShell setPage={setPage} session={session} />}
       {page === "burstlog" && isAdmin && <BurstLogShell setPage={setPage} session={session} />}
