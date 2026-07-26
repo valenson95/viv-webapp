@@ -684,14 +684,23 @@ export function HypothesisRead({ C, study, ticker, date }) {
   return (
     <div style={{ border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "11px 13px", background: "rgba(0,0,0,0.22)", marginBottom: 12 }}>
       <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 9 }}>🧪 What this study says about the hypotheses</div>
-      <div style={{ display: "grid", gap: 6 }}>
+      {/* Strict 3-column grid (Valen 2026-07-26 — the old flex-wrap layout scattered chips/verdicts
+          onto their own lines in narrow containers): [verdict dot] [name — answer, wraps] [chips, nowrap,
+          right-aligned]. Verdict = a colored pill, always in the same place; verb nuance lives in the title. */}
+      <div style={{ display: "grid", gap: 7 }}>
         {lines.map(({ h, answer, chip: ch, tone, verb }) => (
-          <div key={h.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: "0.73rem", lineHeight: 1.4, flexWrap: "wrap" }}>
-            <span style={{ flex: "none", fontSize: "0.82rem" }}>{ch}</span>
-            <b style={{ flex: "none", color: C.white }}>{h.short}</b>
-            <span style={{ flex: 1, color: C.text, minWidth: 130 }}>{answer}</span>
-            <span style={chip(h.source)}>{h.source}</span>
-            <span style={{ flex: "none", fontWeight: 700, color: toneColor(tone) }}>→ {verb}</span>
+          <div key={h.id} style={{ display: "grid", gridTemplateColumns: "16px minmax(0,1fr) auto", alignItems: "start", columnGap: 8, fontSize: "0.73rem", lineHeight: 1.45 }}>
+            <span style={{ fontSize: "0.8rem", lineHeight: 1.3 }}>{ch}</span>
+            <span style={{ minWidth: 0 }}>
+              <b style={{ color: C.white }}>{h.short}</b>
+              <span style={{ color: C.text }}> · {answer}</span>
+            </span>
+            <span style={{ display: "flex", gap: 6, alignItems: "center", whiteSpace: "nowrap", justifySelf: "end", paddingTop: 1 }} title={verb}>
+              <span style={chip(h.source)}>{h.source}</span>
+              <span style={{ fontWeight: 800, fontSize: "0.56rem", letterSpacing: ".05em", textTransform: "uppercase", color: toneColor(tone), border: `1px solid ${toneColor(tone)}`, borderRadius: 99, padding: "1px 8px" }}>
+                {tone === "supports" ? "Supports" : tone === "challenges" ? "Challenges" : "＋ Data"}
+              </span>
+            </span>
           </div>
         ))}
       </div>
