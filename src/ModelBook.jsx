@@ -5,6 +5,7 @@ import { getGrade } from "./grades.js";
 import { SECTIONS, sectionsFor, scoreTicked, versionOf, stampV2 } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
 import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, HypothesisRead, buildCampaigns, outcomeClass, studyQuality } from "./StudyBook.jsx";
+import { ChartSeqEditor, buildChartList, deriveChartFields } from "./ChartSeq.jsx";
 
 // A study starred for the Model Book shows as a card; its star count comes from the study's
 // auto quality grade (tick-%) rather than the 16-criteria Model Book ticks it doesn't have.
@@ -340,6 +341,10 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
       // unambiguous as the admin ticks (a bare "0-0" would otherwise read as a legacy key). Genuine
       // legacy rows (real keys, no marker) are left untouched and keep scoring on the v1 list.
       if (versionOf(base.ticked) === 2) base.ticked = stampV2(base.ticked || []);
+      // The ONE ordered chronological chart list (Valen 2026-07-26). Built from before_img/after_img on load
+      // (plain rows: before→before_img, after→after_img); lives in metrics.charts; the legacy columns are
+      // DERIVED from it on save so the card grid / flash-card strip / PDF / CSV keep reading before_img/after_img.
+      base.metrics = { ...(base.metrics || {}), charts: buildChartList(base, false) };
       return base;
     });
     // Members grade on a simpler, equal-weight rule: every scored tick counts the same and stars are
@@ -391,16 +396,18 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
         metrics: { ...(r.metrics || {}), _auto: [...new Set([...((r.metrics || {})._auto || []), ...Object.keys(fills).filter(k => fills[k] !== "" && fills[k] != null)])].sort() },
       }));
     };
-    // 📋 Paste-to-upload: copy a chart screenshot, hit ⌘V/Ctrl+V anywhere in the editor —
-    // first paste fills the BEFORE slot, second fills AFTER (replace by clearing first).
+    // 📋 Paste-to-upload: copy a chart screenshot, hit ⌘V/Ctrl+V anywhere in the editor — the image is
+    // appended (untagged, oldest-last) to the chart list. ChartSeqEditor's own paste target stops propagation
+    // so a paste inside it never double-adds here.
+    const setCharts = (fn) => setRow(r => ({ ...r, metrics: { ...(r.metrics || {}), charts: fn((r.metrics && r.metrics.charts) || []) } }));
     const onPaste = (e) => {
       const item = [...(e.clipboardData?.items || [])].find(i => i.type && i.type.startsWith("image/"));
       if (!item) return;
       e.preventDefault();
       const file = item.getAsFile();
       if (!file) return;
-      const slot = !row.before_img ? "before_img" : "after_img";
-      onUpload(file, slot, setRow);
+      const slot = "seq_" + Date.now();
+      onUpload(file, slot, (updater) => { const url = updater({})[slot]; if (url) setCharts(list => [...list, { img: url, label: "", caption: "", role: null }]); });
     };
     return (
       <div onPaste={onPaste} style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "20px 22px", marginBottom: 20 }}>
@@ -485,18 +492,15 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
             })}
           </div>
         </>)}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-          <div style={{ gridColumn: "1 / -1", fontSize: "0.7rem", color: C.muted, marginBottom: -4 }}>📋 Tip: copy a chart screenshot and press <b style={{ color: C.goldBright }}>⌘V / Ctrl+V</b> right here — first paste fills Before, second fills After.</div>
-          {[["before_img", "Before chart (the setup)", "⬆ Upload before chart"], ["after_img", "After chart (the outcome)", "⬆ Upload after chart"]].map(([slot, label, cta]) => (
-            <div key={slot}>
-              <span style={lbl}>{label}</span>
-              {row[slot] && <img src={row[slot]} alt={slot} style={{ width: "100%", borderRadius: 10, marginBottom: 8, border: `1px solid ${C.border}` }} />}
-              <label style={{ display: "inline-flex", alignItems: "center", gap: 7, background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1 }}>
-                {busy ? "Uploading…" : row[slot] ? "↻ Replace chart" : cta}
-                <input type="file" accept="image/*" disabled={busy} onChange={e => onUpload(e.target.files?.[0], slot, setRow)} style={{ display: "none" }} />
-              </label>
-            </div>
-          ))}
+        {/* Charts — the ONE ordered, chronological, self-labeled list (metrics.charts). Paste or upload any
+            number, reorder them, caption each. The Before/After flash-card faces are derived from the list on
+            save (first = Before, last = After) so the card grid and study strip keep working. */}
+        <div style={{ marginBottom: 14 }}>
+          <span style={lbl}>Charts — oldest to newest</span>
+          <div style={{ fontSize: "0.7rem", color: C.muted, margin: "0 0 10px" }}>Add as many as you like. The <b style={{ color: C.goldBright }}>first</b> chart becomes the Before face and the <b style={{ color: C.goldBright }}>last</b> the After face automatically — or tag any chart's role yourself.</div>
+          <ChartSeqEditor C={C} font={font} busy={busy} list={(row.metrics && row.metrics.charts) || []} compact
+            onChange={(nl) => setRow(r => ({ ...r, metrics: { ...(r.metrics || {}), charts: nl } }))}
+            onUpload={onUpload} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           <div><span style={lbl}>The thesis (why it was A+ BEFORE the move)<AutoDot k="thesis" /></span><textarea rows={3} style={{ ...inputS, resize: "vertical" }} value={row.thesis || ""} onChange={e => setField("thesis", e.target.value)} /></div>
@@ -602,12 +606,20 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
   const save = async (row) => {
     setBusy(true); setError(null);
+    // Chart list → legacy columns. Study rows arrive from StudyEditor with before_img/after_img ALREADY derived
+    // (its own doSave), so leave those as-is. Plain member/card rows carry metrics.charts here → derive the two
+    // flash-card faces (first=Before, last=After) so the grid/strip/PDF/CSV keep reading before_img/after_img.
+    let derivedBefore = row.before_img, derivedAfter = row.after_img;
+    if (!isStudyRow(row) && row.metrics?.charts) {
+      const d = deriveChartFields(row.metrics.charts, false);
+      derivedBefore = d.before_img; derivedAfter = d.after_img;
+    }
     const body = {
       ticker: (row.ticker || "").toUpperCase().trim(), pattern: row.pattern || "Trendline Breakout",
       stars: starsFromTicked(row.ticked, isAdmin ? undefined : { makerGate: false }).stars, // objective — from the grader ticks; members score equal-weight (no ★-maker gate). Only THIS save's row is (re)scored — existing rows untouched.
       outcome: row.outcome || outcomeFromR(row.r_mult, row.run_pct) || null, // blank → auto-classified from R
       theme: row.theme || null, entry_date: row.entry_date || null, exit_date: row.exit_date || null,
-      before_img: row.before_img || null, after_img: row.after_img || null,
+      before_img: derivedBefore || null, after_img: derivedAfter || null,
       elite: row.elite || [], ticked: row.ticked || [],
       metrics: row.metrics || {}, // chart-extracted deep data + the _auto (gold-dot) key list — must survive edits
       run_pct: row.run_pct === "" || row.run_pct == null ? null : +row.run_pct,

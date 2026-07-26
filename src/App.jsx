@@ -755,6 +755,15 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 26, 2026",
+    title: "🖼 Charts, your way — one timeline per setup",
+    items: [
+      "Model Book entries now take an unlimited, ordered list of charts instead of fixed Before/After slots — paste or upload as many as you like, arrange them oldest → newest, and label + caption each one yourself.",
+      "The Before/After flash card still just works: the first chart becomes the Before face and the last the After — or tag any chart's role yourself.",
+    ],
+  },
+  {
+    tag: "New",
+    date: "July 26, 2026",
     title: "🧭 Market lenses on every dashboard",
     items: [
       "Sector Rotation, Market Breadth and the Earnings radar now show on the Guided dashboard too — including on your phone. They were Pro-view only before (member-requested).",
