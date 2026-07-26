@@ -755,6 +755,16 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 26, 2026",
+    title: "📖 Model Book — the case-study redesign",
+    items: [
+      "Every entry now reads like a case study: ① Context → ② The Setup → ③ The Trigger → ④ The Outcome → ⑤ The Lesson, with a verdict panel (the one number that matters, grade, and the full checklist) pinned alongside.",
+      "The gallery got filters — pattern, grade, ▲ winners / ▼ failures, ticker search — and every card now shows its real charts, outcome and the lesson in one line.",
+      "Losers stay in the book on purpose: comparing a winner with a failed lookalike is how the pattern actually sticks.",
+    ],
+  },
+  {
+    tag: "New",
+    date: "July 26, 2026",
     title: "🖼 Charts, your way — one timeline per setup",
     items: [
       "Model Book entries now take an unlimited, ordered list of charts instead of fixed Before/After slots — paste or upload as many as you like, arrange them oldest → newest, and label + caption each one yourself.",

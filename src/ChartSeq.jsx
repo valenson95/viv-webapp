@@ -103,6 +103,62 @@ export function deriveChartFields(list, isStudy) {
   return { before_img: front, after_img: back };
 }
 
+// ── FACES: the compact before/after pair a strip / card shows (Valen 2026-07-26). Reads the SAME
+// unified list buildChartList() produces (converting legacy slot rows on the fly), so a row whose charts
+// aren't slot-shaped still yields thumbs — fixes strips/cards that read raw legacy fields and showed blanks.
+//   front = first role"before" else the first chart · back = first role"after" else (≥2 ? last : null)
+//   never front===back unless count===1 (then back=null).
+export function chartFaces(row, isStudy) {
+  const list = buildChartList(row, isStudy).filter((c) => c && c.img);
+  const count = list.length;
+  if (count === 0) return { front: null, back: null, count: 0 };
+  const front = list.find((c) => c.role === "before") || list[0];
+  if (count === 1) return { front, back: null, count };
+  let back = list.find((c) => c.role === "after") || list[count - 1];
+  if (back === front) back = [...list].reverse().find((c) => c !== front) || null; // collision → a different chart
+  return { front, back, count };
+}
+
+// ── SECTIONS: group the ordered chart list into the SCR case-study layout (Valen 2026-07-26).
+// Returns [{ num, title, charts:[…] }] in list order. Roled charts map to numbered sections; role-null
+// charts either drive the numbered "setup/outcome" defaults (when NO chart carries a role) or attach as
+// their own unnumbered group (labelled by the chart's own label, else "Chart N") in timeline position.
+const _ROLE_SECTION = {
+  context: { num: "①", title: "① Context" },
+  before: { num: "②", title: "② The Setup" },
+  trigger: { num: "③", title: "③ The Trigger" },
+  after: { num: "④", title: "④ The Outcome" },
+};
+export function sectionizeCharts(list) {
+  const charts = (list || []).filter((c) => c && c.img);
+  if (charts.length === 0) return [];
+  const hasRoles = charts.some((c) => c.role && _ROLE_SECTION[c.role]);
+  if (!hasRoles) {
+    // No roles at all → the invisible default: first chart = the setup, last (if ≥2) = the outcome,
+    // anything between = an unnumbered "More charts" group.
+    if (charts.length === 1) return [{ num: "②", title: "② The Setup", charts: [charts[0]] }];
+    const middles = charts.slice(1, -1);
+    const groups = [{ num: "②", title: "② The Setup", charts: [charts[0]] }];
+    if (middles.length) groups.push({ num: null, title: "More charts", charts: middles });
+    groups.push({ num: "④", title: "④ The Outcome", charts: [charts[charts.length - 1]] });
+    return groups;
+  }
+  // Roles present → walk in order; consecutive same-role charts share one numbered header, null-role
+  // charts each become their own unnumbered group titled by their label (or "Chart N").
+  const groups = [];
+  charts.forEach((c, i) => {
+    if (c.role && _ROLE_SECTION[c.role]) {
+      const sec = _ROLE_SECTION[c.role];
+      const last = groups[groups.length - 1];
+      if (last && last._role === c.role) last.charts.push(c);
+      else groups.push({ num: sec.num, title: sec.title, _role: c.role, charts: [c] });
+    } else {
+      groups.push({ num: null, title: c.label || `Chart ${i + 1}`, charts: [c] });
+    }
+  });
+  return groups.map(({ num, title, charts }) => ({ num, title, charts }));
+}
+
 // ── The shared vertical chronological editor. Module scope — one instance per editor.
 export function ChartSeqEditor({ C, font, busy, list, onChange, onUpload, onZoom, compact }) {
   const items = list || [];

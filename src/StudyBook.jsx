@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { GROUP_RS } from "./groupRS-data.js";
 import { sectorFor } from "./sectors.js";
-import { ChartSeqEditor, buildChartList, deriveChartFields } from "./ChartSeq.jsx";
+import { ChartSeqEditor, buildChartList, deriveChartFields, chartFaces, sectionizeCharts } from "./ChartSeq.jsx";
 
 // ══════════════════════════════════════════════════════════════════
 // STUDY BOOK — private study wing of My Book (admin). Historical EXERCISE
@@ -1150,12 +1150,6 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
   // (Valen 2026-07-26: two viewing formats of ONE editor; detailed is the default).
   const setS = (patch) => setRow(r => ({ ...r, metrics: { ...r.metrics, study: { ...r.metrics.study, ...patch } } }));
 
-  const statCard = (label, val) => (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 10px", background: "rgba(0,0,0,0.25)" }}>
-      <div style={{ fontSize: "0.52rem", fontWeight: 800, letterSpacing: ".07em", textTransform: "uppercase", color: C.muted, marginBottom: 3 }}>{label}</div>
-      <div style={{ fontSize: "0.86rem", fontWeight: 700, color: (val == null || val === "") ? C.muted : C.white }}>{(val == null || val === "") ? "—" : String(val)}</div>
-    </div>
-  );
   const cap = +(s.m?.mcap_t || 0);
   const capText = cap > 0 ? (cap >= 1e9 ? "$" + (cap / 1e9).toFixed(1) + "B" : "$" + Math.round(cap / 1e6) + "M") : null;
   const adr = s.m?.adr20;
@@ -1178,6 +1172,19 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
           {/* ── charts column — the ONE ordered chronological list (metrics.study.charts, lifted to row.charts).
               Replaces the fixed canonical slots + extra_charts; the slots are derived from this list on save. ── */}
           <div className="sbdv-charts" style={{ minWidth: 0 }}>
+            {/* Case-study order (Valen 2026-07-26) — a thin legend of how this list resolves into the SCR
+                sections (same sectionizeCharts the member detail uses). The editor below stays the editing surface. */}
+            {(() => {
+              const secs = sectionizeCharts(row.charts || []);
+              return secs.length > 1 ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                  <span style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, alignSelf: "center" }}>Case-study order:</span>
+                  {secs.map((sec, i) => (
+                    <span key={i} style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase", color: sec.num ? C.goldBright : C.muted, border: `1px solid ${sec.num ? C.borderGold : C.border}`, borderRadius: 99, padding: "3px 9px" }}>{sec.title}{sec.charts.length > 1 ? ` · ${sec.charts.length}` : ""}</span>
+                  ))}
+                </div>
+              ) : null;
+            })()}
             <ChartSeqEditor C={C} font={font} busy={busy} list={row.charts || []}
               onChange={(nl) => setRow(r => ({ ...r, charts: nl }))}
               onUpload={onUpload}
@@ -1193,18 +1200,24 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
                 {row.entry_date && <span style={{ fontSize: "0.7rem", color: C.muted }}>· {row.entry_date}</span>}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 6 }}>
-                {cls && <span style={{ fontSize: "0.68rem", fontWeight: 800, color: cls === "failure" ? "#e05555" : "#7ef0a0", border: `1px solid ${cls === "failure" ? "#e05555" : "#7ef0a0"}`, borderRadius: 99, padding: "2px 10px" }}>{MB_OUTCOME[cls] || cls}</span>}
+                {cls && <span style={{ fontSize: "0.68rem", fontWeight: 800, color: cls === "failure" ? "#e05555" : "#7ef0a0", border: `1px solid ${cls === "failure" ? "#e05555" : "#7ef0a0"}`, borderRadius: 99, padding: "2px 10px" }}>{cls === "failure" ? "▼ " : "▲ "}{MB_OUTCOME[cls] || cls}</span>}
                 {q.letter !== "—" && <span style={{ fontSize: "0.68rem", fontWeight: 800, color: q.letter === "A+" ? "#7ef0a0" : C.goldBright, border: `1px solid ${C.borderGold}`, borderRadius: 99, padding: "2px 10px" }} title={`Auto-grade from ${q.on}/${q.total} ticks`}>Grade {q.letter}</span>}
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12 }}>
-              {statCard("Captured %", row.run_pct)}
-              {statCard("Run-up %", row.run_up_pct)}
-              {statCard("Days held", row.days_held)}
-              {statCard("R multiple", row.r_mult)}
-              {statCard("Theme", row.theme || s.m?.theme)}
-              {statCard("Cap / ADR", (capText || adr != null && adr !== "") ? `${capText || "—"}${adr != null && adr !== "" && !Number.isNaN(+adr) ? ` · ADR ${(+adr).toFixed(1)}%` : ""}` : null)}
+            {/* HERO — Captured % (Valen 2026-07-26), the single loudest stat; the rest demote to quiet rows. */}
+            <div style={{ marginTop: 12, border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "14px 16px", background: C.glass }}>
+              <div style={{ fontSize: "1.7rem", fontWeight: 800, color: C.goldBright, lineHeight: 1.05 }}>{(row.run_pct == null || row.run_pct === "") ? "—" : `${+row.run_pct > 0 ? "+" : ""}${row.run_pct}%`}</div>
+              <div style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted, marginTop: 3 }}>Captured</div>
+            </div>
+            <div style={{ display: "grid", gap: 2, marginTop: 10 }}>
+              {[["Run-up %", row.run_up_pct], ["Days held", row.days_held], ["R multiple", row.r_mult], ["Theme", row.theme || s.m?.theme],
+                ["Cap / ADR", (capText || (adr != null && adr !== "")) ? `${capText || "—"}${adr != null && adr !== "" && !Number.isNaN(+adr) ? ` · ADR ${(+adr).toFixed(1)}%` : ""}` : null]].map(([k, v]) => (
+                <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ fontSize: "0.72rem", color: C.muted, whiteSpace: "nowrap" }}>{k}</span>
+                  <span style={{ fontSize: "0.78rem", fontWeight: 700, color: (v == null || v === "") ? C.muted : "#e8e8ec", textAlign: "right", overflow: "hidden", textOverflow: "ellipsis" }}>{(v == null || v === "") ? "—" : String(v)}</span>
+                </div>
+              ))}
             </div>
 
             {/* Bucket-grouped EDITABLE checklist (Valen 2026-07-26): same three buckets + handlers as the
@@ -1551,7 +1564,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           DEFAULT view; the key strip + full computed grids fold behind "Show all computed". Admin-side
           (📚 Studies is admin-only). The cap/ADR badge stays on the chart. */}
       <HypothesisRead C={C} study={s} ticker={row.ticker} date={row.entry_date} />
-      {cls && <div style={{ marginTop: 6, marginBottom: 6, fontSize: "0.74rem" }}>Auto-class: <b style={{ color: cls === "failure" ? "#e05555" : "#7ef0a0" }}>{cls}</b></div>}
+      {cls && <div style={{ marginTop: 6, marginBottom: 6, fontSize: "0.74rem" }}>Auto-class: <b style={{ color: cls === "failure" ? "#e05555" : "#7ef0a0" }}>{cls === "failure" ? "▼ " : "▲ "}{cls}</b></div>}
 
       {/* Campaign — whole trend (Valen 2026-07-24): H10 leg-lifespan + the shared AFTER-outcome chart are
           recorded ONCE, on the ROOT leg (counted off the shared AFTER chart). Non-root legs show them

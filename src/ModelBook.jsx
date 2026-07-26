@@ -5,7 +5,7 @@ import { getGrade } from "./grades.js";
 import { SECTIONS, sectionsFor, scoreTicked, versionOf, stampV2 } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
 import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, HypothesisRead, buildCampaigns, outcomeClass, studyQuality, STUDY_SETUPS, SUBCATS } from "./StudyBook.jsx";
-import { ChartSeqEditor, buildChartList, deriveChartFields } from "./ChartSeq.jsx";
+import { ChartSeqEditor, buildChartList, deriveChartFields, chartFaces, sectionizeCharts } from "./ChartSeq.jsx";
 
 // A study starred for the Model Book shows as a card; its star count comes from the study's
 // auto quality grade (tick-%) rather than the 16-criteria Model Book ticks it doesn't have.
@@ -14,13 +14,6 @@ import { ChartSeqEditor, buildChartList, deriveChartFields } from "./ChartSeq.js
 const STUDY_LETTER_N = { "A+": 5, A: 4, B: 3, C: 2 };
 const inModelBook = (r) => isStudyRow(r) && !!r.metrics?.study?.in_model_book;
 const cardStars = (r) => isStudyRow(r) ? (STUDY_LETTER_N[studyQuality(r.metrics.study).letter] || 0) : r.stars;
-// Study rows map chart slots differently from card rows: after_img = BEFORE (the setup, right edge
-// = trigger) and the AFTER outcome lives in metrics.study.outcome_img (virtual slot; before_img =
-// optional HTF context). Cards + detail must present the study PAIR or the outcome never shows.
-const displayImgs = (r) => isStudyRow(r)
-  ? { before: r.after_img || r.before_img || "", after: r.metrics?.study?.outcome_img || "" }
-  : { before: r.before_img || "", after: r.after_img || "" };
-
 // tolerant date → ISO (journal trades carry ISO or M/D/YY)
 const mbISO = (d) => {
   if (!d) return "";
@@ -527,8 +520,10 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [fPattern, setFPattern] = useState("All");
-  const [patternOpen, setPatternOpen] = useState(false); // pattern filter dropdown open/closed — presentation only, drives the same fPattern
-  const [fTier, setFTier] = useState("All"); // All | 7 | 6 | 5
+  // Gallery sub-filters (Valen 2026-07-26) — pattern chips + grade + outcome + ticker search, AND-combined.
+  const [fGrade, setFGrade] = useState("All"); // All | A+ | A | B  (B = B & below)
+  const [fOutcome, setFOutcome] = useState("All"); // All | winners | failures
+  const [fTicker, setFTicker] = useState(""); // free-text ticker search
   // Deep link from the top nav ("Studies" admin link): viv-mb-view=studies opens My Book → 📚 Studies
   // directly. Read-and-clear synchronously so it only steers this mount, never a later visit.
   const mbDeepLink = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("viv-mb-view") : null;
@@ -558,14 +553,6 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     return () => window.removeEventListener("keydown", onKey);
   }, [zoom, detail]);
 
-  // Pattern dropdown — Esc closes it (outside-click is handled by an invisible backdrop under the menu)
-  useEffect(() => {
-    if (!patternOpen) return;
-    const onKey = (e) => { if (e.key === "Escape") setPatternOpen(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [patternOpen]);
-
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     const { data, error } = await supabase.from("model_book").select("*").order("created_at", { ascending: false });
@@ -577,16 +564,37 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   // A trade/position sent a prefill (📖 Add to Model Book) → open the editor immediately
   useEffect(() => { try { if (sessionStorage.getItem("viv-mb-prefill")) setEditing({}); } catch {} }, []);
 
+  // Grade badge derived from the objective star tier (same source as the stars — no new data, no re-scoring).
+  // Defined BEFORE `visible` because the grade sub-filter reads it during the filter pass (avoid a TDZ crash).
+  const gradeBadge = (n) => n >= 5 ? { l: "A+", fg: "#86efac", bg: "rgba(34,197,94,0.15)", bd: "rgba(34,197,94,0.3)" }
+    : n === 4 ? { l: "A", fg: "#86efac", bg: "rgba(34,197,94,0.15)", bd: "rgba(34,197,94,0.3)" }
+    : n === 3 ? { l: "B", fg: C.goldBright, bg: C.goldDim, bd: C.borderGold }
+    : { l: "C", fg: "#fca5a5", bg: "rgba(239,68,68,0.12)", bd: "rgba(239,68,68,0.3)" };
+
   const visible = rows.filter(r => {
     // studies live in their own 📚 view UNLESS starred for the Model Book (then they show as cards too)
     if (isStudyRow(r) && !inModelBook(r)) return false;
     if (fScope === "official" && !r.is_published) return false;
     if (fScope === "mine" && r.created_by !== uid) return false;
     if (fPattern !== "All" && r.pattern !== fPattern) return false;
-    const eff = effectiveStars(cardStars(r), (r.elite || []).length).n;
-    if (fTier !== "All" && eff !== +fTier) return false;
+    if (fGrade !== "All") {
+      const l = gradeBadge(effectiveStars(cardStars(r), (r.elite || []).length).n).l;
+      if (fGrade === "B") { if (l !== "B" && l !== "C") return false; } // "B & below" bucket
+      else if (l !== fGrade) return false;
+    }
+    // Effective outcome = SAME fallback the card hero uses (outcome column, else derived from
+    // R/captured%) — filtering on the raw column alone hid cards that visibly render ▲/▼.
+    const effOutcome = r.outcome || outcomeFromR(r.r_mult, r.run_pct) || "";
+    if (fOutcome === "winners" && !/winner/i.test(effOutcome)) return false;
+    if (fOutcome === "failures" && !/(loser|subpar)/i.test(effOutcome)) return false;
+    if (fTicker.trim() && !String(r.ticker || "").toLowerCase().includes(fTicker.trim().toLowerCase())) return false;
     return true;
   });
+  // Distinct patterns actually present among card-eligible rows → the chip set (All + those values).
+  const cardEligible = rows.filter(r => !isStudyRow(r) || inModelBook(r));
+  const patternsPresent = [...new Set(cardEligible.map(r => r.pattern).filter(Boolean))];
+  const subFiltersActive = fPattern !== "All" || fGrade !== "All" || fOutcome !== "All" || !!fTicker.trim();
+  const clearSubFilters = () => { setFPattern("All"); setFGrade("All"); setFOutcome("All"); setFTicker(""); };
   const myRows = rows.filter(r => r.created_by === uid && !isStudyRow(r)); // the member's OWN card entries — export + Your-patterns scope
   const mineCount = myRows.length; // must match the fScope==='mine' predicate
   const studyRows = rows.filter(r => r.created_by === uid && isStudyRow(r));
@@ -689,15 +697,6 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? "#08080e" : C.muted,
     background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
   });
-  // Grade badge derived from the objective star tier (same source as the stars — no new data, no re-scoring)
-  const gradeBadge = (n) => n >= 5 ? { l: "A+", fg: "#86efac", bg: "rgba(34,197,94,0.15)", bd: "rgba(34,197,94,0.3)" }
-    : n === 4 ? { l: "A", fg: "#86efac", bg: "rgba(34,197,94,0.15)", bd: "rgba(34,197,94,0.3)" }
-    : n === 3 ? { l: "B", fg: C.goldBright, bg: C.goldDim, bd: C.borderGold }
-    : { l: "C", fg: "#fca5a5", bg: "rgba(239,68,68,0.12)", bd: "rgba(239,68,68,0.3)" };
-  const outcomeChip = (o) => o === "Huge Winner" ? { fg: "#7ef0a0", bg: "rgba(126,240,160,0.08)", bd: "rgba(126,240,160,0.35)" }
-    : o === "Winner" ? { fg: C.green, bg: "rgba(34,197,94,0.08)", bd: "rgba(34,197,94,0.3)" }
-    : o === "Loser" ? { fg: C.red, bg: "rgba(239,68,68,0.08)", bd: "rgba(239,68,68,0.3)" }
-    : { fg: C.muted, bg: "rgba(255,255,255,0.03)", bd: C.border };
 
   return (
     <div style={{ fontFamily: font }}>
@@ -739,50 +738,32 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           <button onClick={() => { if (fScope !== "mine") { setFScope("mine"); setStudyMode(true); } else setStudyMode(m => !m); }}
             style={chip(studyMode && fScope === "mine")}>📚 Studies{studyRows.length ? ` (${studyRows.length})` : ""}</button>
         )}
-        <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
-        {/* pattern filter — click-down dropdown (drives the same fPattern state; scope/tier stay as chips) */}
-        <div style={{ position: "relative" }}>
-          <button onClick={() => setPatternOpen(o => !o)} aria-haspopup="menu" aria-expanded={patternOpen} style={{
-            display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap",
-            fontSize: "0.72rem", fontWeight: 700, padding: "7px 13px 7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
-            border: `1px solid ${(fPattern !== "All" || patternOpen) ? C.goldBright : C.border}`,
-            color: fPattern !== "All" ? C.goldBright : C.muted,
-            background: fPattern !== "All" ? C.goldDim : "rgba(255,255,255,0.03)",
-          }}>
-            <span>Pattern: {fPattern}</span>
-            <span style={{ fontSize: "0.6rem", transform: patternOpen ? "rotate(180deg)" : "none", transition: "transform .14s", opacity: 0.8 }}>▾</span>
-          </button>
-          {patternOpen && (
-            <>
-              <div onClick={() => setPatternOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div role="menu" style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 210, background: "#13131c", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, padding: 5, boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }}>
-                {["All", ...PATTERNS].map(p => {
-                  const n = p === "All" ? rows.length : rows.filter(r => r.pattern === p).length;
-                  const on = fPattern === p;
-                  return (
-                    <button key={p} role="menuitem" onClick={() => { setFPattern(p); setPatternOpen(false); }} style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%",
-                      fontFamily: font, fontSize: "0.75rem", fontWeight: 700, textAlign: "left",
-                      padding: "8px 11px", borderRadius: 7, cursor: "pointer", border: "none",
-                      color: on ? C.goldBright : C.text, background: on ? C.goldDim : "transparent",
-                    }}
-                    onMouseEnter={e => { if (!on) e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
-                    onMouseLeave={e => { if (!on) e.currentTarget.style.background = "transparent"; }}>
-                      <span>{p === "All" ? "All patterns" : p}</span>
-                      <span style={{ fontSize: "0.66rem", fontWeight: 700, color: on ? C.goldBright : C.muted }}>{n > 0 ? n : ""}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </>
+      </div>
+
+      {/* gallery sub-filter bar (Valen 2026-07-26) — pattern · grade · outcome · ticker search, AND-combined.
+          Hidden in 📚 Studies mode (the studies list has its own layout). Styled with the app's toolbar chips. */}
+      {!studyMode && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "0 0 18px" }}>
+          {["All", ...patternsPresent].map(p => (
+            <button key={p} onClick={() => setFPattern(p)} style={chip(fPattern === p)}>{p === "All" ? "All patterns" : p}</button>
+          ))}
+          <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
+          {[["All", "Any grade"], ["A+", "A+"], ["A", "A"], ["B", "B & below"]].map(([k, label]) => (
+            <button key={k} onClick={() => setFGrade(k)} style={chip(fGrade === k)}>{label}</button>
+          ))}
+          <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
+          {[["All", "All"], ["winners", "▲ Winners"], ["failures", "▼ Failures"]].map(([k, label]) => (
+            <button key={k} onClick={() => setFOutcome(k)} style={chip(fOutcome === k)}>{label}</button>
+          ))}
+          <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
+          <input value={fTicker} onChange={e => setFTicker(e.target.value.toUpperCase())} placeholder="Search ticker…"
+            style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${fTicker ? C.goldBright : C.border}`, borderRadius: 99, color: C.white, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", outline: "none", width: 140, maxWidth: "100%", colorScheme: "dark" }} />
+          {subFiltersActive && (
+            <button onClick={clearSubFilters} title="Reset pattern / grade / outcome / ticker filters"
+              style={{ ...chip(false), color: C.goldBright, borderColor: C.borderGold }}>✕ Clear</button>
           )}
         </div>
-        <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
-        {["All", "7", "6", "5"].map(t => {
-          const n = t === "All" ? 0 : rows.filter(r => effectiveStars(r.stars, (r.elite || []).length).n === +t).length;
-          return <button key={t} onClick={() => setFTier(t)} style={chip(fTier === t)}>{t === "All" ? "Any grade" : `${t}★${n > 0 ? ` (${n})` : ""}`}</button>;
-        })}
-      </div>
+      )}
       {fScope === "mine" && !isAdmin && (
         <div style={{ fontSize: "0.72rem", color: C.muted, margin: "-8px 0 16px" }}>🔒 Your personal model book — entries here are visible only to you. The ⭐ VIV Official book is curated by the team and is read-only.</div>
       )}
@@ -808,7 +789,15 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       })()}
       {error === "setup" && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "30px 0", textAlign: "center" }}>📖 The Model Book is being set up — check back shortly.</div>}
       {error && error !== "setup" && <div style={{ color: C.red, fontSize: "0.8rem", padding: "12px 0" }}>{error}</div>}
-      {!studyMode && !loading && !error && visible.length === 0 && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "30px 0", textAlign: "center" }}>No entries match this filter yet.</div>}
+      {!studyMode && !loading && !error && visible.length === 0 && (
+        <div style={{ color: C.muted, fontSize: "0.86rem", padding: "34px 16px", textAlign: "center", lineHeight: 1.6 }}>
+          {subFiltersActive
+            ? <>No entries match these filters. <button onClick={clearSubFilters} style={{ background: "none", border: "none", color: C.goldBright, fontFamily: font, fontWeight: 800, fontSize: "0.86rem", cursor: "pointer", textDecoration: "underline", padding: 0 }}>Clear filters</button> to see the full book.</>
+            : fScope === "mine" ? "Your book is empty — save a setup to start building your own pattern library."
+            : fScope === "official" ? "No published setups yet — the VIV team is curating the library. Check back soon."
+            : "No entries yet — curated VIV setups and your own saved studies will appear here as cards."}
+        </div>
+      )}
 
       {/* 📚 STUDIES — private study wing of My Book (admin): study a bunch BEFORE posting.
           Rows are model_book rows with metrics.study; excluded from the card grid until promoted. */}
@@ -845,7 +834,11 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               // Plain render helper (invoked directly → inline elements, not a nested component).
               const legRow = (r, legIndex, indent, showAddLeg) => {
                 const s = r.metrics.study; const cls = outcomeClass(s);
-                const after = indent ? camp.root.metrics.study.outcome_img : s.outcome_img; // shared AFTER on nested legs
+                // chartFaces (Valen 2026-07-26) — reads the unified list (converts legacy rows), so a study whose
+                // charts aren't slot-shaped still shows thumbs. Nested legs share the trend's outcome = the root's back face.
+                const faces = chartFaces(r, true);
+                const frontImg = faces.front && faces.front.img;
+                const backImg = indent ? ((chartFaces(camp.root, true).back || {}).img || null) : (faces.back && faces.back.img);
                 return (
                   <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 4, marginLeft: indent ? 22 : 0, fontSize: "0.78rem", cursor: "pointer" }}
                     onClick={() => setStudyEditing(r)}
@@ -855,14 +848,18 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                       : <b style={{ width: 64 }}>{r.ticker}</b>}
                     <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
-                      {r.after_img ? <img src={r.after_img} alt="before" title="BEFORE — the setup (this leg)" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
+                      {frontImg ? <img src={frontImg} alt="setup" title="The setup (this leg)" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
                       <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
-                      {after ? <img src={after} alt="after" title={indent ? "AFTER — shared trend outcome" : "AFTER — the outcome"} style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} /> : <span title="No AFTER chart yet — drop `TICKER DATE AFTER.png` in the study inbox" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
+                      {backImg
+                        ? <img src={backImg} alt="outcome" title={indent ? "The shared trend outcome" : "The outcome"} style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} />
+                        : faces.count > 1
+                          ? <span title={`${faces.count} charts in this study`} style={{ width: 64, height: 40, borderRadius: 5, border: `1px solid ${C.borderGold}`, display: "grid", placeItems: "center", color: C.goldBright, fontSize: "0.62rem", fontWeight: 800 }}>+{faces.count - 1}</span>
+                          : <span title="No outcome chart yet — drop `TICKER DATE AFTER.png` in the study inbox" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
                     </span>
                     <span style={{ width: 150 }}>{r.pattern}</span>
                     {(() => { const q = studyQuality(s); return <span style={{ width: 70, color: q.letter === "—" ? C.muted : q.letter === "A+" ? "#7ef0a0" : C.goldBright, fontWeight: 700 }} title={`${q.on}/${q.total} criteria ticked`}>{q.letter}</span>; })()}
                     <span style={{ flex: 1, color: C.muted, fontSize: "0.7rem" }}>{s.regime_tag || ""}</span>
-                    {cls && <span style={{ fontWeight: 700, color: cls === "failure" ? C.red : "#7ef0a0" }}>{cls}</span>}
+                    {cls && <span style={{ fontWeight: 700, color: cls === "failure" ? C.red : "#7ef0a0" }}>{cls === "failure" ? "▼ " : "▲ "}{cls}</span>}
                     {showAddLeg && <button title="Add a linked leg to this trend" onClick={(e) => { e.stopPropagation(); addLeg(camp.root, camp.legs); }} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, cursor: "pointer", fontSize: "0.6rem", fontWeight: 800, borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" }}>+ leg</button>}
                     <button title={inModelBook(r) ? "In the Model Book — click to remove" : "Add to the Model Book"} onClick={(e) => { e.stopPropagation(); toggleModelBook(r); }} style={{ background: "transparent", border: "none", color: inModelBook(r) ? C.goldBright : C.muted, cursor: "pointer", fontSize: "1rem" }}>{inModelBook(r) ? "★" : "☆"}</button>
                     <button title="Delete study" onClick={(e) => { e.stopPropagation(); remove(r); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: "0.95rem" }}>×</button>
@@ -870,7 +867,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 );
               };
               if (camp.solo) return <div key={camp.cid} style={{ marginTop: 8 }}>{legRow(camp.root, 1, false, true)}</div>;
-              const rootS = camp.root.metrics.study;
+              const rootFaces = chartFaces(camp.root, true);
+              const rootFront = rootFaces.front && rootFaces.front.img;
+              const rootBack = rootFaces.back && rootFaces.back.img;
               return (
                 <div key={camp.cid} style={{ marginTop: 14, marginBottom: 4, border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "8px 10px", background: "rgba(201,152,42,0.04)" }}>
                   {/* Campaign header — ticker · trend span · N legs · shared BEFORE→AFTER · + Add leg */}
@@ -880,9 +879,13 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                     <span style={{ color: C.muted, width: 150, fontSize: "0.7rem" }}>{camp.span[0] || "?"} → {camp.span[1] || "?"}</span>
                     <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, borderRadius: 99, padding: "2px 9px" }}>{camp.count} legs</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
-                      {camp.root.after_img ? <img src={camp.root.after_img} alt="before" title="BEFORE — root leg" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
+                      {rootFront ? <img src={rootFront} alt="setup" title="The setup — root leg" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
                       <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
-                      {rootS.outcome_img ? <img src={rootS.outcome_img} alt="after" title="AFTER — shared trend outcome" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
+                      {rootBack
+                        ? <img src={rootBack} alt="outcome" title="The shared trend outcome" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} />
+                        : rootFaces.count > 1
+                          ? <span title={`${rootFaces.count} charts in the root leg`} style={{ width: 64, height: 40, borderRadius: 5, border: `1px solid ${C.borderGold}`, display: "grid", placeItems: "center", color: C.goldBright, fontSize: "0.62rem", fontWeight: 800 }}>+{rootFaces.count - 1}</span>
+                          : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
                     </span>
                     <span style={{ flex: 1 }} />
                     <button title="Add a linked leg to this trend" onClick={(e) => { e.stopPropagation(); addLeg(camp.root, camp.legs); }} style={{ background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, cursor: "pointer", fontSize: "0.66rem", fontWeight: 800, borderRadius: 99, padding: "4px 12px", whiteSpace: "nowrap" }}>+ Add leg</button>
@@ -900,54 +903,64 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         <YourPatterns C={C} font={font} myRows={myRows} />
       )}
 
-      {/* card grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16, marginTop: 4 }}>
+      {/* card grid — mobile-safe auto-fit (min() caps the track so a card never overflows a narrow screen) */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 16, marginTop: 4 }}>
         {(studyMode ? [] : visible).map(r => {
           const eff = effectiveStars(cardStars(r), (r.elite || []).length);
           const elite = eff.n >= 6;
-          const di = displayImgs(r);
-          const img = di.before || di.after;
+          const faces = chartFaces(r, isStudyRow(r)); // unified front/back — fixes blank thumbs on non-slot rows
           const gb = gradeBadge(eff.n);
           const dr = mbDateRange(r.entry_date, r.exit_date);
-          const rTxt = r.r_mult != null ? `${r.r_mult > 0 ? "+" : ""}${r.r_mult}R` : (r.run_pct != null ? `${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : "");
-          const rUp = (r.r_mult != null ? r.r_mult : r.run_pct || 0) >= 0;
+          // HERO outcome line — his own numbers, never faked. Captured % first, peak run-up fallback; glyph + hue
+          // from the outcome class (win ▲ gold / loss ▼ red / pending — muted). Days appended when known.
+          const heroPct = r.run_pct != null ? r.run_pct : (r.run_up_pct != null ? r.run_up_pct : null);
+          const oc = r.outcome || outcomeFromR(r.r_mult, r.run_pct);
+          const win = oc ? /winner/i.test(oc) : (heroPct != null ? heroPct >= 0 : null);
+          const loss = oc ? /(loser|subpar)/i.test(oc) : (heroPct != null ? heroPct < 0 : null);
+          const heroColor = win ? C.goldBright : loss ? C.red : C.muted;
+          const heroText = heroPct != null
+            ? `${heroPct > 0 ? "+" : ""}${heroPct}%${win ? " ▲" : loss ? " ▼" : ""}${r.days_held != null ? ` · ${r.days_held}d` : ""}`
+            : "—";
+          // One-line hook — HIS OWN words: first sentence of the lesson (fallback thesis), never generated.
+          const hookSrc = (r.lesson || r.thesis || "").trim();
+          const hook = hookSrc ? ((hookSrc.match(/^[^.!?]*[.!?]?/) || [hookSrc])[0]).trim() : "";
           return (
             <div key={r.id} onClick={() => setDetail(r)} style={{ position: "relative", background: C.glass, border: `1px solid ${elite ? "rgba(126,240,160,0.32)" : C.border}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "transform .15s ease, border-color .15s ease" }}
-              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.borderColor = elite ? "rgba(126,240,160,0.55)" : C.borderGold; }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = elite ? "rgba(126,240,160,0.55)" : C.borderGold; }}
               onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.borderColor = elite ? "rgba(126,240,160,0.32)" : C.border; }}>
-              {/* chart area */}
-              <div style={{ position: "relative", height: 160, overflow: "hidden", borderBottom: `1px solid ${C.border}` }}>
+              {/* cover — front image fills; when a back exists it takes the right half (the before → after pair) */}
+              <div style={{ position: "relative", height: 160, overflow: "hidden", borderBottom: `1px solid ${C.border}`, display: "flex" }}>
                 {elite && <span style={{ position: "absolute", top: 12, right: 12, zIndex: 2, fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 99, background: "rgba(126,240,160,0.16)", border: "1px solid rgba(126,240,160,0.45)", color: "#7ef0a0", boxShadow: "0 0 16px rgba(126,240,160,0.25)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}>⭐ Elite</span>}
-                {img ? (
-                  <img src={img} alt={r.ticker} style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }} />
+                {faces.front ? (
+                  <>
+                    <img src={faces.front.img} alt={r.ticker} style={{ width: faces.back ? "50%" : "100%", height: 160, objectFit: "cover", display: "block" }} />
+                    {faces.back && <img src={faces.back.img} alt={`${r.ticker} outcome`} style={{ width: "50%", height: 160, objectFit: "cover", display: "block", borderLeft: `1px solid ${C.border}` }} />}
+                  </>
                 ) : (
-                  <div style={{ position: "relative", height: 160, background: "linear-gradient(180deg, rgba(201,152,42,0.10), rgba(201,152,42,0) 55%), repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 28px), #0d0d16" }}>
+                  <div style={{ position: "relative", flex: 1, height: 160, background: "linear-gradient(180deg, rgba(201,152,42,0.10), rgba(201,152,42,0) 55%), repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 28px), #0d0d16" }}>
                     <span style={{ position: "absolute", left: 12, bottom: 4, fontSize: "2.6rem", fontWeight: 800, letterSpacing: "-0.02em", color: "rgba(255,255,255,0.05)", lineHeight: 1, userSelect: "none", pointerEvents: "none" }}>{r.ticker}</span>
                   </div>
                 )}
               </div>
               {/* body */}
               <div style={{ padding: "14px 16px 16px" }}>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                {/* row 1 — ticker + pattern, grade badge (near-black on gold) top-right */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{r.ticker}</span>
-                  {dr && <span style={{ fontSize: "0.64rem", color: C.muted, whiteSpace: "nowrap" }}>{dr}</span>}
+                  <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.gold, whiteSpace: "nowrap" }}>{r.pattern}</span>
+                  <span title={eff.label} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 26, height: 22, padding: "0 8px", borderRadius: 7, fontWeight: 800, fontSize: "0.72rem", color: "#08080e", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, flexShrink: 0 }}>{gb.l}</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 9 }}>
-                  <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.gold, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 9px", borderRadius: 99 }}>{r.pattern}</span>
-                  {inModelBook(r) && <span title="Starred from a 📚 Study" style={{ fontSize: "0.58rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, padding: "2px 9px", borderRadius: 99 }}>📚 study</span>}
-                  {!r.is_published && !isStudyRow(r) && <span style={{ fontSize: "0.58rem", fontWeight: 800, color: isAdmin ? C.muted : "#8ab4f8", border: `1px solid ${isAdmin ? C.border : "rgba(138,180,248,0.35)"}`, padding: "2px 9px", borderRadius: 99 }}>{isAdmin ? "DRAFT" : "🔒 PERSONAL"}</span>}
-                  {r.is_published && <span title="Curated by the VIV team" style={{ fontSize: "0.58rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 9px", borderRadius: 99 }}>⭐ VIV</span>}
-                  {r.outcome && (() => { const oc = outcomeChip(r.outcome); return <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 800, color: oc.fg, background: oc.bg, border: `1px solid ${oc.bd}`, padding: "3px 10px", borderRadius: 99, whiteSpace: "nowrap" }}>{r.outcome}</span>; })()}
+                {/* status badges + date */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                  {inModelBook(r) && <span title="Starred from a 📚 Study" style={{ fontSize: "0.56rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, padding: "2px 8px", borderRadius: 99 }}>📚 study</span>}
+                  {!r.is_published && !isStudyRow(r) && <span style={{ fontSize: "0.56rem", fontWeight: 800, color: isAdmin ? C.muted : "#8ab4f8", border: `1px solid ${isAdmin ? C.border : "rgba(138,180,248,0.35)"}`, padding: "2px 8px", borderRadius: 99 }}>{isAdmin ? "DRAFT" : "🔒 PERSONAL"}</span>}
+                  {r.is_published && <span title="Curated by the VIV team" style={{ fontSize: "0.56rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 8px", borderRadius: 99 }}>⭐ VIV</span>}
+                  {dr && <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.muted, whiteSpace: "nowrap" }}>{dr}</span>}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 11, paddingTop: 11, borderTop: `1px solid ${C.border}` }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 21, height: 21, padding: "0 5px", borderRadius: 6, fontWeight: 800, fontSize: "0.66rem", color: gb.fg, background: gb.bg, border: `1px solid ${gb.bd}` }}>{gb.l}</span>
-                    <Stars C={C} n={eff.n} size="0.82rem" />
-                  </span>
-                  <span style={{ fontSize: "0.66rem", fontWeight: 800, color: elite ? "#7ef0a0" : C.muted }}>{eff.label}</span>
-                  {rTxt && <span style={{ marginLeft: "auto", fontSize: "0.84rem", fontWeight: 800, color: rUp ? C.green : C.red }}>{rTxt}</span>}
-                </div>
-                {r.lesson && <div style={{ fontSize: "0.74rem", color: C.muted, lineHeight: 1.5, marginTop: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{r.lesson}</div>}
+                {/* row 2 — the loud hero outcome line */}
+                <div style={{ fontSize: "1.05rem", fontWeight: 800, color: heroColor, marginTop: 11, letterSpacing: "-0.01em" }}>{heroText}</div>
+                {/* row 3 — his own one-line hook */}
+                {hook && <div style={{ fontSize: "0.7rem", color: C.muted, lineHeight: 1.45, marginTop: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hook}</div>}
               </div>
             </div>
           );
@@ -959,7 +972,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         const r = detail, eff = effectiveStars(cardStars(r), (r.elite || []).length);
         return (
           <div onClick={e => { if (e.target === e.currentTarget) setDetail(null); }} style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(4,4,8,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
-            <div style={{ width: "min(880px,100%)", background: "linear-gradient(180deg, rgba(18,18,26,0.95), rgba(8,8,14,0.98))", border: `1px solid ${C.borderGold}`, borderRadius: 20, padding: "22px 24px", boxShadow: "0 40px 100px rgba(0,0,0,0.72)" }}>
+            <div style={{ width: "min(1000px,100%)", background: "linear-gradient(180deg, rgba(18,18,26,0.95), rgba(8,8,14,0.98))", border: `1px solid ${C.borderGold}`, borderRadius: 20, padding: "22px 24px", boxShadow: "0 40px 100px rgba(0,0,0,0.72)" }}>
+              <style dangerouslySetInnerHTML={{ __html: ".mbdt-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;align-items:start}.mbdt-rail{position:sticky;top:0;max-height:calc(100vh - 96px);overflow-y:auto}@media (max-width:760px){.mbdt-grid{grid-template-columns:1fr}.mbdt-rail{position:static;max-height:none;overflow:visible;order:-1}}" }} />
+              {/* header — full width above the two columns */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4, flexWrap: "wrap" }}>
                 <span style={{ fontSize: "1.4rem", fontWeight: 800, color: C.white }}>{r.ticker}</span>
                 <span style={{ fontSize: "0.66rem", fontWeight: 800, color: C.gold, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "3px 11px", borderRadius: 99 }}>{r.pattern}</span>
@@ -969,180 +984,200 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 <button onClick={() => setDetail(null)} style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, width: 34, height: 34, borderRadius: 10, fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }} aria-label="Close">&times;</button>
               </div>
               <div style={{ fontSize: "0.74rem", color: C.muted, marginBottom: 16 }}>
-                {r.entry_date || "—"} → {r.exit_date || "—"}{r.days_held != null ? ` · ${r.days_held}d` : ""}{r.run_pct != null ? ` · ${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : ""}{r.r_mult != null ? ` · ${r.r_mult}R` : ""}
+                {r.entry_date || "—"} → {r.exit_date || "—"}{r.days_held != null ? ` · ${r.days_held}d` : ""}
               </div>
-              {/* FULL CHART TIMELINE (Valen 2026-07-26) — the OPENED card shows the whole self-labeled
-                  chronological list, not just the derived before/after pair. buildChartList converts legacy
-                  rows on the fly; every chart stacks vertically with its gold all-caps label + caption, and
-                  clicking any one opens the existing zoom lightbox (now honoring a per-chart title). The
-                  card FACES on the grid keep the before/after flash-card pair — that stays unchanged. */}
+
               {(() => {
-                // Point-in-time cap + ADR% badge — preserved verbatim; rides along when a ★-promoted study surfaces here.
-                const capBadge = (() => {
-                  const sm = r.metrics?.study?.m; if (!sm) return null;
-                  const cap = +(sm.mcap_t || 0), adr = sm.adr20;
-                  const parts = [];
+                // ── shared computations for both columns ──
+                const gb = gradeBadge(eff.n);
+                const heroVal = r.run_pct != null ? `${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : (r.run_up_pct != null ? `+${r.run_up_pct}%` : null);
+                const heroLabel = r.run_pct != null ? "Captured" : (r.run_up_pct != null ? "Peak run-up" : null);
+                const oc = r.outcome || outcomeFromR(r.r_mult, r.run_pct);
+                const win = oc ? /winner/i.test(oc) : null;
+                const loss = oc ? /(loser|subpar)/i.test(oc) : null;
+                const oColor = win ? "#7ef0a0" : loss ? C.red : C.muted;
+                const oGlyph = win ? "▲" : loss ? "▼" : "—";
+                // cap / ADR quiet stat (study-promoted rows only; plain rows show —)
+                const sm = r.metrics?.study?.m;
+                let capAdr = "—", capTip = "";
+                if (sm) {
+                  const cap = +(sm.mcap_t || 0), adr = sm.adr20, parts = [];
                   if (cap > 0) parts.push("≈" + (cap >= 1e9 ? "$" + (cap / 1e9).toFixed(1) + "B" : "$" + Math.round(cap / 1e6) + "M"));
                   if (adr != null && adr !== "" && !Number.isNaN(+adr)) parts.push("ADR " + (+adr).toFixed(1) + "%");
-                  return parts.length ? <span title={`At the trigger date — cap from SEC shares outstanding (${sm.mcap_asof || "n/a"}), ADR20 from the 20 sessions before the trigger.`} style={{ position: "absolute", top: 0, right: 6, zIndex: 2, background: "rgba(8,8,14,0.82)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.04em", padding: "3px 8px", borderRadius: 7, whiteSpace: "nowrap", cursor: "help", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>{parts.join(" · ")}</span> : null;
-                })();
-                const list = buildChartList(r, isStudyRow(r)).filter(c => c && c.img);
-                return (
-                  <div style={{ position: "relative", marginBottom: 16 }}>
-                    {capBadge}
-                    {list.length === 0 ? (
-                      <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>charts pending</div>
-                    ) : (
-                      <div style={{ display: "grid", gap: 18 }}>
-                        {list.map((c, i) => {
-                          const label = c.label || `Chart ${i + 1}`;
+                  if (parts.length) { capAdr = parts.join(" · "); capTip = `At the trigger date — cap from SEC shares outstanding (${sm.mcap_asof || "n/a"}), ADR20 from the 20 sessions before the trigger.`; }
+                }
+                const quiet = [
+                  ["R multiple", r.r_mult != null ? `${r.r_mult}R` : "—", "Reward vs the initial stop"],
+                  ["Days held", r.days_held != null ? `${r.days_held}d` : "—", "Entry → first daily close below EMA9 (the trail exit)"],
+                  ["Theme", r.theme || "—", ""],
+                  ["Cap / ADR", capAdr, capTip],
+                ];
+                const sections = sectionizeCharts(buildChartList(r, isStudyRow(r)));
+
+                // checklist block (unchanged logic — every factor, ticked & unticked, read-only)
+                const checklistBlock = (() => {
+                  const bucketStyle = { border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", background: "rgba(255,255,255,0.015)", minWidth: 0, marginBottom: 8 };
+                  const bucketTitle = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 7 };
+                  const rowStyle = { display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 2px" };
+                  const mark = (on) => ({ color: on ? C.goldBright : "rgba(255,255,255,0.35)", opacity: on ? 1 : 0.5, fontWeight: 800, lineHeight: 1.3, flexShrink: 0 });
+                  const labelStyle = (on) => ({ fontSize: "0.74rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 });
+                  const bonusTag = <span style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "0 5px", borderRadius: 99, marginLeft: 5 }}>Bonus</span>;
+                  if (isStudyRow(r)) {
+                    const study = r.metrics.study;
+                    const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Momentum Breakout"];
+                    const q = studyQuality(study);
+                    return (<>
+                      <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>👁 Checklist — {q.on}/{q.total}</div>
+                      {def.buckets.map((b, bi) => (
+                        <div key={bi} style={bucketStyle}>
+                          <div style={bucketTitle}>{b.title}</div>
+                          {b.items.map(([k, itemLabel, bonus]) => {
+                            const on = !!study.checks?.[k];
+                            const sc = SUBCATS[k];
+                            const subRaw = sc && study.checks?.[sc.store];
+                            const subVal = subRaw != null && subRaw !== "" ? (sc.options.find(([o]) => o === String(subRaw)) || [, String(subRaw)])[1] : null;
+                            return (
+                              <div key={k} style={rowStyle}>
+                                <span style={mark(on)}>{on ? "✓" : "○"}</span>
+                                <span style={labelStyle(on)}>{itemLabel}{subVal && <b style={{ color: C.goldBright, marginLeft: 5 }}>{subVal}</b>}{bonus && bonusTag}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </>);
+                  }
+                  const graded = starsFromTicked(r.ticked, isAdmin ? undefined : { makerGate: false });
+                  const tset = new Set(r.ticked || []);
+                  const secs = sectionsFor(r.ticked).filter(sec => !sec.reminder);
+                  return (<>
+                    <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Setup checklist — {graded.passed}/{graded.total}</div>
+                    {secs.map((sec, si) => (
+                      <div key={si} style={bucketStyle}>
+                        <div style={bucketTitle}>{sec.title}</div>
+                        {sec.items.map((it, ii) => {
+                          const on = tset.has(si + "-" + ii);
                           return (
-                            <div key={i} style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>{label} <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
-                              <img src={c.img} alt={label} onClick={() => setZoom({ imgs: { before: c.img, after: "" }, slot: "before", title: label })} style={{ display: "block", width: "100%", maxWidth: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} />
-                              {c.caption && <div style={{ fontSize: "0.78rem", color: C.muted, lineHeight: 1.55, marginTop: 7 }}>{c.caption}</div>}
+                            <div key={ii} style={rowStyle}>
+                              <span style={mark(on)}>{on ? "✓" : "○"}</span>
+                              <span style={labelStyle(on)}>{it.c}{it.bonus && bonusTag}</span>
                             </div>
                           );
                         })}
                       </div>
-                    )}
-                  </div>
-                );
-              })()}
-              {/* Objective metric strip — gold dot = auto-read off the chart by VIV */}
-              {(() => {
-                const dAuto = new Set((r.metrics && r.metrics._auto) || []);
-                const strip = [["Captured", "run_pct", r.run_pct != null ? `${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : null, C.green, "What the management model banks: 50% at 3–5R + EMA9 trail"],
-                  ["Run-up (peak)", "run_up_pct", r.run_up_pct != null ? `+${r.run_up_pct}%` : null, C.goldBright, "Max run-up of the move"],
-                  ["Slope", "angle", r.angle != null ? `${r.angle}°` : null, C.goldBright, "Advance angle off the info-line"],
-                  ["Held", "days_held", r.days_held != null ? `${r.days_held}d` : null, C.text, "Entry → first daily close below EMA9 (the trail exit)"],
-                  ["R", "r_mult", r.r_mult != null ? `${r.r_mult}R` : null, C.green, "Reward vs the initial stop"]].filter(([, , v]) => v != null);
+                    ))}
+                  </>);
+                })();
+
                 return (
-                  <>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: dAuto.size ? 7 : 14 }}>
-                      {strip.map(([k, fk, v, col, tip]) => (
-                        <span key={k} title={tip} style={{ display: "inline-flex", gap: 7, alignItems: "baseline", padding: "6px 13px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}` }}>
-                          <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>{k}</span>
-                          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: col }}>{v}</span>
-                          {dAuto.has(fk) && <span title="Auto-read from the chart by VIV" style={{ width: 6, height: 6, borderRadius: 99, background: C.goldBright, boxShadow: "0 0 6px rgba(240,192,80,0.85)", alignSelf: "center" }} />}
-                        </span>
-                      ))}
+                  <div className="mbdt-grid">
+                    {/* ── LEFT: the story — sectionized charts → ⑤ the lesson → elite factors ── */}
+                    <div style={{ minWidth: 0, position: "relative" }}>
+                      {sections.length === 0 ? (
+                        <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>Charts pending — they'll appear here as this setup is documented.</div>
+                      ) : (
+                        <div style={{ display: "grid", gap: 20 }}>
+                          {sections.map((sec, si) => (
+                            <div key={si} style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 9 }}>{sec.title}</div>
+                              <div style={{ display: "grid", gap: 16 }}>
+                                {sec.charts.map((c, ci) => {
+                                  const label = c.label || sec.title;
+                                  return (
+                                    <div key={ci} style={{ minWidth: 0 }}>
+                                      <img src={c.img} alt={label} onClick={() => setZoom({ imgs: { before: c.img, after: "" }, slot: "before", title: label })} style={{ display: "block", width: "100%", maxWidth: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} />
+                                      {c.caption && <div style={{ fontSize: "0.78rem", color: C.muted, lineHeight: 1.55, marginTop: 7, maxWidth: "66ch" }}>{c.caption}</div>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {r.lesson && (
+                        <div style={{ marginTop: 22 }}>
+                          <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 9 }}>⑤ The lesson</div>
+                          <div style={{ fontSize: "0.82rem", color: "#e8e8ec", lineHeight: 1.6, maxWidth: "66ch", whiteSpace: "pre-wrap" }}>{r.lesson}</div>
+                        </div>
+                      )}
+                      {(r.elite || []).length > 0 && (
+                        <div style={{ marginTop: 22 }}>
+                          <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7ef0a0", marginBottom: 9 }}>Elite factors present ({(r.elite || []).length}/{ELITE.length})</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px,100%), 1fr))", gap: 6 }}>
+                            {ELITE.filter(f => (r.elite || []).includes(f.k)).map(f => (
+                              <div key={f.k} style={{ display: "flex", gap: 9, padding: "8px 11px", borderRadius: 10, background: "rgba(126,240,160,0.06)", border: "1px solid rgba(126,240,160,0.25)" }}>
+                                <span style={{ color: "#7ef0a0", fontWeight: 800 }}>✓</span>
+                                <div><div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#c9f5d7" }}>{f.c}</div><div style={{ fontSize: "0.7rem", color: C.muted }}>{f.s}</div></div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {dAuto.size > 0 && (
-                      <div style={{ fontSize: "0.66rem", color: C.muted, marginBottom: 14 }}>
-                        <span style={{ color: C.goldBright }}>●</span> auto-read from the chart by VIV — spot an error? hit Edit and correct it (the dot clears)
-                        {(r.metrics?.needs_eye || []).length > 0 && <span style={{ color: "#f0b04f" }}> · 👁 {(r.metrics.needs_eye).length} item{r.metrics.needs_eye.length > 1 ? "s" : ""} awaiting your eye (open Edit)</span>}
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-              {/* FULL CHECKLIST (Valen 2026-07-26) — the opened card shows EVERY factor, ticked AND
-                  unticked, with the pass count, so a member sees exactly how many of the checklist passed.
-                  Read-only, member-facing (no inputs). Study rows render the 3-bucket STUDY_SETUPS checklist
-                  (with sub-cat values inline); plain rows render the equivalent over SECTIONS (same si-ii keys
-                  + inclusion rules the star math uses). This replaces the old ticked-only characteristics
-                  chips as the single factor display; measured traits stay below as a distinct strip. */}
-              {(() => {
-                const headStyle = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 };
-                const gridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 10 };
-                const bucketStyle = { border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", background: "rgba(255,255,255,0.015)", minWidth: 0 };
-                const bucketTitle = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 7 };
-                const rowStyle = { display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 2px" };
-                const mark = (on) => ({ color: on ? C.goldBright : "rgba(255,255,255,0.35)", opacity: on ? 1 : 0.5, fontWeight: 800, lineHeight: 1.3, flexShrink: 0 });
-                const labelStyle = (on) => ({ fontSize: "0.76rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 });
-                const bonusTag = <span style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "0 5px", borderRadius: 99, marginLeft: 5 }}>Bonus</span>;
-                let checklist = null;
-                if (isStudyRow(r)) {
-                  const study = r.metrics.study;
-                  const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Momentum Breakout"];
-                  const q = studyQuality(study);
-                  checklist = (
-                    <>
-                      <div style={headStyle}>👁 Checklist — {q.on}/{q.total}</div>
-                      <div style={gridStyle}>
-                        {def.buckets.map((b, bi) => (
-                          <div key={bi} style={bucketStyle}>
-                            <div style={bucketTitle}>{b.title}</div>
-                            {b.items.map(([k, itemLabel, bonus]) => {
-                              const on = !!study.checks?.[k];
-                              const sc = SUBCATS[k];
-                              const subRaw = sc && study.checks?.[sc.store];
-                              const subVal = subRaw != null && subRaw !== "" ? (sc.options.find(([o]) => o === String(subRaw)) || [, String(subRaw)])[1] : null;
-                              return (
-                                <div key={k} style={rowStyle}>
-                                  <span style={mark(on)}>{on ? "✓" : "○"}</span>
-                                  <span style={labelStyle(on)}>{itemLabel}{subVal && <b style={{ color: C.goldBright, marginLeft: 5 }}>{subVal}</b>}{bonus && bonusTag}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  );
-                } else {
-                  // Plain model-book rows — mirror the star math's inclusion rules exactly: version-aware
-                  // sectionsFor(...), reminder sections skipped, keys are the si-ii of the FILTERED list.
-                  const graded = starsFromTicked(r.ticked, isAdmin ? undefined : { makerGate: false });
-                  const tset = new Set(r.ticked || []);
-                  const secs = sectionsFor(r.ticked).filter(s => !s.reminder);
-                  checklist = (
-                    <>
-                      <div style={headStyle}>Setup checklist — {graded.passed}/{graded.total}</div>
-                      <div style={gridStyle}>
-                        {secs.map((sec, si) => (
-                          <div key={si} style={bucketStyle}>
-                            <div style={bucketTitle}>{sec.title}</div>
-                            {sec.items.map((it, ii) => {
-                              const on = tset.has(si + "-" + ii);
-                              return (
-                                <div key={ii} style={rowStyle}>
-                                  <span style={mark(on)}>{on ? "✓" : "○"}</span>
-                                  <span style={labelStyle(on)}>{it.c}{it.bonus && bonusTag}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  );
-                }
-                return (
-                  <div style={{ marginBottom: 14 }}>
-                    {checklist}
-                    {(r.characteristics || []).length > 0 && (
-                      <div style={{ marginTop: 12 }}>
-                        <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 7 }}>Measured traits</div>
-                        <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-                          {(r.characteristics || []).map((c, i) => <span key={i} style={{ fontSize: "0.72rem", fontWeight: 700, color: C.text, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "4px 11px", borderRadius: 99 }}>{c}</span>)}
+
+                    {/* ── RIGHT: sticky verdict rail ── */}
+                    <div className="mbdt-rail">
+                      {/* (1) HERO stat — the single loudest element */}
+                      <div style={{ border: `1px solid ${C.borderGold}`, borderRadius: 14, padding: "16px 18px", background: C.glass, marginBottom: 12 }}>
+                        {heroVal ? (
+                          <>
+                            <div title={capTip || undefined} style={{ fontSize: "1.7rem", fontWeight: 800, color: "#f0c050", letterSpacing: "-0.02em", lineHeight: 1.05 }}>{heroVal}</div>
+                            <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, marginTop: 3 }}>{heroLabel}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontSize: "1.7rem", fontWeight: 800, color: "#f0c050", lineHeight: 1.05 }}>{gb.l}</div>
+                            <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, marginTop: 3 }}>Grade · no outcome yet</div>
+                          </>
+                        )}
+                        {/* (2) verdict row — outcome chip WITH glyph + grade chip (near-black on gold) */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.68rem", fontWeight: 800, color: oColor, border: `1px solid ${oColor}`, borderRadius: 99, padding: "3px 11px", whiteSpace: "nowrap" }}>{oGlyph} {oc || "Pending"}</span>
+                          <span title={eff.label} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 26, height: 22, padding: "0 9px", borderRadius: 7, fontWeight: 800, fontSize: "0.72rem", color: "#08080e", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` }}>{gb.l}</span>
                         </div>
                       </div>
-                    )}
+
+                      {/* (3) quiet secondary stats — simple label:value rows */}
+                      <div style={{ display: "grid", gap: 2, marginBottom: 14 }}>
+                        {quiet.map(([k, v, tip]) => (
+                          <div key={k} title={tip || undefined} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: `1px solid ${C.border}` }}>
+                            <span style={{ fontSize: "0.72rem", color: C.muted, whiteSpace: "nowrap" }}>{k}</span>
+                            <span style={{ fontSize: "0.78rem", fontWeight: 700, color: (v == null || v === "—") ? C.muted : "#e8e8ec", textAlign: "right", overflow: "hidden", textOverflow: "ellipsis" }}>{v}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* (4) full ✓/○ checklist */}
+                      <div style={{ marginBottom: 14 }}>{checklistBlock}</div>
+
+                      {/* measured traits */}
+                      {(r.characteristics || []).length > 0 && (
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 7 }}>Measured traits</div>
+                          <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                            {(r.characteristics || []).map((c, i) => <span key={i} style={{ fontSize: "0.7rem", fontWeight: 700, color: C.text, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "4px 10px", borderRadius: 99 }}>{c}</span>)}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* (5) thesis block */}
+                      {r.thesis && (
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>The thesis</div>
+                          <div style={{ fontSize: "0.82rem", color: C.text, lineHeight: 1.6, maxWidth: "66ch", whiteSpace: "pre-wrap" }}>{r.thesis}</div>
+                        </div>
+                      )}
+
+                      {/* (6) admin-gated hypothesis read — unchanged */}
+                      {isStudyRow(r) && isAdmin && <HypothesisRead C={C} study={r.metrics.study} ticker={r.ticker} date={r.entry_date} />}
+                    </div>
                   </div>
                 );
               })()}
-              {(r.elite || []).length > 0 && (
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7ef0a0", marginBottom: 8 }}>Elite factors present ({(r.elite || []).length}/{ELITE.length})</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 6 }}>
-                    {ELITE.filter(f => (r.elite || []).includes(f.k)).map(f => (
-                      <div key={f.k} style={{ display: "flex", gap: 9, padding: "8px 11px", borderRadius: 10, background: "rgba(126,240,160,0.06)", border: "1px solid rgba(126,240,160,0.25)" }}>
-                        <span style={{ color: "#7ef0a0", fontWeight: 800 }}>✓</span>
-                        <div><div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#c9f5d7" }}>{f.c}</div><div style={{ fontSize: "0.7rem", color: C.muted }}>{f.s}</div></div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {/* Hypothesis read — ADMIN-ONLY, study-payload rows only (his private 🔒 My Book side). Members
-                  (isAdmin false) and published non-study cards render nothing new. Valen 2026-07-24. */}
-              {isStudyRow(r) && isAdmin && <HypothesisRead C={C} study={r.metrics.study} ticker={r.ticker} date={r.entry_date} />}
-              {r.thesis && <div style={{ marginBottom: 12 }}><div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>The thesis</div><div style={{ fontSize: "0.88rem", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.thesis}</div></div>}
-              {r.lesson && <div style={{ marginBottom: 14 }}><div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>The lesson</div><div style={{ fontSize: "0.88rem", color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{r.lesson}</div></div>}
+
               {(isAdmin || (r.created_by === uid && !r.is_published)) && (
-                <div style={{ display: "flex", gap: 10, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
+                <div style={{ display: "flex", gap: 10, borderTop: `1px solid ${C.border}`, paddingTop: 14, marginTop: 18 }}>
                   <button onClick={() => { if (isStudyRow(r)) { setStudyMode(true); setStudyEditing(r); } else setEditing(r); setDetail(null); }} style={{ background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>{isStudyRow(r) ? "Edit study" : "Edit"}</button>
                   <button onClick={() => remove(r)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.red, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>Delete</button>
                 </div>
