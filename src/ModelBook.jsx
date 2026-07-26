@@ -971,26 +971,44 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               <div style={{ fontSize: "0.74rem", color: C.muted, marginBottom: 16 }}>
                 {r.entry_date || "—"} → {r.exit_date || "—"}{r.days_held != null ? ` · ${r.days_held}d` : ""}{r.run_pct != null ? ` · ${r.run_pct > 0 ? "+" : ""}${r.run_pct}%` : ""}{r.r_mult != null ? ` · ${r.r_mult}R` : ""}
               </div>
-              {/* BEFORE | AFTER — always left/right, clearly compared (responsive, no innerWidth snapshot) */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 16 }}>
-                <div style={{ position: "relative" }}>
-                  {/* Point-in-time cap + ADR% badge — rides along when a ★-promoted study surfaces here (same row, same stats) */}
-                  {(() => {
-                    const sm = r.metrics?.study?.m; if (!sm) return null;
-                    const cap = +(sm.mcap_t || 0), adr = sm.adr20;
-                    const parts = [];
-                    if (cap > 0) parts.push("≈" + (cap >= 1e9 ? "$" + (cap / 1e9).toFixed(1) + "B" : "$" + Math.round(cap / 1e6) + "M"));
-                    if (adr != null && adr !== "" && !Number.isNaN(+adr)) parts.push("ADR " + (+adr).toFixed(1) + "%");
-                    return parts.length ? <span title={`At the trigger date — cap from SEC shares outstanding (${sm.mcap_asof || "n/a"}), ADR20 from the 20 sessions before the trigger.`} style={{ position: "absolute", top: 26, right: 6, zIndex: 2, background: "rgba(8,8,14,0.82)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.04em", padding: "3px 8px", borderRadius: 7, whiteSpace: "nowrap", cursor: "help", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>{parts.join(" · ")}</span> : null;
-                  })()}
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>◀ Before — the setup <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
-                  {(() => { const di = displayImgs(r); return di.before ? <img src={di.before} alt="before" onClick={() => setZoom({ imgs: { before: di.before, after: di.after }, slot: "before" })} style={{ width: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>before chart pending</div>; })()}
-                </div>
-                <div>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.green, marginBottom: 7 }}>After — the outcome ▶ <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
-                  {(() => { const di = displayImgs(r); return di.after ? <img src={di.after} alt="after" onClick={() => setZoom({ imgs: { before: di.before, after: di.after }, slot: "after" })} style={{ width: "100%", borderRadius: 12, border: "1px solid rgba(34,197,94,0.35)", cursor: "zoom-in" }} /> : <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>after chart pending</div>; })()}
-                </div>
-              </div>
+              {/* FULL CHART TIMELINE (Valen 2026-07-26) — the OPENED card shows the whole self-labeled
+                  chronological list, not just the derived before/after pair. buildChartList converts legacy
+                  rows on the fly; every chart stacks vertically with its gold all-caps label + caption, and
+                  clicking any one opens the existing zoom lightbox (now honoring a per-chart title). The
+                  card FACES on the grid keep the before/after flash-card pair — that stays unchanged. */}
+              {(() => {
+                // Point-in-time cap + ADR% badge — preserved verbatim; rides along when a ★-promoted study surfaces here.
+                const capBadge = (() => {
+                  const sm = r.metrics?.study?.m; if (!sm) return null;
+                  const cap = +(sm.mcap_t || 0), adr = sm.adr20;
+                  const parts = [];
+                  if (cap > 0) parts.push("≈" + (cap >= 1e9 ? "$" + (cap / 1e9).toFixed(1) + "B" : "$" + Math.round(cap / 1e6) + "M"));
+                  if (adr != null && adr !== "" && !Number.isNaN(+adr)) parts.push("ADR " + (+adr).toFixed(1) + "%");
+                  return parts.length ? <span title={`At the trigger date — cap from SEC shares outstanding (${sm.mcap_asof || "n/a"}), ADR20 from the 20 sessions before the trigger.`} style={{ position: "absolute", top: 0, right: 6, zIndex: 2, background: "rgba(8,8,14,0.82)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.04em", padding: "3px 8px", borderRadius: 7, whiteSpace: "nowrap", cursor: "help", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>{parts.join(" · ")}</span> : null;
+                })();
+                const list = buildChartList(r, isStudyRow(r)).filter(c => c && c.img);
+                return (
+                  <div style={{ position: "relative", marginBottom: 16 }}>
+                    {capBadge}
+                    {list.length === 0 ? (
+                      <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>charts pending</div>
+                    ) : (
+                      <div style={{ display: "grid", gap: 18 }}>
+                        {list.map((c, i) => {
+                          const label = c.label || `Chart ${i + 1}`;
+                          return (
+                            <div key={i} style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>{label} <span style={{ color: C.muted, textTransform: "none", letterSpacing: 0 }}>· click to zoom</span></div>
+                              <img src={c.img} alt={label} onClick={() => setZoom({ imgs: { before: c.img, after: "" }, slot: "before", title: label })} style={{ display: "block", width: "100%", maxWidth: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} />
+                              {c.caption && <div style={{ fontSize: "0.78rem", color: C.muted, lineHeight: 1.55, marginTop: 7 }}>{c.caption}</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {/* Objective metric strip — gold dot = auto-read off the chart by VIV */}
               {(() => {
                 const dAuto = new Set((r.metrics && r.metrics._auto) || []);
@@ -1019,14 +1037,92 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                   </>
                 );
               })()}
-              {(r.characteristics || []).length > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>Objective characteristics</div>
-                  <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-                    {(r.characteristics || []).map((c, i) => <span key={i} style={{ fontSize: "0.72rem", fontWeight: 700, color: C.text, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "4px 11px", borderRadius: 99 }}>{c}</span>)}
+              {/* FULL CHECKLIST (Valen 2026-07-26) — the opened card shows EVERY factor, ticked AND
+                  unticked, with the pass count, so a member sees exactly how many of the checklist passed.
+                  Read-only, member-facing (no inputs). Study rows render the 3-bucket STUDY_SETUPS checklist
+                  (with sub-cat values inline); plain rows render the equivalent over SECTIONS (same si-ii keys
+                  + inclusion rules the star math uses). This replaces the old ticked-only characteristics
+                  chips as the single factor display; measured traits stay below as a distinct strip. */}
+              {(() => {
+                const headStyle = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 };
+                const gridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 10 };
+                const bucketStyle = { border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", background: "rgba(255,255,255,0.015)", minWidth: 0 };
+                const bucketTitle = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 7 };
+                const rowStyle = { display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 2px" };
+                const mark = (on) => ({ color: on ? C.goldBright : "rgba(255,255,255,0.35)", opacity: on ? 1 : 0.5, fontWeight: 800, lineHeight: 1.3, flexShrink: 0 });
+                const labelStyle = (on) => ({ fontSize: "0.76rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 });
+                const bonusTag = <span style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "0 5px", borderRadius: 99, marginLeft: 5 }}>Bonus</span>;
+                let checklist = null;
+                if (isStudyRow(r)) {
+                  const study = r.metrics.study;
+                  const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Momentum Breakout"];
+                  const q = studyQuality(study);
+                  checklist = (
+                    <>
+                      <div style={headStyle}>👁 Checklist — {q.on}/{q.total}</div>
+                      <div style={gridStyle}>
+                        {def.buckets.map((b, bi) => (
+                          <div key={bi} style={bucketStyle}>
+                            <div style={bucketTitle}>{b.title}</div>
+                            {b.items.map(([k, itemLabel, bonus]) => {
+                              const on = !!study.checks?.[k];
+                              const sc = SUBCATS[k];
+                              const subRaw = sc && study.checks?.[sc.store];
+                              const subVal = subRaw != null && subRaw !== "" ? (sc.options.find(([o]) => o === String(subRaw)) || [, String(subRaw)])[1] : null;
+                              return (
+                                <div key={k} style={rowStyle}>
+                                  <span style={mark(on)}>{on ? "✓" : "○"}</span>
+                                  <span style={labelStyle(on)}>{itemLabel}{subVal && <b style={{ color: C.goldBright, marginLeft: 5 }}>{subVal}</b>}{bonus && bonusTag}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  );
+                } else {
+                  // Plain model-book rows — mirror the star math's inclusion rules exactly: version-aware
+                  // sectionsFor(...), reminder sections skipped, keys are the si-ii of the FILTERED list.
+                  const graded = starsFromTicked(r.ticked, isAdmin ? undefined : { makerGate: false });
+                  const tset = new Set(r.ticked || []);
+                  const secs = sectionsFor(r.ticked).filter(s => !s.reminder);
+                  checklist = (
+                    <>
+                      <div style={headStyle}>Setup checklist — {graded.passed}/{graded.total}</div>
+                      <div style={gridStyle}>
+                        {secs.map((sec, si) => (
+                          <div key={si} style={bucketStyle}>
+                            <div style={bucketTitle}>{sec.title}</div>
+                            {sec.items.map((it, ii) => {
+                              const on = tset.has(si + "-" + ii);
+                              return (
+                                <div key={ii} style={rowStyle}>
+                                  <span style={mark(on)}>{on ? "✓" : "○"}</span>
+                                  <span style={labelStyle(on)}>{it.c}{it.bonus && bonusTag}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  );
+                }
+                return (
+                  <div style={{ marginBottom: 14 }}>
+                    {checklist}
+                    {(r.characteristics || []).length > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 7 }}>Measured traits</div>
+                        <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                          {(r.characteristics || []).map((c, i) => <span key={i} style={{ fontSize: "0.72rem", fontWeight: 700, color: C.text, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "4px 11px", borderRadius: 99 }}>{c}</span>)}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
               {(r.elite || []).length > 0 && (
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7ef0a0", marginBottom: 8 }}>Elite factors present ({(r.elite || []).length}/{ELITE.length})</div>
@@ -1068,7 +1164,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           <div onClick={() => setZoom(null)} style={{ position: "fixed", inset: 0, zIndex: 1500, background: "rgba(2,2,6,0.93)", display: "grid", placeItems: "center", cursor: "zoom-out", padding: 18 }}>
             <img key={zoom.slot} src={url} alt={`${zoom.slot} chart zoom`} style={{ maxWidth: "96vw", maxHeight: "90vh", borderRadius: 12, border: `1px solid ${isBefore ? C.borderGold : "rgba(34,197,94,0.45)"}`, boxShadow: "0 30px 90px rgba(0,0,0,0.8)" }} />
             <span style={{ position: "fixed", top: 20, left: 20, fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: isBefore ? C.goldBright : "#7ef0a0", background: "rgba(8,8,14,0.8)", border: `1px solid ${isBefore ? C.borderGold : "rgba(34,197,94,0.4)"}`, padding: "7px 15px", borderRadius: 99 }}>
-              {isBefore ? "◀ Before — the setup" : "After — the outcome ▶"}
+              {zoom.title ? zoom.title : (isBefore ? "◀ Before — the setup" : "After — the outcome ▶")}
             </span>
             {navBtn("left", "before", hasBoth && !isBefore)}
             {navBtn("right", "after", hasBoth && isBefore)}

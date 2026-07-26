@@ -759,6 +759,7 @@ const WHATS_NEW = [
     items: [
       "Model Book entries now take an unlimited, ordered list of charts instead of fixed Before/After slots — paste or upload as many as you like, arrange them oldest → newest, and label + caption each one yourself.",
       "The Before/After flash card still just works: the first chart becomes the Before face and the last the After — or tag any chart's role yourself.",
+      "Opening any Model Book card now shows the full chart timeline and the complete checklist — every factor, ticked or not, so you can see exactly how many passed.",
     ],
   },
   {
