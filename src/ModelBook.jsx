@@ -4,7 +4,7 @@ import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
 import { SECTIONS, sectionsFor, scoreTicked, versionOf, stampV2 } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
-import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, HypothesisRead, buildCampaigns, outcomeClass, studyQuality } from "./StudyBook.jsx";
+import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, HypothesisRead, buildCampaigns, outcomeClass, studyQuality, STUDY_SETUPS, SUBCATS } from "./StudyBook.jsx";
 import { ChartSeqEditor, buildChartList, deriveChartFields } from "./ChartSeq.jsx";
 
 // A study starred for the Model Book shows as a card; its star count comes from the study's
