@@ -1137,7 +1137,9 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
   }, [lbox]);
 
   const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontFamily: font, fontSize: "0.78rem", padding: "7px 10px", outline: "none", width: "100%", colorScheme: "dark" };
-  const tickedChips = def.buckets.flatMap(b => b.items).filter(([k]) => s.checks?.[k]); // eyeballed checks that are ON
+  // Same study-merge updater as the quick editor — the rail checklist EDITS, it doesn't just display
+  // (Valen 2026-07-26: two viewing formats of ONE editor; detailed is the default).
+  const setS = (patch) => setRow(r => ({ ...r, metrics: { ...r.metrics, study: { ...r.metrics.study, ...patch } } }));
 
   const statCard = (label, val) => (
     <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 10px", background: "rgba(0,0,0,0.25)" }}>
@@ -1151,7 +1153,7 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
 
   const btn = { fontFamily: font, borderRadius: 99, cursor: "pointer", fontWeight: 800 };
   return createPortal(
-    <div style={{ position: "fixed", inset: 0, zIndex: 1340, background: "rgba(10,10,16,0.98)", fontFamily: font, display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 1340, background: "#0a0a10", fontFamily: font, display: "flex", flexDirection: "column" }}>
       <style dangerouslySetInnerHTML={{ __html: DV_CSS }} />
       {/* Header — Back + Save top-right. Sits OUTSIDE the one scroll container (below), so the rail's sticky
           top:0 pins right under it and Save stays reachable without scrolling. No Esc-close on the overlay. */}
@@ -1196,14 +1198,40 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
               {statCard("Cap / ADR", (capText || adr != null && adr !== "") ? `${capText || "—"}${adr != null && adr !== "" && !Number.isNaN(+adr) ? ` · ADR ${(+adr).toFixed(1)}%` : ""}` : null)}
             </div>
 
-            {tickedChips.length > 0 && (<>
-              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "16px 0 8px" }}>👁 Ticked factors</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {tickedChips.map(([k, t]) => (
-                  <span key={k} style={{ fontSize: "0.64rem", fontWeight: 700, color: C.goldBright, border: `1px solid ${C.borderGold}`, borderRadius: 99, padding: "3px 10px" }}>{t}</span>
-                ))}
+            {/* Bucket-grouped EDITABLE checklist (Valen 2026-07-26): same three buckets + handlers as the
+                quick editor, ALL items shown in one column — tick/untick + subcat pills right here.
+                Unticked stay visible but muted. Two viewing formats, one editing surface. */}
+            <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "16px 0 4px" }}>👁 My ticks — {q.on}/{q.total}</div>
+            {def.buckets.map((b) => (
+              <div key={b.title} style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: "0.55rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, margin: "8px 0 4px" }}>{b.title}</div>
+                {b.items.map(([k, t, bonus]) => {
+                  const on = !!s.checks?.[k];
+                  const sub = SUBCATS[k];
+                  return (
+                    <div key={k} style={{ padding: "2px 0" }}>
+                      <label style={{ display: "flex", alignItems: "flex-start", gap: 7, cursor: "pointer", opacity: on ? 1 : 0.5 }}>
+                        <input type="checkbox" style={{ accentColor: C.goldBright, marginTop: 2, flexShrink: 0 }} checked={on}
+                          onChange={e => setS({ checks: { ...s.checks, [k]: e.target.checked, ...(sub && !e.target.checked ? { [sub.store]: "" } : {}) } })} />
+                        <span style={{ fontSize: "0.7rem", color: on ? C.text : C.muted, lineHeight: 1.45 }}>
+                          {t}
+                          {bonus ? <span style={{ fontSize: "0.5rem", fontWeight: 800, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 99, padding: "0 5px", marginLeft: 5, verticalAlign: "1px" }}>BONUS</span> : null}
+                        </span>
+                      </label>
+                      {sub && on && (
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", margin: "4px 0 2px 22px" }}>
+                          {sub.options.map(([val, optLabel]) => { const onOpt = String(s.checks?.[sub.store] || "") === val;
+                            return <button key={val} type="button"
+                              onClick={() => setS({ checks: { ...s.checks, [sub.store]: onOpt ? "" : val } })}
+                              style={{ background: onOpt ? "rgba(212,175,55,0.18)" : "transparent", border: `1px solid ${onOpt ? C.goldBright : C.border}`, color: onOpt ? C.goldBright : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.6rem", fontWeight: 700, padding: "2px 8px", cursor: "pointer" }}>
+                              {optLabel}</button>; })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            </>)}
+            ))}
 
             {row.thesis && (<>
               <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "16px 0 6px" }}>Thesis</div>
