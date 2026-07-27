@@ -77,17 +77,31 @@ const CSV_TICK_COLS = [ // fixed v2 si-ii order — stays in lockstep with SECTI
   ["2-0", "day1_range_expansion"], ["2-1", "max2_updays"], ["2-2", "closed_70pct_range"], ["2-3", "volume_expansion"], ["2-4", "gapped_up"],
 ];
 const csvCell = (v) => { const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+// A CSV can't carry an explanatory comment line, so the first column is `row_type` (classic|study) —
+// the sheet is self-explanatory. Classic (plain) rows export EXACTLY as before (every v2 tick its own
+// TRUE/FALSE column). Study rows fill only the SHARED columns (ticker/date/pattern/theme/outcome/thesis/
+// lesson/chart urls); the 16 grader tick columns + grader-only stars/score/version stay BLANK (studies
+// carry a different, bucket-based checklist — blank = "not this checklist", never guessed).
 export function buildMyBookCsv(rows, { makerGate } = {}) {
-  const head = ["ticker", "entry_date", "exit_date", "pattern", "theme", "outcome", "stars", "score_pct", "checklist_version",
+  const head = ["row_type", "ticker", "entry_date", "exit_date", "pattern", "theme", "outcome", "stars", "score_pct", "checklist_version",
     ...CSV_TICK_COLS.map(([, name]) => name),
     "captured_pct", "run_up_pct", "days_held", "r_multiple", "characteristics", "thesis", "lesson", "chart_before_url", "chart_after_url"];
   const lines = [head.join(",")];
   for (const r of rows) {
+    if (isStudyRow(r)) {
+      const s = r.metrics.study;
+      lines.push([
+        "study", r.ticker, r.entry_date, "", s.setup || r.pattern, r.theme, r.outcome, "", "", "",
+        ...CSV_TICK_COLS.map(() => ""), // grader tick columns don't apply to studies
+        "", "", "", "", (r.characteristics || []).join(" | "), r.thesis, r.lesson, r.before_img, r.after_img,
+      ].map(csvCell).join(","));
+      continue;
+    }
     const v2 = versionOf(r.ticked) !== 1;
     const tset = new Set(r.ticked || []);
     const g = scoreTicked(r.ticked, makerGate === false ? { makerGate: false } : undefined);
     lines.push([
-      r.ticker, r.entry_date, r.exit_date, r.pattern, r.theme, r.outcome, g.stars, g.pct != null ? Math.round(g.pct * 100) + "%" : "", v2 ? "v2" : "v1",
+      "classic", r.ticker, r.entry_date, r.exit_date, r.pattern, r.theme, r.outcome, g.stars, g.pct != null ? Math.round(g.pct * 100) + "%" : "", v2 ? "v2" : "v1",
       ...CSV_TICK_COLS.map(([k]) => (v2 ? (tset.has(k) ? "TRUE" : "FALSE") : "")),
       r.run_pct, r.run_up_pct, r.days_held, r.r_mult, (r.characteristics || []).join(" | "), r.thesis, r.lesson, r.before_img, r.after_img,
     ].map(csvCell).join(","));
@@ -109,12 +123,50 @@ export function downloadMyBookCsv(rows, opts) {
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 export function openMyBookPdf(rows, { makerGate } = {}) {
   const today = new Date().toISOString().slice(0, 10);
+  const stat = (k, v) => v || v === 0 ? `<div class="st"><div class="sk">${k}</div><div class="sv">${esc(v)}</div></div>` : "";
+  const CHART_ROLE_LABEL = { context: "Context (HTF)", before: "The setup", trigger: "The trigger — 5-min", after: "The outcome" };
+  // ── STUDY-ROW entry (presentation-contract: opened/printed = full timeline + full checklist).
+  //   charts  = the FULL ordered list (buildChartList true) — each a full-width figure, its LABEL the
+  //             figcaption + its caption text under it (not the fixed BEFORE/AFTER pair).
+  //   checklist = the study buckets (STUDY_SETUPS / SUBCATS / studyQuality) — ticked items as .tick chips
+  //             (chosen subcat value inline) + a "{on}/{total}" criteria line.
+  //   stats   = study.outcome fields (mfe_d20 / burst_pct …) where the plain fields are absent — the
+  //             stat() helper only renders what exists; "—" is never invented.
+  const studyEntry = (r) => {
+    const study = r.metrics.study;
+    const q = studyQuality(study);
+    const cls = outcomeClass(study);
+    const oc = cls ? OC_CHIP[cls] : null;
+    const ocCls = cls === "failure" ? "bad" : (cls === "monster" || cls === "big winner") ? "good" : "";
+    const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Momentum Breakout"];
+    const chips = def.buckets.flatMap((b) => b.items.map(([k, itemLabel]) => {
+      if (!study.checks?.[k]) return "";
+      const sc = SUBCATS[k];
+      const subRaw = sc && study.checks?.[sc.store];
+      const subVal = sc && subRaw != null && subRaw !== "" ? (sc.options.find(([o]) => o === String(subRaw)) || [, String(subRaw)])[1] : null;
+      return `<span class="tick">✓ ${esc(itemLabel)}${subVal ? ` · <b>${esc(subVal)}</b>` : ""}</span>`;
+    })).filter(Boolean);
+    const o = study.outcome || {};
+    const figs = buildChartList(r, true).filter((c) => c && c.img)
+      .map((c) => `<figure class="fullfig"><figcaption>${esc(c.label || CHART_ROLE_LABEL[c.role] || "Chart")}</figcaption><img src="${esc(c.img)}"/>${c.caption ? `<div class="fignote">${esc(c.caption)}</div>` : ""}</figure>`).join("");
+    return `<section class="entry">
+      <div class="ehead">
+        <div><span class="tk">${esc(r.ticker)}</span><span class="pat">${esc(study.setup || "")}</span></div>
+        <div class="emeta">${esc(r.entry_date || "")} · <b class="${ocCls}">${oc ? esc(oc.label) : "Pending"}</b> · ${esc(q.letter)} ${q.on}/${q.total}</div>
+      </div>
+      <div class="charts stack">${figs || '<div class="noimg">no charts</div>'}</div>
+      <div class="stats">${stat("MFE d5 %", o.mfe_d5)}${stat("MFE d20 %", o.mfe_d20)}${stat("Burst %", o.burst_pct)}${stat("Captured %", r.run_pct)}${stat("R multiple", r.r_mult)}${stat("Theme", r.theme)}</div>
+      ${chips.length ? `<div class="ticks">${chips.join("")}</div><div class="foot">${q.on}/${q.total} criteria ticked</div>` : ""}
+      ${r.thesis ? `<div class="note"><b>Thesis:</b> ${esc(r.thesis)}</div>` : ""}
+      ${r.lesson ? `<div class="note"><b>Lesson:</b> ${esc(r.lesson)}</div>` : ""}
+    </section>`;
+  };
   const entry = (r) => {
+    if (r.metrics?.study) return studyEntry(r);
     const g = scoreTicked(r.ticked, makerGate === false ? { makerGate: false } : undefined);
     const tset = new Set(r.ticked || []);
     const ticks = sectionsFor(r.ticked).filter((s) => !s.reminder).flatMap((sec, si) =>
       sec.items.map((it, ii) => tset.has(si + "-" + ii) ? `<span class="tick">✓ ${esc(it.c)}</span>` : "").filter(Boolean));
-    const stat = (k, v) => v || v === 0 ? `<div class="st"><div class="sk">${k}</div><div class="sv">${esc(v)}</div></div>` : "";
     return `<section class="entry">
       <div class="ehead">
         <div><span class="tk">${esc(r.ticker)}</span><span class="pat">${esc(r.pattern || "")}</span></div>
@@ -158,6 +210,11 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
       figure img{width:100%;max-height:52vh;object-fit:contain;border:1px solid rgba(255,255,255,0.12);border-radius:10px;background:#000}
       figcaption{font-size:0.62rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#c9982a;margin-bottom:5px}
       .noimg{border:1px dashed rgba(255,255,255,0.2);border-radius:10px;padding:30px;text-align:center;color:#666;font-size:0.8rem}
+      /* Study rows print the FULL timeline: each chart a full-width figure (label = figcaption, caption below). */
+      .charts.stack{grid-template-columns:1fr;gap:16px}
+      .fullfig img{max-height:70vh}
+      .fignote{font-size:0.72rem;color:#cfccc3;line-height:1.55;margin-top:6px}
+      body.light .fignote{color:#2e2c25}
       .stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
       .st{border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:7px 14px;background:rgba(255,255,255,0.03)}
       .sk{font-size:0.56rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#9a968c}
@@ -522,6 +579,134 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
     );
 }
 
+// ── EXPORT PICKER (Valen 2026-07-27) — one dialog behind BOTH toolbar buttons. Multi-select, filter by
+// ticker (comma-list = exact set · single = substring), date range on entry_date, and (admin, when studies
+// are in the population) a type chip (All / Studies / Classic). Footer PDF/CSV act on the SELECTED rows.
+// Population: members → their own plain rows (byte-identical to before); admin → plain + study rows (the
+// unified My Research set). Portaled to body; z 1100 — above the card grid, below the detail overlay ladder
+// (detail 1200 · study editor 1250 · lightbox 1500). Palette C; near-black text on gold chips.
+function ExportDialog({ C, font, isAdmin, pop, gradeBadge, onClose }) {
+  const opts = isAdmin ? undefined : { makerGate: false };
+  const hasStudies = isAdmin && pop.some(isStudyRow);
+  const [tickerRaw, setTickerRaw] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [typeF, setTypeF] = useState("all"); // all | studies | classic
+  const filtered = pop.filter((r) => {
+    if (hasStudies && typeF === "studies" && !isStudyRow(r)) return false;
+    if (hasStudies && typeF === "classic" && isStudyRow(r)) return false;
+    const t = String(r.ticker || "").toUpperCase();
+    const raw = tickerRaw.trim().toUpperCase();
+    if (raw) {
+      if (raw.includes(",")) { // comma-separated list → exact-ticker set
+        const toks = raw.split(",").map((x) => x.trim()).filter(Boolean);
+        if (!toks.includes(t)) return false;
+      } else if (!t.includes(raw)) return false; // single term → substring/contains
+    }
+    const iso = mbISO(r.entry_date); // date range on entry_date (blank bound = open-ended)
+    if (from && (!iso || iso < from)) return false;
+    if (to && (!iso || iso > to)) return false;
+    return true;
+  });
+  // Selection: default ALL of the filtered set; re-select-all whenever a filter changes (state stays simple).
+  const [selected, setSelected] = useState(() => new Set(pop.map((r) => r.id)));
+  useEffect(() => { setSelected(new Set(filtered.map((r) => r.id))); /* eslint-disable-next-line */ }, [tickerRaw, from, to, typeF]);
+  const selectedRows = filtered.filter((r) => selected.has(r.id));
+  const N = selectedRows.length, M = filtered.length;
+  const toggle = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const chipS = (active) => ({
+    display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", fontSize: "0.7rem", fontWeight: 700,
+    padding: "6px 13px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
+    border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? "#08080e" : C.muted,
+    background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
+  });
+  const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.8rem", padding: "8px 11px", outline: "none", colorScheme: "dark" };
+  const smallBtn = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 700, fontSize: "0.7rem", padding: "6px 13px", borderRadius: 99, cursor: "pointer" };
+  const footBtn = (disabled) => ({ background: disabled ? "rgba(255,255,255,0.05)" : `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: disabled ? C.muted : "#08080e", border: disabled ? `1px solid ${C.border}` : "none", fontFamily: font, fontWeight: 800, fontSize: "0.8rem", padding: "11px 22px", borderRadius: 99, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.65 : 1 });
+
+  // outcome chip (label + color) — study rows use the pre-registered class; plain rows the outcome column/derivation.
+  const outcomeChip = (r) => {
+    if (isStudyRow(r)) {
+      const cls = outcomeClass(r.metrics.study), oc = cls ? OC_CHIP[cls] : null;
+      return oc ? { label: `${oc.emoji} ${oc.label}`, color: oc.color } : { label: "— pending", color: C.muted };
+    }
+    const eo = r.outcome || outcomeFromR(r.r_mult, r.run_pct);
+    if (!eo) return { label: "— pending", color: C.muted };
+    const win = /winner/i.test(eo), loss = /(loser|subpar)/i.test(eo);
+    return { label: `${win ? "▲ " : loss ? "▼ " : ""}${eo}`, color: win ? C.goldBright : loss ? "#e05555" : C.muted };
+  };
+  const gradeLetter = (r) => isStudyRow(r) ? studyQuality(r.metrics.study).letter
+    : gradeBadge(effectiveStars(cardStars(r), (r.elite || []).length).n).l;
+
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(4,4,8,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "min(760px, 96%)", background: "linear-gradient(180deg, rgba(18,18,26,0.97), rgba(8,8,14,0.99))", border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "22px 24px", boxShadow: "0 40px 100px rgba(0,0,0,0.72)", fontFamily: font }}>
+        {/* header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+          <div>
+            <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>Export</div>
+            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white, marginTop: 3 }}>Export your book</div>
+          </div>
+          <button onClick={onClose} aria-label="Close" style={{ marginLeft: "auto", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, width: 34, height: 34, borderRadius: 10, fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }}>&times;</button>
+        </div>
+        <div style={{ fontSize: "0.74rem", color: C.muted, marginBottom: 16, lineHeight: 1.5 }}>Pick what to export — filter, then tick the entries. PDF = a branded study book; CSV = a flat sheet for any analysis tool.</div>
+
+        {/* (a) FILTERS */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 14 }}>
+          <input value={tickerRaw} onChange={(e) => setTickerRaw(e.target.value)} placeholder="Ticker — MXL, PLTR or a substring"
+            style={{ ...inputS, flex: "1 1 220px", minWidth: 0, fontWeight: 700, borderColor: tickerRaw ? C.goldBright : C.border }} />
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.68rem", fontWeight: 700, color: C.muted }}>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...inputS, cursor: "pointer" }} /></label>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.68rem", fontWeight: 700, color: C.muted }}>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ ...inputS, cursor: "pointer" }} /></label>
+        </div>
+        {hasStudies && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+            {[["all", "All"], ["studies", "Studies"], ["classic", "Classic entries"]].map(([k, label]) => (
+              <button key={k} onClick={() => setTypeF(k)} style={chipS(typeF === k)}>{label}</button>
+            ))}
+          </div>
+        )}
+
+        {/* (b) SELECT-ALL / CLEAR + count */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+          <button onClick={() => setSelected(new Set(filtered.map((r) => r.id)))} style={smallBtn}>Select all</button>
+          <button onClick={() => setSelected(new Set())} style={smallBtn}>Clear</button>
+          <span style={{ marginLeft: "auto", fontSize: "0.72rem", fontWeight: 700, color: C.goldBright }}>{N} of {M} selected</span>
+        </div>
+
+        {/* (b) FILTERED LIST — scrolls internally */}
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, maxHeight: "min(46vh, 380px)", overflowY: "auto", marginBottom: 16 }}>
+          {filtered.length === 0 ? (
+            <div style={{ padding: "34px 16px", textAlign: "center", color: C.muted, fontSize: "0.8rem" }}>No entries match these filters.</div>
+          ) : filtered.map((r) => {
+            const on = selected.has(r.id);
+            const gl = gradeLetter(r);
+            const pat = isStudyRow(r) ? (r.metrics.study.setup || r.pattern) : r.pattern;
+            const ocp = outcomeChip(r);
+            return (
+              <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderBottom: `1px solid ${C.border}`, cursor: "pointer", fontSize: "0.76rem" }}>
+                <input type="checkbox" checked={on} onChange={() => toggle(r.id)} style={{ cursor: "pointer", accentColor: C.goldBright, flexShrink: 0 }} />
+                <b style={{ width: 62, color: C.white, flexShrink: 0 }}>{r.ticker}</b>
+                <span style={{ width: 82, color: C.muted, flexShrink: 0 }}>{r.entry_date || "—"}</span>
+                <span style={{ flex: 1, minWidth: 0, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pat || "—"}</span>
+                {gl === "—"
+                  ? <span style={{ flexShrink: 0, minWidth: 24, textAlign: "center", padding: "1px 7px", borderRadius: 6, fontWeight: 800, fontSize: "0.66rem", color: C.muted, border: `1px solid ${C.border}` }}>—</span>
+                  : <span style={{ flexShrink: 0, minWidth: 24, textAlign: "center", padding: "2px 7px", borderRadius: 6, fontWeight: 800, fontSize: "0.66rem", color: "#08080e", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` }}>{gl}</span>}
+                <span style={{ width: 108, flexShrink: 0, textAlign: "right", fontWeight: 800, fontSize: "0.66rem", color: ocp.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ocp.label}</span>
+              </label>
+            );
+          })}
+        </div>
+
+        {/* (c) FOOTER — act on the SELECTED rows */}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button disabled={N === 0} onClick={() => N && openMyBookPdf(selectedRows, opts)} style={footBtn(N === 0)}>⬇ Export PDF ({N})</button>
+          <button disabled={N === 0} onClick={() => N && downloadMyBookCsv(selectedRows, opts)} style={footBtn(N === 0)}>⬇ CSV ({N})</button>
+        </div>
+      </div>
+    </div>, document.body);
+}
+
 export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, guideLeave, gactive, journaledTrades }) {
   const uid = session?.user?.id;
   const [rows, setRows] = useState([]);
@@ -540,6 +725,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [detail, setDetail] = useState(null);
   const [editing, setEditing] = useState(null); // null | {} (new) | row (edit)
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false); // Export picker dialog (multi-select + filters)
   const [zoom, setZoom] = useState(null); // lightbox: { imgs: {before, after}, slot: "before"|"after" }
   const [studyMode, setStudyMode] = useState(mbDeepLink === "studies"); // 📚 Studies view (admin, inside My Book)
   const [studyEditing, setStudyEditing] = useState(null); // null | {} (new) | row (edit)
@@ -611,6 +797,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const myRows = rows.filter(r => r.created_by === uid && !isStudyRow(r)); // the member's OWN card entries — export + Your-patterns scope
   const mineCount = myRows.length; // must match the fScope==='mine' predicate
   const studyRows = rows.filter(r => r.created_by === uid && isStudyRow(r));
+  // Export population: members export their own plain rows (byte-identical to before); admin exports the
+  // unified My Research set (plain rows + study rows). The Export dialog filters/multi-selects within this.
+  const exportPop = isAdmin ? [...myRows, ...studyRows] : myRows;
 
   const uploadImg = async (file, slot, setRow) => {
     if (!file) return;
@@ -729,13 +918,15 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         </div>
         {!editing && !studyEditing && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {mineCount > 0 && (
+            {exportPop.length > 0 && (
               <>
-                <button onClick={() => openMyBookPdf(myRows, isAdmin ? undefined : { makerGate: false })}
-                  title="Your book as a branded PDF — one page per entry with the BEFORE and AFTER charts, score, factors and your notes. Opens a print view; use Save as PDF."
+                {/* Both buttons now open the ONE Export picker (multi-select · filter by ticker · date range).
+                    The actual PDF/CSV run on the SELECTED rows from inside the dialog. */}
+                <button onClick={() => setExporting(true)}
+                  title="Open the export picker — multi-select entries, filter by ticker and date range, then export as a branded PDF study book."
                   style={{ background: "rgba(255,255,255,0.04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ Export PDF</button>
-                <button onClick={() => downloadMyBookCsv(myRows, isAdmin ? undefined : { makerGate: false })}
-                  title="Download YOUR entries as a CSV — every checklist tick as its own TRUE/FALSE column, plus outcomes, metrics and your notes. Feed it to any analysis tool to hunt commonalities."
+                <button onClick={() => setExporting(true)}
+                  title="Open the export picker — multi-select entries, filter by ticker and date range, then export as a CSV for any analysis tool."
                   style={{ background: "rgba(255,255,255,0.04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ CSV</button>
               </>
             )}
@@ -747,6 +938,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           </div>
         )}
       </div>
+
+      {exporting && <ExportDialog C={C} font={font} isAdmin={isAdmin} pop={exportPop} gradeBadge={gradeBadge} onClose={() => setExporting(false)} />}
 
       {editing !== null && <MBEditor C={C} font={font} busy={busy} isAdmin={isAdmin} initial={editing.id ? editing : null} onSave={save} onCancel={() => setEditing(null)} onUpload={uploadImg} journaledTrades={journaledTrades} />}
 
