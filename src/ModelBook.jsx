@@ -132,7 +132,74 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
   //             (chosen subcat value inline) + a "{on}/{total}" criteria line.
   //   stats   = study.outcome fields (mfe_d20 / burst_pct …) where the plain fields are absent — the
   //             stat() helper only renders what exists; "—" is never invented.
-  const studyEntry = (r) => {
+  // ── Per-row meta for the MENU (clickable TOC) — same star/score math as the cards, never re-derived.
+  const rowMeta = (r, i) => {
+    if (r.metrics?.study) {
+      const s = r.metrics.study, q = studyQuality(s), cls = outcomeClass(s), o = s.outcome || {};
+      return { anchor: "e" + i, stars: STUDY_LETTER_N[q.letter] || 0, ticker: r.ticker, date: r.entry_date || "",
+        setup: s.setup || r.pattern || "", score: `${q.on}/${q.total} · ${q.letter}`,
+        outcome: cls ? (OC_CHIP[cls]?.label || cls) : "Pending", good: cls === "monster" || cls === "big winner", bad: cls === "failure",
+        move: o.mfe_d20 ?? o.burst_pct ?? "", r: r.r_mult ?? "" };
+    }
+    const g = scoreTicked(r.ticked, makerGate === false ? { makerGate: false } : undefined);
+    return { anchor: "e" + i, stars: g.stars || 0, ticker: r.ticker, date: r.entry_date || "",
+      setup: r.pattern || "", score: g.pct != null ? Math.round(g.pct * 100) + "%" : "—",
+      outcome: r.outcome || "—", good: /win/i.test(r.outcome || ""), bad: /los/i.test(r.outcome || ""),
+      move: r.run_up_pct ?? "", r: r.r_mult ?? "" };
+  };
+  const pct = (v) => (v === "" || v == null) ? "—" : (String(v).includes("%") ? esc(v) : esc(v) + "%");
+  // MENU pages — Eric-model-book style: grouped by star tier, every row a link that jumps to the entry
+  // (anchors survive Chrome/Safari Save-as-PDF, so the saved PDF keeps the clickable contents).
+  const menuHtml = (() => {
+    const metas = rows.map(rowMeta);
+    const tiers = [5, 4, 3, 2, 1, 0].map((n) => ({ n, list: metas.filter((m) => m.stars === n) })).filter((t) => t.list.length);
+    const tr = (m) => `<tr onclick="location.hash='${m.anchor}'">
+      <td><a href="#${m.anchor}">${esc(m.ticker)}</a></td><td>${esc(m.date)}</td><td class="mut">${esc(m.setup)}</td>
+      <td>${esc(m.score)}</td><td class="${m.good ? "good" : m.bad ? "bad" : "mut"}">${esc(m.outcome)}</td>
+      <td class="num">${pct(m.move)}</td><td class="num">${m.r === "" || m.r == null ? "—" : esc(m.r) + "R"}</td></tr>`;
+    const tier = (t) => `<tr class="tierh"><td colspan="7">${t.n ? t.n + "-STAR " + "★".repeat(t.n) : "UNGRADED"}</td></tr>${t.list.map(tr).join("")}`;
+    return `<div class="page menu">
+      <div class="mhead"><div><span class="mtitle">MY MODEL BOOK</span><span class="msub">graded setups · ${rows.length} entries</span></div><div class="msub">menu · exported ${today}</div></div>
+      <table class="mtab"><thead><tr><th>Ticker</th><th>Date</th><th>Setup</th><th>Score</th><th>Outcome</th><th>Peak move</th><th>R</th></tr></thead>
+      <tbody>${tiers.map(tier).join("")}</tbody></table>
+      <div class="foot">Click any ticker to jump to that entry — the links stay clickable in the saved PDF.</div>
+    </div>`;
+  })();
+  // 🧪 HYPOTHESIS SUMMARY — included only when the export carries study rows (the research wing).
+  // Votes come from the SAME entryVerdict engine as the Lab strip — presentation reuse, no re-derivation.
+  // Honest-stats laws hold here too: denominators shown, tri-state, per-leg counting disclosed,
+  // zero-failure guard (lift engine blind until ~5 graded failures).
+  const hypHtml = (() => {
+    const studies = rows.filter((r) => r.metrics?.study);
+    if (!studies.length) return "";
+    const classes = studies.map((r) => outcomeClass(r.metrics.study));
+    const nWin = classes.filter((c) => c === "monster" || c === "big winner").length;
+    const nSmall = classes.filter((c) => c === "works small").length;
+    const nFail = classes.filter((c) => c === "failure").length;
+    const nPend = classes.filter((c) => c == null).length;
+    const lines = HYPOTHESES.map((h) => {
+      let sup = 0, chal = 0, data = 0;
+      for (const r of studies) {
+        const v = entryVerdict(h, r.metrics.study, { ticker: r.ticker, date: r.entry_date });
+        if (!v) continue;
+        if (v.bucket === "supports") sup++; else if (v.bucket === "challenges") chal++; else data++;
+      }
+      if (!sup && !chal && !data) return "";
+      const read = (sup || chal)
+        ? (sup === chal ? `<span class="hpill split">SPLIT</span>` : sup > chal ? `<span class="hpill sup">LEANS SUPPORTS</span>` : `<span class="hpill chal">LEANS AGAINST</span>`)
+        : `<span class="hpill mutp">DATA ONLY</span>`;
+      return `<tr><td class="hid">${esc(h.id)}</td><td><b>${esc(h.short || h.claim)}</b><div class="hclaim">${esc(h.prior || "")}</div></td>
+        <td class="num">🟢 ${sup}&nbsp;&nbsp;🔴 ${chal}&nbsp;&nbsp;⚪ ${data}</td><td>${read}</td></tr>`;
+    }).filter(Boolean);
+    return `<div class="page hyp">
+      <div class="mhead"><div><span class="mtitle">🧪 HYPOTHESES</span><span class="msub">what this research says so far</span></div><div class="msub">${studies.length} studies in this export</div></div>
+      <div class="stats">${stat("Studies", studies.length)}${stat("Big winners", nWin)}${stat("Works small", nSmall)}${stat("Failures", nFail)}${stat("Pending", nPend)}</div>
+      ${nFail < 5 ? `<div class="warn">⚠ Only ${nFail} graded failure${nFail === 1 ? "" : "s"} in this export — lift math needs ~5 failures to mean anything. Verdicts below are directional evidence counts, not lift.</div>` : ""}
+      <table class="mtab htab"><thead><tr><th>ID</th><th>Hypothesis</th><th>Evidence</th><th>Read</th></tr></thead><tbody>${lines.join("")}</tbody></table>
+      <div class="foot">Votes per study leg from the same verdict engine as the Lab (🟢 supports · 🔴 challenges · ⚪ adds data). The Lab view collapses multi-leg campaigns and applies the full evidence gates — it is the authority; this page is the summary.</div>
+    </div>`;
+  })();
+  const studyEntry = (r, i) => {
     const study = r.metrics.study;
     const q = studyQuality(study);
     const cls = outcomeClass(study);
@@ -149,7 +216,7 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
     const o = study.outcome || {};
     const figs = buildChartList(r, true).filter((c) => c && c.img)
       .map((c) => `<figure class="fullfig"><figcaption>${esc(c.label || CHART_ROLE_LABEL[c.role] || "Chart")}</figcaption><img src="${esc(c.img)}"/>${c.caption ? `<div class="fignote">${esc(c.caption)}</div>` : ""}</figure>`).join("");
-    return `<section class="entry">
+    return `<section class="entry" id="e${i}">
       <div class="ehead">
         <div><span class="tk">${esc(r.ticker)}</span><span class="pat">${esc(study.setup || "")}</span></div>
         <div class="emeta">${esc(r.entry_date || "")} · <b class="${ocCls}">${oc ? esc(oc.label) : "Pending"}</b> · ${esc(q.letter)} ${q.on}/${q.total}</div>
@@ -161,13 +228,13 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
       ${r.lesson ? `<div class="note"><b>Lesson:</b> ${esc(r.lesson)}</div>` : ""}
     </section>`;
   };
-  const entry = (r) => {
-    if (r.metrics?.study) return studyEntry(r);
+  const entry = (r, i) => {
+    if (r.metrics?.study) return studyEntry(r, i);
     const g = scoreTicked(r.ticked, makerGate === false ? { makerGate: false } : undefined);
     const tset = new Set(r.ticked || []);
     const ticks = sectionsFor(r.ticked).filter((s) => !s.reminder).flatMap((sec, si) =>
       sec.items.map((it, ii) => tset.has(si + "-" + ii) ? `<span class="tick">✓ ${esc(it.c)}</span>` : "").filter(Boolean));
-    return `<section class="entry">
+    return `<section class="entry" id="e${i}">
       <div class="ehead">
         <div><span class="tk">${esc(r.ticker)}</span><span class="pat">${esc(r.pattern || "")}</span></div>
         <div class="emeta">${esc(r.entry_date || "")}${r.exit_date ? " → " + esc(r.exit_date) : ""} · <b class="${/win/i.test(r.outcome || "") ? "good" : /los/i.test(r.outcome || "") ? "bad" : ""}">${esc(r.outcome || "—")}</b> · ${"★".repeat(g.stars || 0)}${"☆".repeat(Math.max(0, 5 - (g.stars || 0)))} ${g.pct != null ? Math.round(g.pct * 100) + "%" : ""}</div>
@@ -225,6 +292,33 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
       .note b{color:#c9982a}
       .foot{color:#66635b;font-size:0.6rem;margin-top:10px}
       .toolbar .ghost{background:transparent;border:1px solid rgba(201,152,42,0.6);color:#c9982a}
+      /* ── MENU (clickable contents) + hypothesis summary ── */
+      .mhead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:2px solid #c9982a;padding-bottom:10px;margin-bottom:14px}
+      .mtitle{color:#c9982a;font-size:1.35rem;font-weight:800;letter-spacing:0.08em}
+      .msub{color:#9a968c;font-size:0.72rem;font-weight:700;margin-left:12px}
+      .mtab{width:100%;border-collapse:collapse}
+      .mtab th{font-size:0.56rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#9a968c;text-align:left;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.16)}
+      .mtab td{font-size:0.74rem;font-weight:600;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.07);vertical-align:top}
+      .mtab td.num,.mtab th:nth-last-child(-n+2){text-align:right}
+      .mtab tr[onclick]{cursor:pointer}
+      .mtab a{color:#f0c050;font-weight:800;text-decoration:none}
+      .mtab .mut{color:#9a968c}
+      .tierh td{color:#c9982a;font-weight:800;font-size:0.7rem;letter-spacing:0.12em;padding-top:16px;border-bottom:1px solid rgba(201,152,42,0.5)}
+      .hid{color:#c9982a;font-weight:800;white-space:nowrap}
+      .hclaim{color:#9a968c;font-size:0.64rem;font-weight:500;line-height:1.45;margin-top:2px}
+      .hpill{display:inline-block;font-size:0.56rem;font-weight:800;letter-spacing:0.06em;border-radius:99px;padding:2px 9px;border:1px solid;white-space:nowrap}
+      .hpill.sup{color:#7ef0a0;border-color:#7ef0a0}.hpill.chal{color:#e05555;border-color:#e05555}
+      .hpill.split{color:#f0c050;border-color:#f0c050}.hpill.mutp{color:#9a968c;border-color:#9a968c}
+      .warn{border:1px solid rgba(224,85,85,0.55);background:rgba(224,85,85,0.08);color:#e8a0a0;border-radius:10px;padding:9px 13px;font-size:0.7rem;font-weight:700;line-height:1.5;margin-bottom:12px}
+      body.light .mtitle,body.light .tierh td,body.light .hid{color:#8a6a1c}
+      body.light .msub,body.light .mtab .mut,body.light .mtab th,body.light .hclaim{color:#6a675e}
+      body.light .mtab a{color:#8a6a1c}
+      body.light .mtab th{border-bottom-color:rgba(0,0,0,0.25)}
+      body.light .mtab td{border-bottom-color:rgba(0,0,0,0.08)}
+      body.light .tierh td{border-bottom-color:rgba(138,106,28,0.5)}
+      body.light .hpill.sup{color:#15803d;border-color:#15803d}.light .hpill.chal{color:#b91c1c;border-color:#b91c1c}
+      body.light .hpill.split{color:#8a6a1c;border-color:#8a6a1c}body.light .hpill.mutp{color:#6a675e;border-color:#6a675e}
+      body.light .warn{color:#8a2626;border-color:rgba(185,28,28,0.5);background:rgba(185,28,28,0.06)}
       /* ── Light / ink-friendly theme (member picks in the toolbar; whichever shows is what prints) ── */
       body.light{background:#fdfcf9;color:#16150f}
       body.light::before{background:#fdfcf9}
@@ -250,7 +344,9 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
       <div class="sub">${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${today}</div>
       <div class="sub" style="margin-top:26px;max-width:60ch;line-height:1.6">Your own pattern library — the setup, the factors that were present, and the outcome. Study the pairs; the commonalities are the edge. Educational, not advice.</div>
     </div>
-    ${rows.map(entry).join("")}
+    ${menuHtml}
+    ${hypHtml}
+    ${rows.map((r, i) => entry(r, i)).join("")}
     <script>window.onload=()=>{const imgs=[...document.images];Promise.all(imgs.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r})))};</script>
     </body></html>`;
   // Blob URL instead of document.write into about:blank — Safari/strict browsers render the
