@@ -285,12 +285,17 @@ export default function MarketMonitor({ C, font, session }) {
     },
   ];
 
+  const t2108Zone = latest.t2108 == null ? null
+    : latest.t2108 < 20 ? { txt: "Below 20 — oversold · opportunity zone", col: C.green }
+    : latest.t2108 > 79.99 ? { txt: "Above 80 — overheated · stretched", col: C.red }
+    : { txt: "Mid-zone (20–80) — no signal", col: C.muted };
+
   const kpis = [
     { k: "up4", label: "Stocks up 4%+ today", val: num(latest.up4), tip: "How many stocks jumped 4%+ today — raw buying pressure.", tone: C.green },
     { k: "down4", label: "Stocks down 4%+ today", val: num(latest.down4), tip: "How many stocks dropped 4%+ today — raw selling pressure.", tone: C.red },
     { k: "r5", label: "5-day ratio", val: rat(latest.r5_calc ?? latest.r5), tip: "Buyers vs sellers over the last 5 days. Above 1 = buyers led the week.", tone: C.goldBright },
     { k: "r10", label: "10-day ratio", val: rat(latest.r10_calc ?? latest.r10), tip: "Same balance over 10 days — a smoother read of who's winning.", tone: C.goldBright },
-    { k: "t2108", label: "T2108", val: rat(latest.t2108), tip: "T2108 — the % of all stocks above their 40-day average. High = crowded and stretched. Low = washed out. Extremes show up near turns.", tone: C.blue },
+    { k: "t2108", label: "T2108", val: rat(latest.t2108), tip: "T2108 — the % of all stocks above their 40-day average. Below 20 = washed out — the oversold opportunity zone where bottoms form. Above 80 = crowded and stretched. In between = no signal.", tone: C.blue, sub: t2108Zone },
   ];
 
   const DualSpark = ({ a, b, ca, cb, W = 260, H = 60 }) => {
@@ -303,12 +308,14 @@ export default function MarketMonitor({ C, font, session }) {
       <polyline points={path(b)} fill="none" stroke={cb} strokeWidth="1.6" strokeLinejoin="round" />
     </svg>);
   };
-  const SingleSpark = ({ a, col, W = 260, H = 60, lo = 0, hi = 100 }) => {
+  const SingleSpark = ({ a, col, W = 260, H = 60, lo = 0, hi = 100, guides = [] }) => {
     const arr = a.filter(v => v != null);
     if (arr.length < 2) return <span style={{ color: C.muted }}>—</span>;
     const rng = hi - lo || 1;
+    const gy = (v) => ((1 - (v - lo) / rng) * (H - 6) + 3).toFixed(1);
     const path = a.map((v, i) => v == null ? null : `${(i / (a.length - 1) * (W - 2) + 1).toFixed(1)},${((1 - (v - lo) / rng) * (H - 6) + 3).toFixed(1)}`).filter(Boolean).join(" ");
     return (<svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: "block", height: H }}>
+      {guides.map(g => <line key={g.v} x1="1" x2={W - 1} y1={gy(g.v)} y2={gy(g.v)} stroke={g.col} strokeWidth="1" strokeDasharray="4 4" opacity="0.55" />)}
       <polyline points={path} fill="none" stroke={col} strokeWidth="1.6" strokeLinejoin="round" />
     </svg>);
   };
@@ -372,6 +379,7 @@ export default function MarketMonitor({ C, font, session }) {
                 <InfoDot tip={k.tip} />
               </div>
               <div style={{ fontSize: "1.6rem", fontWeight: 800, color: k.tone, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{k.val}</div>
+              {k.sub && <div style={{ fontSize: "0.62rem", fontWeight: 700, color: k.sub.col, marginTop: 7, lineHeight: 1.35 }}>{k.sub.txt}</div>}
             </div>
           ))}
         </div>
@@ -492,8 +500,12 @@ export default function MarketMonitor({ C, font, session }) {
             <span style={cardLabel}>T2108 · last {win.length}</span>
             <InfoDot tip="The share of stocks above their 40-day average. BELOW 20 = washed out — historically where market BOTTOMS form (opportunity zone, shows green in the sheet). Above 80 = stretched / overheated (shows red). In between = no signal." />
           </div>
-          <SingleSpark a={t2108Series} col={C.blue} lo={0} hi={100} />
-          <div style={{ fontSize: "0.64rem", color: C.muted, marginTop: 8 }}>0–100 scale · broad participation read</div>
+          <SingleSpark a={t2108Series} col={C.blue} lo={0} hi={100} guides={[{ v: 20, col: C.green }, { v: 80, col: C.red }]} />
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
+            <span style={{ fontSize: "0.64rem", color: C.green, fontWeight: 700 }}>┈ below 20 = oversold · opportunity zone</span>
+            <span style={{ fontSize: "0.64rem", color: C.red, fontWeight: 700 }}>┈ above 80 = overheated</span>
+            <span style={{ fontSize: "0.64rem", color: C.muted }}>0–100 scale</span>
+          </div>
         </div>
       </section>
 

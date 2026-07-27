@@ -755,10 +755,11 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "July 27, 2026",
-    title: "🧭 Rotation ranks + ⚡ macro events on the radar",
+    title: "🧭 Rotation ranks + ⚡ macro events + T2108 zones",
     items: [
       "The sector rotation tables now show a # position column on the left, so you can see exactly where each group sits in the ranking (member-requested).",
       "The earnings radar now flags high-impact macro events — FOMC decisions and CPI prints appear as ⚡ gold markers with the exact time and whether a dot plot is due (member-requested). Rate-odds context is on the list next.",
+      "Market Breadth now marks the T2108 zones in plain sight: below 20 = oversold — the opportunity zone where bottoms form; above 80 = overheated. The tile shows which zone we're in right now, and the chart carries dashed guide lines at 20 and 80.",
     ],
   },
   {
