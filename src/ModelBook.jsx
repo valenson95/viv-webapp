@@ -1066,8 +1066,10 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         const r = detail, eff = effectiveStars(cardStars(r), (r.elite || []).length);
         return (
           <div onClick={e => { if (e.target === e.currentTarget) setDetail(null); }} style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(4,4,8,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
-            <div style={{ width: "min(1000px,100%)", background: "linear-gradient(180deg, rgba(18,18,26,0.95), rgba(8,8,14,0.98))", border: `1px solid ${C.borderGold}`, borderRadius: 20, padding: "22px 24px", boxShadow: "0 40px 100px rgba(0,0,0,0.72)" }}>
-              <style dangerouslySetInnerHTML={{ __html: ".mbdt-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;align-items:start}.mbdt-rail{position:sticky;top:0;max-height:calc(100vh - 96px);overflow-y:auto}@media (max-width:760px){.mbdt-grid{grid-template-columns:1fr}.mbdt-rail{position:static;max-height:none;overflow:visible;order:-1}}" }} />
+            <div style={{ width: "min(1280px,96%)", background: "linear-gradient(180deg, rgba(18,18,26,0.95), rgba(8,8,14,0.98))", border: `1px solid ${C.borderGold}`, borderRadius: 20, padding: "22px 26px", boxShadow: "0 40px 100px rgba(0,0,0,0.72)" }}>
+              {/* Rail scrollbar: thin, gold-tinted, with an 8px gutter so the thumb never sits ON the
+                  card content (Valen 2026-07-27: "the scroll shouldn't overlap the card"). */}
+              <style dangerouslySetInnerHTML={{ __html: ".mbdt-grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:24px;align-items:start}.mbdt-rail{position:sticky;top:0;max-height:calc(100vh - 96px);overflow-y:auto;padding-right:8px;scrollbar-width:thin;scrollbar-color:rgba(201,152,42,0.35) transparent}.mbdt-rail::-webkit-scrollbar{width:6px}.mbdt-rail::-webkit-scrollbar-thumb{background:rgba(201,152,42,0.3);border-radius:3px}.mbdt-rail::-webkit-scrollbar-track{background:transparent}@media (max-width:760px){.mbdt-grid{grid-template-columns:1fr}.mbdt-rail{position:static;max-height:none;overflow:visible;order:-1;padding-right:0}}" }} />
               {/* header — full width above the two columns */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4, flexWrap: "wrap" }}>
                 <span style={{ fontSize: "1.4rem", fontWeight: 800, color: C.white }}>{r.ticker}</span>
