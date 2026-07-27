@@ -754,6 +754,15 @@ function PlaybookTracker({ trades, uid, setPage }) {
 const WHATS_NEW = [
   {
     tag: "New",
+    date: "July 27, 2026",
+    title: "🧭 Rotation ranks + ⚡ macro events on the radar",
+    items: [
+      "The sector rotation tables now show a # position column on the left, so you can see exactly where each group sits in the ranking (member-requested).",
+      "The earnings radar now flags high-impact macro events — FOMC decisions and CPI prints appear as ⚡ gold markers with the exact time and whether a dot plot is due (member-requested). Rate-odds context is on the list next.",
+    ],
+  },
+  {
+    tag: "New",
     date: "July 26, 2026",
     title: "📖 Model Book — the case-study redesign",
     items: [

@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { EARNINGS } from "./earnings-data.js";
 import { GROUP_RS } from "./groupRS-data.js";
+import { MACRO_EVENTS } from "./macroCalendar-data.js";
 import { InfoDot } from "./GroupRS.jsx";
 import { LensCamera } from "./capture.jsx";
 
@@ -20,6 +21,11 @@ const ADMIN_EMAIL = "vc-lv@live.com";
 const LIQUID_LEADERS = new Set((GROUP_RS?.ll || []).map((r) => r.t));
 const LL_BY_T = Object.fromEntries((GROUP_RS?.ll || []).map((r) => [r.t, r]));
 const isLeader = (t) => LIQUID_LEADERS.has(t);
+
+// ── MACRO EVENTS — high-impact US macro (FOMC/CPI) folded into the earnings radar strip +
+// full calendar popup, per member ask ("include economic calendar outlook on key macro events").
+// Deliberately NOT a new dashboard card — this reuses the existing earnings surfaces only.
+const MACRO_BY_DATE = Object.fromEntries(MACRO_EVENTS.map((e) => [e.d, e]));
 
 // ── formatters ───────────────────────────────────────────────────────────────
 const abbrev = (v) => {
@@ -201,6 +207,7 @@ function RadarStrip({ radar, today, onChipClick, interactive = true, C, autoScro
         .radarstrip .radar-day.past{opacity:0.5}
         .radarstrip .radar-hd{font-size:0.72rem;font-weight:800;letter-spacing:0.005em;color:${C.white};text-align:center;padding:0 2px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:8px}
         .radarstrip .radar-hd.today{color:${C.goldBright}}
+        .radarstrip .radar-macro{text-align:center;font-size:0.72rem;color:${C.goldBright};margin:-4px 0 6px;cursor:help;line-height:1}
         .radarstrip .radar-cols{display:flex;gap:6px}
         .radarstrip .radar-sub{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:5px}
         .radarstrip .sub-h{display:flex;align-items:center;gap:4px;font-size:0.54rem;font-weight:800;letter-spacing:0.03em;text-transform:uppercase;padding:2px 6px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -231,6 +238,9 @@ function RadarStrip({ radar, today, onChipClick, interactive = true, C, autoScro
           return (
             <div key={d} ref={i === anchorIdx ? anchorRef : undefined} className={"radar-day" + (past ? " past" : "") + (isLast ? " last" : "")}>
               <div className={"radar-hd" + (d === today ? " today" : "")}>{ordDay(d)}</div>
+              {MACRO_BY_DATE[d] && (
+                <div className="radar-macro" title={`${MACRO_BY_DATE[d].label} — ${MACRO_BY_DATE[d].detail}`}>⚡</div>
+              )}
               {past ? (
                 rows.length === 0 ? (
                   <div className="radar-dim">·</div>
@@ -473,6 +483,9 @@ function WeekGridView({ daysMap, filter, C, today, curWeek, onChipClick }) {
                 <div key={col.d} className={"ec-col" + (col.isToday ? " today" : "")}>
                   <div className="ec-colhead"><span className="ec-wd">{col.weekday}</span><span className="ec-dt">{monDay(col.d)}</span>{col.isToday && <span className="ec-todaytag">TODAY</span>}</div>
                   <div className="ec-colbody">
+                    {MACRO_BY_DATE[col.d] && (
+                      <div className="macro-banner">⚡ {MACRO_BY_DATE[col.d].label} — {MACRO_BY_DATE[col.d].detail}</div>
+                    )}
                     {col.shown === 0 ? <div className="ec-empty">—</div> : STACKS.map((s) => {
                       const list = col.stacks[s.key] || [];
                       if (!list.length) return null;
@@ -631,6 +644,10 @@ export default function EarningsCalendar({ C, font, session }) {
         .earn .pill.on{border-color:${C.goldBright};background:linear-gradient(135deg,${C.goldBright},${C.goldMid});opacity:1}
         .earn .pill.on .p-wd,.earn .pill.on .p-meta{color:#08080e}
         .earn .pill-div{flex:0 0 auto;width:1px;align-self:stretch;background:rgba(255,255,255,0.14);margin:2px 3px}
+        /* macro (FOMC/CPI) banner — slim gold-bordered row at the top of a day carrying a
+           high-impact macro event; folded into the existing day panel / week-grid columns
+           (no new dashboard card). */
+        .earn .macro-banner{padding:8px 12px;border-radius:10px;border:1px solid ${C.borderGold};background:rgba(201,152,42,0.09);color:${C.goldBright};font-size:0.72rem;font-weight:700;line-height:1.5}
         /* day panel */
         .earn .paneln{display:grid;grid-template-columns:1fr 1fr;gap:12px}
         .earn .pcol{border-radius:12px;background:rgba(255,255,255,0.018);border:1px solid rgba(255,255,255,0.06);overflow:hidden}
@@ -778,6 +795,9 @@ export default function EarningsCalendar({ C, font, session }) {
 
               {panel && (
                 <>
+                  {MACRO_BY_DATE[activeDay] && (
+                    <div className="macro-banner" style={{ marginBottom: 12 }}>⚡ {MACRO_BY_DATE[activeDay].label} — {MACRO_BY_DATE[activeDay].detail}</div>
+                  )}
                   <div className="paneln">
                     {[STACKS[0], STACKS[1]].map((s) => {
                       const list = panel.stacks[s.key] || [];

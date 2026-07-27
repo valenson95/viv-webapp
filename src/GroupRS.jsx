@@ -403,14 +403,29 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
     </th>
   );
 
+  // ── RANK "#" column — leftmost, member ask ("add a leftmost column showing # ranking,
+  // there are many of them"). 1-based position in the CURRENT displayed sort order (the
+  // index of the mapped row). Only shown on tables that are ranking-sorted (Groups table,
+  // EW/SPDR Sector blocks, Liquid Leaders) — the Index/Segment blocks stay a fixed ladder
+  // (see the doctrine comment in PlanFocus) and never get a rank number.
+  const RANK_TIP = "Position in the current ranking — sorted by 1-month relative strength, then thrust.";
+  const rth = () => (
+    <th title={RANK_TIP} style={{ padding: "8px 6px", fontSize: "0.62rem", fontWeight: 800, color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: "right", width: 26, whiteSpace: "nowrap", cursor: "default" }}>#</th>
+  );
+  const rtd = (n) => (
+    <td style={{ padding: "7px 6px", borderBottom: `1px solid ${C.border}`, fontSize: "0.62rem", color: C.muted, textAlign: "right", width: 26, fontVariantNumeric: "tabular-nums" }}>{n}</td>
+  );
+
   // one shared data row (used by Groups table AND Plan & Focus blocks). No ★ column.
-  const DataRow = ({ row }) => {
+  // `rank` = 1-based position to show in the leftmost # column; omit/undefined to skip it.
+  const DataRow = ({ row, rank }) => {
     const blank = row.err || null;
     const bench = !!row.benchmark;
     const spy = row.t === "SPY";
     const benchCell = <span style={{ color: C.muted, fontStyle: "italic" }}>benchmark</span>;
     return (
       <tr style={spy ? { boxShadow: `inset 3px 0 0 ${C.gold}` } : undefined}>
+        {rank != null && rtd(rank)}
         <td style={{ ...td, fontWeight: 800, color: C.white }}>
           <span className="grs-tk" title="View top holdings" onClick={() => setHoldingsFor({ t: row.t, name: row.name })}>{row.t}</span>
         </td>
@@ -441,8 +456,9 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
 
   // shared by the Sector Groups table (global chain) AND each Top-Down block
   // (its own chain) — caller supplies which sort chain/handler this header drives.
-  const HeadRow = ({ chain: hChain, onSort }) => (
+  const HeadRow = ({ chain: hChain, onSort, showRank = false }) => (
     <tr>
+      {showRank && rth()}
       {th(hChain, onSort, "Ticker", "The ETF that tracks this group.", "t")}
       {sth("Group", "What kind of stocks this ETF holds.")}
       {th(hChain, onSort, "Thrust %", "This week's momentum, ranked 0–100. Higher = money rushing in right now.", "thrust", "right")}
@@ -481,6 +497,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
 
   const llHead = (hChain, onSort) => (
     <tr>
+      {rth()}
       {th(hChain, onSort, "Ticker", "The stock this row measures.", "t")}
       {sth("Industry", "A display label for the company's group. DeepVue stays the grouping source of truth.")}
       {th(hChain, onSort, "Thrust %", "This week's momentum, ranked 0–100. Higher = money rushing in right now.", "thrust", "right")}
@@ -496,10 +513,11 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
     </tr>
   );
 
-  const llRow = (row) => {
+  const llRow = (row, rank) => {
     const blank = row.err || null;
     return (
       <tr key={row.t}>
+        {rtd(rank)}
         <td style={{ ...td, fontWeight: 800, color: C.white }}>{row.t}</td>
         <td style={{ ...td, color: C.muted, textAlign: "left", maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis" }} title={row.industry || ""}>{row.industry || <span style={{ color: C.muted }}>—</span>}</td>
         <td style={{ ...td, textAlign: "right", background: heat(row.thrust) }}>
@@ -568,7 +586,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
         : rankedByDefault
           ? [...restRaw].sort((a, x) => (x.rs1m ?? -1) - (a.rs1m ?? -1) || (x.thrust ?? -999) - (a.thrust ?? -999))
           : restRaw;
-      return { block: b, rows: [...bench, ...rest] }; // benchmark (RSP) pinned first, never sorted
+      return { block: b, rows: [...bench, ...rest], showRank: rankedByDefault }; // benchmark (RSP) pinned first, never sorted
     }).filter(b => b.rows.length);
 
     const miniChip = (lbl, v, frac) => (
@@ -600,7 +618,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
                 )}
               </div>
               <div style={{ overflowX: "auto" }}>
-                <table><thead><HeadRow chain={bs.chain} onSort={bs.clickSort} /></thead><tbody>{b.rows.map(r => <DataRow key={r.t} row={r} />)}</tbody></table>
+                <table><thead><HeadRow chain={bs.chain} onSort={bs.clickSort} showRank={b.showRank} /></thead><tbody>{b.rows.map((r, i) => <DataRow key={r.t} row={r} rank={b.showRank ? i + 1 : undefined} />)}</tbody></table>
               </div>
             </section>
           );
@@ -729,8 +747,8 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
               <table className="minitable">
                 <thead>{llHead(llSort.chain, llSort.clickSort)}</thead>
                 <tbody>
-                  {llView.map(row => llRow(row))}
-                  {!llView.length && (<tr><td colSpan={12} style={{ ...td, textAlign: "center", color: C.muted, padding: 24 }}>No leaders match this filter.</td></tr>)}
+                  {llView.map((row, i) => llRow(row, i + 1))}
+                  {!llView.length && (<tr><td colSpan={13} style={{ ...td, textAlign: "center", color: C.muted, padding: 24 }}>No leaders match this filter.</td></tr>)}
                 </tbody>
               </table>
             </div>
@@ -756,10 +774,10 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
           <section className="grs-card" style={{ padding: "6px 8px" }}>
             <div style={{ overflowX: "auto" }}>
               <table>
-                <thead><HeadRow chain={chain} onSort={clickSort} /></thead>
+                <thead><HeadRow chain={chain} onSort={clickSort} showRank /></thead>
                 <tbody>
-                  {view.map(row => <DataRow key={row.t} row={row} />)}
-                  {!view.length && (<tr><td colSpan={11} style={{ ...td, textAlign: "center", color: C.muted, padding: 24 }}>No groups match this filter.</td></tr>)}
+                  {view.map((row, i) => <DataRow key={row.t} row={row} rank={i + 1} />)}
+                  {!view.length && (<tr><td colSpan={12} style={{ ...td, textAlign: "center", color: C.muted, padding: 24 }}>No groups match this filter.</td></tr>)}
                 </tbody>
               </table>
             </div>

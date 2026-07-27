@@ -579,9 +579,14 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     : n === 3 ? { l: "B", fg: C.goldBright, bg: C.goldDim, bd: C.borderGold }
     : { l: "C", fg: "#fca5a5", bg: "rgba(239,68,68,0.12)", bd: "rgba(239,68,68,0.3)" };
 
+  // Admin's 🎴 Gallery view over My Research shows the WHOLE personal dataset as cards — study rows +
+  // plain rows together (the "same fills, VIV-Official format" view). Everywhere else, studies stay out
+  // of the card grid unless starred for the Model Book (members are entirely unaffected — adminGallery is
+  // false for them, so their card grid is byte-identical).
+  const adminGallery = isAdmin && fScope === "mine";
   const visible = rows.filter(r => {
     // studies live in their own 📚 view UNLESS starred for the Model Book (then they show as cards too)
-    if (isStudyRow(r) && !inModelBook(r)) return false;
+    if (isStudyRow(r) && !inModelBook(r) && !adminGallery) return false;
     if (fScope === "official" && !r.is_published) return false;
     if (fScope === "mine" && r.created_by !== uid) return false;
     if (fPattern !== "All" && r.pattern !== fPattern) return false;
@@ -699,6 +704,10 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     });
   };
 
+  // Format toggle (admin My Research): studyMode === true ⇔ 🧪 Lab view; false ⇔ 🎴 Gallery view.
+  // Persist the last choice so re-entering the scope restores it (default "lab" when unset).
+  const setFormat = (lab) => { setStudyMode(lab); try { localStorage.setItem("viv-mb-format", lab ? "lab" : "gallery"); } catch {} };
+
   const chip = (active) => ({
     display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
     fontSize: "0.72rem", fontWeight: 700, padding: "7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
@@ -730,10 +739,10 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                   style={{ background: "rgba(255,255,255,0.04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ CSV</button>
               </>
             )}
-            {/* ONE INTAKE (Valen 2026-07-26): for ADMIN in a personal scope (📖 Legacy OR 📚 Studies — both
-                fScope==="mine") "+ Add entry" opens the STUDY editor (studyMode on so its portal mounts).
-                Members (never admin) keep their untouched draft flow → MBEditor. Admin in All/Official still
-                opens MBEditor for a curated card. Editing an EXISTING legacy row still uses MBEditor (elsewhere). */}
+            {/* ONE INTAKE: for ADMIN in 🔒 My Research (fScope==="mine") "＋ New study" opens the STUDY editor
+                (studyMode on → Lab view, its portal mounts). Members (never admin) keep their untouched draft
+                flow → MBEditor. Admin in All/Official opens MBEditor for a curated card. Editing an EXISTING
+                legacy row still uses MBEditor (via the detail overlay's Edit button). */}
             <button onClick={() => { if (isAdmin && fScope === "mine") { setStudyMode(true); setStudyEditing({}); } else setEditing({}); }} style={{ background: `linear-gradient(120deg, ${C.goldMid}, ${C.goldBright}, ${C.goldDeep})`, color: "#0a0a0a", border: "none", fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", boxShadow: "0 6px 18px rgba(201,152,42,0.25)" }}>{(isAdmin && fScope === "mine") ? "＋ New study" : isAdmin ? "+ Add entry" : "+ Add to my book"}</button>
           </div>
         )}
@@ -743,14 +752,26 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
       {/* filters */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 18px", alignItems: "center" }}>
-        {/* "Legacy" framing is ADMIN-only (his pre-studies entries); members see their own personal
-            collection here and for them it stays "My Book". */}
-        {[["All", "All"], ["official", "⭐ VIV Official"], ["mine", `${isAdmin ? "📖 Legacy" : "🔒 My Book"}${mineCount ? ` (${mineCount})` : ""}`]].map(([k, label]) => (
-          <button key={k} onClick={() => { setFScope(k); if (k !== "mine") setStudyMode(false); }} style={chip(fScope === k)}>{label}</button>
+        {/* ONE personal dataset (Valen 2026-07-27): the admin's plain rows + study rows are the SAME
+            collection viewed two ways — so his personal scope is ONE chip "🔒 My Research (N)" (N = plain +
+            study rows), NOT the old split 📖 Legacy / 📚 Studies chips. Members keep their untouched single
+            "🔒 My Book (N)" chip (N = their plain rows). Format (lab vs gallery) lives in the toggle below. */}
+        {[["All", "All"], ["official", "⭐ VIV Official"],
+          ["mine", isAdmin ? `🔒 My Research${(mineCount + studyRows.length) ? ` (${mineCount + studyRows.length})` : ""}` : `🔒 My Book${mineCount ? ` (${mineCount})` : ""}`]].map(([k, label]) => (
+          <button key={k} onClick={() => {
+            if (k === "mine") { if (isAdmin) { let f = "lab"; try { f = localStorage.getItem("viv-mb-format") || "lab"; } catch {} setStudyMode(f === "lab"); } }
+            else setStudyMode(false);
+            setFScope(k);
+          }} style={chip(fScope === k)}>{label}</button>
         ))}
-        {isAdmin && (
-          <button onClick={() => { if (fScope !== "mine") { setFScope("mine"); setStudyMode(true); } else setStudyMode(m => !m); }}
-            style={chip(studyMode && fScope === "mine")}>📚 Studies{studyRows.length ? ` (${studyRows.length})` : ""}</button>
+        {/* FORMAT toggle — admin only, only in My Research scope. Lab = the studies row/stats view
+            (studyMode === true); Gallery = the VIV-Official card grid over the SAME rows. Last choice
+            persists in localStorage "viv-mb-format" (default "lab"). */}
+        {isAdmin && fScope === "mine" && (
+          <>
+            <button onClick={() => setFormat(true)} style={chip(studyMode)}>🧪 Lab view</button>
+            <button onClick={() => setFormat(false)} style={chip(!studyMode)}>🎴 Gallery view</button>
+          </>
         )}
       </div>
 
@@ -920,16 +941,60 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 </div>
               );
             })}
+
+          {/* 📖 Legacy entries — the admin's pre-studies plain personal rows, shown in the SAME dense row
+              format below the studies so Lab view is the whole personal dataset. These are NOT studies:
+              they carry no hypothesis votes (14 hollow dots) and never enter the scoreboard stats above.
+              Clicking a row opens the normal card detail overlay (whose Edit routes to MBEditor), not the
+              study editor. Admin-only block → plain "Legacy" copy is fine. */}
+          {myRows.length > 0 && (
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, borderTop: `1px solid ${C.border}`, paddingTop: 14, marginBottom: 10 }}>
+                📖 Legacy entries — pre-studies era <span style={{ color: C.gold }}>({myRows.length})</span>
+              </div>
+              {myRows.map((r) => {
+                const faces = chartFaces(r, false); // plain rows: derives from before_img/after_img
+                const frontImg = faces.front && faces.front.img;
+                const backImg = faces.back && faces.back.img;
+                const gl = gradeBadge(effectiveStars(cardStars(r), (r.elite || []).length).n).l;
+                const eo = r.outcome || outcomeFromR(r.r_mult, r.run_pct);
+                const win = eo ? /winner/i.test(eo) : null;
+                const loss = eo ? /(loser|subpar)/i.test(eo) : null;
+                const oc = win ? "#7ef0a0" : loss ? "#e05555" : C.muted;
+                return (
+                  <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 4, fontSize: "0.78rem", cursor: "pointer" }}
+                    onClick={() => setDetail(r)}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = C.borderGold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
+                    <b style={{ width: 64 }}>{r.ticker}</b>
+                    <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
+                      {frontImg ? <img src={frontImg} alt="setup" title="The setup" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
+                      <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
+                      {backImg
+                        ? <img src={backImg} alt="outcome" title="The outcome" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} />
+                        : <span title="No after chart" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
+                    </span>
+                    <span style={{ width: 150 }}>{r.pattern}</span>
+                    <span style={{ width: 70, color: gl === "A+" ? "#7ef0a0" : gl === "C" ? "#e05555" : C.goldBright, fontWeight: 700 }} title="Grade from the Setup Grader stars">{gl}</span>
+                    <span title={eo ? `Outcome: ${eo}` : "Outcome pending"} style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 108, flexShrink: 0, whiteSpace: "nowrap", fontSize: "0.66rem", fontWeight: 800, color: oc }}>{eo ? `${win ? "▲" : loss ? "▼" : ""} ${eo}` : "— pending"}</span>
+                    <span style={{ flex: 1, minWidth: 0 }} />
+                    {/* 14-dot alignment slot: hollow only — legacy rows are not part of the hypothesis dataset */}
+                    <span title="legacy entry — not part of the hypothesis dataset" style={{ display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center", flex: "none", maxWidth: 130, justifyContent: "flex-end" }}>
+                      {HYPOTHESES.map(h => <span key={h.id} style={{ width: 7, height: 7, borderRadius: "50%", background: "transparent", border: `1px solid ${C.border}`, boxSizing: "border-box", flex: "none" }} />)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Hypotheses everywhere (Valen 2026-07-26): MEMBERS keep "Your patterns" (their honest own-factor
-          tally) in 📖 Legacy. For ADMIN the same personal scope mounts the 🧪 Hypotheses tally instead —
-          one evidence engine across both his personal surfaces (reuses the same StudyHypotheses instance). */}
-      {fScope === "mine" && !studyMode && !loading && !error && (
-        isAdmin
-          ? <StudyHypotheses C={C} rows={studyRows} />
-          : (myRows.length > 0 ? <YourPatterns C={C} font={font} myRows={myRows} /> : null)
+      {/* MEMBERS keep "Your patterns" (their honest own-factor tally) in 🔒 My Book — UNCHANGED. For ADMIN
+          the 🧪 hypothesis tally + scoreboard now live in 🧪 Lab view only (mounted in the studies block
+          above), so 🎴 Gallery view here is a clean card grid — no stats panel above it. */}
+      {fScope === "mine" && !studyMode && !loading && !error && !isAdmin && myRows.length > 0 && (
+        <YourPatterns C={C} font={font} myRows={myRows} />
       )}
 
       {/* card grid — mobile-safe auto-fit (min() caps the track so a card never overflows a narrow screen) */}
