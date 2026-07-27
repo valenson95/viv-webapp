@@ -252,8 +252,13 @@ const turnover = mcap ? advDollar / mcap.cap * 100 : null;
 // H10 companions (Valen 2026-07-24): sessions from the trigger to the FIRST daily close below the
 // SMA (10 & 20). Reuses `all` + `sma`. Never breaks inside the post-trigger window → null + censored
 // flag (censored ≠ short trend — the readout treats it separately). Distinct from days_above_10ma.
-const daysBelowMA = (period) => { for (let k = ti+1; k < all.length; k++) { const s = sma(all, period, k); if (s && all[k].c < s) return { d: k - ti, cens: false }; } return { d: null, cens: true }; };
+// Also track the PEAK %-from-entry reached BEFORE (and including) the break session — Valen
+// 2026-07-27: "% return peak before closing below MA10/20" (the Eric-book "entry to 1st MA close"
+// stat, in his SMA convention). Break-day high counts: intraday high precedes the close that breaks.
+// Censored (never broke) → peak over the available window, read alongside maN_censored.
+const daysBelowMA = (period) => { let hi = null; for (let k = ti+1; k < all.length; k++) { hi = hi == null ? all[k].h : Math.max(hi, all[k].h); const s = sma(all, period, k); if (s && all[k].c < s) return { d: k - ti, cens: false, peak: hi }; } return { d: null, cens: true, peak: hi }; };
 const b10 = daysBelowMA(10), b20 = daysBelowMA(20);
+const pkPct = (b) => b.peak != null && entry ? (b.peak / entry - 1) * 100 : null;
 
 const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(ret(63)), ext_50ma:f(ext50,2),
   mcap_t: mcap ? Math.round(mcap.cap) : null, mcap_asof: mcap ? `${mcap.asof} (SEC shares ${(mcap.shares/1e6).toFixed(1)}M × trigger close)` : null,
@@ -262,6 +267,7 @@ const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(r
   invaded_half: invadedHalf, d3_moved: d3Moved, dormant_days: dormant, dormant_capped: dormantCapped,
   adv_dollar: advDollar != null ? Math.round(advDollar) : null, turnover_pct: f(turnover, 2),
   d_below_ma10: b10.d, ma10_censored: b10.cens, d_below_ma20: b20.d, ma20_censored: b20.cens,
+  peak_to_ma10_pct: f(pkPct(b10)), peak_to_ma20_pct: f(pkPct(b20)),
   drop_after_peak_5: f(dropPeak5,1), drop_after_peak_10: f(dropPeak10,1),
   closing_range:f(crange,0), stop_width_adr:f(((entry-lod)/entry*100)/adr20,2),
   entry_px:`${f(entry,2)} (${entryModel})`,
