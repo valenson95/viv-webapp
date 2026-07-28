@@ -949,6 +949,10 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [zoom, setZoom] = useState(null); // lightbox: { imgs: {before, after}, slot: "before"|"after" }
   const [studyMode, setStudyMode] = useState(mbDeepLink === "studies"); // 📚 Studies view (admin, inside My Book)
   const [book, setBook] = useState("__all__"); // active project book in My Research: "__all__" | "__none__" (Winner DNA) | project name
+  // Studies-list column sort (Valen 2026-07-28): [{ key: "entry"|"trigger", dir: 1|-1 }, …] — index 0 = primary,
+  // later entries = secondary (multi-sort: clicking a new column makes it primary, the old primary demotes).
+  // Clicking the active primary toggles asc→desc→off. Empty array = the default ticker-chronicle order.
+  const [listSort, setListSort] = useState([]);
   const [studyEditing, setStudyEditing] = useState(null); // null | {} (new) | row (edit)
   // StudyEditor sets this to a guard that returns true when it's safe to close (no unsaved changes, or the
   // user confirmed discarding). The backdrop click consults it; StudyEditor's own Cancel/nav guard themselves.
@@ -1354,10 +1358,47 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           {/* Grouped by CAMPAIGN (Valen 2026-07-24): legs of one trend nest under a header (ticker · span ·
               N legs · shared BEFORE→AFTER). Solo studies (no campaign_id) render as a single row exactly as
               before — a campaign of one. "+ Add leg" links a new leg to the trend. */}
+          {/* Sortable column headers (Valen 2026-07-28): Entry date + Trigger date, multi-sort — the last
+              clicked column is primary (¹), the previous one secondary (²). Blank dates always sort last.
+              Widths mirror the legRow columns below so headers sit over their data. */}
+          {(() => {
+            const th = (key, label, width) => {
+              const idx = listSort.findIndex(s => s.key === key);
+              const st = idx >= 0 ? listSort[idx] : null;
+              const cyc = () => setListSort(prev => {
+                const i = prev.findIndex(s => s.key === key);
+                if (i === 0) return prev[0].dir === 1 ? [{ key, dir: -1 }, ...prev.slice(1)] : prev.slice(1); // asc→desc→off
+                const rest = prev.filter(s => s.key !== key);
+                return [{ key, dir: 1 }, ...rest]; // new/secondary click → primary asc
+              });
+              return (
+                <button onClick={cyc} title="Click to sort — asc → desc → off. The other date column stays as a secondary sort."
+                  style={{ width, textAlign: "left", background: "transparent", border: "none", cursor: "pointer", padding: 0, fontFamily: font, fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: st ? C.goldBright : C.muted, whiteSpace: "nowrap" }}>
+                  {label}{st ? (st.dir === 1 ? " ↑" : " ↓") : " ⇅"}{listSort.length > 1 && idx >= 0 ? <sup>{idx + 1}</sup> : null}
+                </button>
+              );
+            };
+            return (
+              <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "2px 12px 6px" }}>
+                <span style={{ width: 64, fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.muted }}>Ticker</span>
+                {th("entry", "Entry date", 92)}
+                {th("trigger", "Trigger date", 92)}
+              </div>
+            );
+          })()}
           {buildCampaigns(bookStudyRows).list
-            .sort((a, b) => a.root.ticker === b.root.ticker
-              ? String(a.span[0] || "").localeCompare(String(b.span[0] || ""))
-              : (a.root.ticker < b.root.ticker ? -1 : 1))
+            .sort((a, b) => {
+              const trig = (c) => c.root.metrics?.study?.m?.trigger_date || "";
+              for (const s of listSort) {
+                const va = s.key === "entry" ? String(a.span[0] || "") : trig(a);
+                const vb = s.key === "entry" ? String(b.span[0] || "") : trig(b);
+                if (!va && vb) return 1; if (va && !vb) return -1; // blanks last, whatever the direction
+                if (va !== vb) return va.localeCompare(vb) * s.dir;
+              }
+              return a.root.ticker === b.root.ticker
+                ? String(a.span[0] || "").localeCompare(String(b.span[0] || ""))
+                : (a.root.ticker < b.root.ticker ? -1 : 1);
+            })
             .map((camp) => {
               // Plain render helper (invoked directly → inline elements, not a nested component).
               const legRow = (r, legIndex, indent, showAddLeg) => {
@@ -1384,6 +1425,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                       ? <span style={{ width: 64, color: C.muted, fontSize: "0.66rem", fontWeight: 700 }}>leg {legIndex}</span>
                       : <b style={{ width: 64 }}>{r.ticker}</b>}
                     <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
+                    {/* Trigger date (Valen 2026-07-28) — his picked trigger (metrics.study.m.trigger_date), distinct
+                        from the entry/anchor date (e.g. Market Bottom rows anchor on the LOW; the trigger comes later). */}
+                    <span title="Trigger date — fill it in the editor's metrics grid" style={{ color: s.m?.trigger_date ? C.goldBright : C.muted, width: 92, fontSize: "0.74rem" }}>{s.m?.trigger_date || "—"}</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
                       {frontImg
                         ? <span style={{ position: "relative", display: "inline-block", width: 64, height: 40, flexShrink: 0 }}>
@@ -1400,7 +1444,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                             ? <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />
                             : <span title="No outcome chart yet — drop `TICKER DATE AFTER.png` in the study inbox" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
                     </span>
-                    <span style={{ width: 150 }}>{r.pattern}</span>
+                    {/* setup comes from the STUDY payload (the pattern column is the legacy Model-Book field —
+                        rows seeded by script showed the DB-default "Trendline Breakout", Valen bug report 2026-07-28) */}
+                    <span style={{ width: 150 }}>{(s.setup || r.pattern || "") + (s.direction === "short" ? " · Short" : "")}</span>
                     {(() => { const q = studyQuality(s); return <span style={{ width: 70, color: q.letter === "—" ? C.muted : q.letter === "A+" ? "#7ef0a0" : C.goldBright, fontWeight: 700 }} title={`${q.on}/${q.total} criteria ticked`}>{q.letter}</span>; })()}
                     {/* (a) OUTCOME-CLASS chip — emoji + word, colored by tier (never color alone) */}
                     <span title={oc ? `Outcome class: ${oc.label}` : "Outcome pending — grade the result to classify"} style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 108, flexShrink: 0, whiteSpace: "nowrap", fontSize: "0.66rem", fontWeight: 800, color: oc ? oc.color : C.muted }}>{oc ? `${oc.emoji} ${oc.label}` : "— pending"}</span>
@@ -1472,6 +1518,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                     onMouseEnter={e => e.currentTarget.style.borderColor = C.borderGold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
                     <b style={{ width: 64 }}>{r.ticker}</b>
                     <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
+                    <span style={{ color: C.muted, width: 92 }}>—</span>{/* trigger-column spacer — legacy rows have no study payload */}
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
                       {frontImg ? <img src={frontImg} alt="setup" title="The setup" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
                       <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
