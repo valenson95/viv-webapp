@@ -131,7 +131,25 @@ export function downloadMyBookCsv(rows, opts) {
 // score + ticked factors + the member's own thesis/lesson. Opens a print view in a new tab;
 // the browser's native "Save as PDF" does the rendering (no libraries, charts included).
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// PROJECT_EPISODES (Valen 2026-07-28): per-project episode metadata for the project-book export dividers.
+// Keyed project → year → { label, stats }. A missing year/project prints a plain year divider (no stats).
+const PROJECT_EPISODES = {
+  "Finding the Market's Bottom": {
+    "2023": { label: "Rate-scare correction", stats: "QQQ −10.8% over 71 sessions · low Oct 26, 2023 · reclaimed in 13 sessions" },
+    "2024": { label: "Yen-carry unwind", stats: "QQQ −13.6% over 20 sessions · low Aug 7, 2024 · reclaimed in 64 sessions" },
+    "2025": { label: "Tariff crash — V-shaped capitulation", stats: "QQQ −22.8% over 34 sessions · low Apr 8, 2025 · reclaimed in 52 sessions" },
+  },
+};
+
 export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
+  // Project-book export (Valen 2026-07-28): a coverTitle'd book whose rows are ALL non-H-domain studies
+  // (e.g. "Market Bottom") gets the gallery-grade minimal book instead of the classic model-book layout.
+  // The classic path below is byte-identical when this guard doesn't fire.
+  const _pbStudies = rows.filter((r) => r.metrics?.study);
+  if (coverTitle && _pbStudies.length > 0 && _pbStudies.length === rows.length &&
+    !_pbStudies.some((r) => H_DOMAIN.has(r.metrics.study.setup))) {
+    return openProjectBookPdf(rows, coverTitle);
+  }
   // Chronicle order (Valen 2026-07-28): the book reads BY TICKER, each ticker chronological from
   // its first study — one ticker = one chapter of legs, like a single name's history album.
   rows = [...rows].sort((a, b) => String(a.ticker).localeCompare(String(b.ticker)) ||
@@ -526,6 +544,223 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
   const w = window.open(url, "_blank");
   if (!w) { URL.revokeObjectURL(url); return alert("Pop-up blocked — allow pop-ups for this site to export the PDF."); }
   setTimeout(() => URL.revokeObjectURL(url), 60000); // long grace: the tab must finish loading images
+}
+
+// ── PROJECT-BOOK export (Valen 2026-07-28): a gallery-grade minimal book for a non-H-domain project
+//    (e.g. "Finding the Market's Bottom"). Near-black page, single gold accent, Plus Jakarta Sans,
+//    hairlines instead of boxes, ONE idea per page: cover → contents → working hypotheses → per year a
+//    giant year-divider, then two pages per study (vs-QQQ chart, then daily chart + data strip + ticked
+//    checklist + thesis). Order = year ascending then ticker, matching the Contents. e{idx} anchors on the
+//    first page of each study keep the Contents links clickable in the saved PDF.
+function openProjectBookPdf(rows, coverTitle) {
+  const today = new Date().toISOString().slice(0, 10);
+  const yearOf = (r) => (mbISO(r.entry_date) || "").slice(0, 4) || "—";
+  const ordered = [...rows].sort((a, b) => yearOf(a).localeCompare(yearOf(b)) || String(a.ticker).localeCompare(String(b.ticker)));
+  const groups = [];
+  ordered.forEach((r, i) => { const y = yearOf(r); const g = groups[groups.length - 1];
+    if (g && g.year === y) g.items.push({ r, idx: i }); else groups.push({ year: y, items: [{ r, idx: i }] }); });
+  const years = groups.map((g) => g.year).filter((y) => y !== "—");
+  const yearSpan = years.length ? (years[0] === years[years.length - 1] ? years[0] : `${years[0]}–${years[years.length - 1]}`) : "";
+  const episodes = PROJECT_EPISODES[coverTitle] || {};
+  // ── format helpers (blank → "—", never invented) ──
+  const fmtPct = (v) => (v === "" || v == null) ? "—" : `${+v >= 0 && !String(v).startsWith("-") ? "+" : ""}${esc(v)}%`;
+  const fmtPp = (v) => (v === "" || v == null) ? "—" : `${+v >= 0 && !String(v).startsWith("-") ? "+" : ""}${esc(v)} pp`;
+  const fmtSess = (v) => { if (v === "" || v == null) return "—"; const n = +v;
+    return Number.isNaN(n) ? esc(v) : `${n < 0 ? "−" : n > 0 ? "+" : ""}${Math.abs(n)} sessions`; };
+  // ── COVER ──
+  const cover = `<div class="page pbcover">
+    <div class="pbbrand">Valen Insiders Vault · Model Book</div>
+    <h1 class="pbtitle">${esc(coverTitle)}</h1>
+    <div class="pbrule"></div>
+    <div class="pbmeta">${rows.length} ${rows.length === 1 ? "study" : "studies"}${yearSpan ? ` · ${yearSpan}` : ""} · exported ${today}</div>
+  </div>`;
+  // ── CONTENTS ── (each row a link to #e{idx}; dotted leader flex-grows between name and 3M return)
+  const contents = `<div class="page pbcontents">
+    <div class="pblabel">Contents</div>
+    ${groups.map((g) => {
+      const ep = episodes[g.year];
+      const head = `${g.year}${ep ? ` — ${esc(ep.label)}` : ""}`;
+      const rowsHtml = g.items.map(({ r, idx }) => {
+        const m = r.metrics?.study?.m || {}, theme = r.theme || m.theme || "";
+        const ret3 = m.ret_3m;
+        const ret = (ret3 === "" || ret3 == null) ? "—" : `${+ret3 >= 0 && !String(ret3).startsWith("-") ? "+" : ""}${esc(ret3)}% 3M`;
+        return `<a class="pbcrow" href="#e${idx}"><span class="pbctk">${esc(r.ticker)}</span><span class="pbctheme">${esc(theme)}</span><span class="pbcdots"></span><span class="pbcret">${ret}</span></a>`;
+      }).join("");
+      return `<div class="pbcgroup"><div class="pbcyear">${head}</div>${rowsHtml}</div>`;
+    }).join("")}
+  </div>`;
+  // ── WORKING HYPOTHESES & CHECKLIST TALLY ── (same content as the classic project branch, restyled:
+  //    hanging-indent hypothesis list + hairline tally table, no boxed warnings)
+  const studyRows = rows.filter((r) => r.metrics?.study);
+  const hyps = PROJECT_HYPOTHESES[coverTitle];
+  const tallyGroups = checklistTally(studyRows);
+  const hypPage = (hyps || tallyGroups.length) ? `<div class="page pbhyp">
+    <div class="pblabel">Working hypotheses &amp; checklist tally</div>
+    ${hyps ? `<div class="pbhyps">${hyps.map((h) => `<div class="pbhrow"><span class="pbhid">${esc(h.id)}</span><div class="pbhbody"><div class="pbhtext">${esc(h.text)}</div><div class="pbhmeasure">measure: ${esc(h.measure)}</div></div></div>`).join("")}</div>` : ""}
+    ${tallyGroups.map((g) => `<div class="pbtsec">Checklist tally — ${g.n} stud${g.n === 1 ? "y" : "ies"}${tallyGroups.length > 1 ? ` · ${esc(g.setup)}` : ""}</div>
+      <table class="pbttab"><tbody>${g.items.map((it) => { const p = g.n ? Math.round((it.count / g.n) * 100) : 0;
+        return `<tr><td class="pbtlabel">${esc(it.label)}${it.bonus ? ` <span class="pbbtag">bonus</span>` : ""}</td><td class="pbtbarcell"><div class="pbtbar"><div class="pbtfill" style="width:${p}%"></div></div></td><td class="pbtcount">${it.count}/${g.n}</td></tr>`; }).join("")}</tbody></table>`).join("")}
+    <div class="pbfoot">Counts are studies ticked so far — an untick may just mean "not studied yet", never "failed".</div>
+  </div>` : "";
+  // ── YEAR DIVIDER + per-study pages ──
+  const bodyHtml = groups.map((g) => {
+    const ep = episodes[g.year];
+    const divider = `<div class="page pbdivider">
+      <div class="pbdivnum">${g.year === "—" ? "" : esc(g.year)}</div>
+      <div class="pbdivmeta">
+        ${ep ? `<div class="pbeplabel">${esc(ep.label)}</div>` : g.year === "—" ? "" : `<div class="pbeplabel">${esc(g.year)}</div>`}
+        ${ep && ep.stats ? `<div class="pbepstats">${esc(ep.stats)}</div>` : ""}
+        <div class="pbepcount">${g.items.length} ${g.items.length === 1 ? "study" : "studies"}</div>
+      </div>
+    </div>`;
+    const studies = g.items.map(({ r, idx }) => {
+      const study = r.metrics.study, m = study.m || {}, theme = r.theme || m.theme || "";
+      const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Market Bottom"];
+      const head = `<div class="pbshead"><span class="pbstk">${esc(r.ticker)}</span><span class="pbstheme">${esc(theme)}</span></div>`;
+      const chartBlock = (img, cap, cls = "pbchart") => img
+        ? `<hr class="pbhair"/><img class="${cls}" src="${esc(img)}"/><hr class="pbhair"/><div class="pbcap">${cap}</div>`
+        : `<hr class="pbhair"/><div class="pbnoimg">no ${esc(cap.toLowerCase())} chart yet</div><hr class="pbhair"/><div class="pbcap">${cap}</div>`;
+      // Page A — vs-QQQ chart
+      const pageA = `<div class="page pbstudy" id="e${idx}">
+        ${head}
+        <div class="pbownlow">own low ${esc(r.entry_date || "—")}</div>
+        ${chartBlock(r.before_img, "Vs QQQ")}
+      </div>`;
+      // Page B — daily chart + data strip + ticked checklist + thesis
+      const cells = [
+        ["Own low", esc(r.entry_date || "") || "—"],
+        ["Vs index", fmtSess(m.sessions_vs_index)],
+        ["+3M", fmtPct(m.ret_3m)],
+        ["+6M", fmtPct(m.ret_6m)],
+        ["Vs QQQ 3M", fmtPp(m.vs_qqq_3m)],
+      ];
+      if (m.days_to_reclaim !== "" && m.days_to_reclaim != null) cells.push(["Reclaim", `${esc(m.days_to_reclaim)} sessions`]);
+      if (m.trigger_date) cells.push(["Trigger", esc(m.trigger_date)]);
+      const strip = `<div class="pbstrip">${cells.map(([k, v]) => `<div class="pbcell"><div class="pbck">${esc(k)}</div><div class="pbcv">${v}</div></div>`).join("")}</div>`;
+      const ticks = def.buckets.flatMap((b) => b.items.map(([k, label]) => study.checks?.[k] ? `<span class="pbtick">✓ ${esc(label)}</span>` : "").filter(Boolean));
+      const checklist = `<div class="pbchecklist">${ticks.length ? ticks.join("") : `<span class="pbnotick">no criteria ticked yet</span>`}</div>`;
+      const thesis = r.thesis ? `<div class="pbthesis"><div class="pblabel">Thesis</div><div class="pbthesistext">${esc(r.thesis)}</div></div>` : "";
+      const pageB = `<div class="page pbstudy">
+        ${head}
+        ${chartBlock(r.after_img, "Daily", "pbchart pbchartb")}
+        ${strip}
+        ${checklist}
+        ${thesis}
+      </div>`;
+      return pageA + pageB;
+    }).join("");
+    return divider + studies;
+  }).join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(coverTitle)} — ${today}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+    <style>
+      *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      body{background:#08080e;color:#e8e6e0;font-family:'Plus Jakarta Sans',sans-serif;line-height:1.5}
+      body::before{content:"";position:fixed;inset:0;z-index:-1;background:#08080e}
+      /* LANDSCAPE (Valen 2026-07-28): every chart in the book is a wide DeepVue export — portrait left
+         half of each study page empty. A4-landscape lets the charts own the page. */
+      @page{size:A4 landscape;margin:0}
+      .page{padding:40px 56px;page-break-after:always;min-height:94vh}
+      .pblabel{font-size:0.62rem;font-weight:800;letter-spacing:0.28em;text-transform:uppercase;color:#9a968c}
+      .pbfoot{color:#66635b;font-size:0.62rem;margin-top:22px;letter-spacing:0.02em}
+      /* toolbar (screen only) */
+      .toolbar{position:fixed;top:14px;right:14px;display:flex;gap:8px;z-index:9}
+      .toolbar button{background:linear-gradient(120deg,#c9982a,#f0c050);border:none;color:#08080e;font-family:inherit;font-weight:800;font-size:0.85rem;padding:10px 20px;border-radius:99px;cursor:pointer}
+      .toolbar .ghost{background:transparent;border:1px solid rgba(201,152,42,0.6);color:#c9982a}
+      @media print{.toolbar{display:none}}
+      /* ── COVER ── */
+      .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
+      .pbbrand{font-size:0.66rem;font-weight:800;letter-spacing:0.32em;text-transform:uppercase;color:#c9982a}
+      .pbtitle{font-size:clamp(2.6rem,7vw,3.4rem);font-weight:800;letter-spacing:-0.03em;line-height:1.02;color:#fff;margin:22px 0 0;max-width:16ch}
+      .pbrule{width:60px;height:2px;background:#c9982a;margin:26px 0 20px}
+      .pbmeta{font-size:0.9rem;color:#9a968c;letter-spacing:0.01em}
+      /* ── CONTENTS ── */
+      .pbcgroup{margin-top:26px}
+      .pbcyear{font-size:0.66rem;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#c9982a;margin-bottom:12px}
+      .pbcrow{display:flex;align-items:baseline;gap:12px;text-decoration:none;color:inherit;padding:7px 0;break-inside:avoid}
+      .pbctk{font-size:0.92rem;font-weight:800;color:#fff;white-space:nowrap}
+      .pbctheme{font-size:0.78rem;color:#9a968c;white-space:nowrap}
+      .pbcdots{flex:1 1 auto;border-bottom:1px dotted rgba(255,255,255,0.22);transform:translateY(-3px)}
+      .pbcret{font-size:0.82rem;font-weight:800;color:#c9982a;white-space:nowrap}
+      /* ── WORKING HYPOTHESES + TALLY ── */
+      .pbhyps{display:grid;gap:16px;margin:22px 0 8px}
+      .pbhrow{display:flex;align-items:flex-start;gap:14px;break-inside:avoid;page-break-inside:avoid}
+      .pbhid{flex:none;font-size:0.62rem;font-weight:800;letter-spacing:0.06em;color:#c9982a;padding-top:2px;white-space:nowrap}
+      .pbhtext{font-size:0.84rem;color:#e8e6e0;line-height:1.6}
+      .pbhmeasure{font-size:0.68rem;color:#9a968c;line-height:1.5;margin-top:5px}
+      .pbtsec{font-size:0.6rem;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#c9982a;margin:26px 0 10px}
+      .pbttab{width:100%;border-collapse:collapse}
+      .pbttab td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,0.08);vertical-align:middle}
+      .pbttab tr{break-inside:avoid;page-break-inside:avoid}
+      .pbtlabel{font-size:0.78rem;font-weight:600;color:#e8e6e0}
+      .pbtcount{font-size:0.74rem;font-weight:800;color:#9a968c;white-space:nowrap;text-align:right}
+      .pbtbarcell{width:34%}
+      .pbtbar{height:5px;border-radius:99px;background:rgba(255,255,255,0.10);overflow:hidden}
+      .pbtfill{height:100%;border-radius:99px;background:linear-gradient(90deg,#b8820a,#f0c050)}
+      .pbbtag{display:inline-block;font-size:0.54rem;font-weight:800;letter-spacing:0.05em;color:#9a968c;margin-left:6px}
+      /* ── YEAR DIVIDER ── */
+      .pbdivider{display:flex;flex-direction:column;justify-content:center;min-height:96vh;position:relative}
+      .pbdivnum{font-size:clamp(9rem,26vw,13rem);font-weight:800;line-height:0.82;letter-spacing:-0.04em;color:rgba(201,152,42,0.18)}
+      .pbdivmeta{margin-top:-0.4em;position:relative}
+      .pbeplabel{font-size:clamp(1.5rem,4vw,2.1rem);font-weight:800;letter-spacing:-0.02em;color:#fff;line-height:1.1}
+      .pbepstats{font-size:0.9rem;color:#9a968c;margin-top:12px;max-width:60ch;line-height:1.6}
+      .pbepcount{font-size:0.62rem;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:#c9982a;margin-top:16px}
+      /* ── STUDY PAGES ── */
+      .pbstudy{display:flex;flex-direction:column}
+      .pbshead{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+      .pbstk{font-size:2.4rem;font-weight:800;letter-spacing:-0.02em;color:#fff}
+      .pbstheme{font-size:0.66rem;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#c9982a;white-space:nowrap}
+      .pbownlow{font-size:0.76rem;color:#9a968c;margin-top:6px}
+      .pbhair{border:none;border-top:1px solid rgba(255,255,255,0.14);margin:18px 0}
+      .pbchart{display:block;width:100%;max-height:72vh;object-fit:contain}
+      /* Page B carries strip+checklist+thesis under the chart — cap it lower so nothing spills (landscape) */
+      .pbchartb{max-height:46vh}
+      .pbnoimg{padding:40px;text-align:center;color:#66635b;font-size:0.8rem}
+      .pbcap{font-size:0.6rem;font-weight:800;letter-spacing:0.2em;text-transform:uppercase;color:#9a968c}
+      .pbchart,.pbstrip,.pbchecklist,.pbthesis,.pbshead,.pbcap{break-inside:avoid;page-break-inside:avoid}
+      /* data strip — hairlines top/bottom only, small-caps labels over values */
+      .pbstrip{display:flex;flex-wrap:wrap;gap:28px;margin:26px 0 4px;padding:16px 0;border-top:1px solid rgba(255,255,255,0.14);border-bottom:1px solid rgba(255,255,255,0.14)}
+      .pbck{font-size:0.54rem;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#9a968c;margin-bottom:5px}
+      .pbcv{font-size:1rem;font-weight:800;color:#e8e6e0}
+      /* ticked checklist — inline gold, generous spacing, no boxes */
+      .pbchecklist{margin-top:22px;line-height:2}
+      .pbtick{color:#c9982a;font-size:0.72rem;font-weight:700;margin-right:24px;white-space:nowrap}
+      .pbnotick{color:#66635b;font-size:0.72rem}
+      /* thesis */
+      .pbthesis{margin-top:26px}
+      .pbthesis .pblabel{color:#c9982a;margin-bottom:8px}
+      .pbthesistext{font-size:0.82rem;line-height:1.7;color:rgba(232,230,224,0.88);max-width:70ch}
+      /* ── LIGHT / ink-friendly theme (member picks in toolbar; whichever shows prints) ── */
+      body.light{background:#fdfcf9;color:#16150f}
+      body.light::before{background:#fdfcf9}
+      body.light .pblabel,body.light .pbfoot,body.light .pbmeta,body.light .pbctheme,body.light .pbhmeasure,body.light .pbtcount,body.light .pbbtag,body.light .pbownlow,body.light .pbepstats,body.light .pbck{color:#6a675e}
+      body.light .pbbrand,body.light .pbcyear,body.light .pbcret,body.light .pbtsec,body.light .pbepcount,body.light .pbhid,body.light .pbstheme,body.light .pbcap,body.light .pbtick,body.light .pbthesis .pblabel{color:#8a6a1c}
+      body.light .pbtitle,body.light .pbeplabel,body.light .pbctk,body.light .pbstk,body.light .pbhtext,body.light .pbtlabel{color:#16150f}
+      body.light .pbthesistext{color:rgba(22,21,15,0.9)}
+      body.light .pbrule,body.light .pbtfill{background:#8a6a1c}
+      body.light .pbdivnum{color:rgba(138,106,28,0.18)}
+      body.light .pbcdots{border-bottom-color:rgba(0,0,0,0.28)}
+      body.light .pbhair{border-top-color:rgba(0,0,0,0.16)}
+      body.light .pbstrip{border-color:rgba(0,0,0,0.16)}
+      body.light .pbcv{color:#16150f}
+      body.light .pbttab td{border-bottom-color:rgba(0,0,0,0.10)}
+      body.light .pbtbar{background:rgba(0,0,0,0.10)}
+      body.light .pbnoimg,body.light .pbnotick{color:#8a857a}
+    </style></head><body>
+    <div class="toolbar">
+      <button class="ghost" onclick="const l=document.body.classList.toggle('light');this.textContent=l?'🌙 Dark theme':'☀ Light theme'">☀ Light theme</button>
+      <button onclick="window.print()">⬇ Save as PDF</button>
+    </div>
+    ${cover}
+    ${contents}
+    ${hypPage}
+    ${bodyHtml}
+    <script>window.onload=()=>{const imgs=[...document.images];Promise.all(imgs.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r})))};</script>
+    </body></html>`;
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+  const w = window.open(url, "_blank");
+  if (!w) { URL.revokeObjectURL(url); return alert("Pop-up blocked — allow pop-ups for this site to export the PDF."); }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 // The elite layer — ONLY factors the Setup Grader checklist does NOT already score

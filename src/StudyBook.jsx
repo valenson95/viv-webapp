@@ -203,7 +203,7 @@ export const STUDY_SETUPS = {
     ],
     metrics: [
       ["idx_low_date", "QQQ low date"], ["sessions_vs_index", "Own low vs index low (sessions)"],
-      ["ret_3m", "+3M off low %"], ["ret_6m", "+6M off low %"], ["vs_qqq_3m", "vs QQQ +3M (pp)"],
+      ["ret_3m", "+3M off low %"], ["ret_6m", "+6M off low %"], ["days_to_reclaim", "Sessions to reclaim pre-correction high"], ["vs_qqq_3m", "vs QQQ +3M (pp)"],
       ["trigger_date", "Trigger date (your pick)"], ["entry_px", "Trigger/entry price"],
       ["theme", "Theme / group"],
     ],
