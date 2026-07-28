@@ -181,6 +181,33 @@ export const STUDY_SETUPS = {
       ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
   },
+  // Market Bottom — project study type (Valen 2026-07-28): how leaders behave around an index
+  // correction low. Ticks drafted from his own chart annotations; data layer prefilled by script.
+  "Market Bottom": {
+    buckets: [
+      { title: "Bottom tell (vs index)", items: [
+        ["bb_early", "Bottomed before the index (own low printed first)"],
+        ["bb_ma_hold", "Held a rising long-term MA (100/200d) at the low"],
+        ["bb_higher_low", "Higher low while QQQ made lower lows"],
+        ["bb_inpace", "Moved in-pace with index — only tell was MAs on pullbacks", "bonus"],
+      ]},
+      { title: "Recovery character", items: [
+        ["rc_reclaim_fast", "Reclaimed highs in days while QQQ still repairing"],
+        ["rc_ma_stack", "Key MAs stacked/reclaimed (10>20>50) before QQQ's were"],
+        ["rc_higher_high", "Higher highs before QQQ confirmed its own"],
+      ]},
+      { title: "Theme & catalyst", items: [
+        ["th_new_theme", "Belongs to the NEW cycle theme (not last cycle's winner)"],
+        ["th_catalyst", "Catalyst / EP at the launch", "bonus"],
+      ]},
+    ],
+    metrics: [
+      ["idx_low_date", "QQQ low date"], ["sessions_vs_index", "Own low vs index low (sessions)"],
+      ["ret_3m", "+3M off low %"], ["ret_6m", "+6M off low %"], ["vs_qqq_3m", "vs QQQ +3M (pp)"],
+      ["trigger_date", "Trigger date (your pick)"], ["entry_px", "Trigger/entry price"],
+      ["theme", "Theme / group"],
+    ],
+  },
 };
 
 // Data-derived factor flags — computed from the AUTO metrics at analysis time (no tick needed).
@@ -345,8 +372,8 @@ export function StudyScoreboard({ C, rows }) {
               we replace it with a loud banner + raw fractions (both denominators, no %, no ∞), rows
               desaturated. At ≥5 failures the ratio returns, but ALWAYS with both denominators shown. */}
           {guard ? (
-            <div style={{ fontSize: "0.72rem", color: "#f0a0a0", fontWeight: 600, margin: "0 0 10px", padding: "10px 13px", background: "rgba(224,90,85,0.10)", border: "1px solid rgba(224,90,85,0.55)", borderRadius: 8, lineHeight: 1.55 }}>
-              ⚠ LIFT UNAVAILABLE — {nWin} winners / {nFail} failures resolved. Ratios are mathematically meaningless until failures are graded (they divide by zero at 0F). Log ~1 failure per 2–3 winners. Showing raw counts only.
+            <div style={{ fontSize: "0.72rem", color: C.goldBright, fontWeight: 600, margin: "0 0 10px", padding: "10px 13px", background: "rgba(201,152,42,0.06)", border: "1px solid rgba(201,152,42,0.35)", borderRadius: 8, lineHeight: 1.55 }}>
+              🔒 Lift locked — {nWin} winners / {nFail} failures graded so far. Lift compares winners AGAINST failures, so it needs a graded failure control group (~1 failure per 2–3 winners). Raw tick counts are shown below in the meantime.
             </div>
           ) : (
             <div style={small
@@ -1387,7 +1414,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     // folded into metrics.study.charts on save, with the legacy slot columns DERIVED from it.
     charts: buildChartList(initial, true),
     metrics: { ...(initial?.metrics || {}), study: initial?.metrics?.study || {
-      setup: "Momentum Breakout", direction: "long", regime_tag: "",
+      setup: "Momentum Breakout", direction: "long", regime_tag: "", project: "",
       checks: {}, m: {}, grade: { letter: "" }, outcome: {}, refusal: "",
     } },
   }));
@@ -1399,6 +1426,9 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   const s = row.metrics.study;
   const setS = (patch) => setRow(r => ({ ...r, metrics: { ...r.metrics, study: { ...r.metrics.study, ...patch } } }));
   const def = STUDY_SETUPS[s.setup] || STUDY_SETUPS["Momentum Breakout"];
+  // Distinct existing project names (Valen 2026-07-28) → the "Project" input's datalist. Derived from the
+  // same rows the campaign nav already sees (campaignRows = all study rows), so the shelf and the editor agree.
+  const projectNames = [...new Set((campaignRows || []).map(r => r.metrics?.study?.project).filter(Boolean))].sort();
   // ── Campaign context (Valen 2026-07-24): legs of one trend share campaign_id. leg_index is STRUCTURAL
   // (recomputed from the sorted siblings, never stored). campaign-level fields (leg lifespan + shared AFTER
   // chart) are editable on the ROOT leg only; other legs show them read-only. Solo (no campaign_id) = root. */
@@ -1646,6 +1676,12 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           <select style={inputS} value={s.setup} onChange={e => setS({ setup: e.target.value, checks: {}, m: {} })}>
             {Object.keys(STUDY_SETUPS).map(k => <option key={k}>{k}</option>)}
           </select></div>
+        {/* Project (Valen 2026-07-28) — optional grouping so studies collect into named "books" (e.g. a market-bottom
+            research push). Free-text with a datalist of existing names so reuse is one click; blank = the Winner-DNA book. */}
+        <div style={{ width: 240, flex: "1 1 240px", minWidth: 200 }}><label style={lbl}>Project</label>
+          <input style={inputS} list="study-project-names" value={s.project || ""} onChange={e => setS({ project: e.target.value })}
+            placeholder="Project (optional) — e.g. Finding the Market's Bottom" />
+          <datalist id="study-project-names">{projectNames.map(p => <option key={p} value={p} />)}</datalist></div>
         {s.setup === "Parabolic" && <div style={{ width: 110 }}><label style={lbl}>Direction</label>
           <select style={inputS} value={s.direction} onChange={e => setS({ direction: e.target.value })}><option>short</option><option>long</option></select></div>}
         <div style={{ width: 150 }}><label style={lbl}>Market condition</label>

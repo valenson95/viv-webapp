@@ -13,6 +13,12 @@ import { ChartSeqEditor, buildChartList, deriveChartFields, chartFaces, sectioni
 // grade.letter — that stale-grade path drifted whenever ticks were edited outside the editor.
 const STUDY_LETTER_N = { "A+": 5, A: 4, B: 3, C: 2 };
 const inModelBook = (r) => isStudyRow(r) && !!r.metrics?.study?.in_model_book;
+// Project "books" (Valen 2026-07-28): a study's metrics.study.project groups it into a named book in My Research.
+// No project = the 📕 Winner DNA book. matchesBook filters a row against the active book chip ("__all__" = every
+// row · "__none__" = Winner DNA / no project · else an exact project name). Plain (non-study) rows have no
+// project, so they naturally fall into Winner DNA and are excluded from any specific project book.
+const studyProject = (r) => (r?.metrics?.study?.project || "").trim();
+const matchesBook = (r, book) => book === "__all__" ? true : book === "__none__" ? !studyProject(r) : studyProject(r) === book;
 const cardStars = (r) => isStudyRow(r) ? (STUDY_LETTER_N[studyQuality(r.metrics.study).letter] || 0) : r.stars;
 // Outcome-class chip (Valen 2026-07-26) — presentation of the PRE-REGISTERED outcomeClass(): emoji + word,
 // colored by tier (green tiers / red / muted), never color alone. Keys mirror StudyBook.outcomeClass.
@@ -121,7 +127,7 @@ export function downloadMyBookCsv(rows, opts) {
 // score + ticked factors + the member's own thesis/lesson. Opens a print view in a new tab;
 // the browser's native "Save as PDF" does the rendering (no libraries, charts included).
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-export function openMyBookPdf(rows, { makerGate } = {}) {
+export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
   // Chronicle order (Valen 2026-07-28): the book reads BY TICKER, each ticker chronological from
   // its first study — one ticker = one chapter of legs, like a single name's history album.
   rows = [...rows].sort((a, b) => String(a.ticker).localeCompare(String(b.ticker)) ||
@@ -457,8 +463,9 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
     </div>
     <div class="page cover">
       <div class="brand">Valen Insiders Vault</div>
-      <h1>My Model Book</h1>
-      <div class="sub">${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${today}</div>
+      <h1>${coverTitle ? esc(coverTitle) : "My Model Book"}</h1>
+      <div class="sub">${coverTitle ? "VIV Model Book" : `${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${today}`}</div>
+      ${coverTitle ? `<div class="sub">${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${today}</div>` : ""}
       <div class="sub" style="margin-top:26px;max-width:60ch;line-height:1.6">Your own pattern library — the setup, the factors that were present, and the outcome. Study the pairs; the commonalities are the edge. Educational, not advice.</div>
     </div>
     ${menuHtml}
@@ -798,7 +805,7 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
 // Population: members → their own plain rows (byte-identical to before); admin → plain + study rows (the
 // unified My Research set). Portaled to body; z 1100 — above the card grid, below the detail overlay ladder
 // (detail 1200 · study editor 1250 · lightbox 1500). Palette C; near-black text on gold chips.
-function ExportDialog({ C, font, isAdmin, pop, gradeBadge, onClose }) {
+function ExportDialog({ C, font, isAdmin, pop, gradeBadge, onClose, coverTitle }) {
   const opts = isAdmin ? undefined : { makerGate: false };
   const hasStudies = isAdmin && pop.some(isStudyRow);
   const [tickerRaw, setTickerRaw] = useState("");
@@ -913,7 +920,7 @@ function ExportDialog({ C, font, isAdmin, pop, gradeBadge, onClose }) {
 
         {/* (c) FOOTER — act on the SELECTED rows */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button disabled={N === 0} onClick={() => N && openMyBookPdf(selectedRows, opts)} style={footBtn(N === 0)}>⬇ Export PDF ({N})</button>
+          <button disabled={N === 0} onClick={() => N && openMyBookPdf(selectedRows, coverTitle ? { ...(opts || {}), coverTitle } : opts)} style={footBtn(N === 0)}>⬇ Export PDF ({N})</button>
           <button disabled={N === 0} onClick={() => N && downloadMyBookCsv(selectedRows, opts)} style={footBtn(N === 0)}>⬇ CSV ({N})</button>
         </div>
       </div>
@@ -941,6 +948,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [exporting, setExporting] = useState(false); // Export picker dialog (multi-select + filters)
   const [zoom, setZoom] = useState(null); // lightbox: { imgs: {before, after}, slot: "before"|"after" }
   const [studyMode, setStudyMode] = useState(mbDeepLink === "studies"); // 📚 Studies view (admin, inside My Book)
+  const [book, setBook] = useState("__all__"); // active project book in My Research: "__all__" | "__none__" (Winner DNA) | project name
   const [studyEditing, setStudyEditing] = useState(null); // null | {} (new) | row (edit)
   // StudyEditor sets this to a guard that returns true when it's safe to close (no unsaved changes, or the
   // user confirmed discarding). The backdrop click consults it; StudyEditor's own Cancel/nav guard themselves.
@@ -983,11 +991,14 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   // of the card grid unless starred for the Model Book (members are entirely unaffected — adminGallery is
   // false for them, so their card grid is byte-identical).
   const adminGallery = isAdmin && fScope === "mine";
-  const visible = rows.filter(r => {
+  // A specific project book (not "All books" / "Winner DNA") is open — drives the year-grouped book gallery + scoped export.
+  const isProjectBook = adminGallery && book !== "__all__" && book !== "__none__";
+  const cardFilter = (r) => {
     // studies live in their own 📚 view UNLESS starred for the Model Book (then they show as cards too)
     if (isStudyRow(r) && !inModelBook(r) && !adminGallery) return false;
     if (fScope === "official" && !r.is_published) return false;
     if (fScope === "mine" && r.created_by !== uid) return false;
+    if (adminGallery && !matchesBook(r, book)) return false; // active project book (My Research gallery)
     if (fPattern !== "All" && r.pattern !== fPattern) return false;
     if (fGrade !== "All") {
       const l = gradeBadge(effectiveStars(cardStars(r), (r.elite || []).length).n).l;
@@ -1001,7 +1012,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     if (fOutcome === "failures" && !/(loser|subpar)/i.test(effOutcome)) return false;
     if (fTicker.trim() && !String(r.ticker || "").toLowerCase().includes(fTicker.trim().toLowerCase())) return false;
     return true;
-  });
+  };
+  const visible = rows.filter(cardFilter);
   // Distinct patterns actually present among card-eligible rows → the chip set (All + those values).
   const cardEligible = rows.filter(r => !isStudyRow(r) || inModelBook(r));
   const patternsPresent = [...new Set(cardEligible.map(r => r.pattern).filter(Boolean))];
@@ -1010,9 +1022,36 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const myRows = rows.filter(r => r.created_by === uid && !isStudyRow(r)); // the member's OWN card entries — export + Your-patterns scope
   const mineCount = myRows.length; // must match the fScope==='mine' predicate
   const studyRows = rows.filter(r => r.created_by === uid && isStudyRow(r));
+  // Project books (Valen 2026-07-28): distinct project names across the study rows + the count for each chip.
+  const projectBooks = isAdmin ? [...new Set(studyRows.map(studyProject).filter(Boolean))].sort() : [];
+  const dnaCount = studyRows.filter(r => !studyProject(r)).length; // 📕 Winner DNA = studies with no project
+  // Lab (scoreboard / hypotheses / campaign list) is computed from the ACTIVE book's rows so each book's stats are its own.
+  const bookStudyRows = studyRows.filter(r => matchesBook(r, book));
   // Export population: members export their own plain rows (byte-identical to before); admin exports the
-  // unified My Research set (plain rows + study rows). The Export dialog filters/multi-selects within this.
-  const exportPop = isAdmin ? [...myRows, ...studyRows] : myRows;
+  // unified My Research set (plain rows + study rows). A project book scopes the export to that book's rows
+  // only (Change 7 — All books / Winner DNA keep the unified population). The dialog filters/selects within this.
+  const exportPop = isAdmin
+    ? (isProjectBook ? studyRows.filter(r => matchesBook(r, book)) : [...myRows, ...studyRows])
+    : myRows;
+  // ── My Research gallery (Change 6): collapse each multi-leg campaign into ONE card (root leg's charts), so a
+  // 5-leg campaign is a single card with a "{n} legs" chip — never 4 chartless leg-cards. Solo studies + plain
+  // rows pass through. buildCampaigns groups by metrics.study.campaign_id; the root is the earliest leg (the one
+  // that carries the charts). Roots are re-run through cardFilter so grade/outcome/ticker chips still apply.
+  const galleryCards = (() => {
+    if (!adminGallery) return visible.map(r => ({ r, legs: 1 }));
+    const studies = studyRows.filter(r => matchesBook(r, book));
+    const campCards = buildCampaigns(studies).list.map(c => ({ r: c.root, legs: c.count })).filter(x => cardFilter(x.r));
+    const plain = visible.filter(r => !isStudyRow(r)).map(r => ({ r, legs: 1 }));
+    return [...campCards, ...plain];
+  })();
+  // Project-book gallery groups by YEAR of entry_date ascending, tickers sorted within each year.
+  const bookYearGroups = (() => {
+    if (!isProjectBook) return [];
+    const by = {};
+    galleryCards.forEach(item => { const y = String(item.r.entry_date || "").slice(0, 4) || "—"; (by[y] ||= []).push(item); });
+    return Object.entries(by).sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([y, items]) => [y, items.sort((a, b) => String(a.r.ticker || "").localeCompare(String(b.r.ticker || "")))]);
+  })();
 
   const uploadImg = async (file, slot, setRow) => {
     if (!file) return;
@@ -1182,7 +1221,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         )}
       </div>
 
-      {exporting && <ExportDialog C={C} font={font} isAdmin={isAdmin} pop={exportPop} gradeBadge={gradeBadge} onClose={() => setExporting(false)} />}
+      {exporting && <ExportDialog C={C} font={font} isAdmin={isAdmin} pop={exportPop} gradeBadge={gradeBadge} coverTitle={isProjectBook ? book : null} onClose={() => setExporting(false)} />}
 
       {editing !== null && <MBEditor C={C} font={font} busy={busy} isAdmin={isAdmin} initial={editing.id ? editing : null} onSave={save} onCancel={() => setEditing(null)} onUpload={uploadImg} journaledTrades={journaledTrades} />}
 
@@ -1210,6 +1249,21 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           </>
         )}
       </div>
+
+      {/* THE SHELF (Valen 2026-07-28) — project "books" within My Research. Filters BOTH Gallery and Lab.
+          [All books] = current behaviour · [📕 Winner DNA] = studies with no project · one [📗 …] chip per
+          named project. Shown only once at least one project book exists (else the row is noise). */}
+      {isAdmin && fScope === "mine" && projectBooks.length > 0 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "0 0 16px" }}>
+          <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, marginRight: 2 }}>Books</span>
+          <button onClick={() => setBook("__all__")} style={chip(book === "__all__")}>All books</button>
+          <button onClick={() => setBook("__none__")} style={chip(book === "__none__")}>📕 Winner DNA{dnaCount ? ` (${dnaCount})` : ""}</button>
+          {projectBooks.map(p => {
+            const n = studyRows.filter(r => studyProject(r) === p).length;
+            return <button key={p} onClick={() => setBook(p)} style={chip(book === p)}>📗 {p}{n ? ` (${n})` : ""}</button>;
+          })}
+        </div>
+      )}
 
       {/* gallery sub-filter bar (Valen 2026-07-26) — pattern · grade · outcome · ticker search, AND-combined.
           Hidden in 📚 Studies mode (the studies list has its own layout). Styled with the app's toolbar chips. */}
@@ -1276,8 +1330,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         <div style={{ marginBottom: 20 }}>
           {/* Order (Valen 2026-07-26): 🧪 hypothesis tally FIRST, then the scoreboard (stats → outcome-class
               glossary → factor lift). The tally is the headline read; lift sits last behind the zero-F guard. */}
-          <StudyHypotheses C={C} rows={studyRows} />
-          <StudyScoreboard C={C} rows={studyRows} />
+          <StudyHypotheses C={C} rows={bookStudyRows} />
+          <StudyScoreboard C={C} rows={bookStudyRows} />
           {/* Editor opens as a blurred-backdrop POPUP (Valen 2026-07-17) — click a row anywhere in the
               list and edit right there, no scrolling back up. Backdrop click / Cancel closes; clicks
               inside never close (members are editing). Portaled to body so no card backdrop-filter
@@ -1294,13 +1348,13 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               </div>
             </div>, document.body)}
           <button onClick={() => setStudyEditing({})} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", marginBottom: 14 }}>＋ New study</button>
-          {studyRows.length === 0 && studyEditing === null && (
-            <div style={{ color: C.muted, fontSize: "0.82rem", padding: "18px 0" }}>No studies yet — hit ＋ New study. Grade blind (grade + prediction locked before the outcome opens), then record what happened. The scoreboard finds your winner DNA as the sample grows.</div>
+          {bookStudyRows.length === 0 && studyEditing === null && (
+            <div style={{ color: C.muted, fontSize: "0.82rem", padding: "18px 0" }}>{isProjectBook ? "No studies in this book yet — hit ＋ New study and set its Project to this book." : "No studies yet — hit ＋ New study. Grade blind (grade + prediction locked before the outcome opens), then record what happened. The scoreboard finds your winner DNA as the sample grows."}</div>
           )}
           {/* Grouped by CAMPAIGN (Valen 2026-07-24): legs of one trend nest under a header (ticker · span ·
               N legs · shared BEFORE→AFTER). Solo studies (no campaign_id) render as a single row exactly as
               before — a campaign of one. "+ Add leg" links a new leg to the trend. */}
-          {buildCampaigns(studyRows).list
+          {buildCampaigns(bookStudyRows).list
             .sort((a, b) => a.root.ticker === b.root.ticker
               ? String(a.span[0] || "").localeCompare(String(b.span[0] || ""))
               : (a.root.ticker < b.root.ticker ? -1 : 1))
@@ -1398,7 +1452,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               they carry no hypothesis votes (14 hollow dots) and never enter the scoreboard stats above.
               Clicking a row opens the normal card detail overlay (whose Edit routes to MBEditor), not the
               study editor. Admin-only block → plain "Legacy" copy is fine. */}
-          {myRows.length > 0 && (
+          {myRows.length > 0 && !isProjectBook && (
             <div style={{ marginTop: 18 }}>
               <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, borderTop: `1px solid ${C.border}`, paddingTop: 14, marginBottom: 10 }}>
                 📖 Legacy entries — pre-studies era <span style={{ color: C.gold }}>({myRows.length})</span>
@@ -1448,9 +1502,15 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         <YourPatterns C={C} font={font} myRows={myRows} />
       )}
 
-      {/* card grid — mobile-safe auto-fit (min() caps the track so a card never overflows a narrow screen) */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 16, marginTop: 4 }}>
-        {(studyMode ? [] : visible).map(r => {
+      {/* card grid — mobile-safe auto-fit (min() caps the track so a card never overflows a narrow screen).
+          My Research collapses campaigns into ONE card each (Change 6); an open project book renders the
+          year-grouped book gallery of two-chart cards (Change 5). renderCard/renderProjectCard are plain
+          functions invoked directly (never mounted as <Component/>) — same pattern as legRow above. */}
+      {(() => {
+        if (studyMode) return null;
+        const gridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 16, marginTop: 4 };
+        const legsChip = { fontSize: "0.56rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, background: C.goldDim, borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" };
+        const renderCard = ({ r, legs }) => {
           const eff = effectiveStars(cardStars(r), (r.elite || []).length);
           const elite = eff.n >= 6;
           const faces = chartFaces(r, isStudyRow(r)); // unified front/back — fixes blank thumbs on non-slot rows
@@ -1493,6 +1553,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{r.ticker}</span>
                   <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.gold, whiteSpace: "nowrap" }}>{r.pattern}</span>
+                  {legs > 1 && <span title={`${legs} legs in this campaign`} style={legsChip}>{legs} legs</span>}
                   <span title={eff.label} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 26, height: 22, padding: "0 8px", borderRadius: 7, fontWeight: 800, fontSize: "0.72rem", color: "#08080e", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, flexShrink: 0 }}>{gb.l}</span>
                 </div>
                 {/* status badges + date */}
@@ -1509,8 +1570,58 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               </div>
             </div>
           );
-        })}
-      </div>
+        };
+        // Project-book card (Change 5): BOTH charts side by side (before = "vs QQQ", after = "daily"), ticker +
+        // date, and up to 3 stat chips off metrics.study.m (sessions_vs_index / ret_3m / theme) — shown only when set.
+        const renderProjectCard = ({ r, legs }) => {
+          const m = r.metrics?.study?.m || {};
+          const chips = [];
+          if (m.sessions_vs_index != null && m.sessions_vs_index !== "") chips.push(`${m.sessions_vs_index} sess vs index`);
+          if (m.ret_3m != null && m.ret_3m !== "") chips.push(`${+m.ret_3m > 0 ? "+" : ""}${m.ret_3m}% 3M`);
+          if (m.theme) chips.push(String(m.theme));
+          const pane = (img, label, divider) => (
+            <div style={{ position: "relative", flex: 1, minWidth: 0, height: 120, background: "#0d0d16", borderRight: divider ? `1px solid ${C.border}` : "none" }}>
+              {img
+                ? <img src={img} alt={label} style={{ width: "100%", height: 120, objectFit: "cover", display: "block" }} />
+                : <div style={{ width: "100%", height: 120, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.6rem" }}>—</div>}
+              <span style={{ position: "absolute", left: 6, bottom: 5, fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, background: "rgba(8,8,14,0.72)", borderRadius: 5, padding: "1px 6px" }}>{label}</span>
+            </div>
+          );
+          return (
+            <div key={r.id} onClick={() => setDetail(r)} style={{ position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "transform .15s ease, border-color .15s ease" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = C.borderGold; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.borderColor = C.border; }}>
+              <div style={{ display: "flex", borderBottom: `1px solid ${C.border}` }}>
+                {pane(r.before_img, "vs QQQ", true)}
+                {pane(r.after_img, "daily", false)}
+              </div>
+              <div style={{ padding: "12px 14px 14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: "1rem", fontWeight: 800, color: C.white }}>{r.ticker}</span>
+                  {legs > 1 && <span title={`${legs} legs in this campaign`} style={legsChip}>{legs} legs</span>}
+                  <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.muted, whiteSpace: "nowrap" }}>{r.entry_date || "—"}</span>
+                </div>
+                {chips.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 9 }}>
+                    {chips.map((c, i) => <span key={i} style={{ fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, border: `1px solid ${C.borderGold}`, background: C.goldDim, borderRadius: 99, padding: "2px 9px", whiteSpace: "nowrap" }}>{c}</span>)}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        };
+        if (isProjectBook) return (
+          <div style={{ marginTop: 4 }}>
+            {bookYearGroups.map(([year, items]) => (
+              <div key={year} style={{ marginBottom: 26 }}>
+                <div style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.goldBright, margin: "0 0 12px", paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>{year} · {items.length} {items.length === 1 ? "ticker" : "tickers"}</div>
+                <div style={gridStyle}>{items.map(renderProjectCard)}</div>
+              </div>
+            ))}
+          </div>
+        );
+        return <div style={gridStyle}>{galleryCards.map(renderCard)}</div>;
+      })()}
 
       {/* detail overlay */}
       {detail && (() => {
