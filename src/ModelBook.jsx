@@ -1007,6 +1007,36 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     });
   };
 
+  // Leg-strip "+ Add leg" (Valen 2026-07-28): the in-editor strip INSERTS a sibling leg immediately and
+  // switches the open editor to it (distinct from the list's addLeg, which stages an unsaved editor). Reads
+  // the current leg fresh from the DB (the strip persists it first), derives the campaign root, and — if the
+  // campaign has no id yet (a solo root) — stamps `<TICKER>-<root entry_date>` onto the root's FULL metrics
+  // object (a partial update would wipe chart-extracted study data) before inserting. New leg: no charts,
+  // checks:{}, created_by set on insert only.
+  const insertLeg = async (currentId, date) => {
+    setBusy(true); setError(null);
+    const { data: cur, error: e1 } = await supabase.from("model_book").select("*").eq("id", currentId).single();
+    if (e1 || !cur || !cur.metrics?.study) { setError(e1 ? String(e1.message) : "Leg not found."); setBusy(false); return; }
+    const cs = cur.metrics.study;
+    const ticker = (cur.ticker || "").toUpperCase().trim();
+    let cid = cs.campaign_id;
+    if (!cid) {
+      cid = `${ticker}-${cur.entry_date}`;
+      const mt = { ...cur.metrics, study: { ...cs, campaign_id: cid } }; // FULL metrics — partial wipes chart-extracted data
+      const { error: e2 } = await supabase.from("model_book").update({ metrics: mt }).eq("id", cur.id);
+      if (e2) { setError(String(e2.message)); setBusy(false); return; }
+    }
+    const body = {
+      ticker, entry_date: date, is_published: false, created_by: uid, // created_by set once, on insert only
+      metrics: { study: { setup: cs.setup || "Momentum Breakout", campaign_id: cid, checks: {} } }, // never pre-tick eyeball checks
+    };
+    const { data: created, error: e3 } = await supabase.from("model_book").insert(body).select().single();
+    setBusy(false);
+    if (e3) { setError(String(e3.message)); return; }
+    await load();
+    if (created) setStudyEditing(created); // switch the open editor to the new leg
+  };
+
   // Format toggle (admin My Research): studyMode === true ⇔ 🧪 Lab view; false ⇔ 🎴 Gallery view.
   // Persist the last choice so re-entering the scope restores it (default "lab" when unset).
   const setFormat = (lab) => { setStudyMode(lab); try { localStorage.setItem("viv-mb-format", lab ? "lab" : "gallery"); } catch {} };
@@ -1160,6 +1190,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                   initial={studyEditing && (studyEditing.id || studyEditing.metrics) ? studyEditing : null}
                   closeGuard={studyCloseGuard} onNavigate={(t) => setStudyEditing(t)}
                   onSave={async (r) => { if (await save(r)) setStudyEditing(null); }}
+                  onSaveStay={save} onAddLeg={insertLeg}
                   onCancel={() => setStudyEditing(null)} onUpload={uploadImg} />
               </div>
             </div>, document.body)}

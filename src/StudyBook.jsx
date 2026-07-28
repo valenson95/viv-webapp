@@ -1346,7 +1346,7 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
     </div>, document.body);
 }
 
-export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload, campaignRows, closeGuard, onNavigate }) {
+export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload, campaignRows, closeGuard, onNavigate, onSaveStay, onAddLeg }) {
   const [row, setRowRaw] = useState(() => ({
     ticker: "", entry_date: "", before_img: "", after_img: "", thesis: "", lesson: "",
     ticked: [], elite: [], characteristics: [], is_published: false,
@@ -1394,6 +1394,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   const [zoom, setZoom] = useState(null); // null | "before_img" | "after_img" | "outcome_img"
   const [showAll, setShowAll] = useState(false); // raw computed-metrics grid folded by default (Valen 2026-07-24) — key strip stays
   const [detailOpen, setDetailOpen] = useState(true); // 📖 Detailed view is now the DEFAULT landing (Valen 2026-07-26): open a study → chronological chart page; "✎ Ticks & fields" drops to the quick editor
+  const [addingLeg, setAddingLeg] = useState(false), [newLegDate, setNewLegDate] = useState(""); // leg-strip inline "+ Add leg" date entry (Valen 2026-07-28)
   const SLOT_TITLES = { before_img: "BEFORE", after_img: "AFTER", outcome_img: "AFTER — the shared outcome", trigger_ltf_img: "TRIGGER — 5-min entry detail" };
   const zoomSlots = ["before_img", "after_img", "trigger_ltf_img", "outcome_img"].filter(k => row[k]); // only attached charts
   useEffect(() => {
@@ -1498,26 +1499,53 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       )}
     </div>
   );
-  const doSave = () => {
-    if (!row.ticker.trim()) { alert("Ticker first."); return; }
+  // buildBody = the exact DB body doSave ships (extracted Valen 2026-07-28 so the leg strip persists through
+  // the SAME path). The ONE list (row.charts) is the source of truth. Derive the legacy slot columns from it
+  // (study mapping: context→before_img · before→after_img · trigger→trigger_ltf_img · after→outcome_img;
+  // first/last default the flash-card faces). Fold charts into metrics.study.charts. The old extra_charts/
+  // slot_captions are LEFT as `...s` carried them — untouched for rollback safety, no longer written here.
+  const buildBody = () => {
     const q = studyQuality(s); // grade is derived from ticks at save time — stored for the grid + calibration
-    // The ONE list (row.charts) is the source of truth. Derive the legacy slot columns from it (study mapping:
-    // context→before_img · before→after_img · trigger→trigger_ltf_img · after→outcome_img; first/last default
-    // the flash-card faces). Fold charts into metrics.study.charts. The old extra_charts/slot_captions are LEFT
-    // as `...s` carried them — untouched for rollback safety, no longer written from the editor.
     const { outcome_img, trigger_ltf_img, extra_charts, slot_captions, charts, ...bodyRow } = row; // strip non-DB working fields
     const derived = deriveChartFields(charts, true);
     // NOTE: `...s` (= row.metrics.study) spreads FIRST so any unknown study field survives (same guarantee study-fill.mjs
     // relies on for campaign_id); the folded values below then overwrite with the freshly-derived ones.
-    const body = { ...bodyRow,
+    return { ...bodyRow,
       before_img: derived.before_img || null,
       after_img: derived.after_img || null,
       metrics: { ...row.metrics, study: { ...s, charts: charts || [], trigger_ltf_img: derived.trigger_ltf_img || "", outcome_img: derived.outcome_img || "", grade: { letter: q.letter === "—" ? "" : q.letter, auto: true, on: q.on, total: q.total } } },
       pattern: s.setup === "Parabolic" ? `Parabolic ${s.direction === "short" ? "Short" : "Long"}` : s.setup,
       outcome: cls ? MB_OUTCOME[cls] : null, thesis: row.thesis,
       lesson: [s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n") || null };
+  };
+  const doSave = () => {
+    if (!row.ticker.trim()) { alert("Ticker first."); return; }
     setDirty(false); // saved — no longer dirty (the popup also closes on success, which remounts fresh)
-    onSave(body);
+    onSave(buildBody());
+  };
+  // ── Leg strip (Valen 2026-07-28): hop between the legs of this campaign without leaving the chart's editor.
+  // Unlike the ‹ › arrows (which DISCARD on dirty), the strip SAVES the current leg first through the exact
+  // doSave→onSave DB path (onSaveStay = the parent's save, minus the close). Blocked (validation) ⇒ surface why
+  // and don't switch. Only shown once the study is persisted (navPos != null) — you can't add legs to an unsaved row.
+  const saveCurrentFirst = async () => {
+    if (!dirty) return true;
+    if (!row.ticker.trim()) { alert("Add a ticker before leaving this leg (or ✕ collapse to discard)."); return false; }
+    if (!onSaveStay) return false;
+    const ok = await onSaveStay(buildBody());
+    if (ok) setDirty(false);
+    return !!ok;
+  };
+  const stripSwitch = async (leg) => {
+    if (!leg || leg.id === row.id) return;
+    if (!(await saveCurrentFirst())) return;
+    onNavigate && onNavigate(leg);
+  };
+  const confirmAddLeg = async () => {
+    const date = (newLegDate || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { alert("Date must be YYYY-MM-DD."); return; }
+    if (!(await saveCurrentFirst())) return;
+    setAddingLeg(false); setNewLegDate("");
+    onAddLeg && onAddLeg(row.id, date); // parent inserts the sibling + switches the editor to it
   };
   return (
     <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 16, padding: 18, marginBottom: 18, fontFamily: font, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
@@ -1552,6 +1580,38 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           style={{ background: "transparent", border: `1px solid ${C.borderGold}`, color: C.goldBright, borderRadius: 8, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "4px 12px", cursor: "pointer" }}>📖 Detailed view</button>
         <button title="Collapse (asks first if you have unsaved changes)" onClick={guardedCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.72rem", padding: "4px 12px", cursor: "pointer" }}>✕ collapse</button>
       </div>
+
+      {/* LEG STRIP (Valen 2026-07-28): one chip per leg of this campaign (structural order from buildCampaigns —
+          same as the list + stats), current leg highlighted gold. Click a sibling → saves this leg, then switches.
+          "＋ Add leg" → inline date → inserts a new leg (same ticker/setup/campaign, no charts) and switches to it.
+          Only shown once the study is persisted (navPos). Solo studies show their single chip + the add button. */}
+      {navPos && (() => {
+        const legs = navCampaigns[navPos.ci].legs;
+        const chipBase = { display: "inline-flex", alignItems: "center", gap: 6, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "5px 12px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" };
+        return (
+          <div style={{ margin: "0 0 6px" }}>
+            <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, marginRight: 2 }}>Legs</span>
+              {legs.map((leg, i) => { const active = leg.id === row.id;
+                return <button key={leg.id} type="button" disabled={busy} title={active ? "This leg" : "Switch to this leg (saves the current leg first)"} onClick={() => stripSwitch(leg)}
+                  style={{ ...chipBase, border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? C.goldBright : C.muted, background: active ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.03)", cursor: busy ? "default" : "pointer" }}>
+                  Leg {i + 1}{leg.entry_date ? ` · ${leg.entry_date}` : ""}</button>; })}
+              {addingLeg ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <input type="date" autoFocus value={newLegDate} onChange={e => setNewLegDate(e.target.value)} style={{ ...inputS, width: 150, padding: "4px 8px" }} />
+                  <button type="button" disabled={busy || !newLegDate} onClick={confirmAddLeg} style={{ ...chipBase, border: `1px solid ${C.goldBright}`, color: "#08080e", background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, opacity: (busy || !newLegDate) ? 0.5 : 1, cursor: (busy || !newLegDate) ? "default" : "pointer" }}>✓ Add</button>
+                  <button type="button" onClick={() => { setAddingLeg(false); setNewLegDate(""); }} style={{ ...chipBase, border: `1px solid ${C.border}`, color: C.muted, background: "transparent" }}>✕</button>
+                </span>
+              ) : (
+                <button type="button" title="Add another leg to this trend — same chart set serves them all" onClick={() => { setAddingLeg(true); setNewLegDate(""); }}
+                  style={{ ...chipBase, border: `1px dashed ${C.border}`, color: C.muted, background: "transparent" }}>＋ Add leg</button>
+              )}
+            </div>
+            <div style={{ fontSize: "0.62rem", color: C.muted, marginTop: 5 }}>One chart set serves every leg (charts live on the root leg). Computed metrics fill on the next study-fill run.</div>
+          </div>
+        );
+      })()}
+
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div style={{ width: 110 }}><label style={lbl}>Ticker</label><input style={inputS} value={row.ticker} onChange={e => setRow(r => ({ ...r, ticker: e.target.value.toUpperCase() }))} /></div>
         <div style={{ width: 150 }}><label style={lbl}>Trigger date</label><input type="date" style={inputS} value={row.entry_date || ""} onChange={e => setRow(r => ({ ...r, entry_date: e.target.value }))} /></div>
