@@ -4,7 +4,7 @@ import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
 import { SECTIONS, sectionsFor, scoreTicked, versionOf, stampV2 } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
-import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, HypothesisRead, buildCampaigns, outcomeClass, studyQuality, STUDY_SETUPS, SUBCATS, HYPOTHESES, entryVerdict } from "./StudyBook.jsx";
+import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, ChecklistTally, PROJECT_HYPOTHESES, checklistTally, HypothesisRead, buildCampaigns, outcomeClass, studyQuality, STUDY_SETUPS, SUBCATS, HYPOTHESES, entryVerdict } from "./StudyBook.jsx";
 import { ChartSeqEditor, buildChartList, deriveChartFields, chartFaces, sectionizeCharts } from "./ChartSeq.jsx";
 
 // A study starred for the Model Book shows as a card; its star count comes from the study's
@@ -19,6 +19,10 @@ const inModelBook = (r) => isStudyRow(r) && !!r.metrics?.study?.in_model_book;
 // project, so they naturally fall into Winner DNA and are excluded from any specific project book.
 const studyProject = (r) => (r?.metrics?.study?.project || "").trim();
 const matchesBook = (r, book) => book === "__all__" ? true : book === "__none__" ? !studyProject(r) : studyProject(r) === book;
+// H_DOMAIN (Valen 2026-07-28): the setups whose HYPOTHESES / entryVerdict verdict engine is meaningful. A book
+// with study rows and NONE of these setups (e.g. Market Bottom) shows the project-hypotheses + checklist-tally
+// panel/page instead of the breakout-family 🧪 Hypotheses (which would render irrelevant 0-failure warnings).
+const H_DOMAIN = new Set(["Momentum Breakout", "Momentum Burst", "Episodic Pivot", "Parabolic"]);
 const cardStars = (r) => isStudyRow(r) ? (STUDY_LETTER_N[studyQuality(r.metrics.study).letter] || 0) : r.stars;
 // Outcome-class chip (Valen 2026-07-26) — presentation of the PRE-REGISTERED outcomeClass(): emoji + word,
 // colored by tier (green tiers / red / muted), never color alone. Keys mirror StudyBook.outcomeClass.
@@ -184,6 +188,25 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
   const hypHtml = (() => {
     const studies = rows.filter((r) => r.metrics?.study);
     if (!studies.length) return "";
+    // Non-H-domain book (e.g. Market Bottom): the breakout verdict engine is meaningless, so print the
+    // project working-hypotheses + checklist tally instead — and NO zero-failure warning strip (that belongs
+    // to the H-domain page only). Mixed exports (any H-domain row) fall through to the classic hypHtml below.
+    if (!studies.some((r) => H_DOMAIN.has(r.metrics.study.setup))) {
+      const projects = [...new Set(studies.map((r) => (r.metrics.study.project || "").trim()).filter(Boolean))];
+      const project = coverTitle || projects[0] || "";
+      const hyps = PROJECT_HYPOTHESES[project];
+      const tallyGroups = checklistTally(studies);
+      const hypRows = hyps ? `<div class="phyps">${hyps.map((h) => `<div class="phrow"><span class="phid">${esc(h.id)}</span><div class="phbody"><div class="phtext">${esc(h.text)}</div><div class="phmeasure">measure: ${esc(h.measure)}</div></div></div>`).join("")}</div>` : "";
+      const tallyTables = tallyGroups.map((g) => `<div class="ptsec">Checklist tally — ${g.n} stud${g.n === 1 ? "y" : "ies"}${tallyGroups.length > 1 ? ` · ${esc(g.setup)}` : ""}</div>
+        <table class="mtab ttab"><tbody>${g.items.map((it) => { const p = g.n ? Math.round((it.count / g.n) * 100) : 0;
+          return `<tr><td class="tlabel">${esc(it.label)}${it.bonus ? ` <span class="btag">bonus</span>` : ""}</td><td class="tbarcell"><div class="tbar"><div class="tfill" style="width:${p}%"></div></div></td><td class="num tcount">${it.count}/${g.n}</td></tr>`; }).join("")}</tbody></table>`).join("");
+      return `<div class="page hyp">
+        <div class="mhead"><div><span class="mtitle">🧪 WORKING HYPOTHESES &amp; CHECKLIST TALLY</span><span class="msub">what this research says so far</span></div><div class="msub">${studies.length} studies in this export</div></div>
+        ${hypRows}
+        ${tallyTables}
+        <div class="foot">Counts are cards ticked so far — an untick may just mean "not studied yet", never "failed".</div>
+      </div>`;
+    }
     const classes = studies.map((r) => outcomeClass(r.metrics.study));
     const nWin = classes.filter((c) => c === "monster" || c === "big winner").length;
     const nSmall = classes.filter((c) => c === "works small").length;
@@ -442,6 +465,30 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
       body.light .hpill.sup{color:#15803d;border-color:#15803d}.light .hpill.chal{color:#b91c1c;border-color:#b91c1c}
       body.light .hpill.split{color:#8a6a1c;border-color:#8a6a1c}body.light .hpill.mutp{color:#6a675e;border-color:#6a675e}
       body.light .warn{color:#8a2626;border-color:rgba(185,28,28,0.5);background:rgba(185,28,28,0.06)}
+      /* ── Project WORKING HYPOTHESES + CHECKLIST TALLY page (non-H-domain books, Valen 2026-07-28) ── */
+      .phyps{display:grid;gap:12px;margin-bottom:18px}
+      .phrow{display:flex;align-items:flex-start;gap:10px;break-inside:avoid;page-break-inside:avoid}
+      .phid{flex:none;background:#c9982a;color:#08080e;font-size:0.58rem;font-weight:800;letter-spacing:0.05em;border-radius:99px;padding:3px 10px;white-space:nowrap}
+      .phtext{font-size:0.82rem;color:#e8e6e0;line-height:1.5}
+      .phmeasure{font-size:0.66rem;color:#9a968c;line-height:1.45;margin-top:3px}
+      .ptsec{font-size:0.62rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#c9982a;margin:16px 0 8px}
+      .ttab td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.07);vertical-align:middle}
+      .ttab tr{break-inside:avoid;page-break-inside:avoid}
+      .ttab .tlabel{font-size:0.74rem;font-weight:600;color:#e8e6e0}
+      .ttab .tcount{font-size:0.72rem;font-weight:800;color:#9a968c;white-space:nowrap}
+      .tbarcell{width:38%}
+      .tbar{height:7px;border-radius:99px;background:rgba(255,255,255,0.10);overflow:hidden}
+      .tfill{height:100%;border-radius:99px;background:linear-gradient(90deg,#b8820a,#f0c050)}
+      .btag{display:inline-block;font-size:0.54rem;font-weight:800;letter-spacing:0.05em;color:#9a968c;border:1px solid rgba(255,255,255,0.2);border-radius:99px;padding:0 6px;margin-left:6px}
+      body.light .phid{background:#8a6a1c;color:#fdfcf9}
+      body.light .phtext{color:#16150f}
+      body.light .phmeasure{color:#6a675e}
+      body.light .ptsec{color:#8a6a1c}
+      body.light .ttab td{border-bottom-color:rgba(0,0,0,0.08)}
+      body.light .ttab .tlabel{color:#2e2c25}
+      body.light .ttab .tcount,body.light .btag{color:#6a675e}
+      body.light .tbar{background:rgba(0,0,0,0.10)}
+      body.light .btag{border-color:rgba(0,0,0,0.2)}
       /* ── Light / ink-friendly theme (member picks in the toolbar; whichever shows is what prints) ── */
       body.light{background:#fdfcf9;color:#16150f}
       body.light::before{background:#fdfcf9}
@@ -1334,7 +1381,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         <div style={{ marginBottom: 20 }}>
           {/* Order (Valen 2026-07-26): 🧪 hypothesis tally FIRST, then the scoreboard (stats → outcome-class
               glossary → factor lift). The tally is the headline read; lift sits last behind the zero-F guard. */}
-          <StudyHypotheses C={C} rows={bookStudyRows} />
+          {bookStudyRows.length > 0 && !bookStudyRows.some((r) => H_DOMAIN.has(r.metrics?.study?.setup))
+            ? <ChecklistTally C={C} rows={bookStudyRows} project={book !== "__all__" && book !== "__none__" ? book : (bookStudyRows[0]?.metrics?.study?.project || "")} />
+            : <StudyHypotheses C={C} rows={bookStudyRows} />}
           <StudyScoreboard C={C} rows={bookStudyRows} />
           {/* Editor opens as a blurred-backdrop POPUP (Valen 2026-07-17) — click a row anywhere in the
               list and edit right there, no scrolling back up. Backdrop click / Cancel closes; clicks

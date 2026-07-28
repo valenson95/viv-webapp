@@ -1194,6 +1194,106 @@ export function StudyHypotheses({ C, rows }) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  🧪 PROJECT-LEVEL WORKING HYPOTHESES (Valen 2026-07-28) — for research BOOKS whose setup isn't in the
+//  breakout hypothesis family (HYPOTHESES / entryVerdict are meaningless for e.g. Market Bottom ticks).
+//  Keyed by metrics.study.project. These name the research questions a book is trying to answer — shown on
+//  the Lab panel + the export summary page WITH the checklist tally. NO verdict engine yet: the `measure`
+//  line names the fields that will decide each one; never render a fake verdict.
+// ══════════════════════════════════════════════════════════════════
+// Project-level working hypotheses (pre-registered; Valen 2026-07-28). Keyed by metrics.study.project.
+// These are the research questions a project book is trying to answer — shown on the Lab panel and the
+// book's export summary page WITH the checklist tally. No verdict engine yet: the measure line names the
+// fields that will decide each one; never render a fake verdict.
+export const PROJECT_HYPOTHESES = {
+  "Finding the Market's Bottom": [
+    { id: "MB-H1", text: "Slow, orderly correction → leaders show themselves EARLY (higher lows / bottoming before the index). Fast flush → everything drops together; leaders differentiate by RECOVERY SPEED off the shared low, not bottom timing.", measure: "sessions_vs_index + 'higher low' ticks split by episode type (2023/2024 orderly vs 2025 crash); recovery ticks carry the crash case" },
+    { id: "MB-H2", text: "In orderly corrections the eventual leaders bottom days-to-weeks before the index (the RS tell).", measure: "share of studies with sessions_vs_index < 0, per episode" },
+    { id: "MB-H3", text: "Each bottom launches a NEW leadership theme — the prior cycle's winner does not re-lead.", measure: "'NEW cycle theme' tick vs +3M return; count of prior-cycle leaders that re-led" },
+    { id: "MB-H4", text: "The leader's move is front-loaded: most of the 6-month return is made in the first 3 months off the low.", measure: "ret_3m vs (ret_6m − ret_3m) per study" },
+    { id: "MB-H5", text: "MA structure is the tell: leaders hold/reclaim their key MAs (10>20>50 stack, 100/200d hold) before the index repairs its own.", measure: "'held long-term MA' + 'MAs stacked/reclaimed first' ticks vs +3M return" },
+    { id: "MB-H6", text: "A catalyst / episodic pivot at the launch marks the biggest winners off the bottom.", measure: "'Catalyst/EP at the launch' tick vs +3M / +6M return" },
+  ],
+};
+
+// checklistTally — group study rows by setup; per setup return { setup, n (row count), items } where each
+// item = { key, label, bonus, count } and count = rows of that setup with checks[key] truthy. Items follow
+// STUDY_SETUPS bucket order (flatMap buckets). Setups with no STUDY_SETUPS entry are skipped.
+export function checklistTally(rows) {
+  const bySetup = {};
+  (rows || []).forEach((r) => {
+    const s = r && r.metrics && r.metrics.study;
+    if (!s || !STUDY_SETUPS[s.setup]) return;
+    (bySetup[s.setup] || (bySetup[s.setup] = [])).push(s);
+  });
+  return Object.entries(bySetup).map(([setup, studies]) => ({
+    setup,
+    n: studies.length,
+    items: STUDY_SETUPS[setup].buckets.flatMap((b) => b.items).map(([key, label, bonus]) => ({
+      key, label, bonus: !!bonus,
+      count: studies.filter((s) => !!(s.checks && s.checks[key])).length,
+    })),
+  }));
+}
+
+// ChecklistTally — the Lab panel for non-breakout research books. Pure presentation (no state): the project's
+// pre-registered working hypotheses (id chip + text + a muted `measure:` line, NO verdicts / vote dots) over
+// a per-setup checklist tally (label + thin gold progress bar + count/n). An untick ≠ a failure — it may just
+// mean "not studied yet"; the caption says so.
+export function ChecklistTally({ C, rows, project }) {
+  const groups = checklistTally(rows);
+  const hyps = PROJECT_HYPOTHESES[project];
+  const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" };
+  const idChip = { flex: "none", fontSize: "0.5rem", fontWeight: 800, letterSpacing: ".06em", color: "#08080e", background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, borderRadius: 99, padding: "3px 9px", whiteSpace: "nowrap" };
+  return (
+    <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", marginBottom: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
+      <div style={sheen} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 12, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+        <span style={{ flex: 1, fontSize: "0.62rem", fontWeight: 700, letterSpacing: ".13em", textTransform: "uppercase", color: C.muted }}>🧪 Working Hypotheses</span>
+        <span style={{ fontSize: "0.6rem", color: C.muted }}>what this research says so far</span>
+      </div>
+      {hyps && (
+        <div style={{ display: "grid", gap: 11, marginBottom: 16 }}>
+          {hyps.map((h) => (
+            <div key={h.id} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
+              <span style={idChip}>{h.id}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.45 }}>{h.text}</div>
+                <div style={{ fontSize: "0.6rem", color: C.muted, lineHeight: 1.4, marginTop: 3 }}>measure: {h.measure}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {groups.map((g) => (
+        <div key={g.setup} style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 8 }}>
+            Checklist tally — {g.n} stud{g.n === 1 ? "y" : "ies"}{groups.length > 1 ? ` · ${g.setup}` : ""}
+          </div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {g.items.map((it) => {
+              const p = g.n ? Math.round((it.count / g.n) * 100) : 0;
+              return (
+                <div key={it.key} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: "0.72rem", color: C.text, lineHeight: 1.35 }}>
+                    {it.label}
+                    {it.bonus && <span style={{ fontSize: "0.5rem", fontWeight: 800, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 99, padding: "0 5px", marginLeft: 5, verticalAlign: "1px" }}>BONUS</span>}
+                  </span>
+                  <div style={{ width: 96, flex: "none", height: 6, borderRadius: 99, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                    <div style={{ width: `${p}%`, height: "100%", background: `linear-gradient(90deg,${C.goldMid},${C.goldBright})`, borderRadius: 99 }} />
+                  </div>
+                  <span style={{ width: 44, flex: "none", textAlign: "right", fontSize: "0.66rem", fontWeight: 700, color: C.muted }}>{it.count}/{g.n}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <div style={{ fontSize: "0.58rem", color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Counts are cards ticked so far — an untick may just mean "not studied yet", never "failed".</div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  📖 Detailed study view (Valen 2026-07-25) — long-form scrollable page opened from the StudyEditor header.
 //  Charts column (big canonical slots + unlimited extras) scrolls; the stats/hypothesis rail stays pinned.
 //  Reads/writes the editor's own row via setRow (so it flips the SAME dirty flag) and saves via the SAME doSave.
