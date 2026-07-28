@@ -1184,10 +1184,13 @@ const DV_CSS = `
   .sbdv-charts{ order:0; }
 }
 `;
+// Role → caption for the read-only INHERITED chart timeline (Valen 2026-07-28) — module scope so no component
+// is defined inside another. Mirrors the editor's ROLE_LABEL; used only when a chartless leg shows the root's set.
+const DV_ROLE_LABEL = { context: "Context (HTF)", before: "BEFORE — the setup", trigger: "TRIGGER — 5-min entry", after: "AFTER — the outcome" };
 // z-ladder (whole 📚 surface): ModelBook study backdrop 1250 · HypothesisRead deep-dive modal 1300 ·
 // 📖 detailed view 1340 (above the editor + deep-dive, below the app edit modal 1400 and the lightbox 1550) ·
 // app edit modal 1400 · chart lightbox 1550.
-export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, onClose, capBadge, badgeStyle }) {
+export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, onClose, capBadge, badgeStyle, inheritedCharts }) {
   const s = row.metrics.study;
   const cls = outcomeClass(s);
   const q = studyQuality(s);
@@ -1242,10 +1245,31 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
                 </div>
               ) : null;
             })()}
-            <ChartSeqEditor C={C} font={font} busy={busy} list={row.charts || []}
-              onChange={(nl) => setRow(r => ({ ...r, charts: nl }))}
-              onUpload={onUpload}
-              onZoom={({ src, title }) => setLbox({ src, title })} />
+            {/* Display inheritance (Valen 2026-07-28): a leg with NO charts of its own shows the campaign ROOT's
+                chart set READ-ONLY (charts live on the root leg — nothing copied). Own charts (or no root set) ⇒
+                the normal editable timeline, byte-identical to before (inheritedCharts undefined = today's behavior). */}
+            {(() => {
+              const ownList = (row.charts || []).filter((c) => c && c.img);
+              const inherit = ownList.length === 0 && inheritedCharts && inheritedCharts.length > 0;
+              if (!inherit) return (
+                <ChartSeqEditor C={C} font={font} busy={busy} list={row.charts || []}
+                  onChange={(nl) => setRow(r => ({ ...r, charts: nl }))}
+                  onUpload={onUpload}
+                  onZoom={({ src, title }) => setLbox({ src, title })} />
+              );
+              return (<>
+                <div style={{ fontSize: "0.66rem", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", marginBottom: 14, background: "rgba(255,255,255,0.03)" }}>↩ Chart set shared from Leg 1 (root) — edit charts there.</div>
+                <div style={{ display: "grid", gap: 14 }}>
+                  {inheritedCharts.map((c, j) => (
+                    <figure key={j} style={{ margin: 0, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", background: "rgba(0,0,0,0.3)" }}>
+                      <figcaption style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.goldBright, padding: "8px 12px 0" }}>{c.label || DV_ROLE_LABEL[c.role] || `Chart ${j + 1}`}</figcaption>
+                      <img src={c.img} alt={c.label || ""} onClick={() => setLbox({ src: c.img, title: c.label || DV_ROLE_LABEL[c.role] || "Shared chart" })} style={{ display: "block", width: "100%", maxHeight: 460, objectFit: "contain", cursor: "zoom-in", marginTop: 8 }} />
+                      {c.caption && <div style={{ fontSize: "0.72rem", color: C.muted, padding: "0 12px 10px" }}>{c.caption}</div>}
+                    </figure>
+                  ))}
+                </div>
+              </>);
+            })()}
           </div>
 
           {/* ── sticky stats + hypothesis rail ── */}
@@ -1386,6 +1410,9 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   const isRoot = !cid || (sibs.length ? idxInSibs === 0 : true);
   const rootStudy = (cid && sibs.length) ? sibs[0].metrics.study : s;
   const multiLeg = !!cid && sibs.length > 1;
+  // Root chart list for the detailed view's display inheritance (Valen 2026-07-28): a NON-root leg surfaces the
+  // ROOT's chart set read-only when it has none of its own. [] = no inheritance (solo / this-is-root / no charts).
+  const inheritedCharts = (cid && sibs.length && sibs[0].id !== row.id) ? buildChartList(sibs[0], true).filter(c => c && c.img) : [];
   const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontFamily: font, fontSize: "0.78rem", padding: "7px 10px", outline: "none", width: "100%", colorScheme: "dark" };
   const lbl = { fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.muted, marginBottom: 4, display: "block" };
   const sect = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "14px 0 8px" };
@@ -1818,7 +1845,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       {/* 📖 Detailed view overlay — mounts only while open, over the (still-mounted) quick editor. Shares the
           editor's row/setRow so edits here flip the SAME dirty flag and save through the SAME doSave path. */}
       {detailOpen && <StudyDetailView C={C} font={font} busy={busy} row={row} setRow={setRow}
-        onUpload={onUpload} onSave={doSave} onClose={() => setDetailOpen(false)} capBadge={capBadge} badgeStyle={badgeStyle} />}
+        onUpload={onUpload} onSave={doSave} onClose={() => setDetailOpen(false)} capBadge={capBadge} badgeStyle={badgeStyle} inheritedCharts={inheritedCharts} />}
     </div>
   );
 }

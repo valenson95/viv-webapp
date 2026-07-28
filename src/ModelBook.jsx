@@ -209,15 +209,22 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
   // the printer split tall entries mid-figure ("cropped"). Eric-book pagination now: every row
   // renders the SAME chronological timeline via buildChartList, ONE CHART PER PAGE (nothing can
   // crop), big header on page 1, slim running header on later pages, scorecard page last.
+  const addedStamp = (r) => { const d = r.created_at ? new Date(r.created_at) : null;
+    return d && !isNaN(d) ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""; };
   const bigHead = (r, m) => `<div class="ehead">
       <div><span class="tk">${esc(r.ticker)}</span><span class="pat">${esc(m.setup)}</span></div>
-      <div class="emeta">${esc(m.date)}${r.exit_date && !r.metrics?.study ? " → " + esc(r.exit_date) : ""} · <b class="${m.good ? "good" : m.bad ? "bad" : ""}">${esc(m.outcome)}</b> · ${esc(m.score)} · ${"★".repeat(m.stars)}${"☆".repeat(Math.max(0, 5 - m.stars))}</div>
+      <div class="emeta">${esc(m.date)}${r.exit_date && !r.metrics?.study ? " → " + esc(r.exit_date) : ""} · <b class="${m.good ? "good" : m.bad ? "bad" : ""}">${esc(m.outcome)}</b> · ${esc(m.score)} · ${"★".repeat(m.stars)}${"☆".repeat(Math.max(0, 5 - m.stars))}${addedStamp(r) ? `<span class="added">added ${esc(addedStamp(r))}</span>` : ""}</div>
     </div>`;
   const slimHead = (r, m, label) => `<div class="shead"><span class="stk">${esc(r.ticker)}</span><span class="slab">${esc(label)}</span><span class="smeta">${esc(m.date)}</span></div>`;
   const entry = (r, idx) => {
     const isS = !!r.metrics?.study;
     const m = rowMeta(r, idx);
     const charts = buildChartList(r, isS).filter((c) => c && c.img);
+    // Display inheritance (Valen 2026-07-28): a chartless leg whose campaign has a chart-bearing sibling in
+    // THIS export prints a "shared with the root leg" line instead of "no charts" — the root's charts are NOT
+    // re-printed per leg (book bloat); the ticker→date chronicle sort already places the root right above.
+    const sharedWithRoot = isS && charts.length === 0 && !!r.metrics?.study?.campaign_id &&
+      rows.some((o) => o !== r && o.metrics?.study?.campaign_id === r.metrics.study.campaign_id && buildChartList(o, true).some((c) => c && c.img));
     let statsHtml, chipsHtml = "", footLine = "";
     if (isS) {
       const study = r.metrics.study, q = studyQuality(study), o = study.outcome || {};
@@ -246,7 +253,7 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
     </section>`);
     const scorecard = `<section class="entry"${charts.length ? "" : ` id="e${idx}"`}>
       ${charts.length ? slimHead(r, m, "Scorecard") : bigHead(r, m)}
-      ${charts.length ? "" : '<div class="noimg">no charts</div>'}
+      ${charts.length ? "" : sharedWithRoot ? '<div class="noimg">Chart set shared with the root leg — see this ticker\'s first entry.</div>' : '<div class="noimg">no charts</div>'}
       ${statsHtml}
       ${chipsHtml}
       ${footLine ? `<div class="foot">${footLine}</div>` : ""}
@@ -277,6 +284,8 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
       .tk{font-size:1.7rem;font-weight:800;letter-spacing:-0.02em}
       .pat{margin-left:12px;color:#c9982a;font-weight:700;font-size:0.85rem}
       .emeta{color:#9a968c;font-size:0.8rem;font-weight:700}
+      .added{display:block;text-align:right;font-size:0.6rem;font-weight:700;color:#66635b;margin-top:3px}
+      body.light .added{color:#8a857a}
       .good{color:#22c55e}.bad{color:#ef4444}
       .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
       figure{min-width:0}
@@ -1213,9 +1222,16 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 const hctx = { ticker: r.ticker, date: r.entry_date }; // ctx for the per-hypothesis vote strip
                 // chartFaces (Valen 2026-07-26) — reads the unified list (converts legacy rows), so a study whose
                 // charts aren't slot-shaped still shows thumbs. Nested legs share the trend's outcome = the root's back face.
-                const faces = chartFaces(r, true);
+                // Display inheritance (Valen 2026-07-28): a leg with NO charts of its own shows the campaign ROOT's
+                // chart set (presentation-only — nothing is copied into the leg row). Marked "↩ shared"; the "after?"
+                // upload invite is suppressed so a chart never gets attached to the wrong leg.
+                const ownFaces = chartFaces(r, true);
+                const rootFacesInh = indent ? chartFaces(camp.root, true) : null;
+                const rootHasCharts = !!rootFacesInh && (!!(rootFacesInh.front && rootFacesInh.front.img) || !!(rootFacesInh.back && rootFacesInh.back.img) || rootFacesInh.count > 0);
+                const inheritCharts = indent && !(ownFaces.front && ownFaces.front.img) && rootHasCharts;
+                const faces = inheritCharts ? rootFacesInh : ownFaces;
                 const frontImg = faces.front && faces.front.img;
-                const backImg = indent ? ((chartFaces(camp.root, true).back || {}).img || null) : (faces.back && faces.back.img);
+                const backImg = indent ? ((rootFacesInh && rootFacesInh.back) ? rootFacesInh.back.img : null) : (faces.back && faces.back.img);
                 return (
                   <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 4, marginLeft: indent ? 22 : 0, fontSize: "0.78rem", cursor: "pointer" }}
                     onClick={() => setStudyEditing(r)}
@@ -1225,13 +1241,20 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                       : <b style={{ width: 64 }}>{r.ticker}</b>}
                     <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
-                      {frontImg ? <img src={frontImg} alt="setup" title="The setup (this leg)" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
+                      {frontImg
+                        ? <span style={{ position: "relative", display: "inline-block", width: 64, height: 40, flexShrink: 0 }}>
+                            <img src={frontImg} alt="setup" title={inheritCharts ? "Chart set shared from Leg 1 — charts live on the root leg" : "The setup (this leg)"} style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}`, display: "block" }} />
+                            {inheritCharts && <span title="Chart set shared from Leg 1 — charts live on the root leg" style={{ position: "absolute", top: -5, left: -5, background: "rgba(8,8,14,0.92)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontSize: "0.48rem", fontWeight: 800, letterSpacing: ".02em", borderRadius: 99, padding: "0 4px", lineHeight: 1.6, whiteSpace: "nowrap" }}>↩ shared</span>}
+                          </span>
+                        : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
                       <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
                       {backImg
                         ? <img src={backImg} alt="outcome" title={indent ? "The shared trend outcome" : "The outcome"} style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} />
                         : faces.count > 1
                           ? <span title={`${faces.count} charts in this study`} style={{ width: 64, height: 40, borderRadius: 5, border: `1px solid ${C.borderGold}`, display: "grid", placeItems: "center", color: C.goldBright, fontSize: "0.62rem", fontWeight: 800 }}>+{faces.count - 1}</span>
-                          : <span title="No outcome chart yet — drop `TICKER DATE AFTER.png` in the study inbox" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
+                          : inheritCharts
+                            ? <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />
+                            : <span title="No outcome chart yet — drop `TICKER DATE AFTER.png` in the study inbox" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
                     </span>
                     <span style={{ width: 150 }}>{r.pattern}</span>
                     {(() => { const q = studyQuality(s); return <span style={{ width: 70, color: q.letter === "—" ? C.muted : q.letter === "A+" ? "#7ef0a0" : C.goldBright, fontWeight: 700 }} title={`${q.on}/${q.total} criteria ticked`}>{q.letter}</span>; })()}

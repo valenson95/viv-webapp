@@ -274,6 +274,9 @@ const m = { adr20:f(adr20), dolvol_m:f(dolvol,0), tight_days:tight, pole_pct:f(r
   ret_1m:f(ret(21)), ret_3m:f(ret(63)), ret_6m:f(ret(126)), regime: spyOK?"Y":"N",
   spy_10d20: spyCond ? `${spyCond} (${spyAbove}/10 closes above 20SMA)` : null,
   rs:"pending as-rank (needs POLYGON_API_KEY)" };
+// SHORT-DIRECTION GUARD (Valen 2026-07-28): this engine is LONG-anchored (ORH entry, upside MFE,
+// long MA-clock). A study marked direction:"short" (breakdown leg) must NOT get long-framed outcome
+// numbers — refuse --write for shorts; print-only so the numbers can be eyeballed with signs flipped.
 // SUGGESTED ticks only — checks belong to VALEN's eyes now (2026-07-14 split: his buckets vs auto data).
 // Printed for cross-reference, NEVER written into the row.
 // coil_len proxy = the narrow-range streak band · shallow_retrace/retrace_ma proxy = the pullback low
@@ -306,6 +309,12 @@ if (WRITE) {
   const note = `study-fill.mjs ${new Date().toISOString().slice(0,10)} · entry = ${entryModel}, stop = LoD (Valen's standing rule) · base/pole spans = eyeball on chart`;
   if (existing) {
     const s0 = existing.metrics.study;
+    if (s0.direction === "short") { // breakdown leg — long-framed numbers would poison the outcome
+      console.error(`✗ REFUSING --write: this study is direction:"short" (breakdown leg). The compute engine is
+  long-anchored (ORH entry, upside MFE, long MA-clock). Use the printed numbers as a mirror reference only,
+  or ask for the short-side engine. Ticks/charts on the row are untouched.`);
+      process.exit(1);
+    }
     const study = { ...s0, m: { ...s0.m, ...m, rs: s0.m?.rs && !/pending/.test(String(s0.m.rs)) ? s0.m.rs : m.rs }, outcome: { ...s0.outcome, ...outcome },
       regime_tag: s0.regime_tag || spyCond || "", _computed: note }; // his dropdown pick wins; auto fills blanks only
     const { error } = await sb.from("model_book").update({ metrics: { ...existing.metrics, study } }).eq("id", existing.id);
