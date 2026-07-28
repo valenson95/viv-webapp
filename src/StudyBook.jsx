@@ -208,6 +208,39 @@ export const STUDY_SETUPS = {
       ["theme", "Theme / group"],
     ],
   },
+  // High Tight Flag — project study type (Valen 2026-07-28). Criteria from the corpus (valid base shape,
+  // qullamaggie-system.md §base-shapes) + the pattern's primary statistical source (pole ≥90% in ≤2 months;
+  // tight-vs-loose flag; receding flag volume; entry above the PATTERN high; ½-pole measured move).
+  "High Tight Flag": {
+    buckets: [
+      { title: "The pole", items: [
+        ["pole_double", "Pole ≈ doubled — +90–100%+ in ≤ 8 weeks"],
+        ["pole_linear", "Pole orderly ≈45° — strong closes, minimal overlap (not a one-day spike)"],
+        ["pole_fresh", "Pole driven by a fresh catalyst / theme leadership", "bonus"],
+      ]},
+      { title: "The flag", items: [
+        ["flag_shallow", "Flag depth ≤ 20–25% off the pole high"],
+        ["flag_brief", "Flag 3–5 weeks (not stretching past ~8)"],
+        ["flag_tightline", "TIGHT flag — clean drift, no trendline violations or jagged bars"],
+        ["flag_voldry", "Volume recedes through the flag"],
+        ["flag_nr", "Narrow-range days into the pivot"],
+      ]},
+      { title: "Trigger", items: [
+        ["bo_above_high", "Trigger = break above the PATTERN HIGH (not an early flag-line poke)"],
+        ["bo_vol", "Volume expansion on the breakout day"],
+        ["first_flag", "1st–2nd flag of the campaign — not a late leg"],
+      ]},
+    ],
+    metrics: [
+      ["pole_pct", "Pole %"], ["pole_weeks", "Pole length (weeks)"],
+      ["flag_depth_pct", "Flag depth %"], ["flag_weeks", "Flag length (weeks)"],
+      ["rs", "AS/RS rank"], ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"],
+      ["gap_pct", "Gap % on trigger"], ["vol_ratio", "Volume ÷ prior day"], ["ext_50ma", "Ext from 50MA (×ATR%)"],
+      ["entry_px", "Entry (5-min ORH — standing rule)"], ["stop_width_adr", "LoD stop width (×ADR)"],
+      ["mm_target_px", "Measured-move target (½ pole above flag low)"], ["weeks_to_mm", "Weeks to measured move (post)"],
+      ["theme", "Theme / group"], ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
+    ],
+  },
 };
 
 // Data-derived factor flags — computed from the AUTO metrics at analysis time (no tick needed).
@@ -1212,6 +1245,15 @@ export const PROJECT_HYPOTHESES = {
     { id: "MB-H4", text: "The leader's move is front-loaded: most of the 6-month return is made in the first 3 months off the low.", measure: "ret_3m vs (ret_6m − ret_3m) per study" },
     { id: "MB-H5", text: "MA structure is the tell: leaders hold/reclaim their key MAs (10>20>50 stack, 100/200d hold) before the index repairs its own.", measure: "'held long-term MA' + 'MAs stacked/reclaimed first' ticks vs +3M return" },
     { id: "MB-H6", text: "A catalyst / episodic pivot at the launch marks the biggest winners off the bottom.", measure: "'Catalyst/EP at the launch' tick vs +3M / +6M return" },
+  ],
+  // High Tight Flag book (Valen 2026-07-28) — pre-registered from the corpus + the pattern's statistical source.
+  "High Tight Flag": [
+    { id: "HTF-H1", text: "TIGHT flags beat loose ones — clean drift with no trendline violations outperforms meandering/jagged flags.", measure: "'TIGHT flag' tick vs outcome class" },
+    { id: "HTF-H2", text: "Flag depth ≤20–25% is the live/dead line — deeper corrections lose the measured-move odds.", measure: "flag_depth_pct bands vs MFE / measured-move hit" },
+    { id: "HTF-H3", text: "Volume receding through the flag + expanding on the breakout day separates the real ones.", measure: "'volume recedes' + 'breakout volume' ticks vs outcome" },
+    { id: "HTF-H4", text: "Only young flags pay — 1st–2nd flag of a campaign; 3rd+ decays hard (70/20/5/1 leg decay).", measure: "'1st–2nd flag' tick + leg index vs outcome" },
+    { id: "HTF-H5", text: "An orderly ≈45° pole beats a vertical one-day-spike pole.", measure: "'pole orderly' tick vs MFE" },
+    { id: "HTF-H6", text: "The ½-pole measured move (added to the flag low) is hit in the great majority of valid patterns — usable target math.", measure: "mm_target_px hit rate + weeks_to_mm" },
   ],
 };
 
