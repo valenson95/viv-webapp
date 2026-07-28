@@ -2,7 +2,8 @@
 //   1. In the webapp he creates the study (ticker + date + his eyeball ticks), or not — either way works.
 //   2. He saves chart screenshots to  AI-OS/trading/research/chart-study/inbox/
 //      named like:  AA 2021-03-01 HTF.png · AA_2021-03-01_LTF.png · AA 2021-03-01 AFTER.png
-//      (any separators; HTF/weekly/W → Context slot, LTF/daily/D → BEFORE slot,
+//      (any separators; W/weekly/HTF → Context · D/daily/unlabeled → BEFORE (daily setup) ·
+//       LTF/TRIG/5MIN → trigger entry detail ·
 //       AFTER/OUT/OUTCOME → the outcome chart (metrics.study.outcome_img); unlabeled → BEFORE).
 //   3. This script: groups files by ticker+date → finds the study row (creates it via
 //      study-fill.mjs --write if missing, so metrics/outcome auto-fill too) → uploads the
@@ -27,9 +28,13 @@ for (const f of files) {
   const m = f.match(/^([A-Za-z.]+)[ _-]+(\d{4}-\d{2}-\d{2})(?:[ _-]+([A-Za-z]+))?\.(png|jpe?g|webp)$/);
   if (!m) { console.log(`✗ skip "${f}" — name it TICKER YYYY-MM-DD HTF|LTF.png`); continue; }
   const [, tk, date, tfRaw] = m;
+  // Token model LOCKED (Valen 2026-07-28): every study = 3 charts — W (weekly context) ·
+  // D (daily setup) · LTF (lower-timeframe entry detail). "LTF" therefore now maps to the
+  // TRIGGER slot (it used to mean the daily — old inboxes used HTF/LTF pairs); daily = D/DAILY
+  // or unlabeled. AFTER/OUT stays the outcome chart.
   const tf = /^(htf|w|weekly|m|monthly)$/i.test(tfRaw || "") ? "HTF"
     : /^(after|out|outcome|result)$/i.test(tfRaw || "") ? "AFTER"
-    : /^(trig|trigger|entry|5min|ltfafter)$/i.test(tfRaw || "") ? "TRIG" : "LTF";
+    : /^(trig|trigger|entry|5min|ltfafter|ltf|low|intraday|60m|15m|5m)$/i.test(tfRaw || "") ? "TRIG" : "LTF";
   const key = `${tk.toUpperCase()}|${date}`;
   (groups[key] = groups[key] || {}).ticker = tk.toUpperCase();
   groups[key].date = date;

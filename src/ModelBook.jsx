@@ -122,6 +122,10 @@ export function downloadMyBookCsv(rows, opts) {
 // the browser's native "Save as PDF" does the rendering (no libraries, charts included).
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 export function openMyBookPdf(rows, { makerGate } = {}) {
+  // Chronicle order (Valen 2026-07-28): the book reads BY TICKER, each ticker chronological from
+  // its first study — one ticker = one chapter of legs, like a single name's history album.
+  rows = [...rows].sort((a, b) => String(a.ticker).localeCompare(String(b.ticker)) ||
+    String(mbISO(a.entry_date) || a.entry_date || "").localeCompare(String(mbISO(b.entry_date) || b.entry_date || "")));
   const today = new Date().toISOString().slice(0, 10);
   const stat = (k, v) => v || v === 0 ? `<div class="st"><div class="sk">${k}</div><div class="sv">${esc(v)}</div></div>` : "";
   const CHART_ROLE_LABEL = { context: "Context (HTF)", before: "The setup", trigger: "The trigger — 5-min", after: "The outcome" };
@@ -152,17 +156,18 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
   // (anchors survive Chrome/Safari Save-as-PDF, so the saved PDF keeps the clickable contents).
   const menuHtml = (() => {
     const metas = rows.map(rowMeta);
-    const tiers = [5, 4, 3, 2, 1, 0].map((n) => ({ n, list: metas.filter((m) => m.stars === n) })).filter((t) => t.list.length);
+    const groups = [];
+    metas.forEach((m) => { const g = groups[groups.length - 1]; if (g && g.t === m.ticker) g.list.push(m); else groups.push({ t: m.ticker, list: [m] }); });
     const tr = (m) => { const A = (inner) => `<a href="#${m.anchor}">${inner}</a>`; return `<tr>
       <td class="tkcell">${A(esc(m.ticker))}</td><td>${A(esc(m.date))}</td><td class="mut">${A(esc(m.setup))}</td>
-      <td>${A(esc(m.score))}</td><td class="${m.good ? "good" : m.bad ? "bad" : "mut"}">${A(esc(m.outcome))}</td>
+      <td>${A(esc(m.score))}</td><td class="stcell">${A("★".repeat(m.stars) || "—")}</td><td class="${m.good ? "good" : m.bad ? "bad" : "mut"}">${A(esc(m.outcome))}</td>
       <td class="num">${A(pct(m.move))}</td><td class="num">${A(m.r === "" || m.r == null ? "—" : esc(m.r) + "R")}</td></tr>`; };
-    const tier = (t) => `<tr class="tierh"><td colspan="7">${t.n ? t.n + "-STAR " + "★".repeat(t.n) : "UNGRADED"}</td></tr>${t.list.map(tr).join("")}`;
+    const grp = (g) => (g.list.length > 1 ? `<tr class="tierh"><td colspan="8">${esc(g.t)} — ${g.list.length} entries, chronological</td></tr>` : "") + g.list.map(tr).join("");
     return `<div class="page menu">
-      <div class="mhead"><div><span class="mtitle">MY MODEL BOOK</span><span class="msub">graded setups · ${rows.length} entries</span></div><div class="msub">menu · exported ${today}</div></div>
-      <table class="mtab"><thead><tr><th>Ticker</th><th>Date</th><th>Setup</th><th>Score</th><th>Outcome</th><th>Peak move</th><th>R</th></tr></thead>
-      <tbody>${tiers.map(tier).join("")}</tbody></table>
-      <div class="foot">Click any ticker to jump to that entry — the links stay clickable in the saved PDF.</div>
+      <div class="mhead"><div><span class="mtitle">MY MODEL BOOK</span><span class="msub">by ticker, chronological · ${rows.length} entries</span></div><div class="msub">menu · exported ${today}</div></div>
+      <table class="mtab"><thead><tr><th>Ticker</th><th>Date</th><th>Setup</th><th>Score</th><th>Stars</th><th>Outcome</th><th>Peak move</th><th>R</th></tr></thead>
+      <tbody>${groups.map(grp).join("")}</tbody></table>
+      <div class="foot">Click any row to jump to that entry — links stay clickable in the saved PDF. Multi-entry tickers read top-to-bottom as the name's history.</div>
     </div>`;
   })();
   // 🧪 HYPOTHESIS SUMMARY — included only when the export carries study rows (the research wing).
@@ -313,6 +318,8 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
       .mtab td.num,.mtab th:nth-last-child(-n+2){text-align:right}
       .mtab a{display:block;color:inherit;font-weight:inherit;text-decoration:none}
       .mtab .tkcell a{color:#f0c050;font-weight:800}
+      .mtab .stcell a{color:#c9982a;letter-spacing:0.05em}
+      body.light .mtab .stcell a{color:#8a6a1c}
       body.light .mtab .tkcell a{color:#8a6a1c}
       .mtab .mut{color:#9a968c}
       .tierh td{color:#c9982a;font-weight:800;font-size:0.7rem;letter-spacing:0.12em;padding-top:16px;border-bottom:1px solid rgba(201,152,42,0.5)}
