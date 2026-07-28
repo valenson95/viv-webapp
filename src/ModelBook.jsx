@@ -603,6 +603,10 @@ function openProjectBookPdf(rows, coverTitle) {
     <div class="pbfoot">Counts are studies ticked so far — an untick may just mean "not studied yet", never "failed".</div>
   </div>` : "";
   // ── YEAR DIVIDER + per-study pages ──
+  // Click-to-zoom (Valen 2026-07-28): a printed PDF can't run JS, but internal link annotations survive
+  // Save-as-PDF (proven by the TOC). Each chart links to a full-bleed appendix page of itself; the zoom
+  // page links back to the study. Zoom pages collect here and append after the book body.
+  const zoomPages = [];
   const bodyHtml = groups.map((g) => {
     const ep = episodes[g.year];
     const divider = `<div class="page pbdivider">
@@ -617,14 +621,17 @@ function openProjectBookPdf(rows, coverTitle) {
       const study = r.metrics.study, m = study.m || {}, theme = r.theme || m.theme || "";
       const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Market Bottom"];
       const head = `<div class="pbshead"><span class="pbstk">${esc(r.ticker)}</span><span class="pbstheme">${esc(theme)}</span></div>`;
-      const chartBlock = (img, cap, cls = "pbchart") => img
-        ? `<hr class="pbhair"/><img class="${cls}" src="${esc(img)}"/><hr class="pbhair"/><div class="pbcap">${cap}</div>`
-        : `<hr class="pbhair"/><div class="pbnoimg">no ${esc(cap.toLowerCase())} chart yet</div><hr class="pbhair"/><div class="pbcap">${cap}</div>`;
+      const chartBlock = (img, cap, cls = "pbchart", zid = null) => {
+        if (!img) return `<hr class="pbhair"/><div class="pbnoimg">no ${esc(cap.toLowerCase())} chart yet</div><hr class="pbhair"/><div class="pbcap">${cap}</div>`;
+        if (zid) zoomPages.push(`<div class="page pbzoom" id="${zid}"><a class="pbzback" href="#e${idx}">← back to ${esc(r.ticker)}</a><img src="${esc(img)}"/><div class="pbzcap">${esc(r.ticker)} · ${cap}</div></div>`);
+        const im = `<img class="${cls}" src="${esc(img)}"/>`;
+        return `<hr class="pbhair"/>${zid ? `<a class="pbzl" href="#${zid}">${im}</a>` : im}<hr class="pbhair"/><div class="pbcap">${cap}${zid ? ` <span class="pbzhint">· click chart to zoom</span>` : ""}</div>`;
+      };
       // Page A — vs-QQQ chart
       const pageA = `<div class="page pbstudy" id="e${idx}">
         ${head}
         <div class="pbownlow">own low ${esc(r.entry_date || "—")}</div>
-        ${chartBlock(r.before_img, "Vs QQQ")}
+        ${chartBlock(r.before_img, "Vs QQQ", "pbchart", `z${idx}a`)}
       </div>`;
       // Page B — daily chart + data strip + ticked checklist + thesis
       const cells = [
@@ -642,7 +649,7 @@ function openProjectBookPdf(rows, coverTitle) {
       const thesis = r.thesis ? `<div class="pbthesis"><div class="pblabel">Thesis</div><div class="pbthesistext">${esc(r.thesis)}</div></div>` : "";
       const pageB = `<div class="page pbstudy">
         ${head}
-        ${chartBlock(r.after_img, "Daily", "pbchart pbchartb")}
+        ${chartBlock(r.after_img, "Daily", "pbchart pbchartb", `z${idx}b`)}
         ${strip}
         ${checklist}
         ${thesis}
@@ -718,6 +725,13 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbnoimg{padding:40px;text-align:center;color:#66635b;font-size:0.8rem}
       .pbcap{font-size:0.6rem;font-weight:800;letter-spacing:0.2em;text-transform:uppercase;color:#9a968c}
       .pbchart,.pbstrip,.pbchecklist,.pbthesis,.pbshead,.pbcap{break-inside:avoid;page-break-inside:avoid}
+      /* click-to-zoom appendix: full-bleed chart pages, linked from the inline charts (PDF link annotations) */
+      .pbzl{display:block;text-decoration:none}
+      .pbzhint{color:#66635b;letter-spacing:0.08em}
+      .pbzoom{padding:0;position:relative;display:flex;align-items:center;justify-content:center;background:#000}
+      .pbzoom img{width:100%;max-height:97vh;object-fit:contain;display:block}
+      .pbzback{position:absolute;top:14px;left:16px;font-size:0.6rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#f0c050;text-decoration:none;background:rgba(8,8,14,0.82);padding:4px 11px;border-radius:99px}
+      .pbzcap{position:absolute;bottom:12px;left:16px;font-size:0.58rem;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#9a968c;background:rgba(8,8,14,0.82);padding:3px 10px;border-radius:99px}
       /* data strip — hairlines top/bottom only, small-caps labels over values */
       .pbstrip{display:flex;flex-wrap:wrap;gap:28px;margin:26px 0 4px;padding:16px 0;border-top:1px solid rgba(255,255,255,0.14);border-bottom:1px solid rgba(255,255,255,0.14)}
       .pbck{font-size:0.54rem;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#9a968c;margin-bottom:5px}
@@ -746,6 +760,10 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pbttab td{border-bottom-color:rgba(0,0,0,0.10)}
       body.light .pbtbar{background:rgba(0,0,0,0.10)}
       body.light .pbnoimg,body.light .pbnotick{color:#8a857a}
+      body.light .pbzoom{background:#fff}
+      body.light .pbzback{background:rgba(255,255,255,0.88);color:#8a6a1c}
+      body.light .pbzcap{background:rgba(255,255,255,0.88);color:#6b675e}
+      body.light .pbzhint{color:#8a857a}
     </style></head><body>
     <div class="toolbar">
       <button class="ghost" onclick="const l=document.body.classList.toggle('light');this.textContent=l?'🌙 Dark theme':'☀ Light theme'">☀ Light theme</button>
@@ -755,6 +773,7 @@ function openProjectBookPdf(rows, coverTitle) {
     ${contents}
     ${hypPage}
     ${bodyHtml}
+    ${zoomPages.join("")}
     <script>window.onload=()=>{const imgs=[...document.images];Promise.all(imgs.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r})))};</script>
     </body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
