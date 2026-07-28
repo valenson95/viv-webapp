@@ -129,6 +129,7 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
   const today = new Date().toISOString().slice(0, 10);
   const stat = (k, v) => v || v === 0 ? `<div class="st"><div class="sk">${k}</div><div class="sv">${esc(v)}</div></div>` : "";
   const CHART_ROLE_LABEL = { context: "Context (HTF)", before: "The setup", trigger: "The trigger — 5-min", after: "The outcome" };
+  const figLabel = (c, j) => c.label || CHART_ROLE_LABEL[c.role] || `Chart ${j + 1}`; // shared by entry() + campaignUnit()
   // ── STUDY-ROW entry (presentation-contract: opened/printed = full timeline + full checklist).
   //   charts  = the FULL ordered list (buildChartList true) — each a full-width figure, its LABEL the
   //             figcaption + its caption text under it (not the fixed BEFORE/AFTER pair).
@@ -246,7 +247,6 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
       chipsHtml = ticks.length ? `<div class="ticks">${ticks.join("")}</div>` : "";
       statsHtml = `<div class="stats">${stat("Captured %", r.run_pct)}${stat("Run-up % (peak)", r.run_up_pct)}${stat("Days held", r.days_held)}${stat("R multiple", r.r_mult)}${stat("Theme", r.theme)}</div>`;
     }
-    const figLabel = (c, j) => c.label || CHART_ROLE_LABEL[c.role] || `Chart ${j + 1}`;
     const figPages = charts.map((c, j) => `<section class="entry chartpg"${j === 0 ? ` id="e${idx}"` : ""}>
       ${j === 0 ? bigHead(r, m) : slimHead(r, m, figLabel(c, j))}
       <figure class="fullfig"><figcaption>${esc(figLabel(c, j))} · ${j + 1}/${charts.length}</figcaption><img src="${esc(c.img)}"/>${c.caption ? `<div class="fignote">${esc(c.caption)}</div>` : ""}</figure>
@@ -262,6 +262,86 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
     </section>`;
     return figPages.join("") + scorecard;
   };
+  // ── CAMPAIGN UNIT (Valen 2026-07-28): a multi-leg campaign (rows sharing metrics.study.campaign_id) renders as
+  // ONE unit — the root's chart pages ONCE, then a single LEGS LEDGER (one row per leg + per-leg hypothesis votes),
+  // then the root's notes once. Replaces the old N-1 near-empty "shared with the root leg" scorecards (bloat).
+  // legs = [{ r, idx }] in export order (chronological). ANCHORS: the first campaign page carries the FIRST leg's
+  // id (e{idx}); every OTHER leg's id is emitted as an empty <span> on that page so all menu links still resolve.
+  const campaignUnit = (legs) => {
+    const root = legs[0].r, rs = root.metrics.study;
+    const first = legs[0].r.entry_date || "?", last = legs[legs.length - 1].r.entry_date || "?";
+    const setupLabel = (rs.setup || root.pattern || "") + (rs.setup === "Parabolic" && rs.direction === "short" ? " · Short" : "");
+    const anchorSpans = legs.slice(1).map((l) => `<span id="e${l.idx}"></span>`).join(""); // other legs' menu targets
+    const campHead = `<div class="ehead">
+      <div><span class="tk">${esc(root.ticker)}</span><span class="pat">${esc(setupLabel)}</span></div>
+      <div class="emeta"><b>${legs.length} legs</b> · ${esc(first)} → ${esc(last)}${addedStamp(root) ? `<span class="added">added ${esc(addedStamp(root))}</span>` : ""}</div>
+    </div>`;
+    // Chart pages ONCE — the union of the campaign's chart-bearing rows (in practice the root's set).
+    const chartLegs = legs.filter((l) => buildChartList(l.r, true).some((c) => c && c.img));
+    const primary = chartLegs[0] || legs[0];
+    const primaryCharts = buildChartList(primary.r, true).filter((c) => c && c.img);
+    const pmeta = rowMeta(primary.r, legs[0].idx);
+    const hasCharts = primaryCharts.length > 0;
+    const chartPages = primaryCharts.map((c, j) => `<section class="entry chartpg"${j === 0 ? ` id="e${legs[0].idx}"` : ""}>
+      ${j === 0 ? campHead + anchorSpans : slimHead(primary.r, pmeta, figLabel(c, j))}
+      <figure class="fullfig"><figcaption>${esc(figLabel(c, j))} · ${j + 1}/${primaryCharts.length}</figcaption><img src="${esc(c.img)}"/>${c.caption ? `<div class="fignote">${esc(c.caption)}</div>` : ""}</figure>
+    </section>`).join("");
+    // Item 4 — a non-root leg with its OWN charts (rare): append after the campaign pages with its slim header; nothing dropped.
+    const extraPages = chartLegs.filter((l) => l !== primary).map((l) => {
+      const ec = buildChartList(l.r, true).filter((c) => c && c.img), em = rowMeta(l.r, l.idx), n = legs.indexOf(l) + 1;
+      return ec.map((c, j) => `<section class="entry chartpg">
+        ${slimHead(l.r, em, `Leg ${n} · ${figLabel(c, j)}`)}
+        <figure class="fullfig"><figcaption>${esc(figLabel(c, j))} · ${j + 1}/${ec.length}</figcaption><img src="${esc(c.img)}"/>${c.caption ? `<div class="fignote">${esc(c.caption)}</div>` : ""}</figure>
+      </section>`).join("");
+    }).join("");
+    // LEGS LEDGER — one row per leg, chronological. Blank cells print "—" (blank = not measured, never invented).
+    const ledgerRows = legs.map((l, i) => {
+      const s = l.r.metrics.study, q = studyQuality(s), cls = outcomeClass(s), oc = cls ? OC_CHIP[cls] : null;
+      const o = s.outcome || {}, mm = s.m || {};
+      const sl = (s.setup || l.r.pattern || "") + (s.direction === "short" ? " · Short" : "");
+      const ocCell = oc ? `<b class="${cls === "failure" ? "bad" : (cls === "monster" || cls === "big winner") ? "good" : ""}">${esc(oc.label)}</b>` : `<span class="mut">Pending</span>`;
+      const days10 = (mm.d_below_ma10 == null || mm.d_below_ma10 === "") ? "—" : esc(mm.d_below_ma10);
+      const verdict = o.trade_verdict;
+      return `<tr>
+        <td class="hid">Leg ${i + 1}</td><td>${esc(l.r.entry_date || "—")}</td><td class="mut">${esc(sl)}</td>
+        <td class="num">${q.on}/${q.total}</td><td>${ocCell}</td>
+        <td class="num">${pct(o.mfe_d20)}</td><td class="num">${days10}</td><td class="num">${pct(o.peak_to_ma10_pct ?? mm.peak_to_ma10_pct)}</td>
+        <td class="mut">${verdict ? esc(String(verdict).slice(0, 40)) : "—"}</td></tr>`;
+    }).join("");
+    // Per-leg hypothesis votes — the "do my legs support my hypotheses" payoff. One scannable line per leg
+    // (wrap allowed): the verdicts from entryVerdict() for hypotheses that return non-null, as coloured chips.
+    const voteLines = legs.map((l, i) => {
+      const s = l.r.metrics.study;
+      const chips = HYPOTHESES.map((h) => { const v = entryVerdict(h, s, { ticker: l.r.ticker, date: l.r.entry_date }); if (!v) return null;
+        const dot = v.bucket === "supports" ? "🟢" : v.bucket === "challenges" ? "🔴" : "⚪"; return `${dot} ${esc(h.id)}`; }).filter(Boolean);
+      return `<div class="hvline"><b>Leg ${i + 1}</b>${chips.length ? chips.join(" · ") : `<span class="mut">no votes</span>`}</div>`;
+    }).join("");
+    const ledgerPage = `<section class="entry"${hasCharts ? "" : ` id="e${legs[0].idx}"`}>
+      ${hasCharts ? "" : anchorSpans}
+      <div class="shead"><span class="stk">${esc(root.ticker)}</span><span class="slab">Legs ledger</span><span class="smeta">${legs.length} legs · ${esc(first)} → ${esc(last)}</span></div>
+      <table class="mtab ledger"><thead><tr><th>Leg</th><th>Trigger date</th><th>Setup</th><th>Ticks</th><th>Outcome</th><th>MFE d20 %</th><th>Days&gt;10MA</th><th>Peak→10MA %</th><th>Sim verdict</th></tr></thead>
+      <tbody>${ledgerRows}</tbody></table>
+      <div class="hvtitle">Per-leg hypothesis votes — 🟢 supports · 🔴 challenges · ⚪ adds data</div>
+      <div class="hvotes">${voteLines}</div>
+      ${root.thesis ? `<div class="note"><b>Thesis:</b> ${esc(root.thesis)}</div>` : ""}
+      ${root.lesson ? `<div class="note"><b>Lesson:</b> ${esc(root.lesson)}</div>` : ""}
+    </section>`;
+    return chartPages + extraPages + ledgerPage;
+  };
+  // Group consecutive same-campaign rows (post ticker→date sort) into ONE unit; solo studies + classic rows
+  // render exactly as today via entry(). A campaign present as a single leg in THIS export also renders as-today.
+  const bodyEntries = (() => {
+    const out = [];
+    for (let i = 0; i < rows.length; i++) {
+      const cid = rows[i].metrics?.study?.campaign_id;
+      if (cid) {
+        const legs = [{ r: rows[i], idx: i }];
+        while (i + 1 < rows.length && rows[i + 1].metrics?.study?.campaign_id === cid) { i++; legs.push({ r: rows[i], idx: i }); }
+        out.push(legs.length > 1 ? campaignUnit(legs) : entry(legs[0].r, legs[0].idx));
+      } else out.push(entry(rows[i], i));
+    }
+    return out.join("");
+  })();
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>My Model Book — ${today}</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
     <style>
@@ -338,6 +418,16 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
       .hpill.sup{color:#7ef0a0;border-color:#7ef0a0}.hpill.chal{color:#e05555;border-color:#e05555}
       .hpill.split{color:#f0c050;border-color:#f0c050}.hpill.mutp{color:#9a968c;border-color:#9a968c}
       .warn{border:1px solid rgba(224,85,85,0.55);background:rgba(224,85,85,0.08);color:#e8a0a0;border-radius:10px;padding:9px 13px;font-size:0.7rem;font-weight:700;line-height:1.5;margin-bottom:12px}
+      /* ── Campaign LEGS LEDGER + per-leg hypothesis votes (Valen 2026-07-28): the campaign unit's single ledger page ── */
+      .ledger tr{break-inside:avoid;page-break-inside:avoid}
+      .hvtitle{font-size:0.58rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#9a968c;margin:16px 0 8px}
+      .hvotes{display:grid;gap:6px;margin-bottom:12px}
+      .hvline{font-size:0.74rem;color:#cfccc3;line-height:1.6;break-inside:avoid;page-break-inside:avoid}
+      .hvline b{display:inline-block;min-width:52px;color:#c9982a;font-weight:800;margin-right:8px}
+      .hvline .mut{color:#9a968c}
+      body.light .hvtitle,body.light .hvline .mut{color:#6a675e}
+      body.light .hvline{color:#2e2c25}
+      body.light .hvline b{color:#8a6a1c}
       body.light .mtitle,body.light .tierh td,body.light .hid{color:#8a6a1c}
       body.light .msub,body.light .mtab .mut,body.light .mtab th,body.light .hclaim{color:#6a675e}
       body.light .mtab th{border-bottom-color:rgba(0,0,0,0.25)}
@@ -373,7 +463,7 @@ export function openMyBookPdf(rows, { makerGate } = {}) {
     </div>
     ${menuHtml}
     ${hypHtml}
-    ${rows.map((r, i) => entry(r, i)).join("")}
+    ${bodyEntries}
     <script>window.onload=()=>{const imgs=[...document.images];Promise.all(imgs.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r})))};</script>
     </body></html>`;
   // Blob URL instead of document.write into about:blank — Safari/strict browsers render the
