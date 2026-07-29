@@ -790,11 +790,12 @@ function openProjectBookPdf(rows, coverTitle) {
       const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Market Bottom"];
       // Comparison pages pair the name with the index in the header (Valen 2026-07-30: "ARM vs QQQ")
       const head = (vs) => `<div class="pbshead"><span class="pbstk">${esc(r.ticker)}${vs ? `<span class="pbvsq"> vs QQQ</span>` : ""}</span><span class="pbstheme">${esc(theme)}</span></div>`;
-      // Overlay pills (Valen 2026-07-30, from nickschmidt.so's trend-lane chips): translucent mono
-      // chips ON the chart — identity top-left, the headline number top-right. Data only, never invented.
+      // Nick chart card (Valen 2026-07-30): rounded hairline-ring card, overlay chips on the image,
+      // sentence-case grey caption underneath carrying the chart's key datapoint. No hairline rules
+      // around the chart — the ring IS the separation. Caption data comes from stored metrics only.
       const chartBlock = (img, cap, cls = "pbchart", pills = "") => {
-        if (!img) return `<hr class="pbhair"/><div class="pbnoimg">no ${esc(cap.toLowerCase())} chart yet</div><hr class="pbhair"/><div class="pbcap">${cap}</div>`;
-        return `<hr class="pbhair"/><div class="pbchartwrap"><img class="${cls}" src="${esc(img)}"/>${pills}</div><hr class="pbhair"/><div class="pbcap">${cap}</div>`;
+        if (!img) return `<div class="pbnoimgbox">no chart attached yet</div><div class="pbcapn">${cap}</div>`;
+        return `<div class="pbchartwrap"><img class="${cls}" src="${esc(img)}"/>${pills}</div><div class="pbcapn">${cap}</div>`;
       };
       const yy = yearOf(r).slice(2);
       const idPill = `<span class="pbpill pbpill-l">${esc(r.ticker)} '${esc(yy)}</span>`;
@@ -804,11 +805,19 @@ function openProjectBookPdf(rows, coverTitle) {
       const retPill = (m.ret_3m !== "" && m.ret_3m != null)
         ? `<span class="pbpill pbpill-r">${+m.ret_3m >= 0 && !String(m.ret_3m).startsWith("-") ? "+" : ""}${esc(m.ret_3m)}% · 3M</span>` : "";
       const folio = `<div class="pbfolio"><span>${esc(coverTitle)}</span><span>No. ${String(idx + 1).padStart(2, "0")} / ${String(rows.length).padStart(2, "0")} · ${esc(yearOf(r))}</span></div>`;
+      // Sentence captions in Nick's register — small grey line under the card with the key datapoint
+      const vsPhrase = (vsN !== "" && vsN != null && !Number.isNaN(+vsN))
+        ? (+vsN < 0 ? ` — bottomed ${Math.abs(+vsN)} session${Math.abs(+vsN) === 1 ? "" : "s"} before the index`
+          : +vsN > 0 ? ` — bottomed ${+vsN} session${+vsN === 1 ? "" : "s"} after the index` : ` — bottomed with the index`) : "";
+      const capA = isMB ? `${esc(r.ticker)} vs QQQ, daily. Own low ${esc(r.entry_date || "—")}${vsPhrase}.`
+        : `${esc(r.ticker)} — higher-timeframe context.`;
+      const capB = isMB ? `${esc(r.ticker)}, daily${(m.ret_3m !== "" && m.ret_3m != null)
+        ? ` — ${+m.ret_3m >= 0 && !String(m.ret_3m).startsWith("-") ? "+" : ""}${esc(m.ret_3m)}% in the three months off the low` : ""}.`
+        : `${esc(r.ticker)} — the setup, daily.`;
       // Page A — vs-QQQ chart (MB); other project books caption it as HTF context
       const pageA = `<div class="page pbstudy pbplate" id="e${idx}">
         ${head(isMB)}
-        <div class="pbownlow">own low ${esc(r.entry_date || "—")}</div>
-        ${chartBlock(r.before_img, isMB ? "Vs QQQ" : "HTF — context", "pbchart", idPill + (isMB ? vsPill : ""))}
+        ${chartBlock(r.before_img, capA, "pbchart", idPill + (isMB ? vsPill : ""))}
         ${folio}
       </div>`;
       // Page B — daily chart + data strip + ticked checklist + thesis
@@ -827,7 +836,7 @@ function openProjectBookPdf(rows, coverTitle) {
       const thesis = r.thesis ? `<div class="pbthesis"><div class="pblabel">Thesis</div><div class="pbthesistext">${esc(r.thesis)}</div></div>` : "";
       const pageB = `<div class="page pbstudy">
         ${head(false)}
-        ${chartBlock(r.after_img, isMB ? "Daily" : "Setup", "pbchart pbchartb", idPill + retPill)}
+        ${chartBlock(r.after_img, capB, "pbchart pbchartb", idPill + retPill)}
         ${strip}
         ${checklist}
         ${thesis}
@@ -857,10 +866,8 @@ function openProjectBookPdf(rows, coverTitle) {
       .toolbar button{background:linear-gradient(120deg,#c9982a,#f0c050);border:none;color:#08080e;font-family:inherit;font-weight:800;font-size:0.85rem;padding:10px 20px;border-radius:99px;cursor:pointer}
       .toolbar .ghost{background:transparent;border:1px solid rgba(201,152,42,0.6);color:#c9982a}
       @media print{.toolbar{display:none}}
-      /* ── COVER ── */
-      .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh;position:relative}
-      .pbcover::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 68% 50% at 26% 42%,rgba(201,152,42,0.06),transparent 70%)}
-      .pbcover>*{position:relative}
+      /* ── COVER ── (no gradient washes — print rasterizes them with visible banding) */
+      .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
       .pbbrand{font-size:0.66rem;font-weight:800;letter-spacing:0.32em;text-transform:uppercase;color:#c9982a}
       .pbtitle{font-size:clamp(2.6rem,7vw,3.4rem);font-weight:800;letter-spacing:-0.03em;line-height:1.02;color:#fff;margin:22px 0 0;max-width:16ch}
       .pbrule{width:60px;height:2px;background:#c9982a;margin:26px 0 20px}
@@ -956,8 +963,7 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbbtag{display:inline-block;font-size:0.54rem;font-weight:800;letter-spacing:0.05em;color:#9a968c;margin-left:6px}
       /* ── YEAR DIVIDER ── */
       .pbdivider{display:flex;flex-direction:column;justify-content:center;min-height:96vh;position:relative}
-      .pbdivider::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 72% 52% at 30% 44%,rgba(201,152,42,0.07),transparent 70%)}
-      .pbdivnum{font-size:clamp(9rem,26vw,13rem);font-weight:800;line-height:0.82;letter-spacing:-0.04em;color:rgba(201,152,42,0.18);position:relative}
+      .pbdivnum{font-size:clamp(9rem,26vw,13rem);font-weight:800;line-height:0.82;letter-spacing:-0.04em;color:rgba(201,152,42,0.18)}
       .pbdivmeta{margin-top:-0.4em;position:relative}
       .pbeplabel{font-size:clamp(1.5rem,4vw,2.1rem);font-weight:800;letter-spacing:-0.02em;color:#fff;line-height:1.1}
       .pbepstats{font-size:0.9rem;color:#9a968c;margin-top:12px;max-width:60ch;line-height:1.6}
@@ -965,7 +971,9 @@ function openProjectBookPdf(rows, coverTitle) {
       /* ── STUDY PAGES ── */
       .pbstudy{display:flex;flex-direction:column;position:relative}
       /* chart overlay pills — nickschmidt trend-lane chips, moved onto the image */
-      .pbchartwrap{position:relative;border:1px solid rgba(255,255,255,0.10)}
+      .pbchartwrap{position:relative;border:1px solid rgba(255,255,255,0.10);border-radius:10px;overflow:hidden;margin-top:20px}
+      .pbcapn{font-size:0.7rem;color:#9a968c;line-height:1.55;margin-top:10px}
+      .pbnoimgbox{border:1px dashed rgba(255,255,255,0.14);border-radius:10px;padding:52px;text-align:center;color:#66635b;font-size:0.8rem;margin-top:20px}
       .pbpill{position:absolute;top:10px;font-size:0.56rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#e8e6e0;background:rgba(6,6,10,0.74);border:1px solid rgba(255,255,255,0.14);border-radius:99px;padding:3px 11px;white-space:nowrap}
       .pbpill-l{left:10px}
       .pbpill-r{right:10px;color:#f0c050}
@@ -985,7 +993,7 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbvsq{font-size:1.25rem;font-weight:700;color:#9a968c;letter-spacing:0}
       .pbnoimg{padding:40px;text-align:center;color:#66635b;font-size:0.8rem}
       .pbcap{font-size:0.6rem;font-weight:800;letter-spacing:0.2em;text-transform:uppercase;color:#9a968c}
-      .pbchart,.pbstrip,.pbchecklist,.pbthesis,.pbshead,.pbcap{break-inside:avoid;page-break-inside:avoid}
+      .pbchart,.pbchartwrap,.pbcapn,.pbstrip,.pbchecklist,.pbthesis,.pbshead,.pbcap{break-inside:avoid;page-break-inside:avoid}
       /* data strip — 4-per-row grid so it never widens the page; hairlines top/bottom only */
       .pbstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 22px;margin:24px 0 4px;padding:15px 0;border-top:1px solid rgba(255,255,255,0.10);border-bottom:1px solid rgba(255,255,255,0.10)}
       .pbcell{min-width:0}
@@ -1059,7 +1067,8 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pbtkg{color:#8a6a1c}
       body.light .pbstheme{color:#6a675e}
       body.light .pbchartwrap{border-color:rgba(0,0,0,0.12)}
-      body.light .pbcover::before,body.light .pbdivider::before{background:radial-gradient(ellipse 70% 50% at 28% 43%,rgba(138,106,28,0.07),transparent 70%)}
+      body.light .pbcapn{color:#6a675e}
+      body.light .pbnoimgbox{border-color:rgba(0,0,0,0.16);color:#8a857a}
     </style></head><body>
     <div class="toolbar">
       <button class="ghost" onclick="const l=document.body.classList.toggle('light');this.textContent=l?'🌙 Dark theme':'☀ Light theme'">☀ Light theme</button>
