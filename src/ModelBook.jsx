@@ -177,6 +177,160 @@ const PROJECT_PREFACE = {
   },
 };
 
+// ── DEEP DIVES (Valen 2026-07-30, admin-first rollout) ─────────────────────────────────────────
+// The published face of the project books, organized like nickschmidt.so/report: an index page
+// (proof strip → latest hero → minimal archive rows) → click into a read-only dive (premise →
+// hypotheses with verdicts → the study gallery). The registry IS the publish switch — a project
+// appears only when listed here with a topic title. Admin-gated until Valen flips it to members.
+const DEEP_DIVES = [
+  {
+    no: "01", slug: "market-bottom", project: "Finding the Market's Bottom",
+    title: "Surfacing Market Leaders Through a Market Correction",
+    premise: "When the index breaks, the next cycle's leaders refuse to break with it. Fourteen studies across four corrections — how the leaders bottomed, what they held at the low, and how fast they paid once the turn came.",
+    updated: "2026-07-30",
+  },
+];
+
+// Read-only study card for a dive (module scope — never defined inside a component). Mirrors the
+// My-Research project card: two panes (vs QQQ | daily), ticker + date, data chips.
+function DiveStudyCard({ C, item, onOpen }) {
+  const { r, legs } = item;
+  const m = r.metrics?.study?.m || {};
+  const chips = [];
+  if (m.sessions_vs_index != null && m.sessions_vs_index !== "") chips.push(`${m.sessions_vs_index} sess vs index`);
+  if (m.ret_3m != null && m.ret_3m !== "") chips.push(`${+m.ret_3m > 0 ? "+" : ""}${m.ret_3m}% 3M`);
+  if (m.theme) chips.push(String(m.theme));
+  const isMB = r.metrics?.study?.setup === "Market Bottom";
+  const pane = (img, label, divider) => (
+    <div style={{ position: "relative", flex: 1, minWidth: 0, height: 120, background: "#0d0d16", borderRight: divider ? `1px solid ${C.border}` : "none" }}>
+      {img
+        ? <img src={img} alt={label} style={{ width: "100%", height: 120, objectFit: "cover", display: "block" }} />
+        : <div style={{ width: "100%", height: 120, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.6rem" }}>—</div>}
+      <span style={{ position: "absolute", left: 6, bottom: 5, fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, background: "rgba(8,8,14,0.72)", borderRadius: 5, padding: "1px 6px" }}>{label}</span>
+    </div>
+  );
+  return (
+    <div onClick={() => onOpen(r)} style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "transform .15s ease, border-color .15s ease" }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = C.borderGold; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.borderColor = C.border; }}>
+      <div style={{ display: "flex", borderBottom: `1px solid ${C.border}` }}>
+        {pane(r.before_img, isMB ? "vs QQQ" : "context", true)}
+        {pane(r.after_img, isMB ? "daily" : "setup", false)}
+      </div>
+      <div style={{ padding: "12px 14px 14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: "1rem", fontWeight: 800, color: C.white }}>{r.ticker}</span>
+          {legs > 1 && <span style={{ fontSize: "0.56rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, background: C.goldDim, borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" }}>{legs} legs</span>}
+          <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.muted, whiteSpace: "nowrap" }}>{r.entry_date || "—"}</span>
+        </div>
+        {chips.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 9 }}>
+            {chips.map((c, i) => <span key={i} style={{ fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, border: `1px solid ${C.borderGold}`, background: C.goldDim, borderRadius: 99, padding: "2px 9px", whiteSpace: "nowrap" }}>{c}</span>)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// The dives INDEX — nickschmidt.so/report pattern: kicker + explainer → proof strip (top study
+// returns, auditable inside the dives) → latest-dive hero → minimal archive rows (title · date · →).
+function DiveIndex({ C, font, dives, onOpen }) {
+  const label = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", color: C.muted };
+  const proof = dives.flatMap(d => d.rows.map(r => ({ t: r.ticker, v: +(r.metrics?.study?.m?.ret_3m) })))
+    .filter(x => Number.isFinite(x.v) && x.v > 0).sort((a, b) => b.v - a.v).slice(0, 5);
+  const latest = dives[0], rest = dives.slice(1);
+  return (
+    <div style={{ maxWidth: 860 }}>
+      <div style={label}>Deep dives</div>
+      <div style={{ fontSize: "0.84rem", color: C.muted, margin: "10px 0 0", maxWidth: "62ch", lineHeight: 1.6 }}>
+        Long-form research from the vault — each dive studies one repeatable market behaviour, hypothesis by hypothesis, on real charts.
+      </div>
+      {proof.length > 0 && (
+        <div style={{ margin: "18px 0 0" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {proof.map((p, i) => (
+              <span key={i} style={{ fontSize: "0.68rem", fontWeight: 700, color: C.goldBright, border: `1px solid ${C.borderGold}`, background: C.goldDim, borderRadius: 99, padding: "4px 12px" }}>{p.t} +{p.v}%</span>
+            ))}
+          </div>
+          <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 7 }}>3-month returns measured off each study's own low — every underlying study is inside its dive.</div>
+        </div>
+      )}
+      {latest && (
+        <div onClick={() => onOpen(latest.slug)} style={{ marginTop: 26, background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "26px 28px", cursor: "pointer", transition: "transform .15s ease" }}
+          onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = "none"; }}>
+          <div style={{ ...label, color: C.gold }}>Latest dive · No. {latest.no} · updated {latest.updated}</div>
+          <div style={{ fontSize: "1.45rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white, lineHeight: 1.2, margin: "12px 0 0", maxWidth: "24ch" }}>{latest.title}</div>
+          <div style={{ fontSize: "0.82rem", color: C.muted, lineHeight: 1.65, margin: "12px 0 0", maxWidth: "60ch" }}>{latest.premise}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 18 }}>
+            <span style={{ fontSize: "0.66rem", color: C.muted }}>{latest.rows.length} studies</span>
+            <span style={{ fontSize: "0.78rem", fontWeight: 700, color: C.goldBright }}>Open the dive →</span>
+          </div>
+        </div>
+      )}
+      {rest.length > 0 ? (
+        <div style={{ marginTop: 10 }}>
+          {rest.map(d => (
+            <div key={d.slug} onClick={() => onOpen(d.slug)} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "15px 4px", borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}>
+              <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.muted, width: 24 }}>{d.no}</span>
+              <span style={{ fontSize: "0.9rem", fontWeight: 700, color: C.white }}>{d.title}</span>
+              <span style={{ marginLeft: "auto", fontSize: "0.66rem", color: C.muted, whiteSpace: "nowrap" }}>{d.updated}</span>
+              <span style={{ color: C.goldBright }}>→</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 16 }}>New dives are added as research completes.</div>
+      )}
+    </div>
+  );
+}
+
+// A single DIVE, read-only — premise → working hypotheses (verdict cards) → year-grouped studies.
+function DiveView({ C, font, dive, onBack, onOpenStudy }) {
+  if (!dive) return null;
+  const label = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", color: C.gold };
+  const camps = buildCampaigns(dive.rows).list.map(c => ({ r: c.root, legs: c.count }));
+  const byYear = {};
+  camps.forEach(item => { const y = String(item.r.entry_date || "").slice(0, 4) || "—"; (byYear[y] ||= []).push(item); });
+  const years = Object.entries(byYear).sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([y, items]) => [y, items.sort((a, b) => String(a.r.ticker || "").localeCompare(String(b.r.ticker || "")))]);
+  const yearSpan = years.length ? (years[0][0] === years[years.length - 1][0] ? years[0][0] : `${years[0][0]}–${years[years.length - 1][0]}`) : "";
+  return (
+    <div>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: C.muted, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", padding: 0, marginBottom: 18 }}>← All dives</button>
+      <div style={{ maxWidth: 760 }}>
+        <div style={label}>Deep dive · No. {dive.no}</div>
+        <h2 style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, lineHeight: 1.15, margin: "12px 0 0", maxWidth: "22ch" }}>{dive.title}</h2>
+        <div style={{ fontSize: "0.86rem", color: C.muted, lineHeight: 1.7, margin: "14px 0 0" }}>{dive.premise}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", margin: "16px 0 0" }}>
+          <span style={{ fontSize: "0.66rem", color: C.muted }}>{dive.rows.length} studies · {yearSpan} · updated {dive.updated}</span>
+          <button onClick={() => openMyBookPdf(dive.rows, { coverTitle: dive.project })}
+            style={{ background: "rgba(255,255,255,0.04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.7rem", padding: "7px 15px", borderRadius: 99, cursor: "pointer" }}>⬇ Download the book (PDF)</button>
+        </div>
+      </div>
+      <div style={{ margin: "30px 0 0" }}>
+        <div style={{ ...label, color: C.muted }}>01 — Working hypotheses</div>
+        <div style={{ marginTop: 12 }}>
+          <ChecklistTally C={C} rows={dive.rows} project={dive.project} />
+        </div>
+      </div>
+      <div style={{ margin: "30px 0 0" }}>
+        <div style={{ ...label, color: C.muted }}>02 — The studies</div>
+        {years.map(([year, items]) => (
+          <div key={year} style={{ margin: "18px 0 26px" }}>
+            <div style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.goldBright, margin: "0 0 12px", paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>{year} · {items.length} {items.length === 1 ? "ticker" : "tickers"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 16 }}>
+              {items.map(item => <DiveStudyCard key={item.r.id} C={C} item={item} onOpen={onOpenStudy} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
   // Project-book export (Valen 2026-07-28): a coverTitle'd book whose rows are ALL non-H-domain studies
   // (e.g. "Market Bottom") gets the gallery-grade minimal book instead of the classic model-book layout.
@@ -1561,6 +1715,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [zoom, setZoom] = useState(null); // lightbox: { imgs: {before, after}, slot: "before"|"after" }
   const [studyMode, setStudyMode] = useState(mbDeepLink === "studies"); // 📚 Studies view (admin, inside My Book)
   const [book, setBook] = useState("__all__"); // active project book in My Research: "__all__" | "__none__" (Winner DNA) | project name
+  const [dive, setDive] = useState(null); // open Deep Dive slug (fScope === "dives"), null = the dives index
   // Studies-list column sort (Valen 2026-07-28): [{ key: "entry"|"trigger", dir: 1|-1 }, …] — index 0 = primary,
   // later entries = secondary (multi-sort: clicking a new column makes it primary, the old primary demotes).
   // Clicking the active primary toggles asc→desc→off. Empty array = the default ticker-chronicle order.
@@ -1640,6 +1795,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const studyRows = rows.filter(r => r.created_by === uid && isStudyRow(r));
   // Project books (Valen 2026-07-28): distinct project names across the study rows + the count for each chip.
   const projectBooks = isAdmin ? [...new Set(studyRows.map(studyProject).filter(Boolean))].sort() : [];
+  // Deep Dives (admin-first): registry entries enriched with their live study rows; only non-empty dives list.
+  const diveList = isAdmin ? DEEP_DIVES.map(d => ({ ...d, rows: studyRows.filter(r => studyProject(r) === d.project) })).filter(d => d.rows.length > 0) : [];
   const dnaCount = studyRows.filter(r => !studyProject(r)).length; // 📕 Winner DNA = studies with no project
   // Lab (scoreboard / hypotheses / campaign list) is computed from the ACTIVE book's rows so each book's stats are its own.
   const bookStudyRows = studyRows.filter(r => matchesBook(r, book));
@@ -1855,7 +2012,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
             study rows), NOT the old split 📖 Legacy / 📚 Studies chips. Members keep their untouched single
             "🔒 My Book (N)" chip (N = their plain rows). Format (lab vs gallery) lives in the toggle below. */}
         {[["All", "All"], ["official", "⭐ VIV Official"],
-          ["mine", isAdmin ? `🔒 My Research${(mineCount + studyRows.length) ? ` (${mineCount + studyRows.length})` : ""}` : `🔒 My Book${mineCount ? ` (${mineCount})` : ""}`]].map(([k, label]) => (
+          ["mine", isAdmin ? `🔒 My Research${(mineCount + studyRows.length) ? ` (${mineCount + studyRows.length})` : ""}` : `🔒 My Book${mineCount ? ` (${mineCount})` : ""}`],
+          ...(isAdmin && diveList.length > 0 ? [["dives", `🌊 Deep Dives (${diveList.length})`]] : [])].map(([k, label]) => (
           <button key={k} onClick={() => {
             if (k === "mine") { if (isAdmin) { let f = "lab"; try { f = localStorage.getItem("viv-mb-format") || "lab"; } catch {} setStudyMode(f === "lab"); } }
             else setStudyMode(false);
@@ -1890,7 +2048,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
       {/* gallery sub-filter bar (Valen 2026-07-26) — pattern · grade · outcome · ticker search, AND-combined.
           Hidden in 📚 Studies mode (the studies list has its own layout). Styled with the app's toolbar chips. */}
-      {!studyMode && (
+      {!studyMode && fScope !== "dives" && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "0 0 18px" }}>
           {["All", ...patternsPresent].map(p => (
             <button key={p} onClick={() => setFPattern(p)} style={chip(fPattern === p)}>{p === "All" ? "All patterns" : p}</button>
@@ -2183,12 +2341,19 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         <YourPatterns C={C} font={font} myRows={myRows} />
       )}
 
+      {/* Deep Dives (admin-first): index → dive. Replaces the card grid while the dives scope is active. */}
+      {fScope === "dives" && !loading && !error && (
+        dive
+          ? <DiveView C={C} font={font} dive={diveList.find(d => d.slug === dive)} onBack={() => setDive(null)} onOpenStudy={setDetail} />
+          : <DiveIndex C={C} font={font} dives={diveList} onOpen={setDive} />
+      )}
+
       {/* card grid — mobile-safe auto-fit (min() caps the track so a card never overflows a narrow screen).
           My Research collapses campaigns into ONE card each (Change 6); an open project book renders the
           year-grouped book gallery of two-chart cards (Change 5). renderCard/renderProjectCard are plain
           functions invoked directly (never mounted as <Component/>) — same pattern as legRow above. */}
       {(() => {
-        if (studyMode) return null;
+        if (studyMode || fScope === "dives") return null;
         const gridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 16, marginTop: 4 };
         const legsChip = { fontSize: "0.56rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, background: C.goldDim, borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" };
         const renderCard = ({ r, legs }) => {
