@@ -193,7 +193,7 @@ const DEEP_DIVES = [
 
 // Read-only study card for a dive (module scope — never defined inside a component). Mirrors the
 // My-Research project card: two panes (vs QQQ | daily), ticker + date, data chips.
-function DiveStudyCard({ C, item, onOpen }) {
+export function DiveStudyCard({ C, item, onOpen }) {
   const { r, legs } = item;
   const m = r.metrics?.study?.m || {};
   const chips = [];
@@ -235,7 +235,7 @@ function DiveStudyCard({ C, item, onOpen }) {
 
 // The dives INDEX — nickschmidt.so/report pattern: kicker + explainer → proof strip (top study
 // returns, auditable inside the dives) → latest-dive hero → minimal archive rows (title · date · →).
-function DiveIndex({ C, font, dives, onOpen }) {
+export function DiveIndex({ C, font, dives, onOpen }) {
   const label = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", color: C.muted };
   const proof = dives.flatMap(d => d.rows.map(r => ({ t: r.ticker, v: +(r.metrics?.study?.m?.ret_3m) })))
     .filter(x => Number.isFinite(x.v) && x.v > 0).sort((a, b) => b.v - a.v).slice(0, 5);
@@ -288,7 +288,7 @@ function DiveIndex({ C, font, dives, onOpen }) {
 }
 
 // A single DIVE, read-only — premise → working hypotheses (verdict cards) → year-grouped studies.
-function DiveView({ C, font, dive, onBack, onOpenStudy }) {
+export function DiveView({ C, font, dive, onBack, onOpenStudy }) {
   if (!dive) return null;
   const label = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.2em", textTransform: "uppercase", color: C.gold };
   const camps = buildCampaigns(dive.rows).list.map(c => ({ r: c.root, legs: c.count }));
