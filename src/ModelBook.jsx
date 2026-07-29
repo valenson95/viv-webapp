@@ -345,13 +345,23 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
       ${j === 0 ? campHead + anchorSpans : slimHead(primary.r, pmeta, figLabel(c, j))}
       <figure class="fullfig"><figcaption>${esc(figLabel(c, j))} · ${j + 1}/${primaryCharts.length}</figcaption><img src="${esc(c.img)}"/>${c.caption ? `<div class="fignote">${esc(c.caption)}</div>` : ""}</figure>
     </section>`).join("");
-    // Item 4 — a non-root leg with its OWN charts (rare): append after the campaign pages with its slim header; nothing dropped.
-    const extraPages = chartLegs.filter((l) => l !== primary).map((l) => {
-      const ec = buildChartList(l.r, true).filter((c) => c && c.img), em = rowMeta(l.r, l.idx), n = legs.indexOf(l) + 1;
-      return ec.map((c, j) => `<section class="entry chartpg">
-        ${slimHead(l.r, em, `Leg ${n} · ${figLabel(c, j)}`)}
-        <figure class="fullfig"><figcaption>${esc(figLabel(c, j))} · ${j + 1}/${ec.length}</figcaption><img src="${esc(c.img)}"/>${c.caption ? `<div class="fignote">${esc(c.caption)}</div>` : ""}</figure>
-      </section>`).join("");
+    // Per-leg LTF pages (Valen 2026-07-29 slot-level model): the weekly (HTF) is one shared chart that prints
+    // ONCE on the root above; each NON-root leg carries its OWN daily (LTF = after_img → study role "before").
+    // Print each non-root leg's own chart(s) — one per page, headed "{TICKER} · leg {n} · {date}" — so every
+    // unique daily is in the book (the LTF page captioned "LTF — daily setup"). Legs with no own chart print
+    // nothing new (their HTF is the root's, already on the root pages). break-inside avoid via .entry/.chartpg.
+    const extraPages = legs.filter((l) => l !== primary).map((l) => {
+      const ec = buildChartList(l.r, true).filter((c) => c && c.img);
+      if (!ec.length) return "";
+      const n = legs.indexOf(l) + 1, legDate = l.r.entry_date || "?";
+      return ec.map((c) => {
+        const isLtf = c.role === "before"; // study mapping: after_img (LTF daily) → role "before"
+        const cap = isLtf ? "LTF — daily setup" : figLabel(c, 0);
+        return `<section class="entry chartpg">
+        <div class="shead"><span class="stk">${esc(l.r.ticker)} · leg ${n}</span><span class="slab">${esc(cap)}</span><span class="smeta">${esc(legDate)}</span></div>
+        <figure class="fullfig"><figcaption>${esc(cap)}</figcaption><img src="${esc(c.img)}"/>${c.caption ? `<div class="fignote">${esc(c.caption)}</div>` : ""}</figure>
+      </section>`;
+      }).join("");
     }).join("");
     // LEGS LEDGER — one row per leg, chronological. Blank cells print "—" (blank = not measured, never invented).
     const ledgerRows = legs.map((l, i) => {
@@ -1782,17 +1792,27 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 const oc = OC_CHIP[cls]; // outcome-class chip (undefined when pending)
                 const hctx = { ticker: r.ticker, date: r.entry_date }; // ctx for the per-hypothesis vote strip
                 // chartFaces (Valen 2026-07-26) — reads the unified list (converts legacy rows), so a study whose
-                // charts aren't slot-shaped still shows thumbs. Nested legs share the trend's outcome = the root's back face.
-                // Display inheritance (Valen 2026-07-28): a leg with NO charts of its own shows the campaign ROOT's
-                // chart set (presentation-only — nothing is copied into the leg row). Marked "↩ shared"; the "after?"
-                // upload invite is suppressed so a chart never gets attached to the wrong leg.
+                // charts aren't slot-shaped still shows thumbs.
+                // SLOT-LEVEL inheritance (Valen 2026-07-29): a non-root leg's HTF (first thumb = before_img) is its
+                // OWN if set, else the ROOT's before_img (badged "↩ shared" — the weekly is one shared chart on the
+                // root). Its LTF (second thumb = after_img) is ALWAYS its own — each daily is unique, never inherited.
+                // A non-root leg with NO charts of its own still shows the root's WHOLE set (front+back), as before.
+                // Root legs are unchanged (front/back from their own faces).
                 const ownFaces = chartFaces(r, true);
-                const rootFacesInh = indent ? chartFaces(camp.root, true) : null;
-                const rootHasCharts = !!rootFacesInh && (!!(rootFacesInh.front && rootFacesInh.front.img) || !!(rootFacesInh.back && rootFacesInh.back.img) || rootFacesInh.count > 0);
-                const inheritCharts = indent && !(ownFaces.front && ownFaces.front.img) && rootHasCharts;
-                const faces = inheritCharts ? rootFacesInh : ownFaces;
-                const frontImg = faces.front && faces.front.img;
-                const backImg = indent ? ((rootFacesInh && rootFacesInh.back) ? rootFacesInh.back.img : null) : (faces.back && faces.back.img);
+                let frontImg, backImg, frontInherited = false, inheritWholeSet = false, secondCount = ownFaces.count;
+                if (!indent) {
+                  frontImg = ownFaces.front && ownFaces.front.img;
+                  backImg = ownFaces.back && ownFaces.back.img;
+                } else if (ownFaces.count === 0) {
+                  const rootFaces = chartFaces(camp.root, true);
+                  frontImg = rootFaces.front && rootFaces.front.img;
+                  backImg = rootFaces.back && rootFaces.back.img;
+                  frontInherited = !!frontImg; inheritWholeSet = true; secondCount = rootFaces.count;
+                } else {
+                  frontInherited = !r.before_img && !!camp.root.before_img;
+                  frontImg = r.before_img || camp.root.before_img || null;
+                  backImg = r.after_img || null;
+                }
                 return (
                   <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 4, marginLeft: indent ? 22 : 0, fontSize: "0.78rem", cursor: "pointer" }}
                     onClick={() => setStudyEditing(r)}
@@ -1807,18 +1827,18 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
                       {frontImg
                         ? <span style={{ position: "relative", display: "inline-block", width: 64, height: 40, flexShrink: 0 }}>
-                            <img src={frontImg} alt="setup" title={inheritCharts ? "Chart set shared from Leg 1 — charts live on the root leg" : "The setup (this leg)"} style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}`, display: "block" }} />
-                            {inheritCharts && <span title="Chart set shared from Leg 1 — charts live on the root leg" style={{ position: "absolute", top: -5, left: -5, background: "rgba(8,8,14,0.92)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontSize: "0.48rem", fontWeight: 800, letterSpacing: ".02em", borderRadius: 99, padding: "0 4px", lineHeight: 1.6, whiteSpace: "nowrap" }}>↩ shared</span>}
+                            <img src={frontImg} alt="htf" title={frontInherited ? "Shared HTF (weekly) from Leg 1 — the weekly lives on the root leg" : "HTF — this leg's weekly"} style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}`, display: "block" }} />
+                            {frontInherited && <span title="Shared HTF (weekly) from Leg 1 — the weekly lives on the root leg" style={{ position: "absolute", top: -5, left: -5, background: "rgba(8,8,14,0.92)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontSize: "0.48rem", fontWeight: 800, letterSpacing: ".02em", borderRadius: 99, padding: "0 4px", lineHeight: 1.6, whiteSpace: "nowrap" }}>↩ shared</span>}
                           </span>
                         : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
                       <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
                       {backImg
-                        ? <img src={backImg} alt="outcome" title={indent ? "The shared trend outcome" : "The outcome"} style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} />
-                        : faces.count > 1
-                          ? <span title={`${faces.count} charts in this study`} style={{ width: 64, height: 40, borderRadius: 5, border: `1px solid ${C.borderGold}`, display: "grid", placeItems: "center", color: C.goldBright, fontSize: "0.62rem", fontWeight: 800 }}>+{faces.count - 1}</span>
-                          : inheritCharts
+                        ? <img src={backImg} alt={inheritWholeSet ? "outcome" : "ltf"} title={inheritWholeSet ? "The shared trend outcome" : (indent ? "LTF — this leg's daily setup" : "The outcome")} style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} />
+                        : secondCount > 1
+                          ? <span title={`${secondCount} charts in this study`} style={{ width: 64, height: 40, borderRadius: 5, border: `1px solid ${C.borderGold}`, display: "grid", placeItems: "center", color: C.goldBright, fontSize: "0.62rem", fontWeight: 800 }}>+{secondCount - 1}</span>
+                          : inheritWholeSet
                             ? <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />
-                            : <span title="No outcome chart yet — drop `TICKER DATE AFTER.png` in the study inbox" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
+                            : <span title={indent ? "No LTF yet — drop this leg's own daily setup chart" : "No outcome chart yet — drop `TICKER DATE AFTER.png` in the study inbox"} style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>{indent ? "ltf?" : "after?"}</span>}
                     </span>
                     {/* setup comes from the STUDY payload (the pattern column is the legacy Model-Book field —
                         rows seeded by script showed the DB-default "Trendline Breakout", Valen bug report 2026-07-28) */}

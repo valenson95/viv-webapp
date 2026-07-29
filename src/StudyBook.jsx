@@ -1809,6 +1809,12 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   // Root chart list for the detailed view's display inheritance (Valen 2026-07-28): a NON-root leg surfaces the
   // ROOT's chart set read-only when it has none of its own. [] = no inheritance (solo / this-is-root / no charts).
   const inheritedCharts = (cid && sibs.length && sibs[0].id !== row.id) ? buildChartList(sibs[0], true).filter(c => c && c.img) : [];
+  // Shared HTF preview (Valen 2026-07-29): a NON-root leg's weekly (HTF = before_img → role "context") is one
+  // shared chart on the root. When this leg hasn't uploaded its own, the HTF slot shows the root's dimmed as a
+  // "↩ shared" preview (upload here overrides for this leg only). Falls back to sibs[0].before_img if unroled.
+  const sharedRootHTF = (cid && sibs.length && sibs[0].id !== row.id)
+    ? ((buildChartList(sibs[0], true).find(c => c && c.role === "context" && c.img) || {}).img || sibs[0].before_img || null)
+    : null;
   const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontFamily: font, fontSize: "0.78rem", padding: "7px 10px", outline: "none", width: "100%", colorScheme: "dark" };
   const lbl = { fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.muted, marginBottom: 4, display: "block" };
   const sect = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "14px 0 8px" };
@@ -1902,11 +1908,24 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     return { ...r, charts: list, [slotFieldFor(role)]: url };
   });
   const removeCanonical = (role) => setRow(r => ({ ...r, charts: (r.charts || []).filter(c => c.role !== role), [slotFieldFor(role)]: "" }));
-  const chartSlot = (slot, title, hint) => (
+  const chartSlot = (slot, title, hint) => {
+    // NON-root leg, empty HTF slot, root has a weekly → show the root's HTF dimmed as a "↩ shared" preview.
+    // Upload still writes THIS leg's own before_img (override); the LTF slot (after_img) has no such preview —
+    // each leg uploads its own daily.
+    const showSharedHTF = slot === "before_img" && !isRoot && !row[slot] && !!sharedRootHTF;
+    return (
     <div style={{ flex: 1, minWidth: 240 }}>
       <label style={lbl}>{title}</label>
       <div style={{ fontSize: "0.62rem", color: C.muted, marginBottom: 6 }}>{hint}</div>
       <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; onUpload(f, slot, (updater) => { const url = updater({})[slot]; if (url) upsertCanonical(SLOT_ROLE[slot], url); }); }} style={{ fontSize: "0.7rem", color: C.muted }} />
+      {showSharedHTF && (
+        <div style={{ position: "relative", marginTop: 8 }}>
+          <span title="This weekly is shared from leg 1 — the HTF lives on the root leg. Upload here only to override it for this leg."
+            style={{ position: "absolute", top: 6, left: 6, zIndex: 2, background: "rgba(8,8,14,0.9)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.03em", padding: "3px 8px", borderRadius: 7, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>↩ shared HTF — from leg 1</span>
+          <img src={sharedRootHTF} alt="shared HTF" style={{ display: "block", width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px dashed ${C.borderGold}`, background: "rgba(0,0,0,0.3)", opacity: 0.55 }} />
+          <div style={{ fontSize: "0.62rem", color: C.muted, marginTop: 6, fontStyle: "italic" }}>upload here only to override for this leg</div>
+        </div>
+      )}
       {row[slot] && (
         <div style={{ position: "relative", marginTop: 8 }}>
           {capBadge && <span title={capBadge.tip} style={badgeStyle}>{capBadge.text}</span>}
@@ -1922,6 +1941,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       )}
     </div>
   );
+  };
   // buildBody = the exact DB body doSave ships (extracted Valen 2026-07-28 so the leg strip persists through
   // the SAME path). The ONE list (row.charts) is the source of truth. Derive the legacy slot columns from it
   // (study mapping: context→before_img · before→after_img · trigger→trigger_ltf_img · after→outcome_img;
