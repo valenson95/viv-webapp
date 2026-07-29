@@ -822,7 +822,7 @@ function openProjectBookPdf(rows, coverTitle) {
       if (m.days_to_reclaim !== "" && m.days_to_reclaim != null) cells.push(["Reclaim", `${esc(m.days_to_reclaim)} sessions`]);
       if (m.trigger_date) cells.push(["Trigger", esc(m.trigger_date)]);
       const strip = `<div class="pbstrip">${cells.map(([k, v]) => `<div class="pbcell"><div class="pbck">${esc(k)}</div><div class="pbcv">${v}</div></div>`).join("")}</div>`;
-      const ticks = def.buckets.flatMap((b) => b.items.map(([k, label]) => study.checks?.[k] ? `<span class="pbtick">✓ ${esc(label)}</span>` : "").filter(Boolean));
+      const ticks = def.buckets.flatMap((b) => b.items.map(([k, label]) => study.checks?.[k] ? `<span class="pbtick"><span class="pbtkg">✓</span>${esc(label)}</span>` : "").filter(Boolean));
       const checklist = `<div class="pbchecklist">${ticks.length ? ticks.join("") : `<span class="pbnotick">no criteria ticked yet</span>`}</div>`;
       const thesis = r.thesis ? `<div class="pbthesis"><div class="pblabel">Thesis</div><div class="pbthesistext">${esc(r.thesis)}</div></div>` : "";
       const pageB = `<div class="page pbstudy">
@@ -858,7 +858,9 @@ function openProjectBookPdf(rows, coverTitle) {
       .toolbar .ghost{background:transparent;border:1px solid rgba(201,152,42,0.6);color:#c9982a}
       @media print{.toolbar{display:none}}
       /* ── COVER ── */
-      .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
+      .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh;position:relative}
+      .pbcover::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 68% 50% at 26% 42%,rgba(201,152,42,0.06),transparent 70%)}
+      .pbcover>*{position:relative}
       .pbbrand{font-size:0.66rem;font-weight:800;letter-spacing:0.32em;text-transform:uppercase;color:#c9982a}
       .pbtitle{font-size:clamp(2.6rem,7vw,3.4rem);font-weight:800;letter-spacing:-0.03em;line-height:1.02;color:#fff;margin:22px 0 0;max-width:16ch}
       .pbrule{width:60px;height:2px;background:#c9982a;margin:26px 0 20px}
@@ -954,7 +956,8 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbbtag{display:inline-block;font-size:0.54rem;font-weight:800;letter-spacing:0.05em;color:#9a968c;margin-left:6px}
       /* ── YEAR DIVIDER ── */
       .pbdivider{display:flex;flex-direction:column;justify-content:center;min-height:96vh;position:relative}
-      .pbdivnum{font-size:clamp(9rem,26vw,13rem);font-weight:800;line-height:0.82;letter-spacing:-0.04em;color:rgba(201,152,42,0.18)}
+      .pbdivider::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 72% 52% at 30% 44%,rgba(201,152,42,0.07),transparent 70%)}
+      .pbdivnum{font-size:clamp(9rem,26vw,13rem);font-weight:800;line-height:0.82;letter-spacing:-0.04em;color:rgba(201,152,42,0.18);position:relative}
       .pbdivmeta{margin-top:-0.4em;position:relative}
       .pbeplabel{font-size:clamp(1.5rem,4vw,2.1rem);font-weight:800;letter-spacing:-0.02em;color:#fff;line-height:1.1}
       .pbepstats{font-size:0.9rem;color:#9a968c;margin-top:12px;max-width:60ch;line-height:1.6}
@@ -962,7 +965,7 @@ function openProjectBookPdf(rows, coverTitle) {
       /* ── STUDY PAGES ── */
       .pbstudy{display:flex;flex-direction:column;position:relative}
       /* chart overlay pills — nickschmidt trend-lane chips, moved onto the image */
-      .pbchartwrap{position:relative}
+      .pbchartwrap{position:relative;border:1px solid rgba(255,255,255,0.10)}
       .pbpill{position:absolute;top:10px;font-size:0.56rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#e8e6e0;background:rgba(6,6,10,0.74);border:1px solid rgba(255,255,255,0.14);border-radius:99px;padding:3px 11px;white-space:nowrap}
       .pbpill-l{left:10px}
       .pbpill-r{right:10px;color:#f0c050}
@@ -973,9 +976,9 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbplate{justify-content:center;min-height:96vh}
       .pbshead{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
       .pbstk{font-size:2.4rem;font-weight:800;letter-spacing:-0.02em;color:#fff}
-      .pbstheme{font-size:0.66rem;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#c9982a;white-space:nowrap}
+      .pbstheme{font-size:0.66rem;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#9a968c;white-space:nowrap}
       .pbownlow{font-size:0.76rem;color:#9a968c;margin-top:6px}
-      .pbhair{border:none;border-top:1px solid rgba(255,255,255,0.14);margin:18px 0}
+      .pbhair{border:none;border-top:1px solid rgba(255,255,255,0.10);margin:18px 0}
       .pbchart{display:block;width:100%;max-height:52vh;object-fit:contain}
       /* Page B carries strip+checklist+thesis under the chart — cap it lower so nothing spills */
       .pbchartb{max-height:34vh}
@@ -984,13 +987,14 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbcap{font-size:0.6rem;font-weight:800;letter-spacing:0.2em;text-transform:uppercase;color:#9a968c}
       .pbchart,.pbstrip,.pbchecklist,.pbthesis,.pbshead,.pbcap{break-inside:avoid;page-break-inside:avoid}
       /* data strip — 4-per-row grid so it never widens the page; hairlines top/bottom only */
-      .pbstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 22px;margin:24px 0 4px;padding:15px 0;border-top:1px solid rgba(255,255,255,0.14);border-bottom:1px solid rgba(255,255,255,0.14)}
+      .pbstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 22px;margin:24px 0 4px;padding:15px 0;border-top:1px solid rgba(255,255,255,0.10);border-bottom:1px solid rgba(255,255,255,0.10)}
       .pbcell{min-width:0}
       .pbck{font-size:0.54rem;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#9a968c;margin-bottom:5px}
       .pbcv{font-size:0.98rem;font-weight:800;color:#e8e6e0;white-space:nowrap}
-      /* ticked checklist — one gold ✓ per line (column), never a wide horizontal run */
-      .pbchecklist{display:grid;gap:8px;margin-top:20px}
-      .pbtick{color:#c9982a;font-size:0.74rem;font-weight:700;line-height:1.5}
+      /* ticked checklist — gold ✓ glyph, quiet warm-white label (colour carries MEANING only) */
+      .pbchecklist{display:grid;gap:9px;margin-top:20px}
+      .pbtick{color:rgba(232,230,224,0.85);font-size:0.74rem;font-weight:600;line-height:1.5}
+      .pbtkg{color:#c9982a;font-weight:800;margin-right:9px}
       .pbnotick{color:#66635b;font-size:0.72rem}
       /* thesis */
       .pbthesis{margin-top:26px}
@@ -1051,6 +1055,11 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pbpill{background:rgba(253,252,249,0.86);border-color:rgba(0,0,0,0.16);color:#16150f}
       body.light .pbpill-r{color:#8a6a1c}
       body.light .pbfolio,body.light .pbcno{color:#8a857a}
+      body.light .pbtick{color:rgba(22,21,15,0.85)}
+      body.light .pbtkg{color:#8a6a1c}
+      body.light .pbstheme{color:#6a675e}
+      body.light .pbchartwrap{border-color:rgba(0,0,0,0.12)}
+      body.light .pbcover::before,body.light .pbdivider::before{background:radial-gradient(ellipse 70% 50% at 28% 43%,rgba(138,106,28,0.07),transparent 70%)}
     </style></head><body>
     <div class="toolbar">
       <button class="ghost" onclick="const l=document.body.classList.toggle('light');this.textContent=l?'🌙 Dark theme':'☀ Light theme'">☀ Light theme</button>
