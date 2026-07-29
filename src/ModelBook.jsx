@@ -692,9 +692,8 @@ function openProjectBookPdf(rows, coverTitle) {
     <div class="pbrule"></div>
     <div class="pbmeta">${rows.length} ${rows.length === 1 ? "study" : "studies"}${yearSpan ? ` · ${yearSpan}` : ""} · exported ${today}</div>
   </div>`;
-  // ── PREFACE ── (typeset intro pages from PROJECT_PREFACE; era-grid charts link to zoom plates)
+  // ── PREFACE ── (typeset intro pages from PROJECT_PREFACE)
   const prefaceDef = PROJECT_PREFACE[coverTitle];
-  const prefaceZooms = [];
   const preface = prefaceDef ? prefaceDef.sections.map((s, si) => {
     const kicker = `<div class="pfkick"><span class="pfn">${esc(s.n)}</span><span class="pfk">${esc(s.kicker)}</span></div>`;
     let body = "";
@@ -705,10 +704,9 @@ function openProjectBookPdf(rows, coverTitle) {
     }).join("");
     if (s.rows) body = `<div class="pfrows">${s.rows.map(([k, x], i) => `<div class="pfrow"><div class="pfrown">${String(i + 1).padStart(2, "0")}</div><div><div class="pfrowk">${esc(k)}</div><div class="pfrowx">${esc(x)}</div></div></div>`).join("")}</div>`;
     if (s.grid) {
-      body = `<div class="pfgrid">${s.grid.map((g, gi) => {
-        prefaceZooms.push(`<div class="page pbzoom" id="pz${gi}"><a class="pbzback" href="#pf${si}">← back to the eras</a><img src="${esc(g.img)}"/><div class="pbzcap">QQQ · ${esc(g.year)}</div></div>`);
-        return `<a class="pfcell" href="#pz${gi}"><img src="${esc(g.img)}"/><div class="pfcy">${esc(g.year)}</div><div class="pfcc">${esc(g.cap)}</div></a>`;
-      }).join("")}</div>${s.after ? `<div class="pfafter">${esc(s.after)}</div>` : ""}<div class="pbcap" style="margin-top:14px">Click any chart to zoom</div>`;
+      body = `<div class="pfgrid">${s.grid.map((g) =>
+        `<div class="pfcell"><img src="${esc(g.img)}"/><div class="pfcy">${esc(g.year)}</div><div class="pfcc">${esc(g.cap)}</div></div>`
+      ).join("")}</div>${s.after ? `<div class="pfafter">${esc(s.after)}</div>` : ""}`;
     }
     const src = si === 0 && prefaceDef.source ? `<div class="pfsrc">${esc(prefaceDef.source)}</div>` : "";
     return `<div class="page pfpage" id="pf${si}">${kicker}<h2 class="pftitle">${esc(s.title)}</h2>${body}${src}</div>`;
@@ -774,10 +772,9 @@ function openProjectBookPdf(rows, coverTitle) {
     <div class="pbfoot">Counts are studies ticked so far — an untick may just mean "not studied yet", never "failed".</div>
   </div>` : "";
   // ── YEAR DIVIDER + per-study pages ──
-  // Click-to-zoom (Valen 2026-07-28): a printed PDF can't run JS, but internal link annotations survive
-  // Save-as-PDF (proven by the TOC). Each chart links to a full-bleed appendix page of itself; the zoom
-  // page links back to the study. Zoom pages collect here and append after the book body.
-  const zoomPages = [];
+  // Zoom appendix REMOVED (Valen 2026-07-30): a static PDF can only "zoom" via a link to a bigger
+  // appendix page, which teleports the reader to the bottom of the doc. Charts embed at full source
+  // resolution, so the viewer's own pinch-zoom loses nothing.
   const bodyHtml = groups.map((g) => {
     const ep = episodes[g.year];
     const divider = `<div class="page pbdivider">
@@ -793,17 +790,15 @@ function openProjectBookPdf(rows, coverTitle) {
       const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Market Bottom"];
       // Comparison pages pair the name with the index in the header (Valen 2026-07-30: "ARM vs QQQ")
       const head = (vs) => `<div class="pbshead"><span class="pbstk">${esc(r.ticker)}${vs ? `<span class="pbvsq"> vs QQQ</span>` : ""}</span><span class="pbstheme">${esc(theme)}</span></div>`;
-      const chartBlock = (img, cap, cls = "pbchart", zid = null) => {
+      const chartBlock = (img, cap, cls = "pbchart") => {
         if (!img) return `<hr class="pbhair"/><div class="pbnoimg">no ${esc(cap.toLowerCase())} chart yet</div><hr class="pbhair"/><div class="pbcap">${cap}</div>`;
-        if (zid) zoomPages.push(`<div class="page pbzoom" id="${zid}"><a class="pbzback" href="#e${idx}">← back to ${esc(r.ticker)}</a><img src="${esc(img)}"/><div class="pbzcap">${esc(r.ticker)} · ${cap}</div></div>`);
-        const im = `<img class="${cls}" src="${esc(img)}"/>`;
-        return `<hr class="pbhair"/>${zid ? `<a class="pbzl" href="#${zid}">${im}</a>` : im}<hr class="pbhair"/><div class="pbcap">${cap}${zid ? ` <span class="pbzhint">· click chart to zoom</span>` : ""}</div>`;
+        return `<hr class="pbhair"/><img class="${cls}" src="${esc(img)}"/><hr class="pbhair"/><div class="pbcap">${cap}</div>`;
       };
       // Page A — vs-QQQ chart (MB); other project books caption it as HTF context
       const pageA = `<div class="page pbstudy pbplate" id="e${idx}">
         ${head(isMB)}
         <div class="pbownlow">own low ${esc(r.entry_date || "—")}</div>
-        ${chartBlock(r.before_img, isMB ? "Vs QQQ" : "HTF — context", "pbchart", `z${idx}a`)}
+        ${chartBlock(r.before_img, isMB ? "Vs QQQ" : "HTF — context")}
       </div>`;
       // Page B — daily chart + data strip + ticked checklist + thesis
       const cells = [
@@ -821,7 +816,7 @@ function openProjectBookPdf(rows, coverTitle) {
       const thesis = r.thesis ? `<div class="pbthesis"><div class="pblabel">Thesis</div><div class="pbthesistext">${esc(r.thesis)}</div></div>` : "";
       const pageB = `<div class="page pbstudy">
         ${head(false)}
-        ${chartBlock(r.after_img, isMB ? "Daily" : "Setup", "pbchart pbchartb", `z${idx}b`)}
+        ${chartBlock(r.after_img, isMB ? "Daily" : "Setup", "pbchart pbchartb")}
         ${strip}
         ${checklist}
         ${thesis}
@@ -831,16 +826,17 @@ function openProjectBookPdf(rows, coverTitle) {
     return divider + studies;
   }).join("");
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(coverTitle)} — ${today}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
       *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      body{background:#08080e;color:#e8e6e0;font-family:'Plus Jakarta Sans',sans-serif;line-height:1.5}
+      /* Typography (Valen 2026-07-30): Geist + Geist Mono in the nickschmidt.so register —
+         prose/headlines in Geist (tight negative tracking, medium-bold weights), micro-labels
+         and data values in Geist Mono. VIV colours kept. */
+      body{background:#08080e;color:#e8e6e0;font-family:'Geist',sans-serif;line-height:1.5}
       body::before{content:"";position:fixed;inset:0;z-index:-1;background:#08080e}
       /* PORTRAIT (Valen 2026-07-30): the book reads as a document — chart spans the full width,
-         data strip + ticked criteria stack in a single column below. Zoom appendix pages stay
-         landscape (named page) so the wide DeepVue exports go full-bleed. */
+         data strip + ticked criteria stack in a single column below. */
       @page{size:A4;margin:0}
-      @page zoomp{size:A4 landscape;margin:0}
       .page{padding:48px 52px;page-break-after:always;min-height:94vh}
       .pblabel{font-size:0.62rem;font-weight:800;letter-spacing:0.28em;text-transform:uppercase;color:#9a968c}
       .pbfoot{color:#66635b;font-size:0.62rem;margin-top:22px;letter-spacing:0.02em}
@@ -967,14 +963,6 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbnoimg{padding:40px;text-align:center;color:#66635b;font-size:0.8rem}
       .pbcap{font-size:0.6rem;font-weight:800;letter-spacing:0.2em;text-transform:uppercase;color:#9a968c}
       .pbchart,.pbstrip,.pbchecklist,.pbthesis,.pbshead,.pbcap{break-inside:avoid;page-break-inside:avoid}
-      /* click-to-zoom appendix: full-bleed chart pages, linked from the inline charts (PDF link annotations) */
-      .pbzl{display:block;text-decoration:none}
-      .pbzhint{color:#66635b;letter-spacing:0.08em}
-      /* zoom pages print on their own LANDSCAPE page (named page; mm units — vh is portrait-based) */
-      .pbzoom{page:zoomp;padding:0;position:relative;display:flex;align-items:center;justify-content:center;background:#000;min-height:205mm}
-      .pbzoom img{width:100%;max-height:200mm;object-fit:contain;display:block}
-      .pbzback{position:absolute;top:14px;left:16px;font-size:0.6rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#f0c050;text-decoration:none;background:rgba(8,8,14,0.82);padding:4px 11px;border-radius:99px}
-      .pbzcap{position:absolute;bottom:12px;left:16px;font-size:0.58rem;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#9a968c;background:rgba(8,8,14,0.82);padding:3px 10px;border-radius:99px}
       /* data strip — 4-per-row grid so it never widens the page; hairlines top/bottom only */
       .pbstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 22px;margin:24px 0 4px;padding:15px 0;border-top:1px solid rgba(255,255,255,0.14);border-bottom:1px solid rgba(255,255,255,0.14)}
       .pbcell{min-width:0}
@@ -988,6 +976,18 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbthesis{margin-top:26px}
       .pbthesis .pblabel{color:#c9982a;margin-bottom:8px}
       .pbthesistext{font-size:0.82rem;line-height:1.7;color:rgba(232,230,224,0.88);max-width:70ch}
+      /* ── GEIST MONO layer (last so it wins): micro-labels, IDs and data values in mono —
+         Nick's register. Mono is wide, so small-caps tracking comes DOWN to 0.10–0.14em. */
+      .pblabel,.pbbrand,.pbmeta,.pbcyear,.pbcret,.pbctheme,.pbck,.pbcv,.pbcap,.pbtsec,.pbepcount,.pbbtag,.pbtcount,.pbstheme,.pbownlow,.pfk,.pfn,.pfdefk,.pfrown,.pfsrc,.pfcy,.pbhid,.pbvbarstat,.pbexphint,.pbfoot{font-family:'Geist Mono',ui-monospace,monospace}
+      .pblabel,.pbbrand{letter-spacing:0.14em}
+      .pbtsec,.pbepcount,.pbstheme,.pbcap,.pbck,.pfk,.pfdefk{letter-spacing:0.12em}
+      .pbcyear,.pbownlow{letter-spacing:0.06em}
+      .pbcv{font-weight:600}
+      /* Geist headline register: bold not heavy, tighter tracking than Jakarta needed */
+      .pbtitle,.pftitle{font-weight:700;letter-spacing:-0.045em}
+      .pbeplabel,.pbstk{font-weight:700;letter-spacing:-0.03em}
+      .pbdivnum{font-weight:700}
+      .pfrowk,.pbvclaim,.pfafter,.pfdefx,.pfpull{letter-spacing:-0.015em}
       /* ── LIGHT / ink-friendly theme (member picks in toolbar; whichever shows prints) ── */
       body.light{background:#fdfcf9;color:#16150f}
       body.light::before{background:#fdfcf9}
@@ -1028,10 +1028,6 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pfdef{border-left-color:#8a6a1c}
       body.light .pfrow{border-color:rgba(0,0,0,0.12)}
       body.light .pfcell img{border-color:rgba(0,0,0,0.12)}
-      body.light .pbzoom{background:#fff}
-      body.light .pbzback{background:rgba(255,255,255,0.88);color:#8a6a1c}
-      body.light .pbzcap{background:rgba(255,255,255,0.88);color:#6b675e}
-      body.light .pbzhint{color:#8a857a}
     </style></head><body>
     <div class="toolbar">
       <button class="ghost" onclick="const l=document.body.classList.toggle('light');this.textContent=l?'🌙 Dark theme':'☀ Light theme'">☀ Light theme</button>
@@ -1043,8 +1039,6 @@ function openProjectBookPdf(rows, coverTitle) {
     ${contents}
     ${hypPage}
     ${bodyHtml}
-    ${zoomPages.join("")}
-    ${prefaceZooms.join("")}
     <script>window.onload=()=>{const imgs=[...document.images];Promise.all(imgs.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r})))};</script>
     </body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
