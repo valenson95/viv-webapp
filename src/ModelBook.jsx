@@ -687,7 +687,8 @@ function openProjectBookPdf(rows, coverTitle) {
     return Number.isNaN(n) ? esc(v) : `${n < 0 ? "−" : n > 0 ? "+" : ""}${Math.abs(n)} sessions`; };
   // ── COVER ──
   const cover = `<div class="page pbcover">
-    <div class="pbbrand">Valen Insiders Vault · Model Book</div>
+    <img class="pblogo" src="${esc(window.location.origin)}/logo-mark.png"/>
+    <div class="pbbrand">Model Book</div>
     <h1 class="pbtitle">${esc(coverTitle)}</h1>
     <div class="pbrule"></div>
     <div class="pbmeta">${rows.length} ${rows.length === 1 ? "study" : "studies"}${yearSpan ? ` · ${yearSpan}` : ""} · exported ${today}</div>
@@ -868,6 +869,7 @@ function openProjectBookPdf(rows, coverTitle) {
       @media print{.toolbar{display:none}}
       /* ── COVER ── (no gradient washes — print rasterizes them with visible banding) */
       .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
+      .pblogo{height:54px;width:auto;align-self:flex-start;margin-bottom:20px}
       .pbbrand{font-size:0.66rem;font-weight:800;letter-spacing:0.32em;text-transform:uppercase;color:#c9982a}
       .pbtitle{font-size:clamp(2.6rem,7vw,3.4rem);font-weight:800;letter-spacing:-0.03em;line-height:1.02;color:#fff;margin:22px 0 0;max-width:16ch}
       .pbrule{width:60px;height:2px;background:#c9982a;margin:26px 0 20px}
@@ -1010,11 +1012,14 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbthesistext{font-size:0.82rem;line-height:1.7;color:rgba(232,230,224,0.88);max-width:70ch}
       /* ── GEIST MONO layer (last so it wins): micro-labels, IDs and data values in mono —
          Nick's register. Mono is wide, so small-caps tracking comes DOWN to 0.10–0.14em. */
-      .pblabel,.pbbrand,.pbmeta,.pbcyear,.pbcret,.pbctheme,.pbck,.pbcv,.pbcap,.pbtsec,.pbepcount,.pbbtag,.pbtcount,.pbstheme,.pbownlow,.pfk,.pfn,.pfdefk,.pfrown,.pfsrc,.pfcy,.pbhid,.pbvbarstat,.pbexphint,.pbfoot,.pbpill,.pbfolio,.pbcno{font-family:'Geist Mono',ui-monospace,monospace}
+      /* ONE subheading voice: Geist Mono at its REAL weights (family tops out at 600 — any inherited
+         800 forces synthetic faux-bold that reads like a third typeface). Two colours only:
+         gold = section-level, grey = metadata. */
+      .pblabel,.pbbrand,.pbmeta,.pbcyear,.pbcret,.pbctheme,.pbck,.pbcv,.pbcap,.pbtsec,.pbepcount,.pbbtag,.pbtcount,.pbstheme,.pbownlow,.pfk,.pfn,.pfdefk,.pfrown,.pfsrc,.pfcy,.pbhid,.pbvbarstat,.pbexphint,.pbfoot,.pbpill,.pbfolio,.pbcno{font-family:'Geist Mono',ui-monospace,monospace;font-weight:500}
+      .pbcv,.pbpill,.pbvbarstat,.pbcret,.pfcy{font-weight:600}
       .pblabel,.pbbrand{letter-spacing:0.14em}
       .pbtsec,.pbepcount,.pbstheme,.pbcap,.pbck,.pfk,.pfdefk{letter-spacing:0.12em}
       .pbcyear,.pbownlow{letter-spacing:0.06em}
-      .pbcv{font-weight:600}
       /* Geist headline register: bold not heavy, tighter tracking than Jakarta needed */
       .pbtitle,.pftitle{font-weight:700;letter-spacing:-0.045em}
       .pbeplabel,.pbstk{font-weight:700;letter-spacing:-0.03em}
