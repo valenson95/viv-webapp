@@ -138,6 +138,7 @@ const PROJECT_EPISODES = {
     "2023": { label: "Rate-scare correction", stats: "QQQ −10.8% over 71 sessions · low Oct 26, 2023 · reclaimed in 13 sessions" },
     "2024": { label: "Yen-carry unwind", stats: "QQQ −13.6% over 20 sessions · low Aug 7, 2024 · reclaimed in 64 sessions" },
     "2025": { label: "Tariff crash — V-shaped capitulation", stats: "QQQ −22.8% over 34 sessions · low Apr 8, 2025 · reclaimed in 52 sessions" },
+    "2026": { label: "Rolling QQQ grind — memory/storage supercycle emerges", stats: "QQQ −12.0% over 103 sessions · low Mar 30, 2026 · reclaimed in 11 sessions" },
   },
 };
 
