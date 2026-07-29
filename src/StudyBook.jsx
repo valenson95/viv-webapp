@@ -1595,7 +1595,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   // ── click-to-zoom lightbox: click any chart to enlarge, ←/→ cycles Context→BEFORE→AFTER, Esc closes ──
   const [zoom, setZoom] = useState(null); // null | "before_img" | "after_img" | "outcome_img"
   const [showAll, setShowAll] = useState(false); // raw computed-metrics grid folded by default (Valen 2026-07-24) — key strip stays
-  const [detailOpen, setDetailOpen] = useState(true); // 📖 Detailed view is now the DEFAULT landing (Valen 2026-07-26): open a study → chronological chart page; "✎ Ticks & fields" drops to the quick editor
+  const [detailOpen, setDetailOpen] = useState(false); // Ticks & fields = the DEFAULT landing (Valen 2026-07-29, reverses 07-26): open a study → straight to the checklist for fast grading reps; 📖 Detailed view opens on demand for the chart page
   const [addingLeg, setAddingLeg] = useState(false), [newLegDate, setNewLegDate] = useState(""); // leg-strip inline "+ Add leg" date entry (Valen 2026-07-28)
   const SLOT_TITLES = { before_img: "HTF — weekly context", after_img: "LTF — daily setup", outcome_img: "AFTER — the shared outcome", trigger_ltf_img: "TRIGGER — 5-min entry detail" };
   const zoomSlots = ["before_img", "after_img", "trigger_ltf_img", "outcome_img"].filter(k => row[k]); // only attached charts
