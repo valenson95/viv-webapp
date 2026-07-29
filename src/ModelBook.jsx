@@ -142,6 +142,41 @@ const PROJECT_EPISODES = {
   },
 };
 
+// PROJECT_PREFACE (Valen 2026-07-30): typeset intro pages for a project book, adapted from his own
+// Situational Awareness webinar deck (Jul 22, 2026). Numbered-section format referenced from
+// nickschmidt.so weekly reports (numbered kickers · tight headlines · hairlines · one-line chart
+// captions). Text transcribed/tightened from the deck — no mentor names in the typeout.
+const PREFACE_IMG = "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/preface";
+const PROJECT_PREFACE = {
+  "Finding the Market's Bottom": {
+    source: "Adapted from the VIV webinar — Positioning & Situational Awareness · July 22, 2026",
+    sections: [
+      { n: "01", kicker: "Situational awareness", title: "Corrections are screening season.", blocks: [
+        { t: "p", x: "Momentum traders fish from the same ponds, yet the results are drastically different. The entry model is only one criterion — what separates outcomes is the decision matrix that sits on top of it: edge clarity, capital protection (financial and mental), and screen time that turns rules into reflexes. This book trains the first and the last." },
+        { t: "def", k: "Kill bar", x: "A large single-session move on heavy volume that breaks the structure of the trend — it does not respect the moving averages or the higher lows that defined it. One bar flips the stage: Stage 2 uptrend → Stage 3 top." },
+        { t: "p", x: "When the kill bar prints, the questions change. Easy times or hard times? What stage is the market in right now? Do you need to trade every month to make money? What can you do today to be prepared for the next rally — including sitting out completely?" },
+        { t: "pull", x: "Momentum markets occur 1–3 times a year and last 6–12 weeks. The rest of the time the market consolidates its gains — and the prepared build their lists." },
+      ]},
+      { n: "02", kicker: "The edge", title: "The highest-quality buy points come right after the correction.", rows: [
+        ["Divergence exposes the leaders", "When the index is falling but a stock refuses to go down, big money is quietly accumulating. Institutions did their due diligence weeks ago — the correction is their accumulation window. Strength reads both ways: index −10%, stock −5% is relative strength too."],
+        ["Correction = reset", "The flush removes impatient holders and late chasers. What's left is strong-handed ownership and uncrowded trends. Choppy price action is the signature of a crowd — clean trends need that crowd gone."],
+        ["Compression → expansion", "The market always moves in this cycle: a big prolonged move, then compression into an inflection point — with the leaders compressed tightest of all. When the pressure releases, leaders expand harder than the index. That is the edge this book measures."],
+      ]},
+      { n: "03", kicker: "Stay honest", title: "Three questions when the market shifts.", rows: [
+        ["What are the leaders doing?", "Where are they versus their moving averages? Is the structure constructive — higher highs, higher lows? Are pullbacks tight and orderly, or turning wide, loose and sloppy? Watch the subtle % change against the index, with beta in context."],
+        ["Which theme keeps showing up?", "Is a specific sector, group or theme showing relative strength — and which one is stepping up to take the baton? When you screen for RS, what keeps appearing?"],
+        ["What does your own P&L say?", "Your last five trades: more follow-through or more stop-outs? Does trading feel easy, or unusually frustrating? Is your equity curve below its own 5/10/20-day average? Your P&L curve is a live sensor of your system in the current environment — don't ignore it."],
+      ]},
+      { n: "04", kicker: "The tape rhymes", title: "Four tops. The same bar.", grid: [
+        { img: `${PREFACE_IMG}/qqq-2020-killbar.png`, year: "2020", cap: "Kill bar −5.07% on volume — structure breaks, Stage 2 → 3" },
+        { img: `${PREFACE_IMG}/qqq-2024-killbar.png`, year: "2024", cap: "Kill bar −3.6%, high-volume close below the 20-MA — change of character" },
+        { img: `${PREFACE_IMG}/qqq-2025-killbar.png`, year: "2025", cap: "Kill bar again — −3.47%, high-volume close below the 20-MA" },
+        { img: `${PREFACE_IMG}/qqq-2026-killbar.png`, year: "2026", cap: "Kill bar Jun 2 — change of trend. The correction this book is living in" },
+      ], after: "Different years, same bar. The index tells you when the season changes — the studies that follow tell you where to look next." },
+    ],
+  },
+};
+
 export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
   // Project-book export (Valen 2026-07-28): a coverTitle'd book whose rows are ALL non-H-domain studies
   // (e.g. "Market Bottom") gets the gallery-grade minimal book instead of the classic model-book layout.
@@ -657,6 +692,27 @@ function openProjectBookPdf(rows, coverTitle) {
     <div class="pbrule"></div>
     <div class="pbmeta">${rows.length} ${rows.length === 1 ? "study" : "studies"}${yearSpan ? ` · ${yearSpan}` : ""} · exported ${today}</div>
   </div>`;
+  // ── PREFACE ── (typeset intro pages from PROJECT_PREFACE; era-grid charts link to zoom plates)
+  const prefaceDef = PROJECT_PREFACE[coverTitle];
+  const prefaceZooms = [];
+  const preface = prefaceDef ? prefaceDef.sections.map((s, si) => {
+    const kicker = `<div class="pfkick"><span class="pfn">${esc(s.n)}</span><span class="pfk">${esc(s.kicker)}</span></div>`;
+    let body = "";
+    if (s.blocks) body = s.blocks.map((b) => {
+      if (b.t === "def") return `<div class="pfdef"><div class="pfdefk">${esc(b.k)}</div><div class="pfdefx">${esc(b.x)}</div></div>`;
+      if (b.t === "pull") return `<div class="pfpull">${esc(b.x)}</div>`;
+      return `<p class="pfp">${esc(b.x)}</p>`;
+    }).join("");
+    if (s.rows) body = `<div class="pfrows">${s.rows.map(([k, x], i) => `<div class="pfrow"><div class="pfrown">${String(i + 1).padStart(2, "0")}</div><div><div class="pfrowk">${esc(k)}</div><div class="pfrowx">${esc(x)}</div></div></div>`).join("")}</div>`;
+    if (s.grid) {
+      body = `<div class="pfgrid">${s.grid.map((g, gi) => {
+        prefaceZooms.push(`<div class="page pbzoom" id="pz${gi}"><a class="pbzback" href="#pf${si}">← back to the eras</a><img src="${esc(g.img)}"/><div class="pbzcap">QQQ · ${esc(g.year)}</div></div>`);
+        return `<a class="pfcell" href="#pz${gi}"><img src="${esc(g.img)}"/><div class="pfcy">${esc(g.year)}</div><div class="pfcc">${esc(g.cap)}</div></a>`;
+      }).join("")}</div>${s.after ? `<div class="pfafter">${esc(s.after)}</div>` : ""}<div class="pbcap" style="margin-top:14px">Click any chart to zoom</div>`;
+    }
+    const src = si === 0 && prefaceDef.source ? `<div class="pfsrc">${esc(prefaceDef.source)}</div>` : "";
+    return `<div class="page pfpage" id="pf${si}">${kicker}<h2 class="pftitle">${esc(s.title)}</h2>${body}${src}</div>`;
+  }).join("") : "";
   // ── CONTENTS ── (each row a link to #e{idx}; dotted leader flex-grows between name and 3M return)
   const contents = `<div class="page pbcontents">
     <div class="pblabel">Contents</div>
@@ -799,6 +855,31 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbtitle{font-size:clamp(2.6rem,7vw,3.4rem);font-weight:800;letter-spacing:-0.03em;line-height:1.02;color:#fff;margin:22px 0 0;max-width:16ch}
       .pbrule{width:60px;height:2px;background:#c9982a;margin:26px 0 20px}
       .pbmeta{font-size:0.9rem;color:#9a968c;letter-spacing:0.01em}
+      /* ── PREFACE (numbered-section pages; format ref: nickschmidt.so reports) ── */
+      .pfpage{display:flex;flex-direction:column;justify-content:center}
+      .pfkick{display:flex;align-items:baseline;gap:12px}
+      .pfn{font-size:0.72rem;font-weight:800;color:#c9982a;letter-spacing:0.08em}
+      .pfk{font-size:0.62rem;font-weight:800;letter-spacing:0.28em;text-transform:uppercase;color:#9a968c}
+      .pftitle{font-size:clamp(1.7rem,4.6vw,2.3rem);font-weight:800;letter-spacing:-0.035em;line-height:1.12;color:#fff;margin:16px 0 8px;max-width:22ch}
+      .pfp{font-size:0.86rem;line-height:1.75;color:rgba(232,230,224,0.82);max-width:64ch;margin-top:18px}
+      .pfdef{border-left:2px solid #c9982a;padding:4px 0 4px 18px;margin-top:26px;max-width:60ch}
+      .pfdefk{font-size:0.6rem;font-weight:800;letter-spacing:0.24em;text-transform:uppercase;color:#c9982a}
+      .pfdefx{font-size:0.92rem;line-height:1.65;color:#fff;font-weight:600;margin-top:8px}
+      .pfpull{font-size:1.22rem;font-weight:700;letter-spacing:-0.02em;line-height:1.45;color:#f0c050;max-width:34ch;margin-top:34px}
+      .pfsrc{font-size:0.6rem;color:#66635b;letter-spacing:0.04em;margin-top:auto;padding-top:30px}
+      .pfrows{display:grid;gap:0;margin-top:26px}
+      .pfrow{display:flex;gap:20px;padding:20px 0;border-top:1px solid rgba(255,255,255,0.10);break-inside:avoid;page-break-inside:avoid}
+      .pfrow:last-child{border-bottom:1px solid rgba(255,255,255,0.10)}
+      .pfrown{flex:none;font-size:0.72rem;font-weight:800;color:#c9982a;padding-top:3px}
+      .pfrowk{font-size:1rem;font-weight:800;letter-spacing:-0.01em;color:#fff}
+      .pfrowx{font-size:0.8rem;line-height:1.7;color:rgba(232,230,224,0.75);max-width:62ch;margin-top:6px}
+      .pfgrid{display:grid;grid-template-columns:1fr 1fr;gap:22px 20px;margin-top:24px}
+      .pfcell{display:block;text-decoration:none;min-width:0}
+      .pfcell img{display:block;width:100%;object-fit:contain;border:1px solid rgba(255,255,255,0.10)}
+      .pfcy{font-size:0.9rem;font-weight:800;color:#c9982a;margin-top:9px}
+      .pfcc{font-size:0.66rem;line-height:1.5;color:#9a968c;margin-top:3px}
+      .pfafter{font-size:0.92rem;font-weight:700;letter-spacing:-0.01em;line-height:1.55;color:#fff;max-width:52ch;margin-top:26px}
+      .pfgrid,.pfdef,.pfpull,.pfrow{break-inside:avoid;page-break-inside:avoid}
       /* ── CONTENTS ── */
       .pbcgroup{margin-top:26px}
       .pbcyear{font-size:0.66rem;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#c9982a;margin-bottom:12px}
@@ -937,6 +1018,16 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pbnoimg,body.light .pbnotick{color:#8a857a}
       body.light .pbvsq{color:#6a675e}
       body.light .pbvchev,body.light .pbexphint{color:#8a857a}
+      body.light .pfn,body.light .pfdefk,body.light .pfrown,body.light .pfcy{color:#8a6a1c}
+      body.light .pftitle,body.light .pfdefx,body.light .pfrowk,body.light .pfafter{color:#16150f}
+      body.light .pfp{color:rgba(22,21,15,0.82)}
+      body.light .pfrowx{color:rgba(22,21,15,0.72)}
+      body.light .pfk,body.light .pfcc{color:#6a675e}
+      body.light .pfpull{color:#8a6a1c}
+      body.light .pfsrc{color:#8a857a}
+      body.light .pfdef{border-left-color:#8a6a1c}
+      body.light .pfrow{border-color:rgba(0,0,0,0.12)}
+      body.light .pfcell img{border-color:rgba(0,0,0,0.12)}
       body.light .pbzoom{background:#fff}
       body.light .pbzback{background:rgba(255,255,255,0.88);color:#8a6a1c}
       body.light .pbzcap{background:rgba(255,255,255,0.88);color:#6b675e}
@@ -948,10 +1039,12 @@ function openProjectBookPdf(rows, coverTitle) {
       <button onclick="window.print()">⬇ Save as PDF</button>
     </div>
     ${cover}
+    ${preface}
     ${contents}
     ${hypPage}
     ${bodyHtml}
     ${zoomPages.join("")}
+    ${prefaceZooms.join("")}
     <script>window.onload=()=>{const imgs=[...document.images];Promise.all(imgs.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r})))};</script>
     </body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
