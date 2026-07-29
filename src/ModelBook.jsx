@@ -188,52 +188,81 @@ const DEEP_DIVES = [
     title: "Surfacing Market Leaders Through a Market Correction",
     premise: "When the index breaks, the next cycle's leaders refuse to break with it. Fourteen studies across four corrections — how the leaders bottomed, what they held at the low, and how fast they paid once the turn came.",
     updated: "2026-07-30",
+    cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/market-bottom-cover.png",
   },
 ];
 
-// The dives INDEX — faithful to nickschmidt.so/report as RENDERED (Valen's screenshots 2026-07-30):
-// plain page heading · ruled proof band of ticker + green-% text pairs (no pills) · latest hero as
-// OPEN TYPE (no card box) with a small ringed chart thumb at right · dotted-leader archive rows.
-// Clicking a dive opens the exported BOOK page itself (openMyBookPdf) — members never see lab UI.
+// The dives INDEX — faithful to nickschmidt.so/report as rendered: plain heading · auto-scrolling
+// ruled proof marquee (ticker + green %) · open-type latest hero with illustration thumb · archive
+// in LIST (dotted leaders) or GRID (illustration cards) — the toggle mirrors his two formats.
 export function DiveIndex({ C, font, dives, onOpen }) {
+  const [layout, setLayout] = useState(() => { try { return localStorage.getItem("viv-dives-layout") || "list"; } catch { return "list"; } });
+  const setL = (v) => { setLayout(v); try { localStorage.setItem("viv-dives-layout", v); } catch {} };
   const proof = dives.flatMap(d => d.rows.map(r => ({ t: r.ticker, v: +(r.metrics?.study?.m?.ret_3m) })))
-    .filter(x => Number.isFinite(x.v) && x.v > 0).sort((a, b) => b.v - a.v).slice(0, 6);
+    .filter(x => Number.isFinite(x.v) && x.v > 0).sort((a, b) => b.v - a.v).slice(0, 8);
   const latest = dives[0], rest = dives.slice(1);
-  const thumb = latest?.rows?.find(r => r.before_img)?.before_img;
+  const thumbOf = (d) => d.cover || d.rows.find(r => r.before_img)?.before_img;
+  const pair = (p, i) => (
+    <span key={i} title="3-month return off this study's own low — the study is inside the dive" style={{ fontSize: "0.78rem", whiteSpace: "nowrap", marginRight: 44 }}>
+      <span style={{ fontWeight: 700, color: C.white }}>{p.t}</span>
+      <span style={{ fontWeight: 600, color: C.green, marginLeft: 8 }}>+{p.v}%</span>
+    </span>
+  );
+  const toggleBtn = (v, glyph, label) => (
+    <button onClick={() => setL(v)} title={label} style={{ background: layout === v ? "rgba(255,255,255,0.08)" : "none", border: `1px solid ${layout === v ? C.border : "transparent"}`, borderRadius: 10, color: layout === v ? C.white : C.muted, fontSize: "0.9rem", padding: "7px 12px", cursor: "pointer", lineHeight: 1 }}>{glyph}</button>
+  );
   return (
     <div>
+      <style>{`@keyframes divesmarq{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        .divesmarq{display:inline-flex;animation:divesmarq 36s linear infinite}
+        .divesmarqwrap:hover .divesmarq{animation-play-state:paused}`}</style>
       <h2 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, margin: 0 }}>Deep Dives</h2>
       {proof.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 30, flexWrap: "wrap", borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, padding: "14px 0", margin: "24px 0 0" }}>
-          <span style={{ fontSize: "0.72rem", color: C.muted, whiteSpace: "nowrap" }}>From the studies</span>
-          {proof.map((p, i) => (
-            <span key={i} title="3-month return off this study's own low — the study is inside the dive" style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>
-              <span style={{ fontWeight: 700, color: C.white }}>{p.t}</span>
-              <span style={{ fontWeight: 600, color: C.green, marginLeft: 8 }}>+{p.v}%</span>
-            </span>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, padding: "14px 0", margin: "24px 0 0" }}>
+          <span style={{ fontSize: "0.72rem", color: C.muted, whiteSpace: "nowrap", paddingRight: 28, borderRight: `1px solid ${C.border}`, marginRight: 28, flex: "none" }}>From the studies</span>
+          <div className="divesmarqwrap" style={{ overflow: "hidden", flex: 1, minWidth: 0, maskImage: "linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent)" }}>
+            <div className="divesmarq">{proof.map(pair)}{proof.map((p, i) => pair(p, i + 100))}</div>
+          </div>
         </div>
       )}
       {latest && (
         <div style={{ display: "flex", gap: 36, alignItems: "flex-start", justifyContent: "space-between", margin: "40px 0 0", flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 420px", minWidth: 0 }}>
             <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: C.muted }}>Latest dive <span style={{ opacity: 0.45 }}>——</span> {latest.updated}</div>
-            <div style={{ fontSize: "2.1rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, lineHeight: 1.14, margin: "16px 0 0", maxWidth: "20ch" }}>{latest.title}</div>
+            <div onClick={() => onOpen(latest)} style={{ fontSize: "2.1rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, lineHeight: 1.14, margin: "16px 0 0", maxWidth: "20ch", cursor: "pointer" }}>{latest.title}</div>
             <div onClick={() => onOpen(latest)} style={{ display: "inline-block", marginTop: 28, paddingBottom: 10, borderBottom: `1px solid ${C.border}`, fontSize: "0.92rem", color: C.text, cursor: "pointer" }}>Open the dive <span style={{ color: C.muted }}>↗</span></div>
           </div>
-          {thumb && <img src={thumb} alt="" onClick={() => onOpen(latest)} style={{ width: 300, maxWidth: "100%", height: 172, objectFit: "cover", borderRadius: 14, border: `1px solid ${C.border}`, cursor: "pointer" }} />}
+          {thumbOf(latest) && <img src={thumbOf(latest)} alt="" onClick={() => onOpen(latest)} style={{ width: 320, maxWidth: "100%", borderRadius: 16, border: `1px solid ${C.border}`, cursor: "pointer", display: "block" }} />}
         </div>
       )}
       {rest.length > 0 && (
-        <div style={{ margin: "48px 0 0" }}>
-          {rest.map(d => (
-            <div key={d.slug} onClick={() => onOpen(d)} style={{ display: "flex", alignItems: "baseline", gap: 14, padding: "17px 0", cursor: "pointer" }}>
-              <span style={{ fontSize: "0.92rem", fontWeight: 600, color: C.text, whiteSpace: "nowrap" }}>{d.title}</span>
-              <span style={{ flex: 1, borderBottom: "1px dotted rgba(255,255,255,0.18)", transform: "translateY(-4px)" }} />
-              <span style={{ fontSize: "0.78rem", color: C.muted, whiteSpace: "nowrap" }}>{d.updated}</span>
+        <>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 4, margin: "40px 0 0", padding: 4, borderRadius: 14, border: `1px solid ${C.border}`, width: "fit-content", marginLeft: "auto" }}>
+            {toggleBtn("list", "☰", "List view")}
+            {toggleBtn("grid", "▦", "Thumbnail view")}
+          </div>
+          {layout === "list" ? (
+            <div style={{ margin: "16px 0 0" }}>
+              {rest.map(d => (
+                <div key={d.slug} onClick={() => onOpen(d)} style={{ display: "flex", alignItems: "baseline", gap: 14, padding: "17px 0", cursor: "pointer" }}>
+                  <span style={{ fontSize: "0.92rem", fontWeight: 600, color: C.text, whiteSpace: "nowrap" }}>{d.title}</span>
+                  <span style={{ flex: 1, borderBottom: "1px dotted rgba(255,255,255,0.18)", transform: "translateY(-4px)" }} />
+                  <span style={{ fontSize: "0.78rem", color: C.muted, whiteSpace: "nowrap" }}>{d.updated}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(300px, 100%), 1fr))", gap: "28px 24px", margin: "18px 0 0" }}>
+              {rest.map(d => (
+                <div key={d.slug} onClick={() => onOpen(d)} style={{ cursor: "pointer" }}>
+                  {thumbOf(d) && <img src={thumbOf(d)} alt="" style={{ width: "100%", borderRadius: 16, border: `1px solid ${C.border}`, display: "block" }} />}
+                  <div style={{ fontSize: "0.72rem", color: C.muted, margin: "12px 0 0" }}>{d.updated}</div>
+                  <div style={{ fontSize: "1.05rem", fontWeight: 700, color: C.white, lineHeight: 1.3, margin: "6px 0 0" }}>{d.title}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -829,7 +858,7 @@ function openProjectBookPdf(rows, coverTitle) {
     ${hyps ? (pbEvidence
       ? `<div class="pbhyps">${hyps.map((h) => pbEvCard(h)).join("")}</div><div class="pbvcaption">n=${studyRows.length} · descriptive only — pre-registered ladder, threshold notch at 70%.</div>`
       : `<div class="pbhyps">${hyps.map((h) => `<div class="pbhrow"><span class="pbhid">${esc(h.id)}</span><div class="pbhbody"><div class="pbhtext">${esc(h.text)}</div><div class="pbhmeasure">measure: ${esc(h.measure)}</div></div></div>`).join("")}</div>`) : ""}
-    ${tallyGroups.map((g) => `<details class="pbtwrap"><summary class="pbtsec"><span class="pbvchev"></span>Checklist tally — ${g.n} stud${g.n === 1 ? "y" : "ies"}${tallyGroups.length > 1 ? ` · ${esc(g.setup)}` : ""}</summary>
+    ${tallyGroups.map((g) => `<details open class="pbtwrap"><summary class="pbtsec"><span class="pbvchev"></span>Checklist tally — ${g.n} stud${g.n === 1 ? "y" : "ies"}${tallyGroups.length > 1 ? ` · ${esc(g.setup)}` : ""}</summary>
       <table class="pbttab"><tbody>${g.items.map((it) => { const p = g.n ? Math.round((it.count / g.n) * 100) : 0;
         return `<tr><td class="pbtlabel">${esc(it.label)}${it.bonus ? ` <span class="pbbtag">bonus</span>` : ""}</td><td class="pbtbarcell"><div class="pbtbar"><div class="pbtfill" style="width:${p}%"></div></div></td><td class="pbtcount">${it.count}/${g.n}</td></tr>`; }).join("")}</tbody></table></details>`).join("")}
     <div class="pbfoot">Counts are studies ticked so far — an untick may just mean "not studied yet", never "failed".</div>
@@ -929,6 +958,11 @@ function openProjectBookPdf(rows, coverTitle) {
       .toolbar button{background:linear-gradient(120deg,#c9982a,#f0c050);border:none;color:#08080e;font-family:inherit;font-weight:800;font-size:0.85rem;padding:10px 20px;border-radius:99px;cursor:pointer}
       .toolbar .ghost{background:transparent;border:1px solid rgba(201,152,42,0.6);color:#c9982a}
       @media print{.toolbar{display:none}}
+      /* on-screen chart lightbox (never prints) */
+      .pbchartwrap img,.pfcell img{cursor:zoom-in}
+      .zoomov{display:none;position:fixed;inset:0;z-index:60;background:rgba(4,4,8,0.95);align-items:center;justify-content:center;padding:2vh 2vw;cursor:zoom-out}
+      .zoomov img{max-width:100%;max-height:100%;object-fit:contain}
+      @media print{.zoomov{display:none!important}}
       /* ── COVER ── (no gradient washes — print rasterizes them with visible banding) */
       .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
       .pblogo{height:54px;width:auto;align-self:flex-start;margin-bottom:20px}
@@ -1147,7 +1181,15 @@ function openProjectBookPdf(rows, coverTitle) {
     ${contents}
     ${hypPage}
     ${bodyHtml}
-    <script>window.onload=()=>{const imgs=[...document.images];Promise.all(imgs.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r})))};</script>
+    <div class="zoomov" id="zoomov"><img id="zoomim" alt=""/></div>
+    <script>window.onload=()=>{const imgs=[...document.images];Promise.all(imgs.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r})))};
+    // On-screen click-to-zoom (Valen 2026-07-30): any book chart opens a full-screen lightbox.
+    // Screen-only affordance — hidden in print, so the saved PDF is untouched.
+    document.addEventListener('click',(e)=>{const ov=document.getElementById('zoomov');
+      if(e.target.closest('#zoomov')){ov.style.display='none';return;}
+      const im=e.target.closest('.pbchartwrap img, .pfcell img');if(!im)return;
+      document.getElementById('zoomim').src=im.src;ov.style.display='flex';});
+    document.addEventListener('keydown',(e)=>{if(e.key==='Escape')document.getElementById('zoomov').style.display='none';});</script>
     </body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
   const w = window.open(url, "_blank");
@@ -1702,8 +1744,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const studyRows = rows.filter(r => r.created_by === uid && isStudyRow(r));
   // Project books (Valen 2026-07-28): distinct project names across the study rows + the count for each chip.
   const projectBooks = isAdmin ? [...new Set(studyRows.map(studyProject).filter(Boolean))].sort() : [];
-  // Deep Dives (admin-first): registry entries enriched with their live study rows; only non-empty dives list.
-  const diveList = isAdmin ? DEEP_DIVES.map(d => ({ ...d, rows: studyRows.filter(r => studyProject(r) === d.project) })).filter(d => d.rows.length > 0) : [];
+  // Deep Dives: registry entries enriched with their live study rows. Members only receive rows
+  // RLS lets them read (published); a dive with zero readable rows stays hidden.
+  const diveList = DEEP_DIVES.map(d => ({ ...d, rows: rows.filter(r => isStudyRow(r) && studyProject(r) === d.project) })).filter(d => d.rows.length > 0);
   const dnaCount = studyRows.filter(r => !studyProject(r)).length; // 📕 Winner DNA = studies with no project
   // Lab (scoreboard / hypotheses / campaign list) is computed from the ACTIVE book's rows so each book's stats are its own.
   const bookStudyRows = studyRows.filter(r => matchesBook(r, book));
@@ -1872,6 +1915,23 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? "#08080e" : C.muted,
     background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
   });
+
+  // MEMBER VIEW (Valen 2026-07-30): for members the whole Model Book IS the Deep Dives report
+  // page — the Pattern Library header, VIV-Official gallery and the personal book are hidden for
+  // now. Dive click opens the typeset book page. Admin keeps the full workbench below.
+  if (!isAdmin) return (
+    <div style={{ fontFamily: font }}>
+      {loading ? <div style={{ color: C.muted, fontSize: "0.8rem", padding: "30px 0" }}>Loading…</div>
+        : diveList.length > 0
+          ? <DiveIndex C={C} font={font} dives={diveList} onOpen={(d) => openMyBookPdf(d.rows, { coverTitle: d.project })} />
+          : (
+            <div>
+              <h2 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, margin: 0 }}>Deep Dives</h2>
+              <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 14 }}>The first dive is being prepared — check back soon.</div>
+            </div>
+          )}
+    </div>
+  );
 
   return (
     <div style={{ fontFamily: font }}>

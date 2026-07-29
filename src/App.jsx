@@ -754,6 +754,16 @@ function PlaybookTracker({ trades, uid, setPage }) {
 const WHATS_NEW = [
   {
     tag: "New",
+    date: "July 30, 2026",
+    title: "\ud83c\udf0a Deep Dives \u2014 the Model Book, reborn as research reports",
+    items: [
+      "The Model Book is now a library of Deep Dives \u2014 long-form research reports, each studying one repeatable market behaviour on real charts. The first dive is live: Surfacing Market Leaders Through a Market Correction \u2014 14 studies across four corrections.",
+      "Open a dive and you get the full typeset book: the working hypotheses with verdicts, every study's charts and facts, and a one-click Save as PDF. Click any chart to zoom.",
+      "The index shows live returns from the studies inside each dive \u2014 measured off each study's own low, with every underlying study one click away.",
+    ],
+  },
+  {
+    tag: "New",
     date: "July 27, 2026",
     title: "🧭 Rotation ranks + ⚡ macro events + T2108 zones",
     items: [
