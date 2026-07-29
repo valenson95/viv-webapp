@@ -1943,8 +1943,10 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = C.borderGold; }}
               onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.borderColor = C.border; }}>
               <div style={{ display: "flex", borderBottom: `1px solid ${C.border}` }}>
-                {pane(r.before_img, "vs QQQ", true)}
-                {pane(r.after_img, "daily", false)}
+                {/* Pane captions adapt to the book: Market Bottom pairs are vs-QQQ|daily; every other
+                    project's charts follow the standard study slots (context | setup). Valen 2026-07-29 */}
+                {pane(r.before_img, r.metrics?.study?.setup === "Market Bottom" ? "vs QQQ" : "context", true)}
+                {pane(r.after_img, r.metrics?.study?.setup === "Market Bottom" ? "daily" : "setup", false)}
               </div>
               <div style={{ padding: "12px 14px 14px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
