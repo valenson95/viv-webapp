@@ -1355,7 +1355,10 @@ const DV_CSS = `
 `;
 // Role → caption for the read-only INHERITED chart timeline (Valen 2026-07-28) — module scope so no component
 // is defined inside another. Mirrors the editor's ROLE_LABEL; used only when a chartless leg shows the root's set.
-const DV_ROLE_LABEL = { context: "Context (HTF)", before: "BEFORE — the setup", trigger: "TRIGGER — 5-min entry", after: "AFTER — the outcome" };
+// Role labels follow the workflow-v2 chart language (Valen 2026-07-29): HTF = weekly context ·
+// LTF = daily setup (right edge = trigger). "BEFORE/AFTER" wording retired from the study surfaces;
+// the shared campaign outcome keeps the AFTER name.
+const DV_ROLE_LABEL = { context: "HTF — weekly context", before: "LTF — daily setup", trigger: "TRIGGER — 5-min entry", after: "AFTER — the outcome" };
 // z-ladder (whole 📚 surface): ModelBook study backdrop 1250 · HypothesisRead deep-dive modal 1300 ·
 // 📖 detailed view 1340 (above the editor + deep-dive, below the app edit modal 1400 and the lightbox 1550) ·
 // app edit modal 1400 · chart lightbox 1550.
@@ -1594,7 +1597,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   const [showAll, setShowAll] = useState(false); // raw computed-metrics grid folded by default (Valen 2026-07-24) — key strip stays
   const [detailOpen, setDetailOpen] = useState(true); // 📖 Detailed view is now the DEFAULT landing (Valen 2026-07-26): open a study → chronological chart page; "✎ Ticks & fields" drops to the quick editor
   const [addingLeg, setAddingLeg] = useState(false), [newLegDate, setNewLegDate] = useState(""); // leg-strip inline "+ Add leg" date entry (Valen 2026-07-28)
-  const SLOT_TITLES = { before_img: "BEFORE", after_img: "AFTER", outcome_img: "AFTER — the shared outcome", trigger_ltf_img: "TRIGGER — 5-min entry detail" };
+  const SLOT_TITLES = { before_img: "HTF — weekly context", after_img: "LTF — daily setup", outcome_img: "AFTER — the shared outcome", trigger_ltf_img: "TRIGGER — 5-min entry detail" };
   const zoomSlots = ["before_img", "after_img", "trigger_ltf_img", "outcome_img"].filter(k => row[k]); // only attached charts
   useEffect(() => {
     if (!zoom) return;
@@ -1842,13 +1845,14 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
 
       <div style={sect}>This leg — charts{multiLeg ? ` · leg ${legIdx} of ${sibs.length}` : ""}</div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-        {/* Per-leg BEFORE/AFTER (Valen 2026-07-24): a leg's AFTER = the next leg's BEFORE. Field mapping is
-            unchanged — before_img = BEFORE, after_img = AFTER — only the labels reflect his chained model. */}
-        {chartSlot("before_img", "BEFORE", "The setup going into this leg — the base it breaks from (= the previous leg's AFTER).")}
-        {chartSlot("after_img", "AFTER", "How this leg resolved — where it ran to (= the next leg's BEFORE).")}
-        {chartSlot("trigger_ltf_img", "TRIGGER — 5-min entry detail", "Optional: the trigger day on 5-min — ORH, the reclaim, how the entry actually traded")}
+        {/* Workflow-v2 slots (Valen 2026-07-29): the two standard charts are HTF (weekly context) and
+            LTF (daily setup, right edge = the trigger). Field mapping unchanged — before_img = HTF,
+            after_img = LTF — only the language follows his model. 5-min entry detail + extra charts
+            live in the 📖 Detailed view; the shared campaign AFTER keeps its own slot below. */}
+        {chartSlot("before_img", "HTF — weekly context", "The weekly — where this leg sits in the bigger trend (pole, prior base, era).")}
+        {chartSlot("after_img", "LTF — daily setup", "The daily into the trigger — right edge = the trigger day. Grade the ticks off this chart.")}
       </div>
-      <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 6 }}>Charts are managed in the <b style={{ color: C.goldBright }}>📖 Detailed view</b> — this quick row just fills the standard slots.</div>
+      <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 6 }}>5-min entry detail + extra charts live in the <b style={{ color: C.goldBright }}>📖 Detailed view</b> — this quick row fills the two standard slots.</div>
 
       {/* 👁 HIS ticks — only chart-readable factors, grader-style 3 buckets per setup.
           Data-context items (theme/liquidity/ADR/rank) are NOT here: backtested charts
