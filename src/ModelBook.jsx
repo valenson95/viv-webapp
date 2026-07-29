@@ -195,7 +195,7 @@ const DEEP_DIVES = [
 // The dives INDEX — faithful to nickschmidt.so/report as rendered: plain heading · auto-scrolling
 // ruled proof marquee (ticker + green %) · open-type latest hero with illustration thumb · archive
 // in LIST (dotted leaders) or GRID (illustration cards) — the toggle mirrors his two formats.
-export function DiveIndex({ C, font, dives, onOpen }) {
+export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount }) {
   const [layout, setLayout] = useState(() => { try { return localStorage.getItem("viv-dives-layout") || "list"; } catch { return "list"; } });
   const setL = (v) => { setLayout(v); try { localStorage.setItem("viv-dives-layout", v); } catch {} };
   const proof = dives.flatMap(d => d.rows.map(r => ({ t: r.ticker, v: +(r.metrics?.study?.m?.ret_3m) })))
@@ -216,7 +216,17 @@ export function DiveIndex({ C, font, dives, onOpen }) {
       <style>{`@keyframes divesmarq{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
         .divesmarq{display:inline-flex;animation:divesmarq 36s linear infinite}
         .divesmarqwrap:hover .divesmarq{animation-play-state:paused}`}</style>
-      <h2 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, margin: 0 }}>Deep Dives</h2>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, margin: 0 }}>Deep Dives</h2>
+        {onMyBook && (
+          <span onClick={onMyBook} style={{ fontSize: "0.82rem", color: C.muted, cursor: "pointer", whiteSpace: "nowrap" }}
+            onMouseEnter={e => { e.currentTarget.style.color = C.white; }}
+            onMouseLeave={e => { e.currentTarget.style.color = C.muted; }}>
+            {myCount ? `Your book (${myCount})` : "Start your own book"} <span style={{ opacity: 0.6 }}>→</span>
+          </span>
+        )}
+      </div>
+      {!latest && <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 16 }}>The first dive is being prepared — check back soon.</div>}
       {proof.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, padding: "14px 0", margin: "24px 0 0" }}>
           <span style={{ fontSize: "0.72rem", color: C.muted, whiteSpace: "nowrap", paddingRight: 28, borderRight: `1px solid ${C.border}`, marginRight: 28, flex: "none" }}>From the studies</span>
@@ -1665,6 +1675,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [zoom, setZoom] = useState(null); // lightbox: { imgs: {before, after}, slot: "before"|"after" }
   const [studyMode, setStudyMode] = useState(mbDeepLink === "studies"); // 📚 Studies view (admin, inside My Book)
   const [book, setBook] = useState("__all__"); // active project book in My Research: "__all__" | "__none__" (Winner DNA) | project name
+  const [memberView, setMemberView] = useState("dives"); // members: "dives" (report index, default) | "mine" (their own book)
   // Studies-list column sort (Valen 2026-07-28): [{ key: "entry"|"trigger", dir: 1|-1 }, …] — index 0 = primary,
   // later entries = secondary (multi-sort: clicking a new column makes it primary, the old primary demotes).
   // Clicking the active primary toggles asc→desc→off. Empty array = the default ticker-chronicle order.
@@ -1916,20 +1927,15 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
   });
 
-  // MEMBER VIEW (Valen 2026-07-30): for members the whole Model Book IS the Deep Dives report
-  // page — the Pattern Library header, VIV-Official gallery and the personal book are hidden for
-  // now. Dive click opens the typeset book page. Admin keeps the full workbench below.
-  if (!isAdmin) return (
+  // MEMBER VIEW (Valen 2026-07-30): members land on the Deep Dives report page — no Pattern
+  // Library header, no scope chips, no VIV-Official. "Your book →" opens their own personal book
+  // (memberView "mine" falls through to the page below with member-minimal chrome).
+  if (!isAdmin && memberView === "dives") return (
     <div style={{ fontFamily: font }}>
       {loading ? <div style={{ color: C.muted, fontSize: "0.8rem", padding: "30px 0" }}>Loading…</div>
-        : diveList.length > 0
-          ? <DiveIndex C={C} font={font} dives={diveList} onOpen={(d) => openMyBookPdf(d.rows, { coverTitle: d.project })} />
-          : (
-            <div>
-              <h2 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, margin: 0 }}>Deep Dives</h2>
-              <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 14 }}>The first dive is being prepared — check back soon.</div>
-            </div>
-          )}
+        : <DiveIndex C={C} font={font} dives={diveList}
+            onOpen={(d) => openMyBookPdf(d.rows, { coverTitle: d.project })}
+            onMyBook={() => { setFScope("mine"); setMemberView("mine"); }} myCount={mineCount} />}
     </div>
   );
 
@@ -1938,12 +1944,15 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {/* command header */}
       <div className="toolbar" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap", marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold }}>Model Book</div>
-          <h2 className={"sech guide" + (gactive ? gactive("modelbook") : "")}
+          {!isAdmin && <div onClick={() => setMemberView("dives")} style={{ fontSize: "0.72rem", color: C.muted, cursor: "pointer", marginBottom: 10 }}>← Deep Dives</div>}
+          {isAdmin && <div style={{ fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold }}>Model Book</div>}
+          {isAdmin ? (<h2 className={"sech guide" + (gactive ? gactive("modelbook") : "")}
             onMouseEnter={guideEnter ? guideEnter("modelbook", "Model Book", "Two books in one: the ⭐ VIV Official library — curated elite setups, read-only — and 🔒 My Book, your private collection only you can see. Study the before chart, the exact factors that made it elite, then the outcome. Stars are computed from the Setup Grader ticks (objective, no bias). Fields marked with a gold dot were auto-read off the chart by VIV — edit any that look off. Pattern recognition is built by reps: same patterns, hundreds of examples.", undefined) : undefined}
             onMouseLeave={guideLeave ? guideLeave("modelbook") : undefined}
-            style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, marginTop: 5 }}>The Pattern Library</h2>
-          <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 6 }}>{visible.length} {visible.length === 1 ? "entry" : "entries"} · the best setups, kept for study — before → factors → after</div>
+            style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, marginTop: 5 }}>The Pattern Library</h2>) : (
+            <h2 className="sech" style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, marginTop: 5 }}>Your Book</h2>
+          )}
+          {isAdmin && <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 6 }}>{visible.length} {visible.length === 1 ? "entry" : "entries"} · the best setups, kept for study — before → factors → after</div>}
         </div>
         {!editing && !studyEditing && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -1973,7 +1982,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {editing !== null && <MBEditor C={C} font={font} busy={busy} isAdmin={isAdmin} initial={editing.id ? editing : null} onSave={save} onCancel={() => setEditing(null)} onUpload={uploadImg} journaledTrades={journaledTrades} />}
 
       {/* filters */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 18px", alignItems: "center" }}>
+      {isAdmin && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 18px", alignItems: "center" }}>
         {/* ONE personal dataset (Valen 2026-07-27): the admin's plain rows + study rows are the SAME
             collection viewed two ways — so his personal scope is ONE chip "🔒 My Research (N)" (N = plain +
             study rows), NOT the old split 📖 Legacy / 📚 Studies chips. Members keep their untouched single
@@ -1996,7 +2005,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
             <button onClick={() => setFormat(false)} style={chip(!studyMode)}>🎴 Gallery view</button>
           </>
         )}
-      </div>
+      </div>}
 
       {/* THE SHELF (Valen 2026-07-28) — project "books" within My Research. Filters BOTH Gallery and Lab.
           [All books] = current behaviour · [📕 Winner DNA] = studies with no project · one [📗 …] chip per
