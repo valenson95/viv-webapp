@@ -1257,6 +1257,169 @@ export const PROJECT_HYPOTHESES = {
   ],
 };
 
+// ══════════════════════════════════════════════════════════════════
+//  🧪 MARKET-BOTTOM EVIDENCE ENGINE (Valen 2026-07-29) — the FIRST project book to graduate from static
+//  hypothesis text to a descriptive read of its own study rows. n is tiny; this is a pre-registered
+//  DESCRIPTIVE ladder only — it NEVER implies statistical significance. Every number is auditable: the
+//  `expand` array carries the per-study lines that produced it (blank fields = "not measured", excluded
+//  from denominators, never counted as a failure).
+// ══════════════════════════════════════════════════════════════════
+// Episode character for MB-H1/H2 (pre-registered 2026-07-29): 2025 = the V-crash; 2023/2024/2026 = orderly-class
+export const MB_EPISODE_CLASS = { "2023": "orderly", "2024": "orderly", "2025": "crash", "2026": "orderly" };
+// Pre-registered verdict ladder (descriptive only — n is small; never imply significance):
+// share ≥0.70 SUPPORTS · 0.55–0.70 LEANS FOR · 0.45–0.55 MIXED · 0.30–0.45 LEANS AGAINST · <0.30 AGAINST · n<5 INSUFFICIENT
+// mbHypothesisEvidence — per-hypothesis descriptive read over the Market-Bottom study rows. Returns an object
+// keyed "MB-H1"…"MB-H6", each { verdict, chip, headline, compare, n, expand }. compare = null OR the two-sided
+// key comparison { a:{label,value,n}, b:{label,value,n} }; expand = per-study audit rows { ticker, year, line }.
+export function mbHypothesisEvidence(rows) {
+  const num = (v) => (v != null && v !== "") ? Number(v) : null;
+  const median = (arr) => {
+    const a = arr.filter((x) => x != null && !Number.isNaN(x)).slice().sort((x, y) => x - y);
+    if (!a.length) return null;
+    const mid = Math.floor(a.length / 2);
+    return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+  };
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  const r1 = (x) => (x == null || Number.isNaN(x)) ? null : Math.round(x * 10) / 10;
+  const sgn = (x) => x == null ? "—" : (x > 0 ? `+${x}` : `${x}`); // signed display for session counts
+  // ladder over a share (0–1) at sample n
+  const ladder = (share, n) => {
+    if (n < 5) return "INSUFFICIENT";
+    if (share >= 0.70) return "SUPPORTS";
+    if (share >= 0.55) return "LEANS FOR";
+    if (share >= 0.45) return "MIXED";
+    if (share >= 0.30) return "LEANS AGAINST";
+    return "AGAINST";
+  };
+  const S = (rows || []).filter((r) => r && r.metrics && r.metrics.study).map((r) => ({
+    ticker: r.ticker, year: (r.entry_date || "").slice(0, 4),
+    m: r.metrics.study.m || {}, checks: r.metrics.study.checks || {},
+  }));
+  const out = {};
+
+  // ── MB-H1 — orderly leaders lead the index; the crash differentiates by recovery, not timing ──
+  {
+    const orderly = S.filter((x) => MB_EPISODE_CLASS[x.year] === "orderly");
+    const crash = S.filter((x) => MB_EPISODE_CLASS[x.year] === "crash");
+    const nO = orderly.filter((x) => num(x.m.sessions_vs_index) != null).length;
+    const nC = crash.filter((x) => num(x.m.sessions_vs_index) != null).length;
+    const a = r1(median(orderly.map((x) => num(x.m.sessions_vs_index))));
+    const b = r1(median(crash.map((x) => num(x.m.sessions_vs_index))));
+    const crashRecov = crash.length ? crash.filter((x) => x.checks.rc_reclaim_fast).length / crash.length : 0;
+    let verdict;
+    if (nO < 5 || nC < 2) verdict = "INSUFFICIENT";
+    else verdict = (a != null && a <= -4 && b != null && b >= -3) ? "SUPPORTS" : "MIXED";
+    out["MB-H1"] = {
+      verdict, chip: verdict, n: nO + nC,
+      headline: `Orderly corrections: leaders led the index by a median ${a == null ? "—" : Math.abs(a)} sessions (n=${nO}). The crash: median ${sgn(b)} — no timing edge, but ${pct(crashRecov)} out-recovered QQQ.`,
+      compare: { a: { label: "orderly median lead", value: `${sgn(a)} sess`, n: nO }, b: { label: "crash median", value: `${sgn(b)} sess`, n: nC } },
+      expand: S.map((x) => ({ ticker: x.ticker, year: x.year, line: `${MB_EPISODE_CLASS[x.year] || "—"} · vs index ${sgn(num(x.m.sessions_vs_index))} sess${x.checks.rc_reclaim_fast ? " · recovered fast" : ""}` })),
+    };
+  }
+
+  // ── MB-H2 — in orderly corrections the eventual leaders bottom BEFORE the index ──
+  {
+    const orderly = S.filter((x) => MB_EPISODE_CLASS[x.year] === "orderly" && num(x.m.sessions_vs_index) != null);
+    const n = orderly.length;
+    const k = orderly.filter((x) => num(x.m.sessions_vs_index) < 0).length;
+    const share = n ? k / n : 0;
+    out["MB-H2"] = {
+      verdict: ladder(share, n), chip: ladder(share, n), n,
+      headline: `${k}/${n} orderly-episode leaders bottomed before the index.`,
+      compare: { a: { label: "bottomed early", value: `${k}/${n}`, n }, b: { label: "share early", value: n ? pct(share) : "—", n } },
+      expand: orderly.map((x) => ({ ticker: x.ticker, year: x.year, line: `vs index ${sgn(num(x.m.sessions_vs_index))} sess ${num(x.m.sessions_vs_index) < 0 ? "→ before" : "→ with/after"}` })),
+    };
+  }
+
+  // ── MB-H3 — every bottom launches a NEW theme (REFINED — not universal) ──
+  {
+    const years = ["2023", "2024", "2025", "2026"];
+    const perYear = years.map((y) => {
+      const g = S.filter((x) => x.year === y);
+      const k = g.filter((x) => x.checks.th_new_theme).length;
+      return g.length ? `${y} ${k}/${g.length}` : null;
+    }).filter(Boolean).join(" · ");
+    out["MB-H3"] = {
+      verdict: "REFINED", chip: "REFINED", n: S.length,
+      headline: `Not universal — rotation ruled the LATER bottoms (2024/2025) while the FIRST bottom of the secular theme (2023) and the 2026 picks re-led with prior themes. Per-episode new-theme ticks: ${perYear || "—"}. See the refined MB-H3 in the research file.`,
+      compare: null,
+      expand: S.map((x) => ({ ticker: x.ticker, year: x.year, line: x.checks.th_new_theme ? "NEW leadership theme ✓" : "re-led with a prior theme" })),
+    };
+  }
+
+  // ── MB-H4 — the move is FRONT-LOADED (compounding-correct split, not naive pp-subtraction) ──
+  {
+    const both = S.filter((x) => num(x.m.ret_3m) != null && num(x.m.ret_6m) != null);
+    const openWindow = S.filter((x) => num(x.m.ret_3m) != null && num(x.m.ret_6m) == null).length;
+    const rowsF = both.map((x) => {
+      const r3 = num(x.m.ret_3m), r6 = num(x.m.ret_6m);
+      const second3m = ((1 + r6 / 100) / (1 + r3 / 100) - 1) * 100;
+      return { x, r3, second3m: r1(second3m), front: r3 > second3m };
+    });
+    const n = rowsF.length;
+    const k = rowsF.filter((f) => f.front).length;
+    const share = n ? k / n : 0;
+    out["MB-H4"] = {
+      verdict: ladder(share, n), chip: ladder(share, n), n,
+      headline: `${k}/${n} made more in months 0–3 than 3–6 (compounding-correct split — naive pp-subtraction flips several)${openWindow ? ` · ${openWindow} stud${openWindow === 1 ? "y" : "ies"} still in their 6M window` : ""}.`,
+      compare: { a: { label: "front-loaded", value: `${k}/${n}`, n }, b: { label: "share front", value: n ? pct(share) : "—", n } },
+      expand: rowsF.map((f) => ({ ticker: f.x.ticker, year: f.x.year, line: `${sgn(f.r3)}% then ${sgn(f.second3m)}%${f.front ? " · front-loaded" : ""}` })),
+    };
+  }
+
+  // ── MB-H5 — MA structure is the tell: holders/reclaimers post a bigger +3M ──
+  {
+    const A = S.filter((x) => x.checks.bb_ma_hold || x.checks.rc_ma_stack);
+    const B = S.filter((x) => !(x.checks.bb_ma_hold || x.checks.rc_ma_stack));
+    const aVals = A.map((x) => num(x.m.ret_3m)).filter((v) => v != null);
+    const bVals = B.map((x) => num(x.m.ret_3m)).filter((v) => v != null);
+    const a = r1(median(aVals)), b = r1(median(bVals));
+    let verdict;
+    if (aVals.length < 4 || bVals.length < 4) verdict = "INSUFFICIENT";
+    else if (a >= 1.2 * b) verdict = "SUPPORTS";
+    else if (a >= 0.8 * b) verdict = "MIXED";
+    else verdict = "LEANS AGAINST";
+    out["MB-H5"] = {
+      verdict, chip: verdict, n: aVals.length + bVals.length,
+      headline: `MA-structure holders posted a median ${sgn(a)}% at 3M vs ${sgn(b)}% without it${(aVals.length < 4 || bVals.length < 4) ? " — too few in one arm to read yet" : ""}.`,
+      compare: { a: { label: "MA held / stacked", value: `${sgn(a)}% 3M`, n: aVals.length }, b: { label: "did not", value: `${sgn(b)}% 3M`, n: bVals.length } },
+      expand: S.map((x) => ({ ticker: x.ticker, year: x.year, line: `${(x.checks.bb_ma_hold || x.checks.rc_ma_stack) ? "MA held/stacked" : "no MA tell"} · +3M ${sgn(num(x.m.ret_3m))}%` })),
+    };
+  }
+
+  // ── MB-H6 — a catalyst / EP marks the biggest winners (needs more ticks before it can speak) ──
+  {
+    const ticked = S.filter((x) => x.checks.th_catalyst);
+    const nTick = ticked.length;
+    if (nTick < 5) {
+      out["MB-H6"] = {
+        verdict: "INSUFFICIENT", chip: "INSUFFICIENT", n: nTick,
+        headline: `only ${nTick}/${S.length} carry the catalyst tick so far — tick or refute more before this one can speak.`,
+        compare: null,
+        expand: S.map((x) => ({ ticker: x.ticker, year: x.year, line: x.checks.th_catalyst ? "catalyst/EP at launch ✓" : "no catalyst tick" })),
+      };
+    } else {
+      const noTick = S.filter((x) => !x.checks.th_catalyst);
+      const aVals = ticked.map((x) => num(x.m.ret_3m)).filter((v) => v != null);
+      const bVals = noTick.map((x) => num(x.m.ret_3m)).filter((v) => v != null);
+      const a = r1(median(aVals)), b = r1(median(bVals));
+      let verdict;
+      if (aVals.length < 4 || bVals.length < 4) verdict = "INSUFFICIENT";
+      else if (a >= 1.2 * b) verdict = "SUPPORTS";
+      else if (a >= 0.8 * b) verdict = "MIXED";
+      else verdict = "LEANS AGAINST";
+      out["MB-H6"] = {
+        verdict, chip: verdict, n: nTick,
+        headline: `Catalyst-tagged launches posted a median ${sgn(a)}% at 3M vs ${sgn(b)}% without (${nTick}/${S.length} carry the tick).`,
+        compare: { a: { label: "catalyst / EP", value: `${sgn(a)}% 3M`, n: aVals.length }, b: { label: "no catalyst", value: `${sgn(b)}% 3M`, n: bVals.length } },
+        expand: S.map((x) => ({ ticker: x.ticker, year: x.year, line: `${x.checks.th_catalyst ? "catalyst/EP ✓" : "no catalyst"} · +3M ${sgn(num(x.m.ret_3m))}%` })),
+      };
+    }
+  }
+
+  return out;
+}
+
 // checklistTally — group study rows by setup; per setup return { setup, n (row count), items } where each
 // item = { key, label, bonus, count } and count = rows of that setup with checks[key] truthy. Items follow
 // STUDY_SETUPS bucket order (flatMap buckets). Setups with no STUDY_SETUPS entry are skipped.
@@ -1284,8 +1447,25 @@ export function checklistTally(rows) {
 export function ChecklistTally({ C, rows, project }) {
   const groups = checklistTally(rows);
   const hyps = PROJECT_HYPOTHESES[project];
+  // Evidence engine (Valen 2026-07-29): the Market-Bottom book graduates from static text to a descriptive
+  // read of its own rows. Gate on the project key — every other project keeps the static rendering below.
+  const mbEvidence = project === "Finding the Market's Bottom" ? mbHypothesisEvidence(rows) : null;
+  const [openHyp, setOpenHyp] = useState(null); // accordion — only one hypothesis's studies open at a time
   const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" };
   const idChip = { flex: "none", fontSize: "0.5rem", fontWeight: 800, letterSpacing: ".06em", color: "#08080e", background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, borderRadius: 99, padding: "3px 9px", whiteSpace: "nowrap" };
+  // Verdict → chip color, following the pre-registered ladder (SUPPORTS green → AGAINST red).
+  const verdictColor = (v) => v === "SUPPORTS" ? "#7ef0a0" : v === "LEANS FOR" ? "#b6e8bf" : v === "MIXED" ? C.gold
+    : (v === "LEANS AGAINST" || v === "AGAINST") ? "#e05555" : v === "REFINED" ? C.goldBright : C.muted;
+  const verdictChip = (v) => { const col = verdictColor(v); return { flex: "none", fontSize: "0.5rem", fontWeight: 800, letterSpacing: ".07em", textTransform: "uppercase", color: col, border: `1px solid ${col}`, background: "rgba(0,0,0,0.25)", borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" }; };
+  const statBlock = (s) => (
+    <div style={{ flex: "1 1 120px", minWidth: 0, borderLeft: `2px solid ${C.goldMid}`, paddingLeft: 9 }}>
+      <div style={{ fontSize: "0.54rem", color: C.muted, textTransform: "uppercase", letterSpacing: ".07em", lineHeight: 1.3 }}>{s.label}</div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+        <span style={{ fontSize: "0.86rem", fontWeight: 800, color: C.text }}>{s.value}</span>
+        <span style={{ fontSize: "0.52rem", fontWeight: 700, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 99, padding: "0 5px" }}>n={s.n}</span>
+      </div>
+    </div>
+  );
   return (
     <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", marginBottom: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
       <div style={sheen} />
@@ -1295,15 +1475,54 @@ export function ChecklistTally({ C, rows, project }) {
       </div>
       {hyps && (
         <div style={{ display: "grid", gap: 11, marginBottom: 16 }}>
-          {hyps.map((h) => (
-            <div key={h.id} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
-              <span style={idChip}>{h.id}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.45 }}>{h.text}</div>
-                <div style={{ fontSize: "0.6rem", color: C.muted, lineHeight: 1.4, marginTop: 3 }}>measure: {h.measure}</div>
+          {hyps.map((h) => {
+            const ev = mbEvidence && mbEvidence[h.id];
+            return (
+              <div key={h.id} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
+                <span style={idChip}>{h.id}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.45 }}>{h.text}</div>
+                  <div style={{ fontSize: "0.6rem", color: C.muted, lineHeight: 1.4, marginTop: 3 }}>measure: {h.measure}</div>
+                  {ev && (
+                    <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
+                        <span style={verdictChip(ev.verdict)}>{ev.chip}</span>
+                        <span style={{ flex: 1, minWidth: 180, fontSize: "0.68rem", color: C.text, lineHeight: 1.45 }}>{ev.headline}</span>
+                      </div>
+                      {ev.compare && (
+                        <div style={{ display: "flex", gap: 14, marginTop: 9, flexWrap: "wrap" }}>
+                          {statBlock(ev.compare.a)}
+                          {statBlock(ev.compare.b)}
+                        </div>
+                      )}
+                      {ev.expand && ev.expand.length > 0 && (
+                        <>
+                          <div onClick={() => setOpenHyp(openHyp === h.id ? null : h.id)} style={{ cursor: "pointer", fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, marginTop: 9 }}>
+                            {openHyp === h.id ? "▴ hide studies" : "show studies ▾"}
+                          </div>
+                          {openHyp === h.id && (
+                            <div style={{ marginTop: 7, display: "grid", gap: 5, borderLeft: `1px solid ${C.border}`, paddingLeft: 10 }}>
+                              {ev.expand.map((x, i) => (
+                                <div key={i} style={{ display: "flex", gap: 8, fontSize: "0.62rem", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", color: C.muted, lineHeight: 1.4 }}>
+                                  <span style={{ flex: "none", minWidth: 78, color: C.text }}>{x.ticker} · {x.year}</span>
+                                  <span style={{ flex: 1, minWidth: 0 }}>{x.line}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+            );
+          })}
+          {mbEvidence && (
+            <div style={{ fontSize: "0.58rem", color: C.muted, lineHeight: 1.5, marginTop: 2 }}>
+              Descriptive read at n={rows.length} — verdicts follow the pre-registered ladder; believe nothing hard before n≈30.
             </div>
-          ))}
+          )}
         </div>
       )}
       {groups.map((g) => (

@@ -4,7 +4,7 @@ import { supabase } from "./supabaseClient";
 import { getGrade } from "./grades.js";
 import { SECTIONS, sectionsFor, scoreTicked, versionOf, stampV2 } from "./SetupGrader.jsx";
 import { sectorFor } from "./sectors.js";
-import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, ChecklistTally, PROJECT_HYPOTHESES, checklistTally, HypothesisRead, buildCampaigns, outcomeClass, studyQuality, STUDY_SETUPS, SUBCATS, HYPOTHESES, entryVerdict } from "./StudyBook.jsx";
+import { isStudyRow, StudyEditor, StudyScoreboard, StudyHypotheses, ChecklistTally, PROJECT_HYPOTHESES, mbHypothesisEvidence, checklistTally, HypothesisRead, buildCampaigns, outcomeClass, studyQuality, STUDY_SETUPS, SUBCATS, HYPOTHESES, entryVerdict } from "./StudyBook.jsx";
 import { ChartSeqEditor, buildChartList, deriveChartFields, chartFaces, sectionizeCharts } from "./ChartSeq.jsx";
 
 // A study starred for the Model Book shows as a card; its star count comes from the study's
@@ -215,13 +215,24 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
       const project = coverTitle || projects[0] || "";
       const hyps = PROJECT_HYPOTHESES[project];
       const tallyGroups = checklistTally(studies);
-      const hypRows = hyps ? `<div class="phyps">${hyps.map((h) => `<div class="phrow"><span class="phid">${esc(h.id)}</span><div class="phbody"><div class="phtext">${esc(h.text)}</div><div class="phmeasure">measure: ${esc(h.measure)}</div></div></div>`).join("")}</div>` : "";
+      // Evidence engine (Valen 2026-07-29): the Market-Bottom book prints its descriptive verdict per hypothesis.
+      // Print equivalent of "auditable" = the per-study audit lines are ALWAYS printed (no expanders on paper).
+      const evidence = project === "Finding the Market's Bottom" ? mbHypothesisEvidence(studies) : null;
+      const vClass = (v) => v === "SUPPORTS" ? "v-supports" : v === "LEANS FOR" ? "v-leansfor" : v === "MIXED" ? "v-mixed"
+        : (v === "LEANS AGAINST" || v === "AGAINST") ? "v-against" : v === "REFINED" ? "v-refined" : "v-insuff";
+      const vStat = (s) => `<div class="vstat"><div class="vslabel">${esc(s.label)}</div><div class="vsval">${esc(s.value)} <span class="vsn">n=${esc(s.n)}</span></div></div>`;
+      const evBlock = (h) => { const ev = evidence && evidence[h.id]; if (!ev) return "";
+        return `<div class="phverdict"><span class="vchip ${vClass(ev.verdict)}">${esc(ev.chip)}</span><span class="vhead">${esc(ev.headline)}</span></div>`
+          + (ev.compare ? `<div class="vcompare">${vStat(ev.compare.a)}${vStat(ev.compare.b)}</div>` : "")
+          + (ev.expand && ev.expand.length ? `<div class="vaudit">${ev.expand.map((x) => `<div class="vauditrow"><span class="vat">${esc(x.ticker)} · ${esc(x.year)}</span> ${esc(x.line)}</div>`).join("")}</div>` : ""); };
+      const hypRows = hyps ? `<div class="phyps">${hyps.map((h) => `<div class="phrow"><span class="phid">${esc(h.id)}</span><div class="phbody"><div class="phtext">${esc(h.text)}</div><div class="phmeasure">measure: ${esc(h.measure)}</div>${evBlock(h)}</div></div>`).join("")}</div>` : "";
       const tallyTables = tallyGroups.map((g) => `<div class="ptsec">Checklist tally — ${g.n} stud${g.n === 1 ? "y" : "ies"}${tallyGroups.length > 1 ? ` · ${esc(g.setup)}` : ""}</div>
         <table class="mtab ttab"><tbody>${g.items.map((it) => { const p = g.n ? Math.round((it.count / g.n) * 100) : 0;
           return `<tr><td class="tlabel">${esc(it.label)}${it.bonus ? ` <span class="btag">bonus</span>` : ""}</td><td class="tbarcell"><div class="tbar"><div class="tfill" style="width:${p}%"></div></div></td><td class="num tcount">${it.count}/${g.n}</td></tr>`; }).join("")}</tbody></table>`).join("");
       return `<div class="page hyp">
         <div class="mhead"><div><span class="mtitle">🧪 WORKING HYPOTHESES &amp; CHECKLIST TALLY</span><span class="msub">what this research says so far</span></div><div class="msub">${studies.length} studies in this export</div></div>
         ${hypRows}
+        ${evidence ? `<div class="vcaption">Descriptive read at n=${studies.length} — verdicts follow the pre-registered ladder; believe nothing hard before n≈30.</div>` : ""}
         ${tallyTables}
         <div class="foot">Counts are cards ticked so far — an untick may just mean "not studied yet", never "failed".</div>
       </div>`;
@@ -490,6 +501,20 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
       .phid{flex:none;background:#c9982a;color:#08080e;font-size:0.58rem;font-weight:800;letter-spacing:0.05em;border-radius:99px;padding:3px 10px;white-space:nowrap}
       .phtext{font-size:0.82rem;color:#e8e6e0;line-height:1.5}
       .phmeasure{font-size:0.66rem;color:#9a968c;line-height:1.45;margin-top:3px}
+      /* ── Evidence verdicts (Market-Bottom book, Valen 2026-07-29) — printable ladder ── */
+      .phverdict{display:flex;align-items:flex-start;gap:8px;margin-top:8px}
+      .vchip{flex:none;font-size:0.54rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;border:1px solid currentColor;border-radius:99px;padding:2px 8px;white-space:nowrap}
+      .v-supports{color:#1f9d55}.v-leansfor{color:#4faf6a}.v-mixed{color:#b8820a}.v-against{color:#c0392b}.v-insuff{color:#9a968c}.v-refined{color:#c9982a}
+      .vhead{font-size:0.72rem;color:#e8e6e0;line-height:1.45}
+      .vcompare{display:flex;gap:18px;margin-top:8px;flex-wrap:wrap}
+      .vstat{border-left:2px solid #b8820a;padding-left:9px}
+      .vslabel{font-size:0.54rem;text-transform:uppercase;letter-spacing:0.06em;color:#9a968c}
+      .vsval{font-size:0.8rem;font-weight:800;color:#e8e6e0}
+      .vsn{font-size:0.54rem;font-weight:700;color:#9a968c;border:1px solid rgba(255,255,255,0.2);border-radius:99px;padding:0 5px;margin-left:4px}
+      .vaudit{margin-top:8px;border-left:1px solid rgba(255,255,255,0.14);padding-left:10px;display:grid;gap:3px}
+      .vauditrow{font-size:0.6rem;color:#9a968c;line-height:1.4;font-family:ui-monospace,Menlo,monospace}
+      .vat{color:#e8e6e0;font-weight:700}
+      .vcaption{font-size:0.6rem;color:#9a968c;line-height:1.5;margin:2px 0 16px}
       .ptsec{font-size:0.62rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#c9982a;margin:16px 0 8px}
       .ttab td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.07);vertical-align:middle}
       .ttab tr{break-inside:avoid;page-break-inside:avoid}
@@ -508,6 +533,13 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
       body.light .ttab .tcount,body.light .btag{color:#6a675e}
       body.light .tbar{background:rgba(0,0,0,0.10)}
       body.light .btag{border-color:rgba(0,0,0,0.2)}
+      body.light .vhead{color:#16150f}
+      body.light .v-supports{color:#177245}body.light .v-leansfor{color:#2f7d47}body.light .v-mixed{color:#8a6a1c}body.light .v-against{color:#a12d20}body.light .v-insuff{color:#6a675e}body.light .v-refined{color:#8a6a1c}
+      body.light .vslabel,body.light .vsn,body.light .vauditrow,body.light .vcaption{color:#6a675e}
+      body.light .vsn{border-color:rgba(0,0,0,0.2)}
+      body.light .vsval,body.light .vat{color:#16150f}
+      body.light .vstat{border-left-color:#8a6a1c}
+      body.light .vaudit{border-left-color:rgba(0,0,0,0.16)}
       /* ── Light / ink-friendly theme (member picks in the toolbar; whichever shows is what prints) ── */
       body.light{background:#fdfcf9;color:#16150f}
       body.light::before{background:#fdfcf9}
@@ -595,9 +627,19 @@ function openProjectBookPdf(rows, coverTitle) {
   const studyRows = rows.filter((r) => r.metrics?.study);
   const hyps = PROJECT_HYPOTHESES[coverTitle];
   const tallyGroups = checklistTally(studyRows);
+  // Evidence engine (Valen 2026-07-29): the Market-Bottom book prints its descriptive verdict + ALWAYS the
+  // audit lines under each hypothesis (paper equivalent of the app's "show studies ▾" expander).
+  const pbEvidence = coverTitle === "Finding the Market's Bottom" ? mbHypothesisEvidence(studyRows) : null;
+  const pbVClass = (v) => v === "SUPPORTS" ? "v-supports" : v === "LEANS FOR" ? "v-leansfor" : v === "MIXED" ? "v-mixed"
+    : (v === "LEANS AGAINST" || v === "AGAINST") ? "v-against" : v === "REFINED" ? "v-refined" : "v-insuff";
+  const pbVStat = (s) => `<div class="pbvstat"><div class="pbvslabel">${esc(s.label)}</div><div class="pbvsval">${esc(s.value)} <span class="pbvsn">n=${esc(s.n)}</span></div></div>`;
+  const pbEvBlock = (h) => { const ev = pbEvidence && pbEvidence[h.id]; if (!ev) return "";
+    return `<div class="pbverdict"><span class="pbvchip ${pbVClass(ev.verdict)}">${esc(ev.chip)}</span><span class="pbvhead">${esc(ev.headline)}</span></div>`
+      + (ev.compare ? `<div class="pbvcompare">${pbVStat(ev.compare.a)}${pbVStat(ev.compare.b)}</div>` : "")
+      + (ev.expand && ev.expand.length ? `<div class="pbvaudit">${ev.expand.map((x) => `<div class="pbvauditrow"><span class="pbvat">${esc(x.ticker)} · ${esc(x.year)}</span> ${esc(x.line)}</div>`).join("")}</div>` : ""); };
   const hypPage = (hyps || tallyGroups.length) ? `<div class="page pbhyp">
     <div class="pblabel">Working hypotheses &amp; checklist tally</div>
-    ${hyps ? `<div class="pbhyps">${hyps.map((h) => `<div class="pbhrow"><span class="pbhid">${esc(h.id)}</span><div class="pbhbody"><div class="pbhtext">${esc(h.text)}</div><div class="pbhmeasure">measure: ${esc(h.measure)}</div></div></div>`).join("")}</div>` : ""}
+    ${hyps ? `<div class="pbhyps">${hyps.map((h) => `<div class="pbhrow"><span class="pbhid">${esc(h.id)}</span><div class="pbhbody"><div class="pbhtext">${esc(h.text)}</div><div class="pbhmeasure">measure: ${esc(h.measure)}</div>${pbEvBlock(h)}</div></div>`).join("")}</div>${pbEvidence ? `<div class="pbvcaption">Descriptive read at n=${studyRows.length} — verdicts follow the pre-registered ladder; believe nothing hard before n≈30.</div>` : ""}` : ""}
     ${tallyGroups.map((g) => `<div class="pbtsec">Checklist tally — ${g.n} stud${g.n === 1 ? "y" : "ies"}${tallyGroups.length > 1 ? ` · ${esc(g.setup)}` : ""}</div>
       <table class="pbttab"><tbody>${g.items.map((it) => { const p = g.n ? Math.round((it.count / g.n) * 100) : 0;
         return `<tr><td class="pbtlabel">${esc(it.label)}${it.bonus ? ` <span class="pbbtag">bonus</span>` : ""}</td><td class="pbtbarcell"><div class="pbtbar"><div class="pbtfill" style="width:${p}%"></div></div></td><td class="pbtcount">${it.count}/${g.n}</td></tr>`; }).join("")}</tbody></table>`).join("")}
@@ -696,6 +738,20 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbhid{flex:none;font-size:0.62rem;font-weight:800;letter-spacing:0.06em;color:#c9982a;padding-top:2px;white-space:nowrap}
       .pbhtext{font-size:0.84rem;color:#e8e6e0;line-height:1.6}
       .pbhmeasure{font-size:0.68rem;color:#9a968c;line-height:1.5;margin-top:5px}
+      /* ── Evidence verdicts on the project-book hypotheses page (Valen 2026-07-29) ── */
+      .pbverdict{display:flex;align-items:flex-start;gap:9px;margin-top:9px}
+      .pbvchip{flex:none;font-size:0.56rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;border:1px solid currentColor;border-radius:99px;padding:2px 9px;white-space:nowrap}
+      .v-supports{color:#1f9d55}.v-leansfor{color:#4faf6a}.v-mixed{color:#b8820a}.v-against{color:#c0392b}.v-insuff{color:#9a968c}.v-refined{color:#c9982a}
+      .pbvhead{font-size:0.78rem;color:#e8e6e0;line-height:1.55}
+      .pbvcompare{display:flex;gap:22px;margin-top:10px;flex-wrap:wrap}
+      .pbvstat{border-left:2px solid #b8820a;padding-left:11px}
+      .pbvslabel{font-size:0.56rem;text-transform:uppercase;letter-spacing:0.06em;color:#9a968c}
+      .pbvsval{font-size:0.86rem;font-weight:800;color:#fff}
+      .pbvsn{font-size:0.56rem;font-weight:700;color:#9a968c;border:1px solid rgba(255,255,255,0.2);border-radius:99px;padding:0 5px;margin-left:5px}
+      .pbvaudit{margin-top:9px;border-left:1px solid rgba(255,255,255,0.14);padding-left:12px;display:grid;gap:3px}
+      .pbvauditrow{font-size:0.64rem;color:#9a968c;line-height:1.45;font-family:ui-monospace,Menlo,monospace}
+      .pbvat{color:#e8e6e0;font-weight:700}
+      .pbvcaption{font-size:0.66rem;color:#9a968c;line-height:1.55;margin:14px 0 4px}
       .pbtsec{font-size:0.6rem;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#c9982a;margin:26px 0 10px}
       .pbttab{width:100%;border-collapse:collapse}
       .pbttab td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,0.08);vertical-align:middle}
@@ -760,6 +816,12 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pbcv{color:#16150f}
       body.light .pbttab td{border-bottom-color:rgba(0,0,0,0.10)}
       body.light .pbtbar{background:rgba(0,0,0,0.10)}
+      body.light .pbvhead,body.light .pbvsval,body.light .pbvat{color:#16150f}
+      body.light .v-supports{color:#177245}body.light .v-leansfor{color:#2f7d47}body.light .v-mixed{color:#8a6a1c}body.light .v-against{color:#a12d20}body.light .v-insuff{color:#6a675e}body.light .v-refined{color:#8a6a1c}
+      body.light .pbvslabel,body.light .pbvsn,body.light .pbvauditrow,body.light .pbvcaption{color:#6a675e}
+      body.light .pbvsn{border-color:rgba(0,0,0,0.2)}
+      body.light .pbvstat{border-left-color:#8a6a1c}
+      body.light .pbvaudit{border-left-color:rgba(0,0,0,0.16)}
       body.light .pbnoimg,body.light .pbnotick{color:#8a857a}
       body.light .pbzoom{background:#fff}
       body.light .pbzback{background:rgba(255,255,255,0.88);color:#8a6a1c}
