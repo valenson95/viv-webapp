@@ -1462,10 +1462,17 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       thesis: row.thesis || null, lesson: row.lesson || null, is_published: !!row.is_published,
     };
     if (!row.id) body.created_by = uid; // ownership set once at insert — updating must never steal the row
-    const q = row.id
+    // Stale-token guard (Valen bug report 2026-07-29: "save needs two clicks"): a tab idle past the JWT
+    // lifetime fails its FIRST request with an auth error, which triggers the client's session refresh —
+    // so the manual second click worked. Do that retry automatically: refresh the session, re-run ONCE.
+    const runQ = () => row.id
       ? supabase.from("model_book").update(body).eq("id", row.id)
       : supabase.from("model_book").insert(body);
-    const { error } = await q;
+    let { error } = await runQ();
+    if (error && /jwt|expired|token|fetch|network|401/i.test(String(error.message))) {
+      try { await supabase.auth.getSession(); } catch { /* refresh best-effort */ }
+      ({ error } = await runQ());
+    }
     setBusy(false);
     if (error) { setError(String(error.message)); return false; }
     setEditing(null); load();
@@ -1709,10 +1716,13 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           {studyEditing !== null && createPortal(
             <div onClick={() => { if (studyCloseGuard.current()) setStudyEditing(null); }} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "4vh 3vw" }}>
               <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1180, margin: "0 auto", background: "rgba(10,10,16,0.92)", borderRadius: 16 }}>
+                {/* Save errors must be visible INSIDE the popup — the page-level banner sits behind this
+                    backdrop, which made failed saves look like "nothing happened" (Valen 2026-07-29). */}
+                {error && error !== "setup" && <div style={{ color: "#fca5a5", background: "rgba(224,90,85,0.12)", border: "1px solid rgba(224,90,85,0.4)", borderRadius: 10, fontSize: "0.78rem", fontWeight: 600, padding: "10px 14px", margin: "0 0 2px" }}>⚠ Save failed: {error} — your edits are still here; hit Save again.</div>}
                 <StudyEditor key={studyEditing.id || (studyEditing.metrics ? "child" : "new")} C={C} font={font} busy={busy} campaignRows={studyRows}
                   initial={studyEditing && (studyEditing.id || studyEditing.metrics) ? studyEditing : null}
                   closeGuard={studyCloseGuard} onNavigate={(t) => setStudyEditing(t)}
-                  onSave={async (r) => { if (await save(r)) setStudyEditing(null); }}
+                  onSave={async (r) => { const ok = await save(r); if (ok) setStudyEditing(null); return ok; }}
                   onSaveStay={save} onAddLeg={insertLeg}
                   onCancel={() => setStudyEditing(null)} onUpload={uploadImg} />
               </div>

@@ -1941,10 +1941,11 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       outcome: cls ? MB_OUTCOME[cls] : null, thesis: row.thesis,
       lesson: [s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n") || null };
   };
-  const doSave = () => {
+  const doSave = async () => {
     if (!row.ticker.trim()) { alert("Ticker first."); return; }
-    setDirty(false); // saved — no longer dirty (the popup also closes on success, which remounts fresh)
-    onSave(buildBody());
+    setDirty(false); // optimistic — restored below if the save FAILS, so the close-guard keeps protecting edits
+    const ok = await onSave(buildBody());
+    if (ok === false) setDirty(true); // failed save = still dirty (Valen 2026-07-29: silent first-save failures)
   };
   // ── Leg strip (Valen 2026-07-28): hop between the legs of this campaign without leaving the chart's editor.
   // Unlike the ‹ › arrows (which DISCARD on dirty), the strip SAVES the current leg first through the exact
