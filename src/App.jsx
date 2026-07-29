@@ -12944,7 +12944,21 @@ function AppInner() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [page, setPage] = useState("dashboard");
+  // Hash routing (Valen 2026-07-30): the URL mirrors the section (#modelbook, #journal, …) so a
+  // shared link lands the reader on that section after login. Hash-based = zero server config;
+  // unknown hashes (incl. Supabase auth tokens like #access_token=…) fall back to the dashboard.
+  const HASH_PAGES = ["dashboard", "journal", "tools", "daily", "modelbook", "practice", "quant", "burstlog", "mentor", "settings"];
+  const pageFromHash = () => { const h = (window.location.hash || "").replace(/^#\/?/, "").toLowerCase(); return HASH_PAGES.includes(h) ? h : "dashboard"; };
+  const [page, setPage] = useState(pageFromHash);
+  useEffect(() => {
+    const cur = (window.location.hash || "").replace(/^#\/?/, "").toLowerCase();
+    if (HASH_PAGES.includes(page) && cur !== page) { try { window.history.pushState(null, "", "#" + page); } catch {} }
+  }, [page]);
+  useEffect(() => {
+    const onPop = () => setPage(pageFromHash());
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   // Guard: the retired Rotation/Breadth/Earnings nav pages ("grouprs"/"monitor"/"earnings") now live
   // in dashboard popups. If any lingering state lands on them, fall back to the dashboard (never a blank route).
   useEffect(() => { if (page === "grouprs" || page === "monitor" || page === "earnings") setPage("dashboard"); }, [page]);
