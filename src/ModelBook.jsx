@@ -644,6 +644,7 @@ function openProjectBookPdf(rows, coverTitle) {
   const years = groups.map((g) => g.year).filter((y) => y !== "—");
   const yearSpan = years.length ? (years[0] === years[years.length - 1] ? years[0] : `${years[0]}–${years[years.length - 1]}`) : "";
   const episodes = PROJECT_EPISODES[coverTitle] || {};
+  const isMB = coverTitle === "Finding the Market's Bottom";
   // ── format helpers (blank → "—", never invented) ──
   const fmtPct = (v) => (v === "" || v == null) ? "—" : `${+v >= 0 && !String(v).startsWith("-") ? "+" : ""}${esc(v)}%`;
   const fmtPp = (v) => (v === "" || v == null) ? "—" : `${+v >= 0 && !String(v).startsWith("-") ? "+" : ""}${esc(v)} pp`;
@@ -701,16 +702,19 @@ function openProjectBookPdf(rows, coverTitle) {
     }
     return "";
   };
+  // Collapsed by default (Valen 2026-07-30): each hypothesis is a <details> — the one-line claim +
+  // verdict chip always show; the evidence body prints only if expanded before Save-as-PDF.
   const pbEvCard = (h) => { const ev = pbEvidence[h.id];
-    return `<div class="pbvcard"><div class="pbvcardhead"><span class="pbhid">${esc(h.id)}</span><span class="pbvclaim">${esc(h.short || h.text)}</span>${ev ? `<span class="pbvchip ${pbVClass(ev.verdict)}">${esc(ev.chip)}</span>` : ""}</div>${ev ? `<div class="pbvrow">${pbEvRow(h, ev)}</div><div class="pbvheadline">${esc(ev.headline)}</div>` : ""}</div>`; };
+    return `<details class="pbvcard"><summary class="pbvcardhead"><span class="pbvchev"></span><span class="pbhid">${esc(h.id)}</span><span class="pbvclaim">${esc(h.short || h.text)}</span>${ev ? `<span class="pbvchip ${pbVClass(ev.verdict)}">${esc(ev.chip)}</span>` : ""}</summary>${ev ? `<div class="pbvbody"><div class="pbvrow">${pbEvRow(h, ev)}</div><div class="pbvheadline">${esc(ev.headline)}</div></div>` : ""}</details>`; };
   const hypPage = (hyps || tallyGroups.length) ? `<div class="page pbhyp">
     <div class="pblabel">Working hypotheses &amp; checklist tally</div>
+    <div class="pbexphint">Verdicts always print. Expand a row — or use Expand all — before Save as PDF to include its evidence.</div>
     ${hyps ? (pbEvidence
       ? `<div class="pbhyps">${hyps.map((h) => pbEvCard(h)).join("")}</div><div class="pbvcaption">n=${studyRows.length} · descriptive only — pre-registered ladder, threshold notch at 70%.</div>`
       : `<div class="pbhyps">${hyps.map((h) => `<div class="pbhrow"><span class="pbhid">${esc(h.id)}</span><div class="pbhbody"><div class="pbhtext">${esc(h.text)}</div><div class="pbhmeasure">measure: ${esc(h.measure)}</div></div></div>`).join("")}</div>`) : ""}
-    ${tallyGroups.map((g) => `<div class="pbtsec">Checklist tally — ${g.n} stud${g.n === 1 ? "y" : "ies"}${tallyGroups.length > 1 ? ` · ${esc(g.setup)}` : ""}</div>
+    ${tallyGroups.map((g) => `<details class="pbtwrap"><summary class="pbtsec"><span class="pbvchev"></span>Checklist tally — ${g.n} stud${g.n === 1 ? "y" : "ies"}${tallyGroups.length > 1 ? ` · ${esc(g.setup)}` : ""}</summary>
       <table class="pbttab"><tbody>${g.items.map((it) => { const p = g.n ? Math.round((it.count / g.n) * 100) : 0;
-        return `<tr><td class="pbtlabel">${esc(it.label)}${it.bonus ? ` <span class="pbbtag">bonus</span>` : ""}</td><td class="pbtbarcell"><div class="pbtbar"><div class="pbtfill" style="width:${p}%"></div></div></td><td class="pbtcount">${it.count}/${g.n}</td></tr>`; }).join("")}</tbody></table>`).join("")}
+        return `<tr><td class="pbtlabel">${esc(it.label)}${it.bonus ? ` <span class="pbbtag">bonus</span>` : ""}</td><td class="pbtbarcell"><div class="pbtbar"><div class="pbtfill" style="width:${p}%"></div></div></td><td class="pbtcount">${it.count}/${g.n}</td></tr>`; }).join("")}</tbody></table></details>`).join("")}
     <div class="pbfoot">Counts are studies ticked so far — an untick may just mean "not studied yet", never "failed".</div>
   </div>` : "";
   // ── YEAR DIVIDER + per-study pages ──
@@ -731,18 +735,19 @@ function openProjectBookPdf(rows, coverTitle) {
     const studies = g.items.map(({ r, idx }) => {
       const study = r.metrics.study, m = study.m || {}, theme = r.theme || m.theme || "";
       const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Market Bottom"];
-      const head = `<div class="pbshead"><span class="pbstk">${esc(r.ticker)}</span><span class="pbstheme">${esc(theme)}</span></div>`;
+      // Comparison pages pair the name with the index in the header (Valen 2026-07-30: "ARM vs QQQ")
+      const head = (vs) => `<div class="pbshead"><span class="pbstk">${esc(r.ticker)}${vs ? `<span class="pbvsq"> vs QQQ</span>` : ""}</span><span class="pbstheme">${esc(theme)}</span></div>`;
       const chartBlock = (img, cap, cls = "pbchart", zid = null) => {
         if (!img) return `<hr class="pbhair"/><div class="pbnoimg">no ${esc(cap.toLowerCase())} chart yet</div><hr class="pbhair"/><div class="pbcap">${cap}</div>`;
         if (zid) zoomPages.push(`<div class="page pbzoom" id="${zid}"><a class="pbzback" href="#e${idx}">← back to ${esc(r.ticker)}</a><img src="${esc(img)}"/><div class="pbzcap">${esc(r.ticker)} · ${cap}</div></div>`);
         const im = `<img class="${cls}" src="${esc(img)}"/>`;
         return `<hr class="pbhair"/>${zid ? `<a class="pbzl" href="#${zid}">${im}</a>` : im}<hr class="pbhair"/><div class="pbcap">${cap}${zid ? ` <span class="pbzhint">· click chart to zoom</span>` : ""}</div>`;
       };
-      // Page A — vs-QQQ chart
-      const pageA = `<div class="page pbstudy" id="e${idx}">
-        ${head}
+      // Page A — vs-QQQ chart (MB); other project books caption it as HTF context
+      const pageA = `<div class="page pbstudy pbplate" id="e${idx}">
+        ${head(isMB)}
         <div class="pbownlow">own low ${esc(r.entry_date || "—")}</div>
-        ${chartBlock(r.before_img, "Vs QQQ", "pbchart", `z${idx}a`)}
+        ${chartBlock(r.before_img, isMB ? "Vs QQQ" : "HTF — context", "pbchart", `z${idx}a`)}
       </div>`;
       // Page B — daily chart + data strip + ticked checklist + thesis
       const cells = [
@@ -759,8 +764,8 @@ function openProjectBookPdf(rows, coverTitle) {
       const checklist = `<div class="pbchecklist">${ticks.length ? ticks.join("") : `<span class="pbnotick">no criteria ticked yet</span>`}</div>`;
       const thesis = r.thesis ? `<div class="pbthesis"><div class="pblabel">Thesis</div><div class="pbthesistext">${esc(r.thesis)}</div></div>` : "";
       const pageB = `<div class="page pbstudy">
-        ${head}
-        ${chartBlock(r.after_img, "Daily", "pbchart pbchartb", `z${idx}b`)}
+        ${head(false)}
+        ${chartBlock(r.after_img, isMB ? "Daily" : "Setup", "pbchart pbchartb", `z${idx}b`)}
         ${strip}
         ${checklist}
         ${thesis}
@@ -775,10 +780,12 @@ function openProjectBookPdf(rows, coverTitle) {
       *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       body{background:#08080e;color:#e8e6e0;font-family:'Plus Jakarta Sans',sans-serif;line-height:1.5}
       body::before{content:"";position:fixed;inset:0;z-index:-1;background:#08080e}
-      /* LANDSCAPE (Valen 2026-07-28): every chart in the book is a wide DeepVue export — portrait left
-         half of each study page empty. A4-landscape lets the charts own the page. */
-      @page{size:A4 landscape;margin:0}
-      .page{padding:40px 56px;page-break-after:always;min-height:94vh}
+      /* PORTRAIT (Valen 2026-07-30): the book reads as a document — chart spans the full width,
+         data strip + ticked criteria stack in a single column below. Zoom appendix pages stay
+         landscape (named page) so the wide DeepVue exports go full-bleed. */
+      @page{size:A4;margin:0}
+      @page zoomp{size:A4 landscape;margin:0}
+      .page{padding:48px 52px;page-break-after:always;min-height:94vh}
       .pblabel{font-size:0.62rem;font-weight:800;letter-spacing:0.28em;text-transform:uppercase;color:#9a968c}
       .pbfoot{color:#66635b;font-size:0.62rem;margin-top:22px;letter-spacing:0.02em}
       /* toolbar (screen only) */
@@ -810,6 +817,17 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbvcard{padding:13px 0;border-top:1px solid rgba(255,255,255,0.08);break-inside:avoid;page-break-inside:avoid}
       .pbvcard:first-child{border-top:none}
       .pbvcardhead{display:flex;align-items:center;gap:9px}
+      /* collapsible cards (details/summary — the on-screen state IS what prints) */
+      summary.pbvcardhead,summary.pbtsec{cursor:pointer;list-style:none}
+      summary.pbvcardhead::-webkit-details-marker,summary.pbtsec::-webkit-details-marker{display:none}
+      .pbvchev{flex:none;display:inline-block;width:10px;font-size:0.58rem;color:#66635b;transition:transform 0.15s}
+      .pbvchev::before{content:"▸"}
+      details[open]>summary .pbvchev{transform:rotate(90deg)}
+      .pbvbody{margin-left:19px}
+      .pbexphint{font-size:0.64rem;color:#66635b;margin-top:10px;letter-spacing:0.02em}
+      @media print{.pbexphint{display:none}}
+      .pbtwrap{margin-top:26px}
+      summary.pbtsec{display:flex;align-items:center;gap:9px;margin:0 0 10px}
       .pbvchip{flex:none;font-size:0.56rem;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;border-radius:99px;padding:2px 9px;white-space:nowrap}
       .v-supports{color:#1f9d55;background:rgba(31,157,85,0.14)}.v-leansfor{color:#4faf6a;background:rgba(79,175,106,0.12)}.v-mixed{color:#b8820a;background:rgba(184,130,10,0.14)}.v-against{color:#c0392b;background:rgba(192,57,43,0.14)}.v-insuff{color:#9a968c;background:rgba(154,150,140,0.12)}.v-refined{color:#c9982a;background:rgba(201,152,42,0.14)}
       .pbvclaim{flex:1;font-size:0.94rem;font-weight:700;color:#fff;line-height:1.35}
@@ -854,31 +872,36 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbepcount{font-size:0.62rem;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:#c9982a;margin-top:16px}
       /* ── STUDY PAGES ── */
       .pbstudy{display:flex;flex-direction:column}
+      /* page A = a book plate: the wide comparison chart sits vertically centered, not top-crowded */
+      .pbplate{justify-content:center;min-height:96vh}
       .pbshead{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
       .pbstk{font-size:2.4rem;font-weight:800;letter-spacing:-0.02em;color:#fff}
       .pbstheme{font-size:0.66rem;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#c9982a;white-space:nowrap}
       .pbownlow{font-size:0.76rem;color:#9a968c;margin-top:6px}
       .pbhair{border:none;border-top:1px solid rgba(255,255,255,0.14);margin:18px 0}
-      .pbchart{display:block;width:100%;max-height:72vh;object-fit:contain}
-      /* Page B carries strip+checklist+thesis under the chart — cap it lower so nothing spills (landscape) */
-      .pbchartb{max-height:46vh}
+      .pbchart{display:block;width:100%;max-height:52vh;object-fit:contain}
+      /* Page B carries strip+checklist+thesis under the chart — cap it lower so nothing spills */
+      .pbchartb{max-height:34vh}
+      .pbvsq{font-size:1.25rem;font-weight:700;color:#9a968c;letter-spacing:0}
       .pbnoimg{padding:40px;text-align:center;color:#66635b;font-size:0.8rem}
       .pbcap{font-size:0.6rem;font-weight:800;letter-spacing:0.2em;text-transform:uppercase;color:#9a968c}
       .pbchart,.pbstrip,.pbchecklist,.pbthesis,.pbshead,.pbcap{break-inside:avoid;page-break-inside:avoid}
       /* click-to-zoom appendix: full-bleed chart pages, linked from the inline charts (PDF link annotations) */
       .pbzl{display:block;text-decoration:none}
       .pbzhint{color:#66635b;letter-spacing:0.08em}
-      .pbzoom{padding:0;position:relative;display:flex;align-items:center;justify-content:center;background:#000}
-      .pbzoom img{width:100%;max-height:97vh;object-fit:contain;display:block}
+      /* zoom pages print on their own LANDSCAPE page (named page; mm units — vh is portrait-based) */
+      .pbzoom{page:zoomp;padding:0;position:relative;display:flex;align-items:center;justify-content:center;background:#000;min-height:205mm}
+      .pbzoom img{width:100%;max-height:200mm;object-fit:contain;display:block}
       .pbzback{position:absolute;top:14px;left:16px;font-size:0.6rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#f0c050;text-decoration:none;background:rgba(8,8,14,0.82);padding:4px 11px;border-radius:99px}
       .pbzcap{position:absolute;bottom:12px;left:16px;font-size:0.58rem;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:#9a968c;background:rgba(8,8,14,0.82);padding:3px 10px;border-radius:99px}
-      /* data strip — hairlines top/bottom only, small-caps labels over values */
-      .pbstrip{display:flex;flex-wrap:wrap;gap:28px;margin:26px 0 4px;padding:16px 0;border-top:1px solid rgba(255,255,255,0.14);border-bottom:1px solid rgba(255,255,255,0.14)}
+      /* data strip — 4-per-row grid so it never widens the page; hairlines top/bottom only */
+      .pbstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 22px;margin:24px 0 4px;padding:15px 0;border-top:1px solid rgba(255,255,255,0.14);border-bottom:1px solid rgba(255,255,255,0.14)}
+      .pbcell{min-width:0}
       .pbck{font-size:0.54rem;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#9a968c;margin-bottom:5px}
-      .pbcv{font-size:1rem;font-weight:800;color:#e8e6e0}
-      /* ticked checklist — inline gold, generous spacing, no boxes */
-      .pbchecklist{margin-top:22px;line-height:2}
-      .pbtick{color:#c9982a;font-size:0.72rem;font-weight:700;margin-right:24px;white-space:nowrap}
+      .pbcv{font-size:0.98rem;font-weight:800;color:#e8e6e0;white-space:nowrap}
+      /* ticked checklist — one gold ✓ per line (column), never a wide horizontal run */
+      .pbchecklist{display:grid;gap:8px;margin-top:20px}
+      .pbtick{color:#c9982a;font-size:0.74rem;font-weight:700;line-height:1.5}
       .pbnotick{color:#66635b;font-size:0.72rem}
       /* thesis */
       .pbthesis{margin-top:26px}
@@ -912,6 +935,8 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pbvauditlist .va-for{color:#2f7d47}body.light .pbvauditlist .va-against{color:#a12d20}body.light .pbvauditlist .va-na{color:#8a857a}
       body.light .v-supports{color:#177245;background:rgba(23,114,69,0.12)}body.light .v-leansfor{color:#2f7d47;background:rgba(47,125,71,0.10)}body.light .v-mixed{color:#8a6a1c;background:rgba(138,106,28,0.12)}body.light .v-against{color:#a12d20;background:rgba(161,45,32,0.12)}body.light .v-insuff{color:#6a675e;background:rgba(106,103,94,0.10)}body.light .v-refined{color:#8a6a1c;background:rgba(138,106,28,0.12)}
       body.light .pbnoimg,body.light .pbnotick{color:#8a857a}
+      body.light .pbvsq{color:#6a675e}
+      body.light .pbvchev,body.light .pbexphint{color:#8a857a}
       body.light .pbzoom{background:#fff}
       body.light .pbzback{background:rgba(255,255,255,0.88);color:#8a6a1c}
       body.light .pbzcap{background:rgba(255,255,255,0.88);color:#6b675e}
@@ -919,6 +944,7 @@ function openProjectBookPdf(rows, coverTitle) {
     </style></head><body>
     <div class="toolbar">
       <button class="ghost" onclick="const l=document.body.classList.toggle('light');this.textContent=l?'🌙 Dark theme':'☀ Light theme'">☀ Light theme</button>
+      <button class="ghost" onclick="const ds=[...document.querySelectorAll('details')];const open=ds.some(d=>!d.open);ds.forEach(d=>d.open=open);this.textContent=open?'⊟ Collapse all':'⊞ Expand all'">⊞ Expand all</button>
       <button onclick="window.print()">⬇ Save as PDF</button>
     </div>
     ${cover}
