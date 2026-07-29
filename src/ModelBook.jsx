@@ -220,12 +220,31 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
       const evidence = project === "Finding the Market's Bottom" ? mbHypothesisEvidence(studies) : null;
       const vClass = (v) => v === "SUPPORTS" ? "v-supports" : v === "LEANS FOR" ? "v-leansfor" : v === "MIXED" ? "v-mixed"
         : (v === "LEANS AGAINST" || v === "AGAINST") ? "v-against" : v === "REFINED" ? "v-refined" : "v-insuff";
-      const vStat = (s) => `<div class="vstat"><div class="vslabel">${esc(s.label)}</div><div class="vsval">${esc(s.value)} <span class="vsn">n=${esc(s.n)}</span></div></div>`;
-      const evBlock = (h) => { const ev = evidence && evidence[h.id]; if (!ev) return "";
-        return `<div class="phverdict"><span class="vchip ${vClass(ev.verdict)}">${esc(ev.chip)}</span><span class="vhead">${esc(ev.headline)}</span></div>`
-          + (ev.compare ? `<div class="vcompare">${vStat(ev.compare.a)}${vStat(ev.compare.b)}</div>` : "")
-          + (ev.expand && ev.expand.length ? `<div class="vaudit">${ev.expand.map((x) => `<div class="vauditrow"><span class="vat">${esc(x.ticker)} · ${esc(x.year)}</span> ${esc(x.line)}</div>`).join("")}</div>` : ""); };
-      const hypRows = hyps ? `<div class="phyps">${hyps.map((h) => `<div class="phrow"><span class="phid">${esc(h.id)}</span><div class="phbody"><div class="phtext">${esc(h.text)}</div><div class="phmeasure">measure: ${esc(h.measure)}</div>${evBlock(h)}</div></div>`).join("")}</div>` : "";
+      // Print card — id + short claim + verdict chip, then the SAME evidence line (unit bar · compare pills ·
+      // fraction chips), then a headline. Under a unit bar: the coloured ticker'yy list = the print audit
+      // (tooltips do nothing on paper). NO mono audit blocks anywhere.
+      const evRow = (h, ev) => {
+        if (h.id === "MB-H3" && ev.fractions) return `<div class="vfrac">${ev.fractions.map((f) => `<span class="vfr"><span class="vfy">${esc(f.year)}</span> <span class="vfk">${f.k}/${f.n}</span></span>`).join("")}</div>`;
+        if ((h.id === "MB-H1" || h.id === "MB-H5") && ev.compare) {
+          const pill = (s, g) => `<span class="vpill${g ? " g" : ""}"><span class="vpl">${esc(s.label)}</span> ${esc(s.value)} <span class="vpn">n=${esc(s.n)}</span></span>`;
+          return `<div class="vpills">${pill(ev.compare.a, true)}<span class="vpdiv"></span>${pill(ev.compare.b, false)}</div>`;
+        }
+        if (ev.verdict === "INSUFFICIENT") { const forC = ev.units ? ev.units.filter((u) => u.vote === "for").length : 0; const tot = ev.units ? ev.units.length : ev.n;
+          return `<div class="vinsuff">${forC}/${tot} ticked so far · below the n ≥ 5 read threshold</div>`; }
+        if (ev.units && ev.units.length) {
+          const forC = ev.units.filter((u) => u.vote === "for").length;
+          const denom = forC + ev.units.filter((u) => u.vote === "against").length;
+          const bar = `<div class="vbarrow"><div class="vbar">${ev.units.map((u) => `<span class="vseg va-${u.vote}"></span>`).join("")}<span class="vnotch"></span></div><span class="vbarstat">${forC}/${denom}</span></div>`;
+          const audit = `<div class="vauditlist">${ev.units.map((u) => `<span class="va-${u.vote}">${esc(u.ticker)}'${esc(String(u.year).slice(2))}</span>`).join(", ")}</div>`;
+          return bar + audit;
+        }
+        return "";
+      };
+      const evCard = (h) => { const ev = evidence[h.id];
+        return `<div class="vcard"><div class="vcardhead"><span class="phid">${esc(h.id)}</span><span class="vclaim">${esc(h.short || h.text)}</span>${ev ? `<span class="vchip ${vClass(ev.verdict)}">${esc(ev.chip)}</span>` : ""}</div>${ev ? `<div class="vrow">${evRow(h, ev)}</div><div class="vheadline">${esc(ev.headline)}</div>` : ""}</div>`; };
+      const hypRows = hyps ? (evidence
+        ? `<div class="phyps">${hyps.map((h) => evCard(h)).join("")}</div>`
+        : `<div class="phyps">${hyps.map((h) => `<div class="phrow"><span class="phid">${esc(h.id)}</span><div class="phbody"><div class="phtext">${esc(h.text)}</div><div class="phmeasure">measure: ${esc(h.measure)}</div></div></div>`).join("")}</div>`) : "";
       const tallyTables = tallyGroups.map((g) => `<div class="ptsec">Checklist tally — ${g.n} stud${g.n === 1 ? "y" : "ies"}${tallyGroups.length > 1 ? ` · ${esc(g.setup)}` : ""}</div>
         <table class="mtab ttab"><tbody>${g.items.map((it) => { const p = g.n ? Math.round((it.count / g.n) * 100) : 0;
           return `<tr><td class="tlabel">${esc(it.label)}${it.bonus ? ` <span class="btag">bonus</span>` : ""}</td><td class="tbarcell"><div class="tbar"><div class="tfill" style="width:${p}%"></div></div></td><td class="num tcount">${it.count}/${g.n}</td></tr>`; }).join("")}</tbody></table>`).join("");
@@ -511,19 +530,34 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
       .phid{flex:none;background:#c9982a;color:#08080e;font-size:0.58rem;font-weight:800;letter-spacing:0.05em;border-radius:99px;padding:3px 10px;white-space:nowrap}
       .phtext{font-size:0.82rem;color:#e8e6e0;line-height:1.5}
       .phmeasure{font-size:0.66rem;color:#9a968c;line-height:1.45;margin-top:3px}
-      /* ── Evidence verdicts (Market-Bottom book, Valen 2026-07-29) — printable ladder ── */
-      .phverdict{display:flex;align-items:flex-start;gap:8px;margin-top:8px}
-      .vchip{flex:none;font-size:0.54rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;border:1px solid currentColor;border-radius:99px;padding:2px 8px;white-space:nowrap}
-      .v-supports{color:#1f9d55}.v-leansfor{color:#4faf6a}.v-mixed{color:#b8820a}.v-against{color:#c0392b}.v-insuff{color:#9a968c}.v-refined{color:#c9982a}
-      .vhead{font-size:0.72rem;color:#e8e6e0;line-height:1.45}
-      .vcompare{display:flex;gap:18px;margin-top:8px;flex-wrap:wrap}
-      .vstat{border-left:2px solid #b8820a;padding-left:9px}
-      .vslabel{font-size:0.54rem;text-transform:uppercase;letter-spacing:0.06em;color:#9a968c}
-      .vsval{font-size:0.8rem;font-weight:800;color:#e8e6e0}
-      .vsn{font-size:0.54rem;font-weight:700;color:#9a968c;border:1px solid rgba(255,255,255,0.2);border-radius:99px;padding:0 5px;margin-left:4px}
-      .vaudit{margin-top:8px;border-left:1px solid rgba(255,255,255,0.14);padding-left:10px;display:grid;gap:3px}
-      .vauditrow{font-size:0.6rem;color:#9a968c;line-height:1.4;font-family:ui-monospace,Menlo,monospace}
-      .vat{color:#e8e6e0;font-weight:700}
+      /* ── Evidence CARDS (Market-Bottom book, Valen 2026-07-29) — unit-chart ladder, no monospace ── */
+      .vcard{padding:11px 0;border-top:1px solid rgba(255,255,255,0.07);break-inside:avoid;page-break-inside:avoid}
+      .vcard:first-child{border-top:none}
+      .vcardhead{display:flex;align-items:center;gap:8px}
+      .vchip{flex:none;font-size:0.54rem;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;border-radius:99px;padding:2px 9px;white-space:nowrap}
+      .v-supports{color:#1f9d55;background:rgba(31,157,85,0.14)}.v-leansfor{color:#4faf6a;background:rgba(79,175,106,0.12)}.v-mixed{color:#b8820a;background:rgba(184,130,10,0.14)}.v-against{color:#c0392b;background:rgba(192,57,43,0.14)}.v-insuff{color:#9a968c;background:rgba(154,150,140,0.12)}.v-refined{color:#c9982a;background:rgba(201,152,42,0.14)}
+      .vclaim{flex:1;font-size:0.9rem;font-weight:700;color:#fff;line-height:1.35}
+      .vrow{margin-top:9px}
+      .vheadline{font-size:0.68rem;color:#9a968c;line-height:1.4;margin-top:7px}
+      .vbarrow{display:flex;align-items:center;gap:12px}
+      .vbar{position:relative;display:flex;flex:1;max-width:420px;gap:3px;height:10px}
+      .vseg{flex:1;height:10px;border-radius:3px;background:rgba(255,255,255,0.10)}
+      .vseg.va-for{background:#7ef0a0}.vseg.va-against{background:rgba(224,90,85,0.85)}.vseg.va-na{background:rgba(255,255,255,0.10)}
+      .vnotch{position:absolute;left:70%;top:-1px;bottom:-1px;width:1px;background:rgba(255,255,255,0.25)}
+      .vbarstat{flex:none;font-size:0.9rem;font-weight:800;color:#f0c050}
+      .vauditlist{margin-top:6px;font-size:0.55rem;line-height:1.6;color:#9a968c}
+      .vauditlist .va-for{color:#4faf6a}.vauditlist .va-against{color:#d0574f}.vauditlist .va-na{color:#9a968c}
+      .vpills{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+      .vpill{border-bottom:1px solid rgba(255,255,255,0.18);padding-bottom:3px;font-size:0.72rem;font-weight:700;color:#9a968c}
+      .vpill.g{color:#c9982a}
+      .vpl{text-transform:uppercase;letter-spacing:0.05em}
+      .vpn{font-size:0.5rem;font-weight:700;color:#9a968c}
+      .vpdiv{width:1px;height:13px;background:rgba(255,255,255,0.18)}
+      .vfrac{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+      .vfr{font-size:0.74rem}
+      .vfy{color:#9a968c}
+      .vfk{color:#fff;font-weight:700}
+      .vinsuff{font-size:0.72rem;color:#9a968c}
       .vcaption{font-size:0.6rem;color:#9a968c;line-height:1.5;margin:2px 0 16px}
       .ptsec{font-size:0.62rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#c9982a;margin:16px 0 8px}
       .ttab td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.07);vertical-align:middle}
@@ -543,13 +577,18 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
       body.light .ttab .tcount,body.light .btag{color:#6a675e}
       body.light .tbar{background:rgba(0,0,0,0.10)}
       body.light .btag{border-color:rgba(0,0,0,0.2)}
-      body.light .vhead{color:#16150f}
-      body.light .v-supports{color:#177245}body.light .v-leansfor{color:#2f7d47}body.light .v-mixed{color:#8a6a1c}body.light .v-against{color:#a12d20}body.light .v-insuff{color:#6a675e}body.light .v-refined{color:#8a6a1c}
-      body.light .vslabel,body.light .vsn,body.light .vauditrow,body.light .vcaption{color:#6a675e}
-      body.light .vsn{border-color:rgba(0,0,0,0.2)}
-      body.light .vsval,body.light .vat{color:#16150f}
-      body.light .vstat{border-left-color:#8a6a1c}
-      body.light .vaudit{border-left-color:rgba(0,0,0,0.16)}
+      body.light .vcard{border-top-color:rgba(0,0,0,0.08)}
+      body.light .vclaim,body.light .vfk{color:#16150f}
+      body.light .vheadline,body.light .vinsuff,body.light .vpn,body.light .vpill,body.light .vfy,body.light .vauditlist,body.light .vcaption{color:#6a675e}
+      body.light .vbarstat{color:#8a6a1c}
+      body.light .vpill.g{color:#8a6a1c}
+      body.light .vseg,body.light .vseg.va-na{background:rgba(0,0,0,0.10)}
+      body.light .vseg.va-for{background:#2f9e5f}body.light .vseg.va-against{background:rgba(193,60,50,0.75)}
+      body.light .vnotch{background:rgba(0,0,0,0.30)}
+      body.light .vpill{border-color:rgba(0,0,0,0.2)}
+      body.light .vpdiv{background:rgba(0,0,0,0.2)}
+      body.light .vauditlist .va-for{color:#2f7d47}body.light .vauditlist .va-against{color:#a12d20}body.light .vauditlist .va-na{color:#8a857a}
+      body.light .v-supports{color:#177245;background:rgba(23,114,69,0.12)}body.light .v-leansfor{color:#2f7d47;background:rgba(47,125,71,0.10)}body.light .v-mixed{color:#8a6a1c;background:rgba(138,106,28,0.12)}body.light .v-against{color:#a12d20;background:rgba(161,45,32,0.12)}body.light .v-insuff{color:#6a675e;background:rgba(106,103,94,0.10)}body.light .v-refined{color:#8a6a1c;background:rgba(138,106,28,0.12)}
       /* ── Light / ink-friendly theme (member picks in the toolbar; whichever shows is what prints) ── */
       body.light{background:#fdfcf9;color:#16150f}
       body.light::before{background:#fdfcf9}
@@ -642,14 +681,33 @@ function openProjectBookPdf(rows, coverTitle) {
   const pbEvidence = coverTitle === "Finding the Market's Bottom" ? mbHypothesisEvidence(studyRows) : null;
   const pbVClass = (v) => v === "SUPPORTS" ? "v-supports" : v === "LEANS FOR" ? "v-leansfor" : v === "MIXED" ? "v-mixed"
     : (v === "LEANS AGAINST" || v === "AGAINST") ? "v-against" : v === "REFINED" ? "v-refined" : "v-insuff";
-  const pbVStat = (s) => `<div class="pbvstat"><div class="pbvslabel">${esc(s.label)}</div><div class="pbvsval">${esc(s.value)} <span class="pbvsn">n=${esc(s.n)}</span></div></div>`;
-  const pbEvBlock = (h) => { const ev = pbEvidence && pbEvidence[h.id]; if (!ev) return "";
-    return `<div class="pbverdict"><span class="pbvchip ${pbVClass(ev.verdict)}">${esc(ev.chip)}</span><span class="pbvhead">${esc(ev.headline)}</span></div>`
-      + (ev.compare ? `<div class="pbvcompare">${pbVStat(ev.compare.a)}${pbVStat(ev.compare.b)}</div>` : "")
-      + (ev.expand && ev.expand.length ? `<div class="pbvaudit">${ev.expand.map((x) => `<div class="pbvauditrow"><span class="pbvat">${esc(x.ticker)} · ${esc(x.year)}</span> ${esc(x.line)}</div>`).join("")}</div>` : ""); };
+  // Print card (project-book branch) — mirrors the app: id + short claim + verdict chip, one evidence line
+  // (unit bar · compare pills · fraction chips), a headline, and under a unit bar the coloured ticker'yy
+  // print audit. No monospace audit blocks.
+  const pbEvRow = (h, ev) => {
+    if (h.id === "MB-H3" && ev.fractions) return `<div class="pbvfrac">${ev.fractions.map((f) => `<span class="pbvfr"><span class="pbvfy">${esc(f.year)}</span> <span class="pbvfk">${f.k}/${f.n}</span></span>`).join("")}</div>`;
+    if ((h.id === "MB-H1" || h.id === "MB-H5") && ev.compare) {
+      const pill = (s, g) => `<span class="pbvpill${g ? " g" : ""}"><span class="pbvpl">${esc(s.label)}</span> ${esc(s.value)} <span class="pbvpn">n=${esc(s.n)}</span></span>`;
+      return `<div class="pbvpills">${pill(ev.compare.a, true)}<span class="pbvpdiv"></span>${pill(ev.compare.b, false)}</div>`;
+    }
+    if (ev.verdict === "INSUFFICIENT") { const forC = ev.units ? ev.units.filter((u) => u.vote === "for").length : 0; const tot = ev.units ? ev.units.length : ev.n;
+      return `<div class="pbvinsuff">${forC}/${tot} ticked so far · below the n ≥ 5 read threshold</div>`; }
+    if (ev.units && ev.units.length) {
+      const forC = ev.units.filter((u) => u.vote === "for").length;
+      const denom = forC + ev.units.filter((u) => u.vote === "against").length;
+      const bar = `<div class="pbvbarrow"><div class="pbvbar">${ev.units.map((u) => `<span class="pbvseg va-${u.vote}"></span>`).join("")}<span class="pbvnotch"></span></div><span class="pbvbarstat">${forC}/${denom}</span></div>`;
+      const audit = `<div class="pbvauditlist">${ev.units.map((u) => `<span class="va-${u.vote}">${esc(u.ticker)}'${esc(String(u.year).slice(2))}</span>`).join(", ")}</div>`;
+      return bar + audit;
+    }
+    return "";
+  };
+  const pbEvCard = (h) => { const ev = pbEvidence[h.id];
+    return `<div class="pbvcard"><div class="pbvcardhead"><span class="pbhid">${esc(h.id)}</span><span class="pbvclaim">${esc(h.short || h.text)}</span>${ev ? `<span class="pbvchip ${pbVClass(ev.verdict)}">${esc(ev.chip)}</span>` : ""}</div>${ev ? `<div class="pbvrow">${pbEvRow(h, ev)}</div><div class="pbvheadline">${esc(ev.headline)}</div>` : ""}</div>`; };
   const hypPage = (hyps || tallyGroups.length) ? `<div class="page pbhyp">
     <div class="pblabel">Working hypotheses &amp; checklist tally</div>
-    ${hyps ? `<div class="pbhyps">${hyps.map((h) => `<div class="pbhrow"><span class="pbhid">${esc(h.id)}</span><div class="pbhbody"><div class="pbhtext">${esc(h.text)}</div><div class="pbhmeasure">measure: ${esc(h.measure)}</div>${pbEvBlock(h)}</div></div>`).join("")}</div>${pbEvidence ? `<div class="pbvcaption">Descriptive read at n=${studyRows.length} — verdicts follow the pre-registered ladder; believe nothing hard before n≈30.</div>` : ""}` : ""}
+    ${hyps ? (pbEvidence
+      ? `<div class="pbhyps">${hyps.map((h) => pbEvCard(h)).join("")}</div><div class="pbvcaption">n=${studyRows.length} · descriptive only — pre-registered ladder, threshold notch at 70%.</div>`
+      : `<div class="pbhyps">${hyps.map((h) => `<div class="pbhrow"><span class="pbhid">${esc(h.id)}</span><div class="pbhbody"><div class="pbhtext">${esc(h.text)}</div><div class="pbhmeasure">measure: ${esc(h.measure)}</div></div></div>`).join("")}</div>`) : ""}
     ${tallyGroups.map((g) => `<div class="pbtsec">Checklist tally — ${g.n} stud${g.n === 1 ? "y" : "ies"}${tallyGroups.length > 1 ? ` · ${esc(g.setup)}` : ""}</div>
       <table class="pbttab"><tbody>${g.items.map((it) => { const p = g.n ? Math.round((it.count / g.n) * 100) : 0;
         return `<tr><td class="pbtlabel">${esc(it.label)}${it.bonus ? ` <span class="pbbtag">bonus</span>` : ""}</td><td class="pbtbarcell"><div class="pbtbar"><div class="pbtfill" style="width:${p}%"></div></div></td><td class="pbtcount">${it.count}/${g.n}</td></tr>`; }).join("")}</tbody></table>`).join("")}
@@ -748,19 +806,34 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbhid{flex:none;font-size:0.62rem;font-weight:800;letter-spacing:0.06em;color:#c9982a;padding-top:2px;white-space:nowrap}
       .pbhtext{font-size:0.84rem;color:#e8e6e0;line-height:1.6}
       .pbhmeasure{font-size:0.68rem;color:#9a968c;line-height:1.5;margin-top:5px}
-      /* ── Evidence verdicts on the project-book hypotheses page (Valen 2026-07-29) ── */
-      .pbverdict{display:flex;align-items:flex-start;gap:9px;margin-top:9px}
-      .pbvchip{flex:none;font-size:0.56rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;border:1px solid currentColor;border-radius:99px;padding:2px 9px;white-space:nowrap}
-      .v-supports{color:#1f9d55}.v-leansfor{color:#4faf6a}.v-mixed{color:#b8820a}.v-against{color:#c0392b}.v-insuff{color:#9a968c}.v-refined{color:#c9982a}
-      .pbvhead{font-size:0.78rem;color:#e8e6e0;line-height:1.55}
-      .pbvcompare{display:flex;gap:22px;margin-top:10px;flex-wrap:wrap}
-      .pbvstat{border-left:2px solid #b8820a;padding-left:11px}
-      .pbvslabel{font-size:0.56rem;text-transform:uppercase;letter-spacing:0.06em;color:#9a968c}
-      .pbvsval{font-size:0.86rem;font-weight:800;color:#fff}
-      .pbvsn{font-size:0.56rem;font-weight:700;color:#9a968c;border:1px solid rgba(255,255,255,0.2);border-radius:99px;padding:0 5px;margin-left:5px}
-      .pbvaudit{margin-top:9px;border-left:1px solid rgba(255,255,255,0.14);padding-left:12px;display:grid;gap:3px}
-      .pbvauditrow{font-size:0.64rem;color:#9a968c;line-height:1.45;font-family:ui-monospace,Menlo,monospace}
-      .pbvat{color:#e8e6e0;font-weight:700}
+      /* ── Evidence CARDS on the project-book hypotheses page (Valen 2026-07-29) — unit ladder, no monospace ── */
+      .pbvcard{padding:13px 0;border-top:1px solid rgba(255,255,255,0.08);break-inside:avoid;page-break-inside:avoid}
+      .pbvcard:first-child{border-top:none}
+      .pbvcardhead{display:flex;align-items:center;gap:9px}
+      .pbvchip{flex:none;font-size:0.56rem;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;border-radius:99px;padding:2px 9px;white-space:nowrap}
+      .v-supports{color:#1f9d55;background:rgba(31,157,85,0.14)}.v-leansfor{color:#4faf6a;background:rgba(79,175,106,0.12)}.v-mixed{color:#b8820a;background:rgba(184,130,10,0.14)}.v-against{color:#c0392b;background:rgba(192,57,43,0.14)}.v-insuff{color:#9a968c;background:rgba(154,150,140,0.12)}.v-refined{color:#c9982a;background:rgba(201,152,42,0.14)}
+      .pbvclaim{flex:1;font-size:0.94rem;font-weight:700;color:#fff;line-height:1.35}
+      .pbvrow{margin-top:11px}
+      .pbvheadline{font-size:0.7rem;color:#9a968c;line-height:1.5;margin-top:8px}
+      .pbvbarrow{display:flex;align-items:center;gap:14px}
+      .pbvbar{position:relative;display:flex;flex:1;max-width:420px;gap:3px;height:10px}
+      .pbvseg{flex:1;height:10px;border-radius:3px;background:rgba(255,255,255,0.10)}
+      .pbvseg.va-for{background:#7ef0a0}.pbvseg.va-against{background:rgba(224,90,85,0.85)}.pbvseg.va-na{background:rgba(255,255,255,0.10)}
+      .pbvnotch{position:absolute;left:70%;top:-1px;bottom:-1px;width:1px;background:rgba(255,255,255,0.25)}
+      .pbvbarstat{flex:none;font-size:0.94rem;font-weight:800;color:#f0c050}
+      .pbvauditlist{margin-top:7px;font-size:0.58rem;line-height:1.7;color:#9a968c}
+      .pbvauditlist .va-for{color:#4faf6a}.pbvauditlist .va-against{color:#d0574f}.pbvauditlist .va-na{color:#9a968c}
+      .pbvpills{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+      .pbvpill{border-bottom:1px solid rgba(255,255,255,0.18);padding-bottom:3px;font-size:0.76rem;font-weight:700;color:#9a968c}
+      .pbvpill.g{color:#c9982a}
+      .pbvpl{text-transform:uppercase;letter-spacing:0.05em}
+      .pbvpn{font-size:0.54rem;font-weight:700;color:#9a968c}
+      .pbvpdiv{width:1px;height:14px;background:rgba(255,255,255,0.18)}
+      .pbvfrac{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+      .pbvfr{font-size:0.78rem}
+      .pbvfy{color:#9a968c}
+      .pbvfk{color:#fff;font-weight:700}
+      .pbvinsuff{font-size:0.76rem;color:#9a968c}
       .pbvcaption{font-size:0.66rem;color:#9a968c;line-height:1.55;margin:14px 0 4px}
       .pbtsec{font-size:0.6rem;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#c9982a;margin:26px 0 10px}
       .pbttab{width:100%;border-collapse:collapse}
@@ -826,12 +899,18 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pbcv{color:#16150f}
       body.light .pbttab td{border-bottom-color:rgba(0,0,0,0.10)}
       body.light .pbtbar{background:rgba(0,0,0,0.10)}
-      body.light .pbvhead,body.light .pbvsval,body.light .pbvat{color:#16150f}
-      body.light .v-supports{color:#177245}body.light .v-leansfor{color:#2f7d47}body.light .v-mixed{color:#8a6a1c}body.light .v-against{color:#a12d20}body.light .v-insuff{color:#6a675e}body.light .v-refined{color:#8a6a1c}
-      body.light .pbvslabel,body.light .pbvsn,body.light .pbvauditrow,body.light .pbvcaption{color:#6a675e}
-      body.light .pbvsn{border-color:rgba(0,0,0,0.2)}
-      body.light .pbvstat{border-left-color:#8a6a1c}
-      body.light .pbvaudit{border-left-color:rgba(0,0,0,0.16)}
+      body.light .pbvcard{border-top-color:rgba(0,0,0,0.08)}
+      body.light .pbvclaim,body.light .pbvfk{color:#16150f}
+      body.light .pbvheadline,body.light .pbvinsuff,body.light .pbvpn,body.light .pbvpill,body.light .pbvfy,body.light .pbvauditlist,body.light .pbvcaption{color:#6a675e}
+      body.light .pbvbarstat{color:#8a6a1c}
+      body.light .pbvpill.g{color:#8a6a1c}
+      body.light .pbvseg,body.light .pbvseg.va-na{background:rgba(0,0,0,0.10)}
+      body.light .pbvseg.va-for{background:#2f9e5f}body.light .pbvseg.va-against{background:rgba(193,60,50,0.75)}
+      body.light .pbvnotch{background:rgba(0,0,0,0.30)}
+      body.light .pbvpill{border-color:rgba(0,0,0,0.2)}
+      body.light .pbvpdiv{background:rgba(0,0,0,0.2)}
+      body.light .pbvauditlist .va-for{color:#2f7d47}body.light .pbvauditlist .va-against{color:#a12d20}body.light .pbvauditlist .va-na{color:#8a857a}
+      body.light .v-supports{color:#177245;background:rgba(23,114,69,0.12)}body.light .v-leansfor{color:#2f7d47;background:rgba(47,125,71,0.10)}body.light .v-mixed{color:#8a6a1c;background:rgba(138,106,28,0.12)}body.light .v-against{color:#a12d20;background:rgba(161,45,32,0.12)}body.light .v-insuff{color:#6a675e;background:rgba(106,103,94,0.10)}body.light .v-refined{color:#8a6a1c;background:rgba(138,106,28,0.12)}
       body.light .pbnoimg,body.light .pbnotick{color:#8a857a}
       body.light .pbzoom{background:#fff}
       body.light .pbzback{background:rgba(255,255,255,0.88);color:#8a6a1c}

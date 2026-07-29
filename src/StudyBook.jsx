@@ -1241,12 +1241,12 @@ export function StudyHypotheses({ C, rows }) {
 // fields that will decide each one; never render a fake verdict.
 export const PROJECT_HYPOTHESES = {
   "Finding the Market's Bottom": [
-    { id: "MB-H1", text: "Slow, orderly correction → leaders show themselves EARLY (higher lows / bottoming before the index). Fast flush → everything drops together; leaders differentiate by RECOVERY SPEED off the shared low, not bottom timing.", measure: "sessions_vs_index + 'higher low' ticks split by episode type (2023/2024 orderly vs 2025 crash); recovery ticks carry the crash case" },
-    { id: "MB-H2", text: "In orderly corrections the eventual leaders bottom days-to-weeks before the index (the RS tell).", measure: "share of studies with sessions_vs_index < 0, per episode" },
-    { id: "MB-H3", text: "Each bottom launches a NEW leadership theme — the prior cycle's winner does not re-lead.", measure: "'NEW cycle theme' tick vs +3M return; count of prior-cycle leaders that re-led" },
-    { id: "MB-H4", text: "The leader's move is front-loaded: most of the 6-month return is made in the first 3 months off the low.", measure: "ret_3m vs (ret_6m − ret_3m) per study" },
-    { id: "MB-H5", text: "MA structure is the tell: leaders hold/reclaim their key MAs (10>20>50 stack, 100/200d hold) before the index repairs its own.", measure: "'held long-term MA' + 'MAs stacked/reclaimed first' ticks vs +3M return" },
-    { id: "MB-H6", text: "A catalyst / episodic pivot at the launch marks the biggest winners off the bottom.", measure: "'Catalyst/EP at the launch' tick vs +3M / +6M return" },
+    { id: "MB-H1", short: "Slow correction → early tells · flush → recovery speed", text: "Slow, orderly correction → leaders show themselves EARLY (higher lows / bottoming before the index). Fast flush → everything drops together; leaders differentiate by RECOVERY SPEED off the shared low, not bottom timing.", measure: "sessions_vs_index + 'higher low' ticks split by episode type (2023/2024 orderly vs 2025 crash); recovery ticks carry the crash case" },
+    { id: "MB-H2", short: "Leaders bottom before the index", text: "In orderly corrections the eventual leaders bottom days-to-weeks before the index (the RS tell).", measure: "share of studies with sessions_vs_index < 0, per episode" },
+    { id: "MB-H3", short: "Every bottom crowns a NEW theme", text: "Each bottom launches a NEW leadership theme — the prior cycle's winner does not re-lead.", measure: "'NEW cycle theme' tick vs +3M return; count of prior-cycle leaders that re-led" },
+    { id: "MB-H4", short: "The move is front-loaded", text: "The leader's move is front-loaded: most of the 6-month return is made in the first 3 months off the low.", measure: "ret_3m vs (ret_6m − ret_3m) per study" },
+    { id: "MB-H5", short: "MA structure is the tell", text: "MA structure is the tell: leaders hold/reclaim their key MAs (10>20>50 stack, 100/200d hold) before the index repairs its own.", measure: "'held long-term MA' + 'MAs stacked/reclaimed first' ticks vs +3M return" },
+    { id: "MB-H6", short: "A catalyst marks the biggest winners", text: "A catalyst / episodic pivot at the launch marks the biggest winners off the bottom.", measure: "'Catalyst/EP at the launch' tick vs +3M / +6M return" },
   ],
   // High Tight Flag book (Valen 2026-07-28) — pre-registered from the corpus + the pattern's statistical source.
   "High Tight Flag": [
@@ -1284,6 +1284,7 @@ export function mbHypothesisEvidence(rows) {
   const pct = (x) => `${Math.round(x * 100)}%`;
   const r1 = (x) => (x == null || Number.isNaN(x)) ? null : Math.round(x * 10) / 10;
   const sgn = (x) => x == null ? "—" : (x > 0 ? `+${x}` : `${x}`); // signed display for session counts
+  const yy = (y) => `'${String(y).slice(2)}`; // "2024" → "'24" for unit tooltips
   // ladder over a share (0–1) at sample n
   const ladder = (share, n) => {
     if (n < 5) return "INSUFFICIENT";
@@ -1311,10 +1312,23 @@ export function mbHypothesisEvidence(rows) {
     let verdict;
     if (nO < 5 || nC < 2) verdict = "INSUFFICIENT";
     else verdict = (a != null && a <= -4 && b != null && b >= -3) ? "SUPPORTS" : "MIXED";
+    // units — every study votes on its OWN episode logic: orderly leads early, crash recovers fast (else against; unmeasured → na)
+    const units = S.map((x) => {
+      const cls = MB_EPISODE_CLASS[x.year], sv = num(x.m.sessions_vs_index);
+      if (cls === "orderly") {
+        if (sv == null) return { ticker: x.ticker, year: x.year, vote: "na", tip: `${x.ticker} ${yy(x.year)} · lead vs index not measured` };
+        return sv < 0
+          ? { ticker: x.ticker, year: x.year, vote: "for", tip: `${x.ticker} ${yy(x.year)} · led the index by ${Math.abs(sv)} sessions` }
+          : { ticker: x.ticker, year: x.year, vote: "against", tip: `${x.ticker} ${yy(x.year)} · bottomed with/after the index` };
+      }
+      return x.checks.rc_reclaim_fast
+        ? { ticker: x.ticker, year: x.year, vote: "for", tip: `${x.ticker} ${yy(x.year)} · crash — recovered fast off the shared low` }
+        : { ticker: x.ticker, year: x.year, vote: "against", tip: `${x.ticker} ${yy(x.year)} · crash — no fast recovery off the low` };
+    });
     out["MB-H1"] = {
-      verdict, chip: verdict, n: nO + nC,
+      verdict, chip: verdict, n: nO + nC, units,
       headline: `Orderly corrections: leaders led the index by a median ${a == null ? "—" : Math.abs(a)} sessions (n=${nO}). The crash: median ${sgn(b)} — no timing edge, but ${pct(crashRecov)} out-recovered QQQ.`,
-      compare: { a: { label: "orderly median lead", value: `${sgn(a)} sess`, n: nO }, b: { label: "crash median", value: `${sgn(b)} sess`, n: nC } },
+      compare: { a: { label: "orderly lead", value: `${sgn(a)} sess`, n: nO }, b: { label: "crash", value: `${sgn(b)} sess`, n: nC } },
       expand: S.map((x) => ({ ticker: x.ticker, year: x.year, line: `${MB_EPISODE_CLASS[x.year] || "—"} · vs index ${sgn(num(x.m.sessions_vs_index))} sess${x.checks.rc_reclaim_fast ? " · recovered fast" : ""}` })),
     };
   }
@@ -1325,8 +1339,17 @@ export function mbHypothesisEvidence(rows) {
     const n = orderly.length;
     const k = orderly.filter((x) => num(x.m.sessions_vs_index) < 0).length;
     const share = n ? k / n : 0;
+    // units — orderly-with-a-measured-lead is the sample; crash / unmeasured fall out as na
+    const units = S.map((x) => {
+      const inSample = MB_EPISODE_CLASS[x.year] === "orderly" && num(x.m.sessions_vs_index) != null;
+      if (!inSample) return { ticker: x.ticker, year: x.year, vote: "na", tip: `${x.ticker} ${yy(x.year)} · ${MB_EPISODE_CLASS[x.year] === "crash" ? "crash — not in the orderly sample" : "lead vs index not measured"}` };
+      const sv = num(x.m.sessions_vs_index);
+      return sv < 0
+        ? { ticker: x.ticker, year: x.year, vote: "for", tip: `${x.ticker} ${yy(x.year)} · bottomed ${Math.abs(sv)} sessions before the index` }
+        : { ticker: x.ticker, year: x.year, vote: "against", tip: `${x.ticker} ${yy(x.year)} · bottomed with/after the index` };
+    });
     out["MB-H2"] = {
-      verdict: ladder(share, n), chip: ladder(share, n), n,
+      verdict: ladder(share, n), chip: ladder(share, n), n, units,
       headline: `${k}/${n} orderly-episode leaders bottomed before the index.`,
       compare: { a: { label: "bottomed early", value: `${k}/${n}`, n }, b: { label: "share early", value: n ? pct(share) : "—", n } },
       expand: orderly.map((x) => ({ ticker: x.ticker, year: x.year, line: `vs index ${sgn(num(x.m.sessions_vs_index))} sess ${num(x.m.sessions_vs_index) < 0 ? "→ before" : "→ with/after"}` })),
@@ -1336,13 +1359,16 @@ export function mbHypothesisEvidence(rows) {
   // ── MB-H3 — every bottom launches a NEW theme (REFINED — not universal) ──
   {
     const years = ["2023", "2024", "2025", "2026"];
-    const perYear = years.map((y) => {
+    const fractions = years.map((y) => {
       const g = S.filter((x) => x.year === y);
-      const k = g.filter((x) => x.checks.th_new_theme).length;
-      return g.length ? `${y} ${k}/${g.length}` : null;
-    }).filter(Boolean).join(" · ");
+      return g.length ? { year: yy(y), k: g.filter((x) => x.checks.th_new_theme).length, n: g.length } : null;
+    }).filter(Boolean);
+    const perYear = fractions.map((f) => `${f.year} ${f.k}/${f.n}`).join(" · ");
+    const units = S.map((x) => x.checks.th_new_theme
+      ? { ticker: x.ticker, year: x.year, vote: "for", tip: `${x.ticker} ${yy(x.year)} · crowned a NEW leadership theme` }
+      : { ticker: x.ticker, year: x.year, vote: "against", tip: `${x.ticker} ${yy(x.year)} · re-led with a prior theme` });
     out["MB-H3"] = {
-      verdict: "REFINED", chip: "REFINED", n: S.length,
+      verdict: "REFINED", chip: "REFINED", n: S.length, units, fractions,
       headline: `Not universal — rotation ruled the LATER bottoms (2024/2025) while the FIRST bottom of the secular theme (2023) and the 2026 picks re-led with prior themes. Per-episode new-theme ticks: ${perYear || "—"}. See the refined MB-H3 in the research file.`,
       compare: null,
       expand: S.map((x) => ({ ticker: x.ticker, year: x.year, line: x.checks.th_new_theme ? "NEW leadership theme ✓" : "re-led with a prior theme" })),
@@ -1361,8 +1387,18 @@ export function mbHypothesisEvidence(rows) {
     const n = rowsF.length;
     const k = rowsF.filter((f) => f.front).length;
     const share = n ? k / n : 0;
+    // units — studies with BOTH windows vote front/back; those still open (or unmeasured) → na
+    const byTicker = {};
+    rowsF.forEach((f) => { byTicker[`${f.x.ticker}|${f.x.year}`] = f; });
+    const units = S.map((x) => {
+      const f = byTicker[`${x.ticker}|${x.year}`];
+      if (!f) return { ticker: x.ticker, year: x.year, vote: "na", tip: `${x.ticker} ${yy(x.year)} · 6-month window still open` };
+      return f.front
+        ? { ticker: x.ticker, year: x.year, vote: "for", tip: `${x.ticker} ${yy(x.year)} · front-loaded (${sgn(f.r3)}% then ${sgn(f.second3m)}%)` }
+        : { ticker: x.ticker, year: x.year, vote: "against", tip: `${x.ticker} ${yy(x.year)} · back-loaded (${sgn(f.r3)}% then ${sgn(f.second3m)}%)` };
+    });
     out["MB-H4"] = {
-      verdict: ladder(share, n), chip: ladder(share, n), n,
+      verdict: ladder(share, n), chip: ladder(share, n), n, units,
       headline: `${k}/${n} made more in months 0–3 than 3–6 (compounding-correct split — naive pp-subtraction flips several)${openWindow ? ` · ${openWindow} stud${openWindow === 1 ? "y" : "ies"} still in their 6M window` : ""}.`,
       compare: { a: { label: "front-loaded", value: `${k}/${n}`, n }, b: { label: "share front", value: n ? pct(share) : "—", n } },
       expand: rowsF.map((f) => ({ ticker: f.x.ticker, year: f.x.year, line: `${sgn(f.r3)}% then ${sgn(f.second3m)}%${f.front ? " · front-loaded" : ""}` })),
@@ -1382,7 +1418,7 @@ export function mbHypothesisEvidence(rows) {
     else if (a >= 0.8 * b) verdict = "MIXED";
     else verdict = "LEANS AGAINST";
     out["MB-H5"] = {
-      verdict, chip: verdict, n: aVals.length + bVals.length,
+      verdict, chip: verdict, n: aVals.length + bVals.length, units: null,
       headline: `MA-structure holders posted a median ${sgn(a)}% at 3M vs ${sgn(b)}% without it${(aVals.length < 4 || bVals.length < 4) ? " — too few in one arm to read yet" : ""}.`,
       compare: { a: { label: "MA held / stacked", value: `${sgn(a)}% 3M`, n: aVals.length }, b: { label: "did not", value: `${sgn(b)}% 3M`, n: bVals.length } },
       expand: S.map((x) => ({ ticker: x.ticker, year: x.year, line: `${(x.checks.bb_ma_hold || x.checks.rc_ma_stack) ? "MA held/stacked" : "no MA tell"} · +3M ${sgn(num(x.m.ret_3m))}%` })),
@@ -1393,9 +1429,13 @@ export function mbHypothesisEvidence(rows) {
   {
     const ticked = S.filter((x) => x.checks.th_catalyst);
     const nTick = ticked.length;
+    // units — a catalyst tick votes FOR; the rest are na (insufficient data, not a challenge)
+    const units = S.map((x) => x.checks.th_catalyst
+      ? { ticker: x.ticker, year: x.year, vote: "for", tip: `${x.ticker} ${yy(x.year)} · carried a catalyst / EP at the launch` }
+      : { ticker: x.ticker, year: x.year, vote: "na", tip: `${x.ticker} ${yy(x.year)} · no catalyst tick yet` });
     if (nTick < 5) {
       out["MB-H6"] = {
-        verdict: "INSUFFICIENT", chip: "INSUFFICIENT", n: nTick,
+        verdict: "INSUFFICIENT", chip: "INSUFFICIENT", n: nTick, units,
         headline: `only ${nTick}/${S.length} carry the catalyst tick so far — tick or refute more before this one can speak.`,
         compare: null,
         expand: S.map((x) => ({ ticker: x.ticker, year: x.year, line: x.checks.th_catalyst ? "catalyst/EP at launch ✓" : "no catalyst tick" })),
@@ -1411,7 +1451,7 @@ export function mbHypothesisEvidence(rows) {
       else if (a >= 0.8 * b) verdict = "MIXED";
       else verdict = "LEANS AGAINST";
       out["MB-H6"] = {
-        verdict, chip: verdict, n: nTick,
+        verdict, chip: verdict, n: nTick, units,
         headline: `Catalyst-tagged launches posted a median ${sgn(a)}% at 3M vs ${sgn(b)}% without (${nTick}/${S.length} carry the tick).`,
         compare: { a: { label: "catalyst / EP", value: `${sgn(a)}% 3M`, n: aVals.length }, b: { label: "no catalyst", value: `${sgn(b)}% 3M`, n: bVals.length } },
         expand: S.map((x) => ({ ticker: x.ticker, year: x.year, line: `${x.checks.th_catalyst ? "catalyst/EP ✓" : "no catalyst"} · +3M ${sgn(num(x.m.ret_3m))}%` })),
@@ -1452,22 +1492,78 @@ export function ChecklistTally({ C, rows, project }) {
   // Evidence engine (Valen 2026-07-29): the Market-Bottom book graduates from static text to a descriptive
   // read of its own rows. Gate on the project key — every other project keeps the static rendering below.
   const mbEvidence = project === "Finding the Market's Bottom" ? mbHypothesisEvidence(rows) : null;
-  const [openHyp, setOpenHyp] = useState(null); // accordion — only one hypothesis's studies open at a time
   const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" };
-  const idChip = { flex: "none", fontSize: "0.5rem", fontWeight: 800, letterSpacing: ".06em", color: "#08080e", background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, borderRadius: 99, padding: "3px 9px", whiteSpace: "nowrap" };
-  // Verdict → chip color, following the pre-registered ladder (SUPPORTS green → AGAINST red).
-  const verdictColor = (v) => v === "SUPPORTS" ? "#7ef0a0" : v === "LEANS FOR" ? "#b6e8bf" : v === "MIXED" ? C.gold
-    : (v === "LEANS AGAINST" || v === "AGAINST") ? "#e05555" : v === "REFINED" ? C.goldBright : C.muted;
-  const verdictChip = (v) => { const col = verdictColor(v); return { flex: "none", fontSize: "0.5rem", fontWeight: 800, letterSpacing: ".07em", textTransform: "uppercase", color: col, border: `1px solid ${col}`, background: "rgba(0,0,0,0.25)", borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" }; };
-  const statBlock = (s) => (
-    <div style={{ flex: "1 1 120px", minWidth: 0, borderLeft: `2px solid ${C.goldMid}`, paddingLeft: 9 }}>
-      <div style={{ fontSize: "0.54rem", color: C.muted, textTransform: "uppercase", letterSpacing: ".07em", lineHeight: 1.3 }}>{s.label}</div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-        <span style={{ fontSize: "0.86rem", fontWeight: 800, color: C.text }}>{s.value}</span>
-        <span style={{ fontSize: "0.52rem", fontWeight: 700, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 99, padding: "0 5px" }}>n={s.n}</span>
-      </div>
-    </div>
-  );
+  // Tiny gold-outline id chip.
+  const idChip = { flex: "none", fontSize: "0.5rem", fontWeight: 800, letterSpacing: ".06em", color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 99, padding: "2px 7px", whiteSpace: "nowrap" };
+  // Verdict → {color, background}, following the pre-registered ladder (SUPPORTS green → AGAINST red).
+  const VERDICT = {
+    "SUPPORTS": ["#7ef0a0", "rgba(126,240,160,0.12)"],
+    "LEANS FOR": ["#b6e8bf", "rgba(126,240,160,0.08)"],
+    "MIXED": [C.gold, "rgba(201,152,42,0.12)"],
+    "LEANS AGAINST": ["#e05555", "rgba(224,90,85,0.12)"],
+    "AGAINST": ["#e05555", "rgba(224,90,85,0.12)"],
+    "INSUFFICIENT": ["rgba(255,255,255,0.55)", "rgba(255,255,255,0.06)"],
+    "REFINED": [C.goldBright, "rgba(240,192,80,0.12)"],
+  };
+  const verdictChip = (v) => { const [col, bg] = VERDICT[v] || VERDICT["INSUFFICIENT"]; return { flex: "none", fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".04em", textTransform: "uppercase", color: col, background: bg, borderRadius: 99, padding: "2px 9px", whiteSpace: "nowrap" }; };
+  const segColor = (vote) => vote === "for" ? "#7ef0a0" : vote === "against" ? "rgba(224,90,85,0.85)" : "rgba(255,255,255,0.10)";
+  // Row-2 evidence line — ONE line per hypothesis, chosen by shape (fraction chips · compare pills · unit bar · muted).
+  const evidenceRow = (h, ev) => {
+    // H3 — four year fraction chips
+    if (h.id === "MB-H3" && ev.fractions) {
+      return (
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+          {ev.fractions.map((f, i) => (
+            <span key={i} style={{ fontSize: "0.74rem" }}>
+              <span style={{ color: C.muted }}>{f.year} </span>
+              <span style={{ color: "#fff", fontWeight: 700 }}>{f.k}/{f.n}</span>
+            </span>
+          ))}
+        </div>
+      );
+    }
+    // H1 / H5 — two inline text pills (no boxes), thin divider between
+    if ((h.id === "MB-H1" || h.id === "MB-H5") && ev.compare) {
+      const pill = (s, gold) => (
+        <span style={{ display: "inline-flex", alignItems: "baseline", gap: 5, paddingBottom: 3, borderBottom: `1px solid ${C.border}` }}>
+          <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: ".02em", color: gold ? C.gold : C.muted }}>
+            <span style={{ textTransform: "uppercase", letterSpacing: ".05em" }}>{s.label}</span> {s.value}
+          </span>
+          <span style={{ fontSize: "0.5rem", fontWeight: 700, color: C.muted }}>n={s.n}</span>
+        </span>
+      );
+      return (
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          {pill(ev.compare.a, true)}
+          <span style={{ width: 1, height: 13, background: C.border }} />
+          {pill(ev.compare.b, false)}
+        </div>
+      );
+    }
+    // INSUFFICIENT — one muted line, no bar
+    if (ev.verdict === "INSUFFICIENT") {
+      const forC = ev.units ? ev.units.filter((u) => u.vote === "for").length : 0;
+      const tot = ev.units ? ev.units.length : ev.n;
+      return <div style={{ fontSize: "0.72rem", color: C.muted }}>{forC}/{tot} ticked so far · below the n ≥ 5 read threshold</div>;
+    }
+    // unit bar (H2, H4, and H6 once sufficient)
+    if (ev.units && ev.units.length) {
+      const forC = ev.units.filter((u) => u.vote === "for").length;
+      const denom = forC + ev.units.filter((u) => u.vote === "against").length;
+      return (
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ position: "relative", display: "flex", flex: 1, maxWidth: 420, gap: 3, height: 10 }}>
+            {ev.units.map((u, i) => (
+              <div key={i} title={u.tip} style={{ flex: 1, height: 10, borderRadius: 3, background: segColor(u.vote) }} />
+            ))}
+            <div style={{ position: "absolute", left: "70%", top: -1, bottom: -1, width: 1, background: "rgba(255,255,255,0.25)", pointerEvents: "none" }} />
+          </div>
+          <span style={{ flex: "none", fontSize: "0.95rem", fontWeight: 800, color: C.goldBright }}>{forC}/{denom}</span>
+        </div>
+      );
+    }
+    return null;
+  };
   return (
     <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", marginBottom: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
       <div style={sheen} />
@@ -1475,56 +1571,45 @@ export function ChecklistTally({ C, rows, project }) {
         <span style={{ flex: 1, fontSize: "0.62rem", fontWeight: 700, letterSpacing: ".13em", textTransform: "uppercase", color: C.muted }}>🧪 Working Hypotheses</span>
         <span style={{ fontSize: "0.6rem", color: C.muted }}>what this research says so far</span>
       </div>
-      {hyps && (
-        <div style={{ display: "grid", gap: 11, marginBottom: 16 }}>
-          {hyps.map((h) => {
-            const ev = mbEvidence && mbEvidence[h.id];
+      {/* Evidence CARD system (Market-Bottom book) — one card per hypothesis: id + punchy claim + verdict chip,
+          then a single evidence line (unit bar · compare pills · fraction chips), then a one-line headline.
+          The unit tooltips ARE the audit — no expander. Non-evidence books keep the static claim + measure list. */}
+      {hyps && mbEvidence && (
+        <div style={{ marginBottom: 16 }}>
+          {hyps.map((h, idx) => {
+            const ev = mbEvidence[h.id];
             return (
-              <div key={h.id} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
-                <span style={idChip}>{h.id}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.45 }}>{h.text}</div>
-                  <div style={{ fontSize: "0.6rem", color: C.muted, lineHeight: 1.4, marginTop: 3 }}>measure: {h.measure}</div>
-                  {ev && (
-                    <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
-                        <span style={verdictChip(ev.verdict)}>{ev.chip}</span>
-                        <span style={{ flex: 1, minWidth: 180, fontSize: "0.68rem", color: C.text, lineHeight: 1.45 }}>{ev.headline}</span>
-                      </div>
-                      {ev.compare && (
-                        <div style={{ display: "flex", gap: 14, marginTop: 9, flexWrap: "wrap" }}>
-                          {statBlock(ev.compare.a)}
-                          {statBlock(ev.compare.b)}
-                        </div>
-                      )}
-                      {ev.expand && ev.expand.length > 0 && (
-                        <>
-                          <div onClick={() => setOpenHyp(openHyp === h.id ? null : h.id)} style={{ cursor: "pointer", fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, marginTop: 9 }}>
-                            {openHyp === h.id ? "▴ hide studies" : "show studies ▾"}
-                          </div>
-                          {openHyp === h.id && (
-                            <div style={{ marginTop: 7, display: "grid", gap: 5, borderLeft: `1px solid ${C.border}`, paddingLeft: 10 }}>
-                              {ev.expand.map((x, i) => (
-                                <div key={i} style={{ display: "flex", gap: 8, fontSize: "0.62rem", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", color: C.muted, lineHeight: 1.4 }}>
-                                  <span style={{ flex: "none", minWidth: 78, color: C.text }}>{x.ticker} · {x.year}</span>
-                                  <span style={{ flex: 1, minWidth: 0 }}>{x.line}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
+              <div key={h.id} style={{ padding: "12px 0", borderTop: idx > 0 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={idChip}>{h.id}</span>
+                  <span title={`${h.text}\nmeasure: ${h.measure}`} style={{ flex: 1, minWidth: 0, fontSize: "0.88rem", fontWeight: 700, color: "#fff", lineHeight: 1.35, cursor: "help" }}>{h.short || h.text}</span>
+                  {ev && <span style={verdictChip(ev.verdict)}>{ev.chip}</span>}
                 </div>
+                {ev && (
+                  <>
+                    <div style={{ marginTop: 10 }}>{evidenceRow(h, ev)}</div>
+                    <div title={ev.headline} style={{ marginTop: 7, fontSize: "0.7rem", color: C.muted, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.headline}</div>
+                  </>
+                )}
               </div>
             );
           })}
-          {mbEvidence && (
-            <div style={{ fontSize: "0.58rem", color: C.muted, lineHeight: 1.5, marginTop: 2 }}>
-              Descriptive read at n={rows.length} — verdicts follow the pre-registered ladder; believe nothing hard before n≈30.
+          <div style={{ fontSize: "0.58rem", color: C.muted, lineHeight: 1.5, marginTop: 12 }}>
+            n={rows.length} · descriptive only — pre-registered ladder, threshold notch at 70%.
+          </div>
+        </div>
+      )}
+      {hyps && !mbEvidence && (
+        <div style={{ display: "grid", gap: 11, marginBottom: 16 }}>
+          {hyps.map((h) => (
+            <div key={h.id} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
+              <span style={idChip}>{h.id}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.45 }}>{h.short || h.text}</div>
+                <div style={{ fontSize: "0.6rem", color: C.muted, lineHeight: 1.4, marginTop: 3 }}>measure: {h.measure}</div>
+              </div>
             </div>
-          )}
+          ))}
         </div>
       )}
       {groups.map((g) => (
@@ -1541,10 +1626,10 @@ export function ChecklistTally({ C, rows, project }) {
                     {it.label}
                     {it.bonus && <span style={{ fontSize: "0.5rem", fontWeight: 800, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 99, padding: "0 5px", marginLeft: 5, verticalAlign: "1px" }}>BONUS</span>}
                   </span>
-                  <div style={{ width: 96, flex: "none", height: 6, borderRadius: 99, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
-                    <div style={{ width: `${p}%`, height: "100%", background: `linear-gradient(90deg,${C.goldMid},${C.goldBright})`, borderRadius: 99 }} />
+                  <div style={{ width: 96, flex: "none", height: 10, borderRadius: 3, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                    <div style={{ width: `${p}%`, height: "100%", background: `linear-gradient(90deg,${C.goldMid},${C.goldBright})`, borderRadius: 3 }} />
                   </div>
-                  <span style={{ width: 44, flex: "none", textAlign: "right", fontSize: "0.66rem", fontWeight: 700, color: C.muted }}>{it.count}/{g.n}</span>
+                  <span style={{ width: 44, flex: "none", textAlign: "right", fontSize: "0.66rem", fontWeight: 700, color: C.goldBright }}>{it.count}/{g.n}</span>
                 </div>
               );
             })}
