@@ -197,7 +197,9 @@ export const STUDY_SETUPS = {
         ["rc_higher_high", "Higher highs before QQQ confirmed its own"],
       ]},
       { title: "Theme & catalyst", items: [
-        ["th_new_theme", "Belongs to the NEW cycle theme (not last cycle's winner)"],
+        // Research tick (Valen 2026-07-29): NOT chart-visible — Claude fills it at ingest from era
+        // leadership data per the pre-registered definition (research file § New theme cycle). He skips it.
+        ["th_new_theme", "NEW cycle theme — research tick, auto-filled from era data"],
         ["th_catalyst", "Catalyst / EP at the launch", "bonus"],
       ]},
     ],
