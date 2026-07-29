@@ -721,7 +721,7 @@ function openProjectBookPdf(rows, coverTitle) {
         const m = r.metrics?.study?.m || {}, theme = r.theme || m.theme || "";
         const ret3 = m.ret_3m;
         const ret = (ret3 === "" || ret3 == null) ? "—" : `${+ret3 >= 0 && !String(ret3).startsWith("-") ? "+" : ""}${esc(ret3)}% 3M`;
-        return `<a class="pbcrow" href="#e${idx}"><span class="pbctk">${esc(r.ticker)}</span><span class="pbctheme">${esc(theme)}</span><span class="pbcdots"></span><span class="pbcret">${ret}</span></a>`;
+        return `<a class="pbcrow" href="#e${idx}"><span class="pbcno">${String(idx + 1).padStart(2, "0")}</span><span class="pbctk">${esc(r.ticker)}</span><span class="pbctheme">${esc(theme)}</span><span class="pbcdots"></span><span class="pbcret">${ret}</span></a>`;
       }).join("");
       return `<div class="pbcgroup"><div class="pbcyear">${head}</div>${rowsHtml}</div>`;
     }).join("")}
@@ -790,15 +790,26 @@ function openProjectBookPdf(rows, coverTitle) {
       const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Market Bottom"];
       // Comparison pages pair the name with the index in the header (Valen 2026-07-30: "ARM vs QQQ")
       const head = (vs) => `<div class="pbshead"><span class="pbstk">${esc(r.ticker)}${vs ? `<span class="pbvsq"> vs QQQ</span>` : ""}</span><span class="pbstheme">${esc(theme)}</span></div>`;
-      const chartBlock = (img, cap, cls = "pbchart") => {
+      // Overlay pills (Valen 2026-07-30, from nickschmidt.so's trend-lane chips): translucent mono
+      // chips ON the chart — identity top-left, the headline number top-right. Data only, never invented.
+      const chartBlock = (img, cap, cls = "pbchart", pills = "") => {
         if (!img) return `<hr class="pbhair"/><div class="pbnoimg">no ${esc(cap.toLowerCase())} chart yet</div><hr class="pbhair"/><div class="pbcap">${cap}</div>`;
-        return `<hr class="pbhair"/><img class="${cls}" src="${esc(img)}"/><hr class="pbhair"/><div class="pbcap">${cap}</div>`;
+        return `<hr class="pbhair"/><div class="pbchartwrap"><img class="${cls}" src="${esc(img)}"/>${pills}</div><hr class="pbhair"/><div class="pbcap">${cap}</div>`;
       };
+      const yy = yearOf(r).slice(2);
+      const idPill = `<span class="pbpill pbpill-l">${esc(r.ticker)} '${esc(yy)}</span>`;
+      const vsN = m.sessions_vs_index;
+      const vsPill = (vsN !== "" && vsN != null && !Number.isNaN(+vsN))
+        ? `<span class="pbpill pbpill-r">${+vsN < 0 ? "−" : +vsN > 0 ? "+" : ""}${Math.abs(+vsN)} sess vs QQQ</span>` : "";
+      const retPill = (m.ret_3m !== "" && m.ret_3m != null)
+        ? `<span class="pbpill pbpill-r">${+m.ret_3m >= 0 && !String(m.ret_3m).startsWith("-") ? "+" : ""}${esc(m.ret_3m)}% · 3M</span>` : "";
+      const folio = `<div class="pbfolio"><span>${esc(coverTitle)}</span><span>No. ${String(idx + 1).padStart(2, "0")} / ${String(rows.length).padStart(2, "0")} · ${esc(yearOf(r))}</span></div>`;
       // Page A — vs-QQQ chart (MB); other project books caption it as HTF context
       const pageA = `<div class="page pbstudy pbplate" id="e${idx}">
         ${head(isMB)}
         <div class="pbownlow">own low ${esc(r.entry_date || "—")}</div>
-        ${chartBlock(r.before_img, isMB ? "Vs QQQ" : "HTF — context")}
+        ${chartBlock(r.before_img, isMB ? "Vs QQQ" : "HTF — context", "pbchart", idPill + (isMB ? vsPill : ""))}
+        ${folio}
       </div>`;
       // Page B — daily chart + data strip + ticked checklist + thesis
       const cells = [
@@ -816,10 +827,11 @@ function openProjectBookPdf(rows, coverTitle) {
       const thesis = r.thesis ? `<div class="pbthesis"><div class="pblabel">Thesis</div><div class="pbthesistext">${esc(r.thesis)}</div></div>` : "";
       const pageB = `<div class="page pbstudy">
         ${head(false)}
-        ${chartBlock(r.after_img, isMB ? "Daily" : "Setup", "pbchart pbchartb")}
+        ${chartBlock(r.after_img, isMB ? "Daily" : "Setup", "pbchart pbchartb", idPill + retPill)}
         ${strip}
         ${checklist}
         ${thesis}
+        ${folio}
       </div>`;
       return pageA + pageB;
     }).join("");
@@ -948,7 +960,15 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbepstats{font-size:0.9rem;color:#9a968c;margin-top:12px;max-width:60ch;line-height:1.6}
       .pbepcount{font-size:0.62rem;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:#c9982a;margin-top:16px}
       /* ── STUDY PAGES ── */
-      .pbstudy{display:flex;flex-direction:column}
+      .pbstudy{display:flex;flex-direction:column;position:relative}
+      /* chart overlay pills — nickschmidt trend-lane chips, moved onto the image */
+      .pbchartwrap{position:relative}
+      .pbpill{position:absolute;top:10px;font-size:0.56rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#e8e6e0;background:rgba(6,6,10,0.74);border:1px solid rgba(255,255,255,0.14);border-radius:99px;padding:3px 11px;white-space:nowrap}
+      .pbpill-l{left:10px}
+      .pbpill-r{right:10px;color:#f0c050}
+      /* running folio — quiet mono footer anchoring each study page */
+      .pbfolio{position:absolute;left:52px;right:52px;bottom:24px;display:flex;justify-content:space-between;font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:#66635b}
+      .pbcno{flex:none;width:26px;font-size:0.66rem;color:#66635b}
       /* page A = a book plate: the wide comparison chart sits vertically centered, not top-crowded */
       .pbplate{justify-content:center;min-height:96vh}
       .pbshead{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
@@ -978,7 +998,7 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbthesistext{font-size:0.82rem;line-height:1.7;color:rgba(232,230,224,0.88);max-width:70ch}
       /* ── GEIST MONO layer (last so it wins): micro-labels, IDs and data values in mono —
          Nick's register. Mono is wide, so small-caps tracking comes DOWN to 0.10–0.14em. */
-      .pblabel,.pbbrand,.pbmeta,.pbcyear,.pbcret,.pbctheme,.pbck,.pbcv,.pbcap,.pbtsec,.pbepcount,.pbbtag,.pbtcount,.pbstheme,.pbownlow,.pfk,.pfn,.pfdefk,.pfrown,.pfsrc,.pfcy,.pbhid,.pbvbarstat,.pbexphint,.pbfoot{font-family:'Geist Mono',ui-monospace,monospace}
+      .pblabel,.pbbrand,.pbmeta,.pbcyear,.pbcret,.pbctheme,.pbck,.pbcv,.pbcap,.pbtsec,.pbepcount,.pbbtag,.pbtcount,.pbstheme,.pbownlow,.pfk,.pfn,.pfdefk,.pfrown,.pfsrc,.pfcy,.pbhid,.pbvbarstat,.pbexphint,.pbfoot,.pbpill,.pbfolio,.pbcno{font-family:'Geist Mono',ui-monospace,monospace}
       .pblabel,.pbbrand{letter-spacing:0.14em}
       .pbtsec,.pbepcount,.pbstheme,.pbcap,.pbck,.pfk,.pfdefk{letter-spacing:0.12em}
       .pbcyear,.pbownlow{letter-spacing:0.06em}
@@ -1028,6 +1048,9 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pfdef{border-left-color:#8a6a1c}
       body.light .pfrow{border-color:rgba(0,0,0,0.12)}
       body.light .pfcell img{border-color:rgba(0,0,0,0.12)}
+      body.light .pbpill{background:rgba(253,252,249,0.86);border-color:rgba(0,0,0,0.16);color:#16150f}
+      body.light .pbpill-r{color:#8a6a1c}
+      body.light .pbfolio,body.light .pbcno{color:#8a857a}
     </style></head><body>
     <div class="toolbar">
       <button class="ghost" onclick="const l=document.body.classList.toggle('light');this.textContent=l?'🌙 Dark theme':'☀ Light theme'">☀ Light theme</button>
