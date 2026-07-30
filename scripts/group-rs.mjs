@@ -79,6 +79,10 @@ const UNIVERSE = [
   ["ESPO", "E-Sports"],
   ["ARKF", "ARK Fintech"],          // appeared in Jeff's 2026-07-21 groups post
   ["PALL", "Palladium"],            // appeared in Jeff's 2026-07-21 groups post
+  ["PEJ", "Leisure & Entertainment"],
+  ["BETZ", "Sports Betting & iGaming"],
+  ["SHLD", "Defense Tech"],
+  ["COPX", "Copper Miners"],
 ];
 // Plan & Focus map — the source's SECOND artifact (jeff-sun-master-system.md §14b): four FIXED
 // blocks (Index → Segment → EW Sector → SPDR Sector), RSP pinned as the labeled benchmark row.
