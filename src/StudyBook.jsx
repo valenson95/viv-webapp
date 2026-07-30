@@ -1866,7 +1866,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     charts: buildChartList(initial, true),
     metrics: { ...(initial?.metrics || {}), study: initial?.metrics?.study || {
       setup: "Momentum Breakout", direction: "long", regime_tag: "", project: "",
-      checks: {}, m: {}, grade: { letter: "" }, outcome: {}, refusal: "",
+      checks: {}, m: {}, grade: { letter: "" }, outcome: {}, refusal: "", annotation: "",
     } },
   }));
   // Unsaved-changes tracking (Valen 2026-07-24): EVERY working-state edit flows through setRow (ticks, subcats,
@@ -2325,6 +2325,10 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       <div style={{ marginTop: 8 }}>
         <label style={lbl}>Observation / what made this one work</label>
         <textarea style={{ ...inputS, minHeight: 50, resize: "vertical" }} value={row.lesson || ""} onChange={e => setRow(r => ({ ...r, lesson: e.target.value }))} />
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <label style={lbl}>Book narration (prints under the chart in the book/dive — first-person, 40–90 words)</label>
+        <textarea style={{ ...inputS, minHeight: 66, resize: "vertical" }} value={s.annotation || ""} onChange={e => setS({ annotation: e.target.value })} />
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 16 }}>

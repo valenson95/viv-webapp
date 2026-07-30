@@ -760,6 +760,7 @@ const WHATS_NEW = [
       "The Model Book is now a library of Deep Dives \u2014 long-form research reports, each studying one repeatable market behaviour on real charts. The first dive is live: Surfacing Market Leaders Through a Market Correction \u2014 14 studies across four corrections.",
       "Open a dive and you get the full typeset book: the working hypotheses with verdicts, every study's charts and facts, and a one-click Save as PDF. Click any chart to zoom.",
       "The index shows live returns from the studies inside each dive \u2014 measured off each study's own low, with every underlying study one click away.",
+      "Every study is now narrated \u2014 a short read under each chart telling you exactly what to see, plus a framing note on every correction chapter. The book reads itself.",
     ],
   },
   {

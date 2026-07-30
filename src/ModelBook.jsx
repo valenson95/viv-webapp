@@ -135,10 +135,10 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 // Keyed project → year → { label, stats }. A missing year/project prints a plain year divider (no stats).
 const PROJECT_EPISODES = {
   "Finding the Market's Bottom": {
-    "2023": { label: "Rate-scare correction", stats: "QQQ −10.8% over 71 sessions · low Oct 26, 2023 · reclaimed in 13 sessions" },
-    "2024": { label: "Yen-carry unwind", stats: "QQQ −13.6% over 20 sessions · low Aug 7, 2024 · reclaimed in 64 sessions" },
-    "2025": { label: "Tariff crash — V-shaped capitulation", stats: "QQQ −22.8% over 34 sessions · low Apr 8, 2025 · reclaimed in 52 sessions" },
-    "2026": { label: "Rolling QQQ grind — memory/storage supercycle emerges", stats: "QQQ −12.0% over 103 sessions · low Mar 30, 2026 · reclaimed in 11 sessions" },
+    "2023": { label: "Rate-scare correction", stats: "QQQ −10.8% over 71 sessions · low Oct 26, 2023 · reclaimed in 13 sessions", note: "The slowest correction in the book — 71 sessions of lower lows while rates topped. Slow tapes give the clearest tells: every study in this chapter printed its own low before the index did, and most had already reclaimed their moving averages while QQQ was still under water." },
+    "2024": { label: "Yen-carry unwind", stats: "QQQ −13.6% over 20 sessions · low Aug 7, 2024 · reclaimed in 64 sessions", note: "The opposite regime: a 20-session flush that took everything down at once, leaders included. Nobody bottomed meaningfully early here — the tell was recovery speed. The names back at their highs in days, while the index took two months, became the biggest winners of the cycle." },
+    "2025": { label: "Tariff crash — V-shaped capitulation", stats: "QQQ −22.8% over 34 sessions · low Apr 8, 2025 · reclaimed in 52 sessions", note: "A 23% capitulation in 34 sessions. In a forced-liquidation tape the early-bottom tell mostly disappears — the leaders bottomed with the index, not before it. What separated them was the moving averages: stacked at the low, and vertical recovery legs off it." },
+    "2026": { label: "Rolling QQQ grind — memory/storage supercycle emerges", stats: "QQQ −12.0% over 103 sessions · low Mar 30, 2026 · reclaimed in 11 sessions", note: "A 103-session rolling grind — the longest tape in the book, and the one with the earliest tells. DELL bottomed 48 sessions before the index; ARM 38. In a grind there is time for leadership to show its hand: the leaders were back at their highs while QQQ was still stepping down." },
   },
 };
 
@@ -884,6 +884,7 @@ function openProjectBookPdf(rows, coverTitle) {
       <div class="pbdivmeta">
         ${ep ? `<div class="pbeplabel">${esc(ep.label)}</div>` : g.year === "—" ? "" : `<div class="pbeplabel">${esc(g.year)}</div>`}
         ${ep && ep.stats ? `<div class="pbepstats">${esc(ep.stats)}</div>` : ""}
+        ${ep && ep.note ? `<div class="pbdivnote">${esc(ep.note)}</div>` : ""}
         <div class="pbepcount">${g.items.length} ${g.items.length === 1 ? "study" : "studies"}</div>
       </div>
     </div>`;
@@ -920,6 +921,7 @@ function openProjectBookPdf(rows, coverTitle) {
       const pageA = `<div class="page pbstudy pbplate" id="e${idx}">
         ${head(isMB)}
         ${chartBlock(r.before_img, capA, "pbchart", idPill + (isMB ? vsPill : ""))}
+        ${study.annotation ? `<div class="pbnote">${esc(study.annotation)}</div>` : ""}
         ${folio}
       </div>`;
       // Page B — daily chart + data strip + ticked checklist + thesis
@@ -1081,6 +1083,8 @@ function openProjectBookPdf(rows, coverTitle) {
       /* chart overlay pills — nickschmidt trend-lane chips, moved onto the image */
       .pbchartwrap{position:relative;border:1px solid rgba(255,255,255,0.10);border-radius:10px;overflow:hidden;margin-top:20px}
       .pbcapn{font-size:0.7rem;color:#9a968c;line-height:1.55;margin-top:10px}
+      .pbnote{font-size:0.84rem;color:#c6c2b8;line-height:1.72;margin-top:16px}
+      .pbdivnote{font-size:0.85rem;color:#b9b5aa;line-height:1.72;margin-top:18px;max-width:54ch}
       .pbnoimgbox{border:1px dashed rgba(255,255,255,0.14);border-radius:10px;padding:52px;text-align:center;color:#66635b;font-size:0.8rem;margin-top:20px}
       .pbpill{position:absolute;top:10px;font-size:0.56rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#e8e6e0;background:rgba(6,6,10,0.74);border:1px solid rgba(255,255,255,0.14);border-radius:99px;padding:3px 11px;white-space:nowrap}
       .pbpill-l{left:10px}
@@ -1101,7 +1105,7 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbvsq{font-size:1.25rem;font-weight:700;color:#9a968c;letter-spacing:0}
       .pbnoimg{padding:40px;text-align:center;color:#66635b;font-size:0.8rem}
       .pbcap{font-size:0.6rem;font-weight:800;letter-spacing:0.2em;text-transform:uppercase;color:#9a968c}
-      .pbchart,.pbchartwrap,.pbcapn,.pbstrip,.pbchecklist,.pbthesis,.pbshead,.pbcap{break-inside:avoid;page-break-inside:avoid}
+      .pbchart,.pbchartwrap,.pbcapn,.pbstrip,.pbchecklist,.pbthesis,.pbshead,.pbcap,.pbnote,.pbdivnote{break-inside:avoid;page-break-inside:avoid}
       /* data strip — 4-per-row grid so it never widens the page; hairlines top/bottom only */
       .pbstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 22px;margin:24px 0 4px;padding:15px 0;border-top:1px solid rgba(255,255,255,0.10);border-bottom:1px solid rgba(255,255,255,0.10)}
       .pbcell{min-width:0}
@@ -1179,6 +1183,8 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pbstheme{color:#6a675e}
       body.light .pbchartwrap{border-color:rgba(0,0,0,0.12)}
       body.light .pbcapn{color:#6a675e}
+      body.light .pbnote{color:#45433c}
+      body.light .pbdivnote{color:#55534a}
       body.light .pbnoimgbox{border-color:rgba(0,0,0,0.16);color:#8a857a}
     </style></head><body>
     <div class="toolbar">
