@@ -181,7 +181,48 @@ export const STUDY_SETUPS = {
       ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
   },
-  // Market Bottom — project study type (Valen 2026-07-28): how leaders behave around an index
+  // Momentum Breakdown — the downside mirror (Valen 2026-07-31, for the AMD deep dive: one project
+  // can now hold breakouts + breakdowns + EPs). Distinct tick keys (bd_*/etc) so lift stats never
+  // blend long-side and short-side evidence. Direction is forced "short" — study-fill's short guard
+  // keeps the long-anchored compute engine from poisoning outcomes (print-only until a short engine
+  // exists). Ticks stay chart-visible only; doctrine: Qulla S4 short-side mirror + JLaw RS-decay
+  // (down-on-up-day · lost-50d-no-reclaim-in-4-6d).
+  "Momentum Breakdown": {
+    buckets: [
+      { title: "Top / losing leadership", items: [
+        ["dist_top", "Distribution at the top — failed highs / big red-volume days"],
+        ["ma_roll", "MA rollover — price below 10/20/50, averages turning down"],
+        ["lower_highs", "Lower highs forming into the support level"],
+        ["failed_reclaim", "Lost the 50-day and could not reclaim it within a few sessions"],
+        ["rs_decay", "RS decay — down on index up-days before the break", "bonus"],
+      ]},
+      { title: "Coil under support", items: [
+        ["bd_tight", "Bear-flag coil — tightening range sitting on the level"],
+        ["weak_bounce", "Weak bounces — low volume, can't reach the falling 20MA"],
+        ["supp_tests", "Support worn out — 3+ tests of the same level"],
+      ]},
+      { title: "Trigger day", items: [
+        ["supp_break", "Broke support and CLOSED below it (not just an undercut)"],
+        ["bd_re", "Day-1 range expansion down — bar visibly bigger than the last 5–10"],
+        ["bd_vol", "Volume expansion on the break day"],
+        ["gap_dn", "Gapped down through the level"],
+        ["closelo", "Closed in the bottom 30% of the day's range"],
+        ["bd_catalyst", "Catalyst present (earnings/news ≤2d before)", "bonus"],
+      ]},
+    ],
+    metrics: [
+      ["rs", "AS/RS rank at break"], ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"],
+      ["top_decline_pct", "% off the top at trigger"], ["from_high_pct", "% below 52wk high"],
+      ["flag_days", "Coil length at support (days)"], ["supp_touches", "Support touches before break"],
+      ["re_pct", "Trigger day % move"], ["gap_pct", "Gap % (open vs prior close)"], ["vol_ratio", "Volume ÷ prior day"],
+      ["rvol_eod", "RVol 50d on break day"], ["stop_width_adr", "Stop width entry→HoD (×ADR)"],
+      ["dnside_5d", "Move 5d after break (%)"], ["dnside_20d", "Move 20d after break (%)"],
+      ["reclaim_days", "Sessions to reclaim the broken level (blank = never)"],
+      ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
+    ],
+  },
+  
+// Market Bottom — project study type (Valen 2026-07-28): how leaders behave around an index
   // correction low. Ticks drafted from his own chart annotations; data layer prefilled by script.
   "Market Bottom": {
     buckets: [
@@ -1755,7 +1796,7 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
             <div style={{ border: `1px solid ${C.borderGold}`, borderRadius: 14, padding: 16, background: C.glass }}>
               <div style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white }}>{row.ticker || "—"}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", margin: "6px 0 4px" }}>
-                <span style={{ fontSize: "0.74rem", fontWeight: 700, color: C.goldBright }}>{s.setup}{s.setup === "Parabolic" && s.direction === "short" ? " · Short" : ""}</span>
+                <span style={{ fontSize: "0.74rem", fontWeight: 700, color: C.goldBright }}>{s.setup}{(s.setup === "Parabolic" || s.setup === "Momentum Breakdown") && s.direction === "short" ? " · Short" : ""}</span>
                 {row.entry_date && <span style={{ fontSize: "0.7rem", color: C.muted }}>· {row.entry_date}</span>}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 6 }}>
@@ -2042,7 +2083,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       before_img: derived.before_img || null,
       after_img: derived.after_img || null,
       metrics: { ...row.metrics, study: { ...s, charts: charts || [], trigger_ltf_img: derived.trigger_ltf_img || "", outcome_img: derived.outcome_img || "", grade: { letter: q.letter === "—" ? "" : q.letter, auto: true, on: q.on, total: q.total } } },
-      pattern: s.setup === "Parabolic" ? `Parabolic ${s.direction === "short" ? "Short" : "Long"}` : s.setup,
+      pattern: s.setup === "Parabolic" ? `Parabolic ${s.direction === "short" ? "Short" : "Long"}` : s.setup === "Momentum Breakdown" ? "Momentum Breakdown (short-side)" : s.setup,
       outcome: cls ? MB_OUTCOME[cls] : null, thesis: row.thesis,
       lesson: [s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n") || null };
   };
@@ -2145,7 +2186,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
         <div style={{ width: 110 }}><label style={lbl}>Ticker</label><input style={inputS} value={row.ticker} onChange={e => setRow(r => ({ ...r, ticker: e.target.value.toUpperCase() }))} /></div>
         <div style={{ width: 150 }}><label style={lbl}>Trigger date</label><input type="date" style={inputS} value={row.entry_date || ""} onChange={e => setRow(r => ({ ...r, entry_date: e.target.value }))} /></div>
         <div style={{ width: 180 }}><label style={lbl}>Setup</label>
-          <select style={inputS} value={s.setup} onChange={e => setS({ setup: e.target.value, checks: {}, m: {} })}>
+          <select style={inputS} value={s.setup} onChange={e => setS({ setup: e.target.value, checks: {}, m: {}, ...(e.target.value === "Momentum Breakdown" ? { direction: "short" } : {}) })}>
             {Object.keys(STUDY_SETUPS).map(k => <option key={k}>{k}</option>)}
           </select></div>
         {/* Project (Valen 2026-07-28) — optional grouping so studies collect into named "books" (e.g. a market-bottom
@@ -2154,7 +2195,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           <input style={inputS} list="study-project-names" value={s.project || ""} onChange={e => setS({ project: e.target.value })}
             placeholder="Project (optional) — e.g. Finding the Market's Bottom" />
           <datalist id="study-project-names">{projectNames.map(p => <option key={p} value={p} />)}</datalist></div>
-        {s.setup === "Parabolic" && <div style={{ width: 110 }}><label style={lbl}>Direction</label>
+        {(s.setup === "Parabolic" || s.setup === "Momentum Breakdown") && <div style={{ width: 110 }}><label style={lbl}>Direction</label>
           <select style={inputS} value={s.direction} onChange={e => setS({ direction: e.target.value })}><option>short</option><option>long</option></select></div>}
         <div style={{ width: 150 }}><label style={lbl}>Market condition</label>
           <select style={inputS} value={s.regime_tag || ""} onChange={e => setS({ regime_tag: e.target.value })}>
