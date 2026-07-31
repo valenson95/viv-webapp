@@ -401,6 +401,50 @@ const spyByDate = new Map(spy.map(b => [b.d, b.c]));
 
 // ── 2) per-ETF raw metrics (r21, w5, and the absolute price stats). Relative series rel[i] =
 // close_ETF[i] / close_SPY[i] aligned by DATE (only dates present in both).
+
+// ── SPLIT ADJUSTMENT (2026-07-31) ────────────────────────────────────────────────────────────
+// The proxy serves UNADJUSTED bars (real-fills convention — dividends deliberately unadjusted,
+// ±1–3%% drift accepted). But a SPLIT inside the 420d window poisons everything computed across it:
+// NOW (5:1) printed off52 −88%% vs its chart's real ~−36%%, NFLX −94%%, PALL −88%% — false "trap"
+// flags member-side. Fix: detect candidate split days by the overnight prevClose÷open ratio landing
+// within 4%% of a canonical ratio (2..20 or reverse), CONFIRM via Polygon's splits reference API
+// (POLYGON_API_KEY in .env.local; candidates are rare so calls stay under the rate cap), then
+// divide all PRIOR prices by the ratio (volume ×). No key / API error → accept the heuristic, loudly.
+// Crash-gap false positives (a −50%% overnight looks like 2:1) are exactly what the API confirm kills.
+const SPLIT_RATIOS = [2, 3, 4, 5, 6, 7, 8, 10, 15, 20].flatMap(k => [k, 1 / k]);
+async function confirmSplit(ticker, date) {
+  const key = process.env.POLYGON_API_KEY;
+  if (!key) return null; // unknown — heuristic decides
+  try {
+    const r = await fetch(`https://api.polygon.io/v3/reference/splits?ticker=${ticker}&execution_date=${date}&apiKey=${key}`);
+    const j = await r.json();
+    if (Array.isArray(j.results) && j.results.length) {
+      const sp = j.results[0];
+      return sp.split_to / sp.split_from; // divisor for pre-split prices (5:1 fwd → 5; 1:10 rev → 0.1)
+    }
+    return false; // API affirmatively says: no split that day
+  } catch { return null; }
+}
+async function splitAdjust(b, tag) {
+  if (!b || b.length < 2) return b;
+  let out = null;
+  for (let i = 1; i < b.length; i++) {
+    const prev = (out || b)[i - 1].c, open = (out || b)[i].o;
+    if (!prev || !open) continue;
+    const r = prev / open;
+    if (r > 0.6 && r < 1.6) continue; // normal gap territory
+    const cand = SPLIT_RATIOS.find(k => Math.abs(r / k - 1) < 0.04);
+    if (!cand) continue;
+    const confirmed = await confirmSplit(tag, b[i].d);
+    if (confirmed === false) { console.log(`  split? ${tag} ${b[i].d} ratio ${r.toFixed(3)} — Polygon says NO split; leaving raw`); continue; }
+    const div = confirmed || cand;
+    console.log(`  SPLIT ADJ: ${tag} ${div >= 1 ? Math.round(div) + ":1" : "1:" + Math.round(1 / div)} on ${b[i].d}${confirmed ? " (API-confirmed)" : " (heuristic)"}`);
+    out = out || b.map(x => ({ ...x }));
+    for (let j = 0; j < i; j++) { out[j].o /= div; out[j].h /= div; out[j].l /= div; out[j].c /= div; out[j].v *= div; }
+  }
+  return out || b;
+}
+
 function computeRaw(b) {
   // align: keep ETF bars whose date also has a SPY close; rel = etf.c / spy.c
   const aligned = b.filter(x => spyByDate.has(x.d)).map(x => ({ ...x, rel: x.c / spyByDate.get(x.d) }));
@@ -459,6 +503,9 @@ function computeRaw(b) {
   const rsSpark = norm01(rel.slice(-21));                            // last 21 rel values, 0..1
   return { r21, w5, rs1mOwn, thrustOwn, pctIntraday, pct1d, pct1m, off52, spark, rsSpark };
 }
+
+// split-adjustment pass over every universe (cache stays RAW; adjustment is compute-time only)
+for (const list of [raw, rawPF, rawLL]) for (const r of list) if (r.bars) r.bars = await splitAdjust(r.bars, r.t);
 
 const metrics = raw.map(r => ({ ...r, m: r.bars ? computeRaw(r.bars) : null }));
 

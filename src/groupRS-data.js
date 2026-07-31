@@ -3698,7 +3698,7 @@ export const GROUP_RS = {
       "pctIntraday": 2.45,
       "pct1d": 4.24,
       "pct1m": 8.02,
-      "off52": -87.92,
+      "off52": -39.59,
       "spark": [
         0,
         0.4783,
@@ -5666,7 +5666,7 @@ export const GROUP_RS = {
       "pctIntraday": 1.52,
       "pct1d": 0.53,
       "pct1m": 11.01,
-      "off52": -36.54,
+      "off52": -7.09,
       "spark": [
         0,
         0.0602,
@@ -6032,7 +6032,7 @@ export const GROUP_RS = {
       "pctIntraday": -1.09,
       "pct1d": -0.19,
       "pct1m": 1.59,
-      "off52": -44.3,
+      "off52": -4.62,
       "spark": [
         0.4286,
         0.8571,
@@ -6093,7 +6093,7 @@ export const GROUP_RS = {
       "pctIntraday": -1.18,
       "pct1d": -0.56,
       "pct1m": -1.5,
-      "off52": -52.37,
+      "off52": -6.57,
       "spark": [
         0.0675,
         0.6748,
@@ -6215,7 +6215,7 @@ export const GROUP_RS = {
       "pctIntraday": 0.2,
       "pct1d": 0.7,
       "pct1m": -4.17,
-      "off52": -53.82,
+      "off52": -10.1,
       "spark": [
         1,
         0.896,
@@ -6276,7 +6276,7 @@ export const GROUP_RS = {
       "pctIntraday": 1.69,
       "pct1d": 5.5,
       "pct1m": -7.76,
-      "off52": -42.57,
+      "off52": -11.57,
       "spark": [
         0.9917,
         0.7298,
@@ -7078,7 +7078,7 @@ export const GROUP_RS = {
       "pctIntraday": -0.39,
       "pct1d": -4.92,
       "pct1m": 10.87,
-      "off52": -88.92,
+      "off52": -44.58,
       "spark": [
         0.5819,
         0.6037,
@@ -9292,7 +9292,7 @@ export const GROUP_RS = {
       "pctIntraday": 2.36,
       "pct1d": -0.62,
       "pct1m": 2.48,
-      "off52": -94.23,
+      "off52": -42.25,
       "spark": [
         0.6557,
         1,
