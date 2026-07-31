@@ -134,6 +134,12 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 // PROJECT_EPISODES (Valen 2026-07-28): per-project episode metadata for the project-book export dividers.
 // Keyed project → year → { label, stats }. A missing year/project prints a plain year divider (no stats).
 const PROJECT_EPISODES = {
+  "AMD Chronicle": {
+    "2021": { label: "The melt-up — coil, flags, and the top", stats: "Trigger Oct 13 · +50.7% in 33 sessions to the Nov 30 top ($164.46)", note: "The whole cycle in one quarter: a two-month coil, a clean break, two continuation flags — and then the leg that ended it all, printed with the same grammar as the ones that started it." },
+    "2023": { label: "The AI re-rate begins", stats: "May 16 trendline break (+30.9% / 19 sessions) · Dec 7 shelf break (+77.1% / 62 sessions)", note: "Off the October 2022 low AMD built two structures: a trendline-capped recovery that broke in May, and a five-month shelf at 122 that a product event finally released in December." },
+    "2024": { label: "Blow-off and give-back", stats: "Jan 16 triangle (+43.2% / 37 sessions) · Feb 29 final flag (+18.1% / 6 sessions, fully surrendered by Mar 20)", note: "Three breakouts stacked into one run that ended at 227.30 on March 8. The first two paid handsomely; the third was the top. Same setup every time — the only variable that changed was how much trend was left." },
+    "2025": { label: "Washout, wedge, the next campaign", stats: "Jul 10 wedge break · +63.6% in 63 sessions", note: "From the April washout, a three-month recovery ended in a two-line wedge — the 2021 playbook verbatim. It gapped out in July, flagged once mid-month, and was still paying into the autumn." },
+  },
   "Finding the Market's Bottom": {
     "2023": { label: "Rate-scare correction", stats: "QQQ −10.8% over 71 sessions · low Oct 26, 2023 · reclaimed in 13 sessions", note: "The slowest correction in the book — 71 sessions of lower lows while rates topped. Slow tapes give the clearest tells: every study in this chapter printed its own low before the index did, and most had already reclaimed their moving averages while QQQ was still under water." },
     "2024": { label: "Yen-carry unwind", stats: "QQQ −13.6% over 20 sessions · low Aug 7, 2024 · reclaimed in 64 sessions", note: "The opposite regime: a 20-session flush that took everything down at once, leaders included. Nobody bottomed meaningfully early here — the tell was recovery speed. The names back at their highs in days, while the index needed months, became the biggest winners of the cycle." },
@@ -148,6 +154,34 @@ const PROJECT_EPISODES = {
 // captions). Text transcribed/tightened from the deck — no mentor names in the typeout.
 const PREFACE_IMG = "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/preface";
 const PROJECT_PREFACE = {
+  "AMD Chronicle": {
+    source: "VIV Research · the single-name chronicle series",
+    sections: [
+      { n: "01", kicker: "The subject", title: "One company, through every market weather.", blocks: [
+        { t: "p", x: "Most studies compare many stocks inside one moment. This book inverts it: one stock, every moment. Hold the company constant and the market's regimes become the variable — the same name lived through a turnaround, a mania, two crashes, a bear that cut it by two-thirds, and an AI supercycle. What repeats across those eras is not the news. It is the structure of the setups." },
+        { t: "def", k: "Chronicle", x: "A single-name study series ordered by era. Every study is graded on the same factor card as the rest of the vault — only the years change." },
+        { t: "pull", x: "The company changes its story every three years. The setups never change theirs." },
+      ]},
+      { n: "02", kicker: "Why AMD", title: "The perfect specimen.", rows: [
+        ["It nearly died first", "In 2015 this was a two-dollar stock priced for bankruptcy. Everything that followed — Ryzen, EPYC, the datacenter era — happened on a chart you could trade. Turnarounds print the cleanest catalysts."],
+        ["Every setup class in one name", "Earnings gaps that doubled the stock. Bases that took whole quarters. Support breaks that cut it in half. One ticker supplies the full curriculum, both directions."],
+        ["Liquid in every era", "From single digits to the hundreds, AMD stayed one of the most-traded names in the market — every study here was executable at size. No survivor-liquidity bias."],
+      ]},
+      { n: "03", kicker: "How to read", title: "Same anatomy, different years.", rows: [
+        ["The staircase first", "Each earnings-driven study opens with the quarterly engine — sales growth quarter over quarter. The July 2018 gap was three accelerating quarters in a row before the candle ever printed."],
+        ["Structure over story", "Every study asks the same questions: what did the base look like, what triggered, what did volume do, where did the trend die. The narrative changes; the checklist does not."],
+        ["Both directions", "Breakdowns are graded with the same rigor as breakouts — the mirror image. Knowing how leaders die is half of knowing how to hold them."],
+      ]},
+      { n: "04", kicker: "The eras", title: "A decade in six regimes.", rows: [
+        ["2016–2018 · The turnaround", "From left-for-dead to the strongest chart in the index — the Ryzen/EPYC re-rating, ending in the July 2018 earnings gap that doubled the stock in seven weeks."],
+        ["Q4 2018 · The first crash", "Crypto demand vanished and the stock gave back half. The first lesson in how fast momentum unwinds."],
+        ["2019 · The base year", "Three quarters of sideways while the index double-dipped — then the late-October breakout that ran into 2020."],
+        ["2020–2021 · COVID and the melt-up", "A one-month flush, a three-month recovery, and the run to the 2021 top near $164."],
+        ["2022 · The bear", "From $164 to $54 — a two-thirds drawdown with textbook breakdown legs the whole way."],
+        ["2023–2026 · The AI era", "The recovery, the new highs, and the corrections in between — the chapters this book is still being written inside."],
+      ]},
+    ],
+  },
   "Finding the Market's Bottom": {
     source: "Adapted from the VIV webinar — Positioning & Situational Awareness · July 22, 2026",
     sections: [
@@ -184,6 +218,13 @@ const PROJECT_PREFACE = {
 // appears only when listed here with a topic title. Admin-gated until Valen flips it to members.
 const DEEP_DIVES = [
   {
+    no: "02", slug: "amd-chronicle", project: "AMD Chronicle",
+    title: "One Stock Through Every Market Cycle",
+    premise: "Hold the company constant and the regimes become the variable. A decade of AMD — turnaround, mania, two crashes, a two-thirds bear, and the AI era — every setup class graded on the same card.",
+    updated: "2026-07-31",
+    cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/amd-chronicle-cover.png",
+  },
+  {
     no: "01", slug: "market-bottom", project: "Finding the Market's Bottom",
     title: "Surfacing Market Leaders Through a Market Correction",
     premise: "When the index breaks, the next cycle's leaders refuse to break with it. Fourteen studies across four corrections — how the leaders bottomed, what they held at the low, and how fast they paid once the turn came.",
@@ -195,10 +236,19 @@ const DEEP_DIVES = [
 // The dives INDEX — faithful to nickschmidt.so/report as rendered: plain heading · auto-scrolling
 // ruled proof marquee (ticker + green %) · open-type latest hero with illustration thumb · archive
 // in LIST (dotted leaders) or GRID (illustration cards) — the toggle mirrors his two formats.
-export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount }) {
+export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, onTogglePublish }) {
+  // Dive publish state is DERIVED from its rows (any is_published → LIVE). Members never reach
+  // this branch for draft dives — RLS returns zero rows and diveList drops them upstream.
+  const liveOf = (d) => d.rows.some(r => r.is_published);
+  const badge = (d) => isAdmin ? (
+    <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: liveOf(d) ? C.green : C.muted, border: `1px solid ${liveOf(d) ? "rgba(34,197,94,0.35)" : C.border}`, padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>{liveOf(d) ? "LIVE" : "DRAFT"}</span>
+  ) : null;
+  const pubLink = (d) => (isAdmin && onTogglePublish) ? (
+    <span onClick={(e) => { e.stopPropagation(); onTogglePublish(d); }} style={{ fontSize: "0.72rem", color: C.muted, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 4, whiteSpace: "nowrap" }}>{liveOf(d) ? "Unpublish" : "Publish to members"}</span>
+  ) : null;
   const [layout, setLayout] = useState(() => { try { return localStorage.getItem("viv-dives-layout") || "list"; } catch { return "list"; } });
   const setL = (v) => { setLayout(v); try { localStorage.setItem("viv-dives-layout", v); } catch {} };
-  const proof = dives.flatMap(d => d.rows.map(r => ({ t: r.ticker, v: +(r.metrics?.study?.m?.ret_3m) })))
+  const proof = dives.flatMap(d => d.rows.map(r => ({ t: r.ticker, v: +(r.metrics?.study?.m?.ret_3m ?? r.metrics?.study?.m?.peak_pct) })))
     .filter(x => Number.isFinite(x.v) && x.v > 0).sort((a, b) => b.v - a.v).slice(0, 8);
   const latest = dives[0], rest = dives.slice(1);
   const thumbOf = (d) => d.cover || d.rows.find(r => r.before_img)?.before_img;
@@ -238,9 +288,12 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount }) {
       {latest && (
         <div style={{ display: "flex", gap: 36, alignItems: "flex-start", justifyContent: "space-between", margin: "40px 0 0", flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 420px", minWidth: 0 }}>
-            <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: C.muted }}>Latest dive <span style={{ opacity: 0.45 }}>——</span> {latest.updated}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: C.muted }}>Latest dive <span style={{ opacity: 0.45 }}>——</span> {latest.updated}</span>{badge(latest)}</div>
             <div onClick={() => onOpen(latest)} style={{ fontSize: "2.1rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, lineHeight: 1.14, margin: "16px 0 0", maxWidth: "20ch", cursor: "pointer" }}>{latest.title}</div>
-            <div onClick={() => onOpen(latest)} style={{ display: "inline-block", marginTop: 28, paddingBottom: 10, borderBottom: `1px solid ${C.border}`, fontSize: "0.92rem", color: C.text, cursor: "pointer" }}>Open the dive <span style={{ color: C.muted }}>↗</span></div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 22, marginTop: 28 }}>
+              <div onClick={() => onOpen(latest)} style={{ display: "inline-block", paddingBottom: 10, borderBottom: `1px solid ${C.border}`, fontSize: "0.92rem", color: C.text, cursor: "pointer" }}>Open the dive <span style={{ color: C.muted }}>↗</span></div>
+              {pubLink(latest)}
+            </div>
           </div>
           {thumbOf(latest) && <img src={thumbOf(latest)} alt="" onClick={() => onOpen(latest)} style={{ width: 320, maxWidth: "100%", borderRadius: 16, border: `1px solid ${C.border}`, cursor: "pointer", display: "block" }} />}
         </div>
@@ -258,6 +311,7 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount }) {
                   <span style={{ fontSize: "0.92rem", fontWeight: 600, color: C.text, whiteSpace: "nowrap" }}>{d.title}</span>
                   <span style={{ flex: 1, borderBottom: "1px dotted rgba(255,255,255,0.18)", transform: "translateY(-4px)" }} />
                   <span style={{ fontSize: "0.78rem", color: C.muted, whiteSpace: "nowrap" }}>{d.updated}</span>
+                  {badge(d)}{pubLink(d)}
                 </div>
               ))}
             </div>
@@ -266,7 +320,7 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount }) {
               {rest.map(d => (
                 <div key={d.slug} onClick={() => onOpen(d)} style={{ cursor: "pointer" }}>
                   {thumbOf(d) && <img src={thumbOf(d)} alt="" style={{ width: "100%", borderRadius: 16, border: `1px solid ${C.border}`, display: "block" }} />}
-                  <div style={{ fontSize: "0.72rem", color: C.muted, margin: "12px 0 0" }}>{d.updated}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0 0" }}><span style={{ fontSize: "0.72rem", color: C.muted }}>{d.updated}</span>{badge(d)}</div>
                   <div style={{ fontSize: "1.05rem", fontWeight: 700, color: C.white, lineHeight: 1.3, margin: "6px 0 0" }}>{d.title}</div>
                 </div>
               ))}
@@ -283,8 +337,12 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
   // (e.g. "Market Bottom") gets the gallery-grade minimal book instead of the classic model-book layout.
   // The classic path below is byte-identical when this guard doesn't fire.
   const _pbStudies = rows.filter((r) => r.metrics?.study);
+  // Chronicle fix (2026-07-31): a dive whose rows all carry metrics.study.project === coverTitle is a
+  // project book regardless of setup class — "Momentum Breakout" lives in H_DOMAIN, which wrongly sent
+  // the AMD Chronicle to the classic layout. Personal H-studies (no project) keep the classic book.
   if (coverTitle && _pbStudies.length > 0 && _pbStudies.length === rows.length &&
-    !_pbStudies.some((r) => H_DOMAIN.has(r.metrics.study.setup))) {
+    (_pbStudies.every((r) => r.metrics.study.project === coverTitle) ||
+      !_pbStudies.some((r) => H_DOMAIN.has(r.metrics.study.setup)))) {
     return openProjectBookPdf(rows, coverTitle);
   }
   // Chronicle order (Valen 2026-07-28): the book reads BY TICKER, each ticker chronological from
@@ -820,9 +878,10 @@ function openProjectBookPdf(rows, coverTitle) {
       const ep = episodes[g.year];
       const head = `${g.year}${ep ? ` — ${esc(ep.label)}` : ""}`;
       const rowsHtml = g.items.map(({ r, idx }) => {
-        const m = r.metrics?.study?.m || {}, theme = r.theme || m.theme || "";
-        const ret3 = m.ret_3m;
-        const ret = (ret3 === "" || ret3 == null) ? "—" : `${+ret3 >= 0 && !String(ret3).startsWith("-") ? "+" : ""}${esc(ret3)}% 3M`;
+        const m = r.metrics?.study?.m || {}, theme = r.theme || m.theme || r.entry_date || "";
+        const ret3 = (m.ret_3m === "" || m.ret_3m == null) ? null : m.ret_3m;
+        const pk = (ret3 == null && m.peak_pct != null) ? m.peak_pct : null;
+        const ret = ret3 != null ? `${+ret3 >= 0 && !String(ret3).startsWith("-") ? "+" : ""}${esc(ret3)}% 3M` : pk != null ? `${+pk >= 0 ? "+" : ""}${esc(pk)}% peak` : "—";
         return `<a class="pbcrow" href="#e${idx}"><span class="pbcno">${String(idx + 1).padStart(2, "0")}</span><span class="pbctk">${esc(r.ticker)}</span><span class="pbctheme">${esc(theme)}</span><span class="pbcdots"></span><span class="pbcret">${ret}</span></a>`;
       }).join("");
       return `<div class="pbcgroup"><div class="pbcyear">${head}</div>${rowsHtml}</div>`;
@@ -906,17 +965,18 @@ function openProjectBookPdf(rows, coverTitle) {
       const vsPill = (vsN !== "" && vsN != null && !Number.isNaN(+vsN))
         ? `<span class="pbpill pbpill-r">${+vsN < 0 ? "−" : +vsN > 0 ? "+" : ""}${Math.abs(+vsN)} sess vs QQQ</span>` : "";
       const retPill = (m.ret_3m !== "" && m.ret_3m != null)
-        ? `<span class="pbpill pbpill-r">${+m.ret_3m >= 0 && !String(m.ret_3m).startsWith("-") ? "+" : ""}${esc(m.ret_3m)}% · 3M</span>` : "";
+        ? `<span class="pbpill pbpill-r">${+m.ret_3m >= 0 && !String(m.ret_3m).startsWith("-") ? "+" : ""}${esc(m.ret_3m)}% · 3M</span>`
+        : (m.peak_pct != null ? `<span class="pbpill pbpill-r">${+m.peak_pct >= 0 ? "+" : ""}${esc(m.peak_pct)}% · peak</span>` : "");
       const folio = `<div class="pbfolio"><span>${esc(coverTitle)}</span><span>No. ${String(idx + 1).padStart(2, "0")} / ${String(rows.length).padStart(2, "0")} · ${esc(yearOf(r))}</span></div>`;
       // Sentence captions in Nick's register — small grey line under the card with the key datapoint
       const vsPhrase = (vsN !== "" && vsN != null && !Number.isNaN(+vsN))
         ? (+vsN < 0 ? ` — bottomed ${Math.abs(+vsN)} session${Math.abs(+vsN) === 1 ? "" : "s"} before the index`
           : +vsN > 0 ? ` — bottomed ${+vsN} session${+vsN === 1 ? "" : "s"} after the index` : ` — bottomed with the index`) : "";
       const capA = isMB ? `${esc(r.ticker)} vs QQQ, daily. Own low ${esc(r.entry_date || "—")}${vsPhrase}.`
-        : `${esc(r.ticker)} — higher-timeframe context.`;
+        : `${esc(r.ticker)}, daily — the setup into the ${esc(r.entry_date || "trigger")} trigger.`;
       const capB = isMB ? `${esc(r.ticker)}, daily${(m.ret_3m !== "" && m.ret_3m != null)
         ? ` — ${+m.ret_3m >= 0 && !String(m.ret_3m).startsWith("-") ? "+" : ""}${esc(m.ret_3m)}% in the three months off the low` : ""}.`
-        : `${esc(r.ticker)} — the setup, daily.`;
+        : `${esc(r.ticker)}, daily — ${m.day_pct != null ? `${+m.day_pct >= 0 ? "+" : ""}${esc(m.day_pct)}% day one` : "the outcome"}${m.peak_pct != null ? `, ${+m.peak_pct >= 0 ? "+" : ""}${esc(m.peak_pct)}% to the peak in ${esc(m.sessions_to_peak)} sessions` : ""}.`;
       // Page A — vs-QQQ chart (MB); other project books caption it as HTF context
       const pageA = `<div class="page pbstudy pbplate" id="e${idx}">
         ${head(isMB)}
@@ -925,12 +985,19 @@ function openProjectBookPdf(rows, coverTitle) {
         ${folio}
       </div>`;
       // Page B — daily chart + data strip + ticked checklist + thesis
-      const cells = [
+      const cells = isMB ? [
         ["Own low", esc(r.entry_date || "") || "—"],
         ["Vs index", fmtSess(m.sessions_vs_index)],
         ["+3M", fmtPct(m.ret_3m)],
         ["+6M", fmtPct(m.ret_6m)],
         ["Vs QQQ 3M", fmtPp(m.vs_qqq_3m)],
+      ] : [
+        ["Trigger", esc(r.entry_date || "") || "—"],
+        ...(m.gap_pct != null ? [["Gap", fmtPct(m.gap_pct)]] : []),
+        ...(m.day_pct != null ? [["Day-1", fmtPct(m.day_pct)]] : []),
+        ...(m.rvol_eod != null ? [["RVOL", `${esc(m.rvol_eod)}\u00d7`]] : []),
+        ...(m.t20 != null ? [["T+20", fmtPct(m.t20)]] : []),
+        ...(m.peak_pct != null ? [["Peak", `${fmtPct(m.peak_pct)} \u00b7 ${esc(m.sessions_to_peak ?? "\u2014")}s`]] : []),
       ];
       if (m.days_to_reclaim !== "" && m.days_to_reclaim != null) cells.push(["Reclaim", `${esc(m.days_to_reclaim)} sessions`]);
       if (m.trigger_date) cells.push(["Trigger", esc(m.trigger_date)]);
@@ -1764,6 +1831,25 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   // Deep Dives: registry entries enriched with their live study rows. Members only receive rows
   // RLS lets them read (published); a dive with zero readable rows stays hidden.
   const diveList = DEEP_DIVES.map(d => ({ ...d, rows: rows.filter(r => isStudyRow(r) && studyProject(r) === d.project) })).filter(d => d.rows.length > 0);
+
+  // Admin click-to-publish (Valen 2026-07-31): flips is_published on the dive's project rows —
+  // the SAME mechanism as the scripted launch, now a button. Mentor-name sweep gates every publish;
+  // this is an admin CLICK, never a deploy-time write (deploys-never-touch-member-data).
+  const DIVE_SWEEP = /qulla|kullam|minervini|o['\u2019]?neil\b|zanger|bonde|stockbee|jlaw|jeff\s*sun|martin\s*luk|pradeep|easyguru|ritchie|hernandez/i;
+  const toggleDivePublish = async (d) => {
+    const live = d.rows.some(r => r.is_published);
+    if (!live) {
+      const hits = d.rows.filter(r => DIVE_SWEEP.test(JSON.stringify(r)));
+      if (hits.length) { alert(`Publish ABORTED — mentor-name sweep hit on: ${hits.map(r => r.ticker + " " + (r.entry_date || "")).join(", ")}. Clean the rows first.`); return; }
+      if (!window.confirm(`Publish "${d.project}" (${d.rows.length} studies) to ALL members?`)) return;
+    } else {
+      if (!window.confirm(`Unpublish "${d.project}" — members lose access immediately. Continue?`)) return;
+    }
+    const ids = d.rows.map(r => r.id);
+    const { error } = await supabase.from("model_book").update({ is_published: !live }).in("id", ids);
+    if (error) { alert("Publish toggle failed: " + error.message); return; }
+    setRows(rs => rs.map(x => ids.includes(x.id) ? { ...x, is_published: !live } : x));
+  };
   const dnaCount = studyRows.filter(r => !studyProject(r)).length; // 📕 Winner DNA = studies with no project
   // Lab (scoreboard / hypotheses / campaign list) is computed from the ACTIVE book's rows so each book's stats are its own.
   const bookStudyRows = studyRows.filter(r => matchesBook(r, book));
@@ -2326,7 +2412,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {/* Deep Dives (admin-first): the index; opening a dive opens the exported BOOK page itself,
           so the lab-style research UI is never member-visible. */}
       {fScope === "dives" && !loading && !error && (
-        <DiveIndex C={C} font={font} dives={diveList} onOpen={(d) => openMyBookPdf(d.rows, { coverTitle: d.project })} />
+        <DiveIndex C={C} font={font} dives={diveList} onOpen={(d) => openMyBookPdf(d.rows, { coverTitle: d.project })} isAdmin={isAdmin} onTogglePublish={toggleDivePublish} />
       )}
 
       {/* card grid — mobile-safe auto-fit (min() caps the track so a card never overflows a narrow screen).
