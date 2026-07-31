@@ -4420,7 +4420,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 2901100889300,
           "rank": 1,
-          "rx": null
+          "rx": {
+            "gapPct": 12.13,
+            "dayPct": 3.01,
+            "totalPct": 15.51
+          }
         },
         {
           "t": "META",
@@ -4434,7 +4438,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 1486526071055,
           "rank": 2,
-          "rx": null
+          "rx": {
+            "gapPct": -10.18,
+            "dayPct": 2.48,
+            "totalPct": -7.95
+          }
         },
         {
           "t": "SKHY",
@@ -4448,7 +4456,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 924128567450,
           "rank": 3,
-          "rx": null
+          "rx": {
+            "gapPct": 7.67,
+            "dayPct": 9.15,
+            "totalPct": 17.52
+          }
         },
         {
           "t": "HSBC",
@@ -4462,7 +4474,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 353501003941,
           "rank": 4,
-          "rx": null
+          "rx": {
+            "gapPct": 3.68,
+            "dayPct": 0.67,
+            "totalPct": 4.38
+          }
         },
         {
           "t": "PG",
@@ -4476,7 +4492,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 340208310686,
           "rank": 5,
-          "rx": null
+          "rx": {
+            "gapPct": -1.6,
+            "dayPct": 0.14,
+            "totalPct": -1.46
+          }
         },
         {
           "t": "LRCX",
@@ -4490,7 +4510,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 315581591850,
           "rank": 6,
-          "rx": null
+          "rx": {
+            "gapPct": 26.13,
+            "dayPct": -6.46,
+            "totalPct": 17.98
+          }
         },
         {
           "t": "ARM",
@@ -4504,7 +4528,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 239295385622,
           "rank": 7,
-          "rx": null
+          "rx": {
+            "gapPct": 14.72,
+            "dayPct": -6.38,
+            "totalPct": 7.4
+          }
         },
         {
           "t": "APH",
@@ -4518,7 +4546,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 184916539428,
           "rank": 8,
-          "rx": null
+          "rx": {
+            "gapPct": 6.25,
+            "dayPct": 0.07,
+            "totalPct": 6.33
+          }
         },
         {
           "t": "QCOM",
@@ -4532,7 +4564,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 164086720000,
           "rank": 9,
-          "rx": null
+          "rx": {
+            "gapPct": -5.86,
+            "dayPct": 3.45,
+            "totalPct": -2.62
+          }
         },
         {
           "t": "UBS",
@@ -4546,7 +4582,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 160757946416,
           "rank": 10,
-          "rx": null
+          "rx": {
+            "gapPct": 1.43,
+            "dayPct": 1.62,
+            "totalPct": 3.07
+          }
         },
         {
           "t": "BBVA",
@@ -4560,7 +4600,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 146492136842,
           "rank": 11,
-          "rx": null
+          "rx": {
+            "gapPct": 6.31,
+            "dayPct": 1.17,
+            "totalPct": 7.56
+          }
         },
         {
           "t": "SBUX",
@@ -4574,7 +4618,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 118688358000,
           "rank": 12,
-          "rx": null
+          "rx": {
+            "gapPct": 2.95,
+            "dayPct": -1.27,
+            "totalPct": 1.64
+          }
         },
         {
           "t": "FTNT",
@@ -4588,7 +4636,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 112256386469,
           "rank": 13,
-          "rx": null
+          "rx": {
+            "gapPct": 7.04,
+            "dayPct": -5.95,
+            "totalPct": 0.67
+          }
         },
         {
           "t": "ADP",
@@ -4602,7 +4654,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 110070889787,
           "rank": 14,
-          "rx": null
+          "rx": {
+            "gapPct": -2.9,
+            "dayPct": -0.59,
+            "totalPct": -3.48
+          }
         },
         {
           "t": "GD",
@@ -4616,7 +4672,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 103023084040,
           "rank": 15,
-          "rx": null
+          "rx": {
+            "gapPct": -1.08,
+            "dayPct": 1.42,
+            "totalPct": 0.33
+          }
         },
         {
           "t": "EQIX",
@@ -4630,7 +4690,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 99415214469,
           "rank": 16,
-          "rx": null
+          "rx": {
+            "gapPct": 5.32,
+            "dayPct": -1.33,
+            "totalPct": 3.92
+          }
         },
         {
           "t": "VRT",
@@ -4644,7 +4708,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 85671630321,
           "rank": 17,
-          "rx": null
+          "rx": {
+            "gapPct": 6.35,
+            "dayPct": -4.09,
+            "totalPct": 2
+          }
         },
         {
           "t": "JCI",
@@ -4658,7 +4726,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 85062317370,
           "rank": 18,
-          "rx": null
+          "rx": {
+            "gapPct": 3.31,
+            "dayPct": -0.1,
+            "totalPct": 3.2
+          }
         },
         {
           "t": "E",
@@ -4672,7 +4744,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 84663715392,
           "rank": 19,
-          "rx": null
+          "rx": {
+            "gapPct": 1.43,
+            "dayPct": 1.8,
+            "totalPct": 3.25
+          }
         },
         {
           "t": "CP",
@@ -4686,7 +4762,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 81188215509,
           "rank": 20,
-          "rx": null
+          "rx": {
+            "gapPct": -0.04,
+            "dayPct": -3.39,
+            "totalPct": -3.43
+          }
         },
         {
           "t": "HOOD",
@@ -4700,7 +4780,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 80901374321,
           "rank": 21,
-          "rx": null
+          "rx": {
+            "gapPct": 1.19,
+            "dayPct": -4.74,
+            "totalPct": -3.61
+          }
         },
         {
           "t": "AON",
@@ -4714,7 +4798,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 80552682085,
           "rank": 22,
-          "rx": null
+          "rx": {
+            "gapPct": -2.64,
+            "dayPct": -0.17,
+            "totalPct": -2.81
+          }
         },
         {
           "t": "ORLY",
@@ -4728,7 +4816,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 75106447610,
           "rank": 23,
-          "rx": null
+          "rx": {
+            "gapPct": -2.18,
+            "dayPct": -1.46,
+            "totalPct": -3.61
+          }
         },
         {
           "t": "AEM",
@@ -4742,7 +4834,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 73085677599,
           "rank": 24,
-          "rx": null
+          "rx": {
+            "gapPct": 1.52,
+            "dayPct": 2.81,
+            "totalPct": 4.38
+          }
         },
         {
           "t": "CVNA",
@@ -4756,7 +4852,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 72742146277,
           "rank": 25,
-          "rx": null
+          "rx": {
+            "gapPct": -11.11,
+            "dayPct": 4.22,
+            "totalPct": -7.36
+          }
         },
         {
           "t": "BSX",
@@ -5232,7 +5332,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 19561803300,
           "rank": 59,
-          "rx": null
+          "rx": {
+            "gapPct": 0.46,
+            "dayPct": 7.51,
+            "totalPct": 8
+          }
         },
         {
           "t": "ESS",
@@ -5250,7 +5354,7 @@ export const EARNINGS = {
         }
       ],
       "totalCount": 300,
-      "reactionsComputedFor": 0
+      "reactionsComputedFor": 26
     },
     "2026-07-30": {
       "rows": [
@@ -5294,7 +5398,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 497740457199,
           "rank": 3,
-          "rx": null
+          "rx": {
+            "gapPct": 2.49,
+            "dayPct": 0,
+            "totalPct": 2.49
+          }
         },
         {
           "t": "SHEL",
@@ -5308,7 +5416,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 244514940903,
           "rank": 4,
-          "rx": null
+          "rx": {
+            "gapPct": 1.88,
+            "dayPct": 0.57,
+            "totalPct": 2.46
+          }
         },
         {
           "t": "BUD",
@@ -5322,7 +5434,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 167374932293,
           "rank": 5,
-          "rx": null
+          "rx": {
+            "gapPct": -1.12,
+            "dayPct": 2.65,
+            "totalPct": 1.5
+          }
         },
         {
           "t": "SYK",
@@ -5350,7 +5466,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 128854695686,
           "rank": 7,
-          "rx": null
+          "rx": {
+            "gapPct": -0.65,
+            "dayPct": 3.46,
+            "totalPct": 2.79
+          }
         },
         {
           "t": "MO",
@@ -5364,7 +5484,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 125108251326,
           "rank": 8,
-          "rx": null
+          "rx": {
+            "gapPct": -5.64,
+            "dayPct": -3.9,
+            "totalPct": -9.32
+          }
         },
         {
           "t": "MFG",
@@ -5392,7 +5516,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 109382610511,
           "rank": 10,
-          "rx": null
+          "rx": {
+            "gapPct": -6.27,
+            "dayPct": 2.02,
+            "totalPct": -4.37
+          }
         },
         {
           "t": "SO",
@@ -5406,7 +5534,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 108375119191,
           "rank": 11,
-          "rx": null
+          "rx": {
+            "gapPct": 1.2,
+            "dayPct": -2.94,
+            "totalPct": -1.78
+          }
         },
         {
           "t": "TT",
@@ -5420,7 +5552,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 98767587124,
           "rank": 12,
-          "rx": null
+          "rx": {
+            "gapPct": 4.72,
+            "dayPct": -5.9,
+            "totalPct": -1.46
+          }
         },
         {
           "t": "ING",
@@ -5434,7 +5570,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 94358249237,
           "rank": 13,
-          "rx": null
+          "rx": {
+            "gapPct": 6.12,
+            "dayPct": 1.28,
+            "totalPct": 7.47
+          }
         },
         {
           "t": "RACE",
@@ -5448,7 +5588,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 90230067318,
           "rank": 14,
-          "rx": null
+          "rx": {
+            "gapPct": 1.12,
+            "dayPct": 1.98,
+            "totalPct": 3.12
+          }
         },
         {
           "t": "VLO",
@@ -5462,7 +5606,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 89471785872,
           "rank": 15,
-          "rx": null
+          "rx": {
+            "gapPct": -1.63,
+            "dayPct": 5.16,
+            "totalPct": 3.45
+          }
         },
         {
           "t": "KKR",
@@ -5476,7 +5624,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 89140825582,
           "rank": 16,
-          "rx": null
+          "rx": {
+            "gapPct": 1.37,
+            "dayPct": 0.34,
+            "totalPct": 1.71
+          }
         },
         {
           "t": "LYG",
@@ -5490,7 +5642,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 89043602269,
           "rank": 17,
-          "rx": null
+          "rx": {
+            "gapPct": 4.94,
+            "dayPct": 1.46,
+            "totalPct": 6.47
+          }
         },
         {
           "t": "ICE",
@@ -5504,7 +5660,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 87247267729,
           "rank": 18,
-          "rx": null
+          "rx": {
+            "gapPct": 0.49,
+            "dayPct": 0.8,
+            "totalPct": 1.29
+          }
         },
         {
           "t": "PWR",
@@ -5518,7 +5678,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 84204752010,
           "rank": 19,
-          "rx": null
+          "rx": {
+            "gapPct": 15.3,
+            "dayPct": 1.7,
+            "totalPct": 17.26
+          }
         },
         {
           "t": "EPD",
@@ -5532,7 +5696,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 83663251540,
           "rank": 20,
-          "rx": null
+          "rx": {
+            "gapPct": 1.42,
+            "dayPct": -2.8,
+            "totalPct": -1.42
+          }
         },
         {
           "t": "CI",
@@ -5546,7 +5714,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 78425921814,
           "rank": 21,
-          "rx": null
+          "rx": {
+            "gapPct": -3.53,
+            "dayPct": 0.58,
+            "totalPct": -2.97
+          }
         },
         {
           "t": "REGN",
@@ -5560,7 +5732,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 72907159633,
           "rank": 22,
-          "rx": null
+          "rx": {
+            "gapPct": 0.93,
+            "dayPct": 5.19,
+            "totalPct": 6.17
+          }
         },
         {
           "t": "AEP",
@@ -5574,7 +5750,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 70407191141,
           "rank": 23,
-          "rx": null
+          "rx": {
+            "gapPct": -0.53,
+            "dayPct": -0.73,
+            "totalPct": -1.25
+          }
         },
         {
           "t": "TRP",
@@ -5588,7 +5768,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 69867879401,
           "rank": 24,
-          "rx": null
+          "rx": {
+            "gapPct": 4.04,
+            "dayPct": -2.73,
+            "totalPct": 1.2
+          }
         },
         {
           "t": "ASX",
@@ -5602,7 +5786,11 @@ export const EARNINGS = {
           "revEst": null,
           "mcap": 69301090376,
           "rank": 25,
-          "rx": null
+          "rx": {
+            "gapPct": 3.86,
+            "dayPct": 7.58,
+            "totalPct": 11.73
+          }
         },
         {
           "t": "AJG",
@@ -6096,7 +6284,7 @@ export const EARNINGS = {
         }
       ],
       "totalCount": 289,
-      "reactionsComputedFor": 0
+      "reactionsComputedFor": 21
     },
     "2026-07-31": {
       "rows": [
@@ -6472,7 +6660,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 2.37,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 12352078108,
           "rank": 27,
@@ -6528,7 +6716,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 10048804123,
           "rank": 31,
@@ -6542,7 +6730,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 3.95,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 9886631207,
           "rank": 32,
@@ -6584,7 +6772,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.12,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 6612725962,
           "rank": 35,
@@ -6682,7 +6870,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 3028930747,
           "rank": 42,
@@ -6766,7 +6954,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.09,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 1380076924,
           "rank": 48,
@@ -6794,7 +6982,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.01,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 1199066133,
           "rank": 50,
@@ -6850,7 +7038,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -0.46,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 360014244,
           "rank": 54,
@@ -6864,7 +7052,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.08,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 150233286,
           "rank": 55,
@@ -6878,7 +7066,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.36,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 140090932,
           "rank": 56,
@@ -6906,7 +7094,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -1.62,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 72503012,
           "rank": 58,
@@ -6920,7 +7108,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.42,
-          "noEsts": 5,
+          "noEsts": 8,
           "revEst": null,
           "mcap": 60533257,
           "rank": 59,
@@ -7093,7 +7281,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.87,
-          "noEsts": 7,
+          "noEsts": null,
           "revEst": null,
           "mcap": 24474149755,
           "rank": 12,
@@ -7317,7 +7505,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 4.87,
-          "noEsts": 7,
+          "noEsts": null,
           "revEst": null,
           "mcap": 8401254308,
           "rank": 28,
@@ -7784,7 +7972,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 7,
+          "noEsts": 5,
           "revEst": null,
           "mcap": 1473375613761,
           "rank": 1,
@@ -8162,7 +8350,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 7,
+          "noEsts": 5,
           "revEst": null,
           "mcap": 50906793505,
           "rank": 28,
@@ -8176,7 +8364,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 7,
+          "noEsts": 5,
           "revEst": null,
           "mcap": 49457956524,
           "rank": 29,
@@ -8344,7 +8532,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 7,
+          "noEsts": 5,
           "revEst": null,
           "mcap": 25830364752,
           "rank": 41,
@@ -9544,7 +9732,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.64,
-          "noEsts": 3,
+          "noEsts": 1,
           "revEst": null,
           "mcap": 119800771023,
           "rank": 6,
@@ -13699,7 +13887,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 13156000000,
           "rank": 10,
@@ -13783,7 +13971,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 5734653431,
           "rank": 16,
@@ -13797,7 +13985,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 5506279426,
           "rank": 17,
@@ -13825,7 +14013,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 5157866692,
           "rank": 19,
@@ -13839,7 +14027,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 4829157417,
           "rank": 20,
@@ -13923,7 +14111,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 3736185041,
           "rank": 26,
@@ -14021,7 +14209,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 2745694717,
           "rank": 33,
@@ -14161,7 +14349,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 2107238100,
           "rank": 43,
@@ -14175,7 +14363,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 1948010759,
           "rank": 44,
@@ -14189,7 +14377,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 1890344668,
           "rank": 45,
@@ -14245,7 +14433,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.12,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 1664546457,
           "rank": 49,
@@ -14301,7 +14489,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.3,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 1245157517,
           "rank": 53,
@@ -14399,7 +14587,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 10.47,
-          "noEsts": 11,
+          "noEsts": 3,
           "revEst": null,
           "mcap": 826375650,
           "rank": 60,
@@ -14418,7 +14606,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.5,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 9086012207,
           "rank": 1,
@@ -14474,7 +14662,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 9.17,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 4374480545,
           "rank": 5,
@@ -14488,7 +14676,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 9.17,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 4374480545,
           "rank": 6,
@@ -14502,7 +14690,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.57,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 3571587111,
           "rank": 7,
@@ -14516,7 +14704,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 1227252315,
           "rank": 8,
@@ -14530,7 +14718,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 1213541855,
           "rank": 9,
@@ -14544,7 +14732,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.22,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 1060647349,
           "rank": 10,
@@ -14558,7 +14746,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.72,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 870083204,
           "rank": 11,
@@ -14572,7 +14760,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.01,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 692597813,
           "rank": 12,
@@ -14586,7 +14774,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.02,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 683485000,
           "rank": 13,
@@ -14628,7 +14816,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 496203279,
           "rank": 16,
@@ -14642,7 +14830,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -0.01,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 486645700,
           "rank": 17,
@@ -14670,7 +14858,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.26,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 445363986,
           "rank": 19,
@@ -14684,7 +14872,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 1.41,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 427704795,
           "rank": 20,
@@ -14698,7 +14886,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 2.16,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 403298893,
           "rank": 21,
@@ -14726,7 +14914,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -0.57,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 319715232,
           "rank": 23,
@@ -14768,7 +14956,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.05,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 261225470,
           "rank": 26,
@@ -14796,7 +14984,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.26,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 212390102,
           "rank": 28,
@@ -14810,7 +14998,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 35.59,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 158956641,
           "rank": 29,
@@ -14838,7 +15026,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.05,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 115113136,
           "rank": 31,
@@ -14866,7 +15054,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -0.13,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 79476958,
           "rank": 33,
@@ -14880,7 +15068,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 62880095,
           "rank": 34,
@@ -14894,7 +15082,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.1,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 58479268,
           "rank": 35,
@@ -14964,7 +15152,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -0.19,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 47162888,
           "rank": 40,
@@ -14978,7 +15166,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -0.16,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 42939580,
           "rank": 41,
@@ -15006,7 +15194,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -3.66,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 39594756,
           "rank": 43,
@@ -15020,7 +15208,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.05,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 38611177,
           "rank": 44,
@@ -15034,7 +15222,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -0.02,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 37497933,
           "rank": 45,
@@ -15048,7 +15236,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": null,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 34110519,
           "rank": 46,
@@ -15076,7 +15264,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.14,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 32757494,
           "rank": 48,
@@ -15104,7 +15292,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -16.39,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 25879163,
           "rank": 50,
@@ -15118,7 +15306,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.08,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 22173793,
           "rank": 51,
@@ -15132,7 +15320,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -85.5,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 13023412,
           "rank": 52,
@@ -15146,7 +15334,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -0.54,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 11390086,
           "rank": 53,
@@ -15160,7 +15348,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -0.41,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 11026911,
           "rank": 54,
@@ -15174,7 +15362,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -0.41,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 10144386,
           "rank": 55,
@@ -15188,7 +15376,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": 0.07,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 9910404,
           "rank": 56,
@@ -15202,7 +15390,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -3.2,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 8394305,
           "rank": 57,
@@ -15216,7 +15404,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -0.25,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 6285722,
           "rank": 58,
@@ -15244,7 +15432,7 @@ export const EARNINGS = {
           "epsActual": null,
           "surprisePct": null,
           "yearAgoEps": -22.71,
-          "noEsts": 1,
+          "noEsts": 2,
           "revEst": null,
           "mcap": 5685893,
           "rank": 60,
