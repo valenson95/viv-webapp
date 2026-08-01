@@ -1486,32 +1486,32 @@ const PLAYBOOK_INDICATORS = [
   {
     name: "ADR% / ATR / LoD dist. Table",
     url: "https://www.tradingview.com/script/6A822fQ5-ADR-ATR-LoD-dist-Table/",
-    what: "A small on-chart table reading three numbers at once: average daily range as a percentage, average true range, and how far price currently sits from the low of the day.",
-    use: "This is the entry gate made visible. Our stop is the low of the day, so the distance to it [i]is[/i] our risk — and the rule is that it must stay inside about one daily range. The table answers, before the click, the only two questions that decide the trade's size: how far away is the stop, and is that distance sane for this stock's normal range. If the LoD distance is already wide when the trigger fires, the trade doesn't fit — pass or shrink it.",
+    what: "A small table on the chart showing three numbers: how far the stock moves in a normal day (ADR%), its average true range, and how far price is right now from the low of the day.",
+    use: "This is the entry check, made visible. Our stop is the low of the day, so the distance to it [i]is[/i] our risk — and it has to stay inside roughly one normal day's range. Before clicking buy, this table answers the only two questions that decide the size: how far away is the stop, and is that distance sensible for this stock. If the low of the day is already far below when the trigger fires, the trade does not fit. Pass it, or take fewer shares.",
   },
   {
     name: "TraderLion's Relative Strength Line",
     url: "https://www.tradingview.com/script/N4Iqr5Cz-TraderLion-s-Relative-Strength-Line/",
-    what: "Plots the stock divided by the index as a line beneath price, and marks when that line reaches a new high — including when it does so before the stock itself does.",
-    use: "This is how we check relative strength, and its behaviour at index lows is the cleanest tell we have. What we want to see: the line making higher highs while the market chops, and a new RS high [i]before[/i] the breakout — that is institutional buying showing up in public. What kills a candidate: the line rolling over while price still looks fine, and the line falling to new lows on a bounce day. At index lows the reading is decisive — a stock holding a higher low against the index's lower low is the signature of the next cycle's leader.",
+    what: "A line under the price chart showing the stock's performance against the index, with a mark whenever that line hits a new high — including when it does so before the stock does.",
+    use: "This is how we check relative strength. What we want: the line making higher highs while the market chops, and a new high on the line [i]before[/i] the stock breaks out — that is buying showing up early. What kills a candidate: the line rolling over while the price still looks fine, or dropping to new lows on a bounce day. Its most useful moment is when the index is making new lows: a stock holding a higher low right then is the signature of the next leader.",
   },
   {
     name: "Swing Data — ADR% / RVol / PVol / Float / Avg Vol",
     url: "https://www.tradingview.com/script/uloAa2EI-Swing-Data-ADR-RVol-PVol-Float-Avg-Vol/",
-    what: "One panel carrying the swing-trade vitals: average daily range percentage, relative volume, pre-market volume, float, and average volume.",
-    use: "The candidate bar, on the chart instead of in a spreadsheet. ADR% must clear our volatility floor — a stock that doesn't travel cannot pay for its stop. Average volume and float are the liquidity and scarcity checks the CANSLIM screen enforces, re-read here on the individual name. Pre-market volume is the first honest read on a gapper before the bell: real interest shows up early, and a gap with nothing behind it in pre-market is usually a gap that sells.",
+    what: "One panel with the numbers that decide whether a stock is worth trading: how much it moves in a day, today's volume against normal, pre-market volume, shares available (float), and average volume.",
+    use: "The checklist on the chart instead of in a spreadsheet. The stock has to move enough to pay for its stop — one that barely travels never will. Average volume and float tell you whether you can get in and out at size, and whether the shares are scarce enough for buying to really move the price. Pre-market volume is the first honest read on a gapper before the bell: real interest turns up early, and a gap with nothing behind it usually sells.",
   },
   {
     name: "IBD Style Relative Volume — Intraday Adjusted",
     url: "https://www.tradingview.com/script/p9PqBCAX-IBD-Style-Relative-Volume-Intraday-Adjusted/",
-    what: "Relative volume measured against the same time of day on normal days, rather than against a full session's average.",
-    use: "The distinction that makes the volume gate mean anything. At 9:45 a stock has traded a fraction of its day, so comparing that against a full-day average always reads low and tells you nothing — the time-matched version tells you whether [i]this[/i] morning is unusual. Our rule: the trigger alone carries no edge until participation confirms it. This indicator is what confirms it. Once a position is held, we switch back to the daily reading against the 50-day average — intraday for the entry, daily for the hold.",
+    what: "Today's volume compared against the same time of day on a normal day, instead of against a whole day's total.",
+    use: "This is what makes the volume check mean anything. At 9:45 a stock has only traded a fraction of its day, so comparing that to a full day's average always looks low and tells you nothing. Measured against the same time on normal days, it tells you whether [i]this[/i] morning is unusual. The rule is simple: a trigger on its own is not enough until the volume confirms it. Once you are holding, switch back to the daily reading against the 50-day average — one for the entry, the other for the hold.",
   },
   {
     name: "Moving Average Ribbon",
     url: "",
     what: "TradingView's built-in ribbon, set to our own periods: [b]SMA 10 / 20 / 50 / 200 on daily charts[/b], and [b]EMA 10 / 20 / 65 on intraday charts[/b].",
-    use: "The trend lines themselves. On the daily chart they show trend health and the shape of every base — price surfing the rising 10 and 20 into a pivot, the 50 as the line a leader defends, the 200 as the boundary between an uptrend and a repair job. Convergence of the short lines at a pivot is a coil tell. On intraday charts the faster set does the same job inside the day: the entry-day trend is intact while price holds above them, and losing them is the first sign the day's thesis is failing. One ribbon, two timeframes, the same question — is this still in gear?",
+    use: "The lines the trend runs along. On the daily chart they show whether the trend is healthy and give every base its shape — price riding the rising 10 and 20 into a pivot, the 50 as the line a leader defends, the 200 as the difference between an uptrend and a repair job. When the short lines come together at a pivot, the stock is coiling. On intraday charts the faster set does the same job inside the day: while price holds above them the day is intact, and losing them is the first sign it is not. One ribbon, two timeframes, the same question — is this still in gear?",
   },
 ];
 
@@ -1540,11 +1540,11 @@ const PLAYBOOK_PIECES = [
     take: `Market first, setup second, size third. If the market check is not green, do not push.`,
   },
   {
-    no: "02", part: 0, title: `Markets move in groups`, sub: `Money flows into whole sectors and themes, not single stocks`,
-    toc: `money flows into whole sectors and themes, not single stocks`,
+    no: "02", part: 0, title: `Markets move in groups, themes and sectors`, sub: `Money flows into a whole group at once, not one stock at a time`,
+    toc: `money flows into a whole group at once, not one stock at a time`,
     blocks: [
       { h: `Defining the terms` },
-      { p: `Big money does not buy one stock at a time. It buys a whole sector, group or theme at once — chip makers, banks, uranium, whatever is being funded that month. So every stock belongs to a group, and that group is either being bought or it isn't. We call a stock [b]in-theme[/b] when its group is currently near the top of our performance lists. It is a status you look up, not a feeling you have.` },
+      { p: `Big money does not buy one stock at a time. It buys a whole [b]group[/b] at once — chip makers, banks, uranium, whatever is being funded that month. You will hear these called groups, themes or sectors; they mean the same thing here, and this book says [i]group[/i] throughout. So every stock belongs to one, and that group is either being bought or it isn't. We call a stock [b]in-theme[/b] when its group is currently near the top of our performance lists. It is a status you look up, not a feeling you have.` },
       { h: `Why it matters` },
       { p: `About half of any stock's move comes from its group rather than from the stock itself. So when a group is being bought, even its third-best chart tends to beat the best chart in a group being sold. That means the group tells you as much about the outcome as the chart does — and you can look it up before you enter.` },
       { h: `How we measure it` },
@@ -2076,10 +2076,39 @@ export function openPlaybookBook() {
     <div class="pbfoot pbcovfoot">Valen Insiders Vault · Educational — not financial advice</div>
   </div>`;
   const flowChev = `<svg class="pbflowchev" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1.5 6 6.5 11 1.5"/></svg>`;
+  const roadArt = `<div class="pbroadart" aria-hidden="true">
+    <svg viewBox="0 0 190 940" preserveAspectRatio="xMidYMid meet" fill="none">
+      <!-- raised side wall, offset like the reference so the ribbon reads as a surface -->
+      <path d="M42.0 892.0 C39.3 876.7 22.5 830.3 26.0 800.0 C29.5 769.7 53.0 740.0 63.0 710.0 C73.0 680.0 86.3 650.0 86.0 620.0 C85.7 590.0 68.0 560.0 61.0 530.0 C54.0 500.0 41.0 470.0 44.0 440.0 C47.0 410.0 68.8 379.7 79.0 350.0 C89.2 320.3 101.3 291.0 105.0 262.0 C108.7 233.0 101.7 190.3 101.0 176.0 L115.0 176.0 C117.0 190.3 128.0 233.0 127.0 262.0 C126.0 291.0 116.2 320.3 109.0 350.0 C101.8 379.7 83.7 410.0 84.0 440.0 C84.3 470.0 100.7 500.0 111.0 530.0 C121.3 560.0 142.3 590.0 146.0 620.0 C149.7 650.0 139.7 680.0 133.0 710.0 C126.3 740.0 105.8 769.7 106.0 800.0 C106.2 830.3 129.3 876.7 134.0 892.0 Z" fill="currentColor" fill-opacity="0.11" transform="translate(9,11)"/>
+      <!-- the road, wide at the near end and narrowing as it recedes -->
+      <path d="M42.0 892.0 C39.3 876.7 22.5 830.3 26.0 800.0 C29.5 769.7 53.0 740.0 63.0 710.0 C73.0 680.0 86.3 650.0 86.0 620.0 C85.7 590.0 68.0 560.0 61.0 530.0 C54.0 500.0 41.0 470.0 44.0 440.0 C47.0 410.0 68.8 379.7 79.0 350.0 C89.2 320.3 101.3 291.0 105.0 262.0 C108.7 233.0 101.7 190.3 101.0 176.0 L115.0 176.0 C117.0 190.3 128.0 233.0 127.0 262.0 C126.0 291.0 116.2 320.3 109.0 350.0 C101.8 379.7 83.7 410.0 84.0 440.0 C84.3 470.0 100.7 500.0 111.0 530.0 C121.3 560.0 142.3 590.0 146.0 620.0 C149.7 650.0 139.7 680.0 133.0 710.0 C126.3 740.0 105.8 769.7 106.0 800.0 C106.2 830.3 129.3 876.7 134.0 892.0 Z" fill="currentColor" fill-opacity="0.32"/>
+      <path d="M42.0 892.0 C39.3 876.7 22.5 830.3 26.0 800.0 C29.5 769.7 53.0 740.0 63.0 710.0 C73.0 680.0 86.3 650.0 86.0 620.0 C85.7 590.0 68.0 560.0 61.0 530.0 C54.0 500.0 41.0 470.0 44.0 440.0 C47.0 410.0 68.8 379.7 79.0 350.0 C89.2 320.3 101.3 291.0 105.0 262.0 C108.7 233.0 101.7 190.3 101.0 176.0 L115.0 176.0 C117.0 190.3 128.0 233.0 127.0 262.0 C126.0 291.0 116.2 320.3 109.0 350.0 C101.8 379.7 83.7 410.0 84.0 440.0 C84.3 470.0 100.7 500.0 111.0 530.0 C121.3 560.0 142.3 590.0 146.0 620.0 C149.7 650.0 139.7 680.0 133.0 710.0 C126.3 740.0 105.8 769.7 106.0 800.0 C106.2 830.3 129.3 876.7 134.0 892.0 Z" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.3"/>
+      <!-- centre dashes, shortening with distance -->
+      <g stroke="currentColor" stroke-opacity="0.9" stroke-linecap="round" fill="none">
+        <path d="M88.0 892.0 C84.3 876.7 64.3 830.3 66.0 800.0 C67.7 769.7 89.7 740.0 98.0 710.0 C106.3 680.0 118.0 650.0 116.0 620.0 C114.0 590.0 94.7 560.0 86.0 530.0 C77.3 500.0 62.7 470.0 64.0 440.0 C65.3 410.0 85.3 379.7 94.0 350.0 C102.7 320.3 113.7 291.0 116.0 262.0 C118.3 233.0 109.3 190.3 108.0 176.0" stroke-width="3.4" stroke-dasharray="26 24" pathLength="100" stroke-dashoffset="0"/>
+      </g>
+      <!-- the trader, standing where the road starts -->
+      <g fill="currentColor">
+        <ellipse cx="86" cy="880" rx="17" ry="4" opacity="0.3"/>
+        <circle cx="86" cy="822" r="8"/>
+        <path d="M78 832h16l4 26h-5l-3 21h-8l-3-21h-5z"/>
+      </g>
+      <!-- profitability, at the far end -->
+      <g transform="translate(108,120)">
+        <path d="M-11-30h22l-5 8h-12z" fill="currentColor" fill-opacity="0.6"/>
+        <path d="M6-22c17 9 25 31 14 43-8 8-27 11-39 5C-33 18-36-7-6-22z" fill="currentColor"/>
+        <path d="M-9-6c5-3 10-1 10 2s-10 3-10 6 5 5 10 2" stroke="#08080e" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <path d="M0-12v26" stroke="#08080e" stroke-width="2" stroke-linecap="round"/>
+      </g>
+    </svg>
+    <div class="pbroadartcap">The path to profitability</div>
+  </div>`;
   const roadmap = `<div class="page pbroadpage" id="roadmap">
     <div class="pblabel">The roadmap</div>
     <div class="pcH pbroadhead">Six questions, always in this order</div>
     <div class="pcD pbroadintro">Think of it as buying a house. You check the weather before you go out, you pick the neighbourhood before the house, and you look at the house before you decide to walk in. Only then does anything get bought — and after that, the job is looking after what you own. Every piece in this book sits inside one of these six steps.</div>
+    <div class="pbroadcols">
     <div class="pbflow">
       ${PLAYBOOK_ROADMAP.map((group, gi) => {
         const steps = group.steps.map((r, si) => {
@@ -2099,6 +2128,8 @@ export function openPlaybookBook() {
         return `<div class="pbflowphase"><span class="pbflowphaselabel">${esc(group.phase)}</span><span class="pbflowphaserule"></span></div>${steps}`;
       }).join("")}
     </div>
+    ${roadArt}
+    </div>
     <div class="pbfoot">Steps 1 to 3 decide what you look at. Step 4 decides whether you buy. Steps 5 and 6 decide what you keep.</div>
   </div>`;
   const contents = `<div class="page pbcontents">
@@ -2110,7 +2141,7 @@ export function openPlaybookBook() {
       return `<div class="pbcgroup"><div class="pbcyear">${esc(part.toc)}</div>${rowsHtml}</div>`;
     }).join("")}
     <div class="pbcgroup"><div class="pbcyear">Appendix</div>
-      <a class="pbcrow" href="#indicators"><span class="pbcno">—</span><span class="pbctk">The instrument panel</span><span class="pbctheme">five indicators, and the rule each one serves</span><span class="pbcdots"></span></a>
+      <a class="pbcrow" href="#indicators"><span class="pbcno">—</span><span class="pbctk">Tools I use on TradingView</span><span class="pbctheme">five indicators, and what each one is for</span><span class="pbcdots"></span></a>
       <a class="pbcrow" href="#card"><span class="pbcno">—</span><span class="pbctk">The one-page card</span><span class="pbctheme">everything you check before the click</span><span class="pbcdots"></span></a>
     </div>
     <div class="pbfoot">Twenty-one pieces · six parts · the system, front to back. The roadmap on the previous page shows how they fit together.</div>
@@ -2164,14 +2195,14 @@ export function openPlaybookBook() {
     <div class="pbgrid">
       <div>
         <div class="pcK pbkick">Appendix</div>
-        <div class="pcH pbpart">The chart</div>
+        <div class="pcH pbpart">My chart</div>
         <div class="pbpmark"></div>
       </div>
       <div style="min-width:0">
-        <div class="pcH pbhead">The instrument panel</div>
-        <div class="pcD pbsub">Five indicators, and the rule each one serves</div>
+        <div class="pcH pbhead">Tools I use on TradingView</div>
+        <div class="pcD pbsub">Five indicators, and what each one is for</div>
         <div class="pcRule pbhair"></div>
-        <div class="pcM pbp">Nothing on our charts is decorative. Each of these answers one question the system already asks — how far away is the stop, is this name outperforming, does it move enough to pay, is anyone actually here this morning, and is the trend still in gear. Add them once, and the chart starts arguing back.</div>
+        <div class="pcM pbp">These are the five things on my chart, and nothing is there for decoration. Each one answers a question this book already asks: how far away is the stop, is this stock outperforming, does it move enough to be worth trading, is anyone actually here this morning, and is the trend still intact. Add them once and you stop guessing. Every link below opens the script on TradingView.</div>
         ${PLAYBOOK_INDICATORS.map((ind, i) => `
           <div class="pcBlk pbind">
             <div class="pcK pbindno">${String(i + 1).padStart(2, "0")}</div>
@@ -2182,7 +2213,7 @@ export function openPlaybookBook() {
           </div>`).join("")}
       </div>
     </div>
-    <div class="pbfolio"><span>Building Blocks</span><span>Appendix · The chart</span></div>
+    <div class="pbfolio"><span>Building Blocks</span><span>Appendix · My chart</span></div>
   </div>`;
   const card = `<div class="page pbpiece pcRule" id="card" style="max-width:1060px">
     <div class="pbgrid">
@@ -2240,6 +2271,8 @@ export function openPlaybookBook() {
       .pbbrand{font-size:0.66rem;font-weight:800;letter-spacing:0.32em;text-transform:uppercase;color:#c9982a}
       .pbtitle{font-size:clamp(2.6rem,7vw,3.4rem);font-weight:800;letter-spacing:-0.03em;line-height:1.02;color:#fff;margin:22px 0 0;max-width:16ch}
       .pbrule{width:60px;height:2px;background:#c9982a;margin:26px 0 20px}
+      .pbcover .pbtitle{color:#c9982a}
+      body.light .pbcover .pbtitle{color:#8a6a1c}
       .pbmeta{font-size:0.9rem;color:#9a968c;letter-spacing:0.01em}
       .pbcovfoot{margin-top:38px;font-size:0.72rem}
       /* ── CONTENTS ── */
@@ -2305,7 +2338,15 @@ export function openPlaybookBook() {
       .pbroadpage{max-width:1060px}
       .pbroadhead{font-size:1.6rem;font-weight:700;line-height:1.25;margin-top:10px}
       .pbroadintro{font-size:0.98rem;line-height:1.7;margin-top:12px;max-width:70ch}
-      .pbflow{margin-top:32px;max-width:660px}
+      .pbroadcols{display:grid;grid-template-columns:minmax(0,1fr) 235px;gap:38px;align-items:stretch;margin-top:32px}
+      .pbroadart{position:relative;display:flex;flex-direction:column;align-items:center;color:#c9982a}
+      body.light .pbroadart{color:#8a6a1c}
+      .pbroadart svg{width:100%;height:100%;max-height:660px;flex:1;min-height:0}
+      .pbroadartcap{font-family:'Geist Mono',ui-monospace,monospace;font-size:0.58rem;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:#c9982a;opacity:0.75;margin-top:10px;text-align:center}
+      body.light .pbroadartcap{color:#8a6a1c}
+      @media(max-width:820px){.pbroadcols{grid-template-columns:minmax(0,1fr)}.pbroadart{display:none}}
+      .pbflow{max-width:660px}
+
       .pbflowphase{display:grid;grid-template-columns:64px minmax(0,1fr);gap:26px;align-items:center;margin:22px 0 12px}
       .pbflowphase:first-child{margin-top:0}
       .pbflowphaselabel{grid-column:2;font-family:'Geist Mono',ui-monospace,monospace;font-size:0.6rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:#c9982a;white-space:nowrap}
@@ -2326,39 +2367,6 @@ export function openPlaybookBook() {
       body.light .pbflowchev{color:rgba(138,106,28,0.62)}
       @media(max-width:620px){.pbflowphase,.pbflowstep{grid-template-columns:54px minmax(0,1fr);gap:18px}.pbflownode{width:54px;height:54px}.pbflownode svg{width:26px;height:26px}.pbflowconn{width:54px}}
       @media print{.pbflowstep,.pbflowphase{break-inside:avoid;page-break-inside:avoid}}
-      /* Reveal as you scroll. Two independent paths, and BOTH default to visible:
-         1. scroll timelines (preferred) — one shared timeline on .pbflow, each child scrubbed
-            through its own non-overlapping slice, so the steps arrive strictly in order at
-            whatever pace the reader scrolls, and rewind on the way back up.
-         2. the .pending class, added by JS only when path 1 is unavailable.
-         Print overrides both, so the PDF is always the finished diagram. */
-      .pbflow > *{transition:opacity .5s cubic-bezier(.2,.7,.3,1),transform .5s cubic-bezier(.2,.7,.3,1)}
-      .pbflow > .pending{opacity:0;transform:translateY(14px)}
-      .pbflow > .pending.pbflowconn{transform:translateY(7px)}
-      @media screen and (prefers-reduced-motion: no-preference){
-        @supports (animation-timeline: view()){
-          @keyframes pbflowin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-          .pbflow{view-timeline-name:--pbflow;view-timeline-axis:block}
-          .pbflow > *{animation:pbflowin linear both;animation-timeline:--pbflow}
-        .pbflow > *:nth-child(1){animation-range:cover 2.0% cover 13.0%}
-        .pbflow > *:nth-child(2){animation-range:cover 5.6% cover 16.6%}
-        .pbflow > *:nth-child(3){animation-range:cover 9.2% cover 20.2%}
-        .pbflow > *:nth-child(4){animation-range:cover 12.8% cover 23.8%}
-        .pbflow > *:nth-child(5){animation-range:cover 16.4% cover 27.4%}
-        .pbflow > *:nth-child(6){animation-range:cover 20.0% cover 31.0%}
-        .pbflow > *:nth-child(7){animation-range:cover 23.6% cover 34.6%}
-        .pbflow > *:nth-child(8){animation-range:cover 27.2% cover 38.2%}
-        .pbflow > *:nth-child(9){animation-range:cover 30.8% cover 41.8%}
-        .pbflow > *:nth-child(10){animation-range:cover 34.4% cover 45.4%}
-        .pbflow > *:nth-child(11){animation-range:cover 38.0% cover 49.0%}
-        .pbflow > *:nth-child(12){animation-range:cover 41.6% cover 52.6%}
-        .pbflow > *:nth-child(13){animation-range:cover 45.2% cover 56.2%}
-        .pbflow > *:nth-child(14){animation-range:cover 48.8% cover 59.8%}
-        .pbflow > *:nth-child(15){animation-range:cover 52.4% cover 63.4%}
-        .pbflow > *:nth-child(16){animation-range:cover 56.0% cover 67.0%}
-        }
-      }
-      @media print{.pbflow > *{opacity:1 !important;transform:none !important;transition:none !important;animation:none !important}}
       .pbind{margin-top:34px;padding-top:22px;border-top:1px solid rgba(255,255,255,0.08);max-width:70ch}
       body.light .pbind{border-top-color:rgba(23,21,15,0.12)}
       .pbindno{font-size:0.64rem;letter-spacing:0.16em}
@@ -2414,41 +2422,6 @@ export function openPlaybookBook() {
       const im=e.target.closest('.pbchartwrap img');if(!im)return;
       document.getElementById('zoomim').src=im.src;ov.style.display='flex';});
     document.addEventListener('keydown',(e)=>{if(e.key==='Escape')document.getElementById('zoomov').style.display='none';});
-    // Roadmap: each step appears as you scroll to it — sequenced by scroll position, not a timer.
-    // Only elements below the fold at open are ever hidden, so the diagram can never render empty.
-    (function(){
-      var flow=document.querySelector('.pbflow');
-      if(!flow)return;
-      if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-      // Scroll timelines handle it natively where supported — don't double up.
-      if(window.CSS&&CSS.supports&&CSS.supports('animation-timeline: view()'))return;
-      var vh=function(){return window.innerHeight||document.documentElement.clientHeight;};
-      var waiting=[].slice.call(flow.children).filter(function(k){
-        return k.getBoundingClientRect().top > vh()*0.92;
-      });
-      if(!waiting.length)return;
-      waiting.forEach(function(k){k.classList.add('pending');});
-      var queued=false;
-      function reveal(){
-        queued=false;
-        var hit=[];
-        waiting=waiting.filter(function(el){
-          if(el.getBoundingClientRect().top < vh()*0.86){hit.push(el);return false;}
-          return true;
-        });
-        hit.forEach(function(el,i){setTimeout(function(){el.classList.remove('pending');},i*90);});
-        if(!waiting.length){
-          window.removeEventListener('scroll',onScroll);
-          window.removeEventListener('resize',onScroll);
-        }
-      }
-      function onScroll(){if(!queued){queued=true;setTimeout(reveal,16);}}
-      window.addEventListener('scroll',onScroll,{passive:true});
-      window.addEventListener('resize',onScroll);
-      reveal();
-      // Safety net: nothing may stay hidden, whatever happens.
-      setTimeout(function(){waiting.forEach(function(k){k.classList.remove('pending');});},8000);
-    })();
     </script>
     </body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
