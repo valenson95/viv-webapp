@@ -244,8 +244,8 @@ const DEEP_DIVES = [
     // STATIC dive (2026-08-01): no study rows behind it — `static` names the builder that opens it.
     // draft:true keeps it admin-only; publishing a static dive is a code change, HIS call.
     no: "03", slug: "viv-playbook", project: null, static: "playbook", draft: true,
-    title: "The VIV Playbook",
-    premise: "The complete VIV framework in nineteen pieces — weather, neighborhood, house, execution, campaign, survival.",
+    title: "Building Blocks to Profitability",
+    premise: "The VIV system in nineteen pieces — weather, neighborhood, house, execution, campaign, survival.",
     updated: "2026-08-01",
     cover: "",
   },
@@ -1422,7 +1422,7 @@ function openProjectBookPdf(rows, coverTitle) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
-// ── THE VIV PLAYBOOK (static dive, 2026-08-01) ────────────────────────────────────────────────
+// ── BUILDING BLOCKS TO PROFITABILITY (static dive, 2026-08-01) ────────────────────────────────────────────────
 // A typeset book with NO database behind it — the prose is final-draft and lives here verbatim
 // (source of record: AI-OS viv/content/viv-playbook.html). Re-typeset only, in the chronicle v4
 // design language: Geist + Geist Mono, monochrome .chron register, gold reserved for meaning
@@ -1447,17 +1447,21 @@ const PLAYBOOK_PIECES = [
     no: "01", part: 0, title: `The regime dial`, sub: `Breadth decides how aggressive you are allowed to be`,
     toc: `breadth decides how aggressive you are allowed to be`,
     blocks: [
-      { p: `Most stocks move with the market. Before any ticker earns a minute of your attention, answer one question: is this a tape where breakouts get paid, or a tape where they get sold? We answer it with breadth — the daily count of stocks making strong up-moves versus strong down-moves, and the ratio of those counts over the last five and ten sessions.` },
-      { h: `The readings that matter` },
+      { h: `Defining the terms` },
+      { p: `The regime dial is our verdict on the tape itself, taken before any single chart. It reads [b]breadth[/b] — the daily count of stocks making strong up-moves versus strong down-moves — and resolves it into one of three states: a full tape, a transitional one, or a hostile one. Most stocks move with the market, so this is the first question of the day, not the last.` },
+      { h: `Why it matters` },
+      { p: `One question decides how the whole session is played: is this a tape where breakouts get paid, or a tape where they get sold? The regime never picks your stocks — it sets your size and your patience. The same setup, in the same name, is a full-size trade in one tape and a pass in another.` },
+      { h: `How we measure it` },
+      { p: `We take the daily count of strong up-moves against strong down-moves, and the ratio of those counts over the last five and ten sessions. Three readings matter:` },
       { ul: [
         `[b]Both ratios green[/b] — buyers outnumber sellers on every horizon. Breakouts are statistically more likely to work. Press.`,
         `[b]A thrust print[/b] — an explosion of strong up-moves after weakness. One thrust starts the case for a turn; it does not close it. Wait for the second.`,
         `[b]A selling extreme[/b] — a flood of heavy down-moves. Bounces from these are reflexes, not leadership. The most-beaten names rally hardest and mean the least.`,
       ] },
-      { h: `What actually changes` },
-      { p: `The regime never picks your stocks — it sets your size and your patience. Full tape: full playbook. Transitional: half size, faster trims, only A-grade setups. Hostile: the best trade is the list you build for the turn.` },
-      { h: `The expensive mistake` },
-      { p: `Trading the tape you want instead of the one printing. A bounce day after a selling extreme is the single most seductive false start in the book — the dial said [i]wait for confirmation[/i], and the morning fade collected everyone who didn't.` },
+      { h: `In practice` },
+      { p: `Full tape: full playbook. Transitional: half size, faster trims, only A-grade setups. Hostile: the best trade is the list you build for the turn. The dial is read once, before the watchlist is opened, and it stands for the session — it is the permission slip every other piece in this book is written against.` },
+      { h: `Common mistakes` },
+      { p: `Trading the tape you want instead of the one printing. A bounce day after a selling extreme is the single most seductive false start in the book — the dial said [i]wait for confirmation[/i], and the morning fade collected everyone who didn't. Reading the dial after the entry is the same error wearing a schedule.` },
     ],
     take: `Regime first, setups second, size third. The dashboard verdict is the permission slip — no green, no press.`,
   },
@@ -1465,10 +1469,14 @@ const PLAYBOOK_PIECES = [
     no: "02", part: 0, title: `Themes own the tape`, sub: `The in-theme gate`,
     toc: `the in-theme gate`,
     blocks: [
-      { p: `Institutional money moves in themes, not tickers. When a theme is being funded, its third-best chart outruns the best chart of a theme being sold. Half of every stock's move belongs to its group — so we tag every candidate with its theme and check the tag before the chart.` },
-      { h: `The gate` },
-      { p: `We track every theme's performance over one week and one month and mark the top five on each board. A candidate inside those lists is [b]in-theme[/b] — it gets the full playbook. Outside them, the bar rises: the setup must be exceptional, the size smaller, the leash shorter. The gate is written down precisely so a beautiful chart can't argue with it.` },
-      { h: `Reading the boards together` },
+      { h: `Defining the terms` },
+      { p: `A [b]theme[/b] is the group of stocks institutional money funds together — the neighborhood a ticker lives in. [b]In-theme[/b] is a formal status, not an impression: the candidate's theme is currently among the leaders on our performance boards. Institutional money moves in themes, not tickers, so every candidate carries its theme tag with it.` },
+      { h: `Why it matters` },
+      { p: `When a theme is being funded, its third-best chart outruns the best chart of a theme being sold. Half of every stock's move belongs to its group — which means the tag explains as much of the outcome as the chart does, and it is knowable before the entry.` },
+      { h: `How we measure it` },
+      { p: `We track every theme's performance over one week and one month and mark the top five on each board. A candidate inside those lists is [b]in-theme[/b]. The gate is written down precisely so a beautiful chart can't argue with it.` },
+      { h: `In practice` },
+      { p: `In-theme names get the full playbook. Outside the lists, the bar rises: the setup must be exceptional, the size smaller, the leash shorter. We check the tag before the chart, and read the two boards together:` },
       { ul: [
         `[b]On both boards[/b] — durable leadership. The core hunting ground.`,
         `[b]Fresh on the week, absent on the month[/b] — new rotation arriving. Watch for first bases.`,
@@ -1476,7 +1484,7 @@ const PLAYBOOK_PIECES = [
         `[b]The day's biggest gainers from the month's worst themes[/b] — short-covering mechanics. Not leadership.`,
       ] },
       { h: `Common mistakes` },
-      { p: `Falling in love with one name while its theme rolls over. Overriding the gate because a story is exciting — the story is already in the tag.` },
+      { p: `Falling in love with one name while its theme rolls over. Overriding the gate because a story is exciting — the story is already in the tag. Grouping a name by instinct instead of by the board: the theme a stock trades with is a fact to be looked up, never a category we invent for it.` },
     ],
     take: `Strong stocks live in strong themes. Check the tag before the chart, and let the gate say no for you.`,
   },
@@ -1484,15 +1492,24 @@ const PLAYBOOK_PIECES = [
     no: "03", part: 0, title: `Rotation`, sub: `Where money is moving now — and the bounce-trap`,
     toc: `where money is moving now, and the bounce-trap`,
     blocks: [
-      { p: `Between the market and the single stock sits the group table: every theme ranked by how its momentum compares to its own recent history, plus a faster thrust reading for this week's push. High on both = leading [i]and[/i] accelerating — the neighborhoods to hunt in.` },
-      { h: `The one distinction that saves accounts` },
-      { p: `A group can rank top of the table two very different ways. [b]Leading[/b]: strong and within a few percent of its highs — breakout leadership. [b]Off the floor[/b]: the same glowing numbers, but still fifteen, twenty-five percent under its highs — a recovery bounce wearing leadership's clothes. The table marks the difference. Respect the mark: bounces are trades against overhead supply; leaders have none.` },
-      { h: `How to use it` },
+      { h: `Defining the terms` },
+      { p: `Rotation is money changing neighborhoods. Between the market and the single stock sits the group table: every theme ranked by how its momentum compares to its own recent history, plus a faster thrust reading for this week's push. High on both = leading [i]and[/i] accelerating — the neighborhoods to hunt in.` },
+      { h: `Why it matters` },
+      { p: `Rotation is what turns the weather into an address. It also carries the one distinction that saves accounts: a group can rank at the top of the table two very different ways, and only one of them is leadership. Bounces are trades against overhead supply; leaders have none.` },
+      { h: `How we measure it` },
+      { ul: [
+        `[b]Rank[/b] — each theme's momentum measured against its own recent history, with a faster thrust reading layered on for the current week.`,
+        `[b]Leading[/b] — strong and within a few percent of its highs. Breakout leadership.`,
+        `[b]Off the floor[/b] — the same glowing numbers, but still fifteen, twenty-five percent under its highs. A recovery bounce wearing leadership's clothes. The table marks the difference; respect the mark.`,
+      ] },
+      { h: `In practice` },
       { ul: [
         `Hunt only where the group ranks high [i]and[/i] clean. Two or three neighborhoods, not ten.`,
         `Inside the group, buy the leader — the highest-ranked name — not the laggard that "hasn't moved yet." It hasn't moved for a reason.`,
         `Watch the laggard anyway: when the group's weakest name breaks structure, the leader's clock starts ticking.`,
       ] },
+      { h: `Common mistakes` },
+      { p: `Reading the rank number and skipping the distance-to-highs beside it — that is how an off-the-floor bounce gets bought at leadership size. Hunting in ten neighborhoods at once, which is the same as hunting in none. And buying the cheapest name in a great group, when the group's own ranking already told you which name the money chose.` },
     ],
     take: `The rotation table is the map between the weather and the house. Hunt where it's green and near highs; treat off-the-floor strength as a different, lesser trade.`,
   },
@@ -1500,13 +1517,18 @@ const PLAYBOOK_PIECES = [
     no: "04", part: 1, title: `Relative strength`, sub: `Trade the ranked, not the cheap`,
     toc: `trade the ranked, not the cheap`,
     blocks: [
-      { p: `Relative strength is the stock's performance against the index over defined windows — the market's own scoreboard of where big money already is. We demand a high percentile rank before a name enters the watchlist, and we read the ratio line against the index for the cleanest tell of all: [b]a stock refusing to make new lows while the index does is being accumulated in public.[/b]` },
-      { h: `The rules` },
+      { h: `Defining the terms` },
+      { p: `Relative strength is the stock's performance against the index over defined windows, expressed as a percentile rank against every other stock. It is the market's own scoreboard of where big money already is — a measure of position in the field, not of how far a stock has travelled on its own.` },
+      { h: `Why it matters` },
+      { p: `Accumulation leaves footprints before it leaves headlines, and this is where they show: [b]a stock refusing to make new lows while the index does is being accumulated in public.[/b] The scoreboard is published daily, free, and ahead of the story.` },
+      { h: `How we measure it` },
       { ul: [
         `Rank floor for candidates: strong — top-quintile at minimum, top-decile preferred. No exceptions for stories.`,
         `Confirm across windows: one month, three months, six months. One hot week is noise; three agreeing windows are footprints.`,
-        `Behavior at index lows outranks any number: higher low against the index's lower low is the signature of the next cycle's leader.`,
+        `Read the ratio line against the index directly — behavior at index lows outranks any number.`,
       ] },
+      { h: `In practice` },
+      { p: `The rank is a gate at the top of the funnel: a name that fails it never reaches the chart. Where two candidates both clear it, the tiebreak is behavior at the index's worst moments — a higher low against the index's lower low is the signature of the next cycle's leader, and it is worth more than a few points of rank.` },
       { h: `Common mistakes` },
       { p: `Confusing absolute with relative: up 5% while the index is up 8% is weakness. And averaging into "cheap" — weakness is cheap for a reason, and the scoreboard already told you.` },
     ],
@@ -1516,15 +1538,43 @@ const PLAYBOOK_PIECES = [
     no: "05", part: 1, title: `The funnel`, sub: `Three scans, one watchlist, a short focus list`,
     toc: `three scans, one watchlist, a short focus list`,
     blocks: [
-      { p: `Thousands of listed names; fewer than fifty matter on any given day. The funnel finds them mechanically, every evening, the same way — so the same leaders keep earning their way onto your screen and your memory does the compounding.` },
-      { h: `The three nets` },
+      { h: `Defining the terms` },
+      { p: `The funnel is the nightly routine that turns thousands of listed names into the fewer than fifty that matter on any given day: three scans feeding one watchlist, and from that watchlist a short focus list. It is mechanical by design — the same nets, run the same way, every evening.` },
+      { h: `Why it matters` },
+      { p: `Run daily, the funnel makes the same leaders walk past your screen again and again, so your memory does the compounding. By the time one of them triggers, it is not a new idea to evaluate under pressure — it is a name you already know.` },
+      { h: `How we measure it` },
       { ul: [
         `[b]The movers ladder[/b] — top gainers over one, three, and six months, liquidity-gated (dollar volume [i]and[/i] share volume — each gate covers the other's blind spot) with a volatility floor. The overlap pattern is the read: on all three lists = persistent leader; on the longer lists but off the short one = a winner resting. The resters are tomorrow's entries.`,
         `[b]The coil scan[/b] — prior 25%+ move, now hugging its 10-day line with volume drying up. This is the trigger-adjacent list; it feeds the daily setups directly.`,
         `[b]The gapper sweep[/b] — pre-market, twice: early for the catalyst read, again five minutes before the open when the real list forms. Gap size, live volume, and the one thing a screener can't see — was anyone positioned for this?`,
       ] },
-      { h: `The rules` },
-      { p: `Scan in the evening, never in the heat. The scan builds the watchlist; only the chart builds the trade. Keep the focus list under ten — if everything is interesting, nothing is.` },
+      { h: `In practice` },
+      { p: `Scan in the evening, never in the heat. The scan builds the watchlist; only the chart builds the trade. Keep the focus list under ten — if everything is interesting, nothing is. Names that clear a net but not the chart stay on the watchlist; names that clear both move to the focus list and get a written trigger and stop.` },
+      { h: `The live screen — the movers ladder, chip by chip` },
+      { p: `This is the exact screen, saved once and re-sorted three ways. We build it on TradingView because that's where most of the Vault already lives. Six chips do all the work — everything else stays default:` },
+      { kv: [
+        [`Price > 3 USD`, `Kills the sub-$3 tier — thin books, wide spreads, and the games that live down there. We hunt where institutions can actually buy.`],
+        [`Mkt cap > 300M USD`, `Minimum institutional size. Below this, moves are air — there are no fund flows to follow.`],
+        [`ADR > 4%`, `The volatility floor. The daily range has to be able to pay for its stop within days — a one-percent-a-day mover cannot.`],
+        [`Avg vol, 10D > 500K`, `The share-volume gate: enough shares changing hands to enter and exit at size without moving the price.`],
+        [`Price × avg vol, 10D > 5M USD`, `The dollar-volume gate. The two volume gates cover each other's blind spots — share volume alone lets in three-dollar lottery tickets; dollar volume alone lets in thin, high-priced names.`],
+        [`Performance → sort Perf %`, `The ladder itself. Same universe, three lenses — sort by 1M, then 3M, then 6M, and read the overlap between the sorts.`],
+      ] },
+      { fig: { img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-1m.png`, cap: `Sorted by one-month performance — the fresh movers. The chips leave an 887-name universe; the sort decides which fifty you actually look at.` } },
+      { fig: { img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-3m.png`, cap: `The same screen re-sorted by three months — the intermediate leg. Names near the top of both this and the 1M sort are trending on every clock.` } },
+      { fig: { img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-6m.png`, cap: `And by six months — the persistent leaders. Strong here but cooled on the 1M sort is the resting winner: tomorrow's entry, not yesterday's chase.` } },
+      { h: `Tightening the list` },
+      { p: `Eight hundred and eighty-seven names is a universe, not a watchlist. Every chip is a lever — raise the bar until each sort holds under about fifty names, and let the overlap between the three sorts become the real list:` },
+      { ul: [
+        `[b]Price $3 → $10[/b] — removes the junk tier entirely; the leaders we want almost never live under ten dollars.`,
+        `[b]Market cap $300M → $1B[/b] — institutional names only, where the follow-through comes from.`,
+        `[b]ADR 4% → 5–6%[/b] — keeps only the movers that can pay fast.`,
+        `[b]Dollar volume $5M → $20M+[/b] — our own execution bar for trading at real size.`,
+        `[b]Add a Perf % floor matched to the sort[/b] — 1M ≥ +25% · 3M ≥ +50% · 6M ≥ +100%. Now the list holds only names that already proved momentum, not everything merely ranked by it.`,
+        `[b]Optional: price above a rising 10- and 20-day line[/b] — keeps only the names still in gear, and cuts the list hardest of all.`,
+      ] },
+      { h: `Common mistakes` },
+      { p: `Scanning during the session and calling it research — by then the list is being chosen by the day's noise. Letting the focus list swell past ten because nothing wants to be cut. Skipping the evening entirely after a losing day, which is exactly when the routine is doing the most work.` },
     ],
     take: `Three nets, run daily, beat forty run never. The funnel's product isn't trades — it's familiarity with the leaders before they move.`,
   },
@@ -1532,16 +1582,22 @@ const PLAYBOOK_PIECES = [
     no: "06", part: 1, title: `The earnings staircase`, sub: `Fuel beneath the chart`,
     toc: `fuel beneath the chart`,
     blocks: [
-      { p: `The biggest winners share one fingerprint before they run: quarterly sales growth [i]accelerating[/i] — each stair higher than the last — with profit following sales, not replacing it. We read every earnings story the same way: the quarters in a table, oldest to newest, growth rates beside them. The staircase is either there or it isn't.` },
-      { h: `What qualifies as fuel` },
+      { h: `Defining the terms` },
+      { p: `The staircase is the shape of a company's recent quarters laid side by side: sales growth [i]accelerating[/i] — each stair higher than the last — with profit following sales, not replacing it. It is the fundamental fuel underneath a technical setup, and it is either there or it isn't.` },
+      { h: `Why it matters` },
+      { p: `The biggest winners share this one fingerprint before they run. The chart still triggers everything, but the staircase is what tells you whether a name deserves weeks of patience and a second unit — or just a swing and a short leash.` },
+      { h: `How we measure it` },
+      { p: `We read every earnings story the same way: the quarters in a table, oldest to newest, growth rates beside them. What qualifies as fuel:` },
       { ul: [
         `[b]Acceleration[/b], not level: 20% → 40% → 60% beats a flat 50%.`,
         `[b]Sales leading[/b]: profit growth without revenue growth is cost-cutting — it ends.`,
         `[b]A one-sentence story[/b] the market can repeat, attached to a funded theme.`,
         `[b]Surprise[/b]: the violent moves come where expectations were lowest — strong numbers from a stock everyone had filed away.`,
       ] },
-      { h: `How it changes the trade` },
+      { h: `In practice` },
       { p: `The chart still triggers everything. But the staircase decides conviction: how long you're willing to hold through noise, and whether the campaign deserves adds. Great chart, no fuel — take the swing, keep the leash short. Great chart, full staircase, funded theme — that's the one you work.` },
+      { h: `Common mistakes` },
+      { p: `Quoting a staircase from a headline or from memory instead of building the table. Reading one enormous quarter as acceleration when the quarters around it are flat. Buying the fundamentals before the chart gives a trigger — fuel is not a signal, it's a reason to be patient once a signal arrives.` },
     ],
     take: `Charts time the trade; the staircase sizes the ambition. Verify the numbers — never trade a staircase you haven't seen.`,
   },
@@ -1549,8 +1605,12 @@ const PLAYBOOK_PIECES = [
     no: "07", part: 1, title: `The no-buy list`, sub: `The art of refusing`,
     toc: `the art of refusing`,
     blocks: [
-      { p: `The trades you refuse are half your edge. This list hangs above the desk, and any single "yes" ends the conversation — no matter how good the chart looks, no matter how loud the story.` },
-      { h: `No buy when…` },
+      { h: `Defining the terms` },
+      { p: `The no-buy list is a fixed set of disqualifiers written down in advance. It is not a scorecard to be weighed — any single "yes" ends the conversation, no matter how good the chart looks, no matter how loud the story.` },
+      { h: `Why it matters` },
+      { p: `The trades you refuse are half your edge. Every line on this list was paid for by a loss that felt obvious afterwards, and the list exists so the same loss cannot be bought twice.` },
+      { h: `How we measure it` },
+      { p: `No buy when…` },
       { ul: [
         `The breadth verdict is red — breakouts statistically failing.`,
         `The theme is off both boards, or the group table flags it as an off-the-floor bounce.`,
@@ -1561,6 +1621,10 @@ const PLAYBOOK_PIECES = [
         `Open heat is at its cap — the book has no room for another stop.`,
         `The honest reason is boredom, a red P&L, or wanting "traction." The tape owes you nothing.`,
       ] },
+      { h: `In practice` },
+      { p: `The list hangs above the desk and is run before the order exists, not after the fill. Eight questions take seconds, and they are answered out loud in order — a single yes is a no, and there is no arithmetic that lets seven clean lines outvote one dirty one.` },
+      { h: `Common mistakes` },
+      { p: `Overriding one line because the other seven are clean. Checking the list only on trades that already feel shaky. Rewriting a line mid-session so the trade in front of you clears it — the list is edited in the journal, on a quiet evening, with evidence.` },
     ],
     take: `The mistake is never the rule — it's the click that ignored it. If you can't articulate the buy in one sentence, there is no buy.`,
   },
@@ -1568,14 +1632,20 @@ const PLAYBOOK_PIECES = [
     no: "08", part: 2, title: `The coil breakout`, sub: `Big move, tight base, expansion`,
     toc: `big move, tight base, expansion`,
     blocks: [
-      { p: `The flagship setup, in three acts. [b]One:[/b] a real prior move — thirty percent or more in one to three months. Momentum is proven, not hoped for. [b]Two:[/b] a controlled rest — two to eight weeks of higher lows and visibly shrinking ranges, volume drying up, price surfing its rising 10- and 20-day lines. The tighter the coil, the fewer hands left to shake. [b]Three:[/b] the release — a range-expansion day through the pivot on expanding volume.` },
-      { h: `What the best coils share` },
+      { h: `Defining the terms` },
+      { p: `A coil is a leader that has already proven momentum, then rests in a range that tightens instead of unravelling. The [b]coil breakout[/b] is the release out of that range — our flagship setup, and the one every other piece in this book is built to support.` },
+      { h: `Why it matters` },
+      { p: `The tighter the coil, the fewer hands left to shake. Every quiet day removes another seller, so when demand finally arrives it meets thin supply and the move begins with an edge that is visible in advance. Compression is the edge; expansion is only the receipt.` },
+      { h: `How we measure it` },
+      { p: `Three acts. [b]One:[/b] a real prior move — thirty percent or more in one to three months. Momentum is proven, not hoped for. [b]Two:[/b] a controlled rest — two to eight weeks of higher lows and visibly shrinking ranges, volume drying up, price surfing its rising 10- and 20-day lines. [b]Three:[/b] the release — a range-expansion day through the pivot on expanding volume. What the best coils share:` },
       { ul: [
         `Higher lows squeezing into the pivot; a narrow or negative day just before the break.`,
         `Inside days at the apex — the spring fully wound.`,
         `Moving averages converging beneath price like rails meeting at the platform.`,
         `A quiet tape around a loud theme: the stock rests while its group leads.`,
       ] },
+      { h: `In practice` },
+      { p: `The coil scan surfaces them, the three acts qualify them, and the entry stack times the release: the opening-range trigger on the expansion day, stop at the low of that day. Until the expansion arrives, a coil is a watchlist name and nothing more. Size follows the age of the trend — the first coil after a real prior move earns full size; a coil late in a long run earns less.` },
       { h: `Common mistakes` },
       { p: `Buying loose bases because the story is tight. Anticipating the break without a reclaim structure. Taking the third breakout of a long run at the same size as the first — the older the trend, the shorter its fuse.` },
     ],
@@ -1585,15 +1655,20 @@ const PLAYBOOK_PIECES = [
     no: "09", part: 2, title: `The surprise gap`, sub: `Catalyst + volume + neglect`,
     toc: `catalyst + volume + neglect`,
     blocks: [
-      { p: `Occasionally the market is genuinely surprised: real new information — an earnings inflection, a contract, a guidance reset — lands on a stock nobody was positioned in. Price gaps ten percent or more, and volume floods in so fast the stock trades a normal day's volume in the first half hour. These are the season's biggest trades, and there are only a handful per year.` },
-      { h: `The three tests` },
+      { h: `Defining the terms` },
+      { p: `A surprise gap is the market repricing a stock it was not positioned in. Real new information — an earnings inflection, a contract, a guidance reset — lands on a neglected name, price gaps ten percent or more, and volume floods in so fast the stock trades a normal day's volume in the first half hour.` },
+      { h: `Why it matters` },
+      { p: `These are the season's biggest trades, and there are only a handful per year. The gap is not the move; it is the announcement that a repricing has begun, and repricings take weeks to finish.` },
+      { h: `How we measure it` },
       { ul: [
         `[b]Catalyst you can name[/b] — one sentence, new information, not a re-hash.`,
         `[b]Volume that proves it[/b] — pre-market flow first, then the open: on pace for average daily volume inside thirty minutes.`,
         `[b]Neglect before it[/b] — months of sideways-to-down. A gap on an already-loved name is extension risk, not surprise.`,
       ] },
-      { h: `Two ways in` },
-      { p: `[b]Day one:[/b] the opening-range high, stop at the day's low — and the day itself votes: closing near the highs above the prior day is the confirmation; closing back inside the gap is the rejection. [b]The delayed entry:[/b] when the gap is too large to size sanely, wait for the first constructive day — the first tight pause or higher low above the gap. Missing the first hour costs little; the real move takes weeks.` },
+      { h: `In practice` },
+      { p: `Two ways in. [b]Day one:[/b] the opening-range high, stop at the day's low — and the day itself votes: closing near the highs above the prior day is the confirmation; closing back inside the gap is the rejection. [b]The delayed entry:[/b] when the gap is too large to size sanely, wait for the first constructive day — the first tight pause or higher low above the gap. Missing the first hour costs little; the real move takes weeks.` },
+      { h: `Common mistakes` },
+      { p: `Buying the open before any range exists, then discovering the stop is a third of the position. Calling a rehashed headline new information. And holding a gap that closed back inside itself, hoping tomorrow re-votes — if it hesitates, it lied.` },
     ],
     take: `Surprise is the edge and neglect is the proof of it. If it hesitates, it lied — the real ones leave immediately.`,
   },
@@ -1601,14 +1676,19 @@ const PLAYBOOK_PIECES = [
     no: "10", part: 2, title: `The pullback reclaim`, sub: `Buying leaders on their rails`,
     toc: `buying leaders on their rails`,
     blocks: [
-      { p: `Missed the breakout? The leader will offer one more door: the first orderly pullback to its rising rails — the short moving averages a fast leader respects. The entry isn't the touch; it's the [b]reclaim[/b]. Let it undercut, let the weak hands take their stop-out, and buy the move back through the level on a reversal candle.` },
-      { h: `The rules` },
+      { h: `Defining the terms` },
+      { p: `A pullback reclaim is the second door into a leader you already missed: the first orderly retreat to its rising rails — the short moving averages a fast leader respects — followed by a move back up through the level. The entry is not the touch; it is the [b]reclaim[/b].` },
+      { h: `Why it matters` },
+      { p: `The undercut does work no buyer can do for himself: it clears out the weak hands at the level, so the reclaim happens against a lighter book. It also produces the tightest stop of any setup we take, because the low that was just made is the exact level the trade is arguing about.` },
+      { h: `How we measure it` },
       { ul: [
         `Only the [i]first[/i] or [i]second[/i] pullback after a breakout. By the third, the easy trend is old.`,
         `Volume must dry up on the way down — heavy-volume pullbacks are distribution, not rest.`,
         `The stop is the pullback low, and it must be tighter than one daily range. If the structure demands a wider stop, the structure is telling you no.`,
         `The trend context stays intact: rails rising, theme still funded, relative strength holding.`,
       ] },
+      { h: `In practice` },
+      { p: `Let it undercut, let the weak hands take their stop-out, and buy the move back through the level on a reversal candle. Nothing is bought while price is still falling — the reclaim is the entire signal, and if it never comes, there was never a trade.` },
       { h: `Common mistakes` },
       { p: `Buying the falling knife side of the pullback before any reclaim. Treating a broken leader's dead-cat bounce as a pullback — a pullback holds its structure; a breakdown lost it.` },
     ],
@@ -1618,13 +1698,18 @@ const PLAYBOOK_PIECES = [
     no: "11", part: 3, title: `The entry stack`, sub: `Opening range, live volume, one stop`,
     toc: `opening range, live volume, one stop`,
     blocks: [
-      { p: `An entry is not a price — it's a moment when buyers prove control. Ours is built from three parts that must agree, and it is the same on every setup in this book.` },
-      { h: `The stack` },
+      { h: `Defining the terms` },
+      { p: `An entry is not a price — it's a moment when buyers prove control. The entry stack is the three parts that must agree before that moment counts: a trigger, a confirmation, and a stop. It is identical on every setup in this book.` },
+      { h: `Why it matters` },
+      { p: `The entry is the only point in a trade where the risk is entirely in our hands, and the stack is what stops a good setup from becoming a bad position. Our own research on hundreds of opening-range trades found the bare trigger carries no edge at all until the volume gate is added — without real participation, the prettiest trigger is a trap.` },
+      { h: `How we measure it` },
       { ul: [
         `[b]Trigger — the five-minute opening-range high.[/b] The first bar of the day defines the range; the break of its high is the earliest structural proof of demand. On the biggest gaps, the one-minute range serves the same job.`,
-        `[b]Confirmation — live relative volume, measured honestly.[/b] Today's volume against the same time of day on normal days — not against a full day's average. Without real participation, the prettiest trigger is a trap: our own research on hundreds of opening-range trades found the bare trigger carries no edge at all until the volume gate is added.`,
+        `[b]Confirmation — live relative volume, measured honestly.[/b] Today's volume against the same time of day on normal days — not against a full day's average.`,
         `[b]Stop — the low of the day. Placed with the order, not after.[/b] The day's low is where the day's thesis died. If that distance is wider than about one daily range, the trade doesn't fit — pass or shrink.`,
       ] },
+      { h: `In practice` },
+      { p: `The three are checked in order, out loud, before the click — one sentence each. All three or none: a trigger without volume is a pass, and a trigger with volume but a stop wider than one daily range is either a smaller position or no position. The stop is known before the share count exists, because the next piece turns that distance into arithmetic.` },
       { h: `Common mistakes` },
       { p: `Buying mid-bar with no trigger. Entering at lunch on the morning's news. Sizing the trade before knowing the stop — that's backwards, as the next piece makes arithmetic.` },
     ],
@@ -1634,15 +1719,19 @@ const PLAYBOOK_PIECES = [
     no: "12", part: 3, title: `Sizing is arithmetic`, sub: `Risk first, shares second, volatility-scaled`,
     toc: `risk first, shares second, volatility-scaled`,
     blocks: [
-      { p: `Position sizing is one question: how much do I lose if I'm wrong? Fix that number first and the share count computes itself.` },
-      { h: `The formula` },
-      { p: `[b]Shares = (Account × Risk%) ÷ (Entry − Stop).[/b] A $100,000 account risking 0.4% is $400 of risk. Entry $50, stop $48 — $2 per share — is 200 shares. Do it out loud, every time, before the order exists.` },
-      { h: `The anchors` },
+      { h: `Defining the terms` },
+      { p: `Position sizing is one question: how much do I lose if I'm wrong? The answer is a fixed fraction of the account, decided before the trade exists. Fix that number first and the share count computes itself — size is an output of risk, never an expression of enthusiasm.` },
+      { h: `Why it matters` },
+      { p: `Two traders can hold the same dollar position and carry completely different risk; only the distance to the stop says which is which. Sizing from risk makes every loss cost roughly the same, which is what turns a losing streak into an inconvenience instead of an event.` },
+      { h: `How we measure it` },
+      { p: `[b]Shares = (Account × Risk%) ÷ (Entry − Stop).[/b] A $100,000 account risking 0.4% is $400 of risk. Entry $50, stop $48 — $2 per share — is 200 shares. Do it out loud, every time, before the order exists. The anchors:` },
       { ul: [
         `Per-trade risk: a fraction of one percent. We anchor around a quarter to half a percent — tighter after losses, never above one percent for any reason.`,
         `Volatility does the scaling automatically: wilder stocks have wider stops, wider stops mean fewer shares. Same risk, different share counts — that's the system working, not a mistake.`,
         `Notional is an output, never a target. "How many shares can I afford" is the question that ends accounts.`,
       ] },
+      { h: `In practice` },
+      { p: `The order of operations never changes: setup, then stop, then arithmetic, then order. When the arithmetic returns a share count that feels too small to matter, the honest reading is that the stop is too wide for the account — not that the risk percentage should move. The percentage moves for only one reason, and it is a drawdown.` },
       { h: `Common mistakes` },
       { p: `Same share count on every trade regardless of stop distance. Sizing up to win it back. Confusing a big position with a big idea.` },
     ],
@@ -1652,15 +1741,20 @@ const PLAYBOOK_PIECES = [
     no: "13", part: 3, title: `The three gates`, sub: `Per-trade risk, open heat, total exposure`,
     toc: `per-trade risk, open heat, total exposure`,
     blocks: [
-      { p: `Three different ceilings guard the account, and they are not the same number. Conflating them is how disciplined-feeling traders take undisciplined losses.` },
-      { h: `The gates` },
+      { h: `Defining the terms` },
+      { p: `Three different ceilings guard the account, and they are not the same number. [b]Risk[/b] is what one stop-out costs. [b]Open heat[/b] is what every open stop costs together. [b]Exposure[/b] is how much capital is deployed at all. Three questions, three answers, three separate limits.` },
+      { h: `Why it matters` },
+      { p: `Each gate fails differently. Gate one stops the single blowup; gate two stops the flash-day massacre; gate three stops the slow bleed of over-participation in a bad tape. You need all three closed to be actually safe — and any one of them can veto a trade the other two allowed.` },
+      { h: `How we measure it` },
       { ul: [
         `[b]Gate one — per-trade risk.[/b] The fraction of the account one stop-out may cost. The sizing formula enforces it.`,
-        `[b]Gate two — open heat.[/b] The sum of every open position's distance to its stop: what today costs if [i]everything[/i] stops at once. Capped at roughly two percent of equity. A new setup that would breach the cap waits, or an existing stop tightens first. Correlated names count as one bucket — three positions in one theme is one trade wearing three tickers.`,
+        `[b]Gate two — open heat.[/b] The sum of every open position's distance to its stop: what today costs if [i]everything[/i] stops at once. Capped at roughly two percent of equity. Correlated names count as one bucket — three positions in one theme is one trade wearing three tickers.`,
         `[b]Gate three — total exposure.[/b] How much of the account is deployed overnight at all. It breathes with the regime dial: full in confirmed tapes, a fraction in transition, near-zero in hostile ones.`,
       ] },
-      { h: `Why three, not one` },
-      { p: `Each gate fails differently. Gate one stops the single blowup; gate two stops the flash-day massacre; gate three stops the slow bleed of over-participation in a bad tape. You need all three closed to be actually safe — and any one of them can veto a trade the other two allowed.` },
+      { h: `In practice` },
+      { p: `All three are answered before an entry, in that order. A new setup that would breach the heat cap waits, or an existing stop tightens first to make room — the book pays for the new position out of risk it already carries. As stops trail up, heat falls on its own and the room comes back without a decision.` },
+      { h: `Common mistakes` },
+      { p: `Conflating the three — this is how disciplined-feeling traders take undisciplined losses: a book at a comfortable exposure can be carrying triple the intended heat. Waving through a fourth position in the same theme and calling it diversification. And breaching the cap because a setup is A-grade — the gates exist precisely for the trades that feel worth breaking them for.` },
     ],
     take: `Risk per trade, heat per day, exposure per regime. Three questions before every entry; three chances for the system to save you.`,
   },
@@ -1668,16 +1762,21 @@ const PLAYBOOK_PIECES = [
     no: "14", part: 3, title: `Cutting losers`, sub: `Small when wrong, instantly`,
     toc: `small when wrong, instantly`,
     blocks: [
-      { p: `Everything else in this book can be mediocre if this piece is perfect, and perfect everywhere else cannot survive this piece done badly. The stop lives where the thesis is wrong — the day low that defined the entry, the pullback low, the level whose loss unmakes the trade — never where comfort ends.` },
-      { h: `The rules` },
+      { h: `Defining the terms` },
+      { p: `The stop lives where the thesis is wrong — the day low that defined the entry, the pullback low, the level whose loss unmakes the trade — never where comfort ends. It is a structural price, decided before the position exists, and it is the only part of a trade we fully control.` },
+      { h: `Why it matters` },
+      { p: `Everything else in this book can be mediocre if this piece is perfect, and perfect everywhere else cannot survive this piece done badly. Loss math is asymmetric: minus ten needs plus eleven; minus twenty-five needs plus thirty-three; minus fifty needs a double. Small losses are tuition; large ones are amputations.` },
+      { h: `How we measure it` },
       { ul: [
         `The stop is placed with the entry order. A trade without a resting stop is not a position; it's an opinion with leverage.`,
         `Width ceiling: about one daily range. Wider means the trade doesn't fit — reduce shares or pass.`,
         `The stop never moves down. Not once, not for a close call, not for a story.`,
         `Averaging down is not a strategy. It is the same mistake at better prices.`,
       ] },
-      { h: `Why speed is the whole game` },
-      { p: `Loss math is asymmetric: minus ten needs plus eleven; minus twenty-five needs plus thirty-three; minus fifty needs a double. Small losses are tuition; large ones are amputations. And there's a second tell worth acting on before the stop: the trades that work tend to work [i]immediately[/i]. A new position that just sits there wrong-side is volunteering information.` },
+      { h: `In practice` },
+      { p: `The stop rests in the market and is honored without negotiation. There is a second tell worth acting on before it triggers: the trades that work tend to work [i]immediately[/i]. A new position that just sits there wrong-side is volunteering information, and reducing it early is a decision, not a panic.` },
+      { h: `Common mistakes` },
+      { p: `Widening the stop to give the trade room — that is the trade telling you it doesn't fit, and the answer is fewer shares, not more rope. Cancelling the resting order to "watch it manually." Re-entering minutes after the stop with no new trigger. And reading a stop-out as a verdict on yourself rather than the price of finding out.` },
     ],
     take: `Define wrong before entry, honor it without negotiation. The skill isn't being right — it's being small when you're not.`,
   },
@@ -1685,15 +1784,20 @@ const PLAYBOOK_PIECES = [
     no: "15", part: 4, title: `Trim into strength`, sub: `The payday window and extension bands`,
     toc: `the payday window and extension bands`,
     blocks: [
-      { p: `After a breakout works, the market usually pays fast — a sharp expansion over the first three to five sessions. That window is the payday: the probability of a pullback or stall rises sharply after it, and the traders who never collect are the ones who round-trip their best entries.` },
-      { h: `The sequence` },
+      { h: `Defining the terms` },
+      { p: `Trimming is selling part of a winner while it is still strong, so the rest can ride without the whole position being hostage to a single pullback. Two things tell us when: the [b]payday window[/b] — the first few sessions after a breakout — and the [b]extension bands[/b], our measure of how stretched price is from its trend.` },
+      { h: `Why it matters` },
+      { p: `After a breakout works, the market usually pays fast — a sharp expansion over the first three to five sessions. The probability of a pullback or stall rises sharply after it, and the traders who never collect are the ones who round-trip their best entries.` },
+      { h: `How we measure it` },
       { ul: [
         `[b]Days three to five, or a fast fifteen-plus percent:[/b] sell a third to half. Move the stop on the remainder to break-even. The trade can no longer lose; psychology transforms.`,
         `[b]Extension bands:[/b] we measure stretch as daily-ranges-above-the-50-day-line. Deep into the bands — the parabolic zone — sell another tranche [i]into[/i] the vertical move. Our own tracked history shows extreme extensions resolve down far more often than not.`,
         `[b]The rest rides[/b] — that's the next piece.`,
       ] },
-      { h: `Extension versus health` },
-      { p: `A healthy trend grinds with normal rests on its rails — hold it. An extension is vertical, closes pinned to highs, volume accelerating — harvest it. The difference is measurable, so measure it; never eyeball what a number can answer.` },
+      { h: `In practice` },
+      { p: `The read that governs everything here is extension versus health. A healthy trend grinds with normal rests on its rails — hold it. An extension is vertical, closes pinned to highs, volume accelerating — harvest it. The difference is measurable, so measure it; never eyeball what a number can answer.` },
+      { h: `Common mistakes` },
+      { p: `Trimming on a feeling a day or two early, then watching the payday window pay without you. Taking the trim and forgetting the other half of the sequence — the stop to break-even is what makes the trim worth taking. And holding the entire position through a parabolic run because it "still looks strong," which is the trade the extension bands exist to interrupt.` },
     ],
     take: `Sell some into the crowd's excitement, ride the rest on structure. All-out gives up the tail; all-hold gives back the gain; the discipline is the partial.`,
   },
@@ -1701,14 +1805,18 @@ const PLAYBOOK_PIECES = [
     no: "16", part: 4, title: `Trail the rest`, sub: `Close-based rails, matched to tempo`,
     toc: `close-based rails, matched to tempo`,
     blocks: [
+      { h: `Defining the terms` },
+      { p: `The runner is what survives the trim, and it is managed by one trailing rail — a moving average matched to the stock's tempo, read on daily closes only. The rail is not a target; it is the line whose loss ends the campaign.` },
+      { h: `Why it matters` },
       { p: `The runner piece exists for one reason: a single monster campaign a year does more for the account than fifty tidy scalps. You cannot know in advance which winner is the monster — so every runner gets the chance to become one.` },
-      { h: `The rules` },
+      { h: `How we measure it` },
       { ul: [
         `Trail with a short rail on fast names and a slower rail on steady ones — one rail per trade, chosen at the trim, never switched mid-flight to justify holding.`,
         `[b]Daily closes only.[/b] Intraday stabs through the rail are the market collecting the impatient. The close is the verdict.`,
-        `A brief undercut that closes back above the rail is not an exit — reclaim-tolerance is what keeps you in the trends that matter.`,
         `The campaign ends when the closes say so: a decisive close below the rail, or the structure of higher lows breaking.`,
       ] },
+      { h: `In practice` },
+      { p: `A brief undercut that closes back above the rail is not an exit — reclaim-tolerance is what keeps you in the trends that matter. The rail is checked once, after the close, and the next day's action is decided then; nothing about a runner is decided in the middle of a session.` },
       { h: `Common mistakes` },
       { p: `Trailing the fastest rail on a slow stock and donating a good trend to noise. Tightening because you're bored. Selling a runner because it's "up a lot" — up a lot is the point.` },
     ],
@@ -1718,16 +1826,20 @@ const PLAYBOOK_PIECES = [
     no: "17", part: 4, title: `Adds and pyramids`, sub: `Strength on structure, never on hope`,
     toc: `strength on structure, never on hope`,
     blocks: [
-      { p: `Adding is how good campaigns become great ones — and how undisciplined ones die. The rule fits in a sentence: add only when the stock proves itself again, at a new structure, with the whole position's risk still inside the gates.` },
-      { h: `Where adds live` },
+      { h: `Defining the terms` },
+      { p: `An add is a second or third unit bought into an existing winner. A pyramid is a sequence of adds, each smaller than the last. Either way the result is one campaign, one blended position, one risk number — never a collection of separate trades in the same ticker.` },
+      { h: `Why it matters` },
+      { p: `Adding is how good campaigns become great ones — and how undisciplined ones die. The whole difference sits in the sequencing: an add made against fresh structure raises the position without raising the risk, while an add made on feeling raises both.` },
+      { h: `How we measure it` },
+      { p: `Each add smaller than the last — a full first unit, then half to three-quarters, then a quarter to half. The blended cost stays near the original entry, and every add forces the combined stop up so total risk never grows. If the stop can't rise to keep the math legal, the add is not allowed — conviction is not a sizing input.` },
+      { h: `In practice` },
+      { p: `The rule fits in a sentence: add only when the stock proves itself again, at a new structure, with the whole position's risk still inside the gates. Where adds live:` },
       { ul: [
         `The first tight flag against the short rails after the initial leg — the break of the flag is the trigger.`,
         `The next base: a stair-step consolidation and fresh range expansion. Each new coil is a new contract.`,
       ] },
-      { h: `The math of the pyramid` },
-      { p: `Each add smaller than the last — a full first unit, then half to three-quarters, then a quarter to half. The blended cost stays near the original entry, and every add forces the combined stop up so total risk never grows. One campaign, one blended position, one risk number. If the stop can't rise to keep the math legal, the add is not allowed — conviction is not a sizing input.` },
-      { h: `When not to add` },
-      { p: `Vertical bars far above the rails — that's the selling zone from piece fifteen, not the buying zone. You add into consolidation; you trim into extension. Reversing those two sentences is the whole difference between pyramiding and tilting.` },
+      { h: `Common mistakes` },
+      { p: `Adding into vertical bars far above the rails — that's the selling zone from piece fifteen, not the buying zone. You add into consolidation; you trim into extension. Reversing those two sentences is the whole difference between pyramiding and tilting. And adding without moving the stop, which quietly turns one disciplined position into three undisciplined ones.` },
     ],
     take: `Adds are earned by the stock, not felt by the trader. Structure triggers them; the risk math approves them.`,
   },
@@ -1735,16 +1847,21 @@ const PLAYBOOK_PIECES = [
     no: "18", part: 5, title: `The shrink protocol`, sub: `Losing streaks, handled mechanically`,
     toc: `losing streaks, handled mechanically`,
     blocks: [
-      { p: `Streaks are a property of the strategy, not a verdict on you — four, six, even ten in a row will happen inside a winning system. What separates careers from cautionary tales is what size you were doing when the streak found you, and how fast you shrank while it lasted.` },
-      { h: `The protocol` },
+      { h: `Defining the terms` },
+      { p: `The shrink protocol is our pre-written response to a losing run: a schedule that cuts size in steps as a drawdown deepens, decided in advance so it never has to be argued about in the moment. Streaks are a property of the strategy, not a verdict on you.` },
+      { h: `Why it matters` },
+      { p: `Four, six, even ten losses in a row will happen inside a winning system. What separates careers from cautionary tales is what size you were doing when the streak found you, and how fast you shrank while it lasted.` },
+      { h: `How we measure it` },
       { ul: [
         `[b]Consecutive stop-outs, or the feel of "burning profits away":[/b] stop trading, diagnose in the journal before the next order. Drift talk is the alarm — the entries taken to feel traction are the streak's favorite food.`,
         `[b]Mechanical de-grossing:[/b] as the month's drawdown deepens, cut new-trade size in steps — three-quarters, half, a quarter. No debate, no exceptions; the schedule decides so you don't have to.`,
         `[b]The full breaker:[/b] at a hard drawdown-from-peak line, flat the book, stand down, and spend a full day in the journal before the next trade.`,
         `[b]The review:[/b] pull the last twenty trades. Were the setups A-grade or stretched? Were the gates respected or argued with? Did the regime dial already say no? The answers are always obvious in hindsight — the protocol's job is to force the hindsight [i]now[/i].`,
       ] },
-      { h: `The psychology` },
-      { p: `Streaks make you want to do more. The answer is always less: fewer names, smaller size, shorter sessions. You cannot think your way back to even — you size your way back.` },
+      { h: `In practice` },
+      { p: `Streaks make you want to do more. The answer is always less: fewer names, smaller size, shorter sessions. Tomorrow's size is set by last night's numbers, not by how this morning's tape feels — and size returns the same way it left, one step at a time, as the equity curve earns it back. You cannot think your way back to even; you size your way back.` },
+      { h: `Common mistakes` },
+      { p: `Pressing size to win it back, which is the one move that converts a drawdown into a hole. Skipping the journal day because the setups "look too good to miss." Treating the de-gross ladder as a suggestion. And declaring the system broken at four losses when the system's own history says four losses are ordinary.` },
     ],
     take: `Shrink early, shrink mechanically, and survive in good enough shape to press when conditions return. Recovery is a byproduct; survival is the goal.`,
   },
@@ -1752,16 +1869,21 @@ const PLAYBOOK_PIECES = [
     no: "19", part: 5, title: `Progress over perfection`, sub: `Reps compound; opinions don't`,
     toc: `reps compound; opinions don't`,
     blocks: [
-      { p: `The most common failure inside any framework is not breaking the rules — it's freezing inside them. Waiting for the flawless tape, the flawless base, the flawless entry tick, while the leaders run and the month ends flat with a notebook of almosts.` },
-      { h: `Breaking the loop` },
+      { h: `Defining the terms` },
+      { p: `The most common failure inside any framework is not breaking the rules — it's freezing inside them. Progress over perfection is the counter-rule: take the trade the system flagged, at a size you can survive being wrong at, and let the number of correct repetitions do the work that certainty never will.` },
+      { h: `Why it matters` },
+      { p: `Every study in our vault — hundreds of historical campaigns, measured — says the same thing: the edge is small per trade and enormous per decade. The traders who compound are not the ones who were most often right; they're the ones who kept showing up, at survivable size, doing the same boring correct things.` },
+      { h: `How we measure it` },
       { ul: [
         `Trade small when unsure — shrinking the stakes of one decision cures most paralysis.`,
         `Write the trigger and the stop the night before. When the alert fires, the decision is already made; you're just executing yesterday's clarity.`,
         `Log the trades you [i]didn't[/i] take beside the ones you did. The missed-trade ledger teaches faster than the P&L — most rejected setups were fine, and some rejected rules were right.`,
         `Grade weeks by process, not outcome: did you take the setups the system flagged, cut what it said to cut, respect the gates? Yes three times is a won week at any P&L.`,
       ] },
-      { h: `The long game` },
-      { p: `Every study in our vault — hundreds of historical campaigns, measured — says the same thing: the edge is small per trade and enormous per decade. The traders who compound are not the ones who were most often right; they're the ones who kept showing up, at survivable size, doing the same boring correct things.` },
+      { h: `In practice` },
+      { p: `Unsure is a size, not a veto — the answer to a marginal setup is a smaller one, not an empty day. The night before does the deciding; the session only executes. And the week is graded on the three process questions before anyone looks at the number at the bottom.` },
+      { h: `Common mistakes` },
+      { p: `Waiting for the flawless tape, the flawless base, the flawless entry tick, while the leaders run and the month ends flat with a notebook of almosts. Reading a green week as proof of good process and a red one as proof of bad. Opening the missed-trade ledger only when it flatters you.` },
     ],
     take: `Done beats perfect. Take the trade the system flags, honor the stop, log the rep — and let the law of large numbers keep its promise.`,
   },
@@ -1782,14 +1904,14 @@ export function openPlaybookBook() {
   const N = PLAYBOOK_PIECES.length;
   const cover = `<div class="page pbcover">
     <img class="pblogo" src="${esc(window.location.origin)}/logo-mark.png"/>
-    <div class="pbbrand">The VIV Playbook</div>
-    <h1 class="pbtitle">The VIV Playbook</h1>
+    <div class="pbbrand">The VIV System</div>
+    <h1 class="pbtitle">Building Blocks to Profitability</h1>
     <div class="pbrule"></div>
-    <div class="pbmeta">19 pieces · six parts · Weather to Survival · 2026</div>
+    <div class="pbmeta">The VIV system in nineteen pieces · six parts · Weather to Survival · 2026</div>
     <div class="pbfoot pbcovfoot">Valen Insiders Vault · Educational — not financial advice</div>
   </div>`;
   const contents = `<div class="page pbcontents">
-    <div class="pblabel">Contents</div>
+    <div class="pblabel">Contents · Building Blocks to Profitability</div>
     ${PLAYBOOK_PARTS.map((part, pi) => {
       const rowsHtml = PLAYBOOK_PIECES.filter((pc) => pc.part === pi).map((pc) =>
         `<a class="pbcrow" href="#p${pc.no}"><span class="pbcno">${esc(pc.no)}</span><span class="pbctk">${esc(pc.title)}</span><span class="pbctheme">${esc(pc.toc)}</span><span class="pbcdots"></span></a>`
@@ -1811,6 +1933,9 @@ export function openPlaybookBook() {
       const blocks = pc.blocks.map((b) => {
         if (b.h != null) return `<div class="pcH pbh3">${esc(b.h)}</div>`;
         if (b.p != null) return `<div class="pcM pbp">${pbRich(b.p)}</div>`;
+        if (b.fig) return `<div class="pcBlk pbfig"><img class="pcCard" src="${esc(b.fig.img)}" style="width:100%;display:block"/><div class="pcD pbfigcap">${pbRich(b.fig.cap)}</div></div>`;
+        if (b.kv) return `<div class="pbkvs">${b.kv.map(([k, v]) =>
+          `<div class="pbkv"><span class="pcK pbkvk">${esc(k)}</span><div class="pcM pbkvv">${pbRich(v)}</div></div>`).join("")}</div>`;
         return `<div class="pblist">${b.ul.map((x) =>
           `<div class="pbli"><span class="pcTick">—</span><div class="pcM">${pbRich(x)}</div></div>`).join("")}</div>`;
       }).join("");
@@ -1828,7 +1953,7 @@ export function openPlaybookBook() {
             <div class="pcRule pbtake"><div class="pcK pbtakel">Takeaway</div><div class="pcH pbtaket">${esc(pc.take)}</div></div>
           </div>
         </div>
-        <div class="pbfolio"><span>The VIV Playbook</span><span>No. ${esc(pc.no)} / ${N} · ${esc(part.folio)}</span></div>
+        <div class="pbfolio"><span>Building Blocks</span><span>No. ${esc(pc.no)} / ${N} · ${esc(part.folio)}</span></div>
       </div>`;
     }).join("");
     return divider + pieces;
@@ -1847,9 +1972,9 @@ export function openPlaybookBook() {
           `<div class="pbcardsec"><div class="pcK pbcardk">${esc(k)}</div><div class="pcM pbcardx">${pbRich(v)}</div></div>`).join("")}
       </div>
     </div>
-    <div class="pbfolio"><span>Valen Insiders Vault · 2026 · Educational, not financial advice</span><span>The VIV Playbook</span></div>
+    <div class="pbfolio"><span>Valen Insiders Vault · 2026 · Educational, not financial advice</span><span>Building Blocks</span></div>
   </div>`;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>The VIV Playbook</title>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Building Blocks to Profitability</title>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
       *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -1882,7 +2007,7 @@ export function openPlaybookBook() {
       body.light .pcK{color:#8a6a1c}
       .pcTick{color:#c9982a}
       body.light .pcTick{color:#8a6a1c}
-      @media print{.pcBlk,.pbli,.pbtake,.pbcardsec,.pbcrow{break-inside:avoid;page-break-inside:avoid}}
+      @media print{.pcBlk,.pbli,.pbtake,.pbcardsec,.pbcrow,.pbfig,.pbkv{break-inside:avoid;page-break-inside:avoid}}
       /* ── COVER ── */
       .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
       .pblogo{height:54px;width:auto;align-self:flex-start;margin-bottom:20px}
@@ -1923,6 +2048,13 @@ export function openPlaybookBook() {
       .pbli{display:flex;gap:12px;max-width:62ch;margin-top:13px}
       .pbli .pcTick{flex:none;line-height:1.8}
       .pbli .pcM{font-size:1.02rem;line-height:1.8}
+      .pbfig{margin:24px 0 0}
+      .pbfigcap{font-size:0.85rem;line-height:1.6;margin-top:10px;max-width:70ch}
+      .pbkvs{margin:18px 0 4px}
+      .pbkv{display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px;padding:11px 0;border-top:1px solid rgba(255,255,255,0.08)}
+      body.light .pbkv{border-top-color:rgba(23,21,15,0.1)}
+      .pbkvk{font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;padding-top:3px;white-space:nowrap}
+      .pbkvv{font-size:0.95rem;line-height:1.7}
       .pbtake{margin-top:36px;padding-top:18px;max-width:62ch}
       .pbtakel{font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase}
       .pbtaket{font-size:1.02rem;font-weight:600;line-height:1.6;margin-top:10px}
@@ -1964,7 +2096,7 @@ export function openPlaybookBook() {
     </body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
   const w = window.open(url, "_blank");
-  if (!w) { URL.revokeObjectURL(url); return alert("Pop-up blocked — allow pop-ups for this site to open the Playbook."); }
+  if (!w) { URL.revokeObjectURL(url); return alert("Pop-up blocked — allow pop-ups for this site to open the book."); }
   setTimeout(() => URL.revokeObjectURL(url), 60000);
   return html;
 }
