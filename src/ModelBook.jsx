@@ -245,7 +245,7 @@ const DEEP_DIVES = [
     title: "21 Building Blocks to Profitability",
     premise: "The VIV system in twenty-one pieces — weather, neighborhood, house, execution, campaign, survival.",
     updated: "2026-08-01",
-    cover: "",
+    cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/viv-playbook-cover.png",
   },
   {
     no: "01", slug: "market-bottom", project: "Finding the Market's Bottom",
