@@ -971,46 +971,44 @@ function openProjectBookPdf(rows, coverTitle) {
       };
       
       const folio = `<div class="pbfolio"><span>${esc(coverTitle)}</span><span>No. ${String(idx + 1).padStart(2, "0")} / ${String(rows.length).padStart(2, "0")} · ${esc(yearOf(r))}</span></div>`;
-      // ── CHRONICLE PAGE v3 (Valen 2026-07-31, "copy Nick"): faithful port of the
-      // nickschmidt.so/report article grid, studied from the live render — left margin column
-      // (heading + meta), right reading column (airy grey body), chart blocks with white
-      // title / grey subtitle above a rounded hairline card, mono stats line. Monochrome:
-      // no gold on study pages; colour only where it means something.
+      // ── CHRONICLE PAGE v3.1 (Valen 2026-07-31): faithful nick grid, THEME-AWARE.
+      // All text colors via .pcH/.pcM/.pcD classes (body.light overrides recolor the whole page);
+      // type scale measured off his live render: role titles ~1.4rem/700, subtitles ~0.92rem,
+      // body 1.06rem/1.8, hairline rules separating every block. Plain-words labels throughout.
       if (!isMB) {
         const scored = def.buckets.flatMap((b) => b.items).filter((it) => it[2] !== "bonus");
         const tickN = scored.filter(([k]) => study.checks?.[k]).length;
-        const WH = "#ececea", MUT = "#a4a19a", DIM = "#7f7c74";
         const chartBlock2 = (img, title, sub) => img ? `
-          <div style="margin:38px 0 0">
-            <div style="font-size:0.95rem;font-weight:650;color:${WH};letter-spacing:-0.01em">${title}</div>
-            ${sub ? `<div style="font-size:0.78rem;color:${DIM};margin-top:3px">${sub}</div>` : ""}
-            <span class="pbchartwrap" style="display:block;margin-top:14px"><img src="${esc(img)}" style="width:100%;display:block;border-radius:12px;border:1px solid rgba(255,255,255,0.08);background:#0e0e12"/></span>
+          <div class="pcRule" style="margin:44px 0 0;padding-top:34px">
+            <div class="pcH" style="font-size:1.4rem;font-weight:700;letter-spacing:-0.015em;line-height:1.2">${title}</div>
+            ${sub ? `<div class="pcD" style="font-size:0.92rem;margin-top:5px">${sub}</div>` : ""}
+            <span class="pbchartwrap" style="display:block;margin-top:18px"><img class="pcCard" src="${esc(img)}" style="width:100%;display:block"/></span>
           </div>` : "";
-        const stat = (k, v) => (v == null || v === "") ? "" : `<span style="white-space:nowrap"><span style="color:${DIM}">${k}</span>&nbsp; <span style="color:${WH};font-weight:600">${v}</span></span>`;
+        const stat = (k, v) => (v == null || v === "") ? "" : `<span style="white-space:nowrap"><span class="pcD">${k}</span>&nbsp; <span class="pcH" style="font-weight:600">${v}</span></span>`;
         const sgn = (x) => `${+x >= 0 ? "+" : ""}${esc(x)}%`;
-        const pkv = m.peak_pct != null ? `${sgn(m.peak_pct)} in ${esc(m.sessions_to_peak ?? "?")}s` : null;
+        const pkv = m.peak_pct != null ? `${sgn(m.peak_pct)} in ${esc(m.sessions_to_peak ?? "?")} sessions` : null;
         const stats = [
           stat("Day one", m.day_pct != null ? sgn(m.day_pct) : null),
-          stat("Volume", m.rvol_eod != null ? `${esc(m.rvol_eod)}\u00d7` : null),
+          stat("Volume", m.rvol_eod != null ? `${esc(m.rvol_eod)}\u00d7 normal` : null),
           stat("Gap", m.gap_pct != null ? sgn(m.gap_pct) : null),
-          stat(study.direction === "short" ? "Downside peak" : "Peak", pkv),
-          stat("T+20", m.t20 != null ? sgn(m.t20) : null),
-        ].filter(Boolean).join(`<span style="color:rgba(255,255,255,0.16);margin:0 14px">\u00b7</span>`);
+          stat(study.direction === "short" ? "Fall after the break" : "Peak gain", pkv),
+          stat("After 20 days", m.t20 != null ? sgn(m.t20) : null),
+        ].filter(Boolean).join(`<span class="pcDot" style="margin:0 16px">\u00b7</span>`);
         return `<div class="page pbstudy" id="e${idx}" style="max-width:1060px">
           <div style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:52px">
             <div>
-              <div style="font-family:'Geist Mono',monospace;font-size:0.66rem;letter-spacing:0.16em;color:${DIM};text-transform:uppercase">No. ${String(idx + 1).padStart(2, "0")} \u00b7 ${esc(yearOf(r))}</div>
-              <div style="font-size:1.02rem;font-weight:650;color:${WH};line-height:1.4;margin-top:12px">${esc(r.entry_date || "")}</div>
-              <div style="font-size:0.82rem;color:${MUT};margin-top:6px;line-height:1.5">${esc(study.setup)}${study.direction === "short" ? " \u00b7 short side" : ""}</div>
-              ${tickN ? `<div style="font-family:'Geist Mono',monospace;font-size:0.68rem;color:${DIM};margin-top:16px">${tickN}/${scored.length} criteria \u2713</div>` : ""}
+              <div class="pcD" style="font-family:'Geist Mono',monospace;font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase">Study ${String(idx + 1).padStart(2, "0")} of ${String(rows.length).padStart(2, "0")}</div>
+              <div class="pcH" style="font-size:1.02rem;font-weight:650;line-height:1.4;margin-top:12px">${esc(r.entry_date || "")}</div>
+              <div class="pcM" style="font-size:0.82rem;margin-top:6px;line-height:1.5">${esc(study.setup)}${study.direction === "short" ? " \u00b7 short side" : ""}</div>
+              ${tickN ? `<div class="pcD" style="font-size:0.78rem;margin-top:16px">${tickN} of ${scored.length} criteria met \u2713</div>` : ""}
             </div>
             <div style="min-width:0">
-              ${r.thesis ? `<div style="font-size:1.04rem;font-weight:650;color:${WH};line-height:1.55;margin:0 0 16px;letter-spacing:-0.005em">${esc(r.thesis)}</div>` : ""}
-              ${study.annotation ? `<div style="font-size:0.95rem;line-height:1.9;color:${MUT};max-width:64ch">${esc(study.annotation)}</div>` : ""}
-              ${chartBlock2(r.before_img, `${esc(r.ticker)} \u2014 context`, "Higher timeframe, into the trigger")}
-              ${chartBlock2(r.after_img, `${esc(r.ticker)} \u2014 the setup`, `Daily \u00b7 right edge = ${esc(r.entry_date || "trigger")}`)}
-              ${chartBlock2(study.outcome_img, `${esc(r.ticker)} \u2014 the outcome`, "The same chart, weeks later")}
-              ${stats ? `<div style="font-family:'Geist Mono',monospace;font-size:0.74rem;margin:30px 0 0;color:${DIM}">${stats}</div>` : ""}
+              ${r.thesis ? `<div class="pcH" style="font-size:1.18rem;font-weight:650;line-height:1.5;margin:0 0 18px;letter-spacing:-0.008em">${esc(r.thesis)}</div>` : ""}
+              ${study.annotation ? `<div class="pcM" style="font-size:1.06rem;line-height:1.8;max-width:62ch">${esc(study.annotation)}</div>` : ""}
+              ${chartBlock2(r.before_img, "Context", `${esc(r.ticker)} weekly \u00b7 the bigger picture going into the trade`)}
+              ${chartBlock2(r.after_img, "The setup", `${esc(r.ticker)} daily \u00b7 the last candle is the trigger day, ${esc(r.entry_date || "")}`)}
+              ${chartBlock2(study.outcome_img, "The outcome", `${esc(r.ticker)} daily \u00b7 the same chart, weeks later`)}
+              ${stats ? `<div class="pcRule pcD" style="font-family:'Geist Mono',monospace;font-size:0.78rem;margin:36px 0 0;padding-top:22px">${stats}</div>` : ""}
             </div>
           </div>
           ${folio}
@@ -1098,6 +1096,17 @@ function openProjectBookPdf(rows, coverTitle) {
       .zoomov{display:none;position:fixed;inset:0;z-index:60;background:rgba(4,4,8,0.95);align-items:center;justify-content:center;padding:2vh 2vw;cursor:zoom-out}
       .zoomov img{max-width:100%;max-height:100%;object-fit:contain}
       @media print{.zoomov{display:none!important}}
+      /* chronicle article (nick register) — class-driven so Light theme recolors correctly */
+      .pcH{color:#ececea}.pcM{color:#b3b0a9}.pcD{color:#7f7c74}
+      .pcRule{border-top:1px solid rgba(255,255,255,0.07)}
+      .pcCard{border-radius:12px;border:1px solid rgba(255,255,255,0.08);background:#0e0e12}
+      .pcDot{color:rgba(255,255,255,0.16)}
+      body.light .pcH{color:#17150f}
+      body.light .pcM{color:#55524a}
+      body.light .pcD{color:#8a857a}
+      body.light .pcRule{border-top-color:rgba(23,21,15,0.12)}
+      body.light .pcCard{border-color:rgba(23,21,15,0.14);background:#efece4}
+      body.light .pcDot{color:rgba(23,21,15,0.2)}
       /* ── COVER ── (no gradient washes — print rasterizes them with visible banding) */
       .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
       .pblogo{height:54px;width:auto;align-self:flex-start;margin-bottom:20px}
