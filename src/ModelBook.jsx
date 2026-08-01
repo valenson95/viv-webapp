@@ -1284,7 +1284,15 @@ function openProjectBookPdf(rows, coverTitle) {
       .pbdivmeta{margin-top:-0.4em;position:relative}
       .pbeplabel{font-size:clamp(1.5rem,4vw,2.1rem);font-weight:800;letter-spacing:-0.02em;color:#fff;line-height:1.1}
       .pbepstats{font-size:0.9rem;color:#9a968c;margin-top:12px;max-width:60ch;line-height:1.6}
-      .pbepcount{font-size:0.62rem;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:#c9982a;margin-top:16px}
+      .pbepcount{font-size:0.62rem;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:#c9982a;margin-top:22px}
+      .pbdivlist{margin-top:26px;border-top:1px solid rgba(255,255,255,0.08);max-width:62ch}
+      body.light .pbdivlist{border-top-color:rgba(23,21,15,0.12)}
+      .pbdivrow{display:grid;grid-template-columns:34px minmax(0,auto) minmax(0,1fr);gap:14px;align-items:baseline;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)}
+      body.light .pbdivrow{border-bottom-color:rgba(23,21,15,0.09)}
+      .pbdivno{font-size:0.68rem;letter-spacing:0.1em}
+      .pbdivti{font-size:0.98rem;font-weight:650;line-height:1.35}
+      .pbdivsub{font-size:0.85rem;line-height:1.45}
+      @media(max-width:700px){.pbdivrow{grid-template-columns:30px minmax(0,1fr)}.pbdivsub{grid-column:2}}
       /* ── STUDY PAGES ── */
       .pbstudy{display:flex;flex-direction:column;position:relative}
       /* chart overlay pills — nickschmidt trend-lane chips, moved onto the image */
@@ -1434,12 +1442,18 @@ const pbRich = (s) => esc(s)
   .replace(/\[i\]/g, "<i>").replace(/\[\/i\]/g, "</i>");
 
 const PLAYBOOK_PARTS = [
-  { roman: "I", name: "Weather", folio: "Weather", toc: "I — Weather · read the market first", stats: "Read the market first · pieces 01–03", count: "3 pieces" },
-  { roman: "II", name: "Neighborhood", folio: "Neighborhood", toc: "II — Neighborhood · selection", stats: "Selection · pieces 04–07", count: "4 pieces" },
-  { roman: "III", name: "House", folio: "House", toc: "III — House · the setups", stats: "The setups · pieces 08–12", count: "5 pieces" },
-  { roman: "IV", name: "When to walk in", folio: "When to walk in", toc: "IV — When to walk in · execution", stats: "Execution · pieces 13–16", count: "4 pieces" },
-  { roman: "V", name: "The campaign", folio: "The campaign", toc: "V — The campaign · management", stats: "Management · pieces 17–19", count: "3 pieces" },
-  { roman: "VI", name: "Survival", folio: "Survival", toc: "VI — Survival", stats: "Survival · pieces 20–21", count: "2 pieces" },
+  { roman: "I", name: "Weather", folio: "Weather", toc: "I — Weather · read the market first", stats: "Read the market first · pieces 01–03", count: "3 pieces",
+    blurb: "Before any chart, we check the conditions outside. Is this a tape that pays breakouts, or one that sells them? Weather sets your size and your patience for the whole session — it never picks the stock, but it decides how hard you are allowed to push." },
+  { roman: "II", name: "Neighborhood", folio: "Neighborhood", toc: "II — Neighborhood · selection", stats: "Selection · pieces 04–07", count: "4 pieces",
+    blurb: "Good houses cluster in good neighborhoods. Money moves in themes and groups, so before judging any single chart we find where it is actually flowing — and build the nightly routine that puts those names in front of us again and again." },
+  { roman: "III", name: "House", folio: "House", toc: "III — House · the setups", stats: "The setups · pieces 08–12", count: "5 pieces",
+    blurb: "Now the individual property. These are the five structures we buy and sell — the only shapes that earn our capital. Each one has a definition tight enough to say no with, because a setup you cannot describe is a setup you cannot repeat." },
+  { roman: "IV", name: "When to walk in", folio: "When to walk in", toc: "IV — When to walk in · execution", stats: "Execution · pieces 13–16", count: "4 pieces",
+    blurb: "The right house at the wrong moment is still a loss. This is the door: the trigger that proves buyers are in control, the arithmetic that sizes the trade, the gates that can veto it, and the exit that keeps every mistake small." },
+  { roman: "V", name: "The campaign", folio: "The campaign", toc: "V — The campaign · management", stats: "Management · pieces 17–19", count: "3 pieces",
+    blurb: "Getting in was one decision; everything after it is the campaign. Take payment when the market is excited, trail what is left on structure, and add only where the stock proves itself again — this is where good entries become good years." },
+  { roman: "VI", name: "Survival", folio: "Survival", toc: "VI — Survival", stats: "Survival · pieces 20–21", count: "2 pieces",
+    blurb: "Every edge is worthless to a trader who is no longer trading. Losing streaks are a property of the strategy, not a verdict on you — these two pieces are how we shrink mechanically, stay in the chair, and let the reps compound." },
 ];
 
 const PLAYBOOK_PIECES = [
@@ -2011,11 +2025,15 @@ export function openPlaybookBook() {
     <div class="pbfoot">Twenty-one pieces · six parts · the system, front to back.</div>
   </div>`;
   const body = PLAYBOOK_PARTS.map((part, pi) => {
+    const inPart = PLAYBOOK_PIECES.filter((pc) => pc.part === pi);
     const divider = `<div class="page pbdivider">
       <div class="pbdivnum">${esc(part.roman)}</div>
       <div class="pbdivmeta">
         <div class="pbeplabel">${esc(part.name)}</div>
         <div class="pbepstats">${esc(part.stats)}</div>
+        ${part.blurb ? `<div class="pbdivnote">${esc(part.blurb)}</div>` : ""}
+        <div class="pbdivlist">${inPart.map((pc) =>
+          `<div class="pbdivrow"><span class="pcK pbdivno">${esc(pc.no)}</span><span class="pcH pbdivti">${esc(pc.title)}</span><span class="pcD pbdivsub">${esc(pc.sub)}</span></div>`).join("")}</div>
         <div class="pbepcount">${esc(part.count)}</div>
       </div>
     </div>`;
@@ -2125,7 +2143,15 @@ export function openPlaybookBook() {
       .pbeplabel{font-size:clamp(1.5rem,4vw,2.1rem);font-weight:700;letter-spacing:-0.03em;color:#fff;line-height:1.1}
       .pbepstats{font-size:0.9rem;color:#9a968c;margin-top:12px;max-width:60ch;line-height:1.6}
       .pbdivnote{font-size:0.85rem;color:#b9b5aa;line-height:1.72;margin-top:18px;max-width:54ch}
-      .pbepcount{font-size:0.62rem;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:#c9982a;margin-top:16px}
+      .pbepcount{font-size:0.62rem;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:#c9982a;margin-top:22px}
+      .pbdivlist{margin-top:26px;border-top:1px solid rgba(255,255,255,0.08);max-width:62ch}
+      body.light .pbdivlist{border-top-color:rgba(23,21,15,0.12)}
+      .pbdivrow{display:grid;grid-template-columns:34px minmax(0,auto) minmax(0,1fr);gap:14px;align-items:baseline;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)}
+      body.light .pbdivrow{border-bottom-color:rgba(23,21,15,0.09)}
+      .pbdivno{font-size:0.68rem;letter-spacing:0.1em}
+      .pbdivti{font-size:0.98rem;font-weight:650;line-height:1.35}
+      .pbdivsub{font-size:0.85rem;line-height:1.45}
+      @media(max-width:700px){.pbdivrow{grid-template-columns:30px minmax(0,1fr)}.pbdivsub{grid-column:2}}
       /* ── PIECE PAGES (chronicle v4 editorial grid) ── */
       .pbpiece{position:relative;display:flex;flex-direction:column;padding-top:66px;padding-bottom:74px}
       .pbgrid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:52px}
