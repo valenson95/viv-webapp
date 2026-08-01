@@ -12949,7 +12949,7 @@ function AppInner() {
   // shared link lands the reader on that section after login. Hash-based = zero server config;
   // unknown hashes (incl. Supabase auth tokens like #access_token=…) fall back to the dashboard.
   const HASH_PAGES = ["dashboard", "journal", "tools", "daily", "modelbook", "practice", "quant", "burstlog", "mentor", "settings"];
-  const pageFromHash = () => { const h = (window.location.hash || "").replace(/^#\/?/, "").toLowerCase(); return HASH_PAGES.includes(h) ? h : "daily"; }; // Daily Setups = the landing page (Valen 2026-07-31); explicit #hashes still deep-link anywhere
+  const pageFromHash = () => { const h = (window.location.hash || "").replace(/^#\/?/, "").toLowerCase(); return HASH_PAGES.includes(h) ? h : "dashboard"; };
   const [page, setPage] = useState(pageFromHash);
   useEffect(() => {
     const cur = (window.location.hash || "").replace(/^#\/?/, "").toLowerCase();

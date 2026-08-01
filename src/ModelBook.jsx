@@ -996,11 +996,30 @@ function openProjectBookPdf(rows, coverTitle) {
           stat("After 20 days", m.t20 != null ? sgn(m.t20) : null),
         ].filter(Boolean).join(`<span class="pcDot" style="margin:0 14px">\u00b7</span>`);
         const headline = r.thesis || `${study.setup}${study.direction === "short" ? ", short side" : ""} \u2014 ${esc(r.entry_date || "")}`;
-        const supporting = [
-          chartBlock2(r.before_img, "Context", `${esc(r.ticker)} ${tfOf("context", "weekly")} \u00b7 the bigger picture going into the trade`, true),
-          chartBlock2(study.outcome_img, "The outcome", `${esc(r.ticker)} ${tfOf("outcome", "daily")} \u00b7 the same story, weeks later`, false),
-        ].filter(Boolean).join("");
-        const nSupport = [r.before_img, study.outcome_img].filter(Boolean).length;
+        // Hero = the DAILY chart, whichever slot holds it (his setup slot is sometimes the 5-minute
+        // entry chart; the daily then lives in the context slot). Everything else goes to the expander.
+        const slots = [
+          { img: r.after_img, role: "setup", tf: (study.tf || {}).setup || "1D" },
+          { img: r.before_img, role: "context", tf: (study.tf || {}).context || "1W" },
+          { img: study.outcome_img, role: "outcome", tf: (study.tf || {}).outcome || "1D" },
+        ].filter((x) => x.img);
+        const heroSlot = slots.find((x) => x.tf === "1D" && x.role !== "outcome") || slots.find((x) => x.tf === "1D") || slots[0];
+        const restSlots = slots.filter((x) => x !== heroSlot)
+          .sort((a, b) => (a.role === "outcome" ? 1 : 0) - (b.role === "outcome" ? 1 : 0)); // trigger close-up before outcome
+        const INTRA = ["1m", "5m", "15m", "30m", "60m"];
+        const titleOf = (x) => x === heroSlot ? "The setup"
+          : x.role === "outcome" ? "The outcome"
+          : INTRA.includes(x.tf) ? "The trigger, up close"
+          : "Context";
+        const subOf = (x) => {
+          const w = TFWORD[x.tf] || "daily";
+          if (x === heroSlot) return `${esc(r.ticker)} ${w} \u00b7 the trigger day is ${esc(r.entry_date || "the last candle")}`;
+          if (x.role === "outcome") return `${esc(r.ticker)} ${w} \u00b7 the same story, weeks later`;
+          if (INTRA.includes(x.tf)) return `${esc(r.ticker)} ${w} \u00b7 the entry, candle by candle`;
+          return `${esc(r.ticker)} ${w} \u00b7 the bigger picture going into the trade`;
+        };
+        const supporting = restSlots.map((x) => chartBlock2(x.img, titleOf(x), subOf(x), x === restSlots[0])).join("");
+        const nSupport = restSlots.length;
         const critList = ticked.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 26px;margin:18px 0 0">${ticked.map((it) => `<div class="pcM" style="font-size:0.86rem;line-height:1.5">\u2713&nbsp; ${esc(it[1])}</div>`).join("")}</div>` : "";
         return `<div class="page pbstudy pcRule" id="e${idx}" style="max-width:1060px">
           <div style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:52px">
@@ -1012,9 +1031,9 @@ function openProjectBookPdf(rows, coverTitle) {
             <div style="min-width:0">
               <div class="pcH" style="font-size:1.5rem;font-weight:700;line-height:1.3;letter-spacing:-0.015em;margin:0 0 16px">${esc(headline)}</div>
               ${study.annotation ? `<div class="pcM" style="font-size:1.06rem;line-height:1.8;max-width:62ch">${esc(study.annotation)}</div>` : ""}
-              ${chartBlock2(r.after_img, "The setup", `${esc(r.ticker)} ${tfOf("setup", "daily")} \u00b7 ${(study.tf || {}).setup && ["5m","1m","15m","30m","60m"].includes(study.tf.setup) ? `the trigger day up close, ${esc(r.entry_date || "")}` : `the last candle is the trigger day, ${esc(r.entry_date || "")}`}`, true)}
+                            ${heroSlot ? chartBlock2(heroSlot.img, "The setup", subOf(heroSlot), true) : ""}
               ${stats ? `<div class="pcD" style="font-family:'Geist Mono',monospace;font-size:0.78rem;margin:22px 0 0">${stats}</div>` : ""}
-              ${nSupport ? `<details class="pcExp"><summary class="pcM">Context &amp; outcome \u00b7 ${nSupport} more chart${nSupport > 1 ? "s" : ""}</summary>${supporting}</details>` : ""}
+              ${nSupport ? `<details class="pcExp"><summary class="pcM">${nSupport} more chart${nSupport > 1 ? "s" : ""} \u00b7 ${restSlots.map((x) => titleOf(x).toLowerCase()).join(" + ")}</summary>${supporting}</details>` : ""}
               ${ticked.length ? `<details class="pcExp"><summary class="pcM">Criteria \u00b7 ${ticked.length} of ${scored.length} met \u2713</summary>${critList}</details>` : ""}
             </div>
           </div>
