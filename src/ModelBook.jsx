@@ -135,6 +135,13 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 // Keyed project → year → { label, stats }. A missing year/project prints a plain year divider (no stats).
 const PROJECT_EPISODES = {
   "AMD Chronicle": {
+    "2003": { label: "The first turn", stats: "Trigger Oct 28 \u00b7 +24.6% in 12 sessions", note: "A single-digit stock nobody wanted, turning up out of the post-crash wasteland. The first breakout of the chronicle — and already the full grammar: base, trigger, expansion." },
+    "2004": { label: "Stair-steps", stats: "Three triggers Sep\u2013Dec \u00b7 each base building on the last", note: "A campaign in stair-steps: consolidate, break, repeat. The year that teaches adds — every new coil was a new contract." },
+    "2005": { label: "The dual-core run", stats: "Five triggers \u00b7 the strongest year of the first cycle", note: "Product-cycle leadership against a sleeping giant. Note the January breakdown study sitting mid-run — even great years print failures, and the book keeps them." },
+    "2006": { label: "The top nobody rang a bell for", stats: "Mar 7 breakdown \u00b7 the first cycle ends", note: "The first cycle ends the way they all do: support breaks quietly while the story is still good. The breakdown grammar from 2005 returns — this time it was the whole trend." },
+    "2016": { label: "The turnaround year", stats: "Six triggers \u00b7 from left-for-dead to leadership", note: "The great re-rating begins from a near-death base. Six studies in one year — when a true turnaround starts, the setups arrive in clusters. The September breakdown mid-year is the reminder that even new leadership shakes hard." },
+    "2017": { label: "Digestion", stats: "Feb 21 trigger \u00b7 the year after the double", note: "After a 400% year, a digesting one. First-quarter strength, then a long sideways argument — campaigns rest, and the book rests with them." },
+    "2018": { label: "The blow-off and the bill", stats: "May + Sep triggers \u00b7 Sep 28 breakdown \u2192 \u221248% in 60 sessions", note: "The year of everything: a spring base, a summer melt-up on an earnings staircase, and then the bill — the September breakdown that gave back half the stock in one quarter. The two September studies, four sessions apart, are the whole lesson in trend age." },
     "2021": { label: "The melt-up — coil, flags, and the top", stats: "Trigger Oct 13 · +50.7% in 33 sessions to the Nov 30 top ($164.46)", note: "The whole cycle in one quarter: a two-month coil, a clean break, two continuation flags — and then the leg that ended it all, printed with the same grammar as the ones that started it." },
     "2023": { label: "The AI re-rate begins", stats: "May 16 trendline break (+30.9% / 19 sessions) · Dec 7 shelf break (+77.1% / 62 sessions)", note: "Off the October 2022 low AMD built two structures: a trendline-capped recovery that broke in May, and a five-month shelf at 122 that a product event finally released in December." },
     "2024": { label: "Blow-off and give-back", stats: "Jan 16 triangle (+43.2% / 37 sessions) · Feb 29 final flag (+18.1% / 6 sessions, fully surrendered by Mar 20)", note: "Three breakouts stacked into one run that ended at 227.30 on March 8. The first two paid handsomely; the third was the top. Same setup every time — the only variable that changed was how much trend was left." },
@@ -959,6 +966,52 @@ function openProjectBookPdf(rows, coverTitle) {
         if (!img) return `<div class="pbnoimgbox">no chart attached yet</div><div class="pbcapn">${cap}</div>`;
         return `<div class="pbchartwrap"><img class="${cls}" src="${esc(img)}"/>${pills}</div><div class="pbcapn">${cap}</div>`;
       };
+      
+      const folio = `<div class="pbfolio"><span>${esc(coverTitle)}</span><span>No. ${String(idx + 1).padStart(2, "0")} / ${String(rows.length).padStart(2, "0")} · ${esc(yearOf(r))}</span></div>`;
+      // ── CHRONICLE PAGE (Valen 2026-07-31 redesign): one study = ONE page ──
+      // header (date · class · tick chip) → thesis → CONTEXT half-card + narration beside →
+      // SETUP hero (height-capped, right edge = trigger) → OUTCOME half-card + data beside → folio.
+      // Chart labels make the page self-explanatory; per-study checklist lists removed (tally
+      // lives in the front matter; the chip carries the count). All styles inline by design.
+      if (!isMB) {
+        const scored = def.buckets.flatMap((b) => b.items).filter((it) => it[2] !== "bonus");
+        const tickN = scored.filter(([k]) => study.checks?.[k]).length;
+        const chip = tickN ? `<span style="font-family:'Geist Mono',monospace;font-size:0.62rem;font-weight:600;color:#c9982a;border:1px solid rgba(201,152,42,0.35);padding:3px 9px;border-radius:99px;white-space:nowrap">${tickN}/${scored.length} ✓</span>` : "";
+        const shortTag = study.direction === "short" ? `<span style="font-family:'Geist Mono',monospace;font-size:0.62rem;font-weight:600;color:#e05b5b;border:1px solid rgba(224,91,91,0.35);padding:3px 9px;border-radius:99px">SHORT</span>` : "";
+        const lab = (t) => `<div style="font-family:'Geist Mono',monospace;font-size:0.58rem;font-weight:600;letter-spacing:0.16em;color:#8f8b80;text-transform:uppercase;margin:0 0 7px">${t}</div>`;
+        const ring = "border-radius:10px;border:1px solid rgba(255,255,255,0.13);display:block;background:#0b0b12";
+        const kv = (k, v) => (v == null || v === "") ? "" : `<div style="margin:0 0 10px"><div style="font-family:'Geist Mono',monospace;font-size:0.56rem;font-weight:600;letter-spacing:0.12em;color:#8f8b80;text-transform:uppercase">${k}</div><div style="font-family:'Geist Mono',monospace;font-size:0.86rem;font-weight:600;color:#e8e6e0;margin-top:2px">${v}</div></div>`;
+        const pk = m.peak_pct != null ? `${+m.peak_pct >= 0 ? "+" : ""}${esc(m.peak_pct)}%` : null;
+        const strip = [
+          kv("Day one", m.day_pct != null ? `${+m.day_pct >= 0 ? "+" : ""}${esc(m.day_pct)}%` : null),
+          kv("Volume", m.rvol_eod != null ? `${esc(m.rvol_eod)}\u00d7 avg` : null),
+          kv("Gap", m.gap_pct != null ? `${+m.gap_pct >= 0 ? "+" : ""}${esc(m.gap_pct)}%` : null),
+          kv(study.direction === "short" ? "Downside peak" : "Peak", pk ? `${pk} \u00b7 ${esc(m.sessions_to_peak ?? "?")}s` : null),
+          kv("T+20", m.t20 != null ? `${+m.t20 >= 0 ? "+" : ""}${esc(m.t20)}%` : null),
+        ].join("");
+        const ctx = r.before_img
+          ? `<div style="display:flex;gap:22px;align-items:flex-start;margin:22px 0 0"><div style="flex:0 0 42%">${lab("Context \u00b7 higher timeframe")}<img src="${esc(r.before_img)}" style="width:100%;${ring}"/></div><div style="flex:1;min-width:0;padding-top:20px">${study.annotation ? `<div style="font-size:0.86rem;line-height:1.65;color:#b8b5ac">${esc(study.annotation)}</div>` : ""}</div></div>`
+          : (study.annotation ? `<div style="margin:22px 0 0;max-width:58ch;font-size:0.86rem;line-height:1.65;color:#b8b5ac">${esc(study.annotation)}</div>` : "");
+        const hero = r.after_img ? `<div style="margin:20px 0 0">${lab(`The setup \u00b7 daily \u00b7 right edge = ${esc(r.entry_date || "trigger")}`)}<img src="${esc(r.after_img)}" style="width:100%;max-height:400px;object-fit:contain;object-position:left top;${ring}"/></div>` : "";
+        const outImg = study.outcome_img;
+        const outRow = outImg
+          ? `<div style="display:flex;gap:22px;align-items:flex-start;margin:20px 0 0"><div style="flex:0 0 42%">${lab("The outcome \u00b7 weeks later")}<img src="${esc(outImg)}" style="width:100%;${ring}"/></div><div style="flex:1;min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:0 18px;padding-top:22px">${strip}</div></div>`
+          : `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0 18px;margin:24px 0 0">${strip}</div>`;
+        return `<div class="page pbstudy" id="e${idx}">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span style="font-family:'Geist Mono',monospace;font-size:0.78rem;font-weight:600;color:#e8e6e0">${esc(r.entry_date || "")}</span>
+            <span style="font-size:0.78rem;font-weight:700;color:#c9982a">${esc(study.setup)}</span>
+            ${shortTag}${chip}
+            <span style="flex:1"></span>
+            <span style="font-family:'Geist Mono',monospace;font-size:0.62rem;color:#8f8b80">No. ${String(idx + 1).padStart(2, "0")}</span>
+          </div>
+          ${r.thesis ? `<div style="font-size:1.02rem;font-weight:600;color:#e8e6e0;margin:12px 0 0;max-width:60ch;letter-spacing:-0.01em">${esc(r.thesis)}</div>` : ""}
+          ${ctx}
+          ${hero}
+          ${outRow}
+          ${folio}
+        </div>`;
+      }
       const yy = yearOf(r).slice(2);
       const idPill = `<span class="pbpill pbpill-l">${esc(r.ticker)} '${esc(yy)}</span>`;
       const vsN = m.sessions_vs_index;
@@ -967,7 +1020,6 @@ function openProjectBookPdf(rows, coverTitle) {
       const retPill = (m.ret_3m !== "" && m.ret_3m != null)
         ? `<span class="pbpill pbpill-r">${+m.ret_3m >= 0 && !String(m.ret_3m).startsWith("-") ? "+" : ""}${esc(m.ret_3m)}% · 3M</span>`
         : (m.peak_pct != null ? `<span class="pbpill pbpill-r">${+m.peak_pct >= 0 ? "+" : ""}${esc(m.peak_pct)}% · peak</span>` : "");
-      const folio = `<div class="pbfolio"><span>${esc(coverTitle)}</span><span>No. ${String(idx + 1).padStart(2, "0")} / ${String(rows.length).padStart(2, "0")} · ${esc(yearOf(r))}</span></div>`;
       // Sentence captions in Nick's register — small grey line under the card with the key datapoint
       const vsPhrase = (vsN !== "" && vsN != null && !Number.isNaN(+vsN))
         ? (+vsN < 0 ? ` — bottomed ${Math.abs(+vsN)} session${Math.abs(+vsN) === 1 ? "" : "s"} before the index`
