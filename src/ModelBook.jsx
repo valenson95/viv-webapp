@@ -244,7 +244,7 @@ const DEEP_DIVES = [
     // STATIC dive (2026-08-01): no study rows behind it — `static` names the builder that opens it.
     // draft:true keeps it admin-only; publishing a static dive is a code change, HIS call.
     no: "03", slug: "viv-playbook", project: null, static: "playbook", draft: true,
-    title: "Building Blocks to Profitability",
+    title: "21 Building Blocks to Profitability",
     premise: "The VIV system in twenty-one pieces — weather, neighborhood, house, execution, campaign, survival.",
     updated: "2026-08-01",
     cover: "",
@@ -1995,13 +1995,13 @@ export function openPlaybookBook() {
   const cover = `<div class="page pbcover">
     <img class="pblogo" src="${esc(window.location.origin)}/logo-mark.png"/>
     <div class="pbbrand">The VIV System</div>
-    <h1 class="pbtitle">Building Blocks to Profitability</h1>
+    <h1 class="pbtitle">21 Building Blocks to Profitability</h1>
     <div class="pbrule"></div>
-    <div class="pbmeta">The VIV system in twenty-one pieces · six parts · Weather to Survival · 2026</div>
+    <div class="pbmeta">Six parts · Weather to Survival · 2026</div>
     <div class="pbfoot pbcovfoot">Valen Insiders Vault · Educational — not financial advice</div>
   </div>`;
   const contents = `<div class="page pbcontents">
-    <div class="pblabel">Contents · Building Blocks to Profitability</div>
+    <div class="pblabel">Contents · 21 Building Blocks to Profitability</div>
     ${PLAYBOOK_PARTS.map((part, pi) => {
       const rowsHtml = PLAYBOOK_PIECES.filter((pc) => pc.part === pi).map((pc) =>
         `<a class="pbcrow" href="#p${pc.no}"><span class="pbcno">${esc(pc.no)}</span><span class="pbctk">${esc(pc.title)}</span><span class="pbctheme">${esc(pc.toc)}</span><span class="pbcdots"></span></a>`
@@ -2066,7 +2066,7 @@ export function openPlaybookBook() {
     </div>
     <div class="pbfolio"><span>Valen Insiders Vault · 2026 · Educational, not financial advice</span><span>Building Blocks</span></div>
   </div>`;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Building Blocks to Profitability</title>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>21 Building Blocks to Profitability</title>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
       *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
