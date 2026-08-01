@@ -138,17 +138,21 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 // Keyed project → year → { label, stats }. A missing year/project prints a plain year divider (no stats).
 const PROJECT_EPISODES = {
   "AMD Chronicle": {
-    "2003": { label: "The first turn", stats: "Trigger Oct 28 \u00b7 +24.6% in 12 sessions", note: "A single-digit stock nobody wanted, turning up out of the post-crash wasteland. The first breakout of the chronicle — and already the full grammar: base, trigger, expansion." },
+    "2000": { label: "The mania specimen", stats: "Trigger Feb 3 \u00b7 +136.9% in 61 sessions \u00b7 then the dot-com unwind", note: "The book opens at the top of an era: a February breakout that more than doubled in three months — and everything after it belonged to the crash. The first lesson of the chronicle is that the setup grammar works in a mania too; the second is what happens when the era ends." },
+    "2003": { label: "The first turn", stats: "Two October triggers \u00b7 Dec 3 breakdown closes the year", note: "A single-digit stock nobody wanted, turning up out of the post-crash wasteland. Two October breakouts print the full grammar — base, trigger, expansion — and the December breakdown is the first reminder that the book grades both directions." },
     "2004": { label: "Stair-steps", stats: "Three triggers Sep\u2013Dec \u00b7 each base building on the last", note: "A campaign in stair-steps: consolidate, break, repeat. The year that teaches adds — every new coil was a new contract." },
     "2005": { label: "The dual-core run", stats: "Five triggers \u00b7 the strongest year of the first cycle", note: "Product-cycle leadership against a sleeping giant. Note the January breakdown study sitting mid-run — even great years print failures, and the book keeps them." },
     "2006": { label: "The top nobody rang a bell for", stats: "Mar 7 breakdown \u00b7 the first cycle ends", note: "The first cycle ends the way they all do: support breaks quietly while the story is still good. The breakdown grammar from 2005 returns — this time it was the whole trend." },
     "2016": { label: "The turnaround year", stats: "Six triggers \u00b7 from left-for-dead to leadership", note: "The great re-rating begins from a near-death base. Six studies in one year — when a true turnaround starts, the setups arrive in clusters. The September breakdown mid-year is the reminder that even new leadership shakes hard." },
     "2017": { label: "Digestion", stats: "Feb 21 trigger \u00b7 the year after the double", note: "After a 400% year, a digesting one. First-quarter strength, then a long sideways argument — campaigns rest, and the book rests with them." },
     "2018": { label: "The blow-off and the bill", stats: "May + Sep triggers \u00b7 Sep 28 breakdown \u2192 \u221248% in 60 sessions", note: "The year of everything: a spring base, a summer melt-up on an earnings staircase, and then the bill — the September breakdown that gave back half the stock in one quarter. The two September studies, four sessions apart, are the whole lesson in trend age." },
+    "2019": { label: "The base year pays twice", stats: "Mar 19 trigger (+31.9% / 57 sessions) \u00b7 Dec 12 trigger (+39.2% / 45 sessions)", note: "After the Q4 2018 crash, a year of repair — and two clean releases from it. The March trigger ran while the index was still doubting; the December one carried straight into 2020. Base years reward the patient twice." },
+    "2020": { label: "The trap and the gap", stats: "Feb 10 trigger failed into the COVID crash \u00b7 Jul 22 earnings gap +52.6% in 30 sessions", note: "Two studies, one lesson each. February is the honest failure: a textbook trigger that had six sessions before the pandemic took everything — the stop is the whole system. July is the other side: an earnings gap out of a five-month base that paid half the stock in six weeks." },
     "2021": { label: "The melt-up — coil, flags, and the top", stats: "Trigger Oct 13 · +50.7% in 33 sessions to the Nov 30 top ($164.46)", note: "The whole cycle in one quarter: a two-month coil, a clean break, two continuation flags — and then the leg that ended it all, printed with the same grammar as the ones that started it." },
-    "2023": { label: "The AI re-rate begins", stats: "May 16 trendline break (+30.9% / 19 sessions) · Dec 7 shelf break (+77.1% / 62 sessions)", note: "Off the October 2022 low AMD built two structures: a trendline-capped recovery that broke in May, and a five-month shelf at 122 that a product event finally released in December." },
+    "2023": { label: "The AI re-rate begins", stats: "Dec 7 shelf break \u00b7 +77.1% in 62 sessions", note: "Off the October 2022 low AMD spent 2023 rebuilding — and by December a five-month shelf at 122 was all that held it back. A product event released it, and the break ran into the spring." },
     "2024": { label: "Blow-off and give-back", stats: "Jan 16 triangle (+43.2% / 37 sessions) · Feb 29 final flag (+18.1% / 6 sessions, fully surrendered by Mar 20)", note: "Three breakouts stacked into one run that ended at 227.30 on March 8. The first two paid handsomely; the third was the top. Same setup every time — the only variable that changed was how much trend was left." },
     "2025": { label: "Washout, wedge, the next campaign", stats: "Jul 10 wedge break · +63.6% in 63 sessions", note: "From the April washout, a three-month recovery ended in a two-line wedge — the 2021 playbook verbatim. It gapped out in July, flagged once mid-month, and was still paying into the autumn." },
+    "2026": { label: "Off the low, the monster", stats: "Apr 2 trigger \u00b7 +168.8% in 60 sessions", note: "Two sessions after the March 2026 index low, the first breakout of the new cycle — and the biggest payout in the book. The best triggers of a cycle come earliest, printed while the tape still feels broken." },
   },
   "Finding the Market's Bottom": {
     "2023": { label: "Rate-scare correction", stats: "QQQ −10.8% over 71 sessions · low Oct 26, 2023 · reclaimed in 13 sessions", note: "The slowest correction in the book — 71 sessions of lower lows while rates topped. Slow tapes give the clearest tells: every study in this chapter printed its own low before the index did, and most had already reclaimed their moving averages while QQQ was still under water." },
@@ -182,7 +186,9 @@ const PROJECT_PREFACE = {
         ["Structure over story", "Every study asks the same questions: what did the base look like, what triggered, what did volume do, where did the trend die. The narrative changes; the checklist does not."],
         ["Both directions", "Breakdowns are graded with the same rigor as breakouts — the mirror image. Knowing how leaders die is half of knowing how to hold them."],
       ]},
-      { n: "04", kicker: "The eras", title: "A decade in six regimes.", rows: [
+      { n: "04", kicker: "The eras", title: "Twenty years, every regime.", rows: [
+        ["2000 \u00b7 The mania", "The dot-com blow-off — the book opens with a breakout that doubled in three months, at the top of an era about to end."],
+        ["2003\u00b72006 \u00b7 The first cycle", "Out of the post-crash wasteland: the first turn, the stair-step campaigns, the dual-core run — and the 2006 breakdown that ended it."],
         ["2016–2018 · The turnaround", "From left-for-dead to the strongest chart in the index — the Ryzen/EPYC re-rating, ending in the July 2018 earnings gap that doubled the stock in seven weeks."],
         ["Q4 2018 · The first crash", "Crypto demand vanished and the stock gave back half. The first lesson in how fast momentum unwinds."],
         ["2019 · The base year", "Three quarters of sideways while the index double-dipped — then the late-October breakout that ran into 2020."],
@@ -230,8 +236,8 @@ const DEEP_DIVES = [
   {
     no: "02", slug: "amd-chronicle", project: "AMD Chronicle",
     title: "AMD \u2014 20 Years Through Every Market Cycle", // HIS title, 2026-07-31
-    premise: "Hold the company constant and the regimes become the variable. A decade of AMD — turnaround, mania, two crashes, a two-thirds bear, and the AI era — every setup class graded on the same card.",
-    updated: "2026-07-31",
+    premise: "Hold the company constant and the regimes become the variable. Twenty years of AMD — the dot-com mania, the first cycle, the turnaround, two crashes, a two-thirds bear, and the AI era — every setup class graded on the same card.",
+    updated: "2026-08-01",
     cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/amd-chronicle-cover.png",
   },
   {
@@ -841,7 +847,8 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
 function openProjectBookPdf(rows, coverTitle) {
   const today = new Date().toISOString().slice(0, 10);
   const yearOf = (r) => (mbISO(r.entry_date) || "").slice(0, 4) || "—";
-  const ordered = [...rows].sort((a, b) => yearOf(a).localeCompare(yearOf(b)) || String(a.ticker).localeCompare(String(b.ticker)));
+  const ordered = [...rows].sort((a, b) => yearOf(a).localeCompare(yearOf(b)) || String(a.ticker).localeCompare(String(b.ticker)) ||
+    String(mbISO(a.entry_date) || a.entry_date || "").localeCompare(String(mbISO(b.entry_date) || b.entry_date || "")));
   const groups = [];
   ordered.forEach((r, i) => { const y = yearOf(r); const g = groups[groups.length - 1];
     if (g && g.year === y) g.items.push({ r, idx: i }); else groups.push({ year: y, items: [{ r, idx: i }] }); });
@@ -849,6 +856,9 @@ function openProjectBookPdf(rows, coverTitle) {
   const yearSpan = years.length ? (years[0] === years[years.length - 1] ? years[0] : `${years[0]}–${years[years.length - 1]}`) : "";
   const episodes = PROJECT_EPISODES[coverTitle] || {};
   const isMB = coverTitle === "Finding the Market's Bottom";
+  // Cover prints the dive's display title (HIS wording) when one exists; coverTitle stays the
+  // project key for EPISODES/PREFACE lookups and the isMB/theme switches.
+  const displayTitle = DEEP_DIVES.find((d) => d.project === coverTitle)?.title || coverTitle;
   // ── format helpers (blank → "—", never invented) ──
   const fmtPct = (v) => (v === "" || v == null) ? "—" : `${+v >= 0 && !String(v).startsWith("-") ? "+" : ""}${esc(v)}%`;
   const fmtPp = (v) => (v === "" || v == null) ? "—" : `${+v >= 0 && !String(v).startsWith("-") ? "+" : ""}${esc(v)} pp`;
@@ -858,7 +868,7 @@ function openProjectBookPdf(rows, coverTitle) {
   const cover = `<div class="page pbcover">
     <img class="pblogo" src="${esc(window.location.origin)}/logo-mark.png"/>
     <div class="pbbrand">Model Book</div>
-    <h1 class="pbtitle">${esc(coverTitle)}</h1>
+    <h1 class="pbtitle">${esc(displayTitle)}</h1>
     <div class="pbrule"></div>
     <div class="pbmeta">${rows.length} ${rows.length === 1 ? "study" : "studies"}${yearSpan ? ` · ${yearSpan}` : ""} · exported ${today}</div>
   </div>`;
@@ -981,14 +991,14 @@ function openProjectBookPdf(rows, coverTitle) {
         const TFWORD = { "1M": "monthly", "1W": "weekly", "1D": "daily", "60m": "hourly", "30m": "30-minute", "15m": "15-minute", "5m": "5-minute", "1m": "1-minute" };
         const tfOf = (slot, fallback) => TFWORD[(study.tf || {})[slot]] || fallback;
         const chartBlock2 = (img, title, sub, top) => img ? `
-          <div class="${top ? "" : "pcRule"}" style="margin:${top ? "30px" : "34px"} 0 0;${top ? "" : "padding-top:30px"}">
+          <div class="pcBlk${top ? "" : " pcRule"}" style="margin:${top ? "30px" : "34px"} 0 0;${top ? "" : "padding-top:30px"}">
             <div class="pcH" style="font-size:1.35rem;font-weight:700;letter-spacing:-0.015em;line-height:1.2">${title}</div>
             ${sub ? `<div class="pcD" style="font-size:0.92rem;margin-top:5px">${sub}</div>` : ""}
             <span class="pbchartwrap" style="display:block;margin-top:16px"><img class="pcCard" src="${esc(img)}" style="width:100%;display:block"/></span>
           </div>` : "";
         const stat = (k, v) => (v == null || v === "") ? "" : `<span style="white-space:nowrap"><span class="pcD">${k}</span>&nbsp; <span class="pcH" style="font-weight:600">${v}</span></span>`;
         const sgn = (x) => `${+x >= 0 ? "+" : ""}${esc(x)}%`;
-        const pkv = m.peak_pct != null ? `${sgn(m.peak_pct)} in ${esc(m.sessions_to_peak ?? "?")} sessions` : null;
+        const pkv = m.peak_pct != null ? `${sgn(m.peak_pct)} in ${esc(m.sessions_to_peak ?? "?")} session${+m.sessions_to_peak === 1 ? "" : "s"}` : null;
         const stats = [
           stat("Day one", m.day_pct != null ? sgn(m.day_pct) : null),
           stat("Volume", m.rvol_eod != null ? `${esc(m.rvol_eod)}\u00d7 normal` : null),
@@ -1097,7 +1107,7 @@ function openProjectBookPdf(rows, coverTitle) {
     }).join("");
     return divider + studies;
   }).join("");
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(coverTitle)} — ${today}</title>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(displayTitle)} — ${today}</title>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
       *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -1141,6 +1151,10 @@ function openProjectBookPdf(rows, coverTitle) {
       .chron .pfdef{border-left-color:rgba(255,255,255,0.28)}
       .chron .pbtfill{background:rgba(255,255,255,0.42)}
       .chron .pbtkg{color:#9a978f}
+      .chron .pbdivnum{color:rgba(255,255,255,0.07)}
+      body.light.chron .pbdivnum{color:rgba(23,21,15,0.08)}
+      .chron .pblogo{filter:grayscale(1) brightness(1.7)}
+      body.light.chron .pblogo{filter:grayscale(1) brightness(0.45)}
       body.light.chron .pbbrand,body.light.chron .pfn,body.light.chron .pfdefk,body.light.chron .pfrown,body.light.chron .pbcyear,body.light.chron .pbhid,body.light.chron .pbtsec,body.light.chron .pbepcount,body.light.chron .pbthesis .pblabel{color:#8a857a}
       body.light.chron .pfcy,body.light.chron .pfpull,body.light.chron .pbcret,body.light.chron .pbvbarstat,body.light.chron .pbvpill.g,body.light.chron .pbpill-r{color:#17150f}
       body.light.chron .pbrule{background:rgba(23,21,15,0.3)}
@@ -1151,6 +1165,7 @@ function openProjectBookPdf(rows, coverTitle) {
       .pcExp>summary::-webkit-details-marker{display:none}
       .pcExp>summary::before{content:"\\25B8\\00a0 ";font-size:0.8em}
       .pcExp[open]>summary::before{content:"\\25BE\\00a0 "}
+      @media print{.pcBlk{break-inside:avoid;page-break-inside:avoid}}
       /* ── COVER ── (no gradient washes — print rasterizes them with visible banding) */
       .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
       .pblogo{height:54px;width:auto;align-self:flex-start;margin-bottom:20px}
