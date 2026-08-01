@@ -1728,7 +1728,7 @@ const PLAYBOOK_PIECES = [
     take: `The mistake is never the rule — it's the click that ignored it. If you cannot say why you are buying in one sentence, you are not buying.`,
   },
   {
-    no: "08", part: 2, title: `The volatility contraction pattern`, sub: `After a correction or pullback — contractions tightening into the pivot`,
+    no: "08", part: 2, title: `The volatility contraction pattern (VCP)`, sub: `After a correction or pullback — contractions tightening into the pivot`,
     toc: `after a correction or pullback, contractions tightening into the pivot`,
     blocks: [
       { h: `Defining the terms` },
@@ -1753,7 +1753,7 @@ const PLAYBOOK_PIECES = [
     take: `The tightening is the edge; the breakout is only the confirmation. Buy the break of a real sequence of shrinking pullbacks — not the hope of one.`,
   },
   {
-    no: "09", part: 2, title: `The high tight flag`, sub: `Continuation momentum — the pause inside a powerful advance`,
+    no: "09", part: 2, title: `The high tight flag (HTF)`, sub: `Continuation momentum — the pause inside a powerful advance`,
     toc: `continuation momentum, the pause inside a powerful advance`,
     blocks: [
       { h: `Defining the terms` },
@@ -1776,7 +1776,7 @@ const PLAYBOOK_PIECES = [
     take: `The pole is the claim; the tight flag is the proof nobody wants to sell it. Deep, loose or rounded is not a flag — it's a top forming.`,
   },
   {
-    no: "10", part: 2, title: `The undercut and rally`, sub: `Buying a leader on a pullback, after it shakes people out`,
+    no: "10", part: 2, title: `The undercut and rally (UnR)`, sub: `Buying a leader on a pullback, after it shakes people out`,
     toc: `buying a leader on a pullback, after it shakes people out`,
     blocks: [
       { h: `Defining the terms` },
@@ -1800,7 +1800,7 @@ const PLAYBOOK_PIECES = [
     take: `The dip below shakes people out; taking the level back is the proof. Buy the proof, not the hope.`,
   },
   {
-    no: "11", part: 2, title: `The episodic pivot`, sub: `The rare one — surprise catalyst on a neglected name`,
+    no: "11", part: 2, title: `The episodic pivot (EP)`, sub: `The rare one — surprise catalyst on a neglected name`,
     toc: `the rare one, surprise catalyst on a neglected name`,
     blocks: [
       { h: `Defining the terms` },
@@ -1824,7 +1824,7 @@ const PLAYBOOK_PIECES = [
     take: `Surprise is the edge and neglect is the proof of it. If it hesitates, it lied — the real ones leave immediately.`,
   },
   {
-    no: "12", part: 2, title: `The parabolic short and the breakdown`, sub: `The short side, taken only after the top is in`,
+    no: "12", part: 2, title: `The parabolic short and the breakdown (PS)`, sub: `The short side, taken only after the top is in`,
     toc: `the short side, taken only after the top is in`,
     blocks: [
       { h: `Defining the terms` },
@@ -2054,7 +2054,7 @@ const PLAYBOOK_PIECES = [
 
 const PLAYBOOK_CARD = [
   [`The three scans`, `Top gainers over 1M/3M/6M (with liquidity and volatility floors) · CANSLIM scanner (price >$3 · cap >$300M · revenue qtrly YoY >25% · avg vol 60d >500K · price above the 50-day · volatility >3% · float <150M · ≥70% above the 52-week low) · pre-market gappers, the scan built for episodic pivots.`],
-  [`The five setups`, `Volatility contraction pattern · high tight flag · undercut and rally · episodic pivot · parabolic short / breakdown — the short side only after a top is already in.`],
+  [`The five setups`, `Volatility contraction pattern (VCP) · high tight flag (HTF) · undercut and rally (UnR) · episodic pivot (EP) · parabolic short / breakdown (PS) — the short side only after a top is already in.`],
   [`Sizing`, `Shares = (Account × Risk%) ÷ (Entry − Stop) · risk ¼–⅓% per trade · total open risk ≤ ~2% · money held overnight ≤ ~30%, counting break-even positions.`],
   [`What a candidate needs`, `Group in the top five · strong relative strength over 1, 3 and 6 months · enough volume to trade at size · moves enough to pay for its stop · fresh, not stretched above the 50-day.`],
   [`Entry`, `5-minute opening-range high · time-matched relative volume confirming · stop = low of day, ≤ ~1 daily range, placed with the order.`],
