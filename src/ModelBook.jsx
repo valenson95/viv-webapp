@@ -229,7 +229,7 @@ const PROJECT_PREFACE = {
 const DEEP_DIVES = [
   {
     no: "02", slug: "amd-chronicle", project: "AMD Chronicle",
-    title: "One Stock Through Every Market Cycle",
+    title: "AMD \u2014 20 Years Through Every Market Cycle", // HIS title, 2026-07-31
     premise: "Hold the company constant and the regimes become the variable. A decade of AMD — turnaround, mania, two crashes, a two-thirds bear, and the AI era — every setup class graded on the same card.",
     updated: "2026-07-31",
     cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/amd-chronicle-cover.png",
