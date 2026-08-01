@@ -1440,17 +1440,17 @@ const pbRich = (s) => esc(s)
   .replace(/\[i\]/g, "<i>").replace(/\[\/i\]/g, "</i>");
 
 const PLAYBOOK_PARTS = [
-  { roman: "I", name: "Weather", folio: "Weather", toc: "I — Weather · read the market first", stats: "Read the market first · pieces 01–03", count: "3 pieces",
+  { num: "1", name: "Weather", folio: "Weather", toc: "Part 1 — Weather · read the market first", stats: "Read the market first · pieces 01–03", count: "3 pieces",
     blurb: "Before any chart, we check the conditions outside. Is this a market where breakouts work, or one where they get sold? The weather never picks the stock for you. It decides how big you trade and how patient you are for the rest of the day." },
-  { roman: "II", name: "Neighborhood", folio: "Neighborhood", toc: "II — Neighborhood · selection", stats: "Selection · pieces 04–07", count: "4 pieces",
+  { num: "2", name: "Neighborhood", folio: "Neighborhood", toc: "Part 2 — Neighborhood · selection", stats: "Selection · pieces 04–07", count: "4 pieces",
     blurb: "Good houses cluster in good neighbourhoods. Money moves into whole sectors and groups, not single stocks, so before judging any chart we find where it is actually going — and build the nightly routine that puts those names in front of us again and again." },
-  { roman: "III", name: "House", folio: "House", toc: "III — House · the setups", stats: "The setups · pieces 08–12", count: "5 pieces",
+  { num: "3", name: "House", folio: "House", toc: "Part 3 — House · the setups", stats: "The setups · pieces 08–12", count: "5 pieces",
     blurb: "Now the individual house. These are the five chart patterns we buy and sell. Each one is defined tightly enough to say no with, because a setup you cannot describe is a setup you cannot repeat." },
-  { roman: "IV", name: "When to walk in", folio: "When to walk in", toc: "IV — When to walk in · execution", stats: "Execution · pieces 13–16", count: "4 pieces",
+  { num: "4", name: "When to walk in", folio: "When to walk in", toc: "Part 4 — When to walk in · execution", stats: "Execution · pieces 13–16", count: "4 pieces",
     blurb: "The right house at the wrong moment is still a loss. This is the door: the trigger that shows buyers are in control, the maths that sets your size, the limits that can veto the trade, and the stop that keeps every mistake small." },
-  { roman: "V", name: "The campaign", folio: "The campaign", toc: "V — The campaign · management", stats: "Management · pieces 17–19", count: "3 pieces",
+  { num: "5", name: "The campaign", folio: "The campaign", toc: "Part 5 — The campaign · management", stats: "Management · pieces 17–19", count: "3 pieces",
     blurb: "Getting in was one decision. Everything after it is the campaign. Take some profit while buyers are still excited, trail what is left on a moving average, and add only when the stock proves itself again. This is where good entries turn into good years." },
-  { roman: "VI", name: "Survival", folio: "Survival", toc: "VI — Survival", stats: "Survival · pieces 20–21", count: "2 pieces",
+  { num: "6", name: "Survival", folio: "Survival", toc: "Part 6 — Survival", stats: "Survival · pieces 20–21", count: "2 pieces",
     blurb: "No edge helps a trader who has already blown up. Losing streaks are a normal feature of the strategy, not a judgement on you. These two pieces are how we cut size by the schedule, stay in the game, and let the repetitions add up." },
 ];
 
@@ -1492,8 +1492,8 @@ const PLAYBOOK_INDICATORS = [
 
 const PLAYBOOK_PIECES = [
   {
-    no: "01", part: 0, title: `Check the market first`, sub: `How strong the whole market is decides how hard you push`,
-    toc: `how strong the whole market is decides how hard you push`,
+    no: "01", part: 0, title: `Check the market first`, sub: `How strong the market is sets how hard you push`,
+    toc: `how strong the market is sets how hard you push`,
     blocks: [
       { h: `Defining the terms` },
       { p: `Before looking at a single chart, we check the market as a whole. The measure is [b]breadth[/b]: how many stocks made a big up-move today, against how many made a big down-move. That gives us one of three answers — the market is strong, mixed, or weak. Most stocks move with the market, so this is the first question of the day, not the last.` },
@@ -2067,7 +2067,7 @@ export function openPlaybookBook() {
   const body = PLAYBOOK_PARTS.map((part, pi) => {
     const inPart = PLAYBOOK_PIECES.filter((pc) => pc.part === pi);
     const divider = `<div class="page pbdivider">
-      <div class="pbdivnum">${esc(part.roman)}</div>
+      <div class="pbdivnum">${esc(part.num)}</div>
       <div class="pbdivmeta">
         <div class="pbeplabel">${esc(part.name)}</div>
         <div class="pbepstats">${esc(part.stats)}</div>
