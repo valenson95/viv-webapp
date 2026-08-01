@@ -243,7 +243,7 @@ const DEEP_DIVES = [
     // draft:true keeps it admin-only; publishing a static dive is a code change, HIS call.
     no: "03", slug: "viv-playbook", project: null, static: "playbook", draft: true,
     title: "21 Building Blocks to Profitability",
-    premise: "The VIV system in twenty-one pieces — weather, neighborhood, house, execution, campaign, survival.",
+    premise: "The VIV system in twenty-one pieces — the weather, the neighbourhood, the house, when to walk in, after you move in, and keeping the roof on.",
     updated: "2026-08-01",
     cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/viv-playbook-cover.png",
   },
@@ -1457,9 +1457,9 @@ const PLAYBOOK_ROADMAP = [
       svg: `<path d="M12.6 2.6h8.8v18.6h-8.8z" fill="currentColor" fill-opacity="0.14"/><path d="M15.4 12h.01"/><path d="M2.4 12h7.6"/><path d="M6.9 8.5 10.4 12l-3.5 3.5"/>` },
   ] },
   { phase: "What you keep", steps: [
-    { no: "5", name: "The campaign", line: "Take profit, trail the rest, add when it earns it.",
-      svg: `<path d="M1.8 21.2h20.4"/><path d="M3.4 21.2v-4.6h3.4v4.6"/><path d="M9.1 21.2v-8.1h3.4v8.1z" fill="currentColor" fill-opacity="0.2"/><path d="M14.8 21.2v-5.4h3.4v5.4"/><path d="M4 12.4 8.2 8.2l3 2.8 6.4-6.6"/><path d="M13.9 4.4h3.9v3.9"/>` },
-    { no: "6", name: "Survival", line: "Cut size in a losing streak, and stay in the game.",
+    { no: "5", name: "After you move in", line: "Take profit, trail the rest, add when it earns it.",
+      svg: `<path d="M1.6 13.4 8.9 7.3l7.3 6.1"/><path d="M3.4 12.6v8.6h11v-8.6"/><path d="M7.1 21.2v-5h3.6v5z" fill="currentColor" fill-opacity="0.2"/><path d="M15.6 9.6 18.3 6.9l1.8 1.8 2.3-2.6"/><path d="M19.6 5.9h2.9v2.9"/>` },
+    { no: "6", name: "Keeping the roof on", line: "Cut size in a losing streak, and stay in the game.",
       svg: `<path d="M12 1.6v2.3"/><path d="M2.5 12.7a9.5 9.5 0 0 1 19 0z" fill="currentColor" fill-opacity="0.16"/><path d="M12 12.7v6.1a2.35 2.35 0 0 0 4.7 0"/><path d="M5.1 16.4v1.5M7.6 19.2v1.5"/>` },
   ] },
 ];
@@ -1473,10 +1473,10 @@ const PLAYBOOK_PARTS = [
     blurb: "Now the individual house. These are the five chart patterns we buy and sell. Each one is defined tightly enough to say no with, because a setup you cannot describe is a setup you cannot repeat." },
   { num: "4", name: "When to walk in", folio: "When to walk in", toc: "Part 4 — When to walk in · execution", stats: "Execution · pieces 13–16", count: "4 pieces",
     blurb: "The right house at the wrong moment is still a loss. This is the door: the trigger that shows buyers are in control, the maths that sets your size, the limits that can veto the trade, and the stop that keeps every mistake small." },
-  { num: "5", name: "The campaign", folio: "The campaign", toc: "Part 5 — The campaign · management", stats: "Management · pieces 17–19", count: "3 pieces",
-    blurb: "Getting in was one decision. Everything after it is the campaign. Take some profit while buyers are still excited, trail what is left on a moving average, and add only when the stock proves itself again. This is where good entries turn into good years." },
-  { num: "6", name: "Survival", folio: "Survival", toc: "Part 6 — Survival", stats: "Survival · pieces 20–21", count: "2 pieces",
-    blurb: "No edge helps a trader who has already blown up. Losing streaks are a normal feature of the strategy, not a judgement on you. These two pieces are how we cut size by the schedule, stay in the game, and let the repetitions add up." },
+  { num: "5", name: "After you move in", folio: "After you move in", toc: "Part 5 — After you move in · management", stats: "Management · pieces 17–19", count: "3 pieces",
+    blurb: "Getting in was one decision. Everything after it is looking after what you now own. Take some profit while buyers are still excited, trail what is left on a moving average, and add only when the stock proves itself again. This is where good entries turn into good years." },
+  { num: "6", name: "Keeping the roof on", folio: "Keeping the roof on", toc: "Part 6 — Keeping the roof on · survival", stats: "Survival · pieces 20–21", count: "2 pieces",
+    blurb: "You can do everything else right and still lose the house. Losing streaks are a normal feature of the strategy, not a judgement on you. These two pieces are how we cut size by the schedule, stay in the game, and let the repetitions add up." },
 ];
 
 // PLAYBOOK_INDICATORS (Valen 2026-08-01): the chart itself — the five indicators his system reads,
@@ -1769,7 +1769,7 @@ const PLAYBOOK_PIECES = [
         `[b]The trigger[/b] — a break above the [i]pattern high[/i], not an early poke through the flag line, on expanding volume. And it must be the first or second flag of the campaign, not a late leg.`,
       ] },
       { h: `In practice` },
-      { p: `Because it is a continuation setup, the trend that produced the pole has to still be intact when the flag breaks — the entry checklist times it exactly like every other setup — opening-range trigger, live volume confirming, stop at the low of the day. Because the run into it was so steep, price often stretches far above its 50-day average within days, so the profit-taking rules in Part V come into play early.` },
+      { p: `Because it is a continuation setup, the trend that produced the pole has to still be intact when the flag breaks — the entry checklist times it exactly like every other setup — opening-range trigger, live volume confirming, stop at the low of the day. Because the run into it was so steep, price often stretches far above its 50-day average within days, so the profit-taking rules in Part 5 come into play early.` },
       { h: `Common mistakes` },
       { p: `Forcing the label onto a stock that ran forty percent and paused — the pole is a specific, measured number, and the label means nothing until you have measured it. Tolerating a flag that widens, rounds out, or cuts deep, and calling it "still constructive." Buying the flag line instead of the pattern high. And treating a late-campaign flag like a first one, when the same shape at the end of a run carries none of the same message.` },
     ],
@@ -2072,7 +2072,7 @@ export function openPlaybookBook() {
     <div class="pbbrand">The VIV System</div>
     <h1 class="pbtitle">21 Building Blocks to Profitability</h1>
     <div class="pbrule"></div>
-    <div class="pbmeta">Six parts · Weather to Survival · 2026</div>
+    <div class="pbmeta">Six parts · from the weather to keeping the roof on · 2026</div>
     <div class="pbfoot pbcovfoot">Valen Insiders Vault · Educational — not financial advice</div>
   </div>`;
   const flowChev = `<svg class="pbflowchev" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1.5 6 6.5 11 1.5"/></svg>`;
@@ -2297,6 +2297,11 @@ export function openPlaybookBook() {
       .pbtake{margin-top:36px;padding-top:18px;max-width:62ch}
       .pbtakel{font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase}
       .pbtaket{font-size:1.02rem;font-weight:600;line-height:1.6;margin-top:10px}
+      /* Screen-only page segmentation. Print already breaks pages, so this must not apply there. */
+      @media screen{
+        .page + .page{margin-top:64px;padding-top:76px;border-top:1px solid rgba(255,255,255,0.09)}
+        body.light .page + .page{border-top-color:rgba(23,21,15,0.11)}
+      }
       .pbroadpage{max-width:1060px}
       .pbroadhead{font-size:1.6rem;font-weight:700;line-height:1.25;margin-top:10px}
       .pbroadintro{font-size:0.98rem;line-height:1.7;margin-top:12px;max-width:70ch}
@@ -2321,28 +2326,39 @@ export function openPlaybookBook() {
       body.light .pbflowchev{color:rgba(138,106,28,0.62)}
       @media(max-width:620px){.pbflowphase,.pbflowstep{grid-template-columns:54px minmax(0,1fr);gap:18px}.pbflownode{width:54px;height:54px}.pbflownode svg{width:26px;height:26px}.pbflowconn{width:54px}}
       @media print{.pbflowstep,.pbflowphase{break-inside:avoid;page-break-inside:avoid}}
+      /* Reveal as you scroll. Two independent paths, and BOTH default to visible:
+         1. scroll timelines (preferred) — one shared timeline on .pbflow, each child scrubbed
+            through its own non-overlapping slice, so the steps arrive strictly in order at
+            whatever pace the reader scrolls, and rewind on the way back up.
+         2. the .pending class, added by JS only when path 1 is unavailable.
+         Print overrides both, so the PDF is always the finished diagram. */
+      .pbflow > *{transition:opacity .5s cubic-bezier(.2,.7,.3,1),transform .5s cubic-bezier(.2,.7,.3,1)}
+      .pbflow > .pending{opacity:0;transform:translateY(14px)}
+      .pbflow > .pending.pbflowconn{transform:translateY(7px)}
       @media screen and (prefers-reduced-motion: no-preference){
         @supports (animation-timeline: view()){
-          @keyframes pbflowin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-          @keyframes pbflowdraw{from{transform:scaleY(0);opacity:.35}to{transform:scaleY(1);opacity:1}}
-          .pbflow .pbflowphase,.pbflow .pbflowstep{
-            animation:pbflowin linear both;
-            animation-timeline:view();
-            animation-range:entry 4% entry 72%;
-          }
-          .pbflow .pbflowline{
-            transform-origin:top;
-            animation:pbflowdraw linear both;
-            animation-timeline:view();
-            animation-range:entry 8% entry 78%;
-          }
-          .pbflow .pbflowchev{
-            animation:pbflowin linear both;
-            animation-timeline:view();
-            animation-range:entry 30% entry 88%;
-          }
+          @keyframes pbflowin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+          .pbflow{view-timeline-name:--pbflow;view-timeline-axis:block}
+          .pbflow > *{animation:pbflowin linear both;animation-timeline:--pbflow}
+        .pbflow > *:nth-child(1){animation-range:cover 2.0% cover 13.0%}
+        .pbflow > *:nth-child(2){animation-range:cover 5.6% cover 16.6%}
+        .pbflow > *:nth-child(3){animation-range:cover 9.2% cover 20.2%}
+        .pbflow > *:nth-child(4){animation-range:cover 12.8% cover 23.8%}
+        .pbflow > *:nth-child(5){animation-range:cover 16.4% cover 27.4%}
+        .pbflow > *:nth-child(6){animation-range:cover 20.0% cover 31.0%}
+        .pbflow > *:nth-child(7){animation-range:cover 23.6% cover 34.6%}
+        .pbflow > *:nth-child(8){animation-range:cover 27.2% cover 38.2%}
+        .pbflow > *:nth-child(9){animation-range:cover 30.8% cover 41.8%}
+        .pbflow > *:nth-child(10){animation-range:cover 34.4% cover 45.4%}
+        .pbflow > *:nth-child(11){animation-range:cover 38.0% cover 49.0%}
+        .pbflow > *:nth-child(12){animation-range:cover 41.6% cover 52.6%}
+        .pbflow > *:nth-child(13){animation-range:cover 45.2% cover 56.2%}
+        .pbflow > *:nth-child(14){animation-range:cover 48.8% cover 59.8%}
+        .pbflow > *:nth-child(15){animation-range:cover 52.4% cover 63.4%}
+        .pbflow > *:nth-child(16){animation-range:cover 56.0% cover 67.0%}
         }
       }
+      @media print{.pbflow > *{opacity:1 !important;transform:none !important;transition:none !important;animation:none !important}}
       .pbind{margin-top:34px;padding-top:22px;border-top:1px solid rgba(255,255,255,0.08);max-width:70ch}
       body.light .pbind{border-top-color:rgba(23,21,15,0.12)}
       .pbindno{font-size:0.64rem;letter-spacing:0.16em}
@@ -2398,6 +2414,41 @@ export function openPlaybookBook() {
       const im=e.target.closest('.pbchartwrap img');if(!im)return;
       document.getElementById('zoomim').src=im.src;ov.style.display='flex';});
     document.addEventListener('keydown',(e)=>{if(e.key==='Escape')document.getElementById('zoomov').style.display='none';});
+    // Roadmap: each step appears as you scroll to it — sequenced by scroll position, not a timer.
+    // Only elements below the fold at open are ever hidden, so the diagram can never render empty.
+    (function(){
+      var flow=document.querySelector('.pbflow');
+      if(!flow)return;
+      if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+      // Scroll timelines handle it natively where supported — don't double up.
+      if(window.CSS&&CSS.supports&&CSS.supports('animation-timeline: view()'))return;
+      var vh=function(){return window.innerHeight||document.documentElement.clientHeight;};
+      var waiting=[].slice.call(flow.children).filter(function(k){
+        return k.getBoundingClientRect().top > vh()*0.92;
+      });
+      if(!waiting.length)return;
+      waiting.forEach(function(k){k.classList.add('pending');});
+      var queued=false;
+      function reveal(){
+        queued=false;
+        var hit=[];
+        waiting=waiting.filter(function(el){
+          if(el.getBoundingClientRect().top < vh()*0.86){hit.push(el);return false;}
+          return true;
+        });
+        hit.forEach(function(el,i){setTimeout(function(){el.classList.remove('pending');},i*90);});
+        if(!waiting.length){
+          window.removeEventListener('scroll',onScroll);
+          window.removeEventListener('resize',onScroll);
+        }
+      }
+      function onScroll(){if(!queued){queued=true;setTimeout(reveal,16);}}
+      window.addEventListener('scroll',onScroll,{passive:true});
+      window.addEventListener('resize',onScroll);
+      reveal();
+      // Safety net: nothing may stay hidden, whatever happens.
+      setTimeout(function(){waiting.forEach(function(k){k.classList.remove('pending');});},8000);
+    })();
     </script>
     </body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
