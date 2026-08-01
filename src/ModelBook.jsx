@@ -65,7 +65,10 @@ const mbDateRange = (entry, exit) => {
 // Admin curates; members study PUBLISHED entries. Run supabase/modelbook.sql.
 // ══════════════════════════════════════════════════════════════════
 
-export const PATTERNS = ["Trendline Breakout", "Pullback Buy", "Episodic Pivot", "VCP"];
+// Expanded + member-customizable (Mandy feature request, Valen-approved 2026-07-31): the editor
+// offers these as datalist suggestions but accepts ANY typed pattern name. Filter chips derive
+// from patterns actually present, so custom names slot into the gallery automatically.
+export const PATTERNS = ["Trendline Breakout", "Pullback Buy", "Episodic Pivot", "VCP", "Bull Flag", "Flat Base", "Ascending Triangle"];
 export const OUTCOMES = ["Huge Winner", "Winner", "Subpar", "Loser"];
 
 // ── Objective star math — the EXACT Setup Grader checklist + formula (perfect mirror, zero bias).
@@ -968,47 +971,48 @@ function openProjectBookPdf(rows, coverTitle) {
       };
       
       const folio = `<div class="pbfolio"><span>${esc(coverTitle)}</span><span>No. ${String(idx + 1).padStart(2, "0")} / ${String(rows.length).padStart(2, "0")} · ${esc(yearOf(r))}</span></div>`;
-      // ── CHRONICLE PAGE (Valen 2026-07-31 redesign): one study = ONE page ──
-      // header (date · class · tick chip) → thesis → CONTEXT half-card + narration beside →
-      // SETUP hero (height-capped, right edge = trigger) → OUTCOME half-card + data beside → folio.
-      // Chart labels make the page self-explanatory; per-study checklist lists removed (tally
-      // lives in the front matter; the chip carries the count). All styles inline by design.
+      // ── CHRONICLE PAGE v3 (Valen 2026-07-31, "copy Nick"): faithful port of the
+      // nickschmidt.so/report article grid, studied from the live render — left margin column
+      // (heading + meta), right reading column (airy grey body), chart blocks with white
+      // title / grey subtitle above a rounded hairline card, mono stats line. Monochrome:
+      // no gold on study pages; colour only where it means something.
       if (!isMB) {
         const scored = def.buckets.flatMap((b) => b.items).filter((it) => it[2] !== "bonus");
         const tickN = scored.filter(([k]) => study.checks?.[k]).length;
-        const chip = tickN ? `<span style="font-family:'Geist Mono',monospace;font-size:0.62rem;font-weight:600;color:#c9982a;border:1px solid rgba(201,152,42,0.35);padding:3px 9px;border-radius:99px;white-space:nowrap">${tickN}/${scored.length} ✓</span>` : "";
-        const shortTag = study.direction === "short" ? `<span style="font-family:'Geist Mono',monospace;font-size:0.62rem;font-weight:600;color:#e05b5b;border:1px solid rgba(224,91,91,0.35);padding:3px 9px;border-radius:99px">SHORT</span>` : "";
-        const lab = (t) => `<div style="font-family:'Geist Mono',monospace;font-size:0.58rem;font-weight:600;letter-spacing:0.16em;color:#8f8b80;text-transform:uppercase;margin:0 0 7px">${t}</div>`;
-        const ring = "border-radius:10px;border:1px solid rgba(255,255,255,0.13);display:block;background:#0b0b12";
-        const kv = (k, v) => (v == null || v === "") ? "" : `<div style="margin:0 0 10px"><div style="font-family:'Geist Mono',monospace;font-size:0.56rem;font-weight:600;letter-spacing:0.12em;color:#8f8b80;text-transform:uppercase">${k}</div><div style="font-family:'Geist Mono',monospace;font-size:0.86rem;font-weight:600;color:#e8e6e0;margin-top:2px">${v}</div></div>`;
-        const pk = m.peak_pct != null ? `${+m.peak_pct >= 0 ? "+" : ""}${esc(m.peak_pct)}%` : null;
-        const strip = [
-          kv("Day one", m.day_pct != null ? `${+m.day_pct >= 0 ? "+" : ""}${esc(m.day_pct)}%` : null),
-          kv("Volume", m.rvol_eod != null ? `${esc(m.rvol_eod)}\u00d7 avg` : null),
-          kv("Gap", m.gap_pct != null ? `${+m.gap_pct >= 0 ? "+" : ""}${esc(m.gap_pct)}%` : null),
-          kv(study.direction === "short" ? "Downside peak" : "Peak", pk ? `${pk} \u00b7 ${esc(m.sessions_to_peak ?? "?")}s` : null),
-          kv("T+20", m.t20 != null ? `${+m.t20 >= 0 ? "+" : ""}${esc(m.t20)}%` : null),
-        ].join("");
-        const ctx = r.before_img
-          ? `<div style="display:flex;gap:22px;align-items:flex-start;margin:22px 0 0"><div style="flex:0 0 42%">${lab("Context \u00b7 higher timeframe")}<img src="${esc(r.before_img)}" style="width:100%;${ring}"/></div><div style="flex:1;min-width:0;padding-top:20px">${study.annotation ? `<div style="font-size:0.86rem;line-height:1.65;color:#b8b5ac">${esc(study.annotation)}</div>` : ""}</div></div>`
-          : (study.annotation ? `<div style="margin:22px 0 0;max-width:58ch;font-size:0.86rem;line-height:1.65;color:#b8b5ac">${esc(study.annotation)}</div>` : "");
-        const hero = r.after_img ? `<div style="margin:20px 0 0">${lab(`The setup \u00b7 daily \u00b7 right edge = ${esc(r.entry_date || "trigger")}`)}<img src="${esc(r.after_img)}" style="width:100%;max-height:400px;object-fit:contain;object-position:left top;${ring}"/></div>` : "";
-        const outImg = study.outcome_img;
-        const outRow = outImg
-          ? `<div style="display:flex;gap:22px;align-items:flex-start;margin:20px 0 0"><div style="flex:0 0 42%">${lab("The outcome \u00b7 weeks later")}<img src="${esc(outImg)}" style="width:100%;${ring}"/></div><div style="flex:1;min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:0 18px;padding-top:22px">${strip}</div></div>`
-          : `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0 18px;margin:24px 0 0">${strip}</div>`;
-        return `<div class="page pbstudy" id="e${idx}">
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-family:'Geist Mono',monospace;font-size:0.78rem;font-weight:600;color:#e8e6e0">${esc(r.entry_date || "")}</span>
-            <span style="font-size:0.78rem;font-weight:700;color:#c9982a">${esc(study.setup)}</span>
-            ${shortTag}${chip}
-            <span style="flex:1"></span>
-            <span style="font-family:'Geist Mono',monospace;font-size:0.62rem;color:#8f8b80">No. ${String(idx + 1).padStart(2, "0")}</span>
+        const WH = "#ececea", MUT = "#a4a19a", DIM = "#7f7c74";
+        const chartBlock2 = (img, title, sub) => img ? `
+          <div style="margin:38px 0 0">
+            <div style="font-size:0.95rem;font-weight:650;color:${WH};letter-spacing:-0.01em">${title}</div>
+            ${sub ? `<div style="font-size:0.78rem;color:${DIM};margin-top:3px">${sub}</div>` : ""}
+            <span class="pbchartwrap" style="display:block;margin-top:14px"><img src="${esc(img)}" style="width:100%;display:block;border-radius:12px;border:1px solid rgba(255,255,255,0.08);background:#0e0e12"/></span>
+          </div>` : "";
+        const stat = (k, v) => (v == null || v === "") ? "" : `<span style="white-space:nowrap"><span style="color:${DIM}">${k}</span>&nbsp; <span style="color:${WH};font-weight:600">${v}</span></span>`;
+        const sgn = (x) => `${+x >= 0 ? "+" : ""}${esc(x)}%`;
+        const pkv = m.peak_pct != null ? `${sgn(m.peak_pct)} in ${esc(m.sessions_to_peak ?? "?")}s` : null;
+        const stats = [
+          stat("Day one", m.day_pct != null ? sgn(m.day_pct) : null),
+          stat("Volume", m.rvol_eod != null ? `${esc(m.rvol_eod)}\u00d7` : null),
+          stat("Gap", m.gap_pct != null ? sgn(m.gap_pct) : null),
+          stat(study.direction === "short" ? "Downside peak" : "Peak", pkv),
+          stat("T+20", m.t20 != null ? sgn(m.t20) : null),
+        ].filter(Boolean).join(`<span style="color:rgba(255,255,255,0.16);margin:0 14px">\u00b7</span>`);
+        return `<div class="page pbstudy" id="e${idx}" style="max-width:1060px">
+          <div style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:52px">
+            <div>
+              <div style="font-family:'Geist Mono',monospace;font-size:0.66rem;letter-spacing:0.16em;color:${DIM};text-transform:uppercase">No. ${String(idx + 1).padStart(2, "0")} \u00b7 ${esc(yearOf(r))}</div>
+              <div style="font-size:1.02rem;font-weight:650;color:${WH};line-height:1.4;margin-top:12px">${esc(r.entry_date || "")}</div>
+              <div style="font-size:0.82rem;color:${MUT};margin-top:6px;line-height:1.5">${esc(study.setup)}${study.direction === "short" ? " \u00b7 short side" : ""}</div>
+              ${tickN ? `<div style="font-family:'Geist Mono',monospace;font-size:0.68rem;color:${DIM};margin-top:16px">${tickN}/${scored.length} criteria \u2713</div>` : ""}
+            </div>
+            <div style="min-width:0">
+              ${r.thesis ? `<div style="font-size:1.04rem;font-weight:650;color:${WH};line-height:1.55;margin:0 0 16px;letter-spacing:-0.005em">${esc(r.thesis)}</div>` : ""}
+              ${study.annotation ? `<div style="font-size:0.95rem;line-height:1.9;color:${MUT};max-width:64ch">${esc(study.annotation)}</div>` : ""}
+              ${chartBlock2(r.before_img, `${esc(r.ticker)} \u2014 context`, "Higher timeframe, into the trigger")}
+              ${chartBlock2(r.after_img, `${esc(r.ticker)} \u2014 the setup`, `Daily \u00b7 right edge = ${esc(r.entry_date || "trigger")}`)}
+              ${chartBlock2(study.outcome_img, `${esc(r.ticker)} \u2014 the outcome`, "The same chart, weeks later")}
+              ${stats ? `<div style="font-family:'Geist Mono',monospace;font-size:0.74rem;margin:30px 0 0;color:${DIM}">${stats}</div>` : ""}
+            </div>
           </div>
-          ${r.thesis ? `<div style="font-size:1.02rem;font-weight:600;color:#e8e6e0;margin:12px 0 0;max-width:60ch;letter-spacing:-0.01em">${esc(r.thesis)}</div>` : ""}
-          ${ctx}
-          ${hero}
-          ${outRow}
           ${folio}
         </div>`;
       }
@@ -1081,7 +1085,7 @@ function openProjectBookPdf(rows, coverTitle) {
       /* PORTRAIT (Valen 2026-07-30): the book reads as a document — chart spans the full width,
          data strip + ticked criteria stack in a single column below. */
       @page{size:A4;margin:0}
-      .page{padding:48px 52px;page-break-after:always;min-height:94vh}
+      .page{padding:48px 52px;page-break-after:always;min-height:94vh;max-width:880px;margin:0 auto}
       .pblabel{font-size:0.62rem;font-weight:800;letter-spacing:0.28em;text-transform:uppercase;color:#9a968c}
       .pbfoot{color:#66635b;font-size:0.62rem;margin-top:22px;letter-spacing:0.02em}
       /* toolbar (screen only) */
@@ -1559,7 +1563,7 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
           <div><span style={lbl}>Ticker<AutoDot k="ticker" /></span><input style={inputS} value={row.ticker} onChange={e => setField("ticker", e.target.value.toUpperCase())} placeholder="NVDA" /></div>
-          <div><span style={lbl}>Pattern<AutoDot k="pattern" /></span><select style={{ ...inputS, cursor: "pointer" }} value={row.pattern} onChange={e => setField("pattern", e.target.value)}>{PATTERNS.map(p => <option key={p}>{p}</option>)}</select></div>
+          <div><span style={lbl}>Pattern<AutoDot k="pattern" /></span><input style={inputS} list="mb-pattern-names" value={row.pattern || ""} placeholder="e.g. Bull Flag — or type your own" onChange={e => setField("pattern", e.target.value)} /><datalist id="mb-pattern-names">{PATTERNS.map(p => <option key={p} value={p} />)}</datalist></div>
           <div><span style={lbl}>Theme<AutoDot k="theme" /></span><input style={inputS} value={row.theme || ""} onChange={e => setField("theme", e.target.value)} placeholder="Semiconductors" /></div>
           <div><span style={lbl}>Entry date<AutoDot k="entry_date" /></span><input type="date" style={inputS} value={row.entry_date || ""} onChange={e => setField("entry_date", e.target.value)} /></div>
           <div><span style={lbl}>Exit date<AutoDot k="exit_date" /></span><input type="date" style={inputS} value={row.exit_date || ""} onChange={e => setField("exit_date", e.target.value)} /></div>
