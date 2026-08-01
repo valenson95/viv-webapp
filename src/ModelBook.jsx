@@ -1439,6 +1439,25 @@ const pbRich = (s) => esc(s)
   .replace(/\[b\]/g, "<b>").replace(/\[\/b\]/g, "</b>")
   .replace(/\[i\]/g, "<i>").replace(/\[\/i\]/g, "</i>");
 
+// PLAYBOOK_ROADMAP (Valen 2026-08-01): the six parts as one picture, before the contents.
+// His own teaching analogy — you are buying a house: check the weather, pick the neighbourhood,
+// pick the house, decide when to walk in, then look after what you own and stay solvent.
+// Icons are inline stroke-only SVG (24x24, currentColor) so they print flat and scale cleanly.
+const PLAYBOOK_ROADMAP = [
+  { no: "1", name: "Weather", line: "Is the market paying for breakouts right now?",
+    svg: `<circle cx="8.5" cy="8" r="3.4"/><path d="M8.5 1.6v1.6M8.5 12.8v1.6M2.9 8H1.3M15.7 8h-1.6M4.5 4l-1.1-1.1M13.6 13.1l-1.1-1.1"/><path d="M9 20.5h9a3.2 3.2 0 0 0 0-6.4 4.6 4.6 0 0 0-8.8-1.2A3.8 3.8 0 0 0 9 20.5z" fill="none"/>` },
+  { no: "2", name: "Neighbourhood", line: "Which sectors and themes is the money going into?",
+    svg: `<path d="M1.5 21h21"/><path d="M2.5 21v-6l3.5-3 3.5 3v6"/><path d="M10 21v-9l4-3.5 4 3.5v9"/><path d="M18 21v-4.5l2.5-2 2 1.6V21"/>` },
+  { no: "3", name: "The house", line: "Which chart patterns we buy — and what each must show.",
+    svg: `<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.8V21h14V9.8"/><path d="M10 21v-6.5h4V21"/>` },
+  { no: "4", name: "When to walk in", line: "The trigger, the size, the limits and the stop.",
+    svg: `<path d="M12.6 2.6h8.8v18.8h-8.8z"/><path d="M15.6 12h.01"/><path d="M2.4 12h7.4"/><path d="M6.9 8.6 10.3 12l-3.4 3.4"/>` },
+  { no: "5", name: "The campaign", line: "Take profit, trail the rest, add when it earns it.",
+    svg: `<path d="M2.5 21h19"/><path d="M4 21v-3.5h4V21"/><path d="M9.5 21v-7h4v7"/><path d="M15 21v-10.5h4V21"/><path d="M6 12.5 11.5 7l3.5 3.5L21 4"/><path d="M16.6 4H21v4.4"/>` },
+  { no: "6", name: "Survival", line: "Cut size in a losing streak, and stay in the game.",
+    svg: `<path d="M12 2.6v2"/><path d="M2.4 12.4a9.6 9.6 0 0 1 19.2 0z"/><path d="M12 12.4v6.6a2.4 2.4 0 0 0 4.8 0"/>` },
+];
+
 const PLAYBOOK_PARTS = [
   { num: "1", name: "Weather", folio: "Weather", toc: "Part 1 — Weather · read the market first", stats: "Read the market first · pieces 01–03", count: "3 pieces",
     blurb: "Before any chart, we check the conditions outside. Is this a market where breakouts work, or one where they get sold? The weather never picks the stock for you. It decides how big you trade and how patient you are for the rest of the day." },
@@ -2050,6 +2069,24 @@ export function openPlaybookBook() {
     <div class="pbmeta">Six parts · Weather to Survival · 2026</div>
     <div class="pbfoot pbcovfoot">Valen Insiders Vault · Educational — not financial advice</div>
   </div>`;
+  const roadmap = `<div class="page pbroadpage" id="roadmap">
+    <div class="pblabel">The roadmap</div>
+    <div class="pcH pbroadhead">Six questions, always in this order</div>
+    <div class="pcD pbroadintro">Think of it as buying a house. You check the weather before you go out, you pick the neighbourhood before the house, and you look at the house before you decide to walk in. Only then does anything get bought — and after that, the job is looking after what you own. Every piece in this book sits inside one of these six steps.</div>
+    <div class="pbroad">
+      ${PLAYBOOK_ROADMAP.map((r, i) => `
+        <div class="pbroadcell">
+          <div class="pbroadart">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${r.svg}</svg>
+            ${i < PLAYBOOK_ROADMAP.length - 1 ? `<span class="pbroadarrow">&#8594;</span>` : ""}
+          </div>
+          <div class="pcK pbroadno">Step ${esc(r.no)}</div>
+          <div class="pcH pbroadname">${esc(r.name)}</div>
+          <div class="pcD pbroadline">${esc(r.line)}</div>
+        </div>`).join("")}
+    </div>
+    <div class="pbfoot">Steps 1 to 3 decide what you look at. Step 4 decides whether you buy. Steps 5 and 6 decide what you keep.</div>
+  </div>`;
   const contents = `<div class="page pbcontents">
     <div class="pblabel">Contents · 21 Building Blocks to Profitability</div>
     ${PLAYBOOK_PARTS.map((part, pi) => {
@@ -2062,7 +2099,7 @@ export function openPlaybookBook() {
       <a class="pbcrow" href="#indicators"><span class="pbcno">—</span><span class="pbctk">The instrument panel</span><span class="pbctheme">five indicators, and the rule each one serves</span><span class="pbcdots"></span></a>
       <a class="pbcrow" href="#card"><span class="pbcno">—</span><span class="pbctk">The one-page card</span><span class="pbctheme">everything you check before the click</span><span class="pbcdots"></span></a>
     </div>
-    <div class="pbfoot">Twenty-one pieces · six parts · the system, front to back.</div>
+    <div class="pbfoot">Twenty-one pieces · six parts · the system, front to back. The roadmap on the previous page shows how they fit together.</div>
   </div>`;
   const body = PLAYBOOK_PARTS.map((part, pi) => {
     const inPart = PLAYBOOK_PIECES.filter((pc) => pc.part === pi);
@@ -2246,6 +2283,21 @@ export function openPlaybookBook() {
       .pbtake{margin-top:36px;padding-top:18px;max-width:62ch}
       .pbtakel{font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase}
       .pbtaket{font-size:1.02rem;font-weight:600;line-height:1.6;margin-top:10px}
+      .pbroadpage{max-width:1060px}
+      .pbroadhead{font-size:1.6rem;font-weight:700;line-height:1.25;margin-top:10px}
+      .pbroadintro{font-size:1rem;line-height:1.75;margin-top:14px;max-width:68ch}
+      .pbroad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:44px 34px;margin-top:46px}
+      .pbroadcell{position:relative;min-width:0}
+      .pbroadart{position:relative;display:flex;align-items:center;height:62px}
+      .pbroadart svg{width:46px;height:46px;color:#c9982a;flex:none}
+      body.light .pbroadart svg{color:#8a6a1c}
+      .pbroadarrow{position:absolute;right:-24px;top:50%;transform:translateY(-50%);font-size:1rem;opacity:0.28}
+      .pbroad .pbroadcell:nth-child(3n) .pbroadarrow{display:none}
+      .pbroadno{font-size:0.62rem;letter-spacing:0.18em;margin-top:16px}
+      .pbroadname{font-size:1.16rem;font-weight:700;line-height:1.3;margin-top:8px}
+      .pbroadline{font-size:0.93rem;line-height:1.6;margin-top:8px;max-width:34ch}
+      @media(max-width:760px){.pbroad{grid-template-columns:repeat(2,minmax(0,1fr))}.pbroad .pbroadcell:nth-child(3n) .pbroadarrow{display:inline}.pbroad .pbroadcell:nth-child(2n) .pbroadarrow{display:none}}
+      @media print{.pbroadcell{break-inside:avoid;page-break-inside:avoid}}
       .pbind{margin-top:34px;padding-top:22px;border-top:1px solid rgba(255,255,255,0.08);max-width:70ch}
       body.light .pbind{border-top-color:rgba(23,21,15,0.12)}
       .pbindno{font-size:0.64rem;letter-spacing:0.16em}
@@ -2288,6 +2340,7 @@ export function openPlaybookBook() {
       <button onclick="window.print()">⬇ Save as PDF</button>
     </div>
     ${cover}
+    ${roadmap}
     ${contents}
     ${body}
     ${indicators}
