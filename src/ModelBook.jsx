@@ -2073,7 +2073,6 @@ export function openPlaybookBook() {
     <h1 class="pbtitle">21 Building Blocks to Profitability</h1>
     <div class="pbrule"></div>
     <div class="pbmeta">Six parts · from the weather to keeping the roof on · 2026</div>
-    <div class="pbfoot pbcovfoot">Valen Insiders Vault · Educational — not financial advice</div>
   </div>`;
   const flowChev = `<svg class="pbflowchev" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1.5 6 6.5 11 1.5"/></svg>`;
   const roadArt = `<div class="pbroadart" aria-hidden="true">
@@ -2274,7 +2273,6 @@ export function openPlaybookBook() {
       .pbcover .pbtitle{color:#c9982a}
       body.light .pbcover .pbtitle{color:#8a6a1c}
       .pbmeta{font-size:0.9rem;color:#9a968c;letter-spacing:0.01em}
-      .pbcovfoot{margin-top:38px;font-size:0.72rem}
       /* ── CONTENTS ── */
       .pbcgroup{margin-top:26px}
       .pbcyear{font-size:0.66rem;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#c9982a;margin-bottom:12px}
