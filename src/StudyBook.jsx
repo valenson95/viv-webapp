@@ -2085,7 +2085,12 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     // relies on for campaign_id); the folded values below then overwrite with the freshly-derived ones.
     // Ticker→project defaults (Valen 2026-07-31): a blank project on a chronicled ticker auto-joins
     // its chronicle. His explicit pick always wins — this only fills the empty field.
-    const defProject = !s.project && DEFAULT_TICKER_PROJECT[row.ticker.trim().toUpperCase()];
+    // Canonicalize near-miss project strings too (dash/spacing variants drift back from stale
+    // editor tabs — 8 rows fell out of the dive this way on 2026-07-31): if the typed project
+    // loosely matches the ticker's chronicle, snap to the canonical string.
+    const canon = DEFAULT_TICKER_PROJECT[row.ticker.trim().toUpperCase()];
+    const loose = (x) => (x || "").toLowerCase().replace(/[\u2014\u2013-]/g, " ").replace(/\s+/g, " ").trim();
+    const defProject = canon && (!s.project || loose(s.project) === loose(canon)) ? canon : null;
     return { ...bodyRow,
       before_img: derived.before_img || null,
       after_img: derived.after_img || null,

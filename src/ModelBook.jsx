@@ -971,22 +971,20 @@ function openProjectBookPdf(rows, coverTitle) {
       };
       
       const folio = `<div class="pbfolio"><span>${esc(coverTitle)}</span><span>No. ${String(idx + 1).padStart(2, "0")} / ${String(rows.length).padStart(2, "0")} · ${esc(yearOf(r))}</span></div>`;
-      // ── CHRONICLE PAGE v3.1 (Valen 2026-07-31): faithful nick grid, THEME-AWARE.
-      // All text colors via .pcH/.pcM/.pcD classes (body.light overrides recolor the whole page);
-      // type scale measured off his live render: role titles ~1.4rem/700, subtitles ~0.92rem,
-      // body 1.06rem/1.8, hairline rules separating every block. Plain-words labels throughout.
+      // ── CHRONICLE PAGE v4 (Valen-approved direction 2026-07-31, shipped to judge live):
+      // hero = THE SETUP only; Context+Outcome and Criteria live in inline expanders (auto-open on
+      // print so the PDF keeps all charts). Thesis = the study's headline; hairline + kicker restart
+      // separate studies. Revert = git revert of this commit restores the 3-chart inline layout.
       if (!isMB) {
         const scored = def.buckets.flatMap((b) => b.items).filter((it) => it[2] !== "bonus");
-        const tickN = scored.filter(([k]) => study.checks?.[k]).length;
-        // Per-slot timeframes read from HIS charts (study.tf = {context,setup,outcome}, agent-extracted
-        // 2026-07-31): subtitles state the REAL timeframe — some contexts are daily, some setups 5-minute.
+        const ticked = def.buckets.flatMap((b) => b.items).filter((it) => it[2] !== "bonus" && study.checks?.[it[0]]);
         const TFWORD = { "1M": "monthly", "1W": "weekly", "1D": "daily", "60m": "hourly", "30m": "30-minute", "15m": "15-minute", "5m": "5-minute", "1m": "1-minute" };
         const tfOf = (slot, fallback) => TFWORD[(study.tf || {})[slot]] || fallback;
-        const chartBlock2 = (img, title, sub) => img ? `
-          <div class="pcRule" style="margin:44px 0 0;padding-top:34px">
-            <div class="pcH" style="font-size:1.4rem;font-weight:700;letter-spacing:-0.015em;line-height:1.2">${title}</div>
+        const chartBlock2 = (img, title, sub, top) => img ? `
+          <div class="${top ? "" : "pcRule"}" style="margin:${top ? "30px" : "34px"} 0 0;${top ? "" : "padding-top:30px"}">
+            <div class="pcH" style="font-size:1.35rem;font-weight:700;letter-spacing:-0.015em;line-height:1.2">${title}</div>
             ${sub ? `<div class="pcD" style="font-size:0.92rem;margin-top:5px">${sub}</div>` : ""}
-            <span class="pbchartwrap" style="display:block;margin-top:18px"><img class="pcCard" src="${esc(img)}" style="width:100%;display:block"/></span>
+            <span class="pbchartwrap" style="display:block;margin-top:16px"><img class="pcCard" src="${esc(img)}" style="width:100%;display:block"/></span>
           </div>` : "";
         const stat = (k, v) => (v == null || v === "") ? "" : `<span style="white-space:nowrap"><span class="pcD">${k}</span>&nbsp; <span class="pcH" style="font-weight:600">${v}</span></span>`;
         const sgn = (x) => `${+x >= 0 ? "+" : ""}${esc(x)}%`;
@@ -994,25 +992,30 @@ function openProjectBookPdf(rows, coverTitle) {
         const stats = [
           stat("Day one", m.day_pct != null ? sgn(m.day_pct) : null),
           stat("Volume", m.rvol_eod != null ? `${esc(m.rvol_eod)}\u00d7 normal` : null),
-          stat("Gap", m.gap_pct != null ? sgn(m.gap_pct) : null),
           stat(study.direction === "short" ? "Fall after the break" : "Peak gain", pkv),
           stat("After 20 days", m.t20 != null ? sgn(m.t20) : null),
-        ].filter(Boolean).join(`<span class="pcDot" style="margin:0 16px">\u00b7</span>`);
-        return `<div class="page pbstudy" id="e${idx}" style="max-width:1060px">
+        ].filter(Boolean).join(`<span class="pcDot" style="margin:0 14px">\u00b7</span>`);
+        const headline = r.thesis || `${study.setup}${study.direction === "short" ? ", short side" : ""} \u2014 ${esc(r.entry_date || "")}`;
+        const supporting = [
+          chartBlock2(r.before_img, "Context", `${esc(r.ticker)} ${tfOf("context", "weekly")} \u00b7 the bigger picture going into the trade`, true),
+          chartBlock2(study.outcome_img, "The outcome", `${esc(r.ticker)} ${tfOf("outcome", "daily")} \u00b7 the same story, weeks later`, false),
+        ].filter(Boolean).join("");
+        const nSupport = [r.before_img, study.outcome_img].filter(Boolean).length;
+        const critList = ticked.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 26px;margin:18px 0 0">${ticked.map((it) => `<div class="pcM" style="font-size:0.86rem;line-height:1.5">\u2713&nbsp; ${esc(it[1])}</div>`).join("")}</div>` : "";
+        return `<div class="page pbstudy pcRule" id="e${idx}" style="max-width:1060px">
           <div style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:52px">
             <div>
               <div class="pcD" style="font-family:'Geist Mono',monospace;font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase">Study ${String(idx + 1).padStart(2, "0")} of ${String(rows.length).padStart(2, "0")}</div>
               <div class="pcH" style="font-size:1.02rem;font-weight:650;line-height:1.4;margin-top:12px">${esc(r.entry_date || "")}</div>
               <div class="pcM" style="font-size:0.82rem;margin-top:6px;line-height:1.5">${esc(study.setup)}${study.direction === "short" ? " \u00b7 short side" : ""}</div>
-              ${tickN ? `<div class="pcD" style="font-size:0.78rem;margin-top:16px">${tickN} of ${scored.length} criteria met \u2713</div>` : ""}
             </div>
             <div style="min-width:0">
-              ${r.thesis ? `<div class="pcH" style="font-size:1.18rem;font-weight:650;line-height:1.5;margin:0 0 18px;letter-spacing:-0.008em">${esc(r.thesis)}</div>` : ""}
+              <div class="pcH" style="font-size:1.5rem;font-weight:700;line-height:1.3;letter-spacing:-0.015em;margin:0 0 16px">${esc(headline)}</div>
               ${study.annotation ? `<div class="pcM" style="font-size:1.06rem;line-height:1.8;max-width:62ch">${esc(study.annotation)}</div>` : ""}
-              ${chartBlock2(r.before_img, "Context", `${esc(r.ticker)} ${tfOf("context", "weekly")} \u00b7 the bigger picture going into the trade`)}
-              ${chartBlock2(r.after_img, "The setup", `${esc(r.ticker)} ${tfOf("setup", "daily")} \u00b7 ${(study.tf || {}).setup && ["5m","1m","15m","30m","60m"].includes(study.tf.setup) ? `the trigger day up close, ${esc(r.entry_date || "")}` : `the last candle is the trigger day, ${esc(r.entry_date || "")}`}`)}
-              ${chartBlock2(study.outcome_img, "The outcome", `${esc(r.ticker)} ${tfOf("outcome", "daily")} \u00b7 the same story, weeks later`)}
-              ${stats ? `<div class="pcRule pcD" style="font-family:'Geist Mono',monospace;font-size:0.78rem;margin:36px 0 0;padding-top:22px">${stats}</div>` : ""}
+              ${chartBlock2(r.after_img, "The setup", `${esc(r.ticker)} ${tfOf("setup", "daily")} \u00b7 ${(study.tf || {}).setup && ["5m","1m","15m","30m","60m"].includes(study.tf.setup) ? `the trigger day up close, ${esc(r.entry_date || "")}` : `the last candle is the trigger day, ${esc(r.entry_date || "")}`}`, true)}
+              ${stats ? `<div class="pcD" style="font-family:'Geist Mono',monospace;font-size:0.78rem;margin:22px 0 0">${stats}</div>` : ""}
+              ${nSupport ? `<details class="pcExp"><summary class="pcM">Context &amp; outcome \u00b7 ${nSupport} more chart${nSupport > 1 ? "s" : ""}</summary>${supporting}</details>` : ""}
+              ${ticked.length ? `<details class="pcExp"><summary class="pcM">Criteria \u00b7 ${ticked.length} of ${scored.length} met \u2713</summary>${critList}</details>` : ""}
             </div>
           </div>
           ${folio}
@@ -1111,6 +1114,24 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pcRule{border-top-color:rgba(23,21,15,0.12)}
       body.light .pcCard{border-color:rgba(23,21,15,0.14);background:#efece4}
       body.light .pcDot{color:rgba(23,21,15,0.2)}
+      /* .chron — full monochrome for chronicle books (Valen 2026-07-31: one design language, no
+         brand gold; Market Bottom keeps its approved look — this scopes to non-MB books only) */
+      .chron .pbbrand,.chron .pfn,.chron .pfdefk,.chron .pfrown,.chron .pbcyear,.chron .pbhid,.chron .pbtsec,.chron .pbepcount,.chron .pbthesis .pblabel{color:#7f7c74}
+      .chron .pfcy,.chron .pfpull,.chron .pbcret,.chron .pbvbarstat,.chron .pbvpill.g,.chron .pbpill-r{color:#ececea}
+      .chron .pbrule{background:rgba(255,255,255,0.3)}
+      .chron .pfdef{border-left-color:rgba(255,255,255,0.28)}
+      .chron .pbtfill{background:rgba(255,255,255,0.42)}
+      .chron .pbtkg{color:#9a978f}
+      body.light.chron .pbbrand,body.light.chron .pfn,body.light.chron .pfdefk,body.light.chron .pfrown,body.light.chron .pbcyear,body.light.chron .pbhid,body.light.chron .pbtsec,body.light.chron .pbepcount,body.light.chron .pbthesis .pblabel{color:#8a857a}
+      body.light.chron .pfcy,body.light.chron .pfpull,body.light.chron .pbcret,body.light.chron .pbvbarstat,body.light.chron .pbvpill.g,body.light.chron .pbpill-r{color:#17150f}
+      body.light.chron .pbrule{background:rgba(23,21,15,0.3)}
+      body.light.chron .pfdef{border-left-color:rgba(23,21,15,0.25)}
+      body.light.chron .pbtfill{background:rgba(23,21,15,0.4)}
+      .pcExp{margin:26px 0 0}
+      .pcExp>summary{cursor:pointer;list-style:none;font-size:0.88rem;user-select:none}
+      .pcExp>summary::-webkit-details-marker{display:none}
+      .pcExp>summary::before{content:"\\25B8\\00a0 ";font-size:0.8em}
+      .pcExp[open]>summary::before{content:"\\25BE\\00a0 "}
       /* ── COVER ── (no gradient washes — print rasterizes them with visible banding) */
       .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
       .pblogo{height:54px;width:auto;align-self:flex-start;margin-bottom:20px}
@@ -1322,7 +1343,7 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pbnote{color:#45433c}
       body.light .pbdivnote{color:#55534a}
       body.light .pbnoimgbox{border-color:rgba(0,0,0,0.16);color:#8a857a}
-    </style></head><body>
+    </style></head><body class="${isMB ? "" : "chron"}">
     <div class="toolbar">
       <button class="ghost" onclick="const l=document.body.classList.toggle('light');this.textContent=l?'🌙 Dark theme':'☀ Light theme'">☀ Light theme</button>
       <button class="ghost" onclick="const ds=[...document.querySelectorAll('details')];const open=ds.some(d=>!d.open);ds.forEach(d=>d.open=open);this.textContent=open?'⊟ Collapse all':'⊞ Expand all'">⊞ Expand all</button>
@@ -1341,7 +1362,9 @@ function openProjectBookPdf(rows, coverTitle) {
       if(e.target.closest('#zoomov')){ov.style.display='none';return;}
       const im=e.target.closest('.pbchartwrap img, .pfcell img');if(!im)return;
       document.getElementById('zoomim').src=im.src;ov.style.display='flex';});
-    document.addEventListener('keydown',(e)=>{if(e.key==='Escape')document.getElementById('zoomov').style.display='none';});</script>
+    document.addEventListener('keydown',(e)=>{if(e.key==='Escape')document.getElementById('zoomov').style.display='none';});
+    window.addEventListener('beforeprint',()=>{document.querySelectorAll('details.pcExp').forEach(d=>{d.dataset.w=d.open?'1':'';d.open=true;});});
+    window.addEventListener('afterprint',()=>{document.querySelectorAll('details.pcExp').forEach(d=>{d.open=d.dataset.w==='1';});});</script>
     </body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
   const w = window.open(url, "_blank");
