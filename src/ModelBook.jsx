@@ -2031,11 +2031,12 @@ export function openPlaybookBook() {
         return `<div class="pblist">${b.ul.map((x) =>
           `<div class="pbli"><span class="pcTick">—</span><div class="pcM">${pbRich(x)}</div></div>`).join("")}</div>`;
       }).join("");
-      return `<div class="page pbpiece" id="p${esc(pc.no)}" style="max-width:1060px">
+      return `<div class="page pbpiece pcRule" id="p${esc(pc.no)}" style="max-width:1060px">
         <div class="pbgrid">
           <div>
             <div class="pcK pbkick">Piece ${esc(pc.no)} of ${N}</div>
             <div class="pcH pbpart">${esc(part.name)}</div>
+            <div class="pbpmark"></div>
           </div>
           <div style="min-width:0">
             <div class="pcH pbhead">${esc(pc.title)}</div>
@@ -2050,7 +2051,7 @@ export function openPlaybookBook() {
     }).join("");
     return divider + pieces;
   }).join("");
-  const card = `<div class="page pbpiece" id="card" style="max-width:1060px">
+  const card = `<div class="page pbpiece pcRule" id="card" style="max-width:1060px">
     <div class="pbgrid">
       <div>
         <div class="pcK pbkick">Appendix</div>
@@ -2126,7 +2127,7 @@ export function openPlaybookBook() {
       .pbdivnote{font-size:0.85rem;color:#b9b5aa;line-height:1.72;margin-top:18px;max-width:54ch}
       .pbepcount{font-size:0.62rem;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:#c9982a;margin-top:16px}
       /* ── PIECE PAGES (chronicle v4 editorial grid) ── */
-      .pbpiece{position:relative;display:flex;flex-direction:column;padding-bottom:74px}
+      .pbpiece{position:relative;display:flex;flex-direction:column;padding-top:66px;padding-bottom:74px}
       .pbgrid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:52px}
       @media(max-width:760px){.pbgrid{grid-template-columns:1fr;gap:20px}}
       .pbkick{font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase}
@@ -2140,6 +2141,8 @@ export function openPlaybookBook() {
       .pbli{display:flex;gap:12px;max-width:62ch;margin-top:13px}
       .pbli .pcTick{flex:none;line-height:1.8}
       .pbli .pcM{font-size:1.02rem;line-height:1.8}
+      .pbpmark{width:26px;height:2px;background:#c9982a;margin:16px 0 0;opacity:0.75}
+      body.light .pbpmark{background:#8a6a1c}
       .pbfig{margin:24px 0 0}
       .zoomov{display:none;position:fixed;inset:0;z-index:60;background:rgba(4,4,8,0.95);align-items:center;justify-content:center;padding:2vh 2vw;cursor:zoom-out}
       .zoomov img{max-width:100%;max-height:100%;object-fit:contain}
