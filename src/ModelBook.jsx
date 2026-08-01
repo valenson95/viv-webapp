@@ -978,6 +978,10 @@ function openProjectBookPdf(rows, coverTitle) {
       if (!isMB) {
         const scored = def.buckets.flatMap((b) => b.items).filter((it) => it[2] !== "bonus");
         const tickN = scored.filter(([k]) => study.checks?.[k]).length;
+        // Per-slot timeframes read from HIS charts (study.tf = {context,setup,outcome}, agent-extracted
+        // 2026-07-31): subtitles state the REAL timeframe — some contexts are daily, some setups 5-minute.
+        const TFWORD = { "1M": "monthly", "1W": "weekly", "1D": "daily", "60m": "hourly", "30m": "30-minute", "15m": "15-minute", "5m": "5-minute", "1m": "1-minute" };
+        const tfOf = (slot, fallback) => TFWORD[(study.tf || {})[slot]] || fallback;
         const chartBlock2 = (img, title, sub) => img ? `
           <div class="pcRule" style="margin:44px 0 0;padding-top:34px">
             <div class="pcH" style="font-size:1.4rem;font-weight:700;letter-spacing:-0.015em;line-height:1.2">${title}</div>
@@ -1005,9 +1009,9 @@ function openProjectBookPdf(rows, coverTitle) {
             <div style="min-width:0">
               ${r.thesis ? `<div class="pcH" style="font-size:1.18rem;font-weight:650;line-height:1.5;margin:0 0 18px;letter-spacing:-0.008em">${esc(r.thesis)}</div>` : ""}
               ${study.annotation ? `<div class="pcM" style="font-size:1.06rem;line-height:1.8;max-width:62ch">${esc(study.annotation)}</div>` : ""}
-              ${chartBlock2(r.before_img, "Context", `${esc(r.ticker)} weekly \u00b7 the bigger picture going into the trade`)}
-              ${chartBlock2(r.after_img, "The setup", `${esc(r.ticker)} daily \u00b7 the last candle is the trigger day, ${esc(r.entry_date || "")}`)}
-              ${chartBlock2(study.outcome_img, "The outcome", `${esc(r.ticker)} daily \u00b7 the same chart, weeks later`)}
+              ${chartBlock2(r.before_img, "Context", `${esc(r.ticker)} ${tfOf("context", "weekly")} \u00b7 the bigger picture going into the trade`)}
+              ${chartBlock2(r.after_img, "The setup", `${esc(r.ticker)} ${tfOf("setup", "daily")} \u00b7 ${(study.tf || {}).setup && ["5m","1m","15m","30m","60m"].includes(study.tf.setup) ? `the trigger day up close, ${esc(r.entry_date || "")}` : `the last candle is the trigger day, ${esc(r.entry_date || "")}`}`)}
+              ${chartBlock2(study.outcome_img, "The outcome", `${esc(r.ticker)} ${tfOf("outcome", "daily")} \u00b7 the same story, weeks later`)}
               ${stats ? `<div class="pcRule pcD" style="font-family:'Geist Mono',monospace;font-size:0.78rem;margin:36px 0 0;padding-top:22px">${stats}</div>` : ""}
             </div>
           </div>
