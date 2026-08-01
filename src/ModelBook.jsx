@@ -1444,18 +1444,24 @@ const pbRich = (s) => esc(s)
 // pick the house, decide when to walk in, then look after what you own and stay solvent.
 // Icons are inline stroke-only SVG (24x24, currentColor) so they print flat and scale cleanly.
 const PLAYBOOK_ROADMAP = [
-  { no: "1", name: "Weather", line: "Is the market paying for breakouts right now?",
-    svg: `<circle cx="8.5" cy="8" r="3.4"/><path d="M8.5 1.6v1.6M8.5 12.8v1.6M2.9 8H1.3M15.7 8h-1.6M4.5 4l-1.1-1.1M13.6 13.1l-1.1-1.1"/><path d="M9 20.5h9a3.2 3.2 0 0 0 0-6.4 4.6 4.6 0 0 0-8.8-1.2A3.8 3.8 0 0 0 9 20.5z" fill="none"/>` },
-  { no: "2", name: "Neighbourhood", line: "Which sectors and themes is the money going into?",
-    svg: `<path d="M1.5 21h21"/><path d="M2.5 21v-6l3.5-3 3.5 3v6"/><path d="M10 21v-9l4-3.5 4 3.5v9"/><path d="M18 21v-4.5l2.5-2 2 1.6V21"/>` },
-  { no: "3", name: "The house", line: "Which chart patterns we buy — and what each must show.",
-    svg: `<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.8V21h14V9.8"/><path d="M10 21v-6.5h4V21"/>` },
-  { no: "4", name: "When to walk in", line: "The trigger, the size, the limits and the stop.",
-    svg: `<path d="M12.6 2.6h8.8v18.8h-8.8z"/><path d="M15.6 12h.01"/><path d="M2.4 12h7.4"/><path d="M6.9 8.6 10.3 12l-3.4 3.4"/>` },
-  { no: "5", name: "The campaign", line: "Take profit, trail the rest, add when it earns it.",
-    svg: `<path d="M2.5 21h19"/><path d="M4 21v-3.5h4V21"/><path d="M9.5 21v-7h4v7"/><path d="M15 21v-10.5h4V21"/><path d="M6 12.5 11.5 7l3.5 3.5L21 4"/><path d="M16.6 4H21v4.4"/>` },
-  { no: "6", name: "Survival", line: "Cut size in a losing streak, and stay in the game.",
-    svg: `<path d="M12 2.6v2"/><path d="M2.4 12.4a9.6 9.6 0 0 1 19.2 0z"/><path d="M12 12.4v6.6a2.4 2.4 0 0 0 4.8 0"/>` },
+  { phase: "What you look at", steps: [
+    { no: "1", name: "Weather", line: "Is the market paying for breakouts right now?",
+      svg: `<circle cx="15.8" cy="7.2" r="3.3"/><path d="M15.8 1.4v1.5M21.6 7.2h1.5M19.9 3.1l-1.1 1.1M19.9 11.3l-1.1-1.1"/><path d="M6 20.6h9.2a3.7 3.7 0 0 0 .2-7.4 5.1 5.1 0 0 0-9.8-.5A3.95 3.95 0 0 0 6 20.6z" fill="currentColor" fill-opacity="0.15"/>` },
+    { no: "2", name: "Neighbourhood", line: "Which sectors and themes is the money going into?",
+      svg: `<path d="M1.4 21.2h21.2"/><path d="M2.8 21.2v-5.9l2.9-2.4 2.9 2.4v5.9"/><path d="M10.1 21.2V9.4l3.4-2.9 3.4 2.9v11.8z" fill="currentColor" fill-opacity="0.18"/><path d="M18.9 21.2v-4.3l1.8-1.5 1.6 1.3v4.5"/>` },
+    { no: "3", name: "The house", line: "Which chart patterns we buy — and what each must show.",
+      svg: `<path d="M2.6 10.8 12 3l9.4 7.8"/><path d="M4.8 9.9V21.2h14.4V9.9"/><path d="M9.6 21.2v-6.7h4.8v6.7z" fill="currentColor" fill-opacity="0.2"/>` },
+  ] },
+  { phase: "Whether you buy", steps: [
+    { no: "4", name: "When to walk in", line: "The trigger, the size, the limits and the stop.",
+      svg: `<path d="M12.6 2.6h8.8v18.6h-8.8z" fill="currentColor" fill-opacity="0.14"/><path d="M15.4 12h.01"/><path d="M2.4 12h7.6"/><path d="M6.9 8.5 10.4 12l-3.5 3.5"/>` },
+  ] },
+  { phase: "What you keep", steps: [
+    { no: "5", name: "The campaign", line: "Take profit, trail the rest, add when it earns it.",
+      svg: `<path d="M1.8 21.2h20.4"/><path d="M3.4 21.2v-4.6h3.4v4.6"/><path d="M9.1 21.2v-8.1h3.4v8.1z" fill="currentColor" fill-opacity="0.2"/><path d="M14.8 21.2v-5.4h3.4v5.4"/><path d="M4 12.4 8.2 8.2l3 2.8 6.4-6.6"/><path d="M13.9 4.4h3.9v3.9"/>` },
+    { no: "6", name: "Survival", line: "Cut size in a losing streak, and stay in the game.",
+      svg: `<path d="M12 1.6v2.3"/><path d="M2.5 12.7a9.5 9.5 0 0 1 19 0z" fill="currentColor" fill-opacity="0.16"/><path d="M12 12.7v6.1a2.35 2.35 0 0 0 4.7 0"/><path d="M5.1 16.4v1.5M7.6 19.2v1.5"/>` },
+  ] },
 ];
 
 const PLAYBOOK_PARTS = [
@@ -2069,21 +2075,29 @@ export function openPlaybookBook() {
     <div class="pbmeta">Six parts · Weather to Survival · 2026</div>
     <div class="pbfoot pbcovfoot">Valen Insiders Vault · Educational — not financial advice</div>
   </div>`;
+  const flowChev = `<svg class="pbflowchev" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1.5 6 6.5 11 1.5"/></svg>`;
   const roadmap = `<div class="page pbroadpage" id="roadmap">
     <div class="pblabel">The roadmap</div>
     <div class="pcH pbroadhead">Six questions, always in this order</div>
     <div class="pcD pbroadintro">Think of it as buying a house. You check the weather before you go out, you pick the neighbourhood before the house, and you look at the house before you decide to walk in. Only then does anything get bought — and after that, the job is looking after what you own. Every piece in this book sits inside one of these six steps.</div>
-    <div class="pbroad">
-      ${PLAYBOOK_ROADMAP.map((r, i) => `
-        <div class="pbroadcell">
-          <div class="pbroadart">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${r.svg}</svg>
-            ${i < PLAYBOOK_ROADMAP.length - 1 ? `<span class="pbroadarrow">&#8594;</span>` : ""}
-          </div>
-          <div class="pcK pbroadno">Step ${esc(r.no)}</div>
-          <div class="pcH pbroadname">${esc(r.name)}</div>
-          <div class="pcD pbroadline">${esc(r.line)}</div>
-        </div>`).join("")}
+    <div class="pbflow">
+      ${PLAYBOOK_ROADMAP.map((group, gi) => {
+        const steps = group.steps.map((r, si) => {
+          const isLast = gi === PLAYBOOK_ROADMAP.length - 1 && si === group.steps.length - 1;
+          const conn = isLast ? "" : `<div class="pbflowconn"><span class="pbflowline"></span>${flowChev}</div>`;
+          return `<div class="pbflowstep">
+            <div class="pbflownode">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">${r.svg}</svg>
+              <span class="pbflowbadge">${esc(r.no)}</span>
+            </div>
+            <div class="pbflowbody">
+              <div class="pcH pbflowname">${esc(r.name)}</div>
+              <div class="pcD pbflowline2">${esc(r.line)}</div>
+            </div>
+          </div>${conn}`;
+        }).join("");
+        return `<div class="pbflowphase"><span class="pbflowphaselabel">${esc(group.phase)}</span><span class="pbflowphaserule"></span></div>${steps}`;
+      }).join("")}
     </div>
     <div class="pbfoot">Steps 1 to 3 decide what you look at. Step 4 decides whether you buy. Steps 5 and 6 decide what you keep.</div>
   </div>`;
@@ -2285,19 +2299,48 @@ export function openPlaybookBook() {
       .pbtaket{font-size:1.02rem;font-weight:600;line-height:1.6;margin-top:10px}
       .pbroadpage{max-width:1060px}
       .pbroadhead{font-size:1.6rem;font-weight:700;line-height:1.25;margin-top:10px}
-      .pbroadintro{font-size:1rem;line-height:1.75;margin-top:14px;max-width:68ch}
-      .pbroad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:44px 34px;margin-top:46px}
-      .pbroadcell{position:relative;min-width:0}
-      .pbroadart{position:relative;display:flex;align-items:center;height:62px}
-      .pbroadart svg{width:46px;height:46px;color:#c9982a;flex:none}
-      body.light .pbroadart svg{color:#8a6a1c}
-      .pbroadarrow{position:absolute;right:-24px;top:50%;transform:translateY(-50%);font-size:1rem;opacity:0.28}
-      .pbroad .pbroadcell:nth-child(3n) .pbroadarrow{display:none}
-      .pbroadno{font-size:0.62rem;letter-spacing:0.18em;margin-top:16px}
-      .pbroadname{font-size:1.16rem;font-weight:700;line-height:1.3;margin-top:8px}
-      .pbroadline{font-size:0.93rem;line-height:1.6;margin-top:8px;max-width:34ch}
-      @media(max-width:760px){.pbroad{grid-template-columns:repeat(2,minmax(0,1fr))}.pbroad .pbroadcell:nth-child(3n) .pbroadarrow{display:inline}.pbroad .pbroadcell:nth-child(2n) .pbroadarrow{display:none}}
-      @media print{.pbroadcell{break-inside:avoid;page-break-inside:avoid}}
+      .pbroadintro{font-size:0.98rem;line-height:1.7;margin-top:12px;max-width:70ch}
+      .pbflow{margin-top:32px;max-width:660px}
+      .pbflowphase{display:grid;grid-template-columns:64px minmax(0,1fr);gap:26px;align-items:center;margin:22px 0 12px}
+      .pbflowphase:first-child{margin-top:0}
+      .pbflowphaselabel{grid-column:2;font-family:'Geist Mono',ui-monospace,monospace;font-size:0.6rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:#c9982a;white-space:nowrap}
+      body.light .pbflowphaselabel{color:#8a6a1c}
+      .pbflowphaserule{grid-column:2;display:none}
+      .pbflowstep{display:grid;grid-template-columns:64px minmax(0,1fr);gap:26px;align-items:center}
+      .pbflownode{position:relative;width:64px;height:64px;border-radius:50%;border:1px solid rgba(201,152,42,0.38);background:rgba(201,152,42,0.05);display:flex;align-items:center;justify-content:center;color:#c9982a}
+      body.light .pbflownode{border-color:rgba(138,106,28,0.36);background:rgba(138,106,28,0.05);color:#8a6a1c}
+      .pbflownode svg{width:30px;height:30px}
+      .pbflowbadge{position:absolute;top:-3px;right:-3px;width:19px;height:19px;border-radius:50%;background:#c9982a;color:#0a0a0f;font-family:'Geist Mono',ui-monospace,monospace;font-size:0.62rem;font-weight:600;display:flex;align-items:center;justify-content:center;line-height:1}
+      body.light .pbflowbadge{background:#8a6a1c;color:#fbfaf7}
+      .pbflowname{font-size:1.2rem;font-weight:700;line-height:1.25}
+      .pbflowline2{font-size:0.95rem;line-height:1.6;margin-top:6px;max-width:46ch}
+      .pbflowconn{width:64px;display:flex;flex-direction:column;align-items:center;padding:5px 0}
+      .pbflowline{width:1px;height:19px;background:rgba(201,152,42,0.32)}
+      body.light .pbflowline{background:rgba(138,106,28,0.32)}
+      .pbflowchev{width:12px;height:8px;margin-top:3px;color:rgba(201,152,42,0.62)}
+      body.light .pbflowchev{color:rgba(138,106,28,0.62)}
+      @media(max-width:620px){.pbflowphase,.pbflowstep{grid-template-columns:54px minmax(0,1fr);gap:18px}.pbflownode{width:54px;height:54px}.pbflownode svg{width:26px;height:26px}.pbflowconn{width:54px}}
+      @media print{.pbflowstep,.pbflowphase{break-inside:avoid;page-break-inside:avoid}}
+      @media screen and (prefers-reduced-motion: no-preference){
+        @keyframes pbflowin{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+        @keyframes pbflowdraw{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+        .pbflow .pbflowphase,.pbflow .pbflowstep{animation:pbflowin .45s cubic-bezier(.2,.7,.3,1) backwards}
+        .pbflow .pbflowline{transform-origin:top;animation:pbflowdraw .3s linear backwards}
+        .pbflow .pbflowchev{animation:pbflowin .3s ease-out backwards}
+        .pbflow > *:nth-child(1){animation-delay:.05s}
+        .pbflow > *:nth-child(2){animation-delay:.20s}
+        .pbflow > *:nth-child(3){animation-delay:.38s}
+        .pbflow > *:nth-child(4){animation-delay:.53s}
+        .pbflow > *:nth-child(5){animation-delay:.71s}
+        .pbflow > *:nth-child(6){animation-delay:.86s}
+        .pbflow > *:nth-child(7){animation-delay:1.04s}
+        .pbflow > *:nth-child(8){animation-delay:1.19s}
+        .pbflow > *:nth-child(9){animation-delay:1.37s}
+        .pbflow > *:nth-child(10){animation-delay:1.52s}
+        .pbflow > *:nth-child(11){animation-delay:1.70s}
+        .pbflow > *:nth-child(12){animation-delay:1.85s}
+        .pbflow .pbflowconn .pbflowline{animation-delay:inherit}
+      }
       .pbind{margin-top:34px;padding-top:22px;border-top:1px solid rgba(255,255,255,0.08);max-width:70ch}
       body.light .pbind{border-top-color:rgba(23,21,15,0.12)}
       .pbindno{font-size:0.64rem;letter-spacing:0.16em}
