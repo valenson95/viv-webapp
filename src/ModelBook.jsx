@@ -138,21 +138,19 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 // Keyed project → year → { label, stats }. A missing year/project prints a plain year divider (no stats).
 const PROJECT_EPISODES = {
   "AMD Chronicle": {
-    "2000": { label: "The mania specimen", stats: "Trigger Feb 3 \u00b7 +136.9% in 61 sessions \u00b7 then the dot-com unwind", note: "The book opens at the top of an era: a February breakout that more than doubled in three months — and everything after it belonged to the crash. The first lesson of the chronicle is that the setup grammar works in a mania too; the second is what happens when the era ends." },
-    "2003": { label: "The first turn", stats: "Two October triggers \u00b7 Dec 3 breakdown closes the year", note: "A single-digit stock nobody wanted, turning up out of the post-crash wasteland. Two October breakouts print the full grammar — base, trigger, expansion — and the December breakdown is the first reminder that the book grades both directions." },
-    "2004": { label: "Stair-steps", stats: "Three triggers Sep\u2013Dec \u00b7 each base building on the last", note: "A campaign in stair-steps: consolidate, break, repeat. The year that teaches adds — every new coil was a new contract." },
-    "2005": { label: "The dual-core run", stats: "Five triggers \u00b7 the strongest year of the first cycle", note: "Product-cycle leadership against a sleeping giant. Note the January breakdown study sitting mid-run — even great years print failures, and the book keeps them." },
-    "2006": { label: "The top nobody rang a bell for", stats: "Mar 7 breakdown \u00b7 the first cycle ends", note: "The first cycle ends the way they all do: support breaks quietly while the story is still good. The breakdown grammar from 2005 returns — this time it was the whole trend." },
-    "2016": { label: "The turnaround year", stats: "Six triggers \u00b7 from left-for-dead to leadership", note: "The great re-rating begins from a near-death base. Six studies in one year — when a true turnaround starts, the setups arrive in clusters. The September breakdown mid-year is the reminder that even new leadership shakes hard." },
-    "2017": { label: "Digestion", stats: "Feb 21 trigger \u00b7 the year after the double", note: "After a 400% year, a digesting one. First-quarter strength, then a long sideways argument — campaigns rest, and the book rests with them." },
-    "2018": { label: "The blow-off and the bill", stats: "May + Sep triggers \u00b7 Sep 28 breakdown \u2192 \u221248% in 60 sessions", note: "The year of everything: a spring base, a summer melt-up on an earnings staircase, and then the bill — the September breakdown that gave back half the stock in one quarter. The two September studies, four sessions apart, are the whole lesson in trend age." },
-    "2019": { label: "The base year pays twice", stats: "Mar 19 trigger (+31.9% / 57 sessions) \u00b7 Dec 12 trigger (+39.2% / 45 sessions)", note: "After the Q4 2018 crash, a year of repair — and two clean releases from it. The March trigger ran while the index was still doubting; the December one carried straight into 2020. Base years reward the patient twice." },
-    "2020": { label: "The trap and the gap", stats: "Feb 10 trigger failed into the COVID crash \u00b7 Jul 22 earnings gap +52.6% in 30 sessions", note: "Two studies, one lesson each. February is the honest failure: a textbook trigger that had six sessions before the pandemic took everything — the stop is the whole system. July is the other side: an earnings gap out of a five-month base that paid half the stock in six weeks." },
-    "2021": { label: "The melt-up — coil, flags, and the top", stats: "Trigger Oct 13 · +50.7% in 33 sessions to the Nov 30 top ($164.46)", note: "The whole cycle in one quarter: a two-month coil, a clean break, two continuation flags — and then the leg that ended it all, printed with the same grammar as the ones that started it." },
-    "2023": { label: "The AI re-rate begins", stats: "Dec 7 shelf break \u00b7 +77.1% in 62 sessions", note: "Off the October 2022 low AMD spent 2023 rebuilding — and by December a five-month shelf at 122 was all that held it back. A product event released it, and the break ran into the spring." },
-    "2024": { label: "Blow-off and give-back", stats: "Jan 16 triangle (+43.2% / 37 sessions) · Feb 29 final flag (+18.1% / 6 sessions, fully surrendered by Mar 20)", note: "Three breakouts stacked into one run that ended at 227.30 on March 8. The first two paid handsomely; the third was the top. Same setup every time — the only variable that changed was how much trend was left." },
-    "2025": { label: "Washout, wedge, the next campaign", stats: "Jul 10 wedge break · +63.6% in 63 sessions", note: "From the April washout, a three-month recovery ended in a two-line wedge — the 2021 playbook verbatim. It gapped out in July, flagged once mid-month, and was still paying into the autumn." },
-    "2026": { label: "Off the low, the monster", stats: "Apr 2 trigger \u00b7 +168.8% in 60 sessions", note: "Two sessions after the March 2026 index low, the first breakout of the new cycle — and the biggest payout in the book. The best triggers of a cycle come earliest, printed while the tape still feels broken." },
+    "2000": { label: "The mania specimen", stats: "Trigger Feb 3 · +136.9% in 61 sessions · then the dot-com unwind", note: "The book opens at the top of an era: a February breakout that more than doubled in three months, printed at the top of an era. The first lesson of the chronicle is that the setup grammar works in a mania too; the second is what happens when the era ends." },
+    "2003": { label: "The first turn", stats: "Two October triggers · Dec 3 breakdown closes the year", note: "A single-digit stock turning up out of the post-crash years. Two October breakouts print the full grammar — base, trigger, expansion — and the December breakdown is the first reminder that the book grades both directions." },
+    "2005": { label: "Five triggers, one campaign", stats: "Five triggers · the strongest year of the first cycle", note: "The year opens with a breakdown study and then runs — even the strongest years print failures, and the book keeps them. Watch the same supply band get tested through the autumn until it finally gives." },
+    "2006": { label: "The top nobody rang a bell for", stats: "Mar 7 breakdown · the first cycle ends", note: "The first cycle ends the way they often do: support breaks quietly, with no single dramatic session to mark it. The breakdown grammar from 2005 returns — this time it was the whole trend." },
+    "2016": { label: "The turnaround year", stats: "Six long triggers · one short · the base that changed the decade", note: "The re-rating begins out of a multi-year base. Seven studies in one year — six long triggers and a short. The September breakdown is the reminder that even new leadership shakes hard." },
+    "2017": { label: "Digestion", stats: "Feb 21 trigger · the year after the double", note: "After the turnaround year, a digesting one. First-quarter strength, then a long sideways argument — campaigns rest, and the book rests with them." },
+    "2018": { label: "The blow-off and the bill", stats: "May + Sep triggers · Sep 28 breakdown → −48% in 60 sessions", note: "The year of everything: a spring base, a summer melt-up on an earnings staircase, and then the bill — the September breakdown that gave back half the stock in one quarter. The two September studies, eighteen sessions apart, are the whole lesson in trend age." },
+    "2019": { label: "The base year pays twice", stats: "Mar 19 trigger (+31.9% / 57 sessions) · Dec 12 trigger (+39.2% / 45 sessions)", note: "After the Q4 2018 crash, a year of repair — and two clean releases from it. The March trigger ran while the index was still doubting; the December one carried straight into 2020. Base years reward the patient twice." },
+    "2020": { label: "The trap and the gap", stats: "Feb 10 trigger failed into the COVID crash · Jul 22 trigger +52.6% in 30 sessions", note: "Two studies, one lesson each. February is the honest failure: a textbook trigger that had six sessions before the pandemic took everything — the stop is the whole system. July is the other side: a break out of a five-month base, taken with enough cushion to hold through the earnings print that followed, that paid half the stock in six weeks." },
+    "2021": { label: "The melt-up — coil, flags, and the top", stats: "Trigger Oct 13 · +50.7% in 33 sessions to the Nov 30 top", note: "The whole cycle in one quarter: a summer study before the trigger, a two-month coil, the clean break, one continuation flag — and then a December breakdown, printed with the same grammar as the breakouts that started it." },
+    "2023": { label: "The AI re-rate begins", stats: "Dec 7 shelf break · +77.1% in 62 sessions", note: "Off the October 2022 low AMD spent 2023 rebuilding — and by December a five-month shelf at 124 was all that held it back — and the break out of it ran into the spring." },
+    "2024": { label: "Blow-off and give-back", stats: "Jan 16 inside-bar break (+43.2% / 37 sessions) · Feb 29 final flag (+18.1% / 6 sessions, surrendered within weeks)", note: "Two breakouts in the new year, stacked onto December's, into one run that topped on March 8. The first two paid handsomely; the third was the top. Same setup every time — the only variable that changed was how much trend was left." },
+    "2026": { label: "Off the low, the monster", stats: "Apr 2 trigger · +168.8% in 60 sessions", note: "Three sessions after the March 2026 index low — the follow-through day — the first breakout of the new cycle — and the biggest payout in the book. The best triggers of a cycle come earliest, printed while the tape still feels broken." },
   },
   "Finding the Market's Bottom": {
     "2023": { label: "Rate-scare correction", stats: "QQQ −10.8% over 71 sessions · low Oct 26, 2023 · reclaimed in 13 sessions", note: "The slowest correction in the book — 71 sessions of lower lows while rates topped. Slow tapes give the clearest tells: every study in this chapter printed its own low before the index did, and most had already reclaimed their moving averages while QQQ was still under water." },
@@ -172,28 +170,28 @@ const PROJECT_PREFACE = {
     source: "VIV Research · the single-name chronicle series",
     sections: [
       { n: "01", kicker: "The subject", title: "One company, through every market weather.", blocks: [
-        { t: "p", x: "Most studies compare many stocks inside one moment. This book inverts it: one stock, every moment. Hold the company constant and the market's regimes become the variable — the same name lived through a turnaround, a mania, two crashes, a bear that cut it by two-thirds, and an AI supercycle. What repeats across those eras is not the news. It is the structure of the setups." },
+        { t: "p", x: "Most studies compare many stocks inside one moment. This book inverts it: one stock, every moment. Hold the company constant and the market's regimes become the variable — the same name lived through a mania, a turnaround, two crashes, a long bear and an AI cycle. What repeats across those eras is not the news. It is the structure of the setups." },
         { t: "def", k: "Chronicle", x: "A single-name study series ordered by era. Every study is graded on the same factor card as the rest of the vault — only the years change." },
         { t: "pull", x: "The company changes its story every three years. The setups never change theirs." },
       ]},
       { n: "02", kicker: "Why AMD", title: "The perfect specimen.", rows: [
-        ["It nearly died first", "In 2015 this was a two-dollar stock priced for bankruptcy. Everything that followed — Ryzen, EPYC, the datacenter era — happened on a chart you could trade. Turnarounds print the cleanest catalysts."],
+        ["It started from the floor", "The chronicle's turnaround chapter opens with the stock in single digits and a multi-year base behind it. Everything that followed happened on a chart you could trade, trigger by trigger."],
         ["Every setup class in one name", "Earnings gaps that doubled the stock. Bases that took whole quarters. Support breaks that cut it in half. One ticker supplies the full curriculum, both directions."],
-        ["Liquid in every era", "From single digits to the hundreds, AMD stayed one of the most-traded names in the market — every study here was executable at size. No survivor-liquidity bias."],
+        ["Liquid in every era", "From single digits to the hundreds, the name carried enough volume in each era for these triggers to be taken at size — the studies are not a museum of untradeable charts."],
       ]},
       { n: "03", kicker: "How to read", title: "Same anatomy, different years.", rows: [
-        ["The staircase first", "Each earnings-driven study opens with the quarterly engine — sales growth quarter over quarter. The July 2018 gap was three accelerating quarters in a row before the candle ever printed."],
+        ["The trigger first", "Each study opens with the same anatomy: what the base looked like, what the trigger day did, and what volume said about it. Where an earnings print drove the move, the study says so — and where it didn't, it doesn't."],
         ["Structure over story", "Every study asks the same questions: what did the base look like, what triggered, what did volume do, where did the trend die. The narrative changes; the checklist does not."],
         ["Both directions", "Breakdowns are graded with the same rigor as breakouts — the mirror image. Knowing how leaders die is half of knowing how to hold them."],
       ]},
-      { n: "04", kicker: "The eras", title: "Twenty-six years, every regime.", rows: [
-        ["2000 \u00b7 The mania", "The dot-com blow-off — the book opens with a breakout that doubled in three months, at the top of an era about to end."],
-        ["2003\u00b72006 \u00b7 The first cycle", "Out of the post-crash wasteland: the first turn, the stair-step campaigns, the dual-core run — and the 2006 breakdown that ended it."],
-        ["2016–2018 · The turnaround", "From left-for-dead to the strongest chart in the index — the Ryzen/EPYC re-rating, ending in the July 2018 earnings gap that doubled the stock in seven weeks."],
-        ["Q4 2018 · The first crash", "Crypto demand vanished and the stock gave back half. The first lesson in how fast momentum unwinds."],
-        ["2019 · The base year", "Three quarters of sideways while the index double-dipped — then the late-October breakout that ran into 2020."],
+      { n: "04", kicker: "The eras", title: "Twenty-six years, era by era.", rows: [
+        ["2000 · The mania", "The dot-com blow-off — the book opens with a breakout that doubled in three months, at the top of an era about to end."],
+        ["2003·2006 · The first cycle", "Out of the post-crash wasteland: the first turn, the stair-step campaigns, the dual-core run — and the 2006 breakdown that ended it."],
+        ["2016–2018 · The turnaround", "Out of a multi-year base to the strongest chart in the index — a cluster of triggers in 2016, then the May 2018 gap that ran 78.9% over the next 59 sessions."],
+        ["Q4 2018 · The first crash", "The September breakdown gave back 48% in 60 sessions. The first lesson in how fast momentum unwinds."],
+        ["2019 · The base year", "A year of repair that paid twice — the March trigger while the index still doubted, and the December one that carried into 2020."],
         ["2020–2021 · COVID and the melt-up", "A one-month flush, a three-month recovery, and the run to the 2021 top near $164."],
-        ["2022 · The bear", "From $164 to $54 — a two-thirds drawdown with textbook breakdown legs the whole way."],
+        ["2022 · The bear", "The long give-back of the melt-up — a chapter the chronicle does not yet have studies for."],
         ["2023–2026 · The AI era", "The recovery, the new highs, and the corrections in between — the chapters this book is still being written inside."],
       ]},
     ],
@@ -208,7 +206,7 @@ const PROJECT_PREFACE = {
         { t: "pull", x: "Momentum markets occur 1–3 times a year and last 6–12 weeks. The rest of the time the market consolidates its gains — and the prepared build their lists." },
       ]},
       { n: "02", kicker: "The edge", title: "The highest-quality buy points come right after the correction.", rows: [
-        ["Divergence exposes the leaders", "When the index is falling but a stock refuses to go down, big money is quietly accumulating. Institutions did their due diligence weeks ago — the correction is their accumulation window. Strength reads both ways: index −10%, stock −5% is relative strength too."],
+        ["Divergence exposes the leaders", "When the index is falling but a stock refuses to go down, that refusal is the observable part — someone is absorbing the supply, and the chart shows it before any headline does. Strength reads both ways: index −10%, stock −5% is relative strength too."],
         ["Correction = reset", "The flush removes impatient holders and late chasers. What's left is strong-handed ownership and uncrowded trends. Choppy price action is the signature of a crowd — clean trends need that crowd gone."],
         ["Compression → expansion", "The market always moves in this cycle: a big prolonged move, then compression into an inflection point — with the leaders compressed tightest of all. When the pressure releases, leaders expand harder than the index. That is the edge this book measures."],
       ]},
@@ -235,8 +233,8 @@ const PROJECT_PREFACE = {
 const DEEP_DIVES = [
   {
     no: "02", slug: "amd-chronicle", project: "AMD Chronicle",
-    title: "AMD \u2014 26 Years Through Every Market Cycle", // HIS title, 2026-08-01 (was 20 Years)
-    premise: "Hold the company constant and the regimes become the variable. Twenty-six years of AMD — the dot-com mania, the first cycle, the turnaround, two crashes, a two-thirds bear, and the AI era — every setup class graded on the same card.",
+    title: "AMD — 26 Years Through Every Market Cycle", // HIS title, 2026-08-01 (was 20 Years)
+    premise: "Hold the company constant and the regimes become the variable. Twenty-six years of AMD — the dot-com mania, the first cycle, the turnaround, two crashes, a long bear, and the AI era — every setup class graded on the same card.",
     updated: "2026-08-01",
     cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/amd-chronicle-cover.png",
   },
@@ -1013,11 +1011,11 @@ function openProjectBookPdf(rows, coverTitle) {
         const pkv = m.peak_pct != null ? `${sgn(m.peak_pct)} in ${esc(m.sessions_to_peak ?? "?")} session${+m.sessions_to_peak === 1 ? "" : "s"}` : null;
         const stats = [
           stat("Day one", m.day_pct != null ? sgn(m.day_pct) : null),
-          stat("Volume", m.rvol_eod != null ? `${esc(m.rvol_eod)}\u00d7 normal` : null),
+          stat("Volume", m.rvol_eod != null ? `${esc(m.rvol_eod)}× normal` : null),
           stat(study.direction === "short" ? "Fall after the break" : "Peak gain", pkv),
           stat("After 20 days", m.t20 != null ? sgn(m.t20) : null),
-        ].filter(Boolean).join(`<span class="pcDot" style="margin:0 14px">\u00b7</span>`);
-        const headline = r.thesis || `${study.setup}${study.direction === "short" ? ", short side" : ""} \u2014 ${esc(r.entry_date || "")}`;
+        ].filter(Boolean).join(`<span class="pcDot" style="margin:0 14px">·</span>`);
+        const headline = r.thesis || `${study.setup}${study.direction === "short" ? ", short side" : ""} — ${esc(r.entry_date || "")}`;
         // Hero = the DAILY chart, whichever slot holds it (his setup slot is sometimes the 5-minute
         // entry chart; the daily then lives in the context slot). Everything else goes to the expander.
         const slots = [
@@ -1035,28 +1033,28 @@ function openProjectBookPdf(rows, coverTitle) {
           : "Context";
         const subOf = (x) => {
           const w = TFWORD[x.tf] || "daily";
-          if (x === heroSlot) return `${esc(r.ticker)} ${w} \u00b7 the trigger day is ${esc(r.entry_date || "the last candle")}`;
-          if (x.role === "outcome") return `${esc(r.ticker)} ${w} \u00b7 the same story, weeks later`;
-          if (INTRA.includes(x.tf)) return `${esc(r.ticker)} ${w} \u00b7 the entry, candle by candle`;
-          return `${esc(r.ticker)} ${w} \u00b7 the bigger picture going into the trade`;
+          if (x === heroSlot) return `${esc(r.ticker)} ${w} · the trigger day is ${esc(r.entry_date || "the last candle")}`;
+          if (x.role === "outcome") return `${esc(r.ticker)} ${w} · the same story, weeks later`;
+          if (INTRA.includes(x.tf)) return `${esc(r.ticker)} ${w} · the entry, candle by candle`;
+          return `${esc(r.ticker)} ${w} · the bigger picture going into the trade`;
         };
         const supporting = restSlots.map((x) => chartBlock2(x.img, titleOf(x), subOf(x), x === restSlots[0])).join("");
         const nSupport = restSlots.length;
-        const critList = ticked.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 26px;margin:18px 0 0">${ticked.map((it) => `<div class="pcM" style="font-size:0.86rem;line-height:1.5"><span class="pcTick">\u2713</span>&nbsp; ${esc(it[1])}</div>`).join("")}</div>` : "";
+        const critList = ticked.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 26px;margin:18px 0 0">${ticked.map((it) => `<div class="pcM" style="font-size:0.86rem;line-height:1.5"><span class="pcTick">✓</span>&nbsp; ${esc(it[1])}</div>`).join("")}</div>` : "";
         return `<div class="page pbstudy pcRule" id="e${idx}" style="max-width:1060px">
           <div style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:52px">
             <div>
               <div class="pcK" style="font-family:'Geist Mono',monospace;font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase">Study ${String(idx + 1).padStart(2, "0")} of ${String(rows.length).padStart(2, "0")}</div>
               <div class="pcH" style="font-size:1.02rem;font-weight:650;line-height:1.4;margin-top:12px">${esc(r.entry_date || "")}</div>
-              <div class="pcM" style="font-size:0.82rem;margin-top:6px;line-height:1.5">${esc(study.setup)}${study.direction === "short" ? " \u00b7 short side" : ""}</div>
+              <div class="pcM" style="font-size:0.82rem;margin-top:6px;line-height:1.5">${esc(study.setup)}${study.direction === "short" ? " · short side" : ""}</div>
             </div>
             <div style="min-width:0">
               <div class="pcH" style="font-size:1.5rem;font-weight:700;line-height:1.3;letter-spacing:-0.015em;margin:0 0 16px">${esc(headline)}</div>
               ${study.annotation ? `<div class="pcM" style="font-size:1.06rem;line-height:1.8;max-width:62ch">${esc(study.annotation)}</div>` : ""}
                             ${heroSlot ? chartBlock2(heroSlot.img, "The setup", subOf(heroSlot), true) : ""}
               ${stats ? `<div class="pcD" style="font-family:'Geist Mono',monospace;font-size:0.78rem;margin:22px 0 0">${stats}</div>` : ""}
-              ${nSupport ? `<details class="pcExp"><summary class="pcM">${nSupport} more chart${nSupport > 1 ? "s" : ""} \u00b7 ${restSlots.map((x) => titleOf(x).toLowerCase()).join(" + ")}</summary>${supporting}</details>` : ""}
-              ${ticked.length ? `<details class="pcExp"><summary class="pcM">Criteria \u00b7 ${ticked.length} of ${scored.length} met <span class="pcTick">\u2713</span></summary>${critList}</details>` : ""}
+              ${nSupport ? `<details class="pcExp"><summary class="pcM">${nSupport} more chart${nSupport > 1 ? "s" : ""} · ${restSlots.map((x) => titleOf(x).toLowerCase()).join(" + ")}</summary>${supporting}</details>` : ""}
+              ${ticked.length ? `<details class="pcExp"><summary class="pcM">Criteria · ${ticked.length} of ${scored.length} met <span class="pcTick">✓</span></summary>${critList}</details>` : ""}
             </div>
           </div>
           ${folio}
@@ -1097,9 +1095,9 @@ function openProjectBookPdf(rows, coverTitle) {
         ["Trigger", esc(r.entry_date || "") || "—"],
         ...(m.gap_pct != null ? [["Gap", fmtPct(m.gap_pct)]] : []),
         ...(m.day_pct != null ? [["Day-1", fmtPct(m.day_pct)]] : []),
-        ...(m.rvol_eod != null ? [["RVOL", `${esc(m.rvol_eod)}\u00d7`]] : []),
+        ...(m.rvol_eod != null ? [["RVOL", `${esc(m.rvol_eod)}×`]] : []),
         ...(m.t20 != null ? [["T+20", fmtPct(m.t20)]] : []),
-        ...(m.peak_pct != null ? [["Peak", `${fmtPct(m.peak_pct)} \u00b7 ${esc(m.sessions_to_peak ?? "\u2014")}s`]] : []),
+        ...(m.peak_pct != null ? [["Peak", `${fmtPct(m.peak_pct)} · ${esc(m.sessions_to_peak ?? "—")}s`]] : []),
       ];
       if (m.days_to_reclaim !== "" && m.days_to_reclaim != null) cells.push(["Reclaim", `${esc(m.days_to_reclaim)} sessions`]);
       if (m.trigger_date) cells.push(["Trigger", esc(m.trigger_date)]);
@@ -1447,7 +1445,7 @@ const PLAYBOOK_PARTS = [
   { roman: "II", name: "Neighborhood", folio: "Neighborhood", toc: "II — Neighborhood · selection", stats: "Selection · pieces 04–07", count: "4 pieces",
     blurb: "Good houses cluster in good neighborhoods. Money moves in themes and groups, so before judging any single chart we find where it is actually flowing — and build the nightly routine that puts those names in front of us again and again." },
   { roman: "III", name: "House", folio: "House", toc: "III — House · the setups", stats: "The setups · pieces 08–12", count: "5 pieces",
-    blurb: "Now the individual property. These are the five structures we buy and sell — the only shapes that earn our capital. Each one has a definition tight enough to say no with, because a setup you cannot describe is a setup you cannot repeat." },
+    blurb: "Now the individual property. These are the five structures we buy and sell. Each one has a definition tight enough to say no with, because a setup you cannot describe is a setup you cannot repeat." },
   { roman: "IV", name: "When to walk in", folio: "When to walk in", toc: "IV — When to walk in · execution", stats: "Execution · pieces 13–16", count: "4 pieces",
     blurb: "The right house at the wrong moment is still a loss. This is the door: the trigger that proves buyers are in control, the arithmetic that sizes the trade, the gates that can veto it, and the exit that keeps every mistake small." },
   { roman: "V", name: "The campaign", folio: "The campaign", toc: "V — The campaign · management", stats: "Management · pieces 17–19", count: "3 pieces",
@@ -1470,7 +1468,7 @@ const PLAYBOOK_INDICATORS = [
     name: "TraderLion's Relative Strength Line",
     url: "https://www.tradingview.com/script/N4Iqr5Cz-TraderLion-s-Relative-Strength-Line/",
     what: "Plots the stock divided by the index as a line beneath price, and marks when that line reaches a new high — including when it does so before the stock itself does.",
-    use: "This is how we check relative strength, and it is the cleanest tell in the book. What we want to see: the line making higher highs while the market chops, and a new RS high [i]before[/i] the breakout — that is institutional buying showing up in public. What kills a candidate: the line rolling over while price still looks fine, and the line falling to new lows on a bounce day. At index lows the reading is decisive — a stock holding a higher low against the index's lower low is the signature of the next cycle's leader.",
+    use: "This is how we check relative strength, and its behaviour at index lows is the cleanest tell we have. What we want to see: the line making higher highs while the market chops, and a new RS high [i]before[/i] the breakout — that is institutional buying showing up in public. What kills a candidate: the line rolling over while price still looks fine, and the line falling to new lows on a bounce day. At index lows the reading is decisive — a stock holding a higher low against the index's lower low is the signature of the next cycle's leader.",
   },
   {
     name: "Swing Data — ADR% / RVol / PVol / Float / Avg Vol",
@@ -1482,7 +1480,7 @@ const PLAYBOOK_INDICATORS = [
     name: "IBD Style Relative Volume — Intraday Adjusted",
     url: "https://www.tradingview.com/script/p9PqBCAX-IBD-Style-Relative-Volume-Intraday-Adjusted/",
     what: "Relative volume measured against the same time of day on normal days, rather than against a full session's average.",
-    use: "The single most important distinction in the entry stack. At 9:45 a stock has traded a fraction of its day, so comparing that against a full-day average always reads low and tells you nothing — the time-matched version tells you whether [i]this[/i] morning is unusual. Our rule: the trigger alone carries no edge until participation confirms it. This indicator is what confirms it. Once a position is held, we switch back to the daily reading against the 50-day average — intraday for the entry, daily for the hold.",
+    use: "The distinction that makes the volume gate mean anything. At 9:45 a stock has traded a fraction of its day, so comparing that against a full-day average always reads low and tells you nothing — the time-matched version tells you whether [i]this[/i] morning is unusual. Our rule: the trigger alone carries no edge until participation confirms it. This indicator is what confirms it. Once a position is held, we switch back to the daily reading against the 50-day average — intraday for the entry, daily for the hold.",
   },
   {
     name: "Moving Average Ribbon",
@@ -1502,11 +1500,11 @@ const PLAYBOOK_PIECES = [
       { h: `Why it matters` },
       { p: `One question decides how the whole session is played: is this a tape where breakouts get paid, or a tape where they get sold? The regime never picks your stocks — it sets your size and your patience. The same setup, in the same name, is a full-size trade in one tape and a pass in another.` },
       { h: `How we measure it` },
-      { p: `We take the daily count of strong up-moves against strong down-moves, and the ratio of those counts over the last five and ten sessions. Three readings matter:` },
+      { p: `We take the daily count of strong up-moves against strong down-moves, and compare them over two horizons — the month and the quarter. Three readings matter:` },
       { ul: [
         `[b]Both ratios green[/b] — buyers outnumber sellers on every horizon. Breakouts are statistically more likely to work. Press.`,
-        `[b]A thrust print[/b] — an explosion of strong up-moves after weakness. One thrust starts the case for a turn; it does not close it. Wait for the second.`,
-        `[b]A selling extreme[/b] — a flood of heavy down-moves. Bounces from these are reflexes, not leadership. The most-beaten names rally hardest and mean the least.`,
+        `[b]A thrust print[/b] — an explosion of strong up-moves after weakness. A documented turn signal, and the reason the dial is read every day rather than once a week.`,
+        `[b]A selling extreme[/b] — a flood of heavy down-moves. On the daily board that is a warning; on the quarterly board, an extremely low up-count is the capitulation reading, and it has marked major lows.`,
       ] },
       { h: `In practice` },
       { p: `Full tape: full playbook. Transitional: half size, faster trims, only A-grade setups. Hostile: the best trade is the list you build for the turn. The dial is read once, before the watchlist is opened, and it stands for the session — it is the permission slip every other piece in this book is written against.` },
@@ -1599,10 +1597,10 @@ const PLAYBOOK_PIECES = [
       { ul: [
         `[b]The movers ladder[/b] — top gainers over one, three, and six months, liquidity-gated (dollar volume [i]and[/i] share volume — each gate covers the other's blind spot) with a volatility floor. The overlap pattern is the read: on all three lists = persistent leader; on the longer lists but off the short one = a winner resting. The resters are tomorrow's entries.`,
         `[b]The CANSLIM scanner[/b] — the fundamental net: current-quarter earnings and sales both growing hard, a multi-year record behind them, high relative strength, and price already near its 52-week high. It answers a different question from the ladder — not "what moved" but "what has fuel underneath it."`,
-        `[b]The pre-market gappers[/b] — run twice before the bell: early for the catalyst read, again five minutes before the open when the real list forms. This is the net that finds episodic pivots, and nothing else finds them. Gap size, live volume, and the one thing a screener can't see — was anyone positioned for this?`,
+        `[b]The pre-market gappers[/b] — the last activity before the open, run around 9:25 New York time when the real list has formed. This is the net built for episodic pivots. Gap size, live volume, and the one thing a screener can't see — was anyone positioned for this?`,
       ] },
       { h: `In practice` },
-      { p: `Scan in the evening, never in the heat. The scan builds the watchlist; only the chart builds the trade. Keep the focus list under ten — if everything is interesting, nothing is. Names that clear a net but not the chart stay on the watchlist; names that clear both move to the focus list and get a written trigger and stop.` },
+      { p: `Scan in the evening, never in the heat. The scan builds the watchlist; only the chart builds the trade. Keep the focus list to six to twelve names — if everything is interesting, nothing is. Names that clear a net but not the chart stay on the watchlist; names that clear both move to the focus list and get a written trigger and stop.` },
       { h: `The live screen — the movers ladder, chip by chip` },
       { p: `This is the exact screen, saved once and re-sorted three ways. We build it on TradingView because that's where most of the Vault already lives. Six chips do all the work — everything else stays default:` },
       { kv: [
@@ -1623,7 +1621,7 @@ const PLAYBOOK_PIECES = [
         `[b]Market cap $300M → $1B[/b] — institutional names only, where the follow-through comes from.`,
         `[b]ADR 4% → 5–6%[/b] — keeps only the movers that can pay fast.`,
         `[b]Dollar volume $5M → $20M+[/b] — our own execution bar for trading at real size.`,
-        `[b]Add a Perf % floor matched to the sort[/b] — 1M ≥ +25% · 3M ≥ +50% · 6M ≥ +100%. Now the list holds only names that already proved momentum, not everything merely ranked by it.`,
+        `[b]Add a Perf % floor matched to the sort[/b] — 1M ≥ +30% · 3M ≥ +50% · 6M ≥ +100%. Now the list holds only names that already proved momentum, not everything merely ranked by it.`,
         `[b]Optional: price above a rising 10- and 20-day line[/b] — keeps only the names still in gear, and cuts the list hardest of all.`,
       ] },
       { h: `The second net — the CANSLIM scanner, filter by filter` },
@@ -1642,14 +1640,14 @@ const PLAYBOOK_PIECES = [
       { h: `Tightening the CANSLIM net` },
       { p: `Same rule of thumb as the ladder: if the net returns more names than you can chart in an evening, the net is too loose. Raise the bars until it holds under about fifty:` },
       { ul: [
-        `[b]Revenue growth 25% → 40%+[/b] — acceleration this steep is rare, and rarity is the point.`,
+        `[b]Revenue growth 25% → 40%+[/b] — each step up the bar cuts the survivor count hard, which is the whole job of a tightener.`,
         `[b]Float 150M → 50M or less[/b] — the single most powerful lever on this screen; scarcity is what makes the moves violent.`,
         `[b]Volatility 3% → 5%+[/b] — keeps only names that can pay within days.`,
         `[b]Add price above the 200-day line[/b] — long-term trend agreement on top of the 50-day condition.`,
         `[b]Lift the volume floor[/b] — well past 500K, so every survivor is tradeable at real size.`,
       ] },
       { h: `Common mistakes` },
-      { p: `Scanning during the session and calling it research — by then the list is being chosen by the day's noise. Letting the focus list swell past ten because nothing wants to be cut. Skipping the evening entirely after a losing day, which is exactly when the routine is doing the most work.` },
+      { p: `Scanning during the session and calling it research — by then the list is being chosen by the day's noise. Letting the focus list swell past a dozen because nothing wants to be cut. Skipping the evening entirely after a losing day, which is exactly when the routine is doing the most work.` },
     ],
     take: `Three nets, run daily, beat forty run never. The funnel's product isn't trades — it's familiarity with the leaders before they move.`,
   },
@@ -1660,11 +1658,11 @@ const PLAYBOOK_PIECES = [
       { h: `Defining the terms` },
       { p: `The staircase is the shape of a company's recent quarters laid side by side: sales growth [i]accelerating[/i] — each stair higher than the last — with profit following sales, not replacing it. It is the fundamental fuel underneath a technical setup, and it is either there or it isn't.` },
       { h: `Why it matters` },
-      { p: `The biggest winners share this one fingerprint before they run. The chart still triggers everything, but the staircase is what tells you whether a name deserves weeks of patience and a second unit — or just a swing and a short leash.` },
+      { p: `The chart triggers every trade in this book — the staircase does a different job. It tells you whether a name deserves weeks of patience and a second unit, or just a swing and a short leash. Fuel sets hold length and add aggression; it never sets the entry.` },
       { h: `How we measure it` },
       { p: `We read every earnings story the same way: the quarters in a table, oldest to newest, growth rates beside them. What qualifies as fuel:` },
       { ul: [
-        `[b]Acceleration[/b], not level: 20% → 40% → 60% beats a flat 50%.`,
+        `[b]Acceleration[/b], not level: 20% → 60% → 110% beats a flat 50%.`,
         `[b]Sales leading[/b]: profit growth without revenue growth is cost-cutting — it ends.`,
         `[b]A one-sentence story[/b] the market can repeat, attached to a funded theme.`,
         `[b]Surprise[/b]: the violent moves come where expectations were lowest — strong numbers from a stock everyone had filed away.`,
@@ -1689,7 +1687,8 @@ const PLAYBOOK_PIECES = [
       { ul: [
         `The breadth verdict is red — breakouts statistically failing.`,
         `The theme is off both boards, or the group table flags it as an off-the-floor bounce.`,
-        `The stock is extended — multiple daily ranges above its 50-day line, or meaningfully past the proper pivot. Fresh, not stretched.`,
+        `The stock is extended — four or more daily ranges above its 50-day line, or more than five percent past the proper pivot. Fresh, not stretched.`,
+        `The base is late in the run — a third or fourth base, where the same shape carries far less message than the first.`,
         `The base is wide and loose — deep retraces, overlapping bars, no tightening.`,
         `The breakout has no volume behind it.`,
         `Earnings land within five sessions — unless the trade [i]is[/i] the earnings reaction, planned as one.`,
@@ -1708,7 +1707,7 @@ const PLAYBOOK_PIECES = [
     toc: `after a correction or pullback, contractions tightening into the pivot`,
     blocks: [
       { h: `Defining the terms` },
-      { p: `A volatility contraction pattern — [b]VCP[/b] — is what a leader builds after a correction or a pullback: a base whose swings get progressively [i]smaller[/i]. Not one tight range: a sequence. Each swing shallower than the one before it, volume thinning as it goes, until the last contraction is a drift rather than a swing. The breakout is the release out of that final contraction, and this is our flagship setup.` },
+      { p: `A volatility contraction pattern — [b]VCP[/b] — is what a leader builds after a correction or a pullback: a base whose swings get progressively [i]smaller[/i]. Not one tight range: a sequence. Each swing shallower than the one before it, volume thinning as it goes, until the last contraction is a drift rather than a swing. The breakout is the release out of that final contraction.` },
       { h: `Why it matters` },
       { p: `Each contraction is a round of sellers being retired. The first pullback shakes out the weak hands, the second shakes out the ones who bought the first, and by the final contraction there is almost nobody left to sell. That is why the pattern is readable in advance — the shrinking depths are supply being consumed in public. Compression is the edge; expansion is only the receipt.` },
       { h: `How we measure it` },
@@ -1722,9 +1721,9 @@ const PLAYBOOK_PIECES = [
       ] },
       { p: `[b]Three — the pivot and trigger:[/b] a clean flat pivot drawn across the highs of that final contraction, then a day-one range expansion of four percent or more — a bar visibly bigger than the last five to ten — closing in the top thirty percent of its range, on volume above the prior day. Two more conditions on the trigger day: no more than two up-days into it, so we aren't buying day three, and a named catalyst within a couple of sessions is a bonus, never a requirement.` },
       { h: `In practice` },
-      { p: `The nightly nets surface the candidates, the three acts qualify them, and the entry stack times the release: the opening-range trigger on the expansion day, stop at the low of that day. Until the expansion arrives, a contraction pattern is a watchlist name and nothing more. Size follows the age of the trend — the first base after a real prior move earns full size; the third base of a long run earns less.` },
+      { p: `The nightly nets surface the candidates, the three acts qualify them, and the entry stack times the release: the opening-range trigger on the expansion day, stop at the low of that day. Until the expansion arrives, a contraction pattern is a watchlist name and nothing more. Size never changes here: it is arithmetic off the stop, exactly as in piece fourteen. What the age of the base changes is whether the trade qualifies at all — a fourth base is on the no-buy list.` },
       { h: `Common mistakes` },
-      { p: `Calling one quiet week a VCP. The pattern is a [i]sequence[/i] — without successively shallower pullbacks, it is just a range. Buying loose bases because the story is tight. Anticipating the break before the expansion day exists. And taking the third breakout of a long run at the same size as the first — the older the trend, the shorter its fuse.` },
+      { p: `Calling one quiet week a VCP. The pattern is a [i]sequence[/i] — without successively shallower pullbacks, it is just a range. Buying loose bases because the story is tight. Anticipating the break before the expansion day exists. And taking a late base as though it were the first — the older the trend, the shorter its fuse.` },
     ],
     take: `Compression is the edge; expansion is only the receipt. Buy the release of a real contraction sequence — not the hope of one.`,
   },
@@ -1745,9 +1744,9 @@ const PLAYBOOK_PIECES = [
         `[b]The trigger[/b] — a break above the [i]pattern high[/i], not an early poke through the flag line, on expanding volume. And it must be the first or second flag of the campaign, not a late leg.`,
       ] },
       { h: `In practice` },
-      { p: `Because it is a continuation setup, the trend that produced the pole has to still be intact when the flag breaks — the entry stack times it exactly like every other setup — opening-range trigger, live volume confirming, stop at the low of the day. Because the pole is so steep, the extension rules from the campaign section matter more here than anywhere else, and the first trim comes fast.` },
+      { p: `Because it is a continuation setup, the trend that produced the pole has to still be intact when the flag breaks — the entry stack times it exactly like every other setup — opening-range trigger, live volume confirming, stop at the low of the day. Because the pole is so steep, price is often deep into the extension bands within days, so the campaign section's trim rules come into play early.` },
       { h: `Common mistakes` },
-      { p: `Forcing the label onto a stock that ran forty percent and paused — the pole is a specific, brutal number and almost nothing clears it. Tolerating a flag that widens, rounds out, or cuts deep, and calling it "still constructive." Buying the flag line instead of the pattern high. And treating a late-campaign flag like a first one, when the same shape at the end of a run carries none of the same message.` },
+      { p: `Forcing the label onto a stock that ran forty percent and paused — the pole is a specific, measured number, and the label means nothing until you have measured it. Tolerating a flag that widens, rounds out, or cuts deep, and calling it "still constructive." Buying the flag line instead of the pattern high. And treating a late-campaign flag like a first one, when the same shape at the end of a run carries none of the same message.` },
     ],
     take: `The pole is the claim; the tight flag is the proof nobody wants to sell it. Deep, loose or rounded is not a flag — it's a top forming.`,
   },
@@ -1758,20 +1757,20 @@ const PLAYBOOK_PIECES = [
       { h: `Defining the terms` },
       { p: `The undercut and rally is the second door into a leader you already missed. The stock pulls back to its rising rails — the short moving averages a fast leader respects — dips [i]through[/i] a prior low or an obvious support level, and then reclaims it. The entry is not the touch and it is not the undercut. The entry is the [b]reclaim[/b].` },
       { h: `Why it matters` },
-      { p: `The undercut does work no buyer can do for himself: it runs the stops sitting under the obvious level and clears out the weak hands, so the reclaim happens against a lighter book. It also produces the tightest stop of any setup we take, because the low that was just made is the exact level the trade is arguing about — a few percent of risk on a leader mid-trend.` },
+      { p: `The undercut does work no buyer can do for himself: it runs the stops sitting under the obvious level and clears out the weak hands, so the reclaim happens against a lighter book. It also produces a tight stop, because the low that was just made is the exact level the trade is arguing about — a few percent of risk on a leader mid-trend.` },
       { h: `How we measure it` },
       { ul: [
         `[b]Rails rising[/b] — the short moving averages still sloping up and price still above the longer ones. A pullback into flat or falling rails is not this setup.`,
-        `[b]First or second pullback only[/b] — by the third, the easy part of the trend is behind us and the same shape pays far less.`,
+        `[b]A young trend — first, second or third pullback[/b] — not a late one. By the fourth, the easy part of the trend is behind us and the same shape pays far less.`,
         `[b]Volume dries up on the way down[/b] — a heavy-volume pullback is distribution, not rest, and the level it undercuts will not hold.`,
         `[b]A real undercut, then a reclaim[/b] — price must break the prior low or the support level and close back above it, ideally on a reversal bar. No undercut means no shakeout; no reclaim means no trade.`,
         `[b]Stop at the pullback low, under one daily range[/b] — that low is what the trade is arguing about. If the structure demands a wider stop, the structure is telling you no.`,
         `[b]Context intact[/b] — theme still funded, relative strength still holding, the trend structure unbroken.`,
       ] },
       { h: `In practice` },
-      { p: `Let it undercut, let the weak hands take their stop-out, and buy the move back through the level. Nothing is bought while price is still falling — the reclaim is the entire signal, and if it never comes, there was never a trade. Because the stop is so tight, this setup carries more shares for the same risk than any other, which is exactly why it must not be forced onto a name that hasn't earned it.` },
+      { p: `Let it undercut, let the weak hands take their stop-out, and buy the move back through the level. Nothing is bought while price is still falling — the reclaim is the entire signal, and if it never comes, there was never a trade. Because the stop is so tight, the arithmetic returns a large share count for the usual risk — which is exactly why the setup must not be forced onto a name that hasn't earned it.` },
       { h: `Common mistakes` },
-      { p: `Buying the falling-knife side of the pullback before any reclaim, which converts the tightest stop in the book into the widest one. Treating a broken leader's dead-cat bounce as a pullback — a pullback holds its structure, a breakdown lost it. And taking the fourth and fifth pullback of an aging trend with first-pullback size.` },
+      { p: `Buying the falling-knife side of the pullback before any reclaim, which converts the tightest stop in the book into the widest one. Treating a broken leader's dead-cat bounce as a pullback — a pullback holds its structure, a breakdown lost it. And taking the fourth or fifth pullback of an aging trend as though it were the first.` },
     ],
     take: `The undercut clears the crowd; the reclaim proves the leader. Buy proof, not hope, and let the pullback low do the arguing.`,
   },
@@ -1780,9 +1779,9 @@ const PLAYBOOK_PIECES = [
     toc: `the rare one, surprise catalyst on a neglected name`,
     blocks: [
       { h: `Defining the terms` },
-      { p: `An episodic pivot — a buyable gap up — is the market repricing a stock it was not positioned in. Real new information lands on a neglected name, price gaps up ten percent or more, and volume floods in so fast the stock trades a normal day's volume inside the first thirty minutes. This is the setup the pre-market gapper scan exists to find; it is the only net that finds them, and it is why that scan runs before every open.` },
+      { p: `An episodic pivot — a buyable gap up — is the market repricing a stock it was not positioned in. Real new information lands on a neglected name, price gaps up ten percent or more, and volume floods in so fast the stock trades a normal day's volume inside the first thirty minutes. This is the setup the pre-market gapper scan is built for, and it is why that scan runs before every open.` },
       { h: `Why it matters` },
-      { p: `These are the rarest setups in the book and the season's biggest trades — only a handful per year. The gap is not the move; it is the announcement that a repricing has begun, and repricings take weeks to finish. Everything that makes them work is knowable on the day.` },
+      { p: `These are the rarest setups in the book — only a handful a year. The gap is not the move; it is the announcement that a repricing has begun, and repricings take weeks to finish. Everything that makes them work is knowable on the day.` },
       { h: `How we measure it` },
       { ul: [
         `[b]Neglect before it[/b] — flat or basing for months with no big run behind it. A gap on an already-loved name is extension risk, not surprise. And it should be coming out of an orderly base, not out of a downtrend knife.`,
@@ -1826,7 +1825,7 @@ const PLAYBOOK_PIECES = [
         `[b]Trigger:[/b] it breaks support and [i]closes[/i] below it — not an intraday undercut — on an expanded down bar with volume above the prior day, closing in the bottom thirty percent of the range. A gap down through the level counts.`,
       ] },
       { h: `In practice` },
-      { p: `The short side is smaller by default and faster by nature — downside moves are quicker and more violent than the up moves that preceded them, so the trims come earlier. The regime dial matters more here than anywhere else: these trades work in the tapes where our long book should already be shrinking, which is precisely why the setup exists.` },
+      { p: `The short side is smaller by default: half the per-trade risk of a long, and total short exposure kept under half of what the long book would carry in a healthy tape. Targets are the 10- and 20-day lines, not a collapse. These trades work in the tapes where our long book should already be shrinking, which is precisely why the setup exists.` },
       { h: `Common mistakes` },
       { p: `Shorting a strong stock because it is up a lot — up a lot is not a signal, and a leader can stay parabolic far longer than the position can survive. Selling the intraday undercut before a close below the level, then getting reclaimed. Taking the first bounce off support as the breakdown. And carrying short-side size as if the risk were symmetric with the long side; it is not.` },
     ],
@@ -1839,11 +1838,11 @@ const PLAYBOOK_PIECES = [
       { h: `Defining the terms` },
       { p: `An entry is not a price — it's a moment when buyers prove control. The entry stack is the three parts that must agree before that moment counts: a trigger, a confirmation, and a stop. It is identical on every setup in this book.` },
       { h: `Why it matters` },
-      { p: `The entry is the only point in a trade where the risk is entirely in our hands, and the stack is what stops a good setup from becoming a bad position. Our own research on hundreds of opening-range trades found the bare trigger carries no edge at all until the volume gate is added — without real participation, the prettiest trigger is a trap.` },
+      { p: `The entry is the only point in a trade where the risk is entirely in our hands, and the stack is what stops a good setup from becoming a bad position. A trigger on its own proves very little: price pokes through levels all day long. What separates a breakout from a poke is participation, which is why the volume gate is not optional here — without it, the prettiest trigger is a trap.` },
       { h: `How we measure it` },
       { ul: [
         `[b]Trigger — the five-minute opening-range high.[/b] The first bar of the day defines the range; the break of its high is the earliest structural proof of demand. On the biggest gaps, the one-minute range serves the same job.`,
-        `[b]Confirmation — live relative volume, measured honestly.[/b] Today's volume against the same time of day on normal days — not against a full day's average.`,
+        `[b]Confirmation — live relative volume, measured honestly.[/b] Today's volume against the same time of day on normal days — not against a full day's average. The working bar: roughly forty percent of a full session's volume already done inside the first thirty minutes.`,
         `[b]Stop — the low of the day. Placed with the order, not after.[/b] The day's low is where the day's thesis died. If that distance is wider than about one daily range, the trade doesn't fit — pass or shrink.`,
       ] },
       { h: `In practice` },
@@ -1862,9 +1861,9 @@ const PLAYBOOK_PIECES = [
       { h: `Why it matters` },
       { p: `Two traders can hold the same dollar position and carry completely different risk; only the distance to the stop says which is which. Sizing from risk makes every loss cost roughly the same, which is what turns a losing streak into an inconvenience instead of an event.` },
       { h: `How we measure it` },
-      { p: `[b]Shares = (Account × Risk%) ÷ (Entry − Stop).[/b] A $100,000 account risking 0.4% is $400 of risk. Entry $50, stop $48 — $2 per share — is 200 shares. Do it out loud, every time, before the order exists. The anchors:` },
+      { p: `[b]Shares = (Account × Risk%) ÷ (Entry − Stop).[/b] A $100,000 account risking 0.3% is $300 of risk. Entry $50, stop $48 — $2 per share — is 150 shares. Do it out loud, every time, before the order exists. The anchors:` },
       { ul: [
-        `Per-trade risk: a fraction of one percent. We anchor around a quarter to half a percent — tighter after losses, never above one percent for any reason.`,
+        `Per-trade risk: a fraction of one percent. We anchor at a quarter to a third of a percent — tighter after losses, never above one percent for any reason.`,
         `Volatility does the scaling automatically: wilder stocks have wider stops, wider stops mean fewer shares. Same risk, different share counts — that's the system working, not a mistake.`,
         `Notional is an output, never a target. "How many shares can I afford" is the question that ends accounts.`,
       ] },
@@ -1887,7 +1886,7 @@ const PLAYBOOK_PIECES = [
       { ul: [
         `[b]Gate one — per-trade risk.[/b] The fraction of the account one stop-out may cost. The sizing formula enforces it.`,
         `[b]Gate two — open heat.[/b] The sum of every open position's distance to its stop: what today costs if [i]everything[/i] stops at once. Capped at roughly two percent of equity. Correlated names count as one bucket — three positions in one theme is one trade wearing three tickers.`,
-        `[b]Gate three — total exposure.[/b] How much of the account is deployed overnight at all. It breathes with the regime dial: full in confirmed tapes, a fraction in transition, near-zero in hostile ones.`,
+        `[b]Gate three — total exposure.[/b] How much of the account is deployed overnight at all — roughly thirty percent of the account as the standing ceiling, and it counts [i]every[/i] overnight position including the ones whose stops are already at break-even, because a gap can open below a stop and skip it. Risk-free is not exposure-free. Inside that ceiling it breathes with the regime dial: full in confirmed tapes, a fraction in transition, near-zero in hostile ones.`,
       ] },
       { h: `In practice` },
       { p: `All three are answered before an entry, in that order. A new setup that would breach the heat cap waits, or an existing stop tightens first to make room — the book pays for the new position out of risk it already carries. As stops trail up, heat falls on its own and the room comes back without a decision.` },
@@ -1928,8 +1927,9 @@ const PLAYBOOK_PIECES = [
       { p: `After a breakout works, the market usually pays fast — a sharp expansion over the first three to five sessions. The probability of a pullback or stall rises sharply after it, and the traders who never collect are the ones who round-trip their best entries.` },
       { h: `How we measure it` },
       { ul: [
-        `[b]Days three to five, or a fast fifteen-plus percent:[/b] sell a third to half. Move the stop on the remainder to break-even. The trade can no longer lose; psychology transforms.`,
-        `[b]Extension bands:[/b] we measure stretch as daily-ranges-above-the-50-day-line. Deep into the bands — the parabolic zone — sell another tranche [i]into[/i] the vertical move. Our own tracked history shows extreme extensions resolve down far more often than not.`,
+        `[b]Three to five R printing, or day three to five as the fallback:[/b] sell thirty to fifty percent. Move the stop on the remainder to break-even. The trade can no longer lose; psychology transforms. The profit trigger leads and the clock is the backstop — not the other way round.`,
+        `[b]Extension bands:[/b] we measure stretch as daily-ranges above the 50-day line. Under four is fresh and entries are allowed; around five, no adds and tighten; seven-and-a-half to eight is rare air where trims start scaling; near ten on a stock — six to seven on an index or leveraged fund — sell aggressively [i]into[/i] the move.`,
+        `[b]And the direction matters:[/b] extension is a measure of momentum quality, not a top signal. Our own tracked history is explicit — exits taken deep in the bands came out far better than exits taken shallow — and long-horizon research agrees that stretched names are weak for about a week and then outperform for months. So we trim into it. We never short it, and we never chase it.`,
         `[b]The rest rides[/b] — that's the next piece.`,
       ] },
       { h: `In practice` },
@@ -1946,12 +1946,12 @@ const PLAYBOOK_PIECES = [
       { h: `Defining the terms` },
       { p: `The runner is what survives the trim, and it is managed by one trailing rail — a moving average matched to the stock's tempo, read on daily closes only. The rail is not a target; it is the line whose loss ends the campaign.` },
       { h: `Why it matters` },
-      { p: `The runner piece exists for one reason: a single monster campaign a year does more for the account than fifty tidy scalps. You cannot know in advance which winner is the monster — so every runner gets the chance to become one.` },
+      { p: `The runner is where a good year separates from an average one. You cannot know in advance which winner keeps going for months — so every runner gets the chance to prove it, on a rail rather than on an opinion.` },
       { h: `How we measure it` },
       { ul: [
-        `Trail with a short rail on fast names and a slower rail on steady ones — one rail per trade, chosen at the trim, never switched mid-flight to justify holding.`,
+        `The rails we use: the 9- and 21-day exponential averages for the trail itself, read against the 10/20/50-day simple lines that define the trend on the daily chart. Fast names ride the faster rail, steadier ones the slower — one rail per trade, chosen at the trim, never switched mid-flight to justify holding.`,
         `[b]Daily closes only.[/b] Intraday stabs through the rail are the market collecting the impatient. The close is the verdict.`,
-        `The campaign ends when the closes say so: a decisive close below the rail, or the structure of higher lows breaking.`,
+        `The campaign ends when the closes say so: the first decisive daily close below the rail, or the structure of higher lows breaking.`,
       ] },
       { h: `In practice` },
       { p: `A brief undercut that closes back above the rail is not an exit — reclaim-tolerance is what keeps you in the trends that matter. The rail is checked once, after the close, and the next day's action is decided then; nothing about a runner is decided in the middle of a session.` },
@@ -1992,8 +1992,8 @@ const PLAYBOOK_PIECES = [
       { h: `How we measure it` },
       { ul: [
         `[b]Consecutive stop-outs, or the feel of "burning profits away":[/b] stop trading, diagnose in the journal before the next order. Drift talk is the alarm — the entries taken to feel traction are the streak's favorite food.`,
-        `[b]Mechanical de-grossing:[/b] as the month's drawdown deepens, cut new-trade size in steps — three-quarters, half, a quarter. No debate, no exceptions; the schedule decides so you don't have to.`,
-        `[b]The full breaker:[/b] at a hard drawdown-from-peak line, flat the book, stand down, and spend a full day in the journal before the next trade.`,
+        `[b]Mechanical de-grossing:[/b] as the month's drawdown deepens, cut new-trade size in steps — down three percent, trade at three-quarters size; down five, half; down seven, a quarter. No debate, no exceptions; the schedule decides so you don't have to.`,
+        `[b]The full breaker:[/b] ten percent down from peak equity — flat the book, stand down, and spend a full day in the journal before the next trade.`,
         `[b]The review:[/b] pull the last twenty trades. Were the setups A-grade or stretched? Were the gates respected or argued with? Did the regime dial already say no? The answers are always obvious in hindsight — the protocol's job is to force the hindsight [i]now[/i].`,
       ] },
       { h: `In practice` },
@@ -2010,7 +2010,7 @@ const PLAYBOOK_PIECES = [
       { h: `Defining the terms` },
       { p: `The most common failure inside any framework is not breaking the rules — it's freezing inside them. Progress over perfection is the counter-rule: take the trade the system flagged, at a size you can survive being wrong at, and let the number of correct repetitions do the work that certainty never will.` },
       { h: `Why it matters` },
-      { p: `Every study in our vault — hundreds of historical campaigns, measured — says the same thing: the edge is small per trade and enormous per decade. The traders who compound are not the ones who were most often right; they're the ones who kept showing up, at survivable size, doing the same boring correct things.` },
+      { p: `The edge in this book is small on any single trade and only shows up over a long run of them. The traders who compound are not the ones who were most often right; they're the ones who kept showing up, at survivable size, doing the same boring correct things.` },
       { h: `How we measure it` },
       { ul: [
         `Trade small when unsure — shrinking the stakes of one decision cures most paralysis.`,
@@ -2028,12 +2028,12 @@ const PLAYBOOK_PIECES = [
 ];
 
 const PLAYBOOK_CARD = [
-  [`The three nets`, `Movers ladder (1M/3M/6M top gainers, liquidity- and volatility-gated) · CANSLIM scanner (EPS latest qtr >25% · 3-yr avg EPS >25% · sales latest qtr >25% · RS 6M >80 · within 15% of the 52-week high · avg vol 50d >100K · price >$10) · pre-market gappers, the net that finds episodic pivots.`],
+  [`The three nets`, `Movers ladder (1M/3M/6M top gainers, liquidity- and volatility-gated) · CANSLIM scanner (price >$3 · cap >$300M · revenue qtrly YoY >25% · avg vol 60d >500K · price above the 50-day · volatility >3% · float <150M · ≥70% above the 52-week low) · pre-market gappers, the net that finds episodic pivots.`],
   [`The five setups`, `Volatility contraction pattern · high tight flag · undercut and rally · episodic pivot · parabolic short / breakdown — the short side only after a top is already in.`],
-  [`Sizing`, `Shares = (Account × Risk%) ÷ (Entry − Stop) · risk ¼–½% per trade · open heat ≤ ~2% · exposure per the regime dial.`],
+  [`Sizing`, `Shares = (Account × Risk%) ÷ (Entry − Stop) · risk ¼–⅓% per trade · open heat ≤ ~2% · overnight exposure ≤ ~30% incl. break-even positions.`],
   [`The candidate bar`, `In-theme (top-5 boards) · high RS rank across 1/3/6 months · real liquidity (dollar [i]and[/i] share volume) · volatile enough to pay · fresh, not extended from the 50-day.`],
   [`Entry`, `5-minute opening-range high · time-matched relative volume confirming · stop = low of day, ≤ ~1 daily range, placed with the order.`],
-  [`Campaign`, `T+3–5: trim ⅓–½, stop to break-even · extension bands: sell into verticals · trail the rest on one rail, daily closes, reclaim-tolerant · adds only at new structure with rising stops.`],
+  [`Campaign`, `+3R–5R (or T+3–5 as the fallback): trim 30–50%, stop to break-even · extension bands: trim into verticals, never short them · trail the rest on one rail, daily closes, reclaim-tolerant · adds only at new structure with rising stops.`],
   [`No-buy — any yes kills it`, `Breadth red? · Off-theme / off-the-floor? · Extended? · Loose base? · No volume? · Earnings ≤ 5 sessions? · Heat at cap? · Trading a feeling?`],
   [`Survival`, `Streak or drift-talk → stop and diagnose · de-gross in steps as the month draws down · hard line → flat, stand down, journal day.`],
 ];
@@ -2127,11 +2127,11 @@ export function openPlaybookBook() {
             <div class="pcH pbindname">${esc(ind.name)}</div>
             <div class="pcM pbindwhat">${pbRich(ind.what)}</div>
             <div class="pcM pbinduse">${pbRich(ind.use)}</div>
-            ${ind.url ? `<a class="pbindlink" href="${esc(ind.url)}" target="_blank" rel="noopener">${esc(ind.url.replace("https://www.", ""))}</a>` : `<div class="pbindlink pbindbuiltin">Built into TradingView \u2014 add “Moving Average Ribbon”, then set the periods above</div>`}
+            ${ind.url ? `<a class="pbindlink" href="${esc(ind.url)}" target="_blank" rel="noopener">${esc(ind.url.replace("https://www.", ""))}</a>` : `<div class="pbindlink pbindbuiltin">Built into TradingView — add “Moving Average Ribbon”, then set the periods above</div>`}
           </div>`).join("")}
       </div>
     </div>
-    <div class="pbfolio"><span>Building Blocks</span><span>Appendix \u00b7 The chart</span></div>
+    <div class="pbfolio"><span>Building Blocks</span><span>Appendix · The chart</span></div>
   </div>`;
   const card = `<div class="page pbpiece pcRule" id="card" style="max-width:1060px">
     <div class="pbgrid">
@@ -2867,7 +2867,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   // Admin click-to-publish (Valen 2026-07-31): flips is_published on the dive's project rows —
   // the SAME mechanism as the scripted launch, now a button. Mentor-name sweep gates every publish;
   // this is an admin CLICK, never a deploy-time write (deploys-never-touch-member-data).
-  const DIVE_SWEEP = /qulla|kullam|minervini|o['\u2019]?neil\b|zanger|bonde|stockbee|jlaw|jeff\s*sun|martin\s*luk|pradeep|easyguru|ritchie|hernandez/i;
+  const DIVE_SWEEP = /qulla|kullam|minervini|o['’]?neil\b|zanger|bonde|stockbee|jlaw|jeff\s*sun|martin\s*luk|pradeep|easyguru|ritchie|hernandez/i;
   const toggleDivePublish = async (d) => {
     const live = d.rows.some(r => r.is_published);
     if (!live) {
