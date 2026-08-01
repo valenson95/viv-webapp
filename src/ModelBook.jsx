@@ -2322,24 +2322,26 @@ export function openPlaybookBook() {
       @media(max-width:620px){.pbflowphase,.pbflowstep{grid-template-columns:54px minmax(0,1fr);gap:18px}.pbflownode{width:54px;height:54px}.pbflownode svg{width:26px;height:26px}.pbflowconn{width:54px}}
       @media print{.pbflowstep,.pbflowphase{break-inside:avoid;page-break-inside:avoid}}
       @media screen and (prefers-reduced-motion: no-preference){
-        @keyframes pbflowin{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
-        @keyframes pbflowdraw{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-        .pbflow .pbflowphase,.pbflow .pbflowstep{animation:pbflowin .45s cubic-bezier(.2,.7,.3,1) backwards}
-        .pbflow .pbflowline{transform-origin:top;animation:pbflowdraw .3s linear backwards}
-        .pbflow .pbflowchev{animation:pbflowin .3s ease-out backwards}
-        .pbflow > *:nth-child(1){animation-delay:.05s}
-        .pbflow > *:nth-child(2){animation-delay:.20s}
-        .pbflow > *:nth-child(3){animation-delay:.38s}
-        .pbflow > *:nth-child(4){animation-delay:.53s}
-        .pbflow > *:nth-child(5){animation-delay:.71s}
-        .pbflow > *:nth-child(6){animation-delay:.86s}
-        .pbflow > *:nth-child(7){animation-delay:1.04s}
-        .pbflow > *:nth-child(8){animation-delay:1.19s}
-        .pbflow > *:nth-child(9){animation-delay:1.37s}
-        .pbflow > *:nth-child(10){animation-delay:1.52s}
-        .pbflow > *:nth-child(11){animation-delay:1.70s}
-        .pbflow > *:nth-child(12){animation-delay:1.85s}
-        .pbflow .pbflowconn .pbflowline{animation-delay:inherit}
+        @supports (animation-timeline: view()){
+          @keyframes pbflowin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+          @keyframes pbflowdraw{from{transform:scaleY(0);opacity:.35}to{transform:scaleY(1);opacity:1}}
+          .pbflow .pbflowphase,.pbflow .pbflowstep{
+            animation:pbflowin linear both;
+            animation-timeline:view();
+            animation-range:entry 4% entry 72%;
+          }
+          .pbflow .pbflowline{
+            transform-origin:top;
+            animation:pbflowdraw linear both;
+            animation-timeline:view();
+            animation-range:entry 8% entry 78%;
+          }
+          .pbflow .pbflowchev{
+            animation:pbflowin linear both;
+            animation-timeline:view();
+            animation-range:entry 30% entry 88%;
+          }
+        }
       }
       .pbind{margin-top:34px;padding-top:22px;border-top:1px solid rgba(255,255,255,0.08);max-width:70ch}
       body.light .pbind{border-top-color:rgba(23,21,15,0.12)}
