@@ -1456,6 +1456,42 @@ const PLAYBOOK_PARTS = [
     blurb: "Every edge is worthless to a trader who is no longer trading. Losing streaks are a property of the strategy, not a verdict on you — these two pieces are how we shrink mechanically, stay in the chair, and let the reps compound." },
 ];
 
+// PLAYBOOK_INDICATORS (Valen 2026-08-01): the chart itself — the five indicators his system reads,
+// each tied to the rule in this book that consumes it. Links are the public TradingView scripts
+// (verified 200 OK); the MA ribbon is TradingView's built-in with his own periods.
+const PLAYBOOK_INDICATORS = [
+  {
+    name: "ADR% / ATR / LoD dist. Table",
+    url: "https://www.tradingview.com/script/6A822fQ5-ADR-ATR-LoD-dist-Table/",
+    what: "A small on-chart table reading three numbers at once: average daily range as a percentage, average true range, and how far price currently sits from the low of the day.",
+    use: "This is the entry gate made visible. Our stop is the low of the day, so the distance to it [i]is[/i] our risk — and the rule is that it must stay inside about one daily range. The table answers, before the click, the only two questions that decide the trade's size: how far away is the stop, and is that distance sane for this stock's normal range. If the LoD distance is already wide when the trigger fires, the trade doesn't fit — pass or shrink it.",
+  },
+  {
+    name: "TraderLion's Relative Strength Line",
+    url: "https://www.tradingview.com/script/N4Iqr5Cz-TraderLion-s-Relative-Strength-Line/",
+    what: "Plots the stock divided by the index as a line beneath price, and marks when that line reaches a new high — including when it does so before the stock itself does.",
+    use: "This is how we check relative strength, and it is the cleanest tell in the book. What we want to see: the line making higher highs while the market chops, and a new RS high [i]before[/i] the breakout — that is institutional buying showing up in public. What kills a candidate: the line rolling over while price still looks fine, and the line falling to new lows on a bounce day. At index lows the reading is decisive — a stock holding a higher low against the index's lower low is the signature of the next cycle's leader.",
+  },
+  {
+    name: "Swing Data — ADR% / RVol / PVol / Float / Avg Vol",
+    url: "https://www.tradingview.com/script/uloAa2EI-Swing-Data-ADR-RVol-PVol-Float-Avg-Vol/",
+    what: "One panel carrying the swing-trade vitals: average daily range percentage, relative volume, pre-market volume, float, and average volume.",
+    use: "The candidate bar, on the chart instead of in a spreadsheet. ADR% must clear our volatility floor — a stock that doesn't travel cannot pay for its stop. Average volume and float are the liquidity and scarcity checks the CANSLIM screen enforces, re-read here on the individual name. Pre-market volume is the first honest read on a gapper before the bell: real interest shows up early, and a gap with nothing behind it in pre-market is usually a gap that sells.",
+  },
+  {
+    name: "IBD Style Relative Volume — Intraday Adjusted",
+    url: "https://www.tradingview.com/script/p9PqBCAX-IBD-Style-Relative-Volume-Intraday-Adjusted/",
+    what: "Relative volume measured against the same time of day on normal days, rather than against a full session's average.",
+    use: "The single most important distinction in the entry stack. At 9:45 a stock has traded a fraction of its day, so comparing that against a full-day average always reads low and tells you nothing — the time-matched version tells you whether [i]this[/i] morning is unusual. Our rule: the trigger alone carries no edge until participation confirms it. This indicator is what confirms it. Once a position is held, we switch back to the daily reading against the 50-day average — intraday for the entry, daily for the hold.",
+  },
+  {
+    name: "Moving Average Ribbon",
+    url: "",
+    what: "TradingView's built-in ribbon, set to our own periods: [b]SMA 10 / 20 / 50 / 200 on daily charts[/b], and [b]EMA 10 / 20 / 65 on intraday charts[/b].",
+    use: "The rails. On the daily they define trend health and the shape of every base — price surfing the rising 10 and 20 into a pivot, the 50 as the line a leader defends, the 200 as the boundary between an uptrend and a repair job. Convergence of the short lines at a pivot is a coil tell. On intraday charts the faster set does the same job inside the day: the entry-day trend is intact while price holds above them, and losing them is the first sign the day's thesis is failing. One ribbon, two timeframes, the same question — is this still in gear?",
+  },
+];
+
 const PLAYBOOK_PIECES = [
   {
     no: "01", part: 0, title: `The regime dial`, sub: `Breadth decides how aggressive you are allowed to be`,
@@ -2022,6 +2058,10 @@ export function openPlaybookBook() {
       ).join("");
       return `<div class="pbcgroup"><div class="pbcyear">${esc(part.toc)}</div>${rowsHtml}</div>`;
     }).join("")}
+    <div class="pbcgroup"><div class="pbcyear">Appendix</div>
+      <a class="pbcrow" href="#indicators"><span class="pbcno">—</span><span class="pbctk">The instrument panel</span><span class="pbctheme">five indicators, and the rule each one serves</span><span class="pbcdots"></span></a>
+      <a class="pbcrow" href="#card"><span class="pbcno">—</span><span class="pbctk">The one-page card</span><span class="pbctheme">everything you check before the click</span><span class="pbcdots"></span></a>
+    </div>
     <div class="pbfoot">Twenty-one pieces · six parts · the system, front to back.</div>
   </div>`;
   const body = PLAYBOOK_PARTS.map((part, pi) => {
@@ -2069,6 +2109,30 @@ export function openPlaybookBook() {
     }).join("");
     return divider + pieces;
   }).join("");
+  const indicators = `<div class="page pbpiece pcRule" id="indicators" style="max-width:1060px">
+    <div class="pbgrid">
+      <div>
+        <div class="pcK pbkick">Appendix</div>
+        <div class="pcH pbpart">The chart</div>
+        <div class="pbpmark"></div>
+      </div>
+      <div style="min-width:0">
+        <div class="pcH pbhead">The instrument panel</div>
+        <div class="pcD pbsub">Five indicators, and the rule each one serves</div>
+        <div class="pcRule pbhair"></div>
+        <div class="pcM pbp">Nothing on our charts is decorative. Each of these answers one question the system already asks — how far away is the stop, is this name outperforming, does it move enough to pay, is anyone actually here this morning, and is the trend still in gear. Add them once, and the chart starts arguing back.</div>
+        ${PLAYBOOK_INDICATORS.map((ind, i) => `
+          <div class="pcBlk pbind">
+            <div class="pcK pbindno">${String(i + 1).padStart(2, "0")}</div>
+            <div class="pcH pbindname">${esc(ind.name)}</div>
+            <div class="pcM pbindwhat">${pbRich(ind.what)}</div>
+            <div class="pcM pbinduse">${pbRich(ind.use)}</div>
+            ${ind.url ? `<a class="pbindlink" href="${esc(ind.url)}" target="_blank" rel="noopener">${esc(ind.url.replace("https://www.", ""))}</a>` : `<div class="pbindlink pbindbuiltin">Built into TradingView \u2014 add “Moving Average Ribbon”, then set the periods above</div>`}
+          </div>`).join("")}
+      </div>
+    </div>
+    <div class="pbfolio"><span>Building Blocks</span><span>Appendix \u00b7 The chart</span></div>
+  </div>`;
   const card = `<div class="page pbpiece pcRule" id="card" style="max-width:1060px">
     <div class="pbgrid">
       <div>
@@ -2118,7 +2182,7 @@ export function openPlaybookBook() {
       body.light .pcK{color:#8a6a1c}
       .pcTick{color:#c9982a}
       body.light .pcTick{color:#8a6a1c}
-      @media print{.pcBlk,.pbli,.pbtake,.pbcardsec,.pbcrow,.pbfig,.pbkv{break-inside:avoid;page-break-inside:avoid}}
+      @media print{.pcBlk,.pbli,.pbtake,.pbcardsec,.pbcrow,.pbfig,.pbkv,.pbind{break-inside:avoid;page-break-inside:avoid}}
       /* ── COVER ── */
       .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
       .pblogo{height:54px;width:auto;align-self:flex-start;margin-bottom:20px}
@@ -2182,6 +2246,16 @@ export function openPlaybookBook() {
       .pbtake{margin-top:36px;padding-top:18px;max-width:62ch}
       .pbtakel{font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase}
       .pbtaket{font-size:1.02rem;font-weight:600;line-height:1.6;margin-top:10px}
+      .pbind{margin-top:34px;padding-top:22px;border-top:1px solid rgba(255,255,255,0.08);max-width:70ch}
+      body.light .pbind{border-top-color:rgba(23,21,15,0.12)}
+      .pbindno{font-size:0.64rem;letter-spacing:0.16em}
+      .pbindname{font-size:1.12rem;font-weight:700;line-height:1.35;margin-top:8px}
+      .pbindwhat{font-size:0.95rem;line-height:1.7;margin-top:10px}
+      .pbinduse{font-size:1rem;line-height:1.75;margin-top:12px}
+      .pbindlink{display:inline-block;margin-top:12px;font-family:'Geist Mono',monospace;font-size:0.74rem;color:#c9982a;text-decoration:none;border-bottom:1px solid rgba(201,152,42,0.4);padding-bottom:2px;word-break:break-all}
+      body.light .pbindlink{color:#8a6a1c;border-bottom-color:rgba(138,106,28,0.4)}
+      .pbindbuiltin{border-bottom:none;color:#9a968c}
+      body.light .pbindbuiltin{color:#8a857a}
       .pbcardsec{margin-top:28px;max-width:70ch}
       .pbcardk{font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase}
       .pbcardx{font-size:0.95rem;line-height:1.8;letter-spacing:0.01em;margin-top:8px}
@@ -2216,6 +2290,7 @@ export function openPlaybookBook() {
     ${cover}
     ${contents}
     ${body}
+    ${indicators}
     ${card}
     <div class="zoomov" id="zoomov"><img id="zoomim" alt=""/></div>
     <script>
