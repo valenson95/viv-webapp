@@ -186,7 +186,7 @@ const PROJECT_PREFACE = {
         ["Structure over story", "Every study asks the same questions: what did the base look like, what triggered, what did volume do, where did the trend die. The narrative changes; the checklist does not."],
         ["Both directions", "Breakdowns are graded with the same rigor as breakouts — the mirror image. Knowing how leaders die is half of knowing how to hold them."],
       ]},
-      { n: "04", kicker: "The eras", title: "Twenty years, every regime.", rows: [
+      { n: "04", kicker: "The eras", title: "Twenty-six years, every regime.", rows: [
         ["2000 \u00b7 The mania", "The dot-com blow-off — the book opens with a breakout that doubled in three months, at the top of an era about to end."],
         ["2003\u00b72006 \u00b7 The first cycle", "Out of the post-crash wasteland: the first turn, the stair-step campaigns, the dual-core run — and the 2006 breakdown that ended it."],
         ["2016–2018 · The turnaround", "From left-for-dead to the strongest chart in the index — the Ryzen/EPYC re-rating, ending in the July 2018 earnings gap that doubled the stock in seven weeks."],
@@ -235,8 +235,8 @@ const PROJECT_PREFACE = {
 const DEEP_DIVES = [
   {
     no: "02", slug: "amd-chronicle", project: "AMD Chronicle",
-    title: "AMD \u2014 20 Years Through Every Market Cycle", // HIS title, 2026-07-31
-    premise: "Hold the company constant and the regimes become the variable. Twenty years of AMD — the dot-com mania, the first cycle, the turnaround, two crashes, a two-thirds bear, and the AI era — every setup class graded on the same card.",
+    title: "AMD \u2014 26 Years Through Every Market Cycle", // HIS title, 2026-08-01 (was 20 Years)
+    premise: "Hold the company constant and the regimes become the variable. Twenty-six years of AMD — the dot-com mania, the first cycle, the turnaround, two crashes, a two-thirds bear, and the AI era — every setup class graded on the same card.",
     updated: "2026-08-01",
     cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/amd-chronicle-cover.png",
   },
@@ -1030,11 +1030,11 @@ function openProjectBookPdf(rows, coverTitle) {
         };
         const supporting = restSlots.map((x) => chartBlock2(x.img, titleOf(x), subOf(x), x === restSlots[0])).join("");
         const nSupport = restSlots.length;
-        const critList = ticked.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 26px;margin:18px 0 0">${ticked.map((it) => `<div class="pcM" style="font-size:0.86rem;line-height:1.5">\u2713&nbsp; ${esc(it[1])}</div>`).join("")}</div>` : "";
+        const critList = ticked.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 26px;margin:18px 0 0">${ticked.map((it) => `<div class="pcM" style="font-size:0.86rem;line-height:1.5"><span class="pcTick">\u2713</span>&nbsp; ${esc(it[1])}</div>`).join("")}</div>` : "";
         return `<div class="page pbstudy pcRule" id="e${idx}" style="max-width:1060px">
           <div style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:52px">
             <div>
-              <div class="pcD" style="font-family:'Geist Mono',monospace;font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase">Study ${String(idx + 1).padStart(2, "0")} of ${String(rows.length).padStart(2, "0")}</div>
+              <div class="pcK" style="font-family:'Geist Mono',monospace;font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase">Study ${String(idx + 1).padStart(2, "0")} of ${String(rows.length).padStart(2, "0")}</div>
               <div class="pcH" style="font-size:1.02rem;font-weight:650;line-height:1.4;margin-top:12px">${esc(r.entry_date || "")}</div>
               <div class="pcM" style="font-size:0.82rem;margin-top:6px;line-height:1.5">${esc(study.setup)}${study.direction === "short" ? " \u00b7 short side" : ""}</div>
             </div>
@@ -1044,7 +1044,7 @@ function openProjectBookPdf(rows, coverTitle) {
                             ${heroSlot ? chartBlock2(heroSlot.img, "The setup", subOf(heroSlot), true) : ""}
               ${stats ? `<div class="pcD" style="font-family:'Geist Mono',monospace;font-size:0.78rem;margin:22px 0 0">${stats}</div>` : ""}
               ${nSupport ? `<details class="pcExp"><summary class="pcM">${nSupport} more chart${nSupport > 1 ? "s" : ""} \u00b7 ${restSlots.map((x) => titleOf(x).toLowerCase()).join(" + ")}</summary>${supporting}</details>` : ""}
-              ${ticked.length ? `<details class="pcExp"><summary class="pcM">Criteria \u00b7 ${ticked.length} of ${scored.length} met \u2713</summary>${critList}</details>` : ""}
+              ${ticked.length ? `<details class="pcExp"><summary class="pcM">Criteria \u00b7 ${ticked.length} of ${scored.length} met <span class="pcTick">\u2713</span></summary>${critList}</details>` : ""}
             </div>
           </div>
           ${folio}
@@ -1145,19 +1145,23 @@ function openProjectBookPdf(rows, coverTitle) {
       body.light .pcDot{color:rgba(23,21,15,0.2)}
       /* .chron — full monochrome for chronicle books (Valen 2026-07-31: one design language, no
          brand gold; Market Bottom keeps its approved look — this scopes to non-MB books only) */
-      .chron .pbbrand,.chron .pfn,.chron .pfdefk,.chron .pfrown,.chron .pbcyear,.chron .pbhid,.chron .pbtsec,.chron .pbepcount,.chron .pbthesis .pblabel{color:#7f7c74}
+      .chron .pbbrand,.chron .pfrown,.chron .pbcyear,.chron .pbhid,.chron .pbtsec,.chron .pbepcount,.chron .pbthesis .pblabel{color:#7f7c74}
       .chron .pfcy,.chron .pfpull,.chron .pbcret,.chron .pbvbarstat,.chron .pbvpill.g,.chron .pbpill-r{color:#ececea}
-      .chron .pbrule{background:rgba(255,255,255,0.3)}
       .chron .pfdef{border-left-color:rgba(255,255,255,0.28)}
       .chron .pbtfill{background:rgba(255,255,255,0.42)}
       .chron .pbtkg{color:#9a978f}
       .chron .pbdivnum{color:rgba(255,255,255,0.07)}
       body.light.chron .pbdivnum{color:rgba(23,21,15,0.08)}
-      .chron .pblogo{filter:grayscale(1) brightness(1.7)}
-      body.light.chron .pblogo{filter:grayscale(1) brightness(0.45)}
-      body.light.chron .pbbrand,body.light.chron .pfn,body.light.chron .pfdefk,body.light.chron .pfrown,body.light.chron .pbcyear,body.light.chron .pbhid,body.light.chron .pbtsec,body.light.chron .pbepcount,body.light.chron .pbthesis .pblabel{color:#8a857a}
+      .chron .pbepstats{color:#c9982a}
+      body.light.chron .pbepstats{color:#8a6a1c}
+      .pcK{color:#c9982a}
+      body.light .pcK{color:#8a6a1c}
+      .pcTick{color:#c9982a}
+      body.light .pcTick{color:#8a6a1c}
+      .chron .pcExp>summary::before{color:#c9982a}
+      body.light.chron .pcExp>summary::before{color:#8a6a1c}
+      body.light.chron .pbbrand,body.light.chron .pfrown,body.light.chron .pbcyear,body.light.chron .pbhid,body.light.chron .pbtsec,body.light.chron .pbepcount,body.light.chron .pbthesis .pblabel{color:#8a857a}
       body.light.chron .pfcy,body.light.chron .pfpull,body.light.chron .pbcret,body.light.chron .pbvbarstat,body.light.chron .pbvpill.g,body.light.chron .pbpill-r{color:#17150f}
-      body.light.chron .pbrule{background:rgba(23,21,15,0.3)}
       body.light.chron .pfdef{border-left-color:rgba(23,21,15,0.25)}
       body.light.chron .pbtfill{background:rgba(23,21,15,0.4)}
       .pcExp{margin:26px 0 0}
