@@ -2070,35 +2070,40 @@ export function openPlaybookBook() {
   const cover = `<div class="page pbcover">
     <img class="pblogo" src="${esc(window.location.origin)}/logo-mark.png"/>
     <div class="pbbrand">The VIV System</div>
-    <h1 class="pbtitle">21 Building Blocks to Profitability</h1>
+    <h1 class="pbtitle">21 <span class="pbtitlegold">Building Blocks</span> to Profitability</h1>
     <div class="pbrule"></div>
     <div class="pbmeta">Six parts · from the weather to keeping the roof on · 2026</div>
   </div>`;
   const flowChev = `<svg class="pbflowchev" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1.5 6 6.5 11 1.5"/></svg>`;
   const roadArt = `<div class="pbroadart" aria-hidden="true">
-    <svg viewBox="0 0 190 940" preserveAspectRatio="xMidYMid meet" fill="none">
-      <!-- raised side wall, offset like the reference so the ribbon reads as a surface -->
-      <path d="M42.0 892.0 C39.3 876.7 22.5 830.3 26.0 800.0 C29.5 769.7 53.0 740.0 63.0 710.0 C73.0 680.0 86.3 650.0 86.0 620.0 C85.7 590.0 68.0 560.0 61.0 530.0 C54.0 500.0 41.0 470.0 44.0 440.0 C47.0 410.0 68.8 379.7 79.0 350.0 C89.2 320.3 101.3 291.0 105.0 262.0 C108.7 233.0 101.7 190.3 101.0 176.0 L115.0 176.0 C117.0 190.3 128.0 233.0 127.0 262.0 C126.0 291.0 116.2 320.3 109.0 350.0 C101.8 379.7 83.7 410.0 84.0 440.0 C84.3 470.0 100.7 500.0 111.0 530.0 C121.3 560.0 142.3 590.0 146.0 620.0 C149.7 650.0 139.7 680.0 133.0 710.0 C126.3 740.0 105.8 769.7 106.0 800.0 C106.2 830.3 129.3 876.7 134.0 892.0 Z" fill="currentColor" fill-opacity="0.11" transform="translate(9,11)"/>
-      <!-- the road, wide at the near end and narrowing as it recedes -->
-      <path d="M42.0 892.0 C39.3 876.7 22.5 830.3 26.0 800.0 C29.5 769.7 53.0 740.0 63.0 710.0 C73.0 680.0 86.3 650.0 86.0 620.0 C85.7 590.0 68.0 560.0 61.0 530.0 C54.0 500.0 41.0 470.0 44.0 440.0 C47.0 410.0 68.8 379.7 79.0 350.0 C89.2 320.3 101.3 291.0 105.0 262.0 C108.7 233.0 101.7 190.3 101.0 176.0 L115.0 176.0 C117.0 190.3 128.0 233.0 127.0 262.0 C126.0 291.0 116.2 320.3 109.0 350.0 C101.8 379.7 83.7 410.0 84.0 440.0 C84.3 470.0 100.7 500.0 111.0 530.0 C121.3 560.0 142.3 590.0 146.0 620.0 C149.7 650.0 139.7 680.0 133.0 710.0 C126.3 740.0 105.8 769.7 106.0 800.0 C106.2 830.3 129.3 876.7 134.0 892.0 Z" fill="currentColor" fill-opacity="0.32"/>
-      <path d="M42.0 892.0 C39.3 876.7 22.5 830.3 26.0 800.0 C29.5 769.7 53.0 740.0 63.0 710.0 C73.0 680.0 86.3 650.0 86.0 620.0 C85.7 590.0 68.0 560.0 61.0 530.0 C54.0 500.0 41.0 470.0 44.0 440.0 C47.0 410.0 68.8 379.7 79.0 350.0 C89.2 320.3 101.3 291.0 105.0 262.0 C108.7 233.0 101.7 190.3 101.0 176.0 L115.0 176.0 C117.0 190.3 128.0 233.0 127.0 262.0 C126.0 291.0 116.2 320.3 109.0 350.0 C101.8 379.7 83.7 410.0 84.0 440.0 C84.3 470.0 100.7 500.0 111.0 530.0 C121.3 560.0 142.3 590.0 146.0 620.0 C149.7 650.0 139.7 680.0 133.0 710.0 C126.3 740.0 105.8 769.7 106.0 800.0 C106.2 830.3 129.3 876.7 134.0 892.0 Z" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.3"/>
+    <svg viewBox="0 0 190 960" preserveAspectRatio="xMidYMid meet" fill="none">
+      <!-- side wall, offset so the ribbon reads as a raised surface -->
+      <path d="M34.0 900.0 C31.8 880.3 19.5 821.3 21.0 782.0 C22.5 742.7 32.3 703.3 43.0 664.0 C53.7 624.7 75.7 585.3 85.0 546.0 C94.3 506.7 98.7 466.3 99.0 428.0 C99.3 389.7 89.0 351.3 87.0 316.0 C85.0 280.7 87.0 232.7 87.0 216.0 L109.0 216.0 C111.0 232.7 114.3 280.7 121.0 316.0 C127.7 351.3 144.0 389.7 149.0 428.0 C154.0 466.3 155.0 506.7 151.0 546.0 C147.0 585.3 130.3 624.7 125.0 664.0 C119.7 703.3 114.8 742.7 119.0 782.0 C123.2 821.3 144.8 880.3 150.0 900.0 Z" fill="currentColor" fill-opacity="0.09" transform="translate(8,10)"/>
+      <!-- the road: wide at the near end, narrowing as it recedes -->
+      <path d="M34.0 900.0 C31.8 880.3 19.5 821.3 21.0 782.0 C22.5 742.7 32.3 703.3 43.0 664.0 C53.7 624.7 75.7 585.3 85.0 546.0 C94.3 506.7 98.7 466.3 99.0 428.0 C99.3 389.7 89.0 351.3 87.0 316.0 C85.0 280.7 87.0 232.7 87.0 216.0 L109.0 216.0 C111.0 232.7 114.3 280.7 121.0 316.0 C127.7 351.3 144.0 389.7 149.0 428.0 C154.0 466.3 155.0 506.7 151.0 546.0 C147.0 585.3 130.3 624.7 125.0 664.0 C119.7 703.3 114.8 742.7 119.0 782.0 C123.2 821.3 144.8 880.3 150.0 900.0 Z" fill="currentColor" fill-opacity="0.2"/>
+      <path d="M34.0 900.0 C31.8 880.3 19.5 821.3 21.0 782.0 C22.5 742.7 32.3 703.3 43.0 664.0 C53.7 624.7 75.7 585.3 85.0 546.0 C94.3 506.7 98.7 466.3 99.0 428.0 C99.3 389.7 89.0 351.3 87.0 316.0 C85.0 280.7 87.0 232.7 87.0 216.0 L109.0 216.0 C111.0 232.7 114.3 280.7 121.0 316.0 C127.7 351.3 144.0 389.7 149.0 428.0 C154.0 466.3 155.0 506.7 151.0 546.0 C147.0 585.3 130.3 624.7 125.0 664.0 C119.7 703.3 114.8 742.7 119.0 782.0 C123.2 821.3 144.8 880.3 150.0 900.0 Z" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1.2"/>
       <!-- centre dashes, shortening with distance -->
-      <g stroke="currentColor" stroke-opacity="0.9" stroke-linecap="round" fill="none">
-        <path d="M88.0 892.0 C84.3 876.7 64.3 830.3 66.0 800.0 C67.7 769.7 89.7 740.0 98.0 710.0 C106.3 680.0 118.0 650.0 116.0 620.0 C114.0 590.0 94.7 560.0 86.0 530.0 C77.3 500.0 62.7 470.0 64.0 440.0 C65.3 410.0 85.3 379.7 94.0 350.0 C102.7 320.3 113.7 291.0 116.0 262.0 C118.3 233.0 109.3 190.3 108.0 176.0" stroke-width="3.4" stroke-dasharray="26 24" pathLength="100" stroke-dashoffset="0"/>
-      </g>
-      <!-- the trader, standing where the road starts -->
+      <path d="M92.0 900.0 C88.3 880.3 71.3 821.3 70.0 782.0 C68.7 742.7 76.0 703.3 84.0 664.0 C92.0 624.7 111.3 585.3 118.0 546.0 C124.7 506.7 126.3 466.3 124.0 428.0 C121.7 389.7 108.3 351.3 104.0 316.0 C99.7 280.7 99.0 232.7 98.0 216.0" fill="none" stroke="currentColor" stroke-opacity="0.75"
+            stroke-width="3.2" stroke-linecap="round" stroke-dasharray="30 26"/>
+      <!-- the trader, at the near end -->
       <g fill="currentColor">
-        <ellipse cx="86" cy="880" rx="17" ry="4" opacity="0.3"/>
-        <circle cx="86" cy="822" r="8"/>
-        <path d="M78 832h16l4 26h-5l-3 21h-8l-3-21h-5z"/>
+        <ellipse cx="90" cy="884" rx="19" ry="4.5" opacity="0.3"/>
+        <circle cx="90" cy="826" r="8.5"/>
+        <path d="M81.5 837h17l4 28h-5.5l-3 22h-8l-3-22H77.5z"/>
       </g>
-      <!-- profitability, at the far end -->
-      <g transform="translate(108,120)">
-        <path d="M-11-30h22l-5 8h-12z" fill="currentColor" fill-opacity="0.6"/>
-        <path d="M6-22c17 9 25 31 14 43-8 8-27 11-39 5C-33 18-36-7-6-22z" fill="currentColor"/>
-        <path d="M-9-6c5-3 10-1 10 2s-10 3-10 6 5 5 10 2" stroke="#08080e" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <path d="M0-12v26" stroke="#08080e" stroke-width="2" stroke-linecap="round"/>
+      <!-- the money bag -->
+      <g transform="translate(98,138)">
+        <!-- tie -->
+        <path d="M-13-31c4-4 22-4 26 0" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <!-- cinched neck -->
+        <path d="M-11-29h22l-4 10h-14z" fill="currentColor"/>
+        <!-- body -->
+        <path d="M-8-19C-27-8-33 10-24 21c9 11 39 11 48 0C33 10 27-8 8-19z" fill="currentColor"/>
+        <!-- dollar sign, knocked out in the page colour -->
+        <g stroke="#08080e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <path d="M0-9v22"/>
+          <path d="M6-4c0-3-3-4-6-4s-6 1-6 4 3 4 6 5 6 2 6 5-3 4-6 4-6-1-6-4"/>
+        </g>
       </g>
     </svg>
     <div class="pbroadartcap">The path to profitability</div>
@@ -2270,8 +2275,15 @@ export function openPlaybookBook() {
       .pbbrand{font-size:0.66rem;font-weight:800;letter-spacing:0.32em;text-transform:uppercase;color:#c9982a}
       .pbtitle{font-size:clamp(2.6rem,7vw,3.4rem);font-weight:800;letter-spacing:-0.03em;line-height:1.02;color:#fff;margin:22px 0 0;max-width:16ch}
       .pbrule{width:60px;height:2px;background:#c9982a;margin:26px 0 20px}
-      .pbcover .pbtitle{color:#c9982a}
-      body.light .pbcover .pbtitle{color:#8a6a1c}
+      .pbcover .pbtitle{color:#fff}
+      .pbcover .pbtitlegold{color:#c9982a}
+      .pbcover .pbbrand{color:#e8e6e0}
+      .pbcover .pbrule{background:#e8e6e0}
+      .pbcover .pbmeta{color:#e8e6e0}
+      body.light .pbcover .pbtitle{color:#16150f}
+      body.light .pbcover .pbtitlegold{color:#8a6a1c}
+      body.light .pbcover .pbbrand,body.light .pbcover .pbrule,body.light .pbcover .pbmeta{color:#16150f}
+      body.light .pbcover .pbrule{background:#16150f}
       .pbmeta{font-size:0.9rem;color:#9a968c;letter-spacing:0.01em}
       /* ── CONTENTS ── */
       .pbcgroup{margin-top:26px}
@@ -2336,12 +2348,12 @@ export function openPlaybookBook() {
       .pbroadpage{max-width:1060px}
       .pbroadhead{font-size:1.6rem;font-weight:700;line-height:1.25;margin-top:10px}
       .pbroadintro{font-size:0.98rem;line-height:1.7;margin-top:12px;max-width:70ch}
-      .pbroadcols{display:grid;grid-template-columns:minmax(0,1fr) 235px;gap:38px;align-items:stretch;margin-top:32px}
-      .pbroadart{position:relative;display:flex;flex-direction:column;align-items:center;color:#c9982a}
-      body.light .pbroadart{color:#8a6a1c}
+      .pbroadcols{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:38px;align-items:stretch;margin-top:32px}
+      .pbroadart{position:relative;display:flex;flex-direction:column;align-items:center;color:#e8e6e0}
+      body.light .pbroadart{color:#2a2822}
       .pbroadart svg{width:100%;height:100%;max-height:660px;flex:1;min-height:0}
-      .pbroadartcap{font-family:'Geist Mono',ui-monospace,monospace;font-size:0.58rem;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:#c9982a;opacity:0.75;margin-top:10px;text-align:center}
-      body.light .pbroadartcap{color:#8a6a1c}
+      .pbroadartcap{font-family:'Geist Mono',ui-monospace,monospace;font-size:0.58rem;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:#9a968c;opacity:0.9;margin-top:10px;text-align:center}
+      body.light .pbroadartcap{color:#66635b}
       @media(max-width:820px){.pbroadcols{grid-template-columns:minmax(0,1fr)}.pbroadart{display:none}}
       .pbflow{max-width:660px}
 
