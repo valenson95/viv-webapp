@@ -1704,11 +1704,11 @@ const PLAYBOOK_PIECES = [
     take: `The mistake is never the rule — it's the click that ignored it. If you can't articulate the buy in one sentence, there is no buy.`,
   },
   {
-    no: "08", part: 2, title: `The volatility contraction pattern`, sub: `Shallower and shallower, until the spring is wound`,
-    toc: `shallower and shallower, until the spring is wound`,
+    no: "08", part: 2, title: `The volatility contraction pattern`, sub: `After a correction or pullback — contractions tightening into the pivot`,
+    toc: `after a correction or pullback, contractions tightening into the pivot`,
     blocks: [
       { h: `Defining the terms` },
-      { p: `A volatility contraction pattern — [b]VCP[/b] — is a leader that has already proven momentum, then rests in a base whose pullbacks get progressively [i]smaller[/i]. Not one tight range: a sequence. Each swing shallower than the one before it, volume thinning as it goes, until the last contraction is a drift rather than a swing. The breakout is the release out of that final contraction, and this is our flagship setup.` },
+      { p: `A volatility contraction pattern — [b]VCP[/b] — is what a leader builds after a correction or a pullback: a base whose swings get progressively [i]smaller[/i]. Not one tight range: a sequence. Each swing shallower than the one before it, volume thinning as it goes, until the last contraction is a drift rather than a swing. The breakout is the release out of that final contraction, and this is our flagship setup.` },
       { h: `Why it matters` },
       { p: `Each contraction is a round of sellers being retired. The first pullback shakes out the weak hands, the second shakes out the ones who bought the first, and by the final contraction there is almost nobody left to sell. That is why the pattern is readable in advance — the shrinking depths are supply being consumed in public. Compression is the edge; expansion is only the receipt.` },
       { h: `How we measure it` },
@@ -1729,11 +1729,11 @@ const PLAYBOOK_PIECES = [
     take: `Compression is the edge; expansion is only the receipt. Buy the release of a real contraction sequence — not the hope of one.`,
   },
   {
-    no: "09", part: 2, title: `The high tight flag`, sub: `The rarest pattern, and the most explosive`,
-    toc: `the rarest pattern, and the most explosive`,
+    no: "09", part: 2, title: `The high tight flag`, sub: `Continuation momentum — the pause inside a powerful advance`,
+    toc: `continuation momentum, the pause inside a powerful advance`,
     blocks: [
       { h: `Defining the terms` },
-      { p: `A high tight flag is two parts and nothing else. [b]The pole:[/b] a violent advance — roughly a double, ninety to a hundred percent or more, inside about eight weeks. [b]The flag:[/b] a shallow, tight, quiet drift near those highs while the stock does almost nothing. The trade is the break out of that flag. It is the rarest setup in this book and the one with the largest payoff when it works.` },
+      { p: `A high tight flag is two parts and nothing else. [b]The pole:[/b] a violent advance — roughly a double, ninety to a hundred percent or more, inside about eight weeks. [b]The flag:[/b] a shallow, tight, quiet drift near those highs while the stock does almost nothing. The trade is the break out of that flag. This is a [i]continuation[/i] setup: the trend is already running, and the flag is the pause inside it — not a bottom, not a turn.` },
       { h: `Why it matters` },
       { p: `A stock that doubles in weeks and then [i]refuses to give it back[/i] is telling you something no other pattern says as loudly: not one holder is willing to sell into a hundred-percent gain. That is an extraordinary statement about demand. The whole edge lives in the refusal — which is why the flag's tightness is not a detail, it is the setup.` },
       { h: `How we measure it` },
@@ -1745,7 +1745,7 @@ const PLAYBOOK_PIECES = [
         `[b]The trigger[/b] — a break above the [i]pattern high[/i], not an early poke through the flag line, on expanding volume. And it must be the first or second flag of the campaign, not a late leg.`,
       ] },
       { h: `In practice` },
-      { p: `We may see a handful of genuine high tight flags in a year, so the discipline is patience rather than technique: the entry stack times it exactly like every other setup — opening-range trigger, live volume confirming, stop at the low of the day. Because the pole is so steep, the extension rules from the campaign section matter more here than anywhere else, and the first trim comes fast.` },
+      { p: `Because it is a continuation setup, the trend that produced the pole has to still be intact when the flag breaks — the entry stack times it exactly like every other setup — opening-range trigger, live volume confirming, stop at the low of the day. Because the pole is so steep, the extension rules from the campaign section matter more here than anywhere else, and the first trim comes fast.` },
       { h: `Common mistakes` },
       { p: `Forcing the label onto a stock that ran forty percent and paused — the pole is a specific, brutal number and almost nothing clears it. Tolerating a flag that widens, rounds out, or cuts deep, and calling it "still constructive." Buying the flag line instead of the pattern high. And treating a late-campaign flag like a first one, when the same shape at the end of a run carries none of the same message.` },
     ],
@@ -1776,13 +1776,13 @@ const PLAYBOOK_PIECES = [
     take: `The undercut clears the crowd; the reclaim proves the leader. Buy proof, not hope, and let the pullback low do the arguing.`,
   },
   {
-    no: "11", part: 2, title: `The episodic pivot`, sub: `Catalyst + volume + neglect`,
-    toc: `catalyst + volume + neglect`,
+    no: "11", part: 2, title: `The episodic pivot`, sub: `The rare one — surprise catalyst on a neglected name`,
+    toc: `the rare one, surprise catalyst on a neglected name`,
     blocks: [
       { h: `Defining the terms` },
       { p: `An episodic pivot — a buyable gap up — is the market repricing a stock it was not positioned in. Real new information lands on a neglected name, price gaps up ten percent or more, and volume floods in so fast the stock trades a normal day's volume inside the first thirty minutes. This is the setup the pre-market gapper scan exists to find; it is the only net that finds them, and it is why that scan runs before every open.` },
       { h: `Why it matters` },
-      { p: `These are the season's biggest trades, and there are only a handful per year. The gap is not the move; it is the announcement that a repricing has begun, and repricings take weeks to finish. Everything that makes them work is knowable on the day.` },
+      { p: `These are the rarest setups in the book and the season's biggest trades — only a handful per year. The gap is not the move; it is the announcement that a repricing has begun, and repricings take weeks to finish. Everything that makes them work is knowable on the day.` },
       { h: `How we measure it` },
       { ul: [
         `[b]Neglect before it[/b] — flat or basing for months with no big run behind it. A gap on an already-loved name is extension risk, not surprise. And it should be coming out of an orderly base, not out of a downtrend knife.`,
