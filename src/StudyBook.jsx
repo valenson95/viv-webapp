@@ -44,6 +44,10 @@ export function buildCampaigns(rows) {
 //   metrics = the AUTO-PULLED data section — filled by study-fill.mjs / Claude; he only
 //             corrects, never sources. Data-threshold factors (ADR≥4, RVol>1, ext≤4…) are
 //             derived from these values at analysis time, so they need no tick at all.
+// Ticker→project chronicle defaults — a new study on these tickers joins its chronicle unless
+// a project is typed explicitly (Valen 2026-07-31: "all AMD in my studies belongs to the AMD Chronicle").
+export const DEFAULT_TICKER_PROJECT = { AMD: "AMD Chronicle" };
+
 export const STUDY_SETUPS = {
   "Momentum Breakout": {
     buckets: [
@@ -2079,10 +2083,13 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     const derived = deriveChartFields(charts, true);
     // NOTE: `...s` (= row.metrics.study) spreads FIRST so any unknown study field survives (same guarantee study-fill.mjs
     // relies on for campaign_id); the folded values below then overwrite with the freshly-derived ones.
+    // Ticker→project defaults (Valen 2026-07-31): a blank project on a chronicled ticker auto-joins
+    // its chronicle. His explicit pick always wins — this only fills the empty field.
+    const defProject = !s.project && DEFAULT_TICKER_PROJECT[row.ticker.trim().toUpperCase()];
     return { ...bodyRow,
       before_img: derived.before_img || null,
       after_img: derived.after_img || null,
-      metrics: { ...row.metrics, study: { ...s, charts: charts || [], trigger_ltf_img: derived.trigger_ltf_img || "", outcome_img: derived.outcome_img || "", grade: { letter: q.letter === "—" ? "" : q.letter, auto: true, on: q.on, total: q.total } } },
+      metrics: { ...row.metrics, study: { ...s, ...(defProject ? { project: defProject } : {}), charts: charts || [], trigger_ltf_img: derived.trigger_ltf_img || "", outcome_img: derived.outcome_img || "", grade: { letter: q.letter === "—" ? "" : q.letter, auto: true, on: q.on, total: q.total } } },
       pattern: s.setup === "Parabolic" ? `Parabolic ${s.direction === "short" ? "Short" : "Long"}` : s.setup === "Momentum Breakdown" ? "Momentum Breakdown (short-side)" : s.setup,
       outcome: cls ? MB_OUTCOME[cls] : null, thesis: row.thesis,
       lesson: [s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n") || null };

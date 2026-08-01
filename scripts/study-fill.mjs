@@ -322,7 +322,8 @@ if (WRITE) {
     console.log(`✓ refreshed auto layers on existing study row id=${existing.id} (your ticks/grade/charts untouched)`);
   } else {
     // regime_tag = the pre-registered SPY 10-sessions-vs-SMA20 condition (matches the dropdown).
-    const study = { setup:"Momentum Breakout", direction:"long", regime_tag: spyCond || "",
+    const DEFAULT_TICKER_PROJECT = { AMD: "AMD Chronicle" }; // keep in lockstep with StudyBook.jsx
+    const study = { setup:"Momentum Breakout", direction:"long", regime_tag: spyCond || "", project: DEFAULT_TICKER_PROJECT[TICKER.toUpperCase()] || "",
       checks:{}, m, grade:{letter:""}, outcome, refusal:"", _computed: note };
     const { data, error } = await sb.from("model_book").insert({ created_by:UID, ticker:T, pattern:"Momentum Breakout",
       stars:0, entry_date:t.d, is_published:false, elite:[], ticked:[], characteristics:[], metrics:{ study } }).select("id");
