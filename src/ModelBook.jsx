@@ -22,7 +22,7 @@ const matchesBook = (r, book) => book === "__all__" ? true : book === "__none__"
 // H_DOMAIN (Valen 2026-07-28): the setups whose HYPOTHESES / entryVerdict verdict engine is meaningful. A book
 // with study rows and NONE of these setups (e.g. Market Bottom) shows the project-hypotheses + checklist-tally
 // panel/page instead of the breakout-family 🧪 Hypotheses (which would render irrelevant 0-failure warnings).
-const H_DOMAIN = new Set(["Momentum Breakout", "Momentum Burst", "Episodic Pivot", "Parabolic"]);
+const H_DOMAIN = new Set(["Momentum Breakout", "Momentum Burst", "Volatility Contraction Pattern", "Episodic Pivot", "Parabolic"]);
 const cardStars = (r) => isStudyRow(r) ? (STUDY_LETTER_N[studyQuality(r.metrics.study).letter] || 0) : r.stars;
 // Outcome-class chip (Valen 2026-07-26) — presentation of the PRE-REGISTERED outcomeClass(): emoji + word,
 // colored by tier (green tiers / red / muted), never color alone. Keys mirror StudyBook.outcomeClass.
@@ -241,6 +241,15 @@ const DEEP_DIVES = [
     cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/amd-chronicle-cover.png",
   },
   {
+    // STATIC dive (2026-08-01): no study rows behind it — `static` names the builder that opens it.
+    // draft:true keeps it admin-only; publishing a static dive is a code change, HIS call.
+    no: "03", slug: "viv-playbook", project: null, static: "playbook", draft: true,
+    title: "The VIV Playbook",
+    premise: "The complete VIV framework in nineteen pieces — weather, neighborhood, house, execution, campaign, survival.",
+    updated: "2026-08-01",
+    cover: "",
+  },
+  {
     no: "01", slug: "market-bottom", project: "Finding the Market's Bottom",
     title: "Surfacing Market Leaders Through a Market Correction",
     premise: "When the index breaks, the next cycle's leaders refuse to break with it. Fourteen studies across four corrections — how the leaders bottomed, what they held at the low, and how fast they paid once the turn came.",
@@ -255,19 +264,22 @@ const DEEP_DIVES = [
 export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, onTogglePublish }) {
   // Dive publish state is DERIVED from its rows (any is_published → LIVE). Members never reach
   // this branch for draft dives — RLS returns zero rows and diveList drops them upstream.
-  const liveOf = (d) => d.rows.some(r => r.is_published);
+  // Static dives (no rows) carry their own switch: draft:true = admin-only, draft:false = LIVE.
+  const liveOf = (d) => d.static ? !d.draft : (d.rows || []).some(r => r.is_published);
   const badge = (d) => isAdmin ? (
     <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: liveOf(d) ? C.green : C.muted, border: `1px solid ${liveOf(d) ? "rgba(34,197,94,0.35)" : C.border}`, padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>{liveOf(d) ? "LIVE" : "DRAFT"}</span>
   ) : null;
-  const pubLink = (d) => (isAdmin && onTogglePublish) ? (
+  // No publish link for static dives — there are no rows to flip; publishing one is a code change.
+  const pubLink = (d) => (isAdmin && onTogglePublish && !d.static) ? (
     <span onClick={(e) => { e.stopPropagation(); onTogglePublish(d); }} style={{ fontSize: "0.72rem", color: C.muted, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 4, whiteSpace: "nowrap" }}>{liveOf(d) ? "Unpublish" : "Publish to members"}</span>
   ) : null;
   const [layout, setLayout] = useState(() => { try { return localStorage.getItem("viv-dives-layout") || "list"; } catch { return "list"; } });
   const setL = (v) => { setLayout(v); try { localStorage.setItem("viv-dives-layout", v); } catch {} };
-  const proof = dives.flatMap(d => d.rows.map(r => ({ t: r.ticker, v: +(r.metrics?.study?.m?.ret_3m ?? r.metrics?.study?.m?.peak_pct) })))
+  const proof = dives.flatMap(d => (d.rows || []).map(r => ({ t: r.ticker, v: +(r.metrics?.study?.m?.ret_3m ?? r.metrics?.study?.m?.peak_pct) })))
     .filter(x => Number.isFinite(x.v) && x.v > 0).sort((a, b) => b.v - a.v).slice(0, 8);
   const latest = dives[0], rest = dives.slice(1);
-  const thumbOf = (d) => d.cover || d.rows.find(r => r.before_img)?.before_img;
+  // Falsy cover on a static dive → no thumb at all (never a broken <img>).
+  const thumbOf = (d) => d.cover || (d.rows || []).find(r => r.before_img)?.before_img || null;
   const pair = (p, i) => (
     <span key={i} title="3-month return off this study's own low — the study is inside the dive" style={{ fontSize: "0.78rem", whiteSpace: "nowrap", marginRight: 44 }}>
       <span style={{ fontWeight: 700, color: C.white }}>{p.t}</span>
@@ -1410,6 +1422,553 @@ function openProjectBookPdf(rows, coverTitle) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
+// ── THE VIV PLAYBOOK (static dive, 2026-08-01) ────────────────────────────────────────────────
+// A typeset book with NO database behind it — the prose is final-draft and lives here verbatim
+// (source of record: AI-OS viv/content/viv-playbook.html). Re-typeset only, in the chronicle v4
+// design language: Geist + Geist Mono, monochrome .chron register, gold reserved for meaning
+// (kickers, ticks, rules, divider stats). Zero mentor names — member-facing.
+// Inline emphasis is carried as [b]…[/b] / [i]…[/i] tokens so the text can still go through esc()
+// (esc leaves square brackets alone) — no raw HTML in the content, no double-escaping.
+const pbRich = (s) => esc(s)
+  .replace(/\[b\]/g, "<b>").replace(/\[\/b\]/g, "</b>")
+  .replace(/\[i\]/g, "<i>").replace(/\[\/i\]/g, "</i>");
+
+const PLAYBOOK_PARTS = [
+  { roman: "I", name: "Weather", folio: "Weather", toc: "I — Weather · read the market first", stats: "Read the market first · pieces 01–03", count: "3 pieces" },
+  { roman: "II", name: "Neighborhood", folio: "Neighborhood", toc: "II — Neighborhood · selection", stats: "Selection · pieces 04–07", count: "4 pieces" },
+  { roman: "III", name: "House", folio: "House", toc: "III — House · the setups", stats: "The setups · pieces 08–10", count: "3 pieces" },
+  { roman: "IV", name: "When to walk in", folio: "When to walk in", toc: "IV — When to walk in · execution", stats: "Execution · pieces 11–14", count: "4 pieces" },
+  { roman: "V", name: "The campaign", folio: "The campaign", toc: "V — The campaign · management", stats: "Management · pieces 15–17", count: "3 pieces" },
+  { roman: "VI", name: "Survival", folio: "Survival", toc: "VI — Survival", stats: "Survival · pieces 18–19", count: "2 pieces" },
+];
+
+const PLAYBOOK_PIECES = [
+  {
+    no: "01", part: 0, title: `The regime dial`, sub: `Breadth decides how aggressive you are allowed to be`,
+    toc: `breadth decides how aggressive you are allowed to be`,
+    blocks: [
+      { p: `Most stocks move with the market. Before any ticker earns a minute of your attention, answer one question: is this a tape where breakouts get paid, or a tape where they get sold? We answer it with breadth — the daily count of stocks making strong up-moves versus strong down-moves, and the ratio of those counts over the last five and ten sessions.` },
+      { h: `The readings that matter` },
+      { ul: [
+        `[b]Both ratios green[/b] — buyers outnumber sellers on every horizon. Breakouts are statistically more likely to work. Press.`,
+        `[b]A thrust print[/b] — an explosion of strong up-moves after weakness. One thrust starts the case for a turn; it does not close it. Wait for the second.`,
+        `[b]A selling extreme[/b] — a flood of heavy down-moves. Bounces from these are reflexes, not leadership. The most-beaten names rally hardest and mean the least.`,
+      ] },
+      { h: `What actually changes` },
+      { p: `The regime never picks your stocks — it sets your size and your patience. Full tape: full playbook. Transitional: half size, faster trims, only A-grade setups. Hostile: the best trade is the list you build for the turn.` },
+      { h: `The expensive mistake` },
+      { p: `Trading the tape you want instead of the one printing. A bounce day after a selling extreme is the single most seductive false start in the book — the dial said [i]wait for confirmation[/i], and the morning fade collected everyone who didn't.` },
+    ],
+    take: `Regime first, setups second, size third. The dashboard verdict is the permission slip — no green, no press.`,
+  },
+  {
+    no: "02", part: 0, title: `Themes own the tape`, sub: `The in-theme gate`,
+    toc: `the in-theme gate`,
+    blocks: [
+      { p: `Institutional money moves in themes, not tickers. When a theme is being funded, its third-best chart outruns the best chart of a theme being sold. Half of every stock's move belongs to its group — so we tag every candidate with its theme and check the tag before the chart.` },
+      { h: `The gate` },
+      { p: `We track every theme's performance over one week and one month and mark the top five on each board. A candidate inside those lists is [b]in-theme[/b] — it gets the full playbook. Outside them, the bar rises: the setup must be exceptional, the size smaller, the leash shorter. The gate is written down precisely so a beautiful chart can't argue with it.` },
+      { h: `Reading the boards together` },
+      { ul: [
+        `[b]On both boards[/b] — durable leadership. The core hunting ground.`,
+        `[b]Fresh on the week, absent on the month[/b] — new rotation arriving. Watch for first bases.`,
+        `[b]Strong month, fading week[/b] — a leader resting, or a leader ending. The charts of its top names tell you which.`,
+        `[b]The day's biggest gainers from the month's worst themes[/b] — short-covering mechanics. Not leadership.`,
+      ] },
+      { h: `Common mistakes` },
+      { p: `Falling in love with one name while its theme rolls over. Overriding the gate because a story is exciting — the story is already in the tag.` },
+    ],
+    take: `Strong stocks live in strong themes. Check the tag before the chart, and let the gate say no for you.`,
+  },
+  {
+    no: "03", part: 0, title: `Rotation`, sub: `Where money is moving now — and the bounce-trap`,
+    toc: `where money is moving now, and the bounce-trap`,
+    blocks: [
+      { p: `Between the market and the single stock sits the group table: every theme ranked by how its momentum compares to its own recent history, plus a faster thrust reading for this week's push. High on both = leading [i]and[/i] accelerating — the neighborhoods to hunt in.` },
+      { h: `The one distinction that saves accounts` },
+      { p: `A group can rank top of the table two very different ways. [b]Leading[/b]: strong and within a few percent of its highs — breakout leadership. [b]Off the floor[/b]: the same glowing numbers, but still fifteen, twenty-five percent under its highs — a recovery bounce wearing leadership's clothes. The table marks the difference. Respect the mark: bounces are trades against overhead supply; leaders have none.` },
+      { h: `How to use it` },
+      { ul: [
+        `Hunt only where the group ranks high [i]and[/i] clean. Two or three neighborhoods, not ten.`,
+        `Inside the group, buy the leader — the highest-ranked name — not the laggard that "hasn't moved yet." It hasn't moved for a reason.`,
+        `Watch the laggard anyway: when the group's weakest name breaks structure, the leader's clock starts ticking.`,
+      ] },
+    ],
+    take: `The rotation table is the map between the weather and the house. Hunt where it's green and near highs; treat off-the-floor strength as a different, lesser trade.`,
+  },
+  {
+    no: "04", part: 1, title: `Relative strength`, sub: `Trade the ranked, not the cheap`,
+    toc: `trade the ranked, not the cheap`,
+    blocks: [
+      { p: `Relative strength is the stock's performance against the index over defined windows — the market's own scoreboard of where big money already is. We demand a high percentile rank before a name enters the watchlist, and we read the ratio line against the index for the cleanest tell of all: [b]a stock refusing to make new lows while the index does is being accumulated in public.[/b]` },
+      { h: `The rules` },
+      { ul: [
+        `Rank floor for candidates: strong — top-quintile at minimum, top-decile preferred. No exceptions for stories.`,
+        `Confirm across windows: one month, three months, six months. One hot week is noise; three agreeing windows are footprints.`,
+        `Behavior at index lows outranks any number: higher low against the index's lower low is the signature of the next cycle's leader.`,
+      ] },
+      { h: `Common mistakes` },
+      { p: `Confusing absolute with relative: up 5% while the index is up 8% is weakness. And averaging into "cheap" — weakness is cheap for a reason, and the scoreboard already told you.` },
+    ],
+    take: `The market ranks every stock every day. Read the scoreboard; don't argue with it.`,
+  },
+  {
+    no: "05", part: 1, title: `The funnel`, sub: `Three scans, one watchlist, a short focus list`,
+    toc: `three scans, one watchlist, a short focus list`,
+    blocks: [
+      { p: `Thousands of listed names; fewer than fifty matter on any given day. The funnel finds them mechanically, every evening, the same way — so the same leaders keep earning their way onto your screen and your memory does the compounding.` },
+      { h: `The three nets` },
+      { ul: [
+        `[b]The movers ladder[/b] — top gainers over one, three, and six months, liquidity-gated (dollar volume [i]and[/i] share volume — each gate covers the other's blind spot) with a volatility floor. The overlap pattern is the read: on all three lists = persistent leader; on the longer lists but off the short one = a winner resting. The resters are tomorrow's entries.`,
+        `[b]The coil scan[/b] — prior 25%+ move, now hugging its 10-day line with volume drying up. This is the trigger-adjacent list; it feeds the daily setups directly.`,
+        `[b]The gapper sweep[/b] — pre-market, twice: early for the catalyst read, again five minutes before the open when the real list forms. Gap size, live volume, and the one thing a screener can't see — was anyone positioned for this?`,
+      ] },
+      { h: `The rules` },
+      { p: `Scan in the evening, never in the heat. The scan builds the watchlist; only the chart builds the trade. Keep the focus list under ten — if everything is interesting, nothing is.` },
+    ],
+    take: `Three nets, run daily, beat forty run never. The funnel's product isn't trades — it's familiarity with the leaders before they move.`,
+  },
+  {
+    no: "06", part: 1, title: `The earnings staircase`, sub: `Fuel beneath the chart`,
+    toc: `fuel beneath the chart`,
+    blocks: [
+      { p: `The biggest winners share one fingerprint before they run: quarterly sales growth [i]accelerating[/i] — each stair higher than the last — with profit following sales, not replacing it. We read every earnings story the same way: the quarters in a table, oldest to newest, growth rates beside them. The staircase is either there or it isn't.` },
+      { h: `What qualifies as fuel` },
+      { ul: [
+        `[b]Acceleration[/b], not level: 20% → 40% → 60% beats a flat 50%.`,
+        `[b]Sales leading[/b]: profit growth without revenue growth is cost-cutting — it ends.`,
+        `[b]A one-sentence story[/b] the market can repeat, attached to a funded theme.`,
+        `[b]Surprise[/b]: the violent moves come where expectations were lowest — strong numbers from a stock everyone had filed away.`,
+      ] },
+      { h: `How it changes the trade` },
+      { p: `The chart still triggers everything. But the staircase decides conviction: how long you're willing to hold through noise, and whether the campaign deserves adds. Great chart, no fuel — take the swing, keep the leash short. Great chart, full staircase, funded theme — that's the one you work.` },
+    ],
+    take: `Charts time the trade; the staircase sizes the ambition. Verify the numbers — never trade a staircase you haven't seen.`,
+  },
+  {
+    no: "07", part: 1, title: `The no-buy list`, sub: `The art of refusing`,
+    toc: `the art of refusing`,
+    blocks: [
+      { p: `The trades you refuse are half your edge. This list hangs above the desk, and any single "yes" ends the conversation — no matter how good the chart looks, no matter how loud the story.` },
+      { h: `No buy when…` },
+      { ul: [
+        `The breadth verdict is red — breakouts statistically failing.`,
+        `The theme is off both boards, or the group table flags it as an off-the-floor bounce.`,
+        `The stock is extended — multiple daily ranges above its 50-day line, or meaningfully past the proper pivot. Fresh, not stretched.`,
+        `The base is wide and loose — deep retraces, overlapping bars, no tightening.`,
+        `The breakout has no volume behind it.`,
+        `Earnings land within five sessions — unless the trade [i]is[/i] the earnings reaction, planned as one.`,
+        `Open heat is at its cap — the book has no room for another stop.`,
+        `The honest reason is boredom, a red P&L, or wanting "traction." The tape owes you nothing.`,
+      ] },
+    ],
+    take: `The mistake is never the rule — it's the click that ignored it. If you can't articulate the buy in one sentence, there is no buy.`,
+  },
+  {
+    no: "08", part: 2, title: `The coil breakout`, sub: `Big move, tight base, expansion`,
+    toc: `big move, tight base, expansion`,
+    blocks: [
+      { p: `The flagship setup, in three acts. [b]One:[/b] a real prior move — thirty percent or more in one to three months. Momentum is proven, not hoped for. [b]Two:[/b] a controlled rest — two to eight weeks of higher lows and visibly shrinking ranges, volume drying up, price surfing its rising 10- and 20-day lines. The tighter the coil, the fewer hands left to shake. [b]Three:[/b] the release — a range-expansion day through the pivot on expanding volume.` },
+      { h: `What the best coils share` },
+      { ul: [
+        `Higher lows squeezing into the pivot; a narrow or negative day just before the break.`,
+        `Inside days at the apex — the spring fully wound.`,
+        `Moving averages converging beneath price like rails meeting at the platform.`,
+        `A quiet tape around a loud theme: the stock rests while its group leads.`,
+      ] },
+      { h: `Common mistakes` },
+      { p: `Buying loose bases because the story is tight. Anticipating the break without a reclaim structure. Taking the third breakout of a long run at the same size as the first — the older the trend, the shorter its fuse.` },
+    ],
+    take: `Compression is the edge; expansion is only the receipt. Buy the release of a real coil — not the hope of one.`,
+  },
+  {
+    no: "09", part: 2, title: `The surprise gap`, sub: `Catalyst + volume + neglect`,
+    toc: `catalyst + volume + neglect`,
+    blocks: [
+      { p: `Occasionally the market is genuinely surprised: real new information — an earnings inflection, a contract, a guidance reset — lands on a stock nobody was positioned in. Price gaps ten percent or more, and volume floods in so fast the stock trades a normal day's volume in the first half hour. These are the season's biggest trades, and there are only a handful per year.` },
+      { h: `The three tests` },
+      { ul: [
+        `[b]Catalyst you can name[/b] — one sentence, new information, not a re-hash.`,
+        `[b]Volume that proves it[/b] — pre-market flow first, then the open: on pace for average daily volume inside thirty minutes.`,
+        `[b]Neglect before it[/b] — months of sideways-to-down. A gap on an already-loved name is extension risk, not surprise.`,
+      ] },
+      { h: `Two ways in` },
+      { p: `[b]Day one:[/b] the opening-range high, stop at the day's low — and the day itself votes: closing near the highs above the prior day is the confirmation; closing back inside the gap is the rejection. [b]The delayed entry:[/b] when the gap is too large to size sanely, wait for the first constructive day — the first tight pause or higher low above the gap. Missing the first hour costs little; the real move takes weeks.` },
+    ],
+    take: `Surprise is the edge and neglect is the proof of it. If it hesitates, it lied — the real ones leave immediately.`,
+  },
+  {
+    no: "10", part: 2, title: `The pullback reclaim`, sub: `Buying leaders on their rails`,
+    toc: `buying leaders on their rails`,
+    blocks: [
+      { p: `Missed the breakout? The leader will offer one more door: the first orderly pullback to its rising rails — the short moving averages a fast leader respects. The entry isn't the touch; it's the [b]reclaim[/b]. Let it undercut, let the weak hands take their stop-out, and buy the move back through the level on a reversal candle.` },
+      { h: `The rules` },
+      { ul: [
+        `Only the [i]first[/i] or [i]second[/i] pullback after a breakout. By the third, the easy trend is old.`,
+        `Volume must dry up on the way down — heavy-volume pullbacks are distribution, not rest.`,
+        `The stop is the pullback low, and it must be tighter than one daily range. If the structure demands a wider stop, the structure is telling you no.`,
+        `The trend context stays intact: rails rising, theme still funded, relative strength holding.`,
+      ] },
+      { h: `Common mistakes` },
+      { p: `Buying the falling knife side of the pullback before any reclaim. Treating a broken leader's dead-cat bounce as a pullback — a pullback holds its structure; a breakdown lost it.` },
+    ],
+    take: `The undercut clears the crowd; the reclaim proves the leader. Buy proof, not hope, and let the pullback low do the arguing.`,
+  },
+  {
+    no: "11", part: 3, title: `The entry stack`, sub: `Opening range, live volume, one stop`,
+    toc: `opening range, live volume, one stop`,
+    blocks: [
+      { p: `An entry is not a price — it's a moment when buyers prove control. Ours is built from three parts that must agree, and it is the same on every setup in this book.` },
+      { h: `The stack` },
+      { ul: [
+        `[b]Trigger — the five-minute opening-range high.[/b] The first bar of the day defines the range; the break of its high is the earliest structural proof of demand. On the biggest gaps, the one-minute range serves the same job.`,
+        `[b]Confirmation — live relative volume, measured honestly.[/b] Today's volume against the same time of day on normal days — not against a full day's average. Without real participation, the prettiest trigger is a trap: our own research on hundreds of opening-range trades found the bare trigger carries no edge at all until the volume gate is added.`,
+        `[b]Stop — the low of the day. Placed with the order, not after.[/b] The day's low is where the day's thesis died. If that distance is wider than about one daily range, the trade doesn't fit — pass or shrink.`,
+      ] },
+      { h: `Common mistakes` },
+      { p: `Buying mid-bar with no trigger. Entering at lunch on the morning's news. Sizing the trade before knowing the stop — that's backwards, as the next piece makes arithmetic.` },
+    ],
+    take: `Trigger, volume, stop — one sentence each, before the click. If any of the three is missing, so is the trade.`,
+  },
+  {
+    no: "12", part: 3, title: `Sizing is arithmetic`, sub: `Risk first, shares second, volatility-scaled`,
+    toc: `risk first, shares second, volatility-scaled`,
+    blocks: [
+      { p: `Position sizing is one question: how much do I lose if I'm wrong? Fix that number first and the share count computes itself.` },
+      { h: `The formula` },
+      { p: `[b]Shares = (Account × Risk%) ÷ (Entry − Stop).[/b] A $100,000 account risking 0.4% is $400 of risk. Entry $50, stop $48 — $2 per share — is 200 shares. Do it out loud, every time, before the order exists.` },
+      { h: `The anchors` },
+      { ul: [
+        `Per-trade risk: a fraction of one percent. We anchor around a quarter to half a percent — tighter after losses, never above one percent for any reason.`,
+        `Volatility does the scaling automatically: wilder stocks have wider stops, wider stops mean fewer shares. Same risk, different share counts — that's the system working, not a mistake.`,
+        `Notional is an output, never a target. "How many shares can I afford" is the question that ends accounts.`,
+      ] },
+      { h: `Common mistakes` },
+      { p: `Same share count on every trade regardless of stop distance. Sizing up to win it back. Confusing a big position with a big idea.` },
+    ],
+    take: `Your equity curve is decided by what you risk, not what you predict. Fix the loss; derive the shares.`,
+  },
+  {
+    no: "13", part: 3, title: `The three gates`, sub: `Per-trade risk, open heat, total exposure`,
+    toc: `per-trade risk, open heat, total exposure`,
+    blocks: [
+      { p: `Three different ceilings guard the account, and they are not the same number. Conflating them is how disciplined-feeling traders take undisciplined losses.` },
+      { h: `The gates` },
+      { ul: [
+        `[b]Gate one — per-trade risk.[/b] The fraction of the account one stop-out may cost. The sizing formula enforces it.`,
+        `[b]Gate two — open heat.[/b] The sum of every open position's distance to its stop: what today costs if [i]everything[/i] stops at once. Capped at roughly two percent of equity. A new setup that would breach the cap waits, or an existing stop tightens first. Correlated names count as one bucket — three positions in one theme is one trade wearing three tickers.`,
+        `[b]Gate three — total exposure.[/b] How much of the account is deployed overnight at all. It breathes with the regime dial: full in confirmed tapes, a fraction in transition, near-zero in hostile ones.`,
+      ] },
+      { h: `Why three, not one` },
+      { p: `Each gate fails differently. Gate one stops the single blowup; gate two stops the flash-day massacre; gate three stops the slow bleed of over-participation in a bad tape. You need all three closed to be actually safe — and any one of them can veto a trade the other two allowed.` },
+    ],
+    take: `Risk per trade, heat per day, exposure per regime. Three questions before every entry; three chances for the system to save you.`,
+  },
+  {
+    no: "14", part: 3, title: `Cutting losers`, sub: `Small when wrong, instantly`,
+    toc: `small when wrong, instantly`,
+    blocks: [
+      { p: `Everything else in this book can be mediocre if this piece is perfect, and perfect everywhere else cannot survive this piece done badly. The stop lives where the thesis is wrong — the day low that defined the entry, the pullback low, the level whose loss unmakes the trade — never where comfort ends.` },
+      { h: `The rules` },
+      { ul: [
+        `The stop is placed with the entry order. A trade without a resting stop is not a position; it's an opinion with leverage.`,
+        `Width ceiling: about one daily range. Wider means the trade doesn't fit — reduce shares or pass.`,
+        `The stop never moves down. Not once, not for a close call, not for a story.`,
+        `Averaging down is not a strategy. It is the same mistake at better prices.`,
+      ] },
+      { h: `Why speed is the whole game` },
+      { p: `Loss math is asymmetric: minus ten needs plus eleven; minus twenty-five needs plus thirty-three; minus fifty needs a double. Small losses are tuition; large ones are amputations. And there's a second tell worth acting on before the stop: the trades that work tend to work [i]immediately[/i]. A new position that just sits there wrong-side is volunteering information.` },
+    ],
+    take: `Define wrong before entry, honor it without negotiation. The skill isn't being right — it's being small when you're not.`,
+  },
+  {
+    no: "15", part: 4, title: `Trim into strength`, sub: `The payday window and extension bands`,
+    toc: `the payday window and extension bands`,
+    blocks: [
+      { p: `After a breakout works, the market usually pays fast — a sharp expansion over the first three to five sessions. That window is the payday: the probability of a pullback or stall rises sharply after it, and the traders who never collect are the ones who round-trip their best entries.` },
+      { h: `The sequence` },
+      { ul: [
+        `[b]Days three to five, or a fast fifteen-plus percent:[/b] sell a third to half. Move the stop on the remainder to break-even. The trade can no longer lose; psychology transforms.`,
+        `[b]Extension bands:[/b] we measure stretch as daily-ranges-above-the-50-day-line. Deep into the bands — the parabolic zone — sell another tranche [i]into[/i] the vertical move. Our own tracked history shows extreme extensions resolve down far more often than not.`,
+        `[b]The rest rides[/b] — that's the next piece.`,
+      ] },
+      { h: `Extension versus health` },
+      { p: `A healthy trend grinds with normal rests on its rails — hold it. An extension is vertical, closes pinned to highs, volume accelerating — harvest it. The difference is measurable, so measure it; never eyeball what a number can answer.` },
+    ],
+    take: `Sell some into the crowd's excitement, ride the rest on structure. All-out gives up the tail; all-hold gives back the gain; the discipline is the partial.`,
+  },
+  {
+    no: "16", part: 4, title: `Trail the rest`, sub: `Close-based rails, matched to tempo`,
+    toc: `close-based rails, matched to tempo`,
+    blocks: [
+      { p: `The runner piece exists for one reason: a single monster campaign a year does more for the account than fifty tidy scalps. You cannot know in advance which winner is the monster — so every runner gets the chance to become one.` },
+      { h: `The rules` },
+      { ul: [
+        `Trail with a short rail on fast names and a slower rail on steady ones — one rail per trade, chosen at the trim, never switched mid-flight to justify holding.`,
+        `[b]Daily closes only.[/b] Intraday stabs through the rail are the market collecting the impatient. The close is the verdict.`,
+        `A brief undercut that closes back above the rail is not an exit — reclaim-tolerance is what keeps you in the trends that matter.`,
+        `The campaign ends when the closes say so: a decisive close below the rail, or the structure of higher lows breaking.`,
+      ] },
+      { h: `Common mistakes` },
+      { p: `Trailing the fastest rail on a slow stock and donating a good trend to noise. Tightening because you're bored. Selling a runner because it's "up a lot" — up a lot is the point.` },
+    ],
+    take: `One rail, daily closes, reclaim-tolerant. Let the winners spend their whole lives proving you wrong to sell.`,
+  },
+  {
+    no: "17", part: 4, title: `Adds and pyramids`, sub: `Strength on structure, never on hope`,
+    toc: `strength on structure, never on hope`,
+    blocks: [
+      { p: `Adding is how good campaigns become great ones — and how undisciplined ones die. The rule fits in a sentence: add only when the stock proves itself again, at a new structure, with the whole position's risk still inside the gates.` },
+      { h: `Where adds live` },
+      { ul: [
+        `The first tight flag against the short rails after the initial leg — the break of the flag is the trigger.`,
+        `The next base: a stair-step consolidation and fresh range expansion. Each new coil is a new contract.`,
+      ] },
+      { h: `The math of the pyramid` },
+      { p: `Each add smaller than the last — a full first unit, then half to three-quarters, then a quarter to half. The blended cost stays near the original entry, and every add forces the combined stop up so total risk never grows. One campaign, one blended position, one risk number. If the stop can't rise to keep the math legal, the add is not allowed — conviction is not a sizing input.` },
+      { h: `When not to add` },
+      { p: `Vertical bars far above the rails — that's the selling zone from piece fifteen, not the buying zone. You add into consolidation; you trim into extension. Reversing those two sentences is the whole difference between pyramiding and tilting.` },
+    ],
+    take: `Adds are earned by the stock, not felt by the trader. Structure triggers them; the risk math approves them.`,
+  },
+  {
+    no: "18", part: 5, title: `The shrink protocol`, sub: `Losing streaks, handled mechanically`,
+    toc: `losing streaks, handled mechanically`,
+    blocks: [
+      { p: `Streaks are a property of the strategy, not a verdict on you — four, six, even ten in a row will happen inside a winning system. What separates careers from cautionary tales is what size you were doing when the streak found you, and how fast you shrank while it lasted.` },
+      { h: `The protocol` },
+      { ul: [
+        `[b]Consecutive stop-outs, or the feel of "burning profits away":[/b] stop trading, diagnose in the journal before the next order. Drift talk is the alarm — the entries taken to feel traction are the streak's favorite food.`,
+        `[b]Mechanical de-grossing:[/b] as the month's drawdown deepens, cut new-trade size in steps — three-quarters, half, a quarter. No debate, no exceptions; the schedule decides so you don't have to.`,
+        `[b]The full breaker:[/b] at a hard drawdown-from-peak line, flat the book, stand down, and spend a full day in the journal before the next trade.`,
+        `[b]The review:[/b] pull the last twenty trades. Were the setups A-grade or stretched? Were the gates respected or argued with? Did the regime dial already say no? The answers are always obvious in hindsight — the protocol's job is to force the hindsight [i]now[/i].`,
+      ] },
+      { h: `The psychology` },
+      { p: `Streaks make you want to do more. The answer is always less: fewer names, smaller size, shorter sessions. You cannot think your way back to even — you size your way back.` },
+    ],
+    take: `Shrink early, shrink mechanically, and survive in good enough shape to press when conditions return. Recovery is a byproduct; survival is the goal.`,
+  },
+  {
+    no: "19", part: 5, title: `Progress over perfection`, sub: `Reps compound; opinions don't`,
+    toc: `reps compound; opinions don't`,
+    blocks: [
+      { p: `The most common failure inside any framework is not breaking the rules — it's freezing inside them. Waiting for the flawless tape, the flawless base, the flawless entry tick, while the leaders run and the month ends flat with a notebook of almosts.` },
+      { h: `Breaking the loop` },
+      { ul: [
+        `Trade small when unsure — shrinking the stakes of one decision cures most paralysis.`,
+        `Write the trigger and the stop the night before. When the alert fires, the decision is already made; you're just executing yesterday's clarity.`,
+        `Log the trades you [i]didn't[/i] take beside the ones you did. The missed-trade ledger teaches faster than the P&L — most rejected setups were fine, and some rejected rules were right.`,
+        `Grade weeks by process, not outcome: did you take the setups the system flagged, cut what it said to cut, respect the gates? Yes three times is a won week at any P&L.`,
+      ] },
+      { h: `The long game` },
+      { p: `Every study in our vault — hundreds of historical campaigns, measured — says the same thing: the edge is small per trade and enormous per decade. The traders who compound are not the ones who were most often right; they're the ones who kept showing up, at survivable size, doing the same boring correct things.` },
+    ],
+    take: `Done beats perfect. Take the trade the system flags, honor the stop, log the rep — and let the law of large numbers keep its promise.`,
+  },
+];
+
+const PLAYBOOK_CARD = [
+  [`Sizing`, `Shares = (Account × Risk%) ÷ (Entry − Stop) · risk ¼–½% per trade · open heat ≤ ~2% · exposure per the regime dial.`],
+  [`The candidate bar`, `In-theme (top-5 boards) · high RS rank across 1/3/6 months · real liquidity (dollar [i]and[/i] share volume) · volatile enough to pay · fresh, not extended from the 50-day.`],
+  [`Entry`, `5-minute opening-range high · time-matched relative volume confirming · stop = low of day, ≤ ~1 daily range, placed with the order.`],
+  [`Campaign`, `T+3–5: trim ⅓–½, stop to break-even · extension bands: sell into verticals · trail the rest on one rail, daily closes, reclaim-tolerant · adds only at new structure with rising stops.`],
+  [`No-buy — any yes kills it`, `Breadth red? · Off-theme / off-the-floor? · Extended? · Loose base? · No volume? · Earnings ≤ 5 sessions? · Heat at cap? · Trading a feeling?`],
+  [`Survival`, `Streak or drift-talk → stop and diagnose · de-gross in steps as the month draws down · hard line → flat, stand down, journal day.`],
+];
+
+// The book itself — same open-a-Blob mechanism as openProjectBookPdf, same CSS class names, same
+// dark-default + body.light toggle. No database read: the content above IS the book.
+export function openPlaybookBook() {
+  const N = PLAYBOOK_PIECES.length;
+  const cover = `<div class="page pbcover">
+    <img class="pblogo" src="${esc(window.location.origin)}/logo-mark.png"/>
+    <div class="pbbrand">The VIV Playbook</div>
+    <h1 class="pbtitle">The VIV Playbook</h1>
+    <div class="pbrule"></div>
+    <div class="pbmeta">19 pieces · six parts · Weather to Survival · 2026</div>
+    <div class="pbfoot pbcovfoot">Valen Insiders Vault · Educational — not financial advice</div>
+  </div>`;
+  const contents = `<div class="page pbcontents">
+    <div class="pblabel">Contents</div>
+    ${PLAYBOOK_PARTS.map((part, pi) => {
+      const rowsHtml = PLAYBOOK_PIECES.filter((pc) => pc.part === pi).map((pc) =>
+        `<a class="pbcrow" href="#p${pc.no}"><span class="pbcno">${esc(pc.no)}</span><span class="pbctk">${esc(pc.title)}</span><span class="pbctheme">${esc(pc.toc)}</span><span class="pbcdots"></span></a>`
+      ).join("");
+      return `<div class="pbcgroup"><div class="pbcyear">${esc(part.toc)}</div>${rowsHtml}</div>`;
+    }).join("")}
+    <div class="pbfoot">Nineteen pieces · six parts · the system, front to back.</div>
+  </div>`;
+  const body = PLAYBOOK_PARTS.map((part, pi) => {
+    const divider = `<div class="page pbdivider">
+      <div class="pbdivnum">${esc(part.roman)}</div>
+      <div class="pbdivmeta">
+        <div class="pbeplabel">${esc(part.name)}</div>
+        <div class="pbepstats">${esc(part.stats)}</div>
+        <div class="pbepcount">${esc(part.count)}</div>
+      </div>
+    </div>`;
+    const pieces = PLAYBOOK_PIECES.filter((pc) => pc.part === pi).map((pc) => {
+      const blocks = pc.blocks.map((b) => {
+        if (b.h != null) return `<div class="pcH pbh3">${esc(b.h)}</div>`;
+        if (b.p != null) return `<div class="pcM pbp">${pbRich(b.p)}</div>`;
+        return `<div class="pblist">${b.ul.map((x) =>
+          `<div class="pbli"><span class="pcTick">—</span><div class="pcM">${pbRich(x)}</div></div>`).join("")}</div>`;
+      }).join("");
+      return `<div class="page pbpiece" id="p${esc(pc.no)}" style="max-width:1060px">
+        <div class="pbgrid">
+          <div>
+            <div class="pcK pbkick">Piece ${esc(pc.no)} of ${N}</div>
+            <div class="pcH pbpart">${esc(part.name)}</div>
+          </div>
+          <div style="min-width:0">
+            <div class="pcH pbhead">${esc(pc.title)}</div>
+            <div class="pcD pbsub">${esc(pc.sub)}</div>
+            <div class="pcRule pbhair"></div>
+            ${blocks}
+            <div class="pcRule pbtake"><div class="pcK pbtakel">Takeaway</div><div class="pcH pbtaket">${esc(pc.take)}</div></div>
+          </div>
+        </div>
+        <div class="pbfolio"><span>The VIV Playbook</span><span>No. ${esc(pc.no)} / ${N} · ${esc(part.folio)}</span></div>
+      </div>`;
+    }).join("");
+    return divider + pieces;
+  }).join("");
+  const card = `<div class="page pbpiece" id="card" style="max-width:1060px">
+    <div class="pbgrid">
+      <div>
+        <div class="pcK pbkick">Appendix</div>
+        <div class="pcH pbpart">The card</div>
+      </div>
+      <div style="min-width:0">
+        <div class="pcH pbhead">The one-page card</div>
+        <div class="pcD pbsub">Nineteen pieces, compressed to what you check before the click.</div>
+        <div class="pcRule pbhair"></div>
+        ${PLAYBOOK_CARD.map(([k, v]) =>
+          `<div class="pbcardsec"><div class="pcK pbcardk">${esc(k)}</div><div class="pcM pbcardx">${pbRich(v)}</div></div>`).join("")}
+      </div>
+    </div>
+    <div class="pbfolio"><span>Valen Insiders Vault · 2026 · Educational, not financial advice</span><span>The VIV Playbook</span></div>
+  </div>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>The VIV Playbook</title>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      body{background:#08080e;color:#e8e6e0;font-family:'Geist',sans-serif;line-height:1.5}
+      body::before{content:"";position:fixed;inset:0;z-index:-1;background:#08080e}
+      @page{size:A4;margin:0}
+      .page{padding:48px 52px;page-break-after:always;min-height:94vh;max-width:880px;margin:0 auto}
+      .pblabel{font-size:0.62rem;font-weight:800;letter-spacing:0.28em;text-transform:uppercase;color:#9a968c}
+      .pbfoot{color:#66635b;font-size:0.62rem;margin-top:22px;letter-spacing:0.02em}
+      /* toolbar (screen only) */
+      .toolbar{position:fixed;top:14px;right:14px;display:flex;gap:8px;z-index:9}
+      .toolbar button{background:linear-gradient(120deg,#c9982a,#f0c050);border:none;color:#08080e;font-family:inherit;font-weight:800;font-size:0.85rem;padding:10px 20px;border-radius:99px;cursor:pointer}
+      .toolbar .ghost{background:transparent;border:1px solid rgba(201,152,42,0.6);color:#c9982a}
+      @media print{.toolbar{display:none}}
+      /* chronicle article register — class-driven so Light theme recolors correctly */
+      .pcH{color:#ececea}.pcM{color:#b3b0a9}.pcD{color:#7f7c74}
+      .pcRule{border-top:1px solid rgba(255,255,255,0.07)}
+      body.light .pcH{color:#17150f}
+      body.light .pcM{color:#55524a}
+      body.light .pcD{color:#8a857a}
+      body.light .pcRule{border-top-color:rgba(23,21,15,0.12)}
+      /* .chron — full monochrome; gold survives only where it carries meaning */
+      .chron .pbbrand,.chron .pbcyear,.chron .pbepcount{color:#7f7c74}
+      .chron .pbdivnum{color:rgba(255,255,255,0.07)}
+      body.light.chron .pbdivnum{color:rgba(23,21,15,0.08)}
+      .chron .pbepstats{color:#c9982a}
+      body.light.chron .pbepstats{color:#8a6a1c}
+      body.light.chron .pbbrand,body.light.chron .pbcyear,body.light.chron .pbepcount{color:#8a857a}
+      .pcK{color:#c9982a}
+      body.light .pcK{color:#8a6a1c}
+      .pcTick{color:#c9982a}
+      body.light .pcTick{color:#8a6a1c}
+      @media print{.pcBlk,.pbli,.pbtake,.pbcardsec,.pbcrow{break-inside:avoid;page-break-inside:avoid}}
+      /* ── COVER ── */
+      .pbcover{display:flex;flex-direction:column;justify-content:center;min-height:96vh}
+      .pblogo{height:54px;width:auto;align-self:flex-start;margin-bottom:20px}
+      .pbbrand{font-size:0.66rem;font-weight:800;letter-spacing:0.32em;text-transform:uppercase;color:#c9982a}
+      .pbtitle{font-size:clamp(2.6rem,7vw,3.4rem);font-weight:800;letter-spacing:-0.03em;line-height:1.02;color:#fff;margin:22px 0 0;max-width:16ch}
+      .pbrule{width:60px;height:2px;background:#c9982a;margin:26px 0 20px}
+      .pbmeta{font-size:0.9rem;color:#9a968c;letter-spacing:0.01em}
+      .pbcovfoot{margin-top:38px;font-size:0.72rem}
+      /* ── CONTENTS ── */
+      .pbcgroup{margin-top:26px}
+      .pbcyear{font-size:0.66rem;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;color:#c9982a;margin-bottom:12px}
+      .pbcrow{display:flex;align-items:baseline;gap:12px;text-decoration:none;color:inherit;padding:7px 0}
+      .pbctk{font-size:0.92rem;font-weight:800;color:#fff;white-space:nowrap}
+      .pbctheme{font-size:0.78rem;color:#9a968c}
+      .pbcdots{flex:1 1 auto;border-bottom:1px dotted rgba(255,255,255,0.22);transform:translateY(-3px)}
+      .pbcret{font-size:0.82rem;font-weight:800;color:#c9982a;white-space:nowrap}
+      .pbcno{flex:none;width:26px;font-size:0.66rem;color:#66635b}
+      /* ── PART DIVIDER ── */
+      .pbdivider{display:flex;flex-direction:column;justify-content:center;min-height:96vh;position:relative}
+      .pbdivnum{font-size:clamp(9rem,26vw,13rem);font-weight:700;line-height:0.82;letter-spacing:-0.04em;color:rgba(201,152,42,0.18)}
+      .pbdivmeta{margin-top:-0.4em;position:relative}
+      .pbeplabel{font-size:clamp(1.5rem,4vw,2.1rem);font-weight:700;letter-spacing:-0.03em;color:#fff;line-height:1.1}
+      .pbepstats{font-size:0.9rem;color:#9a968c;margin-top:12px;max-width:60ch;line-height:1.6}
+      .pbdivnote{font-size:0.85rem;color:#b9b5aa;line-height:1.72;margin-top:18px;max-width:54ch}
+      .pbepcount{font-size:0.62rem;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:#c9982a;margin-top:16px}
+      /* ── PIECE PAGES (chronicle v4 editorial grid) ── */
+      .pbpiece{position:relative;display:flex;flex-direction:column;padding-bottom:74px}
+      .pbgrid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:52px}
+      @media(max-width:760px){.pbgrid{grid-template-columns:1fr;gap:20px}}
+      .pbkick{font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase}
+      .pbpart{font-size:1.02rem;font-weight:650;line-height:1.4;margin-top:12px}
+      .pbhead{font-size:1.5rem;font-weight:700;line-height:1.3;letter-spacing:-0.015em}
+      .pbsub{font-size:0.95rem;line-height:1.6;margin-top:8px;max-width:62ch}
+      .pbhair{margin-top:26px}
+      .pbp{font-size:1.06rem;line-height:1.8;max-width:62ch;margin-top:20px}
+      .pbh3{font-size:1.05rem;font-weight:700;line-height:1.4;margin-top:26px}
+      .pblist{margin-top:14px}
+      .pbli{display:flex;gap:12px;max-width:62ch;margin-top:13px}
+      .pbli .pcTick{flex:none;line-height:1.8}
+      .pbli .pcM{font-size:1.02rem;line-height:1.8}
+      .pbtake{margin-top:36px;padding-top:18px;max-width:62ch}
+      .pbtakel{font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase}
+      .pbtaket{font-size:1.02rem;font-weight:600;line-height:1.6;margin-top:10px}
+      .pbcardsec{margin-top:28px;max-width:70ch}
+      .pbcardk{font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase}
+      .pbcardx{font-size:0.95rem;line-height:1.8;letter-spacing:0.01em;margin-top:8px}
+      /* running folio */
+      .pbfolio{position:absolute;left:52px;right:52px;bottom:26px;display:flex;justify-content:space-between;gap:20px;font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:#66635b}
+      /* ── GEIST MONO layer (last so it wins) ── */
+      .pblabel,.pbbrand,.pbmeta,.pbcyear,.pbcret,.pbctheme,.pbepcount,.pbfoot,.pbfolio,.pbcno,.pcK{font-family:'Geist Mono',ui-monospace,monospace;font-weight:500}
+      .pbcret{font-weight:600}
+      .pblabel,.pbbrand{letter-spacing:0.14em}
+      .pbepcount{letter-spacing:0.12em}
+      .pbcyear{letter-spacing:0.06em}
+      .pbtitle{font-weight:700;letter-spacing:-0.045em}
+      /* ── LIGHT / ink-friendly theme (whichever shows prints) ── */
+      body.light{background:#fdfcf9;color:#16150f}
+      body.light::before{background:#fdfcf9}
+      body.light .pblabel,body.light .pbfoot,body.light .pbmeta,body.light .pbctheme,body.light .pbepstats{color:#6a675e}
+      body.light .pbbrand,body.light .pbcyear,body.light .pbcret,body.light .pbepcount{color:#8a6a1c}
+      body.light .pbtitle,body.light .pbeplabel,body.light .pbctk{color:#16150f}
+      body.light .pbrule{background:#8a6a1c}
+      body.light .pbdivnum{color:rgba(138,106,28,0.18)}
+      body.light .pbcdots{border-bottom-color:rgba(0,0,0,0.28)}
+      body.light .pbdivnote{color:#55534a}
+      body.light .pbfolio{color:#8a857a}
+      /* contents numerals read as meaning-accents — gold in both themes, last word wins */
+      .pbcno{color:#c9982a}
+      body.light .pbcno{color:#8a6a1c}
+    </style></head><body class="chron">
+    <div class="toolbar">
+      <button class="ghost" onclick="const l=document.body.classList.toggle('light');this.textContent=l?'🌙 Dark theme':'☀ Light theme'">☀ Light theme</button>
+      <button onclick="window.print()">⬇ Save as PDF</button>
+    </div>
+    ${cover}
+    ${contents}
+    ${body}
+    ${card}
+    </body></html>`;
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+  const w = window.open(url, "_blank");
+  if (!w) { URL.revokeObjectURL(url); return alert("Pop-up blocked — allow pop-ups for this site to open the Playbook."); }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return html;
+}
+
 // The elite layer — ONLY factors the Setup Grader checklist does NOT already score
 // (no double-counting: dead volume / inside days / EMA pinch / freshness are grader ★-makers).
 export const ELITE = [
@@ -1960,7 +2519,10 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const projectBooks = isAdmin ? [...new Set(studyRows.map(studyProject).filter(Boolean))].sort() : [];
   // Deep Dives: registry entries enriched with their live study rows. Members only receive rows
   // RLS lets them read (published); a dive with zero readable rows stays hidden.
-  const diveList = DEEP_DIVES.map(d => ({ ...d, rows: rows.filter(r => isStudyRow(r) && studyProject(r) === d.project) })).filter(d => d.rows.length > 0);
+  // Static dives (project:null) carry no rows — they'd otherwise scoop up every project-less study.
+  // They survive the filter on their own draft flag: admin-only while draft, everyone once published.
+  const diveList = DEEP_DIVES.map(d => ({ ...d, rows: d.static ? [] : rows.filter(r => isStudyRow(r) && studyProject(r) === d.project) }))
+    .filter(d => d.static ? (isAdmin || !d.draft) : d.rows.length > 0);
 
   // Admin click-to-publish (Valen 2026-07-31): flips is_published on the dive's project rows —
   // the SAME mechanism as the scripted launch, now a button. Mentor-name sweep gates every publish;
@@ -2156,7 +2718,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     <div style={{ fontFamily: font }}>
       {loading ? <div style={{ color: C.muted, fontSize: "0.8rem", padding: "30px 0" }}>Loading…</div>
         : <DiveIndex C={C} font={font} dives={diveList}
-            onOpen={(d) => openMyBookPdf(d.rows, { coverTitle: d.project })}
+            onOpen={(d) => d.static === "playbook" ? openPlaybookBook() : openMyBookPdf(d.rows, { coverTitle: d.project })}
             onMyBook={() => { setFScope("mine"); setMemberView("mine"); }} myCount={mineCount} />}
     </div>
   );
@@ -2542,7 +3104,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {/* Deep Dives (admin-first): the index; opening a dive opens the exported BOOK page itself,
           so the lab-style research UI is never member-visible. */}
       {fScope === "dives" && !loading && !error && (
-        <DiveIndex C={C} font={font} dives={diveList} onOpen={(d) => openMyBookPdf(d.rows, { coverTitle: d.project })} isAdmin={isAdmin} onTogglePublish={toggleDivePublish} />
+        <DiveIndex C={C} font={font} dives={diveList} onOpen={(d) => d.static === "playbook" ? openPlaybookBook() : openMyBookPdf(d.rows, { coverTitle: d.project })} isAdmin={isAdmin} onTogglePublish={toggleDivePublish} />
       )}
 
       {/* card grid — mobile-safe auto-fit (min() caps the track so a card never overflows a narrow screen).

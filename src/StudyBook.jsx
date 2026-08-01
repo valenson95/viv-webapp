@@ -135,6 +135,57 @@ export const STUDY_SETUPS = {
       ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
   },
+  // Volatility Contraction Pattern (Valen 2026-08-01). Shares tick keys with Momentum Breakout /
+  // Momentum Burst wherever the concept is identical (pole/linear/young · vol_dry/higher_lows/
+  // ma_surf · re/up2/closehi/vol_exp/gapped · bonus inside/ma_conv/catalyst) so the lift table and
+  // hypothesis readouts aggregate the field across setups. VCP-distinct = the contraction sequence
+  // (vcp_* keys). Long-side only.
+  "Volatility Contraction Pattern": {
+    buckets: [
+      { title: "Prior move / trend", items: [
+        ["pole", "Prior pole — big move ≥30% into the base"],
+        ["linear", "Pole linear — clean advance, no whipsaw"],
+        ["young", "Young trend — 1st–3rd base, not late/extended"], // sub-cat young_leg
+      ]},
+      { title: "Contraction sequence", items: [
+        ["vcp_seq", "Successive contractions — each pullback visibly shallower than the last"],
+        ["vcp_half", "Depth roughly halves left to right (e.g. 25% → 12% → 6%)"],
+        ["vcp_final_tight", "Final contraction tight — ≤10% deep, drift not swing"],
+        ["vol_dry", "Volume drying up in the base (lower than usual)"],
+        ["vcp_dryup_low", "Driest volume of the whole base inside the final contraction"],
+        ["higher_lows", "Higher lows forming into the pivot"],
+        ["ma_surf", "Surfing rising 10/20/50-day MA into the pivot"],
+        ["inside", "Inside bar(s) right before the trigger — coil tell", "bonus"],
+        ["ma_conv", "SMA 10/20/50 converging at the pivot", "bonus"],
+      ]},
+      { title: "Pivot & trigger", items: [
+        ["vcp_pivot", "Clean flat pivot across the final contraction highs"],
+        ["re", "Day-1 range expansion ≥4% — bar visibly bigger than last 5–10"],
+        ["up2", "≤2 up-days before the trigger (not buying day 3)"],
+        ["closehi", "Closed ≥70% of the day's range"],
+        ["vol_exp", "Volume expansion — trigger bar volume above prior day"],
+        ["gapped", "Gapped up on the trigger day"], // sub-cat gap_band
+        ["catalyst", "Catalyst present (news/earnings ≤2d before trigger)", "bonus"],
+      ]},
+    ],
+    metrics: [
+      ["rs", "AS/RS rank"], ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"],
+      ["vcp_contractions", "Contractions (count of T's)"], ["base_depth_pct", "Deepest contraction %"], ["final_depth_pct", "Final contraction depth %"],
+      ["tight_days", "Tight days (NR streak)"], ["base_days", "Base length (days)"],
+      ["pole_pct", "Pole run-up %"], ["pole_days", "Pole length (days)"],
+      ["ext_50ma", "Ext from 50MA (×ATR%)"], ["from_high_pct", "% below 52wk high"],
+      ["breakout_num", "Breakout # in trend (1st/2nd/3rd…)"], ["up_days_before", "Up-days in a row before trigger"],
+      ["re_pct", "Trigger day % move"], ["gap_pct", "Gap % (open vs prior close)"], ["vol_ratio", "Volume ÷ prior day"],
+      ["rvol_eod", "RVol 50d EOD"], ["rvol_30m", "RVOL 1st 30min (vs same window, 20d)"], ["vol30_adv_pct", "1st-30min vol as % of ADV"], ["run_rate", "Run rate at entry (×)"],
+      ["closing_range", "Closing range % (C−L)/(H−L)"], ["entry_px", "Entry (5-min ORH — standing rule)"], ["pivot_px", "Pivot (annotated) $ — gates the sim"], ["stop_width_adr", "LoD stop width from entry (×ADR)"],
+      ["adv_dollar", "ADV $ (20d avg vol × trigger close)"], ["turnover_pct", "Turnover % ($ADV ÷ cap)"], ["dormant_days", "Dormant days (since last ≥20%/5d burst)"],
+      ["invaded_half", "Invaded day-1 half? (low d2–5 < midpoint)"], ["d3_moved", "Follow-through by D3? (new high by d2/d3)"],
+      ["d_below_ma10", "Sessions to 1st close below 10MA"], ["d_below_ma20", "Sessions to 1st close below 20MA"],
+      ["drop_after_peak_5", "Drop after ext peak, 5d (%)"], ["drop_after_peak_10", "Drop after ext peak, 10d (%)"],
+      ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
+      ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
+    ],
+  },
   "Episodic Pivot": {
     buckets: [
       { title: "Before the gap", items: [

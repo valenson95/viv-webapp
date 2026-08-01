@@ -752,6 +752,20 @@ function PlaybookTracker({ trades, uid, setPage }) {
 }
 
 const WHATS_NEW = [
+  // ── STAGED: AMD Chronicle publish entry (Valen's standing rule 2026-08-01: every dive publish
+  // ships a What's New the same day). When he publishes the dive: uncomment, set the real date,
+  // build + push. Keep member-invisible until then.
+  // {
+  //   tag: "New",
+  //   date: "August X, 2026",
+  //   title: "📖 New Deep Dive — AMD: 26 Years Through Every Market Cycle",
+  //   items: [
+  //     "One company, every market weather. 34 studies from the dot-com mania to the AI era — the same setups, graded on the same card, through six different regimes.",
+  //     "Both directions: 28 breakouts and 6 breakdowns, each with the daily trigger chart, the entry up close, the outcome, and the criteria that were met.",
+  //     "Every study is narrated from the chart itself — what tightened, what triggered, what the volume said — with era notes framing each chapter.",
+  //     "Open it from Deep Dives; Save as PDF for the full typeset book.",
+  //   ],
+  // },
   {
     tag: "New",
     date: "July 30, 2026",
