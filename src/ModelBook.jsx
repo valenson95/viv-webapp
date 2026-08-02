@@ -1920,7 +1920,8 @@ const PLAYBOOK_PIECES = [
       { p: `No other pattern says that as loudly. The whole edge is in that refusal to sell. So the tightness of the pause is not a detail — it [i]is[/i] the setup.` },
       { h: `What I need to see` },
       { ul: [
-        `[b]The pole[/b] — roughly a double, 90 to 100% or more, in eight weeks or less. Orderly, strong closes, bars that do not overlap much. One vertical spike day is not a pole.`,
+        `[b]The pole[/b] — roughly a double, 90 to 100% or more, in eight weeks or less.`,
+        `[b]The pole climbs at about 45 degrees[/b] — a steady staircase, not a wall. Strong closes, bars that do not overlap much. If it is going near-vertical it is not a pole, it is a blow-off, and those come down as fast as they went up. One big spike day is not a pole either.`,
         `[b]The flag is shallow[/b] — no more than 20 to 25% off the pole high. Deeper than that and it is a correction, not a flag.`,
         `[b]The flag is brief[/b] — three to five weeks, and not stretching much past eight. Time is the enemy here. The longer it drifts, the less the pole means.`,
         `[b]The flag is tight[/b] — a clean drift. No jagged bars, volume fading through it, narrow days into the buy point. It must not round out and it must not cut deep.`,
