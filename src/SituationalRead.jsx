@@ -204,8 +204,8 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
 
   const Rich = ({ html, style }) => <div className="sitrich" style={style} dangerouslySetInnerHTML={{ __html: sanitizeRich(html) }} />;
 
-  // STANCE — the one word the whole card exists to deliver. Colour carries the meaning:
-  // green = risk on · gold = neutral · red = risk off.
+  // STANCE — the one word the whole card exists to deliver, shown as a badge in the header.
+  // Colour carries the meaning: green = risk on · gold = neutral · red = risk off.
   const STANCE = {
     "RISK ON": { fg: "#7ef0a0", bg: "rgba(34,197,94,0.14)", bd: "rgba(34,197,94,0.4)" },
     "NEUTRAL": { fg: "#f0c050", bg: "rgba(201,152,42,0.15)", bd: "rgba(201,152,42,0.42)" },
@@ -225,7 +225,14 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
         .sitrich b, .sitedit b, .sitrich strong{color:${C.white}; font-weight:700}
       `}</style>
       <div className="cardhead">
-        <span className="label">Situational Awareness</span>
+        <span className="label" style={{ flex: "none" }}>Situational Awareness</span>
+        {st && (
+          <span title={`Stance: ${read.stance.toUpperCase()}`}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 4, padding: "3px 10px", borderRadius: 99, background: st.bg, border: `1px solid ${st.bd}` }}>
+            <span style={{ fontSize: "0.48rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted }}>Stance</span>
+            <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.05em", color: st.fg }}>{read.stance.toUpperCase()}</span>
+          </span>
+        )}
         <InfoDot tip={{ lead: "Every table above, boiled down to one verdict.", points: [
           "The weather — what the market is actually doing",
           "The neighbourhood — where the strength is",
@@ -286,16 +293,8 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
       ) : (
         <>
           {/* THE CALL — one punchy line, gold rule on the left so it reads as the verdict */}
-          {(read.headline || st) && (
-            <div style={{ borderLeft: `2px solid ${C.goldBright || C.gold}`, paddingLeft: 13, marginBottom: 15 }}>
-              {read.headline && <Rich html={read.headline} style={{ fontSize: "0.92rem", fontWeight: 700, lineHeight: 1.5, color: C.white, letterSpacing: "-0.01em" }} />}
-              {st && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 10, padding: "5px 14px", borderRadius: 99, background: st.bg, border: `1px solid ${st.bd}` }}>
-                  <span style={{ fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted }}>Stance</span>
-                  <span style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "0.06em", color: st.fg }}>{read.stance.toUpperCase()}</span>
-                </span>
-              )}
-            </div>
+          {read.headline && (
+            <Rich html={read.headline} style={{ borderLeft: `2px solid ${C.goldBright || C.gold}`, paddingLeft: 13, marginBottom: 15, fontSize: "0.92rem", fontWeight: 700, lineHeight: 1.5, color: C.white, letterSpacing: "-0.01em" }} />
           )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20 }}>
             <div><div style={blockLabel}>The weather</div><Rich html={read.weather} style={blockBody} /></div>
