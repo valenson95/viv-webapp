@@ -7,6 +7,13 @@
 // ─────────────────────────────────────────────────────────────
 
 export const THEME_SNAPSHOTS = {
+  // 2026-08-02 — his Sunday-MYT drop; data = the US Fri 07-31 close (same session as the 08-02
+  // rotation + breadth push). day = Since Open (Friday's intraday move, ex-gap).
+  "2026-08-02": {
+    week: [["China Internet", 7.75], ["Medical", 6.27], ["Software", 6.25], ["Airlines", 3.92], ["Steel", 3.75], ["Aerospace", 3.70], ["HealthCare", 1.67], ["Social Media", 1.62], ["Retail", 1.17], ["Robotics", 0.95], ["Cybersecurity", 0.71], ["Industrials", 0.55], ["Banks", 0.46], ["Real Estate", 0.13], ["Biotechnology", -0.32], ["Genomics", -0.75], ["Materials", -0.77], ["Oil & Gas", -0.94], ["Home Construction", -1.15], ["AI", -2.08], ["Telecom", -2.33], ["Quantum", -2.47], ["Growth Stocks", -2.71], ["Gold Miners", -3.36], ["Utilities", -3.44], ["Transports", -3.48], ["Bitcoin", -4.55], ["Silver Miners", -4.72], ["Semiconductors", -7.90], ["Solar", -8.17], ["Bitcoin Miners", -9.97]],
+    month: [["China Internet", 13.42], ["Steel", 8.90], ["Oil & Gas", 6.87], ["Medical", 5.06], ["Bitcoin", 4.82], ["Retail", 2.21], ["Real Estate", 2.01], ["Software", 1.33], ["HealthCare", 1.32], ["Banks", 0.39], ["Social Media", 0.36], ["Cybersecurity", -0.29], ["Utilities", -0.94], ["Materials", -1.16], ["Gold Miners", -1.29], ["Aerospace", -1.72], ["Industrials", -1.92], ["Biotechnology", -1.95], ["Transports", -3.02], ["Silver Miners", -4.46], ["Airlines", -5.87], ["Telecom", -7.32], ["AI", -7.45], ["Robotics", -7.46], ["Home Construction", -7.64], ["Genomics", -9.53], ["Quantum", -11.92], ["Bitcoin Miners", -12.44], ["Growth Stocks", -12.82], ["Semiconductors", -12.88], ["Solar", -14.65]],
+    day: [["Oil & Gas", 1.73], ["Software", 1.43], ["Cybersecurity", 1.04], ["China Internet", 0.96], ["Medical", 0.59], ["Aerospace", 0.46], ["Steel", 0.39], ["Telecom", 0.32], ["Transports", 0.06], ["Banks", 0.00], ["HealthCare", -0.19], ["Social Media", -0.27], ["Industrials", -0.37], ["Robotics", -0.45], ["Real Estate", -0.46], ["Utilities", -0.58], ["Retail", -0.74], ["Silver Miners", -0.86], ["Materials", -0.94], ["Gold Miners", -1.04], ["Airlines", -1.11], ["Growth Stocks", -1.19], ["Home Construction", -1.26], ["Bitcoin", -1.30], ["Biotechnology", -1.44], ["Quantum", -1.67], ["AI", -1.68], ["Solar", -2.03], ["Genomics", -2.55], ["Semiconductors", -3.04], ["Bitcoin Miners", -6.93]],
+  },
   // 2026-06-26 = the 06-28 snapshot BACKDATED 2 trading days by VALEN'S MANUAL JUDGMENT
   // (2026-07-07): his 6/26 entries (CRWD/FTNT cyber, MRNA biotech) predate the first logged
   // snapshot but the leaders were the same — Cyber 1W #1, Biotech top-5. Auditable here + in
