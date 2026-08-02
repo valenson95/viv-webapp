@@ -9492,11 +9492,11 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .lensrowA > .dragwrap > *{flex:1 1 auto; min-height:0}
 /* third column = a stack of two half-height drag slots (Breadth mini + Risk Allocation by default) */
 .vd.expert .lensstack{display:flex; flex-direction:column; gap:14px; min-width:0; height:100%}
-.vd.expert .lensstack > .dragwrap{flex:1 1 0; min-width:0; display:flex; flex-direction:column; min-height:0}
+.vd.expert .lensstack > .dragwrap{flex:0 1 auto; min-width:0; display:flex; flex-direction:column; min-height:0}
 /* Sizing is POSITIONAL: whichever card is dragged to the TOP slot gets the larger share so it
    fits without internal scroll (default top = Market Breadth: 4-col switch + verdict + breakouts line).
    Bottom slot (default Risk Allocation) is slightly smaller — internal scroll acceptable there. */
-.vd.expert .lensstack > .dragwrap:first-child{flex:1.5 1 0}
+.vd.expert .lensstack > .dragwrap:last-child{flex:1 1 auto}
 .vd.expert .lensstack > .dragwrap > *{flex:1 1 auto; min-height:0}
 /* a tall card (Theme Leaders) dragged into a half slot scrolls instead of overlapping the card below */
 .vd.expert .lensstack > .dragwrap > .card{overflow:auto}

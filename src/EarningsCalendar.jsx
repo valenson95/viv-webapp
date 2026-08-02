@@ -167,50 +167,46 @@ function buildRadar(daysMap, days, fillTo = 5) {
 //   · your holdings sort to the top of their day
 const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MON_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-function UpcomingList({ daysMap, today, held, C, maxRows = 9 }) {
+function UpcomingList({ daysMap, today, held, C, days: maxDays = 4, perDay = 5 }) {
   const days = Object.keys(daysMap).filter((d) => d >= today).sort();
-  const out = [];
-  let used = 0;
+  const cols = [];
   for (const d of days) {
-    if (used >= maxRows) break;
+    if (cols.length >= maxDays) break;
     const all = daysMap[d]?.rows || [];
     const scored = all
       .map((r) => ({ ...r, held: held.has(r.t), ldr: isLeader(r.t) }))
       // holdings first, then leaders by rank, then the biggest other reporters
-      .sort((a, b) => (b.held - a.held) || (b.ldr - a.ldr) || ((a.rank ?? 1e9) - (b.rank ?? 1e9)) || ((b.mcap ?? -1) - (a.mcap ?? -1)))
-      .filter((r) => r.held || r.ldr || (r.mcap ?? 0) > 0);
+      .sort((a, b) => (b.held - a.held) || (b.ldr - a.ldr) || ((a.rank ?? 1e9) - (b.rank ?? 1e9)) || ((b.mcap ?? -1) - (a.mcap ?? -1)));
     if (!scored.length) continue;
-    const take = scored.slice(0, Math.min(4, maxRows - used));
-    if (!take.length) break;
-    out.push({ d, rows: take, more: scored.length - take.length });
-    used += take.length;
+    cols.push({ d, rows: scored.slice(0, perDay), more: Math.max(0, scored.length - perDay) });
   }
-  if (!out.length) return <div style={{ padding: "12px 4px", fontSize: "0.7rem", color: C.muted }}>Nothing reports in the days ahead.</div>;
+  if (!cols.length) return <div style={{ padding: "12px 4px", fontSize: "0.7rem", color: C.muted }}>Nothing reports in the days ahead.</div>;
   const dl = (iso) => { const x = D(iso); return `${DOW_SHORT[x.getUTCDay()]} ${x.getUTCDate()} ${MON_SHORT[x.getUTCMonth()]}`; };
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {out.map(({ d, rows, more }) => (
-        <div key={d}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "7px 0 4px" }}>
-            <span style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.13em", textTransform: "uppercase", color: d === today ? (C.goldBright || C.gold) : C.muted }}>
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols.length}, minmax(0, 1fr))`, gap: 14 }}>
+      {cols.map(({ d, rows, more }) => (
+        <div key={d} style={{ minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 5, paddingBottom: 5, marginBottom: 6, borderBottom: `1px solid ${C.border}` }}>
+            <span style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: d === today ? (C.goldBright || C.gold) : C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {d === today ? "Today" : dl(d)}
             </span>
-            <span style={{ flex: 1, height: 1, background: C.border }} />
-            {more > 0 && <span style={{ fontSize: "0.54rem", fontWeight: 700, color: C.muted, opacity: 0.7 }}>+{more}</span>}
+            {more > 0 && <span style={{ marginLeft: "auto", fontSize: "0.52rem", fontWeight: 700, color: C.muted, opacity: 0.65 }}>+{more}</span>}
           </div>
-          {rows.map((r) => {
-            const m = TIMING[r.time] || TIMING.tbc;
-            return (
-              <div key={r.t} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 2px" }}>
-                <span title={timeWord(r.time)} style={{ flex: "none", width: 13, textAlign: "center", fontSize: "0.6rem", color: m.fg }}>{m.glyph || "·"}</span>
-                <span style={{ fontSize: "0.74rem", fontWeight: 800, color: r.ldr ? (C.goldBright || C.gold) : "rgba(255,255,255,0.9)" }}>{r.t}</span>
-                {r.held && (
-                  <span style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.08em", padding: "1px 6px", borderRadius: 5, background: "rgba(96,165,250,0.16)", border: "1px solid rgba(96,165,250,0.4)", color: "#93c5fd" }}>YOU HOLD</span>
-                )}
-                <span style={{ marginLeft: "auto", fontSize: "0.58rem", color: C.muted, opacity: 0.75, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>{r.name || ""}</span>
-              </div>
-            );
-          })}
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {rows.map((r) => {
+              const m = TIMING[r.time] || TIMING.tbc;
+              return (
+                <div key={r.t} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  <span title={timeWord(r.time)} style={{ flex: "none", width: 11, textAlign: "center", fontSize: "0.56rem", color: m.fg }}>{m.glyph || "·"}</span>
+                  <span style={{ fontSize: "0.72rem", fontWeight: 800, color: r.held ? "#93c5fd" : r.ldr ? (C.goldBright || C.gold) : "rgba(255,255,255,0.88)", overflow: "hidden", textOverflow: "ellipsis" }}>{r.t}</span>
+                  {r.held && (
+                    <span title="You hold this — a report can gap it overnight"
+                      style={{ flex: "none", fontSize: "0.46rem", fontWeight: 800, letterSpacing: "0.06em", padding: "1px 4px", borderRadius: 4, background: "rgba(96,165,250,0.18)", border: "1px solid rgba(96,165,250,0.45)", color: "#93c5fd" }}>HOLD</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       ))}
     </div>
