@@ -46,7 +46,7 @@ export function buildCampaigns(rows) {
 //             derived from these values at analysis time, so they need no tick at all.
 // Ticker→project chronicle defaults — a new study on these tickers joins its chronicle unless
 // a project is typed explicitly (Valen 2026-07-31: "all AMD in my studies belongs to the AMD Chronicle").
-export const DEFAULT_TICKER_PROJECT = { AMD: "AMD Chronicle" };
+export const DEFAULT_TICKER_PROJECT = { AMD: "AMD Chronicle", TSLA: "TSLA Chronicle" };
 
 export const STUDY_SETUPS = {
   "Momentum Breakout": {
