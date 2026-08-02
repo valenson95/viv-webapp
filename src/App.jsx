@@ -10908,7 +10908,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               themes: <ThemeStrip C={C} font={font} variant="pro" noStamp />,
               rotation: <RotationMini C={C} font={font} session={session} noStamp />,
               breadth: <BreadthMini C={C} font={font} session={session} noStamp />,
-              earnings: <EarningsRadarMini C={C} font={font} session={session} compact noStamp />,
+              earnings: <EarningsRadarMini C={C} font={font} session={session} compact noStamp positions={positions} />,
             };
             const ps = planStamp();
             const slot = (vi) => {

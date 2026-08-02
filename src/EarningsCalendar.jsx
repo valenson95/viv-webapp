@@ -157,6 +157,66 @@ function buildRadar(daysMap, days, fillTo = 5) {
 // looking forward while still letting you scroll back into last week.
 // `interactive`: chips open the detail popup; the mini passes interactive={false} so chips are
 // pointer-events:none and the whole card stays the single click target.
+// ── UPCOMING LIST — the compact dashboard variant (Valen 2026-08-02, replacing the horizontal
+// day-column strip in the small lens slot). A horizontally-scrolling strip inside a ~350px card
+// hides most of its content and clips tickers mid-word; a vertical list does not. It answers the
+// one pre-market question — "does anything I hold or watch report in the next few days?" — and
+// the full week grid still lives one tap away in the popup, where there is room for it.
+//   · upcoming days only (today forward) — past reporters belong in the surprise radar
+//   · one line per name: timing glyph · ticker · ★ leader · HOLD flag if it is an open position
+//   · your holdings sort to the top of their day
+const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MON_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function UpcomingList({ daysMap, today, held, C, maxRows = 9 }) {
+  const days = Object.keys(daysMap).filter((d) => d >= today).sort();
+  const out = [];
+  let used = 0;
+  for (const d of days) {
+    if (used >= maxRows) break;
+    const all = daysMap[d]?.rows || [];
+    const scored = all
+      .map((r) => ({ ...r, held: held.has(r.t), ldr: isLeader(r.t) }))
+      // holdings first, then leaders by rank, then the biggest other reporters
+      .sort((a, b) => (b.held - a.held) || (b.ldr - a.ldr) || ((a.rank ?? 1e9) - (b.rank ?? 1e9)) || ((b.mcap ?? -1) - (a.mcap ?? -1)))
+      .filter((r) => r.held || r.ldr || (r.mcap ?? 0) > 0);
+    if (!scored.length) continue;
+    const take = scored.slice(0, Math.min(4, maxRows - used));
+    if (!take.length) break;
+    out.push({ d, rows: take, more: scored.length - take.length });
+    used += take.length;
+  }
+  if (!out.length) return <div style={{ padding: "12px 4px", fontSize: "0.7rem", color: C.muted }}>Nothing reports in the days ahead.</div>;
+  const dl = (iso) => { const x = D(iso); return `${DOW_SHORT[x.getUTCDay()]} ${x.getUTCDate()} ${MON_SHORT[x.getUTCMonth()]}`; };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {out.map(({ d, rows, more }) => (
+        <div key={d}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "7px 0 4px" }}>
+            <span style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.13em", textTransform: "uppercase", color: d === today ? (C.goldBright || C.gold) : C.muted }}>
+              {d === today ? "Today" : dl(d)}
+            </span>
+            <span style={{ flex: 1, height: 1, background: C.border }} />
+            {more > 0 && <span style={{ fontSize: "0.54rem", fontWeight: 700, color: C.muted, opacity: 0.7 }}>+{more}</span>}
+          </div>
+          {rows.map((r) => {
+            const m = TIMING[r.time] || TIMING.tbc;
+            return (
+              <div key={r.t} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 2px" }}>
+                <span title={timeWord(r.time)} style={{ flex: "none", width: 13, textAlign: "center", fontSize: "0.6rem", color: m.fg }}>{m.glyph || "·"}</span>
+                <span style={{ fontSize: "0.74rem", fontWeight: 800, color: r.ldr ? (C.goldBright || C.gold) : "rgba(255,255,255,0.9)" }}>{r.t}</span>
+                {r.held && (
+                  <span style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.08em", padding: "1px 6px", borderRadius: 5, background: "rgba(96,165,250,0.16)", border: "1px solid rgba(96,165,250,0.4)", color: "#93c5fd" }}>YOU HOLD</span>
+                )}
+                <span style={{ marginLeft: "auto", fontSize: "0.58rem", color: C.muted, opacity: 0.75, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>{r.name || ""}</span>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function RadarStrip({ radar, today, onChipClick, interactive = true, C, autoScrollToday = false }) {
   const scrollRef = useRef(null);
   const anchorRef = useRef(null);
@@ -885,7 +945,7 @@ export default function EarningsCalendar({ C, font, session }) {
 // like the Rotation/Breadth minis. Chips inside the strip are non-interactive (pointer-events:none)
 // so a stray chip tap can't open BOTH the section popup and a detail popup. Inside the section
 // popup, the full page's own detail popup is z 1320 (> 1250) so it correctly stacks above.
-export function EarningsRadarMini({ C, font, session, compact, noStamp }) {
+export function EarningsRadarMini({ C, font, session, compact, noStamp, positions }) {
   const [open, setOpen] = useState(false);
   const cardRef = useRef(null);
   const base = EARNINGS || {};
@@ -896,11 +956,11 @@ export function EarningsRadarMini({ C, font, session, compact, noStamp }) {
   // Window = prior week + this week + next week (Mon of last week → Sun of next week). The strip
   // scrolls both directions; it auto-scrolls today to the left edge on mount. Days beyond this
   // window live only in the full view.
-  // COMPACT (the lens-stack slot, Valen 2026-08-02): the days that matter for the daily plan —
-  // yesterday's reporters (reaction plays) through the next few sessions. Fewer chips per day so
-  // it fits a small card; the full window lives one tap away.
-  const winStart = compact ? addISO(today, -2) : addISO(weekStart(today), -7);
-  const winEnd = compact ? addISO(today, 7) : addISO(weekStart(today), 13);
+  const winStart = addISO(weekStart(today), -7);
+  const winEnd = addISO(weekStart(today), 13);
+  // Tickers currently held — flagged in the compact list so an upcoming report on an OPEN
+  // position is impossible to miss (the whole point of checking this pre-market).
+  const held = useMemo(() => new Set((positions || []).map((p) => String(p.sym || p.symbol || "").toUpperCase()).filter(Boolean)), [positions]);
   const winDays = tradingDays.filter((d) => d >= winStart && d <= winEnd);
   // Dashboard card stays short: max 5 chips/day (leaders sort first, so leaders survive the cut).
   // The full popup view shows everything.
@@ -922,10 +982,12 @@ export function EarningsRadarMini({ C, font, session, compact, noStamp }) {
           <XShare getEl={() => cardRef.current} C={C} text={`Earnings on deck — week of ${asof}\n\nWho reports when, and which of them are leaders.\n\nvalensontrades.com`} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
-        {hasAny ? (
+        {compact ? (
+          <UpcomingList daysMap={daysMap} today={today} held={held} C={C} />
+        ) : hasAny ? (
           <RadarStrip radar={radar} today={today} interactive={false} C={C} autoScrollToday />
         ) : (
-          <div style={{ padding: "12px 4px", fontSize: "0.7rem", color: C.muted }}>{compact ? "No reporters in the coming days." : "No reporters in the three-week window."}</div>
+          <div style={{ padding: "12px 4px", fontSize: "0.7rem", color: C.muted }}>No reporters in the three-week window.</div>
         )}
       </div>
       {open && createPortal(

@@ -877,7 +877,7 @@ export function RotationMini({ C, font, session, noStamp }) {
     resting: rows.filter(r => r.state === "resting").length,
     trap: rows.filter(r => (r.warns || []).includes("trap")).length,
   };
-  const cellChip = (bg) => ({ display: "inline-block", minWidth: 30, textAlign: "right", fontSize: "0.62rem", fontWeight: 800, padding: "3px 6px", borderRadius: 6, background: bg, border: `1px solid ${C.border}`, color: C.text, fontVariantNumeric: "tabular-nums" });
+  const cellChip = (bg) => ({ display: "block", width: "100%", boxSizing: "border-box", textAlign: "center", fontSize: "0.7rem", fontWeight: 700, padding: "6px 6px", borderRadius: 3, background: bg, border: "none", color: "#fff", fontVariantNumeric: "tabular-nums", letterSpacing: "0.01em" });
   const hcell = { fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, padding: "0 4px 6px", whiteSpace: "nowrap" };
   return (
     <>
@@ -898,23 +898,23 @@ export function RotationMini({ C, font, session, noStamp }) {
           <thead><tr>
             <th style={{ ...hcell, textAlign: "left" }}>Ticker</th>
             <th style={{ ...hcell, textAlign: "left", width: "40%" }}>Group</th>
-            <th style={{ ...hcell, textAlign: "right" }}>Thrust %</th>
-            <th style={{ ...hcell, textAlign: "right" }}>1M RS %</th>
-            <th style={{ ...hcell, textAlign: "right" }}>% off 52W H</th>
+            <th style={{ ...hcell, textAlign: "center" }}>Thrust %</th>
+            <th style={{ ...hcell, textAlign: "center" }}>1M RS %</th>
+            <th style={{ ...hcell, textAlign: "center" }}>% off 52W H</th>
           </tr></thead>
           <tbody>
             {top.map(r => (
               <tr key={r.t}>
                 <td style={{ fontSize: "0.72rem", fontWeight: 800, color: C.white, padding: "3px 4px", textAlign: "left" }}>{r.t}</td>
                 <td style={{ fontSize: "0.66rem", color: C.muted, padding: "3px 4px", textAlign: "left", maxWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</td>
-                <td style={{ padding: "3px 4px", textAlign: "right" }}><span style={cellChip(greenHeat(r.thrust == null ? null : r.thrust / 100))}>{r.thrust == null ? "—" : Math.round(r.thrust)}</span></td>
-                <td style={{ padding: "3px 4px", textAlign: "right" }}><span style={cellChip(greenHeat(r.rs1m == null ? null : r.rs1m / 100))}>{r.rs1m == null ? "—" : Math.round(r.rs1m)}</span></td>
-                <td style={{ padding: "3px 4px", textAlign: "right", whiteSpace: "nowrap" }}>
+                <td style={{ padding: "2px 3px", width: 62 }}><span style={cellChip(greenHeat(r.thrust == null ? null : r.thrust / 100))}>{r.thrust == null ? "—" : Math.round(r.thrust)}</span></td>
+                <td style={{ padding: "2px 3px", width: 62 }}><span style={cellChip(greenHeat(r.rs1m == null ? null : r.rs1m / 100))}>{r.rs1m == null ? "—" : Math.round(r.rs1m)}</span></td>
+                <td style={{ padding: "2px 3px", whiteSpace: "nowrap", width: 78 }}>
                   {/* Valen 2026-07-19: OFF-FLOOR flag = plain ⚠️ to the LEFT of the value so the
                       right-aligned % column stays a clean edge. No separate column. */}
                   {(r.warns || []).includes("trap") && <Tip tip="Strong, but still far below its 52-week high. This is a bounce, not a breakout." style={{ marginRight: 4, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
                   {(r.warns || []).includes("artifact") && <Tip tip="The rank looks high, but the actual month is negative. Ranking beats a weak field." style={{ marginRight: 3, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
-                  <span style={cellChip(redHeat(off52Mag(r.off52)))}>{r.off52 == null ? "—" : (r.off52 >= -0.05 ? "0%" : Math.round(r.off52) + "%")}</span>
+                  <span style={{ ...cellChip(redHeat(off52Mag(r.off52))), display: "inline-block", width: "auto", minWidth: 46 }}>{r.off52 == null ? "—" : (r.off52 >= -0.05 ? "0%" : Math.round(r.off52) + "%")}</span>
                 </td>
               </tr>
             ))}
