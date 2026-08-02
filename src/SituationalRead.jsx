@@ -226,7 +226,12 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
       `}</style>
       <div className="cardhead">
         <span className="label">Situational Awareness</span>
-        <InfoDot tip="Every table above, boiled down to one verdict: what the market is doing, where the strength actually is, and what would change it." />
+        <InfoDot tip={{ lead: "Every table above, boiled down to one verdict.", points: [
+          "The weather — what the market is actually doing",
+          "The neighbourhood — where the strength is",
+          "What would change it",
+          "Ends with a stance: risk on, neutral, or risk off",
+        ] }} />
         <LensCamera getEl={() => cardRef.current} name="situational" C={C} style={{ marginLeft: 6 }} />
         {/* Post to X shares the IMAGE + a short hook — never the full read as text (the card is the
             product; the paragraph belongs on the site, not pasted into a post). */}

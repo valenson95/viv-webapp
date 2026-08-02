@@ -81,6 +81,25 @@ function chainComparator(chain) {
 // ── InfoDot — viewport-aware tooltip (portal to body, fixed from getBoundingClientRect).
 // Left-edge dots open right, right-edge dots open left; flips above near the viewport
 // bottom. Never clips inside a table's overflow-x container. House pattern (SetupGrader).
+export function TipBody({ tip }) {
+  if (tip == null) return null;
+  const lead = Array.isArray(tip) ? null : (tip && tip.lead) || null;
+  const points = Array.isArray(tip) ? tip : (tip && tip.points) || null;
+  if (!points) return <>{tip}</>;
+  return (
+    <>
+      {lead && <div style={{ marginBottom: 7, color: "#fff", fontWeight: 600 }}>{lead}</div>}
+      <ul style={{ margin: 0, paddingLeft: 14, listStyle: "none" }}>
+        {points.map((p, i) => (
+          <li key={i} style={{ position: "relative", marginBottom: i === points.length - 1 ? 0 : 5 }}>
+            <span style={{ position: "absolute", left: -12, color: "#c9982a" }}>▸</span>{p}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 export function InfoDot({ tip, size = 14 }) {
   const ref = useRef(null);
   const [pos, setPos] = useState(null);
@@ -116,7 +135,7 @@ export function InfoDot({ tip, size = 14 }) {
           background: "#13131c", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, padding: "9px 12px",
           fontSize: "0.66rem", fontWeight: 500, lineHeight: 1.55, color: "#E7E9EE", textTransform: "none", letterSpacing: 0,
           whiteSpace: "normal", textAlign: "left", boxShadow: "0 10px 30px rgba(0,0,0,0.55)", pointerEvents: "none", fontVariantNumeric: "normal" }}>
-          {tip}
+          <TipBody tip={tip} />
         </div>, document.body)}
     </span>
   );
@@ -161,7 +180,7 @@ export function Tip({ tip, children, as: Tag = "span", className, style }) {
           background: "#13131c", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, padding: "9px 12px",
           fontSize: "0.66rem", fontWeight: 500, lineHeight: 1.55, color: "#E7E9EE", textTransform: "none", letterSpacing: 0,
           whiteSpace: "normal", textAlign: "left", boxShadow: "0 10px 30px rgba(0,0,0,0.55)", pointerEvents: "none", fontVariantNumeric: "normal" }}>
-          {tip}
+          <TipBody tip={tip} />
         </div>, document.body)}
     </Tag>
   );
@@ -865,7 +884,12 @@ export function RotationMini({ C, font, session, noStamp }) {
       <div ref={cardRef} className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
         <div className="cardhead">
           <span className="label">Sector Group Rotation</span>
-          <InfoDot tip="Where the money is moving. Groups at the top are being bought; groups at the bottom are being sold. Tap for the full table." />
+          <InfoDot tip={{ lead: "Where the money is moving.", points: [
+            "Top of the list = being bought",
+            "Bottom = being sold",
+            "⚠️ = strong, but still far below its highs — a bounce, not a breakout",
+            "Tap for the full table",
+          ] }} />
           <LensCamera getEl={() => cardRef.current} name="rotation" C={C} style={{ marginLeft: 6 }} />
           <XShare getEl={() => cardRef.current} C={C} text={`Sector group rotation — ${asof}\n\nWhich groups are accelerating and which are resting.\n\nvalensontrades.com`} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}

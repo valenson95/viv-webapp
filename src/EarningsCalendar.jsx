@@ -912,7 +912,12 @@ export function EarningsRadarMini({ C, font, session, compact, noStamp }) {
       <div ref={cardRef} className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
         <div className="cardhead">
           <span className="label">{compact ? "Earnings" : "Earnings — On Your Radar"}</span>
-          <InfoDot tip="Who reports, and when. Gold = a liquid leader. A report can gap a stock overnight, so check this before you hold through one. Tap for the full calendar." />
+          <InfoDot tip={{ lead: "Who reports, and when.", points: [
+            "Gold = a liquid leader",
+            "☀ before the open · 🌙 after the close",
+            "A report can gap a stock overnight — check before you hold through one",
+            "Tap for the full calendar",
+          ] }} />
           <LensCamera getEl={() => cardRef.current} name="earnings-radar" C={C} style={{ marginLeft: 6 }} />
           <XShare getEl={() => cardRef.current} C={C} text={`Earnings on deck — week of ${asof}\n\nWho reports when, and which of them are leaders.\n\nvalensontrades.com`} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}

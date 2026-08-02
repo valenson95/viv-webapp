@@ -10946,7 +10946,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                   </div>
                 </div>
                 <div className="lensrowB planrow" style={{ marginTop: 14 }}>
-                  <MarketTrend C={C} font={font} />
+                  <MarketTrend C={C} font={font} trades={journaledTrades} />
                   <SituationalRead C={C} font={font} session={session} isAdmin={isAdmin} />
                 </div>
               </div>

@@ -632,7 +632,12 @@ export function BreadthMini({ C, font, session, noStamp }) {
       <div ref={cardRef} className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
         <div className="cardhead">
           <span className="label">Market Breadth</span>
-          <InfoDot tip="Counts how many stocks are surging vs collapsing. It answers one question: are breakouts working right now? Tap for the full sheet." />
+          <InfoDot tip={{ lead: "Are breakouts working right now?", points: [
+            "Counts how many stocks are surging vs collapsing",
+            "Green on both boxes = buyers in control",
+            "It sets how aggressive to be — never which stock to buy",
+            "Tap for counts, ratios and the full sheet",
+          ] }} />
           <LensCamera getEl={() => cardRef.current} name="breadth" C={C} style={{ marginLeft: 6 }} />
           <XShare getEl={() => cardRef.current} C={C} text={`Market breadth — ${asof}\n\nAre breakouts likely to work right now?\n\nvalensontrades.com`} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
