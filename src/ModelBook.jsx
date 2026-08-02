@@ -2485,15 +2485,58 @@ export function openPlaybookBook() {
       const rowsHtml = PLAYBOOK_PIECES.filter((pc) => pc.part === pi).map((pc) =>
         `<a class="pbcrow" href="#p${pc.no}"><span class="pbcno">${esc(pc.no)}</span><span class="pbctk">${esc(pc.title)}</span><span class="pbctheme">${esc(pc.toc)}</span><span class="pbcdots"></span></a>`
       ).join("");
-      return `<div class="pbcgroup"><div class="pbcyear">${esc(part.toc)}</div>${rowsHtml}</div>`;
+      // Part 1 ends with the unnumbered daily-read page (Valen: "it should be included in the weather portion").
+      const extra = pi === 0
+        ? `<a class="pbcrow" href="#dailyplan"><span class="pbcno">—</span><span class="pbctk">The card that does all of this for you</span><span class="pbctheme">your daily read, written out every day</span><span class="pbcdots"></span></a>`
+        : "";
+      return `<div class="pbcgroup"><div class="pbcyear">${esc(part.toc)}</div>${rowsHtml}${extra}</div>`;
     }).join("")}
     <div class="pbcgroup"><div class="pbcyear">Appendix</div>
-      <a class="pbcrow" href="#dailyplan"><span class="pbcno">—</span><span class="pbctk">The card that does Part 1 and 2 for you</span><span class="pbctheme">your daily read, written out every day</span><span class="pbcdots"></span></a>
       <a class="pbcrow" href="#indicators"><span class="pbcno">—</span><span class="pbctk">Tools I use on TradingView</span><span class="pbctheme">six indicators, and what each one is for</span><span class="pbcdots"></span></a>
       <a class="pbcrow" href="#card"><span class="pbcno">—</span><span class="pbctk">The one-page card</span><span class="pbctheme">everything you check before the click</span><span class="pbcdots"></span></a>
     </div>
     <div class="pbfoot">Twenty-one pieces · six parts · the system, front to back. The roadmap on the previous page shows how they fit together.</div>
   </div>`;
+  // The Daily Market Plan card (Valen 2026-08-02 — "explain that this feature is created to help
+  // members navigate around the market easier", and "it should be included in the weather portion").
+  // Pieces 01-03 ARE Part 1, so this closes Part 1 rather than sitting in the appendix. It stays
+  // UNNUMBERED — the count is in the title, and this is the app doing existing pieces for you.
+  const dailyplan = `<div class="page pbpiece pcRule" id="dailyplan" style="max-width:1060px">
+    <div class="pbgrid">
+      <div>
+        <div class="pcK pbkick">Part 1 · Weather</div>
+        <div class="pcH pbpart">Your daily read</div>
+        <div class="pbpmark"></div>
+      </div>
+      <div style="min-width:0">
+        <div class="pcH pbhead">The card that does all of this for you</div>
+        <div class="pcD pbsub">Situational awareness, written out every day</div>
+        <div class="pcRule pbhair"></div>
+        <div class="pcM pbp">Pieces 01 to 03 ask you to check three things before you look at a chart: the market, the groups, and the rotation. That is real work, and doing it badly is worse than not doing it at all.</div>
+        <div class="pcM pbp">So I built this card into the app to do it for you. I write it every day, after the close, from the same numbers the pieces describe. You open it and the reading is already done.</div>
+        <div class="pcM pbp"><b>The whole point is to make the market easier to navigate.</b> You should not have to hold four different readings in your head before you have even opened a chart.</div>
+        <div class="pcBlk pbfig"><span class="pbchartwrap" style="max-width:640px"><img class="pcCard" src="https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/situational-awareness.png" style="width:100%;display:block;cursor:zoom-in"/><span class="pbzoom" aria-hidden="true">⤢</span></span><div class="pcD pbfigcap">The card as you see it. One sentence at the top, three columns underneath, and a stance in the corner. Click to zoom.</div></div>
+        <div class="pcH pbshead">How to read it</div>
+        <div class="pbkvs">
+          <div class="pbkv"><span class="pcK pbkvk">The stance</span><div class="pcM pbkvv">Top corner, colour-coded. <b>Risk on</b> means conditions favour buying, so trade the full playbook. <b>Neutral</b> means mixed, so half size and only the best setups. <b>Risk off</b> means breakouts are failing, so the best work you can do is build the watchlist. This one word sets your size for the day.</div></div>
+          <div class="pbkv"><span class="pcK pbkvk">The headline</span><div class="pcM pbkvv">One or two sentences saying what actually happened. If you read nothing else, read this.</div></div>
+          <div class="pbkv"><span class="pcK pbkvk">The weather</span><div class="pcM pbkvv">The market itself — piece 01. How many stocks rose against how many fell, and whether that agrees with what the index did.</div></div>
+          <div class="pbkv"><span class="pcK pbkvk">The neighbourhood</span><div class="pcM pbkvv">Where the money is — pieces 02 and 03. Which groups lead, and the important part: whether they lead from their highs or are just bouncing off their lows.</div></div>
+          <div class="pbkv"><span class="pcK pbkvk">What would change it</span><div class="pcM pbkvv">What I am watching for that would flip the stance. This is the one people skip, and it is the one that tells you what to do tomorrow.</div></div>
+        </div>
+        <div class="pcH pbshead">How I use it</div>
+        <div class="pblist">
+          <div class="pbli"><span class="pcTick">—</span><div class="pcM">I read the stance first. That decides my size before I have looked at anything.</div></div>
+          <div class="pbli"><span class="pcTick">—</span><div class="pcM">Then the headline, then the neighbourhood column. That tells me where to hunt tonight.</div></div>
+          <div class="pbli"><span class="pcTick">—</span><div class="pcM">Then I open the charts. Never before.</div></div>
+        </div>
+        <div class="pcM pbp">Everything on the card is a reading, not a prediction. It describes what the market is doing right now. It does not tell you what happens next, and neither does anything else in this book.</div>
+        <div class="pcM pbp">Use it as the first thing you check, not the last thing you argue with.</div>
+      </div>
+    </div>
+    <div class="pbfolio"><span>Building Blocks</span><span>Part 1 · Your daily read</span></div>
+  </div>`;
+
   const body = PLAYBOOK_PARTS.map((part, pi) => {
     const inPart = PLAYBOOK_PIECES.filter((pc) => pc.part === pi);
     const divider = `<div class="page pbdivider">
@@ -2545,47 +2588,9 @@ export function openPlaybookBook() {
         <div class="pbfolio"><span>Building Blocks</span><span>No. ${esc(pc.no)} / ${N} · ${esc(part.folio)}</span></div>
       </div>`;
     }).join("");
-    return divider + pieces;
+    // Part 1 closes with the card that does pieces 01-03 for you.
+    return divider + pieces + (pi === 0 ? dailyplan : "");
   }).join("");
-  // Appendix: the Daily Market Plan card (Valen 2026-08-02 — "explain that this feature is created
-  // to help members navigate around the market easier"). This is the app doing pieces 01-03 for you,
-  // so it sits in the appendix rather than becoming a 22nd piece — the count is in the title.
-  const dailyplan = `<div class="page pbpiece pcRule" id="dailyplan" style="max-width:1060px">
-    <div class="pbgrid">
-      <div>
-        <div class="pcK pbkick">Appendix</div>
-        <div class="pcH pbpart">Your daily read</div>
-        <div class="pbpmark"></div>
-      </div>
-      <div style="min-width:0">
-        <div class="pcH pbhead">The card that does Part 1 and 2 for you</div>
-        <div class="pcD pbsub">Situational awareness, written out every day</div>
-        <div class="pcRule pbhair"></div>
-        <div class="pcM pbp">Pieces 01 to 03 ask you to check three things before you look at a chart: the market, the groups, and the rotation. That is real work, and doing it badly is worse than not doing it at all.</div>
-        <div class="pcM pbp">So I built this card into the app to do it for you. I write it every day, after the close, from the same numbers the pieces describe. You open it and the reading is already done.</div>
-        <div class="pcM pbp"><b>The whole point is to make the market easier to navigate.</b> You should not have to hold four different readings in your head before you have even opened a chart.</div>
-        <div class="pcBlk pbfig"><span class="pbchartwrap" style="max-width:640px"><img class="pcCard" src="https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/situational-awareness.png" style="width:100%;display:block;cursor:zoom-in"/><span class="pbzoom" aria-hidden="true">⤢</span></span><div class="pcD pbfigcap">The card as you see it. One sentence at the top, three columns underneath, and a stance in the corner. Click to zoom.</div></div>
-        <div class="pcH pbshead">How to read it</div>
-        <div class="pbkvs">
-          <div class="pbkv"><span class="pcK pbkvk">The stance</span><div class="pcM pbkvv">Top corner, colour-coded. <b>Risk on</b> means conditions favour buying, so trade the full playbook. <b>Neutral</b> means mixed, so half size and only the best setups. <b>Risk off</b> means breakouts are failing, so the best work you can do is build the watchlist. This one word sets your size for the day.</div></div>
-          <div class="pbkv"><span class="pcK pbkvk">The headline</span><div class="pcM pbkvv">One or two sentences saying what actually happened. If you read nothing else, read this.</div></div>
-          <div class="pbkv"><span class="pcK pbkvk">The weather</span><div class="pcM pbkvv">The market itself — piece 01. How many stocks rose against how many fell, and whether that agrees with what the index did.</div></div>
-          <div class="pbkv"><span class="pcK pbkvk">The neighbourhood</span><div class="pcM pbkvv">Where the money is — pieces 02 and 03. Which groups lead, and the important part: whether they lead from their highs or are just bouncing off their lows.</div></div>
-          <div class="pbkv"><span class="pcK pbkvk">What would change it</span><div class="pcM pbkvv">What I am watching for that would flip the stance. This is the one people skip, and it is the one that tells you what to do tomorrow.</div></div>
-        </div>
-        <div class="pcH pbshead">How I use it</div>
-        <div class="pblist">
-          <div class="pbli"><span class="pcTick">—</span><div class="pcM">I read the stance first. That decides my size before I have looked at anything.</div></div>
-          <div class="pbli"><span class="pcTick">—</span><div class="pcM">Then the headline, then the neighbourhood column. That tells me where to hunt tonight.</div></div>
-          <div class="pbli"><span class="pcTick">—</span><div class="pcM">Then I open the charts. Never before.</div></div>
-        </div>
-        <div class="pcM pbp">Everything on the card is a reading, not a prediction. It describes what the market is doing right now. It does not tell you what happens next, and neither does anything else in this book.</div>
-        <div class="pcM pbp">Use it as the first thing you check, not the last thing you argue with.</div>
-      </div>
-    </div>
-    <div class="pbfolio"><span>Building Blocks</span><span>Appendix · Your daily read</span></div>
-  </div>`;
-
   const indicators = `<div class="page pbpiece pcRule" id="indicators" style="max-width:1060px">
     <div class="pbgrid">
       <div>
@@ -2842,7 +2847,6 @@ export function openPlaybookBook() {
     ${roadmap}
     ${contents}
     ${body}
-    ${dailyplan}
     ${indicators}
     ${card}
     <div class="zoomov" id="zoomov"><img id="zoomim" alt=""/></div>
