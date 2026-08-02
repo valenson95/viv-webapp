@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/playbook",
+      "destination": "/playbook.html"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/:path*"
     },

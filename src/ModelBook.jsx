@@ -2400,6 +2400,11 @@ const PLAYBOOK_CARD = [
   [`Survival`, `Run of losses, or giving profits back → stop and review · cut size in steps as the month draws down · at the hard line → close everything, stand down, spend a day in the journal.`],
 ];
 
+// Version stamp (Valen 2026-08-02: "annotate this is version 1, because i'll be adding onto it as
+// time goes by"). Bump BOTH fields when a new edition ships — the cover and the last page read from
+// here, and members compare against the version they last read.
+const PLAYBOOK_VERSION = { label: "Version 1", date: "August 2026" };
+
 // The book itself — same open-a-Blob mechanism as openProjectBookPdf, same CSS class names, same
 // dark-default + body.light toggle. No database read: the content above IS the book.
 export function openPlaybookBook() {
@@ -2409,7 +2414,8 @@ export function openPlaybookBook() {
     <div class="pbbrand">The VIV System</div>
     <h1 class="pbtitle">21 <span class="pbtitlegold">Building Blocks</span> to Profitability</h1>
     <div class="pbrule"></div>
-    <div class="pbmeta">Six parts · from the weather to keeping the roof on · 2026</div>
+    <div class="pbmeta">Six parts · from the weather to keeping the roof on</div>
+    <div class="pbver">${esc(PLAYBOOK_VERSION.label)} · ${esc(PLAYBOOK_VERSION.date)} · a living handbook, added to over time</div>
   </div>`;
   const flowChev = `<svg class="pbflowchev" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1.5 6 6.5 11 1.5"/></svg>`;
   const roadArt = `<div class="pbroadart" aria-hidden="true">
@@ -2579,9 +2585,13 @@ export function openPlaybookBook() {
           `<div class="pbcardsec"><div class="pcK pbcardk">${esc(k)}</div><div class="pcM pbcardx">${pbRich(v)}</div></div>`).join("")}
       </div>
     </div>
-    <div class="pbfolio"><span>Valen Insiders Vault · 2026 · Educational, not financial advice</span><span>Building Blocks</span></div>
+    <div class="pbfolio"><span>Valen Insiders Vault · ${esc(PLAYBOOK_VERSION.label)} · ${esc(PLAYBOOK_VERSION.date)}</span><span>Building Blocks</span></div>
   </div>`;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>21 Building Blocks to Profitability</title>
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>21 Building Blocks to Profitability</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="description" content="The VIV system in twenty-one pieces \u2014 how to read the market, pick the stock, take the trade, and look after it afterwards.">
+    <!-- noindex: this is member material. It is shareable by link, not something to be found in search. -->
+    <meta name="robots" content="noindex,nofollow">
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
       *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -2693,6 +2703,8 @@ export function openPlaybookBook() {
       .pbzoom{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#e8e6e0;background:rgba(6,6,10,0.62);border:1px solid rgba(255,255,255,0.16);opacity:0;transition:opacity .16s;pointer-events:none}
       .pbchartwrap:hover .pbzoom{opacity:1}
       @media print{.pbzoom{display:none}}
+      .pbver{font-family:'Geist Mono',ui-monospace,monospace;font-size:0.68rem;letter-spacing:0.06em;color:#66635b;margin-top:12px}
+      body.light .pbver{color:#8c887e}
       .pbkvs{margin:18px 0 4px}
       .pbkv{display:grid;grid-template-columns:minmax(0,230px) minmax(0,1fr);gap:18px;padding:11px 0;border-top:1px solid rgba(255,255,255,0.08)}
       body.light .pbkv{border-top-color:rgba(23,21,15,0.1)}
