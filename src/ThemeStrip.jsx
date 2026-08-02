@@ -2,7 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { latestSnapshot, consistentTop } from "./themes.js";
 import { THEME_CONSTITUENTS } from "./themeConstituents-data.js";
-import { LensCamera } from "./capture.jsx";
+import { LensCamera, XShare } from "./capture.jsx";
 
 // ─────────────────────────────────────────────────────────────
 // Theme Leaders — Top-5 · 1W and Top-5 · 1M as two side-by-side tables.
@@ -168,6 +168,7 @@ export default function ThemeStrip({ C, font, variant, noStamp }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
               <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.muted }}>Theme Leaders</span>
               <LensCamera getEl={() => cardRef.current} name="theme-leaders" C={C} style={{ marginLeft: 6 }} />
+              <XShare getEl={() => cardRef.current} C={C} text={`Theme leaders — ${snap.date}\n\nWhere the money actually went this week and this month.\n\nvalensontrades.com`} />
               {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.goldBright || C.gold, fontWeight: 700 }}>updated {snap.date}</span>}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>

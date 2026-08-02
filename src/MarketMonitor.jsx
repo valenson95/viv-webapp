@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MARKET_MONITOR } from "./marketMonitor-data.js";
 import { InfoDot } from "./GroupRS.jsx";
-import { LensCamera, SectionCamera } from "./capture.jsx";
+import { LensCamera, SectionCamera, XShare } from "./capture.jsx";
 
 // ── BREADTH — market monitor ─────────────────────────────────────────────────
 // A market-breadth "weather station": how many stocks moved 4%+ up vs down today,
@@ -634,6 +634,7 @@ export function BreadthMini({ C, font, session, noStamp }) {
           <span className="label">Market Breadth</span>
           <InfoDot tip="Are breakouts likely to work right now? Tap for counts, ratios and the full sheet." />
           <LensCamera getEl={() => cardRef.current} name="breadth" C={C} style={{ marginLeft: 6 }} />
+          <XShare getEl={() => cardRef.current} C={C} text={`Market breadth — ${asof}\n\nAre breakouts likely to work right now?\n\nvalensontrades.com`} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
         {/* the four-column master switch */}

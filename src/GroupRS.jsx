@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { GROUP_RS } from "./groupRS-data.js";
 import { ETF_HOLDINGS } from "./etfHoldings-data.js";
-import { LensCamera, SectionCamera } from "./capture.jsx";
+import { LensCamera, SectionCamera, XShare } from "./capture.jsx";
 
 // ── ROTATION — group RS table + Plan & Focus ─────────────────────────────────
 // Group-level rotation lens computed from ETF daily closes vs the equal-weight
@@ -867,6 +867,7 @@ export function RotationMini({ C, font, session, noStamp }) {
           <span className="label">Sector Group Rotation</span>
           <InfoDot tip="Which sector groups are heating up and which are cooling. Tap for the full table." />
           <LensCamera getEl={() => cardRef.current} name="rotation" C={C} style={{ marginLeft: 6 }} />
+          <XShare getEl={() => cardRef.current} C={C} text={`Sector group rotation — ${asof}\n\nWhich groups are accelerating and which are resting.\n\nvalensontrades.com`} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
         <table className="minitable" style={{ width: "100%", borderCollapse: "collapse" }}>

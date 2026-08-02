@@ -66,6 +66,68 @@ export function LensCamera({ getEl, name, C, style }) {
   );
 }
 
+// ─── Post to X (Valen 2026-08-02, "like DeepVue's") ─────────────────────────
+// ⚠️ X's web intent CANNOT attach an image — the API was removed years ago, and no site can
+// upload media on your behalf without OAuth. So the only working flow (DeepVue's too) is:
+//   1. render the card → PNG → clipboard (synchronously inside the gesture, Safari's rule)
+//   2. open X's composer with the text pre-filled
+//   3. the user pastes with ⌘V / Ctrl+V
+// The button says so in its label so nobody waits for an image that never arrives. If the
+// clipboard write fails (older Safari, insecure context) we download the PNG instead and say so.
+export function XShare({ getEl, text, C, style, label }) {
+  const [state, setState] = useState("");   // "" | "copied" | "saved"
+  const muted = (C && C.muted) || "rgba(255,255,255,0.5)";
+  const gold = (C && C.goldBright) || "#f0c050";
+  const openX = () => {
+    const url = "https://x.com/intent/post?text=" + encodeURIComponent(text || "");
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+  const flash = (s) => { setState(s); setTimeout(() => setState(""), 4000); };
+  const onClick = (e) => {
+    e.stopPropagation();
+    const el = typeof getEl === "function" ? getEl() : getEl;
+    if (!el) return;
+    try {
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        const item = new window.ClipboardItem({
+          "image/png": render(el).then((canvas) => new Promise((res) => canvas.toBlob(res, "image/png"))),
+        });
+        navigator.clipboard.write([item]).then(() => { flash("copied"); openX(); }).catch(() => {
+          render(el).then((canvas) => {
+            const a = document.createElement("a");
+            a.href = canvas.toDataURL("image/png");
+            a.download = `viv-${new Date().toISOString().slice(0, 10)}.png`;
+            a.click();
+            flash("saved"); openX();
+          }).catch(() => {});
+        });
+      } else {
+        render(el).then((canvas) => {
+          const a = document.createElement("a");
+          a.href = canvas.toDataURL("image/png");
+          a.download = `viv-${new Date().toISOString().slice(0, 10)}.png`;
+          a.click();
+          flash("saved"); openX();
+        }).catch(() => {});
+      }
+    } catch { openX(); }
+  };
+  const msg = state === "copied" ? "Image copied — paste it in the post (⌘V)"
+    : state === "saved" ? "Image downloaded — attach it in the post"
+    : (label || "Post to X — copies the image, opens the post box for you to paste");
+  return (
+    <button type="button" data-html2canvas-ignore="true" onClick={onClick} title={msg} aria-label="Post to X"
+      style={{ display: "inline-flex", alignItems: "center", gap: 5, height: 22, padding: state ? "0 8px" : "0 5px", borderRadius: 7, cursor: "pointer", flex: "none", background: "transparent", border: "none", color: state ? gold : muted, transition: "color .15s", fontSize: "0.58rem", fontWeight: 700, whiteSpace: "nowrap", ...style }}
+      onMouseEnter={(e) => { if (!state) e.currentTarget.style.color = gold; }}
+      onMouseLeave={(e) => { if (!state) e.currentTarget.style.color = muted; }}>
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+      </svg>
+      {state === "copied" ? <span>Copied — paste in X</span> : state === "saved" ? <span>Downloaded — attach in X</span> : null}
+    </button>
+  );
+}
+
 // ─── Corner camera for one PANEL inside a full-view popup (Valen 2026-08-02: "the rotation
 // card when i clicked into it, it also should have screenshot features across all the cards").
 // Drops into any positioned panel and captures the nearest ancestor matching `sel` — no per-panel

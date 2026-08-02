@@ -2,7 +2,7 @@ import React, { useMemo, useRef } from "react";
 import { MARKET_MONITOR } from "./marketMonitor-data.js";
 import { InfoDot } from "./GroupRS.jsx";
 import { readBreadth } from "./MarketMonitor.jsx";
-import { LensCamera } from "./capture.jsx";
+import { LensCamera, XShare } from "./capture.jsx";
 
 // ── MARKET TREND — the daily checklist card ──────────────────────────────────
 // A short table of YES/NO trend signals on the S&P 500, ending in one regime verdict —
@@ -94,6 +94,7 @@ export default function MarketTrend({ C, font }) {
         <span className="label">Market Trend</span>
         <InfoDot tip="The daily first-check: is the index in gear on the daily and the weekly, and is breadth backing it up? Every row is computed from S&P closes — nothing is opinion." />
         <LensCamera getEl={() => cardRef.current} name="market-trend" C={C} style={{ marginLeft: 6 }} />
+        <XShare getEl={() => cardRef.current} C={C} text={`Market trend — ${t.asof}\n\nMarket regime: ${t.regime}\n\nvalensontrades.com`} />
       </div>
       {/* rows share the column height (flex:1 each) so the card fills its planrow slot with no void
           when the Situational card beside it runs taller */}

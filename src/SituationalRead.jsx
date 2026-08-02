@@ -5,7 +5,7 @@ import { GROUP_RS } from "./groupRS-data.js";
 import { latestSnapshot } from "./themes.js";
 import { readBreadth } from "./MarketMonitor.jsx";
 import { InfoDot } from "./GroupRS.jsx";
-import { LensCamera } from "./capture.jsx";
+import { LensCamera, XShare } from "./capture.jsx";
 import { supabase } from "./supabaseClient.js";
 
 // ── SITUATIONAL AWARENESS ────────────────────────────────────────────────────
@@ -208,6 +208,10 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
         <span className="label">Situational Awareness</span>
         <InfoDot tip="The lenses above in one read — what the market is doing, and where the strength actually is. Educational, not advice." />
         <LensCamera getEl={() => cardRef.current} name="situational" C={C} style={{ marginLeft: 6 }} />
+        {/* Post to X shares the IMAGE + a short hook — never the full read as text (the card is the
+            product; the paragraph belongs on the site, not pasted into a post). */}
+        <XShare getEl={() => cardRef.current} C={C}
+          text={`Situational awareness — ${read.asof || ""}\n\nThe market weather, where the strength actually is, and what would change it.\n\nvalensontrades.com`} />
         {/* No standing date stamp — the Daily Plan section header carries the ONE batch stamp.
             Only a typed override gets its own small marker, since it can move independently. */}
         <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 10 }}>
