@@ -213,6 +213,62 @@ export const STUDY_SETUPS = {
       ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
   },
+  // Delayed Episodic Pivot (Valen 2026-08-02). NOT a softer EP — a different decision: the catalyst
+  // day is deliberately SKIPPED and the entry is the first positive/breakout day after it. Corpus:
+  // stockbee-sources/48 §4 ("wait for the first positive / breakout day AFTER the catalyst"; prefer
+  // it when the reaction is uncertain or the gap is too big to buy; the entry comes to you instead
+  // of being chased) + 65 §3, the evening DEP scan: c/c1>=1.04 and v>v1 and v>=8,900,000.
+  // Tick keys are shared with Episodic Pivot / Momentum Breakout wherever the concept is identical,
+  // so the lift table aggregates the same factor across setups.
+  "Delayed Episodic Pivot": {
+    buckets: [
+      { title: "Before the catalyst", items: [
+        ["neglect", "Neglected — flat/basing, no big run in prior months"],
+        ["first", "FIRST big surprise (no recent prior EP gap on the chart)"],
+        ["base_ok", "Coming out of an orderly base, not a downtrend knife"],
+      ]},
+      { title: "The catalyst day — the one you SKIPPED", items: [
+        ["gap", "Gap up ≥10% visible (or 4%+ earnings-day range expansion)"],
+        ["vol_huge", "Huge volume bar — dwarfs recent bars"],
+        // The two reasons the corpus gives for waiting instead of buying day 1. At least one
+        // should be true or this was a chase-worthy EP and belongs under "Episodic Pivot".
+        ["why_wait_gap", "Reason to wait: gapped too far to take a sane stop"],
+        ["why_wait_doubt", "Reason to wait: reaction uncertain — this name has faded catalysts before"],
+      ]},
+      { title: "The wait", items: [
+        ["held_d1", "Day-1 range held while waiting — never gave the gap back"],
+        ["quiet", "Quiet/narrowing bars during the wait, not heavy selling"],
+        ["above_d1", "Delayed day cleared the catalyst day's high"],
+      ]},
+      { title: "The delayed trigger", items: [
+        ["re", "Range expansion ≥4% on the delayed day"],
+        ["vol_exp", "Volume expansion — delayed bar volume above prior day"],
+        ["closehi", "Closed ≥70% of the day's range"],
+      ]},
+      { title: "Structure", items: [
+        ["stopw", "Stop ≤1–1.5× ADR from entry (tight structure available)"],
+        ["cont", "No overhead resistance nearby (blue sky / clears the base)"],
+      ]},
+    ],
+    metrics: [
+      // days_waited is the defining number of this setup — it is what separates it from an EP.
+      ["days_waited", "Sessions from catalyst day to the delayed entry"],
+      ["cat_gap_pct", "Catalyst-day gap %"], ["cat_day_pct", "Catalyst-day % move"], ["cat_vol_m", "Catalyst-day volume (M sh — his 8.9M flag)"],
+      ["giveback_pct", "Deepest giveback of the day-1 range while waiting (%)"],
+      ["gap_pct", "Delayed-day gap %"], ["re_pct", "Delayed-day % move"], ["vol_ratio", "Volume ÷ prior day"],
+      ["rvol_eod", "RVol 50d EOD"], ["rvol_30m", "RVOL 1st 30min (vs same window, 20d)"], ["vol30_adv_pct", "1st-30min vol as % of ADV"], ["run_rate", "Run rate at entry (×)"],
+      ["closing_range", "Closing range % (C−L)/(H−L)"],
+      ["yoy_eps", "YoY EPS growth %"], ["yoy_rev", "YoY revenue growth %"],
+      ["neglect_3m", "3-mo return before the catalyst %"], ["surprise_num", "Surprise # (1st / 2nd…)"],
+      ["analysts", "Analyst count"], ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"],
+      ["entry_px", "Entry (5-min ORH — standing rule)"], ["stop_width_adr", "LoD stop width from entry (×ADR)"],
+      // The whole point of waiting is a better price. This pair is the audit of that claim.
+      ["cost_of_waiting_pct", "Delayed entry vs day-1 close (%) — the price paid to wait"],
+      ["d_below_ma10", "Sessions to 1st close below 10MA"],
+      ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
+      ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
+    ],
+  },
   "Parabolic": {
     buckets: [
       { title: "The stretch", items: [

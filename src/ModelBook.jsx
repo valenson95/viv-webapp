@@ -22,7 +22,7 @@ const matchesBook = (r, book) => book === "__all__" ? true : book === "__none__"
 // H_DOMAIN (Valen 2026-07-28): the setups whose HYPOTHESES / entryVerdict verdict engine is meaningful. A book
 // with study rows and NONE of these setups (e.g. Market Bottom) shows the project-hypotheses + checklist-tally
 // panel/page instead of the breakout-family 🧪 Hypotheses (which would render irrelevant 0-failure warnings).
-const H_DOMAIN = new Set(["Momentum Breakout", "Momentum Burst", "Volatility Contraction Pattern", "Episodic Pivot", "Parabolic"]);
+const H_DOMAIN = new Set(["Momentum Breakout", "Momentum Burst", "Volatility Contraction Pattern", "Episodic Pivot", "Delayed Episodic Pivot", "Parabolic"]);
 const cardStars = (r) => isStudyRow(r) ? (STUDY_LETTER_N[studyQuality(r.metrics.study).letter] || 0) : r.stars;
 // Outcome-class chip (Valen 2026-07-26) — presentation of the PRE-REGISTERED outcomeClass(): emoji + word,
 // colored by tier (green tiers / red / muted), never color alone. Keys mirror StudyBook.outcomeClass.
@@ -68,7 +68,7 @@ const mbDateRange = (entry, exit) => {
 // Expanded + member-customizable (Mandy feature request, Valen-approved 2026-07-31): the editor
 // offers these as datalist suggestions but accepts ANY typed pattern name. Filter chips derive
 // from patterns actually present, so custom names slot into the gallery automatically.
-export const PATTERNS = ["Trendline Breakout", "Pullback Buy", "Episodic Pivot", "VCP", "Bull Flag", "Flat Base", "Ascending Triangle"];
+export const PATTERNS = ["Trendline Breakout", "Pullback Buy", "Episodic Pivot", "Delayed Episodic Pivot", "VCP", "Bull Flag", "Flat Base", "Ascending Triangle"];
 export const OUTCOMES = ["Huge Winner", "Winner", "Subpar", "Loser"];
 
 // ── Objective star math — the EXACT Setup Grader checklist + formula (perfect mirror, zero bias).
