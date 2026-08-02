@@ -2153,11 +2153,12 @@ export function openPlaybookBook() {
   const body = PLAYBOOK_PARTS.map((part, pi) => {
     const inPart = PLAYBOOK_PIECES.filter((pc) => pc.part === pi);
     const divider = `<div class="page pbdivider">
-      <div class="pbdivnum">${esc(part.num)}</div>
       <div class="pbdivmeta">
-        <div class="pbeplabel">${esc(part.name)}</div>
+        <div class="pbdivnum" aria-hidden="true">${esc(part.num)}</div>
+        <div class="pcK pbdivkick">Part ${esc(part.num)} of ${PLAYBOOK_PARTS.length}</div>
+        <h2 class="pbeplabel">${esc(part.name)}</h2>
+        ${part.blurb ? `<div class="pbdivlede">${esc(part.blurb)}</div>` : ""}
         <div class="pbepstats">${esc(part.stats)}</div>
-        ${part.blurb ? `<div class="pbdivnote">${esc(part.blurb)}</div>` : ""}
         <div class="pbdivlist">${inPart.map((pc) =>
           `<div class="pbdivrow"><span class="pcK pbdivno">${esc(pc.no)}</span><span class="pcH pbdivti">${esc(pc.title)}</span><span class="pcD pbdivsub">${esc(pc.sub)}</span></div>`).join("")}</div>
         <div class="pbepcount">${esc(part.count)}</div>
@@ -2296,13 +2297,19 @@ export function openPlaybookBook() {
       .pbcno{flex:none;width:26px;font-size:0.66rem;color:#66635b}
       /* ── PART DIVIDER ── */
       .pbdivider{display:flex;flex-direction:column;justify-content:center;min-height:96vh;position:relative}
-      .pbdivnum{font-size:clamp(9rem,26vw,13rem);font-weight:700;line-height:0.82;letter-spacing:-0.04em;color:rgba(201,152,42,0.18)}
-      .pbdivmeta{margin-top:-0.4em;position:relative}
-      .pbeplabel{font-size:clamp(1.5rem,4vw,2.1rem);font-weight:700;letter-spacing:-0.03em;color:#fff;line-height:1.1}
-      .pbepstats{font-size:0.9rem;color:#9a968c;margin-top:12px;max-width:60ch;line-height:1.6}
+      /* the numeral is a WATERMARK behind the masthead now, not the headline itself */
+      .pbdivnum{position:absolute;top:-0.04em;left:-0.045em;font-size:clamp(8rem,20vw,12rem);font-weight:700;line-height:0.78;letter-spacing:-0.05em;color:rgba(201,152,42,0.10);pointer-events:none;user-select:none}
+      .pbdivmeta{position:relative;z-index:1}
+      .pbdivkick{font-size:0.66rem;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:20px;position:relative;z-index:1}
+      .pbdivmeta > *:not(.pbdivnum){position:relative;z-index:1}
+      .pbeplabel{font-size:clamp(2.9rem,7.6vw,5rem);font-weight:700;letter-spacing:-0.035em;color:#fff;line-height:0.99;margin:0}
+      .pbdivlede{font-size:1.1rem;color:#d6d3cb;line-height:1.62;margin-top:24px;max-width:52ch}
+      .pbepstats{font-size:0.88rem;color:#9a968c;margin-top:18px;max-width:60ch;line-height:1.6}
+      body.light .pbdivnum{color:rgba(138,106,28,0.12)}
+      body.light .pbdivlede{color:#3d3b34}
       .pbdivnote{font-size:0.85rem;color:#b9b5aa;line-height:1.72;margin-top:18px;max-width:54ch}
       .pbepcount{font-size:0.62rem;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:#c9982a;margin-top:22px}
-      .pbdivlist{margin-top:26px;border-top:1px solid rgba(255,255,255,0.08);max-width:62ch}
+      .pbdivlist{margin-top:38px;border-top:1px solid rgba(255,255,255,0.08);max-width:62ch}
       body.light .pbdivlist{border-top-color:rgba(23,21,15,0.12)}
       .pbdivrow{display:grid;grid-template-columns:34px minmax(0,auto) minmax(0,1fr);gap:14px;align-items:baseline;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)}
       body.light .pbdivrow{border-bottom-color:rgba(23,21,15,0.09)}
