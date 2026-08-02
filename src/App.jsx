@@ -756,6 +756,18 @@ function PlaybookTracker({ trades, uid, setPage }) {
 }
 
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "August 2, 2026",
+    title: "📘 21 Building Blocks to Profitability — the handbook is live",
+    items: [
+      "The whole system in twenty-one pieces: read the market, pick the stock, take the trade, and look after it afterwards. Written to be read start to finish, in plain English.",
+      "Six parts — the weather, the neighbourhood, the house, when to walk in, after you move in, and keeping the roof on.",
+      "Includes the exact screens I run (with the saved links), my shared focus list, my chart setup, and the card in this app that does the daily market read for you.",
+      "Read it at valensontrades.com/playbook — no login needed, so you can share the link. Save as PDF from the top of the page.",
+      "This is Version 1. I will keep adding to it.",
+    ],
+  },
   // ── STAGED: AMD Chronicle publish entry (Valen's standing rule 2026-08-01: every dive publish
   // ships a What's New the same day). When he publishes the dive: uncomment, set the real date,
   // build + push. Keep member-invisible until then.

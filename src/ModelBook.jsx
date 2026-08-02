@@ -241,10 +241,12 @@ const DEEP_DIVES = [
   {
     // STATIC dive (2026-08-01): no study rows behind it — `static` names the builder that opens it.
     // draft:true keeps it admin-only; publishing a static dive is a code change, HIS call.
-    no: "03", slug: "viv-playbook", project: null, static: "playbook", draft: true,
+    // PUBLISHED 2026-08-02 on Valen's word ("publish it with specific link!"). Mentor-name sweep
+    // and disclaimer sweep both clean on the live artifact before the flip.
+    no: "03", slug: "viv-playbook", project: null, static: "playbook", draft: false,
     title: "21 Building Blocks to Profitability",
     premise: "The VIV system in twenty-one pieces — the weather, the neighbourhood, the house, when to walk in, after you move in, and keeping the roof on.",
-    updated: "2026-08-01",
+    updated: "2026-08-02",
     cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/viv-playbook-cover.png",
   },
   {
