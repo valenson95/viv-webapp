@@ -55,13 +55,14 @@ export function computeTraction(trades) {
     .filter(t => t && !t.is_deleted && t.rMult != null && isFinite(Number(t.rMult)))
     .sort((a, b) => parseExit(b.exit) - parseExit(a.exit))
     .slice(0, TRACTION_N);
-  if (rows.length < TRACTION_N) return { v: null, sub: `only ${rows.length} closed trade${rows.length === 1 ? "" : "s"} with an R so far`, n: rows.length };
+  if (rows.length < TRACTION_N) return { v: null, sub: `only ${rows.length} closed trade${rows.length === 1 ? "" : "s"} logged so far`, n: rows.length };
   const netR = rows.reduce((s2, t) => s2 + Number(t.rMult), 0);
   const wins = rows.filter(t => Number(t.rMult) > 0).length;
+  const losses = TRACTION_N - wins;
   return {
     v: netR > 0,
-    sub: `last ${TRACTION_N}: ${wins}W / ${TRACTION_N - wins}L · ${netR >= 0 ? "+" : ""}${netR.toFixed(1)}R`,
-    n: rows.length, netR, wins,
+    sub: `Last ${TRACTION_N} trades — ${losses} ${losses === 1 ? "loss" : "losses"}, ${wins} ${wins === 1 ? "win" : "wins"}`,
+    n: rows.length, netR, wins, losses,
   };
 }
 
@@ -111,7 +112,7 @@ export function computeTrend(trades) {
       { k: "weekly", label: "Weekly buy signal", sub: "S&P above its 10 & 20-week lines, 10 above 20", v: weekly, drives: true },
       { k: "r5", label: "Price above a rising 5-day line", sub: "short-term momentum still up", v: rising5, drives: true },
       { k: "breadth", label: "Breadth supportive", sub: "more stocks up 25% than down, month and quarter", v: breadthOk },
-      { k: "traction", label: "My recent trades working", sub: tr.sub, v: tr.v, mine: true },
+      { k: "traction", label: "Trade feedback loop", sub: tr.sub, v: tr.v, mine: true },
     ],
     regime,
   };
@@ -137,7 +138,7 @@ export default function MarketTrend({ C, font, trades }) {
           "Is the index in gear on the daily and the weekly?",
           "Is short-term momentum still up?",
           "Is breadth backing it up?",
-          "Are your own recent trades working?",
+          "Is your own trading working right now?",
           "Every row is computed from S&P closes and your journal. No opinion.",
         ] }} />
         <LensCamera getEl={() => cardRef.current} name="market-trend" C={C} style={{ marginLeft: 6 }} />
