@@ -13040,10 +13040,16 @@ function AppInner() {
   // shared link lands the reader on that section after login. Hash-based = zero server config;
   // unknown hashes (incl. Supabase auth tokens like #access_token=…) fall back to the dashboard.
   const HASH_PAGES = ["dashboard", "journal", "tools", "daily", "modelbook", "practice", "quant", "burstlog", "mentor", "settings"];
-  const pageFromHash = () => { const h = (window.location.hash || "").replace(/^#\/?/, "").toLowerCase(); return HASH_PAGES.includes(h) ? h : "dashboard"; };
+  // Deep links that land on a page AND open something on it. #playbook is the onboarding link
+  // Valen pins in Skool (2026-08-02): it opens Model Book and pops the 21 Building Blocks book
+  // straight away, so a new member's first click is the handbook, not a menu.
+  const HASH_DEEP = { playbook: "modelbook" };
+  const rawHash = () => (window.location.hash || "").replace(/^#\/?/, "").toLowerCase();
+  const pageFromHash = () => { const h = rawHash(); return HASH_DEEP[h] || (HASH_PAGES.includes(h) ? h : "dashboard"); };
   const [page, setPage] = useState(pageFromHash);
   useEffect(() => {
     const cur = (window.location.hash || "").replace(/^#\/?/, "").toLowerCase();
+    if (HASH_DEEP[cur]) return;   // leave a deep link in the URL until its target consumes it
     if (HASH_PAGES.includes(page) && cur !== page) { try { window.history.pushState(null, "", "#" + page); } catch {} }
   }, [page]);
   useEffect(() => {
