@@ -12005,7 +12005,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             </div>
             <div className="prow">
               <span className="plabel">Interface style</span>
-              <div className="seg" id="prefTheme"><button className={uiTheme === "classic" ? "on" : ""} onClick={() => setUiTheme("classic")}>VIV Classic</button><button className={uiTheme === "zella" ? "on" : ""} onClick={() => setUiTheme("zella")}>Zella Clean</button></div>
+              <div className="seg" id="prefTheme"><button className={uiTheme === "classic" ? "on" : ""} onClick={() => setUiTheme("classic")}>VIV Classic</button><button className={uiTheme === "geist" ? "on" : ""} onClick={() => setUiTheme("geist")}>Book</button><button className={uiTheme === "zella" ? "on" : ""} onClick={() => setUiTheme("zella")}>Zella Clean</button></div>
             </div>
             <div className="prow">
               <span className="plabel">Community reminders</span>
@@ -12194,8 +12194,8 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
 
           <div className="prefrow">
             <div className="pl"><div className="t"><span className="term" data-tip="Choose the overall look of the app. VIV Classic is the signature near-black + gold look. Zella Clean is a calmer, flatter alternative with Inter typography, softer whites and a toned-down gold accent — everything else works exactly the same. Switch back any time.">Interface style</span></div>
-              <div className="d">VIV Classic is the signature near-black + gold look. Zella Clean is a calmer, flatter alternative — Inter type, softer whites, muted accent. Switches instantly and you can revert any time.</div></div>
-            <div className="seg" id="prefTheme"><button className={uiTheme === "classic" ? "on" : ""} onClick={() => setUiTheme("classic")}>VIV Classic</button><button className={uiTheme === "zella" ? "on" : ""} onClick={() => setUiTheme("zella")}>Zella Clean</button></div>
+              <div className="d">VIV Classic is the signature near-black + gold look. <b>Book</b> keeps those exact colours but uses the Model Book's typeface — easier to read at small sizes, and numbers line up in columns. Zella Clean is a calmer, flatter alternative — Inter type, softer whites, muted accent. All switch instantly and you can revert any time.</div></div>
+            <div className="seg" id="prefTheme"><button className={uiTheme === "classic" ? "on" : ""} onClick={() => setUiTheme("classic")}>VIV Classic</button><button className={uiTheme === "geist" ? "on" : ""} onClick={() => setUiTheme("geist")}>Book</button><button className={uiTheme === "zella" ? "on" : ""} onClick={() => setUiTheme("zella")}>Zella Clean</button></div>
           </div>
 
           <div className="prefrow">
@@ -12875,6 +12875,28 @@ body.theme-zella .vp .card, body.theme-zella .vj .card, body.theme-zella .vd .ca
 }
 /* Quiet the drifting gold particles/pulses so the backdrop stays calm and cool. */
 body.theme-zella .viv-bg-particle, body.theme-zella .viv-bg-pulse{ display:none; }
+
+/* ─── "Book" interface style (Valen 2026-08-02) — VIV Classic's palette, the MODEL BOOK's type.
+   Geist is what the typeset book pages already use: designed for interfaces, cleaner at the
+   0.6–0.8rem sizes this dashboard lives at, and it ships real TABULAR numerals, which is what
+   the rotation / breadth / RS columns actually need. Colours are untouched — this layer only
+   swaps the family, so reverting to VIV Classic is pixel-identical. */
+body.theme-geist,
+body.theme-geist .vp, body.theme-geist .vj, body.theme-geist .vd, body.theme-geist .vs{
+  --font:'Geist',-apple-system,BlinkMacSystemFont,'Plus Jakarta Sans',sans-serif;
+}
+body.theme-geist{ font-family:'Geist',-apple-system,BlinkMacSystemFont,'Plus Jakarta Sans',sans-serif; }
+body.theme-geist .vp, body.theme-geist .vj, body.theme-geist .vd, body.theme-geist .vs{ font-family:var(--font); }
+/* Inline styles pass fontFamily explicitly (the shared font constant), so override those too. */
+body.theme-geist .vd *, body.theme-geist .vj *, body.theme-geist .vp *, body.theme-geist .vs *{
+  font-family:inherit;
+}
+/* …except the micro-label register, which gets the book's companion mono. */
+body.theme-geist .vd .label, body.theme-geist .vj .label, body.theme-geist .vp .label, body.theme-geist .vs .label{
+  font-family:'Geist Mono',ui-monospace,monospace; font-weight:600; letter-spacing:0.12em;
+}
+/* Numbers line up in columns — the whole point of the swap. */
+body.theme-geist .vd table, body.theme-geist .vj table{ font-variant-numeric:tabular-nums; }
 `;
 
 // ─── Animated app background — calm grid + drifting particles + cursor glow ───
@@ -12989,12 +13011,14 @@ function AppInner() {
     tag.textContent = THEME_CSS;
     document.head.appendChild(tag);
   }, []);
-  // Interface style: "classic" (VIV Classic, the default) or "zella" (Zella Clean). Persisted per browser.
+  // Interface style: "classic" (VIV Classic, the default) · "zella" (Zella Clean) · "geist" (Book
+  // — Classic's colours with the Model Book's Geist type). Persisted per browser; revert = one click.
+  const UI_THEMES = ["zella", "geist"];
   const [uiTheme, setUiThemeState] = useState(() => {
-    try { return localStorage.getItem("viv-ui-theme") === "zella" ? "zella" : "classic"; } catch { return "classic"; }
+    try { const v = localStorage.getItem("viv-ui-theme"); return UI_THEMES.includes(v) ? v : "classic"; } catch { return "classic"; }
   });
   const setUiTheme = useCallback((t) => {
-    const next = t === "zella" ? "zella" : "classic";
+    const next = UI_THEMES.includes(t) ? t : "classic";
     try { localStorage.setItem("viv-ui-theme", next); } catch { /* private mode — ignore */ }
     setUiThemeState(next);
   }, []);
@@ -13002,6 +13026,7 @@ function AppInner() {
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.body.classList.toggle("theme-zella", uiTheme === "zella");
+    document.body.classList.toggle("theme-geist", uiTheme === "geist");
   }, [uiTheme]);
   const screenW = useScreenWidth();
   const isMobile = screenW < 768;

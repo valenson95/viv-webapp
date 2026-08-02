@@ -125,13 +125,15 @@ export default function ThemeStrip({ C, font, variant, noStamp }) {
     // Since Open (intraday ex-gap) — only recent snapshots carry it; the popup grows a
     // third column when present, mini card stays 1W/1M only (Valen 2026-07-24).
     const dayRows = snap.day || [];
-    const wkTop = wkRows.slice(0, 5);
-    const moTop = moRows.slice(0, 5);
+    const LEAD_N = 8;          // rows shown
+    const GATE_N = 5;          // …of which the first 5 are the in-theme gate
+    const wkTop = wkRows.slice(0, LEAD_N);
+    const moTop = moRows.slice(0, LEAD_N);
     // Weakest = bottom-5, worst first.
     const wkBot = wkRows.slice(-5).reverse();
     const moBot = moRows.slice(-5).reverse();
     // Shared column renderer — colors each % by sign (green ≥ 0, red < 0).
-    const Col = ({ title, rows, size }) => {
+    const Col = ({ title, rows, size, gate }) => {
       const fs = size === "lg" ? "0.9rem" : "0.74rem";
       return (
         <div>
@@ -139,8 +141,10 @@ export default function ThemeStrip({ C, font, variant, noStamp }) {
           <div style={{ display: "flex", flexDirection: "column", gap: size === "lg" ? 9 : 7 }}>
             {rows.map(([name, pct], i) => {
               const pos = pct >= 0;
+              const gateEnd = gate && i === gate;
               return (
-                <div key={name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: fs }}>
+                <div key={name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: fs,
+                  ...(gateEnd ? { borderTop: `1px solid ${C.border}`, paddingTop: 8, marginTop: 1 } : null) }}>
                   <span style={{ color: C.muted, opacity: 0.65, fontWeight: 700, width: 15, flex: "none", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
                   <ThemeName name={name} onOpen={setActiveTheme} C={C} style={{ flex: 1, color: "rgba(255,255,255,0.9)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} />
                   <span style={{ color: pos ? C.green : C.red, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{pos ? "+" : ""}{pct.toFixed(2)}%</span>
@@ -172,8 +176,11 @@ export default function ThemeStrip({ C, font, variant, noStamp }) {
               {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.goldBright || C.gold, fontWeight: 700 }}>updated {snap.date}</span>}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-              <Col title="1 Week" rows={wkTop} />
-              <Col title="1 Month" rows={moTop} />
+              <Col title="1 Week" rows={wkTop} gate={GATE_N} />
+              <Col title="1 Month" rows={moTop} gate={GATE_N} />
+            </div>
+            <div style={{ marginTop: 10, fontSize: "0.55rem", color: C.muted, opacity: 0.7, lineHeight: 1.5 }}>
+              Above the line = in-theme (top 5). Below = next in strength.
             </div>
             {divider}
             <div style={{ marginBottom: 11 }}>{microLabel("Weakest")}</div>
