@@ -838,7 +838,7 @@ const WHATS_NEW = [
     title: "🧭 Rotation — index & macro leverage vehicles",
     items: [
       "Liquid Leaders now tracks the big non-stock exposures too: semiconductors, small caps, Bitcoin, Ethereum, crude oil, silver, biotech and volatility — each with its liquid 2x/3x long and short vehicles in the pointer columns.",
-      "Same discipline as every row: the signal is computed on the underlying index or commodity; the leveraged ticker is only the vehicle. Educational, not advice.",
+      "Same discipline as every row: the signal is computed on the underlying index or commodity; the leveraged ticker is only the vehicle.",
     ],
   },
   {

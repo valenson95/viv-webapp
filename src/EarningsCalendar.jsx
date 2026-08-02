@@ -3,8 +3,8 @@ import { createPortal } from "react-dom";
 import { EARNINGS } from "./earnings-data.js";
 import { GROUP_RS } from "./groupRS-data.js";
 import { MACRO_EVENTS } from "./macroCalendar-data.js";
-import { InfoDot } from "./GroupRS.jsx";
-import { LensCamera, SectionCamera } from "./capture.jsx";
+import { InfoDot, Tip } from "./GroupRS.jsx";
+import { LensCamera, SectionCamera, XShare } from "./capture.jsx";
 
 // ── EARNINGS CALENDAR — V4 "est→actual lifecycle + surprise radar" ────────────
 // Top → bottom: header+filters · ON YOUR RADAR (leaders-only day strip) · SURPRISE RADAR
@@ -14,7 +14,7 @@ import { LensCamera, SectionCamera } from "./capture.jsx";
 //
 // Base data = the committed src/earnings-data.js snapshot; on the live domain it tries
 // /api/earnings for freshness and MERGES (keeps snapshot rx). Every data surface carries its
-// refresh date. No logos — hierarchy = market cap + Liquid Leaders. Educational, not advice.
+// refresh date. No logos — hierarchy = market cap + Liquid Leaders.
 
 const ADMIN_EMAIL = "vc-lv@live.com";
 
@@ -181,7 +181,7 @@ function RadarStrip({ radar, today, onChipClick, interactive = true, C, autoScro
         title={reported ? `${r.t} — reported ${valTxt}` : `${r.t} — ${timeWord(r.time)}`}>
         <span className="tk">{r.t}</span>
         {past && valTxt && <span className="ra" style={{ color: reported ? beatCol(r) : "rgba(255,255,255,0.45)" }}>{valTxt}</span>}
-        {showQ && <span className="q" title="time not confirmed">?</span>}
+        {showQ && <Tip tip="Report time not confirmed yet — it could be before the open or after the close." className="q">?</Tip>}
       </div>
     );
   };
@@ -440,7 +440,7 @@ function EarningsDetailPopup({ target, C, font, onClose }) {
             <div style={{ display: "grid", gap: 9 }}>
               <div><div style={label}>Long ETF</div><div style={{ marginTop: 6 }}><LevChips arr={ll?.long} C={C} /></div></div>
               <div><div style={label}>Short / inverse ETF</div><div style={{ marginTop: 6 }}><LevChips arr={ll?.short} C={C} /></div></div>
-              <div style={{ fontSize: "0.62rem", lineHeight: 1.5, color: "rgba(255,255,255,0.4)" }}>Leveraged/inverse funds — liquidity varies, always check the fund before using it. Educational, not advice.</div>
+              <div style={{ fontSize: "0.62rem", lineHeight: 1.5, color: "rgba(255,255,255,0.4)" }}>Leveraged/inverse funds — liquidity varies, always check the fund before using it.</div>
             </div>
           )}
         </div>
@@ -698,7 +698,7 @@ export default function EarningsCalendar({ C, font, session }) {
           <div style={{ ...cardLabel, marginBottom: 5 }}>Earnings</div>
           <h1 style={{ margin: "0 0 5px", fontSize: "1.4rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white }}>Earnings calendar</h1>
           <p style={{ margin: 0, fontSize: "0.78rem", lineHeight: 1.55, color: C.muted, maxWidth: "70ch" }}>
-            Who reports and when — and how last week's reports actually landed — so you know which of your names has a report that can gap the stock. Educational, not advice.
+            Who reports and when — and how last week's reports actually landed — so you know which of your names has a report that can gap the stock.
           </p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
@@ -737,7 +737,7 @@ export default function EarningsCalendar({ C, font, session }) {
         <section className="earn-card sr-card">
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11, flexWrap: "wrap" }}>
             <span style={cardLabel}>Reported — surprise radar</span>
-            <InfoDot tip="The biggest earnings surprises of the last week and how the stock actually reacted — big surprise + strong reaction is where new momentum is born. Educational, not advice." />
+            <InfoDot tip="The biggest earnings surprises of the last week and how the stock actually reacted — big surprise + strong reaction is where new momentum is born." />
             <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 700, color: C.muted }}>ranked by size of surprise</span>
             <SectionCamera sel=".earn-card" name="earnings-surprises" C={C} style={{ position: "static", top: "auto", right: "auto" }} />
           </div>
@@ -762,7 +762,7 @@ export default function EarningsCalendar({ C, font, session }) {
             </div>
           </div>
           <div style={{ marginTop: 9, fontSize: "0.6rem", lineHeight: 1.5, color: "rgba(255,255,255,0.4)" }}>
-            Reactions computed for each day's largest reporters (top 25) + all liquid leaders ({reactionsTotal} in range) — smaller names show estimates only. Educational, not advice.
+            Reactions computed for each day's largest reporters (top 25) + all liquid leaders ({reactionsTotal} in range) — smaller names show estimates only.
           </div>
         </section>
       )}
@@ -867,7 +867,7 @@ export default function EarningsCalendar({ C, font, session }) {
                 <b style={{ color: C.text }}>Source: {source}.</b> Snapshot base = <code style={{ color: C.text }}>src/earnings-data.js</code>; on the live domain only it merges a fresher <code style={{ color: C.text }}>/api/earnings</code> pull (keeping snapshot reactions). Nasdaq returns <b style={{ color: C.text }}>two schemas</b>: future dates carry the estimate + last-year EPS; past dates carry the <b style={{ color: C.text }}>actual EPS + % surprise</b>. Finnhub (if a key is set) adds a revenue estimate; otherwise revenue stays blank — never fabricated.
               </p>
               <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.7, color: C.muted }}>
-                <b style={{ color: C.text }}>Reactions</b> are computed from daily candles for past-day reporters only, bounded to each day's top 25 by market cap ∪ all liquid leaders. Reaction day = the report day for a before-open report, else the next trading day. Gap = open vs prior close · Session = close vs open · Total = close vs prior close. Below cap / bars missing → shown as "—". Chip prominence scales by market cap; leaders pin gold. Refresh: <code style={{ color: C.text }}>node --env-file=.env.local scripts/earnings-fetch.mjs</code>. Educational, not advice.
+                <b style={{ color: C.text }}>Reactions</b> are computed from daily candles for past-day reporters only, bounded to each day's top 25 by market cap ∪ all liquid leaders. Reaction day = the report day for a before-open report, else the next trading day. Gap = open vs prior close · Session = close vs open · Total = close vs prior close. Below cap / bars missing → shown as "—". Chip prominence scales by market cap; leaders pin gold. Refresh: <code style={{ color: C.text }}>node --env-file=.env.local scripts/earnings-fetch.mjs</code>.
               </p>
             </div>
           )}
@@ -912,8 +912,9 @@ export function EarningsRadarMini({ C, font, session, compact, noStamp }) {
       <div ref={cardRef} className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
         <div className="cardhead">
           <span className="label">{compact ? "Earnings" : "Earnings — On Your Radar"}</span>
-          <InfoDot tip="Which names report soon, day by day — before the open or after the close. Your liquid leaders in gold; the day's biggest other reporters fill in quietly. Tap for the full calendar." />
+          <InfoDot tip="Who reports, and when. Gold = a liquid leader. A report can gap a stock overnight, so check this before you hold through one. Tap for the full calendar." />
           <LensCamera getEl={() => cardRef.current} name="earnings-radar" C={C} style={{ marginLeft: 6 }} />
+          <XShare getEl={() => cardRef.current} C={C} text={`Earnings on deck — week of ${asof}\n\nWho reports when, and which of them are leaders.\n\nvalensontrades.com`} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
         {hasAny ? (

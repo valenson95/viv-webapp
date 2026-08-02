@@ -6,7 +6,7 @@ import { BURST_LOG } from "./burstLog-data.js";
 // The read Valen wants per day (2026-07-24): WHAT SIZE (cap profile),
 // WHERE (theme/sector mix), and IS IT IN-THEME (vs the tracker gate at
 // that date). Gauge = froth thermometer (study floor). Forward returns
-// stay as columns in the drill-down only. Educational, not advice.
+// stay as columns in the drill-down only.
 // ─────────────────────────────────────────────────────────────
 
 const gaugeColor = (n, C) =>
@@ -198,7 +198,7 @@ export default function BurstLog({ C, font }) {
       <div style={{ ...small, marginTop: 10, lineHeight: 1.5 }}>
         Cap = shares outstanding × that session&rsquo;s close (weekly-refreshed shares; blank = not available). Theme = the webapp&rsquo;s
         DeepVue-derived map; <i>italic</i> = SIC industry fallback, ⚪ = unmapped. Study floor ≥ {(D.floors?.studyShares || 100000).toLocaleString()} sh/day ·
-        Trade floor ≥ ${((D.floors?.tradeDvol || 2e7) / 1e6).toFixed(0)}M/day · close ≥ ${D.floors?.price || 5}. Educational, not advice.
+        Trade floor ≥ ${((D.floors?.tradeDvol || 2e7) / 1e6).toFixed(0)}M/day · close ≥ ${D.floors?.price || 5}.
       </div>
     </div>
   );

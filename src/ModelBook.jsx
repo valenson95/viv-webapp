@@ -833,7 +833,7 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
       <h1>${coverTitle ? esc(coverTitle) : "My Model Book"}</h1>
       <div class="sub">${coverTitle ? "VIV Model Book" : `${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${today}`}</div>
       ${coverTitle ? `<div class="sub">${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${today}</div>` : ""}
-      <div class="sub" style="margin-top:26px;max-width:60ch;line-height:1.6">Your own pattern library — the setup, the factors that were present, and the outcome. Study the pairs; the commonalities are the edge. Educational, not advice.</div>
+      <div class="sub" style="margin-top:26px;max-width:60ch;line-height:1.6">Your own pattern library — the setup, the factors that were present, and the outcome. Study the pairs; the commonalities are the edge.</div>
     </div>
     ${menuHtml}
     ${hypHtml}

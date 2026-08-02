@@ -11,7 +11,7 @@ import { LensCamera, SectionCamera, XShare } from "./capture.jsx";
 // DeepVue stays the source of truth for single-stock RS and sector grouping.
 //
 // Member-safe: the whole page renders for any logged-in user; the collapsible
-// "Method / formulas" card is ADMIN-ONLY (holds provenance). Educational, not advice.
+// "Method / formulas" card is ADMIN-ONLY (holds provenance).
 //
 // DESIGN = the webapp Pro system: near-black, palette C, Plus Jakarta (font prop),
 // rounded-16 glass cards, uppercase gold section labels, gold-gradient active chips.
@@ -226,7 +226,7 @@ function HoldingsPopup({ target, onClose, C, font }) {
             <span style={{ fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
           </div>
           <div style={{ marginTop: 5, fontSize: "0.6rem", color: "rgba(255,255,255,0.42)", lineHeight: 1.5 }}>
-            Holdings change slowly — refreshed periodically. Educational, not advice.
+            Holdings change slowly — refreshed periodically.
           </div>
         </div>
         {/* body */}
@@ -536,8 +536,8 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
           <span style={{ position: "relative" }}>{row.pct1m == null ? "—" : sgn(row.pct1m) + "%"}</span>
         </td>
         <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap", background: redHeat(off52Mag(row.off52)), color: row.off52 == null ? C.muted : row.off52 >= -0.05 ? "#86efac" : "#fca5a5" }}>
-          {(row.warns || []).includes("trap") && <span title="Far below its 52-week high — strength here is a bounce, not a breakout." style={{ marginRight: 4, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
-          {(row.warns || []).includes("artifact") && <span title="Percentile illusion — RS% looks high but the actual month is negative." style={{ marginRight: 3, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
+          {(row.warns || []).includes("trap") && <Tip tip="Strong, but still far below its 52-week high. This is a bounce, not a breakout." style={{ marginRight: 4, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
+          {(row.warns || []).includes("artifact") && <Tip tip="The rank looks high, but the actual month is negative. Ranking beats a weak field." style={{ marginRight: 3, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
           {row.off52 == null ? "—" : (row.off52 >= -0.05 ? "0%" : sgn(row.off52) + "%")}
         </td>
         <td style={{ ...td, textAlign: "center" }}><StateChips row={row} /></td>
@@ -682,7 +682,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
           <div style={{ ...cardLabel, marginBottom: 6 }}>Rotation</div>
           <h1 style={{ margin: "0 0 6px", fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white }}>Rotation — sector groups & top-down view</h1>
           <p style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.6, color: C.muted, maxWidth: "72ch" }}>
-            Which groups are accelerating, which are resting, which are traps — computed daily from ETF closes vs the equal-weight benchmark. Educational, not advice.
+            Which groups are accelerating, which are resting, which are traps — computed daily from ETF closes vs the equal-weight benchmark.
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -744,7 +744,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
           <section className="grs-card" style={{ padding: "6px 8px" }}>
             <SectionCamera sel=".grs-card" name="rotation-liquid-leaders" C={C} />
             <p style={{ margin: "8px 10px 6px", fontSize: "0.72rem", lineHeight: 1.55, color: C.muted, maxWidth: "94ch" }}>
-              Individual leading stocks — the same weekly-thrust / monthly-RS reads as the group table, on a curated universe of liquid leaders. These are companies, not funds. Educational, not advice.
+              Individual leading stocks — the same weekly-thrust / monthly-RS reads as the group table, on a curated universe of liquid leaders. These are companies, not funds.
             </p>
             <div style={{ overflowX: "auto" }}>
               <table className="minitable">
@@ -828,7 +828,7 @@ decode (pre-registered thresholds):
                   <b style={{ color: C.text }}>Liquid Leaders (3rd tab)</b> runs the IDENTICAL rs1m / thrust machinery on individual stocks (vs RSP, no benchmark row) over a single curated universe of ~62 liquid leaders that ship with leveraged/inverse ETF mappings. The Long/Short cells list those liquid lev/inverse ETFs (always vet the fund before using it). These are companies, not funds — no holdings popup. (A wider DeepVue "screen" list is kept documented-but-inactive in the script for easy re-add.)
                 </p>
                 <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.7, color: "rgba(255,255,255,0.5)" }}>
-                  DeepVue remains the source of truth for single-stock RS and sector grouping. Refresh: <code style={{ color: C.text }}>node scripts/group-rs.mjs</code>. Educational, not advice.
+                  DeepVue remains the source of truth for single-stock RS and sector grouping. Refresh: <code style={{ color: C.text }}>node scripts/group-rs.mjs</code>.
                 </p>
               </div>
             </div>
@@ -865,7 +865,7 @@ export function RotationMini({ C, font, session, noStamp }) {
       <div ref={cardRef} className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
         <div className="cardhead">
           <span className="label">Sector Group Rotation</span>
-          <InfoDot tip="Which sector groups are heating up and which are cooling. Tap for the full table." />
+          <InfoDot tip="Where the money is moving. Groups at the top are being bought; groups at the bottom are being sold. Tap for the full table." />
           <LensCamera getEl={() => cardRef.current} name="rotation" C={C} style={{ marginLeft: 6 }} />
           <XShare getEl={() => cardRef.current} C={C} text={`Sector group rotation — ${asof}\n\nWhich groups are accelerating and which are resting.\n\nvalensontrades.com`} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
@@ -888,8 +888,8 @@ export function RotationMini({ C, font, session, noStamp }) {
                 <td style={{ padding: "3px 4px", textAlign: "right", whiteSpace: "nowrap" }}>
                   {/* Valen 2026-07-19: OFF-FLOOR flag = plain ⚠️ to the LEFT of the value so the
                       right-aligned % column stays a clean edge. No separate column. */}
-                  {(r.warns || []).includes("trap") && <span title="Far below its 52-week high — strength here is a bounce, not a breakout." style={{ marginRight: 4, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
-                  {(r.warns || []).includes("artifact") && <span title="Percentile illusion — RS% looks high but the actual month is negative." style={{ marginRight: 3, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</span>}
+                  {(r.warns || []).includes("trap") && <Tip tip="Strong, but still far below its 52-week high. This is a bounce, not a breakout." style={{ marginRight: 4, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
+                  {(r.warns || []).includes("artifact") && <Tip tip="The rank looks high, but the actual month is negative. Ranking beats a weak field." style={{ marginRight: 3, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
                   <span style={cellChip(redHeat(off52Mag(r.off52)))}>{r.off52 == null ? "—" : (r.off52 >= -0.05 ? "0%" : Math.round(r.off52) + "%")}</span>
                 </td>
               </tr>

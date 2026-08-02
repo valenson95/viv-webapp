@@ -9,7 +9,7 @@ import { LensCamera, SectionCamera, XShare } from "./capture.jsx";
 // plus longer-horizon ±25% counts. It answers ONE question — are breakouts likely
 // to work right now? — it never picks the stock. Member-safe: the page renders for
 // any logged-in user; the citation/provenance ("Signal read" + "Method") cards are
-// ADMIN-ONLY. Educational, not advice.
+// ADMIN-ONLY.
 //
 // THE FOUR COLUMNS (systematic read): documented in
 //   trading/research/stockbee-sources/49-...md §4 —
@@ -344,7 +344,7 @@ export default function MarketMonitor({ C, font, session }) {
           <div style={{ ...cardLabel, marginBottom: 6 }}>Breadth</div>
           <h1 style={{ margin: "0 0 6px", fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white }}>Market Breadth</h1>
           <p style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.6, color: C.muted, maxWidth: "74ch" }}>
-            How many stocks moved 4%+ up vs down today — the market's weather station. Sets the aggression dial, never picks the stock. Educational, not advice.
+            How many stocks moved 4%+ up vs down today — the market's weather station. Sets the aggression dial, never picks the stock.
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -479,7 +479,7 @@ export default function MarketMonitor({ C, font, session }) {
               </tbody>
             </table>
             <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
-              ⭐ rows are the rare, high-power signals — most fire at MAXIMUM pain, marking where risk/reward flips bullish while everything feels terrible. Golden rule: breadth calls <b style={{ color: C.text }}>bottoms</b>, never tops — markets top on <i>narrowing participation</i>, not on euphoric breadth, so never sell just because the sheet looks too green. Educational, not advice.
+              ⭐ rows are the rare, high-power signals — most fire at MAXIMUM pain, marking where risk/reward flips bullish while everything feels terrible. Golden rule: breadth calls <b style={{ color: C.text }}>bottoms</b>, never tops — markets top on <i>narrowing participation</i>, not on euphoric breadth, so never sell just because the sheet looks too green.
             </div>
           </div>
         )}
@@ -632,7 +632,7 @@ export function BreadthMini({ C, font, session, noStamp }) {
       <div ref={cardRef} className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
         <div className="cardhead">
           <span className="label">Market Breadth</span>
-          <InfoDot tip="Are breakouts likely to work right now? Tap for counts, ratios and the full sheet." />
+          <InfoDot tip="Counts how many stocks are surging vs collapsing. It answers one question: are breakouts working right now? Tap for the full sheet." />
           <LensCamera getEl={() => cardRef.current} name="breadth" C={C} style={{ marginLeft: 6 }} />
           <XShare getEl={() => cardRef.current} C={C} text={`Market breadth — ${asof}\n\nAre breakouts likely to work right now?\n\nvalensontrades.com`} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}

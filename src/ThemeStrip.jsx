@@ -68,7 +68,7 @@ function ThemeConstituentsPopup({ theme, onClose, C, font }) {
             <span style={{ fontSize: "0.6rem", fontWeight: 700, color: C.goldBright || C.gold, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
           </div>
           <div style={{ marginTop: 5, fontSize: "0.6rem", color: "rgba(255,255,255,0.42)", lineHeight: 1.5 }}>
-            Order = recent relative strength, strongest first. Educational, not advice.
+            Order = recent relative strength, strongest first.
           </div>
         </div>
         {/* body */}

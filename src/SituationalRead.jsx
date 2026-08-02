@@ -4,7 +4,7 @@ import { MARKET_MONITOR } from "./marketMonitor-data.js";
 import { GROUP_RS } from "./groupRS-data.js";
 import { latestSnapshot } from "./themes.js";
 import { readBreadth } from "./MarketMonitor.jsx";
-import { InfoDot } from "./GroupRS.jsx";
+import { InfoDot, Tip } from "./GroupRS.jsx";
 import { LensCamera, XShare } from "./capture.jsx";
 import { supabase } from "./supabaseClient.js";
 
@@ -22,7 +22,7 @@ import { supabase } from "./supabaseClient.js";
 //   2. THE SPINE — chips computed live from the same data files, so the numbers can never drift
 //      from the tables above even when the paragraph is a day old.
 //
-// Educational, not advice — the copy describes what the lenses show, it never instructs.
+// The copy describes what the lenses show — it never instructs.
 
 const canonicalApi = (path) => {
   const onVst = typeof window !== "undefined" && /(^|\.)valensontrades\.com$/i.test(window.location.hostname);
@@ -33,7 +33,7 @@ const canonicalApi = (path) => {
 // Whitelist: inline formatting tags + the styles the toolbar can produce. Everything else
 // (scripts, handlers, links, images, classes) is stripped. Runs on RENDER, so even a hostile
 // stored doc can't execute — the server check is a courtesy, this is the defense.
-const OK_TAGS = new Set(["B", "STRONG", "I", "EM", "U", "BR", "P", "DIV", "SPAN", "FONT"]);
+const OK_TAGS = new Set(["B", "STRONG", "I", "EM", "U", "BR", "P", "DIV", "SPAN", "FONT", "UL", "OL", "LI"]);
 const OK_STYLE = new Set(["color", "font-size", "font-weight", "font-style", "text-decoration"]);
 export function sanitizeRich(html) {
   if (html == null) return "";
@@ -96,10 +96,11 @@ function RichField({ C, font, label, value, onChange, minH = 96 }) {
             <button key={col} type="button" title="Text colour" onMouseDown={cmd("foreColor", col)}
               style={{ ...tbtn, minWidth: 16, width: 16, height: 16, padding: 0, borderRadius: 99, background: col, border: "1px solid rgba(0,0,0,0.4)" }} />
           ))}
+          <button type="button" style={tbtn} onMouseDown={cmd("insertUnorderedList")} title="Bullet list">•</button>
           <button type="button" style={tbtn} onMouseDown={cmd("removeFormat")} title="Clear formatting">✕</button>
         </span>
       </div>
-      <div ref={ref} contentEditable suppressContentEditableWarning
+      <div ref={ref} className="sitedit" contentEditable suppressContentEditableWarning
         onInput={() => ref.current && onChange(ref.current.innerHTML)}
         style={{ minHeight: minH, background: "rgba(0,0,0,0.3)", border: `1px solid ${C.border}`, borderRadius: 9, color: C.text, fontFamily: font, fontSize: "0.75rem", lineHeight: 1.65, padding: "10px 12px", outline: "none", overflowWrap: "break-word" }} />
     </div>
@@ -164,6 +165,7 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
       shop: sanitizeRich(read.shop || ""),
       flip: sanitizeRich(read.flip || ""),
       commentary: sanitizeRich(read.commentary || ""),
+      stance: read.stance || "NEUTRAL",
     });
     setEditing(true);
   };
@@ -200,13 +202,31 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
   const blockBody = { fontSize: "0.75rem", lineHeight: 1.65, color: C.text, overflowWrap: "break-word" };
   const btn = (primary) => ({ fontFamily: font, fontSize: "0.66rem", fontWeight: 700, padding: "7px 14px", borderRadius: 99, cursor: saving ? "wait" : "pointer", border: `1px solid ${primary ? "rgba(201,152,42,0.5)" : C.border}`, background: primary ? "rgba(201,152,42,0.16)" : "rgba(255,255,255,0.03)", color: primary ? (C.goldBright || C.gold) : C.muted });
 
-  const Rich = ({ html, style }) => <div style={style} dangerouslySetInnerHTML={{ __html: sanitizeRich(html) }} />;
+  const Rich = ({ html, style }) => <div className="sitrich" style={style} dangerouslySetInnerHTML={{ __html: sanitizeRich(html) }} />;
+
+  // STANCE — the one word the whole card exists to deliver. Colour carries the meaning:
+  // green = risk on · gold = neutral · red = risk off.
+  const STANCE = {
+    "RISK ON": { fg: "#7ef0a0", bg: "rgba(34,197,94,0.14)", bd: "rgba(34,197,94,0.4)" },
+    "NEUTRAL": { fg: "#f0c050", bg: "rgba(201,152,42,0.15)", bd: "rgba(201,152,42,0.42)" },
+    "RISK OFF": { fg: "#fca5a5", bg: "rgba(239,68,68,0.14)", bd: "rgba(239,68,68,0.4)" },
+  };
+  const st = STANCE[(read.stance || "").toUpperCase()];
 
   return (
     <div ref={cardRef} className="card" style={{ fontFamily: font, display: "flex", flexDirection: "column" }}>
+      {/* Bullets are the house format for this card (Valen 2026-08-02: point form, punchy).
+          Tight leading, gold markers, no default browser indent blowout. */}
+      <style>{`
+        .sitrich ul, .sitedit ul{margin:0; padding-left:16px; list-style:none}
+        .sitrich li, .sitedit li{position:relative; padding-left:2px; margin:0 0 7px}
+        .sitrich li:last-child, .sitedit li:last-child{margin-bottom:0}
+        .sitrich li::before, .sitedit li::before{content:'▸'; position:absolute; left:-14px; color:${C.goldBright || C.gold}; font-size:0.7em; top:0.15em}
+        .sitrich b, .sitedit b, .sitrich strong{color:${C.white}; font-weight:700}
+      `}</style>
       <div className="cardhead">
         <span className="label">Situational Awareness</span>
-        <InfoDot tip="The lenses above in one read — what the market is doing, and where the strength actually is. Educational, not advice." />
+        <InfoDot tip="Every table above, boiled down to one verdict: what the market is doing, where the strength actually is, and what would change it." />
         <LensCamera getEl={() => cardRef.current} name="situational" C={C} style={{ marginLeft: 6 }} />
         {/* Post to X shares the IMAGE + a short hook — never the full read as text (the card is the
             product; the paragraph belongs on the site, not pasted into a post). */}
@@ -233,7 +253,19 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
 
       {editing ? (
         <div style={{ display: "grid", gap: 13 }}>
-          <RichField C={C} font={font} label="The call — one line" value={form.headline} onChange={(v) => setForm(f => ({ ...f, headline: v }))} minH={44} />
+          <RichField C={C} font={font} label="The call — one or two lines" value={form.headline} onChange={(v) => setForm(f => ({ ...f, headline: v }))} minH={44} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: C.goldBright || C.gold }}>Stance</span>
+            {["RISK ON", "NEUTRAL", "RISK OFF"].map(k => {
+              const on = (form.stance || "").toUpperCase() === k;
+              const c = STANCE[k];
+              return (
+                <button key={k} type="button" onClick={() => setForm(f => ({ ...f, stance: k }))}
+                  style={{ fontFamily: font, fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.05em", padding: "5px 13px", borderRadius: 99, cursor: "pointer",
+                    border: `1px solid ${on ? c.bd : C.border}`, background: on ? c.bg : "rgba(255,255,255,0.03)", color: on ? c.fg : C.muted }}>{k}</button>
+              );
+            })}
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 14 }}>
             <RichField C={C} font={font} label="The weather" value={form.weather} onChange={(v) => setForm(f => ({ ...f, weather: v }))} />
             <RichField C={C} font={font} label="The neighbourhood" value={form.shop} onChange={(v) => setForm(f => ({ ...f, shop: v }))} />
@@ -250,8 +282,16 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
       ) : (
         <>
           {/* THE CALL — one punchy line, gold rule on the left so it reads as the verdict */}
-          {read.headline && (
-            <Rich html={read.headline} style={{ borderLeft: `2px solid ${C.goldBright || C.gold}`, paddingLeft: 13, marginBottom: 15, fontSize: "0.92rem", fontWeight: 700, lineHeight: 1.5, color: C.white, letterSpacing: "-0.01em" }} />
+          {(read.headline || st) && (
+            <div style={{ borderLeft: `2px solid ${C.goldBright || C.gold}`, paddingLeft: 13, marginBottom: 15 }}>
+              {read.headline && <Rich html={read.headline} style={{ fontSize: "0.92rem", fontWeight: 700, lineHeight: 1.5, color: C.white, letterSpacing: "-0.01em" }} />}
+              {st && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 10, padding: "5px 14px", borderRadius: 99, background: st.bg, border: `1px solid ${st.bd}` }}>
+                  <span style={{ fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted }}>Stance</span>
+                  <span style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "0.06em", color: st.fg }}>{read.stance.toUpperCase()}</span>
+                </span>
+              )}
+            </div>
           )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20 }}>
             <div><div style={blockLabel}>The weather</div><Rich html={read.weather} style={blockBody} /></div>
@@ -281,19 +321,25 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
           <Chip C={C} label="Themes this week" value={spine.themes.join(" · ")} title={spine.themeAsof ? `Theme tracker, updated ${spine.themeAsof}` : undefined} />
         )}
         <span style={{ marginLeft: "auto", fontSize: "0.6rem", color: C.muted, opacity: 0.8 }}>
-          A read of the lenses above. Educational, not advice.
+          A read of the lenses above.
         </span>
       </div>
     </div>
   );
 }
 
+// Chip tooltips go through Tip (portal, opens on hover with NO delay and flips at the viewport
+// edge). The native `title` attribute was used here first — the browser holds it back ~1s and
+// clips it inside the card, which is exactly what Valen flagged 2026-08-02. Never use `title`
+// for anything a member is meant to read.
 function Chip({ C, label, value, tone, title }) {
   const fg = tone === "green" ? C.green : tone === "red" ? C.red : tone === "amber" ? (C.goldBright || C.gold) : C.text;
-  return (
-    <span title={title} style={{ display: "inline-flex", alignItems: "baseline", gap: 7, padding: "5px 11px", borderRadius: 99, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", cursor: title ? "help" : "default" }}>
+  const body = (
+    <>
       <span style={{ fontSize: "0.53rem", fontWeight: 800, letterSpacing: "0.11em", textTransform: "uppercase", color: C.muted }}>{label}</span>
       <span style={{ fontSize: "0.68rem", fontWeight: 800, color: fg, whiteSpace: "nowrap" }}>{value}</span>
-    </span>
+    </>
   );
+  const style = { display: "inline-flex", alignItems: "baseline", gap: 7, padding: "5px 11px", borderRadius: 99, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", cursor: title ? "help" : "default" };
+  return title ? <Tip tip={title} style={style}>{body}</Tip> : <span style={style}>{body}</span>;
 }

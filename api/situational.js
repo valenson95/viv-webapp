@@ -20,7 +20,7 @@ const SB_ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_
 const SB_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ADMIN_EMAIL = "vc-lv@live.com";
 
-const FIELDS = ["headline", "weather", "shop", "flip", "commentary", "asof", "updated"];
+const FIELDS = ["headline", "weather", "shop", "flip", "commentary", "stance", "asof", "updated"];
 const MAX = 6000; // per field — rich-text HTML (bold/colour spans) inflates the raw length
 // Courtesy server-side scrub. The REAL defense is the client-side whitelist sanitizer that runs
 // on render (sanitizeRich in SituationalRead.jsx) — this just keeps obviously hostile payloads

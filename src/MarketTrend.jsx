@@ -18,8 +18,7 @@ import { LensCamera, XShare } from "./capture.jsx";
 //   Breadth supportive  = both ±25% pairs green AND no heavy-selling extreme (readBreadth)
 //   Regime              = UPTREND when daily AND weekly are YES · DOWNTREND when both are
 //                         NO · CHOP otherwise.
-// Educational, not advice.
-
+//
 const sma = (arr, k, end) => {
   if (end + 1 < k) return null;
   let s = 0;
