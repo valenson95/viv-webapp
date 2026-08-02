@@ -1554,7 +1554,7 @@ const PLAYBOOK_PIECES = [
         `[b]Weak[/b] — the best work I can do is build the watchlist for when it turns.`,
       ] },
       { p: `I check once, before I open the watchlist, and that answer stands for the day. Everything else in this book assumes I have done it.` },
-      { fig: { w: 560, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/lens-breadth.png`, cap: `The reading as you see it in the app. Two panels, two periods. The month pair reads 81 up against 266 down, so sellers lead. The quarter pair is almost even at 1,213 against 1,196. When the two periods disagree like this, the market is choppy. The card says so in one line: [b]breakouts are less likely to work[/b]. That is a reading, not an opinion.` } },
+      { fig: { w: 500, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/lens-breadth.png`, cap: `The reading as you see it in the app. Two panels, two periods. The month pair reads 81 up against 266 down, so sellers lead. The quarter pair is almost even at 1,213 against 1,196. When the two periods disagree like this, the market is choppy. The card says so in one line: [b]breakouts are less likely to work[/b]. That is a reading, not an opinion.` } },
       { h: `Common mistakes` },
       { p: `[b]Trading the market you wish you had instead of the one in front of you.[/b] The most tempting version is buying the first green day after heavy selling. It feels like the turn. Most of the time it fades by lunch. Wait for the market to confirm.` },
       { p: `[b]Checking after you enter instead of before.[/b] That is the same mistake, just later.` },
@@ -1577,7 +1577,7 @@ const PLAYBOOK_PIECES = [
       { h: `How I read it` },
       { p: `I track how every group performed over the past week and the past month, and I mark the top five on each list. A stock whose group is on those lists is in-theme.` },
       { p: `The rule is written down on purpose, so a good-looking chart cannot talk me out of it.` },
-      { fig: { w: 700, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/lens-themes-full.png`, cap: `The list you read each morning: thirty-one groups, ranked three ways at once. [b]Since Open[/b] measures the move from the opening price instead of from yesterday's close, so it shows what buyers actually did during the day rather than what the gap handed them. Compare the columns against each other. Bitcoin Miners lead the day but sit near the bottom of the month, which is a bounce. China Internet and Steel are top-five on both the week and the month, which is leadership. Click to zoom.` } },
+      { fig: { w: 600, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/lens-themes-full.png`, cap: `The list you read each morning: thirty-one groups, ranked three ways at once. [b]Since Open[/b] measures the move from the opening price instead of from yesterday's close, so it shows what buyers actually did during the day rather than what the gap handed them. Compare the columns against each other. Bitcoin Miners lead the day but sit near the bottom of the month, which is a bounce. China Internet and Steel are top-five on both the week and the month, which is leadership. Click to zoom.` } },
       { h: `Reading the two lists together` },
       { ul: [
         `[b]On both lists[/b] — real leadership. This is my main hunting ground.`,
@@ -1615,7 +1615,7 @@ const PLAYBOOK_PIECES = [
         `[b]Leading[/b] — strong, and within a few percent of its highs. This is breakout leadership.`,
         `[b]Off the floor[/b] — the same strong numbers, but still fifteen or twenty-five percent below its highs. That is a recovery bounce dressed up as leadership. The table marks the difference. Respect the mark.`,
       ] },
-      { fig: { w: 760, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/lens-rotation.png`, cap: `The rotation table, sorted the way I read it. [b]Thrust %[/b] is this week's push. [b]1-month RS %[/b] is the standing rank. [b]% off 52-week high[/b] is the honesty column: it separates a group leading from its highs from one merely bouncing off its lows. Financials at 100 thrust, 95 RS and 1% off its high is leadership. Technology, red on the month and eleven percent off its high, is not, whatever its thrust reads. Click to zoom.` } },
+      { fig: { w: 620, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/lens-rotation.png`, cap: `The rotation table, sorted the way I read it. [b]Thrust %[/b] is this week's push. [b]1-month RS %[/b] is the standing rank. [b]% off 52-week high[/b] is the honesty column: it separates a group leading from its highs from one merely bouncing off its lows. Financials at 100 thrust, 95 RS and 1% off its high is leadership. Technology, red on the month and eleven percent off its high, is not, whatever its thrust reads. Click to zoom.` } },
       { h: `How I use it` },
       { ul: [
         `Hunt only where the group ranks high [i]and[/i] sits near its highs. Two or three groups, not ten.`,
@@ -1651,7 +1651,7 @@ const PLAYBOOK_PIECES = [
       { p: `A stock's gain means nothing on its own. You have to know what the market did over the same period.` },
       { p: `Say a stock is up 10% this month. On its own that sounds ordinary. Now look at the market: it fell 6% in that same month. So the stock beat the market by 16%. Nothing is lifting it. People are buying that stock while they sell everything else.` },
       { p: `So I check the market first, before I pick any number:` },
-      { fig: { w: 620, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/qqq-1m-context.png`, cap: `The market over the last month: down about 6%. So when you screen, compare each stock's gain to minus 6%, not to zero.` } },
+      { fig: { w: 460, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/qqq-1m-context.png`, cap: `The market over the last month: down about 6%. So when you screen, compare each stock's gain to minus 6%, not to zero.` } },
       { kv: [
         [`The market went up a lot`, `Most stocks will show a big gain. Set your minimum higher, or your filter lets almost everything through.`],
         [`The market was flat`, `The stock's gain is roughly how much it beat the market by. Read it as it is.`],
@@ -1664,8 +1664,8 @@ const PLAYBOOK_PIECES = [
         `[b]Minimum 20%[/b] — these stocks beat the market by 26%. Twenty-five stocks pass. That is an evening's work.`,
         `[b]Minimum 30%[/b] — these beat the market by 36%. Eight stocks pass. That is a focus list.`,
       ] },
-      { fig: { w: 700, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-perf1m-20.png`, cap: `Minimum set to 20%: twenty-five stocks pass. Every other filter is exactly the same. Only this one number changed.` } },
-      { fig: { w: 700, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-perf1m-30.png`, cap: `The same screen at 30%: eight stocks. Raising one number by ten points cut the list by two thirds.` } },
+      { fig: { w: 580, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-perf1m-20.png`, cap: `Minimum set to 20%: twenty-five stocks pass. Every other filter is exactly the same. Only this one number changed.` } },
+      { fig: { w: 580, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-perf1m-30.png`, cap: `The same screen at 30%: eight stocks. Raising one number by ten points cut the list by two thirds.` } },
       { p: `Use a bigger number for a longer period. Beating the market by 20% in one month is hard. Beating it by 20% over six months is not. Same idea, higher bar.` },
       { h: `How I use it` },
       { p: `The ranking is my first filter. A stock that fails it never gets charted.` },
@@ -1715,9 +1715,9 @@ const PLAYBOOK_PIECES = [
         `[b]Near the top of all three[/b] — a leader that keeps leading.`,
         `[b]High on 3 and 6 months, cooled on 1 month[/b] — a winner resting. These are tomorrow's entries.`,
       ] },
-      { fig: { w: 640, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-1m.png`, cap: `Sorted by one-month performance: the fresh movers. The filters leave an 887-stock universe. The sort decides which fifty I actually look at.` } },
-      { fig: { w: 640, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-3m.png`, cap: `The same screen sorted by three months. Stocks near the top of this and the one-month sort are trending on every time frame.` } },
-      { fig: { w: 640, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-6m.png`, cap: `And by six months: the stocks that have led for a long time. Strong here but cooled on the one-month sort is the resting winner.` } },
+      { fig: { w: 540, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-1m.png`, cap: `Sorted by one-month performance: the fresh movers. The filters leave an 887-stock universe. The sort decides which fifty I actually look at.` } },
+      { fig: { w: 540, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-3m.png`, cap: `The same screen sorted by three months. Stocks near the top of this and the one-month sort are trending on every time frame.` } },
+      { fig: { w: 540, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-6m.png`, cap: `And by six months: the stocks that have led for a long time. Strong here but cooled on the one-month sort is the resting winner.` } },
       { h: `Tightening the ladder` },
       { p: `887 stocks is a starting pool, not a watchlist. Every filter is a lever. I raise them until each sort holds under about fifty.` },
       { ul: [
@@ -1744,7 +1744,7 @@ const PLAYBOOK_PIECES = [
         [`Float under 150M shares`, `Float is how many shares are actually available to trade. The same buying against a smaller float produces a far bigger move. This is the filter that turns good growth into violent price action.`],
         [`70% or more above its 52-week low`, `Proof the market has already re-rated it. Leaders break out from strength, not from repair.`],
       ] },
-      { fig: { w: 700, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-canslim.png`, cap: `The growth screen as I have it saved. Eight filters leave 56 stocks — small enough to chart in one sitting, which is the whole point. The Overview tab is the right one here: relative volume, market cap and earnings growth all read at a glance next to the price.` } },
+      { fig: { w: 580, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-canslim.png`, cap: `The growth screen as I have it saved. Eight filters leave 56 stocks — small enough to chart in one sitting, which is the whole point. The Overview tab is the right one here: relative volume, market cap and earnings growth all read at a glance next to the price.` } },
       { h: `Tightening the growth scan` },
       { p: `Same rule as before. If a scan returns more stocks than I can chart in an evening, it is too loose. I raise the bars until it holds under about fifty.` },
       { ul: [
@@ -1768,7 +1768,7 @@ const PLAYBOOK_PIECES = [
         [`5% or more above the 20-day and 50-day lines`, `Price is already above both of those moving averages, so the stock is already going up.`],
         [`Weekly range over 4%`, `The stock has to move enough to be worth trading. One that barely moves cannot pay you.`],
       ] },
-      { fig: { w: 760, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-canslim-finviz.png`, cap: `The nine filters as they are saved. Everything else on the page stays on "Any". Nine filters you can explain beats thirty you cannot.` } },
+      { fig: { w: 600, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/screener-canslim-finviz.png`, cap: `The nine filters as they are saved. Everything else on the page stays on "Any". Nine filters you can explain beats thirty you cannot.` } },
       { h: `The list I actually watch` },
       { p: `All of this scanning ends in one place: a watchlist that stays open on my screen all day.` },
       { p: `Mine is shared, so you can see what this routine actually produces. It is the same list I trade from, and it changes as stocks earn their place or lose it.` },
@@ -1779,7 +1779,7 @@ const PLAYBOOK_PIECES = [
         `[b]Mediocre stocks (setting up)[/b] — not strong enough to buy yet, but tightening up. I keep them in front of me so I notice the day they change.`,
       ] },
       { p: `Two groups instead of one, because a list that mixes "buy this today" with "maybe next month" makes you hesitate at the wrong moment.` },
-      { fig: { w: 420, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/focus-watchlist.png`, cap: `The shared list, in its two groups. Colour-flagged so you can see which group a stock is in without opening a chart.` } },
+      { fig: { h: 420, img: `https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/focus-watchlist.png`, cap: `The shared list, in its two groups. Colour-flagged so you can see which group a stock is in without opening a chart.` } },
       { p: `I keep the focus list to six to twelve stocks. If everything is interesting, nothing is. A stock that passes a scan but fails the chart stays on the watchlist. One that clears both moves to the focus list and gets a written trigger and stop.` },
       { h: `Common mistakes` },
       { p: `[b]Scanning during the session and calling it research.[/b] By then the day's noise is picking your list.` },
@@ -2507,7 +2507,14 @@ export function openPlaybookBook() {
         if (b.p != null) return `<div class="pcM pbp">${pbRich(b.p)}</div>`;
         // Figures are modest on the page and click-to-zoom on screen (Valen 2026-08-01):
         // b.fig.w caps the display width so a small card doesn't stretch to the column.
-        if (b.fig) return `<div class="pcBlk pbfig"><span class="pbchartwrap" style="display:block;max-width:${b.fig.w || 640}px"><img class="pcCard" src="${esc(b.fig.img)}" style="width:100%;display:block;cursor:zoom-in"/></span><div class="pcD pbfigcap">${pbRich(b.fig.cap)}</div></div>`;
+        // fig.h caps a TALL image by height instead of width (the watchlist is skinny and long —
+        // sized by width it would swallow a whole page). Either way the image is click-to-zoom.
+        if (b.fig) {
+          const tall = !!b.fig.h;
+          const box = tall ? `max-height:${b.fig.h}px` : `max-width:${b.fig.w || 560}px`;
+          const im = tall ? `max-height:${b.fig.h}px;width:auto` : `width:100%`;
+          return `<figure class="pcBlk pbfig${tall ? " pbfigtall" : ""}"><span class="pbchartwrap" style="${box}"><img class="pcCard" src="${esc(b.fig.img)}" style="${im};display:block;cursor:zoom-in"/><span class="pbzoom" aria-hidden="true">⤢</span></span><figcaption class="pcD pbfigcap">${pbRich(b.fig.cap)}</figcaption></figure>`;
+        }
         if (b.kv) return `<div class="pbkvs">${b.kv.map(([k, v]) =>
           `<div class="pbkv"><span class="pcK pbkvk">${esc(k)}</span><div class="pcM pbkvv">${pbRich(v)}</div></div>`).join("")}</div>`;
         return `<div class="pblist">${b.ul.map((x) =>
@@ -2545,7 +2552,7 @@ export function openPlaybookBook() {
         <div class="pcD pbsub">Six indicators, and what each one is for</div>
         <div class="pcRule pbhair"></div>
         <div class="pcM pbp">These are the six things on my chart, and nothing is there for decoration. Each one answers a question this book already asks: how far away is the stop, is this stock outperforming, does it move enough to be worth trading, is anyone actually here this morning, and is the trend still intact. Add them once and you stop guessing. Every link below opens the script on TradingView.</div>
-        <div class="pcBlk pbfig"><span class="pbchartwrap" style="display:block;max-width:820px"><img class="pcCard" src="https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/chart-layout.png" style="width:100%;display:block;cursor:zoom-in"/></span><div class="pcD pbfigcap">What the finished chart looks like. Three panels: the strength line on top, price with the 10, 20, 50 and 200-day lines in the middle, and volume at the bottom. Set it up once, then use the same layout on every stock.</div></div>
+        <div class="pcBlk pbfig"><span class="pbchartwrap" style="display:block;max-width:680px"><img class="pcCard" src="https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/playbook/chart-layout.png" style="width:100%;display:block;cursor:zoom-in"/></span><div class="pcD pbfigcap">What the finished chart looks like. Three panels: the strength line on top, price with the 10, 20, 50 and 200-day lines in the middle, and volume at the bottom. Set it up once, then use the same layout on every stock.</div></div>
         ${PLAYBOOK_INDICATORS.map((ind, i) => `
           <div class="pcBlk pbind">
             <div class="pcK pbindno">${String(i + 1).padStart(2, "0")}</div>
@@ -2677,6 +2684,15 @@ export function openPlaybookBook() {
       .zoomov img{max-width:100%;max-height:100%;object-fit:contain}
       @media print{.zoomov{display:none!important}}
       .pbfigcap{font-size:0.85rem;line-height:1.6;margin-top:10px;max-width:70ch}
+      /* Figures: quieter frame, more air, smaller by default. A tall figure (fig.h) centres and is
+         capped by height so a skinny screenshot stays a thumbnail you click rather than a wall. */
+      .pbfig{margin:30px 0 34px}
+      .pbfigtall{display:flex;flex-direction:column;align-items:center;text-align:center}
+      .pbfigtall .pbfigcap{max-width:52ch}
+      .pbfig .pbchartwrap{margin-top:0;border-radius:8px}
+      .pbzoom{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#e8e6e0;background:rgba(6,6,10,0.62);border:1px solid rgba(255,255,255,0.16);opacity:0;transition:opacity .16s;pointer-events:none}
+      .pbchartwrap:hover .pbzoom{opacity:1}
+      @media print{.pbzoom{display:none}}
       .pbkvs{margin:18px 0 4px}
       .pbkv{display:grid;grid-template-columns:minmax(0,230px) minmax(0,1fr);gap:18px;padding:11px 0;border-top:1px solid rgba(255,255,255,0.08)}
       body.light .pbkv{border-top-color:rgba(23,21,15,0.1)}
