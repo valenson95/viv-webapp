@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 
 // ─── Shared screenshot → clipboard button for dashboard lens cards. ───
 // Captures a card element to PNG and copies it to the clipboard (Safari needs the
@@ -63,5 +63,22 @@ export function LensCamera({ getEl, name, C, style }) {
         </svg>
       )}
     </button>
+  );
+}
+
+// ─── Corner camera for one PANEL inside a full-view popup (Valen 2026-08-02: "the rotation
+// card when i clicked into it, it also should have screenshot features across all the cards").
+// Drops into any positioned panel and captures the nearest ancestor matching `sel` — no per-panel
+// ref plumbing. Sits top-right, only fully visible on hover so it never competes with the data.
+export function SectionCamera({ sel = "section", name, C, style, top = 9, right = 11 }) {
+  const ref = useRef(null);
+  return (
+    <span ref={ref} data-html2canvas-ignore="true" className="seccam"
+      onClick={(e) => e.stopPropagation()}
+      style={{ position: "absolute", top, right, zIndex: 4, lineHeight: 0, opacity: 0.32, transition: "opacity .15s", ...style }}
+      onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
+      onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.32; }}>
+      <LensCamera getEl={() => ref.current && ref.current.closest(sel)} name={name} C={C} />
+    </span>
   );
 }

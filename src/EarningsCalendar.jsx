@@ -4,7 +4,7 @@ import { EARNINGS } from "./earnings-data.js";
 import { GROUP_RS } from "./groupRS-data.js";
 import { MACRO_EVENTS } from "./macroCalendar-data.js";
 import { InfoDot } from "./GroupRS.jsx";
-import { LensCamera } from "./capture.jsx";
+import { LensCamera, SectionCamera } from "./capture.jsx";
 
 // ── EARNINGS CALENDAR — V4 "est→actual lifecycle + surprise radar" ────────────
 // Top → bottom: header+filters · ON YOUR RADAR (leaders-only day strip) · SURPRISE RADAR
@@ -721,6 +721,7 @@ export default function EarningsCalendar({ C, font, session }) {
           <span style={cardLabel}>On your radar</span>
           <span style={{ fontSize: "0.6rem", fontWeight: 700, color: C.muted }}>leaders in gold · the day's biggest others fill in</span>
           <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 700, color: C.muted, fontVariantNumeric: "tabular-nums" }}>{radarLeaderTotal} leaders in range</span>
+          <SectionCamera sel=".earn-card" name="earnings-radar-full" C={C} style={{ position: "static", top: "auto", right: "auto" }} />
         </div>
         {!radarHasRows ? (
           <div className="ec-empty" style={{ fontSize: "0.74rem", padding: "14px 10px" }}>No reporters in this window.</div>
@@ -738,6 +739,7 @@ export default function EarningsCalendar({ C, font, session }) {
             <span style={cardLabel}>Reported — surprise radar</span>
             <InfoDot tip="The biggest earnings surprises of the last week and how the stock actually reacted — big surprise + strong reaction is where new momentum is born. Educational, not advice." />
             <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 700, color: C.muted }}>ranked by size of surprise</span>
+            <SectionCamera sel=".earn-card" name="earnings-surprises" C={C} style={{ position: "static", top: "auto", right: "auto" }} />
           </div>
           <div className="hscroll">
             <div className="sr-rows">
@@ -769,7 +771,8 @@ export default function EarningsCalendar({ C, font, session }) {
       <section className="earn-card">
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11, flexWrap: "wrap" }}>
           <span style={cardLabel}>{view === "compact" ? "Day navigator" : "Week grid"}</span>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+            <SectionCamera sel=".earn-card" name="earnings-days" C={C} style={{ position: "static", top: "auto", right: "auto" }} />
             {[["compact", "Compact"], ["grid", "Week grid"]].map(([k, l]) => <button key={k} onClick={() => setView(k)} style={chipStyle(view === k)}>{l}</button>)}
           </div>
         </div>
@@ -882,7 +885,7 @@ export default function EarningsCalendar({ C, font, session }) {
 // like the Rotation/Breadth minis. Chips inside the strip are non-interactive (pointer-events:none)
 // so a stray chip tap can't open BOTH the section popup and a detail popup. Inside the section
 // popup, the full page's own detail popup is z 1320 (> 1250) so it correctly stacks above.
-export function EarningsRadarMini({ C, font, session }) {
+export function EarningsRadarMini({ C, font, session, compact, noStamp }) {
   const [open, setOpen] = useState(false);
   const cardRef = useRef(null);
   const base = EARNINGS || {};
@@ -893,27 +896,30 @@ export function EarningsRadarMini({ C, font, session }) {
   // Window = prior week + this week + next week (Mon of last week → Sun of next week). The strip
   // scrolls both directions; it auto-scrolls today to the left edge on mount. Days beyond this
   // window live only in the full view.
-  const winStart = addISO(weekStart(today), -7);
-  const winEnd = addISO(weekStart(today), 13);
+  // COMPACT (the lens-stack slot, Valen 2026-08-02): the days that matter for the daily plan —
+  // yesterday's reporters (reaction plays) through the next few sessions. Fewer chips per day so
+  // it fits a small card; the full window lives one tap away.
+  const winStart = compact ? addISO(today, -2) : addISO(weekStart(today), -7);
+  const winEnd = compact ? addISO(today, 7) : addISO(weekStart(today), 13);
   const winDays = tradingDays.filter((d) => d >= winStart && d <= winEnd);
   // Dashboard card stays short: max 5 chips/day (leaders sort first, so leaders survive the cut).
   // The full popup view shows everything.
-  const radar = buildRadar(daysMap, winDays).map((x) => ({ ...x, rows: x.rows.slice(0, 5) }));
+  const radar = buildRadar(daysMap, winDays).map((x) => ({ ...x, rows: x.rows.slice(0, compact ? 4 : 5) }));
   const hasAny = radar.some((x) => x.rows.length);
-  const stamp = `as of ${asof} · updated ${refreshed}`;
+  const stamp = compact ? `as of ${asof}` : `as of ${asof} · updated ${refreshed}`;
   return (
     <>
       <div ref={cardRef} className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
         <div className="cardhead">
-          <span className="label">Earnings — On Your Radar</span>
+          <span className="label">{compact ? "Earnings" : "Earnings — On Your Radar"}</span>
           <InfoDot tip="Which names report soon, day by day — before the open or after the close. Your liquid leaders in gold; the day's biggest other reporters fill in quietly. Tap for the full calendar." />
           <LensCamera getEl={() => cardRef.current} name="earnings-radar" C={C} style={{ marginLeft: 6 }} />
-          <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>
+          {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
         {hasAny ? (
           <RadarStrip radar={radar} today={today} interactive={false} C={C} autoScrollToday />
         ) : (
-          <div style={{ padding: "12px 4px", fontSize: "0.7rem", color: C.muted }}>No reporters in the three-week window.</div>
+          <div style={{ padding: "12px 4px", fontSize: "0.7rem", color: C.muted }}>{compact ? "No reporters in the coming days." : "No reporters in the three-week window."}</div>
         )}
       </div>
       {open && createPortal(

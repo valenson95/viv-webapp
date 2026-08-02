@@ -16,3 +16,4 @@ dist/
 .vercel
 scripts/.grouprs-cache.json
 scripts/.burstlog-cache.json
+.preview/

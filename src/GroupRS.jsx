@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { GROUP_RS } from "./groupRS-data.js";
 import { ETF_HOLDINGS } from "./etfHoldings-data.js";
-import { LensCamera } from "./capture.jsx";
+import { LensCamera, SectionCamera } from "./capture.jsx";
 
 // ── ROTATION — group RS table + Plan & Focus ─────────────────────────────────
 // Group-level rotation lens computed from ETF daily closes vs the equal-weight
@@ -608,6 +608,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
           const bs = blockSorts[b.block];
           return (
             <section key={b.block} className="grs-card" style={{ padding: "6px 8px" }}>
+              <SectionCamera sel=".grs-card" name={`rotation-${b.block.toLowerCase().replace(/\s+/g, "-")}`} C={C} />
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 10px 4px" }}>
                 <span style={cardLabel}>{b.block}</span>
                 {!bs.isDefault && (
@@ -626,6 +627,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
 
         {/* EW ↔ CW pairing strip */}
         <section className="grs-card">
+          <SectionCamera sel=".grs-card" name="rotation-equal-vs-cap" C={C} />
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
             <span style={cardLabel}>Equal-weight ↔ cap-weighted</span>
             <InfoDot tip="Equal-weight (RSP-) beside cap-weighted (XL-). Broad = the whole sector is moving; Narrow = just a few giant stocks." />
@@ -740,6 +742,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
             )}
           </section>
           <section className="grs-card" style={{ padding: "6px 8px" }}>
+            <SectionCamera sel=".grs-card" name="rotation-liquid-leaders" C={C} />
             <p style={{ margin: "8px 10px 6px", fontSize: "0.72rem", lineHeight: 1.55, color: C.muted, maxWidth: "94ch" }}>
               Individual leading stocks — the same weekly-thrust / monthly-RS reads as the group table, on a curated universe of liquid leaders. These are companies, not funds. Educational, not advice.
             </p>
@@ -772,6 +775,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
 
           {/* THE TABLE */}
           <section className="grs-card" style={{ padding: "6px 8px" }}>
+            <SectionCamera sel=".grs-card" name="rotation-groups" C={C} />
             <div style={{ overflowX: "auto" }}>
               <table>
                 <thead><HeadRow chain={chain} onSort={clickSort} showRank /></thead>
@@ -838,7 +842,7 @@ decode (pre-registered thresholds):
 }
 
 // ── ROTATION MINI — focal highlight (top 10), clicks to open the full table popup.
-export function RotationMini({ C, font, session }) {
+export function RotationMini({ C, font, session, noStamp }) {
   const [open, setOpen] = useState(false);
   const cardRef = useRef(null);
   const rows = GROUP_RS?.rows || [];
@@ -863,7 +867,7 @@ export function RotationMini({ C, font, session }) {
           <span className="label">Sector Group Rotation</span>
           <InfoDot tip="Which sector groups are heating up and which are cooling. Tap for the full table." />
           <LensCamera getEl={() => cardRef.current} name="rotation" C={C} style={{ marginLeft: 6 }} />
-          <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>
+          {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
         <table className="minitable" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr>

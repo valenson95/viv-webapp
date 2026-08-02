@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MARKET_MONITOR } from "./marketMonitor-data.js";
 import { InfoDot } from "./GroupRS.jsx";
-import { LensCamera } from "./capture.jsx";
+import { LensCamera, SectionCamera } from "./capture.jsx";
 
 // ── BREADTH — market monitor ─────────────────────────────────────────────────
 // A market-breadth "weather station": how many stocks moved 4%+ up vs down today,
@@ -154,7 +154,7 @@ function TrafficCalendar({ C, rows }) {
   );
 }
 
-function readBreadth(L) {
+export function readBreadth(L) {
   const mUp = L.up25m, mDn = L.down25m, qUp = L.up25q, qDn = L.down25q, up4 = L.up4, down4 = L.down4;
   const mGreen = mUp != null && mDn != null ? mUp > mDn : false;
   const qGreen = qUp != null && qDn != null ? qUp > qDn : false;
@@ -360,6 +360,7 @@ export default function MarketMonitor({ C, font, session }) {
           <span style={{ fontSize: "0.82rem", color: C.muted }}>— are breakouts likely to work right now?</span>
           <InfoDot tip="Are big-money moves leaning up or down? Green on both timeframes = the tape supports breakouts." />
           <span style={{ marginLeft: "auto", ...chip(read.verdict.fg, read.verdict.bg, read.verdict.bd), fontSize: "0.68rem", padding: "5px 13px" }}>{read.verdict.txt}</span>
+          <SectionCamera sel=".mm-card" name="breadth-verdict" C={C} style={{ position: "static", top: "auto", right: "auto" }} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))", gap: 12 }}>
           <HorizonBlock C={C} title="25%+ in a month" up={read.mUp} dn={read.mDn} green={read.mGreen} />
@@ -370,6 +371,7 @@ export default function MarketMonitor({ C, font, session }) {
 
       {/* 3 — TODAY TILES */}
       <section className="mm-card">
+        <SectionCamera sel=".mm-card" name="breadth-today" C={C} />
         <div style={{ ...cardLabel, marginBottom: 12 }}>Today · {asof}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
           {kpis.map(k => (
@@ -424,6 +426,7 @@ export default function MarketMonitor({ C, font, session }) {
 
       {/* 4.5 — TRAFFIC-LIGHT CALENDAR (one glance: is the environment ON, and for how long) */}
       <section className="mm-card">
+        <SectionCamera sel=".mm-card" name="breadth-traffic-light" C={C} />
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
           <span style={cardLabel}>Market traffic light — the year at a glance</span>
           <InfoDot tip="Each square is one trading day. Green = more stocks up 25%+ over the quarter than down (the primary breadth read) — the environment pays longs. Red = the reverse — capital preservation mode. Streaks matter more than any single day." />
@@ -485,6 +488,7 @@ export default function MarketMonitor({ C, font, session }) {
       {/* 5 — TREND MINI-CHARTS */}
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px,1fr))", gap: 14, marginBottom: 14 }}>
         <div className="mm-card" style={{ marginBottom: 0 }}>
+          <SectionCamera sel=".mm-card" name="breadth-4pct-trend" C={C} />
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
             <span style={cardLabel}>4%-up vs 4%-down · last {win.length}</span>
             <InfoDot tip="Green = stocks up 4%+, red = down 4%+. When green pulls ahead, buyers are winning." />
@@ -496,6 +500,7 @@ export default function MarketMonitor({ C, font, session }) {
           </div>
         </div>
         <div className="mm-card" style={{ marginBottom: 0 }}>
+          <SectionCamera sel=".mm-card" name="breadth-t2108-trend" C={C} />
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
             <span style={cardLabel}>T2108 · last {win.length}</span>
             <InfoDot tip="The share of stocks above their 40-day average. BELOW 20 = washed out — historically where market BOTTOMS form (opportunity zone, shows green in the sheet). Above 80 = stretched / overheated (shows red). In between = no signal." />
@@ -514,6 +519,7 @@ export default function MarketMonitor({ C, font, session }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 10px 4px", flexWrap: "wrap" }}>
           <span style={cardLabel}>The sheet — {showAll ? `all ${allRows.length} sessions` : `latest ${win.length} sessions`}</span>
           <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+            <SectionCamera sel=".mm-card" name="breadth-sheet" C={C} style={{ position: "static", top: "auto", right: "auto" }} />
             {!isDefaultChain && (
               <button onClick={() => setChain(DEFAULT_CHAIN)} title="Restore the default sort (date, newest first)" style={{ fontFamily: font, fontSize: "0.66rem", fontWeight: 700, color: C.muted, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 11px", cursor: "pointer" }}>× reset sort</button>
             )}
@@ -610,7 +616,7 @@ HONEST GAPS 5d/10d ratio bands · T2108 bands — undocumented, shown raw.`
 
 // ── BREADTH MINI — the four-column master switch + one plain-English verdict.
 // Everything else (dual bar, ratios, T2108, tiles, table) lives in the popup.
-export function BreadthMini({ C, font, session }) {
+export function BreadthMini({ C, font, session, noStamp }) {
   const [open, setOpen] = useState(false);
   const cardRef = useRef(null);
   const rows = MARKET_MONITOR?.rows || [];
@@ -628,7 +634,7 @@ export function BreadthMini({ C, font, session }) {
           <span className="label">Market Breadth</span>
           <InfoDot tip="Are breakouts likely to work right now? Tap for counts, ratios and the full sheet." />
           <LensCamera getEl={() => cardRef.current} name="breadth" C={C} style={{ marginLeft: 6 }} />
-          <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>
+          {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
         {/* the four-column master switch */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>

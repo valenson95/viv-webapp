@@ -17,6 +17,10 @@ import BurstLog from "./BurstLog.jsx";
 import { EarningsRadarMini } from "./EarningsCalendar.jsx";
 import { RotationMini, InfoDot, Tip } from "./GroupRS.jsx";
 import { BreadthMini } from "./MarketMonitor.jsx";
+import SituationalRead from "./SituationalRead.jsx";
+import MarketTrend from "./MarketTrend.jsx";
+import { LensCamera } from "./capture.jsx";
+import { planStamp } from "./planStamp.js";
 import SetupGraderTab from "./SetupGrader.jsx";
 import DailySetupsTab from "./DailySetups.jsx";
 import ModelBookPage, { outcomeFromR } from "./ModelBook.jsx";
@@ -766,6 +770,17 @@ const WHATS_NEW = [
   //     "Open it from Deep Dives; Save as PDF for the full typeset book.",
   //   ],
   // },
+  {
+    tag: "New",
+    date: "August 2, 2026",
+    title: "🗺️ The Daily Market Plan — your dashboard, reorganized",
+    items: [
+      "The top of the dashboard is now one Daily Market Plan: Theme Leaders, Rotation, Breadth and the Earnings days that matter, with two new cards below — Market Trend (four YES/NO signals ending in a market regime) and Situational Awareness (the whole picture in a few plain sentences: what the market is doing, and where the strength actually is).",
+      "One 📷 in the section header copies the ENTIRE plan as a single image — your daily overview in one screenshot. Every card and every panel inside the full Rotation, Breadth and Earnings views has its own 📷 too.",
+      "All the plan's tables refresh together, so there is now ONE date stamp for the whole section (hover it for the per-table detail) instead of one on every card.",
+      "Risk Allocation moved onto the Open Positions card as a slim strip — same numbers, less scrolling.",
+    ],
+  },
   {
     tag: "New",
     date: "July 30, 2026",
@@ -9467,6 +9482,11 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
    its right is fine) instead of stretching absurdly wide; collapses to full width on phones. */
 .vd.expert .lensrowB{display:grid; grid-template-columns:1fr; gap:14px; align-items:start; margin-top:14px}
 .vd.expert .lensrowB > *{min-width:0}
+/* row 2 of the Daily Plan: Market Trend (fixed narrow) | Situational Awareness (the rest).
+   align-items:stretch so the regime bar bottoms out level with the situational chips. */
+.vd.expert .planrow{grid-template-columns:minmax(290px, 360px) minmax(0,1fr); align-items:stretch}
+.vd.expert .planrow > .card{height:100%; box-sizing:border-box}
+@media(max-width:900px){.vd.expert .planrow{grid-template-columns:1fr}}
 /* each full-column slot is a drag-wrapper that passes height through to its card */
 .vd.expert .lensrowA > .dragwrap{display:flex; flex-direction:column; min-width:0}
 .vd.expert .lensrowA > .dragwrap > *{flex:1 1 auto; min-height:0}
@@ -9487,6 +9507,13 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .lensmini thead th:last-child{position:static; background:transparent}
 /* P4. Positions table — Pro only tightens container/density + sticky head; the table markup is shared with Guided */
 .vd.expert .poscard{padding:16px 16px 18px}
+/* Risk-allocation strip riding on top of the positions table (2026-08-02 — replaces the old lens-row
+   card). One slim ruled row: small donut + legend + budget note; wraps cleanly on narrow screens. */
+.vd .allocstrip{display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:9px 4px 12px; margin-bottom:6px; border-bottom:1px solid var(--border)}
+.vd .allocstrip .allocnote{font-size:0.7rem}
+.vd .allocstrip .leg{font-size:0.74rem; color:var(--muted)}
+.vd .allocstrip .leg b{color:var(--text); font-weight:700}
+@media(max-width:640px){.vd .allocstrip .allocnote{flex-basis:100%; margin-left:0 !important}}
 .vd.expert .poshead h2{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
 .vd.expert .countchip{background:var(--goldDim); color:var(--goldBright); font-size:0.66rem; font-weight:800; padding:3px 10px; border-radius:980px}
 @media(min-width:761px){
@@ -10293,13 +10320,17 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
   const [manageId, setManageId] = useState(null);
   const [sellOpen, setSellOpen] = useState(false);
   const [cfgOpen, setCfgOpen] = useState(false); // Pro layout: reveal the relocated sizing controls (⚙ Configure)
+  const dailyPlanRef = useRef(null); // wraps the whole Daily Market Plan section for the one-shot 📷 capture
   // drag-to-rearrange card layouts (hold a card's ⋮⋮ handle) — one saved order per group per browser
   const kpiArr = useCardArrange(["openpl", "risk", "equity", "budget", "rote"], "viv-dash-kpi-order");   // Pro KPI strip
   const ctxArr = useCardArrange(["market", "alloc", "themes"], "viv-dash-ctx-order");                     // Pro context row
   const stackArr = useCardArrange(["market", "themes", "alloc", "edge"], "viv-dash-stack-order"); // Guided card stack
   // Lens row — 4 slots (col1 · col2 · stack-top · stack-bottom); rearrangeable by ALL members.
   // Order persisted per USER id (never per-browser only) so shared browsers don't leak layouts.
-  const lensArr = useCardArrange(["themes", "rotation", "breadth", "alloc"], "viv-lens-order-" + (session?.user?.id || "anon"));
+  // 2026-08-02 restructure (Valen): "alloc" left this row (Risk Allocation now overlays the Open
+  // Positions card) and "earnings" took its slot — sanitize() in useCardArrange self-heals every
+  // stored order that still says "alloc".
+  const lensArr = useCardArrange(["themes", "rotation", "breadth", "earnings"], "viv-lens-order-" + (session?.user?.id || "anon"));
   // Stream privacy (admin) — hide account size on the Equity KPI card. Shares the "viv-privacy-mode"
   // key with the Journal, so the eye stays in sync across pages. Admin fresh device = ON.
   const [privacyOn, setPrivacyOn] = useState(() => {
@@ -10860,33 +10891,26 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           )}
 
-          {/* P3. LENS ROW — 4 rearrangeable cards across 4 slots: [col1] · [col2] · [stack-top] ·
-              [stack-bottom]. Drag any card by its ⠿ handle onto another to swap slots; order saves
-              per-user (viv-lens-order-<uid>). Minis show for ALL logged-in users; the full tables now
-              open from each card's click-through popup (no nav page). Screenshot 📷 lives in each header. */}
+          {/* P3. THE DAILY PLAN — everything a member checks before the open, captured as ONE
+              screenshot (Valen 2026-08-02, modelled on the daily-plan-sheet workflow):
+                row 1 (lens row, drag-to-rearrange): Theme Leaders · Rotation · stack(Breadth ·
+                  Earnings — compact window, yesterday's reporters → the next sessions)
+                row 2 (fixed): Market Trend (signals → regime) | Situational Awareness (the verdict,
+                  admin-editable rich text via /api/situational).
+              Risk Allocation left this section — it overlays the Open Positions card below, which
+              also keeps account-size dollars OUT of this shareable capture. The 📷 in the header
+              copies the whole plan; each card keeps its own 📷 too. */}
           {(() => {
-            const allocCard = (
-              <div className="card">
-                <div className="cardhead"><span className="label">Risk Allocation</span><InfoDot tip="A picture of your risk budget — red is risk already in the market, green is what's still free to deploy." /></div>
-                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <AllocDonut pct={allocPct} over={over} size={92} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="alloclegend" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
-                      <Tip className="leg" tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></Tip>
-                      <Tip className="leg" tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></Tip>
-                      <Tip className="leg" tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></Tip>
-                    </div>
-                    <div className="allocnote" style={{ marginTop: 8 }}>{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</div>
-                  </div>
-                </div>
-              </div>
-            );
+            // noStamp: the whole section refreshes as one batch, so the ONLY date stamp is the
+            // section header's "updated <date> (<day>)" (per-lens detail in its tooltip) — no
+            // per-card stamps inside the plan (Valen 2026-08-02). Popups keep their own stamps.
             const lensCards = {
-              themes: <ThemeStrip C={C} font={font} variant="pro" />,
-              rotation: <RotationMini C={C} font={font} session={session} />,
-              breadth: <BreadthMini C={C} font={font} session={session} />,
-              alloc: allocCard,
+              themes: <ThemeStrip C={C} font={font} variant="pro" noStamp />,
+              rotation: <RotationMini C={C} font={font} session={session} noStamp />,
+              breadth: <BreadthMini C={C} font={font} session={session} noStamp />,
+              earnings: <EarningsRadarMini C={C} font={font} session={session} compact noStamp />,
             };
+            const ps = planStamp();
             const slot = (vi) => {
               const key = lensArr.order[vi];
               return (
@@ -10897,9 +10921,21 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               );
             };
             return (
-              // 3 grid columns; column 3 is a stack of two slots. Whole row wraps under ~940px (auto-fit minmax 300px)
-              <>
-                <div className="lensrowA" style={{ marginTop: 14 }}>
+              <div ref={dailyPlanRef}>
+                <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 16, marginBottom: 2, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--muted)" }}>Daily Market Plan</span>
+                  <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <span title={ps.detail} style={{ fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums", cursor: "help" }}>
+                      {ps.updated ? `updated ${ps.updated} (${ps.day})` : ""}
+                    </span>
+                    <span data-html2canvas-ignore="true" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: "0.58rem", fontWeight: 700, color: "var(--muted)", opacity: 0.85 }}>Copy the whole plan</span>
+                      <LensCamera getEl={() => dailyPlanRef.current} name="daily-plan" C={C} />
+                    </span>
+                  </span>
+                </div>
+                {/* 3 grid columns; column 3 is a stack of two slots. Whole row wraps under ~940px (auto-fit minmax 300px) */}
+                <div className="lensrowA" style={{ marginTop: 10 }}>
                   {slot(0)}
                   {slot(1)}
                   <div className="lensstack">
@@ -10907,13 +10943,11 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                     {slot(3)}
                   </div>
                 </div>
-                {/* FULL-WIDTH row below the lens row — the Earnings "On Your Radar" strip (a horizontal
-                    leaders-by-day timeline), so it spans the whole width. Whole card opens the full
-                    Earnings calendar in a popup. NOT in the drag system. Visible to all users. */}
-                <div className="lensrowB">
-                  <EarningsRadarMini C={C} font={font} session={session} />
+                <div className="lensrowB planrow" style={{ marginTop: 14 }}>
+                  <MarketTrend C={C} font={font} />
+                  <SituationalRead C={C} font={font} session={session} isAdmin={isAdmin} />
                 </div>
-              </>
+              </div>
             );
           })()}
           {/* admin-only Edge Ledger: wrapped so the 14px row rhythm holds (its own card has no top
@@ -10933,7 +10967,11 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           )}
 
-          {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS */}
+          {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS.
+              RISK ALLOCATION now lives HERE as a slim strip over the table (Valen 2026-08-02 — "overlay
+              it on top of the open position card"): same numbers as the old lens card (donut + At Risk /
+              Available / Risk-Free + deploy note), one row instead of a whole slot. Dollar figures stay
+              out of the Daily Plan capture because this card sits below the capture wrapper. */}
           <div className="card poscard" style={{ marginTop: 14 }}>
             <div className="cardhead poshead">
               <h2>Open Positions</h2>
@@ -10944,6 +10982,14 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
                 <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
               </div>
+            </div>
+            <div className="allocstrip">
+              <AllocDonut pct={allocPct} over={over} size={54} />
+              <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--muted)", marginRight: 2 }}>Risk Allocation</span>
+              <Tip className="leg" tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></Tip>
+              <Tip className="leg" tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></Tip>
+              <Tip className="leg" tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></Tip>
+              <span className="allocnote" style={{ marginLeft: "auto" }}>{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</span>
             </div>
             <div className="pos-scroll">
               {positionsTable}
@@ -11152,6 +11198,11 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
         </div>
         <div className="lensduo" style={{ gridTemplateColumns: "1fr" }}>
           <EarningsRadarMini C={C} font={font} session={session} />
+        </div>
+        {/* Guided view gets the same daily verdict card (read-only for members; the guided layout
+            keeps per-card stamps since there is no Daily Plan batch header here). */}
+        <div className="lensduo" style={{ gridTemplateColumns: "1fr" }}>
+          <SituationalRead C={C} font={font} session={session} isAdmin={isAdmin} />
         </div>
 
         {/* TABLE */}

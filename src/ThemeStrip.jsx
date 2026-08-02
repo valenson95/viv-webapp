@@ -91,7 +91,7 @@ function ThemeConstituentsPopup({ theme, onClose, C, font }) {
       </div>
     </div>, document.body);
 }
-export default function ThemeStrip({ C, font, variant }) {
+export default function ThemeStrip({ C, font, variant, noStamp }) {
   const [full, setFull] = React.useState(false);
   const [popup, setPopup] = React.useState(false);
   const [activeTheme, setActiveTheme] = React.useState(null); // theme whose constituents popup is open
@@ -168,7 +168,7 @@ export default function ThemeStrip({ C, font, variant }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
               <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.muted }}>Theme Leaders</span>
               <LensCamera getEl={() => cardRef.current} name="theme-leaders" C={C} style={{ marginLeft: 6 }} />
-              <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.goldBright || C.gold, fontWeight: 700 }}>updated {snap.date}</span>
+              {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.goldBright || C.gold, fontWeight: 700 }}>updated {snap.date}</span>}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
               <Col title="1 Week" rows={wkTop} />
