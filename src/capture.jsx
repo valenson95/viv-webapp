@@ -70,60 +70,61 @@ export function LensCamera({ getEl, name, C, style }) {
 // ⚠️ X's web intent CANNOT attach an image — the API was removed years ago, and no site can
 // upload media on your behalf without OAuth. So the only working flow (DeepVue's too) is:
 //   1. render the card → PNG → clipboard (synchronously inside the gesture, Safari's rule)
-//   2. open X's composer with the text pre-filled
-//   3. the user pastes with ⌘V / Ctrl+V
-// The button says so in its label so nobody waits for an image that never arrives. If the
-// clipboard write fails (older Safari, insecure context) we download the PNG instead and say so.
+//   2. open X's composer BLANK (Valen writes his own copy)
+//   3. the user pastes the image with ⌘V / Ctrl+V
+// The button label flips to "Copied — paste ⌘V" for 8s so nobody waits for an image that never
+// arrives on its own. If the clipboard write fails (older Safari, insecure context) we download
+// the PNG instead and say so.
 export function XShare({ getEl, text, C, style, label }) {
   const [state, setState] = useState("");   // "" | "copied" | "saved"
   const muted = (C && C.muted) || "rgba(255,255,255,0.5)";
   const gold = (C && C.goldBright) || "#f0c050";
+  // Blank composer by default (Valen 2026-08-02: "i just have to do my own write up").
+  // The IMAGE is the payload; pass `text` only if a caller genuinely wants a seed caption.
   const openX = () => {
-    const url = "https://x.com/intent/post?text=" + encodeURIComponent(text || "");
+    const url = "https://x.com/intent/post" + (text ? "?text=" + encodeURIComponent(text) : "");
     window.open(url, "_blank", "noopener,noreferrer");
   };
-  const flash = (s) => { setState(s); setTimeout(() => setState(""), 4000); };
+  const flash = (s2) => { setState(s2); setTimeout(() => setState(""), 8000); };
+  const download = (canvas) => {
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = `viv-${new Date().toISOString().slice(0, 10)}.png`;
+    a.click();
+  };
   const onClick = (e) => {
     e.stopPropagation();
     const el = typeof getEl === "function" ? getEl() : getEl;
     if (!el) return;
+    // ORDER MATTERS: finish the clipboard write BEFORE opening the tab. Opening first steals
+    // focus and the browser rejects the write ("document is not focused") — the image would
+    // silently never arrive, which is exactly what went wrong on the first version.
     try {
       if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
         const item = new window.ClipboardItem({
+          // Promise value passed synchronously — required for Safari's user-gesture rule.
           "image/png": render(el).then((canvas) => new Promise((res) => canvas.toBlob(res, "image/png"))),
         });
-        navigator.clipboard.write([item]).then(() => { flash("copied"); openX(); }).catch(() => {
-          render(el).then((canvas) => {
-            const a = document.createElement("a");
-            a.href = canvas.toDataURL("image/png");
-            a.download = `viv-${new Date().toISOString().slice(0, 10)}.png`;
-            a.click();
-            flash("saved"); openX();
-          }).catch(() => {});
-        });
+        navigator.clipboard.write([item])
+          .then(() => { flash("copied"); openX(); })
+          .catch(() => { render(el).then((c) => { download(c); flash("saved"); openX(); }).catch(() => {}); });
       } else {
-        render(el).then((canvas) => {
-          const a = document.createElement("a");
-          a.href = canvas.toDataURL("image/png");
-          a.download = `viv-${new Date().toISOString().slice(0, 10)}.png`;
-          a.click();
-          flash("saved"); openX();
-        }).catch(() => {});
+        render(el).then((c) => { download(c); flash("saved"); openX(); }).catch(() => {});
       }
     } catch { openX(); }
   };
-  const msg = state === "copied" ? "Image copied — paste it in the post (⌘V)"
+  const msg = state === "copied" ? "Image is on your clipboard — press \u2318V in the post box"
     : state === "saved" ? "Image downloaded — attach it in the post"
-    : (label || "Post to X — copies the image, opens the post box for you to paste");
+    : (label || "Post to X — copies this card as an image, then opens a blank post for you to paste into");
   return (
     <button type="button" data-html2canvas-ignore="true" onClick={onClick} title={msg} aria-label="Post to X"
-      style={{ display: "inline-flex", alignItems: "center", gap: 5, height: 22, padding: state ? "0 8px" : "0 5px", borderRadius: 7, cursor: "pointer", flex: "none", background: "transparent", border: "none", color: state ? gold : muted, transition: "color .15s", fontSize: "0.58rem", fontWeight: 700, whiteSpace: "nowrap", ...style }}
+      style={{ display: "inline-flex", alignItems: "center", gap: 5, height: 22, padding: state ? "0 8px" : "0 5px", borderRadius: 7, cursor: "pointer", flex: "none", background: state ? "rgba(201,152,42,0.14)" : "transparent", border: "none", color: state ? gold : muted, transition: "color .15s", fontSize: "0.56rem", fontWeight: 800, whiteSpace: "nowrap", ...style }}
       onMouseEnter={(e) => { if (!state) e.currentTarget.style.color = gold; }}
       onMouseLeave={(e) => { if (!state) e.currentTarget.style.color = muted; }}>
       <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
         <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
       </svg>
-      {state === "copied" ? <span>Copied — paste in X</span> : state === "saved" ? <span>Downloaded — attach in X</span> : null}
+      {state === "copied" ? <span>Copied — paste ⌘V</span> : state === "saved" ? <span>Downloaded — attach it</span> : null}
     </button>
   );
 }

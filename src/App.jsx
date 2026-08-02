@@ -10931,8 +10931,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                     <span data-html2canvas-ignore="true" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                       <span style={{ fontSize: "0.58rem", fontWeight: 700, color: "var(--muted)", opacity: 0.85 }}>Copy the whole plan</span>
                       <LensCamera getEl={() => dailyPlanRef.current} name="daily-plan" C={C} />
-                      <XShare getEl={() => dailyPlanRef.current} C={C}
-                        text={`My daily market plan — ${ps.updated || ""}\n\nTheme leaders, sector rotation, market breadth and the earnings on deck, in one view.\n\nvalensontrades.com`} />
+                      <XShare getEl={() => dailyPlanRef.current} C={C} />
                     </span>
                   </span>
                 </div>

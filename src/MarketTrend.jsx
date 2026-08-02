@@ -141,7 +141,7 @@ export default function MarketTrend({ C, font, trades }) {
           "Every row is computed from S&P closes and your journal. No opinion.",
         ] }} />
         <LensCamera getEl={() => cardRef.current} name="market-trend" C={C} style={{ marginLeft: 6 }} />
-        <XShare getEl={() => cardRef.current} C={C} text={`Market trend — ${t.asof}\n\nMarket regime: ${t.regime}\n\nvalensontrades.com`} />
+        <XShare getEl={() => cardRef.current} C={C} />
       </div>
       {/* rows share the column height (flex:1 each) so the card fills its planrow slot with no void
           when the Situational card beside it runs taller */}

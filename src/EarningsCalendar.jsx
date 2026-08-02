@@ -975,7 +975,7 @@ export function EarningsRadarMini({ C, font, session, compact, noStamp, position
             "Tap for the full calendar",
           ] }} />
           <LensCamera getEl={() => cardRef.current} name="earnings-radar" C={C} style={{ marginLeft: 6 }} />
-          <XShare getEl={() => cardRef.current} C={C} text={`Earnings on deck — week of ${asof}\n\nWho reports when, and which of them are leaders.\n\nvalensontrades.com`} />
+          <XShare getEl={() => cardRef.current} C={C} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
         {compact ? (

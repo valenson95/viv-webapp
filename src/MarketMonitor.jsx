@@ -639,7 +639,7 @@ export function BreadthMini({ C, font, session, noStamp }) {
             "Tap for counts, ratios and the full sheet",
           ] }} />
           <LensCamera getEl={() => cardRef.current} name="breadth" C={C} style={{ marginLeft: 6 }} />
-          <XShare getEl={() => cardRef.current} C={C} text={`Market breadth — ${asof}\n\nAre breakouts likely to work right now?\n\nvalensontrades.com`} />
+          <XShare getEl={() => cardRef.current} C={C} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
         {/* the four-column master switch */}

@@ -891,7 +891,7 @@ export function RotationMini({ C, font, session, noStamp }) {
             "Tap for the full table",
           ] }} />
           <LensCamera getEl={() => cardRef.current} name="rotation" C={C} style={{ marginLeft: 6 }} />
-          <XShare getEl={() => cardRef.current} C={C} text={`Sector group rotation — ${asof}\n\nWhich groups are accelerating and which are resting.\n\nvalensontrades.com`} />
+          <XShare getEl={() => cardRef.current} C={C} />
           {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
         <table className="minitable" style={{ width: "100%", borderCollapse: "collapse" }}>
