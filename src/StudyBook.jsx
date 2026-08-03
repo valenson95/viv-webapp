@@ -203,7 +203,11 @@ export const STUDY_SETUPS = {
       ]},
       { title: "Shakeout & reclaim (the trigger)", items: [
         ["undercut", "Real dip BELOW a prior low / obvious support — the shakeout"],
-        ["reclaim", "Closed back ABOVE that level — the reclaim IS the entry"],
+        // Valen 2026-08-03: the reclaim needs a BENCHMARK, not just "back above the level".
+        // Either a 6/20 EMA-or-SMA reclaim upwards, or a VWAP reclaim. Which one is recorded in
+        // the sub-category (reclaim_ref) so the lift table can rank the benchmarks against each other.
+        ["reclaim", "Reclaimed the benchmark upwards — 6/20 EMA or SMA, or VWAP"], // sub-cat reclaim_ref
+        ["higher_lows", "Higher lows forming after the undercut, into the reclaim"],
         ["closehi", "Closed ≥70% of the day's range"],
         ["vol_exp", "Volume expansion on the reclaim day"],
         ["rev_bar", "Reversal bar on the reclaim day", "bonus"],
@@ -477,6 +481,10 @@ export const SUBCATS = {
   // Valen 2026-07-24: coil duration band on the tightening tick; retrace depth on the shallow-retrace bonus tick.
   tight: { store: "coil_len", options: [["<10", "<10d"], ["10-20", "10–20d"], [">20", ">20d"]] },
   shallow_retrace: { store: "retrace_ma", options: [["10ma", "10MA"], ["20ma", "20MA"], ["50ma", "50MA"], ["deeper", "deeper"], ["none", "no touch"]] },
+  // Valen 2026-08-03 (Undercut & Rally): WHICH benchmark the reclaim happened against. He named
+  // "6/20 EMA or SMA reclaim upwards, or VWAP" — each option is its own lift row, so the data can
+  // eventually say which reclaim benchmark actually produces the winners.
+  reclaim: { store: "reclaim_ref", options: [["6ema", "6 EMA"], ["20ema", "20 EMA"], ["6sma", "6 SMA"], ["20sma", "20 SMA"], ["vwap", "VWAP"]] },
 };
 
 // Quality is AUTO-COMPUTED from how many checklist criteria are ticked (Valen 2026-07-14) —
