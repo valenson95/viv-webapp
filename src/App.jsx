@@ -13935,9 +13935,11 @@ function AppInner() {
           lastLoadedCount.current = 0;
           await saveSettingNow(uid, "initialized", true);
         } else {
-          // User deleted all positions intentionally — keep empty
+          // User deleted all positions intentionally — keep empty (also the empty-world case on a
+          // demo-mode flip). Ref must follow state or the bulk writer saves the stale world.
           lastLoadedCount.current = 0;
           setPositions([]);
+          positionsRef.current = [];
         }
       }
 
@@ -13951,6 +13953,13 @@ function AppInner() {
       if (trades && trades.length > 0) {
         setJournaledTrades(applyTradeLinks(trades.map(t => ({ id: t.id, ticker: t.ticker, entry: t.entry_date, entryTime: t.entry_time || "", exit: t.exit_date, exitTime: t.exit_time || "", entryP: t.entry_price, exitP: t.exit_price, shares: t.shares, stop: t.stop_price, setup: t.setup, tags: t.tags || [], plPct: t.pl_pct, plDollar: t.pl_dollar, rMult: deriveRMult(t.entry_price, t.exit_price, t.stop_price, t.trade_type, t.r_mult), reason: t.exit_reason, commission: t.commission != null ? t.commission : 0, notes: t.notes || "", chartUrl: t.chart_url || "", chartImage: t.chart_image || "", tradeType: t.trade_type || "Long", source: t.source || "manual", ibExecId: t.ib_exec_id || null, ibTradeId: t.ib_trade_id || null, positionId: t.position_id || null, needsStop: t.needs_stop || false, currentStop: t.current_stop_price ?? null, stopLockedAt: t.stop_locked_at || null, aiReview: t.ai_review || null, gradeSnapshot: t.grade_snapshot || null, profitTarget: t.profit_target ?? null, plannedStop: t.planned_stop ?? null, extEntry: t.ext_entry ?? null, extExit: t.ext_exit ?? null }))));
         lastLoadedTradeCount.current = trades.length;
+      } else if (!tradesErr) {
+        // A SUCCESSFUL empty result must clear the journal — without this, flipping into an empty
+        // demo book (or back) leaves the OTHER world's trades on screen (Valen's screenshot,
+        // 2026-08-03: demo ON, 153 real closed trades still showing). The error path above keeps
+        // the existing state on purpose; this branch runs only on a clean, genuinely-empty load.
+        setJournaledTrades([]);
+        lastLoadedTradeCount.current = 0;
       }
       // Soft-deleted IBKR exec ids — small parallel query, just the column we need. Used by the matcher
       // to skip re-importing rows the unique constraint trades_user_ib_exec would block anyway.
