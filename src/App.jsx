@@ -761,7 +761,7 @@ const WHATS_NEW = [
     date: "August 3, 2026",
     title: "🎮 Demo mode + publish your own Deep Dive",
     items: [
-      "Demo mode: hit the 🎮 Demo button next to Simple/Pro. Everything switches to a practice book — positions, journal, stats — completely separate from your real trades. Add trades, get stopped out, learn. Flip it off and your real book is exactly as you left it.",
+      "Demo mode: flip the 🎮 Demo switch in the top-right corner, next to Pro Mode. The whole app switches to a practice book — positions, journal, stats — completely separate from your real trades. Add trades, get stopped out, learn. Flip it off and your real book is exactly as you left it.",
       "Your Deep Dive: open Your Book in the Model Book and hit “Make it a Deep Dive”. Your studies get typeset with the same template as the VIV dives — title, premise, your name on it.",
       "Keep it as a private draft, or flip it live so other members can read it in the new “From the community” section. On and off any time, instantly.",
     ],
@@ -1397,8 +1397,9 @@ function useUiMode() {
   }, []);
   return uiMode;
 }
-function HeaderControls({ onLogout, inline }) {
+function HeaderControls({ onLogout, inline, demoMode = false, onToggleDemo }) {
   const pro = useUiMode() === "pro";
+  const DV = "#7c5cff"; // demo violet
   return (
     <div style={inline
       ? { display: "flex", alignItems: "center", gap: 8, fontFamily: font }
@@ -1406,7 +1407,7 @@ function HeaderControls({ onLogout, inline }) {
       {/* NO backdrop-filter here — it would become the containing block for the What's New
           modal's position:fixed overlay, pinning the popup inside this pill instead of the screen */}
       {/* keep the page navbars clear of the fixed cluster (tabs otherwise run underneath it) */}
-      {!inline && <style dangerouslySetInnerHTML={{ __html: `.vp .navbar,.vj .navbar,.vd .navbar,.vs .navbar{padding-right:300px}` }} />}
+      {!inline && <style dangerouslySetInnerHTML={{ __html: `.vp .navbar,.vj .navbar,.vd .navbar,.vs .navbar{padding-right:430px}` }} />}
       <WhatsNew />
       <button onClick={() => broadcastUiMode(pro ? "guided" : "pro")} title={pro ? "Pro Mode is on — click for Guided (plain-English explainers everywhere)" : "Pro Mode is off — click to strip the guided teaching layer"}
         style={{ display: "inline-flex", alignItems: "center", gap: 8, background: pro ? C.goldDim : "rgba(255,255,255,0.05)", border: `1px solid ${pro ? C.borderGold : C.border}`, borderRadius: 980, padding: "6px 10px 6px 13px", cursor: "pointer", fontFamily: font, transition: "background .18s, border-color .18s" }}>
@@ -1416,6 +1417,16 @@ function HeaderControls({ onLogout, inline }) {
         </span>
         <span style={{ fontSize: "0.62rem", fontWeight: 800, width: 20, textAlign: "left", color: pro ? C.goldBright : C.muted }}>{pro ? "On" : "Off"}</span>
       </button>
+      {onToggleDemo && (
+        <button onClick={onToggleDemo} title={demoMode ? "Demo mode is ON — the whole app is your practice book. Click to return to your real book." : "Switch the whole app to your demo book — practice positions and trades, fully separate from the real ones."}
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, background: demoMode ? "rgba(124,92,255,0.18)" : "rgba(255,255,255,0.05)", border: `1px solid ${demoMode ? DV : C.border}`, borderRadius: 980, padding: "6px 10px 6px 13px", cursor: "pointer", fontFamily: font, transition: "background .18s, border-color .18s" }}>
+          <span style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: demoMode ? "#a78bfa" : C.muted, whiteSpace: "nowrap" }}>🎮 Demo</span>
+          <span style={{ position: "relative", width: 32, height: 17, borderRadius: 980, background: demoMode ? `linear-gradient(135deg, #a78bfa, ${DV})` : "rgba(255,255,255,0.14)", transition: "background .18s", flex: "none" }}>
+            <span style={{ position: "absolute", top: 2, left: demoMode ? 17 : 2, width: 13, height: 13, borderRadius: "50%", background: demoMode ? "#08080e" : "rgba(255,255,255,0.75)", transition: "left .18s" }} />
+          </span>
+          <span style={{ fontSize: "0.62rem", fontWeight: 800, width: 20, textAlign: "left", color: demoMode ? "#a78bfa" : C.muted }}>{demoMode ? "On" : "Off"}</span>
+        </button>
+      )}
       {!inline && <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer", whiteSpace: "nowrap" }}>Sign out</button>}
     </div>
   );
@@ -8533,9 +8544,6 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <div className="seg" id="viewSeg">
                 <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
                 <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro · all columns</button>
-                {onToggleDemo && <button className={demoMode ? "on" : ""} onClick={onToggleDemo}
-                  title={demoMode ? "Demo mode is ON — this is your practice book. Click to return to your real book." : "Switch to your demo book — practice positions and trades, fully separate from your real ones."}
-                  style={demoMode ? { background: "#7c5cff", color: "#fff", borderColor: "#7c5cff" } : {}}>🎮 Demo</button>}
               </div>
             </div>
             <div className="tablewrap">
@@ -8970,9 +8978,6 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           <div className="seg" id="viewSeg">
             <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
             <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro · all columns</button>
-                {onToggleDemo && <button className={demoMode ? "on" : ""} onClick={onToggleDemo}
-                  title={demoMode ? "Demo mode is ON — this is your practice book. Click to return to your real book." : "Switch to your demo book — practice positions and trades, fully separate from your real ones."}
-                  style={demoMode ? { background: "#7c5cff", color: "#fff", borderColor: "#7c5cff" } : {}}>🎮 Demo</button>}
           </div>
         </div>
 
@@ -11022,9 +11027,6 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <div className="seg" id="viewSeg">
                 <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
                 <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
-                {onToggleDemo && <button className={demoMode ? "on" : ""} onClick={onToggleDemo}
-                  title={demoMode ? "Demo mode is ON — this is your practice book. Click to return to your real book." : "Switch to your demo book — practice positions and trades, fully separate from your real ones."}
-                  style={demoMode ? { background: "#7c5cff", color: "#fff", borderColor: "#7c5cff" } : {}}>🎮 Demo</button>}
               </div>
             </div>
             <div className="allocstrip">
@@ -11256,9 +11258,6 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <div className="seg" id="viewSeg">
             <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
             <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
-                {onToggleDemo && <button className={demoMode ? "on" : ""} onClick={onToggleDemo}
-                  title={demoMode ? "Demo mode is ON — this is your practice book. Click to return to your real book." : "Switch to your demo book — practice positions and trades, fully separate from your real ones."}
-                  style={demoMode ? { background: "#7c5cff", color: "#fff", borderColor: "#7c5cff" } : {}}>🎮 Demo</button>}
           </div>
           <button className="btn" onClick={fetchLivePrices} disabled={priceLoading}>{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
           <button
@@ -14427,7 +14426,7 @@ function AppInner() {
       <div className="mobshell" style={{ fontFamily: font, background: C.bg, WebkitFontSmoothing: "antialiased", color: C.text, display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "12px 16px", background: "rgba(8,8,14,0.95)", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
           <Wordmark size="0.88rem" style={{ lineHeight: 1 }} />
-          <HeaderControls onLogout={handleLogout} inline />
+          <HeaderControls onLogout={handleLogout} inline demoMode={demoMode} onToggleDemo={toggleDemoMode} />
         </div>
         <AppBackground />
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: `${contentPadV}px ${contentPadH}px`, paddingBottom: 80, position: "relative", zIndex: 1, zoom: appZoom }}>{pageContent}</div>
@@ -14460,7 +14459,7 @@ function AppInner() {
         <AppBackground />
         <div style={{ position:"relative",zIndex:1 }}>{pageContent}</div>
       </div>
-      <HeaderControls onLogout={handleLogout} />
+      <HeaderControls onLogout={handleLogout} demoMode={demoMode} onToggleDemo={toggleDemoMode} />
     </div>
   );
 }
