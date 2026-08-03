@@ -13591,6 +13591,11 @@ function AppInner() {
   // num_stocks=5 in the DB but the UI always reset to 4 on reload).
   const [rNumStocks, setRNumStocks] = useState(4);
   const dataLoaded = useRef(false);
+  // World bookkeeping (2026-08-03): which world (real/demo) the loaded state belongs to, and a
+  // freeze flag that blocks the bulk writer while a world switch is in flight — a save racing the
+  // flip must never write one world's rows into the other.
+  const loadedWorldRef = useRef(null);
+  const worldSwitching = useRef(false);
   const loadFailed = useRef(false); // tracks if data load had errors — blocks autosave to prevent data loss
 
   // ─── Auth Listener ───
@@ -13649,6 +13654,9 @@ function AppInner() {
   const skipNextAutosave = useRef(false); // flag to prevent autosave loop after ID sync
   const lastSaveIdMap = useRef(new Map()); // old→new ID mapping from last save, used by DashboardPage to remap sellId
   const savePositionsNow = useCallback(async (uid, posArr) => {
+    // A world switch is in flight — the array in hand may belong to the OLD world. Skip; the
+    // autosave refires on the next state change once the new world has loaded.
+    if (worldSwitching.current) { console.warn("world switch in flight — save skipped"); return; }
     // If offline, queue the save for when connection returns
     if (!navigator.onLine) {
       console.warn("OFFLINE: Queuing save for", posArr.length, "positions until connection returns.");
@@ -13804,7 +13812,20 @@ function AppInner() {
 
   // ─── Load all data when session is available ───
   useEffect(() => {
-    if (!session || dataLoaded.current) return;
+    // Re-run when the WORLD changes, not just the session. The old `dataLoaded.current` guard
+    // silently swallowed the demo-mode reload: the effect re-ran on flip and exited before
+    // fetching anything, so toggling Demo kept showing the other world's rows (member reports,
+    // 2026-08-03). A flip now: freezes writers → clears state to a blank slate immediately
+    // (fail-safe: an empty screen is always safer than the wrong world) → full reload.
+    if (!session) return;
+    if (dataLoaded.current && loadedWorldRef.current === demoMode) return;
+    worldSwitching.current = true;
+    if (dataLoaded.current) { // live flip (not first boot): blank slate before the async fetch
+      setPositions([]); positionsRef.current = [];
+      setJournaledTrades([]);
+      lastLoadedCount.current = 0; lastLoadedTradeCount.current = 0;
+      dataLoaded.current = false;
+    }
     const load = async () => {
       const uid = session.user.id;
 
@@ -14018,9 +14039,11 @@ function AppInner() {
       } catch (e) { console.error("Emergency recovery failed:", e); }
 
       dataLoaded.current = true;
+      loadedWorldRef.current = demoMode; // this state now belongs to THIS world
+      worldSwitching.current = false;    // writers may run again
       setAuthLoading(false);
     };
-    load();
+    load().catch((e) => { console.error("load failed:", e); worldSwitching.current = false; });
   }, [session, demoMode]); // demoMode: flipping the switch reloads the whole book in the other world
 
   // ─── Device sync: re-fetch positions when tab becomes visible again ───
