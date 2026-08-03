@@ -292,13 +292,23 @@ const DEEP_DIVES = [
 // in a member_dives row and flips it live themselves. No review gate; the RLS policy
 // mb_read_community exposes their study rows to other members ONLY while the dive is live.
 // Module scope — an editor defined inside its page remounts on every parent render (hard-won rule).
-export function MemberDiveModal({ C, font, dive, projects, defaultAuthor, onSave, onDelete, onClose }) {
+export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = false, defaultAuthor, onSave, onDelete, onClose }) {
   const [title, setTitle] = useState(dive?.title || "");
   const [premise, setPremise] = useState(dive?.premise || "");
   const [author, setAuthor] = useState(dive?.author_name || defaultAuthor || "");
-  const [project, setProject] = useState(dive?.project || (projects[0] ?? "*"));
+  const [project, setProject] = useState(dive?.project || (projects[0] ??
+    "*"));
   const [live, setLive] = useState(!!dive?.is_live);
   const [busy, setBusy] = useState(false);
+  // v2 customisation (Valen 2026-08-03: "as customisable as possible", picked: tick studies ·
+  // named chapters · opening page · hide notes). New dive = everything ticked by default.
+  const [sel, setSel] = useState(() => new Set(
+    Array.isArray(dive?.selected_ids) && dive.selected_ids.length ? dive.selected_ids.map(String) : entries.map((e) => String(e.id))));
+  const [chapters, setChapters] = useState(dive?.chapters && typeof dive.chapters === "object" ? { ...dive.chapters } : {});
+  const [intro, setIntro] = useState(dive?.intro || "");
+  const [hideNotes, setHideNotes] = useState(!!dive?.hide_notes);
+  const tickAll = (on) => setSel(on ? new Set(entries.map((e) => String(e.id))) : new Set());
+  const years = [...new Set(entries.filter((e) => sel.has(String(e.id))).map((e) => String(e.date || "").slice(0, 4)).filter((y) => /^\d{4}$/.test(y)))].sort();
   const inp = { width: "100%", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.86rem", padding: "10px 12px", outline: "none", boxSizing: "border-box" };
   const lab = { fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted, margin: "16px 0 6px" };
   return createPortal(
@@ -315,11 +325,52 @@ export function MemberDiveModal({ C, font, dive, projects, defaultAuthor, onSave
         <input style={inp} value={premise} onChange={(e) => setPremise(e.target.value)} placeholder="What is this dive trying to show?" maxLength={200} />
         <div style={lab}>Your name on it</div>
         <input style={inp} value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Shown as the author" maxLength={50} />
-        <div style={lab}>Which studies</div>
-        <select style={{ ...inp, cursor: "pointer" }} value={project} onChange={(e) => setProject(e.target.value)}>
-          <option value="*">My whole book — every study</option>
-          {projects.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
-        </select>
+        <div style={{ ...lab, display: "flex", alignItems: "baseline", gap: 12 }}>Which studies
+          {v2 && entries.length > 0 && <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 600 }}>
+            <span onClick={() => tickAll(true)} style={{ color: C.gold, cursor: "pointer" }}>All</span>
+            <span style={{ opacity: 0.5, margin: "0 6px" }}>·</span>
+            <span onClick={() => tickAll(false)} style={{ color: C.muted, cursor: "pointer" }}>None</span>
+            <span style={{ color: C.muted, marginLeft: 10 }}>{sel.size} of {entries.length} in</span>
+          </span>}
+        </div>
+        {v2 && entries.length > 0 ? (
+          <div style={{ maxHeight: 220, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 12, padding: "6px 4px" }}>
+            {entries.map((e) => { const on = sel.has(String(e.id)); return (
+              <div key={e.id} onClick={() => setSel((prev) => { const nx = new Set(prev); on ? nx.delete(String(e.id)) : nx.add(String(e.id)); return nx; })}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer", background: on ? "rgba(201,152,42,0.07)" : "none" }}>
+                <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", border: `1px solid ${on ? C.gold : C.border}`, background: on ? C.gold : "none", color: "#08080e", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{on ? "✓" : ""}</span>
+                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: C.white, width: 62, flex: "none" }}>{e.ticker}</span>
+                <span style={{ fontSize: "0.74rem", color: C.muted, width: 88, flex: "none" }}>{e.date || "—"}</span>
+                <span style={{ fontSize: "0.74rem", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.setup || ""}</span>
+              </div>); })}
+          </div>
+        ) : (
+          <select style={{ ...inp, cursor: "pointer" }} value={project} onChange={(e) => setProject(e.target.value)}>
+            <option value="*">My whole book — every study</option>
+            {projects.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
+          </select>
+        )}
+        {v2 && years.length > 0 && (<>
+          <div style={lab}>Chapters <span style={{ opacity: 0.6, textTransform: "none", letterSpacing: 0 }}>(optional — name each year of your journey)</span></div>
+          {years.map((y) => (
+            <div key={y} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+              <span style={{ fontSize: "0.78rem", fontWeight: 800, color: C.muted, width: 44, flex: "none" }}>{y}</span>
+              <input style={{ ...inp, marginTop: 0 }} value={chapters[y] || ""} maxLength={60}
+                onChange={(e) => setChapters((c) => ({ ...c, [y]: e.target.value }))}
+                placeholder={`e.g. "My first month" · "After I fixed my stops"`} />
+            </div>
+          ))}
+        </>)}
+        {v2 && (<>
+          <div style={lab}>Opening page <span style={{ opacity: 0.6, textTransform: "none", letterSpacing: 0 }}>(optional — why does this book exist?)</span></div>
+          <textarea style={{ ...inp, minHeight: 84, resize: "vertical" }} value={intro} maxLength={1200}
+            onChange={(e) => setIntro(e.target.value)}
+            placeholder="In your own words. This becomes page one of your dive." />
+          <div onClick={() => setHideNotes(!hideNotes)} style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0 0", cursor: "pointer" }}>
+            <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", border: `1px solid ${hideNotes ? C.gold : C.border}`, background: hideNotes ? C.gold : "none", color: "#08080e", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{hideNotes ? "✓" : ""}</span>
+            <span style={{ fontSize: "0.8rem", color: C.text }}>Hide my notes — charts and numbers show, personal notes stay private</span>
+          </div>
+        </>)}
         <div onClick={() => setLive(!live)} style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 0", cursor: "pointer", padding: "12px 14px", borderRadius: 12, border: `1px solid ${live ? "rgba(34,197,94,0.4)" : C.border}`, background: live ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)" }}>
           <span style={{ width: 34, height: 20, borderRadius: 99, background: live ? "#22c55e" : "rgba(255,255,255,0.14)", position: "relative", flex: "none", transition: "background .15s" }}>
             <span style={{ position: "absolute", top: 2, left: live ? 16 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
@@ -330,7 +381,12 @@ export function MemberDiveModal({ C, font, dive, projects, defaultAuthor, onSave
           </span>
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 24, alignItems: "center" }}>
-          <button disabled={busy || !title.trim()} onClick={async () => { setBusy(true); await onSave({ title: title.trim(), premise: premise.trim() || null, author_name: author.trim() || null, project, is_live: live }); setBusy(false); }}
+          <button disabled={busy || !title.trim() || (v2 && entries.length > 0 && sel.size === 0)} onClick={async () => { setBusy(true); await onSave({
+              title: title.trim(), premise: premise.trim() || null, author_name: author.trim() || null, project, is_live: live,
+              ...(v2 ? { selected_ids: entries.length ? [...sel] : null,
+                chapters: Object.fromEntries(Object.entries(chapters).filter(([, v]) => v && String(v).trim())),
+                intro: intro.trim() || null, hide_notes: hideNotes } : {}),
+            }); setBusy(false); }}
             style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.8rem", padding: "11px 22px", borderRadius: 99, cursor: title.trim() ? "pointer" : "not-allowed", opacity: title.trim() ? 1 : 0.5 }}>
             {busy ? "Saving…" : "Save"}</button>
           <button onClick={onClose} style={{ background: "none", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontWeight: 700, fontSize: "0.8rem", padding: "11px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
@@ -462,7 +518,7 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, 
   );
 }
 
-export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle } = {}) {
+export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle, episodesOverride, introText, forceProject } = {}) {
   // Project-book export (Valen 2026-07-28): a coverTitle'd book whose rows are ALL non-H-domain studies
   // (e.g. "Market Bottom") gets the gallery-grade minimal book instead of the classic model-book layout.
   // The classic path below is byte-identical when this guard doesn't fire.
@@ -470,10 +526,13 @@ export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle } = {}) {
   // Chronicle fix (2026-07-31): a dive whose rows all carry metrics.study.project === coverTitle is a
   // project book regardless of setup class — "Momentum Breakout" lives in H_DOMAIN, which wrongly sent
   // the AMD Chronicle to the classic layout. Personal H-studies (no project) keep the classic book.
-  if (coverTitle && _pbStudies.length > 0 && _pbStudies.length === rows.length &&
+  if ((coverTitle && _pbStudies.length > 0 && _pbStudies.length === rows.length &&
     (_pbStudies.every((r) => r.metrics.study.project === coverTitle) ||
-      !_pbStudies.some((r) => H_DOMAIN.has(r.metrics.study.setup)))) {
-    return openProjectBookPdf(rows, coverTitle, diveTitle);
+      !_pbStudies.some((r) => H_DOMAIN.has(r.metrics.study.setup)))) ||
+    // Member dives (2026-08-03): all-study selections take the typeset chronicle layout even
+    // without a shared project string — that IS "the template like mine".
+    (forceProject && rows.length > 0 && _pbStudies.length === rows.length)) {
+    return openProjectBookPdf(rows, coverTitle || diveTitle || "", { diveTitle, episodesOverride, introText });
   }
   // Chronicle order (Valen 2026-07-28): the book reads BY TICKER, each ticker chronological from
   // its first study — one ticker = one chapter of legs, like a single name's history album.
@@ -958,7 +1017,7 @@ export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle } = {}) {
 //    giant year-divider, then two pages per study (vs-QQQ chart, then daily chart + data strip + ticked
 //    checklist + thesis). Order = year ascending then ticker, matching the Contents. e{idx} anchors on the
 //    first page of each study keep the Contents links clickable in the saved PDF.
-function openProjectBookPdf(rows, coverTitle, diveTitle) {
+function openProjectBookPdf(rows, coverTitle, { diveTitle, episodesOverride, introText } = {}) {
   const today = new Date().toISOString().slice(0, 10);
   const yearOf = (r) => (mbISO(r.entry_date) || "").slice(0, 4) || "—";
   const ordered = [...rows].sort((a, b) => yearOf(a).localeCompare(yearOf(b)) || String(a.ticker).localeCompare(String(b.ticker)) ||
@@ -968,7 +1027,7 @@ function openProjectBookPdf(rows, coverTitle, diveTitle) {
     if (g && g.year === y) g.items.push({ r, idx: i }); else groups.push({ year: y, items: [{ r, idx: i }] }); });
   const years = groups.map((g) => g.year).filter((y) => y !== "—");
   const yearSpan = years.length ? (years[0] === years[years.length - 1] ? years[0] : `${years[0]}–${years[years.length - 1]}`) : "";
-  const episodes = PROJECT_EPISODES[coverTitle] || {};
+  const episodes = episodesOverride || PROJECT_EPISODES[coverTitle] || {}; // member chapters win
   const isMB = coverTitle === "Finding the Market's Bottom";
   // Cover prints the dive's display title (HIS wording) when one exists; coverTitle stays the
   // project key for EPISODES/PREFACE lookups and the isMB/theme switches.
@@ -988,6 +1047,14 @@ function openProjectBookPdf(rows, coverTitle, diveTitle) {
     <div class="pbmeta">${rows.length} ${rows.length === 1 ? "study" : "studies"}${yearSpan ? ` · ${yearSpan}` : ""} · exported ${today}</div>
   </div>`;
   // ── PREFACE ── (typeset intro pages from PROJECT_PREFACE)
+  // Member opening page (2026-08-03): their own words, typeset as page one. esc()'d — member
+  // input must never reach the DOM raw.
+  const introPage = introText ? `<div class="page">
+    <div style="max-width:640px">
+      <div class="pcK" style="font-family:'Geist Mono',monospace;font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase">Why this book exists</div>
+      ${String(introText).split(/\n\s*\n/).map((par) => `<div class="pcM" style="font-size:1.08rem;line-height:1.85;margin-top:18px">${esc(par)}</div>`).join("")}
+    </div>
+  </div>` : "";
   const prefaceDef = PROJECT_PREFACE[coverTitle];
   const preface = prefaceDef ? prefaceDef.sections.map((s, si) => {
     const kicker = `<div class="pfkick"><span class="pfn">${esc(s.n)}</span><span class="pfk">${esc(s.kicker)}</span></div>`;
@@ -1515,6 +1582,7 @@ function openProjectBookPdf(rows, coverTitle, diveTitle) {
       <button onclick="window.print()">⬇ Save as PDF</button>
     </div>
     ${cover}
+    ${introPage}
     ${preface}
     ${contents}
     ${hypPage}
@@ -3461,9 +3529,15 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   // member's own (any state). Author identity is denormalized on the row (no profiles dependency).
   const [memberDives, setMemberDives] = useState([]);
   const [diveModal, setDiveModal] = useState(false);
+  const [diveColsV2, setDiveColsV2] = useState(false); // customisation columns present? (deploy-safe probe)
   const loadMemberDives = useCallback(async () => {
     const { data } = await supabase.from("member_dives").select("*").order("updated_at", { ascending: false });
     setMemberDives(data || []);
+    // Probe the customisation columns (selected_ids/chapters/intro/hide_notes). PostgREST validates
+    // the select list even on zero rows, so a missing column errors — the modal then hides the new
+    // sections instead of failing saves. They light up on their own once the SQL is run.
+    const probe = await supabase.from("member_dives").select("selected_ids,chapters,intro,hide_notes").limit(1);
+    setDiveColsV2(!probe.error);
   }, []);
   useEffect(() => { loadMemberDives(); }, [loadMemberDives]);
   // Studies-list column sort (Valen 2026-07-28): [{ key: "entry"|"trigger", dir: 1|-1 }, …] — index 0 = primary,
@@ -3577,15 +3651,31 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   };
   const openCommunityDive = async (d) => {
     // Owner opens from local rows; other members fetch the author's rows — readable only while
-    // the dive is live (mb_read_community). Project '*' = the author's whole study book.
+    // the dive is live (mb_read_community). Selection order of precedence: ticked ids (v2) →
+    // project → '*' whole book.
     let src = rows.filter((r) => r.created_by === d.created_by && isStudyRow(r));
     if (!src.length) {
       const { data } = await supabase.from("model_book").select("*").eq("created_by", d.created_by);
       src = (data || []).filter(isStudyRow);
     }
-    const mine = d.project === "*" ? src : src.filter((r) => studyProject(r) === d.project);
-    if (!mine.length) { alert("This dive has no readable studies right now."); return; }
-    openMyBookPdf(mine, { coverTitle: d.project !== "*" ? d.project : undefined, diveTitle: d.title });
+    const picked = Array.isArray(d.selected_ids) && d.selected_ids.length
+      ? src.filter((r) => d.selected_ids.includes(String(r.id)))
+      : d.project === "*" ? src : src.filter((r) => studyProject(r) === d.project);
+    if (!picked.length) { alert("This dive has no readable studies right now."); return; }
+    // Hide-my-notes: strip the personal layers at render time — the charts and data still teach.
+    const shown = d.hide_notes ? picked.map((r) => ({ ...r, lesson: null,
+      metrics: { ...r.metrics, study: { ...(r.metrics?.study || {}), annotation: "", refusal: "" } } })) : picked;
+    // Chapters {year: label} → the era-divider machinery. Label-only; stats/note stay VIV-side.
+    const eps = d.chapters && typeof d.chapters === "object"
+      ? Object.fromEntries(Object.entries(d.chapters).filter(([, v]) => v && String(v).trim()).map(([y, v]) => [y, { label: String(v).trim() }]))
+      : null;
+    openMyBookPdf(shown, {
+      coverTitle: d.project && d.project !== "*" ? d.project : undefined,
+      diveTitle: d.title,
+      episodesOverride: eps && Object.keys(eps).length ? eps : undefined,
+      introText: d.intro || undefined,
+      forceProject: true,
+    });
   };
   const DIVE_SWEEP = /qulla|kullam|minervini|o['’]?neil\b|zanger|bonde|stockbee|jlaw|jeff\s*sun|martin\s*luk|pradeep|easyguru|ritchie|hernandez/i;
   const toggleDivePublish = async (d) => {
@@ -3786,8 +3876,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
   return (
     <div style={{ fontFamily: font }}>
-      {diveModal && <MemberDiveModal C={C} font={font} dive={myDive}
+      {diveModal && <MemberDiveModal C={C} font={font} dive={myDive} v2={diveColsV2}
         projects={[...new Set(studyRows.map(studyProject).filter(Boolean))].sort()}
+        entries={studyRows.map((r) => ({ id: r.id, ticker: r.ticker, date: mbISO(r.entry_date) || r.entry_date || "", setup: r.metrics?.study?.setup || r.pattern || "" }))}
         defaultAuthor={(session?.user?.email || "").split("@")[0]}
         onSave={saveMemberDive} onDelete={myDive ? deleteMemberDive : undefined} onClose={() => setDiveModal(false)} />}
       {/* command header */}

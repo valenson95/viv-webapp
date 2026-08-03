@@ -65,3 +65,27 @@ alter table public.trades    add column if not exists is_demo boolean not null d
 
 create index if not exists positions_demo_idx on public.positions (user_id, is_demo);
 create index if not exists trades_demo_idx    on public.trades    (user_id, is_demo);
+
+
+-- ── 3 · MEMBER DIVE CUSTOMISATION (2026-08-03 evening — his picks: tick studies · named
+--        chapters · opening page · hide notes). Code is deploy-safe: the modal probes these
+--        columns and only shows the new sections once they exist.
+alter table public.member_dives add column if not exists selected_ids jsonb;   -- ["<model_book uuid>", ...] — ticked studies; null = project/whole-book rule
+alter table public.member_dives add column if not exists chapters     jsonb;   -- {"2026": "My first month", ...} — year → chapter label
+alter table public.member_dives add column if not exists intro        text;    -- opening page, their words
+alter table public.member_dives add column if not exists hide_notes   boolean not null default false;
+
+-- Visibility follows the TICKED set exactly when one exists; falls back to the project rule.
+drop policy if exists mb_read_community on public.model_book;
+create policy mb_read_community on public.model_book for select to authenticated
+  using (exists (
+    select 1 from public.member_dives d
+    where d.created_by = model_book.created_by
+      and d.is_live
+      and (
+        case when d.selected_ids is not null and jsonb_typeof(d.selected_ids) = 'array'
+             then d.selected_ids ? model_book.id::text
+             else (d.project = '*' or d.project = (model_book.metrics -> 'study' ->> 'project'))
+        end
+      )
+  ));
