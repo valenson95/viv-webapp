@@ -158,6 +158,19 @@ const PROJECT_EPISODES = {
     "2025": { label: "Tariff crash — V-shaped capitulation", stats: "QQQ −22.8% over 34 sessions · low Apr 8, 2025 · reclaimed in 52 sessions", note: "A 23% capitulation in 34 sessions. In a forced-liquidation tape the early-bottom tell mostly disappears — the leaders bottomed with the index, not before it. What separated them was the moving averages: stacked at the low, and vertical recovery legs off it." },
     "2026": { label: "Rolling QQQ grind — memory/storage supercycle emerges", stats: "QQQ −12.0% over 103 sessions · low Mar 30, 2026 · reclaimed in 11 sessions", note: "A 103-session rolling grind — the longest tape in the book, and the one with the earliest tells. DELL bottomed 48 sessions before the index; ARM 38. In a grind there is time for leadership to show its hand: the leaders were back at their highs while QQQ was still stepping down." },
   },
+  // TSLA Chronicle eras — labels approved by Valen 2026-08-03 ("Approve as proposed").
+  // Stats from the verified anatomy engine (chronicle-discover.py math, anchor-checked).
+  "TSLA Chronicle": {
+    "2010": { label: "The listing year", stats: "Two November triggers off the first IPO base · +46.3% peak in 18 sessions", note: "The book opens three months after the IPO — the first base the stock ever built. His note from the chart: the first base since IPO should be on our radar. Both entries in the campaign print here, including the 3rd–4th-leg tightening he flagged as late." },
+    "2013": { label: "The re-rate", stats: "Four triggers · the April delayed EP runs +183.7% in 60 sessions", note: "The profitability pre-announce turns a neglected car startup into the year's monster. A delayed episodic pivot built on post-earnings drift, then three continuation entries as the run extends — the last one flagged overextended at a 5.55 ATR multiple, and mean reversion followed." },
+    "2014": { label: "Digestion", stats: "One February trigger · +42.1% in 12 sessions", note: "After the vertical year, one study: an inside-bar coil under a four-month descending trendline. The wedge apex pays fast — twelve sessions to the peak — and then the stock goes quiet for two years." },
+    "2017": { label: "The Model 3 run", stats: "Four studies · the multi-year base breaks in April · the May undercut & rally", note: "A multi-year base, worked from the inside: a February inside-bar probe, a T2 VCP with three staged entries in March, the April gap through the ceiling — and then May's undercut & rally, the shakeout below the broken base that reclaimed with VWAP and 6/20 MA confluence." },
+    "2019": { label: "The turn", stats: "One December EP · +177.8% in 37 sessions off the $342M profit inflection", note: "Wall Street modelled a loss as large as $257M; the print was a $342M profit. The episodic pivot off that inflection — a stock neglected for three years reclaiming its 200-day on volume — opens the biggest advance in the book." },
+    "2020": { label: "The parabola", stats: "Four triggers · the May coil pays +160% in 63 sessions", note: "The year the grammar compounds: a three-week weekly coil with four reverse pocket pivots, a second-leg 5-minute ORH break, the cup-and-handle off the autumn base, and a year-end trigger into S&P-inclusion strength. Every entry is the same card, printed at four different altitudes." },
+    "2021": { label: "The top", stats: "Two triggers into the November 4 high at 414.50", note: "The cheat-level entry in September and the post-earnings base break in October — +39.1% in ten sessions — carry straight into the all-time high. The book stops printing longs here for three years." },
+    "2024": { label: "The second act", stats: "VCP T3 · a 973-day weekly base resolves in December", note: "Nine hundred and seventy-three days of weekly base — the longest structure in the book — resolving as a third-stage VCP through the 361 line his chart carries as 'weekly 3 years base'." },
+    "2025": { label: "The second act, continued", stats: "One September trigger · wedge apex on high volume · +28.5% in 37 sessions", note: "The follow-on: five months of higher lows into a converging wedge, contracting volume, RS turning green — and a high-volume apex breakout surfing the rising moving averages." },
+  },
 };
 
 // PROJECT_PREFACE (Valen 2026-07-30): typeset intro pages for a project book, adapted from his own
@@ -231,6 +244,16 @@ const PROJECT_PREFACE = {
 // hypotheses with verdicts → the study gallery). The registry IS the publish switch — a project
 // appears only when listed here with a topic title. Admin-gated until Valen flips it to members.
 const DEEP_DIVES = [
+  {
+    // Title by Fable on Valen's delegation 2026-08-03 ("you can think of the name, it's a 16 years
+    // dive") — 2010 IPO base → 2025 trigger, outcome windows into 2026. Rows are DRAFT until his
+    // publish click (per-dive publish is row-derived; members see nothing while is_published=false).
+    no: "04", slug: "tsla-chronicle", project: "TSLA Chronicle",
+    title: "Sixteen Years of Tesla — Every Setup the Trend Gave",
+    premise: "One ticker, sixteen years, twenty studies. From the first base after the 2010 IPO to the 973-day base that resolved in 2024 — every setup class in the playbook, graded on the same card, through every altitude of one generational trend.",
+    updated: "2026-08-03",
+    cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/tsla-chronicle-cover.png",
+  },
   {
     no: "02", slug: "amd-chronicle", project: "AMD Chronicle",
     title: "AMD — 26 Years Through Every Market Cycle", // HIS title, 2026-08-01 (was 20 Years)
@@ -1001,7 +1024,11 @@ function openProjectBookPdf(rows, coverTitle) {
         const scored = def.buckets.flatMap((b) => b.items).filter((it) => it[2] !== "bonus");
         const ticked = def.buckets.flatMap((b) => b.items).filter((it) => it[2] !== "bonus" && study.checks?.[it[0]]);
         const TFWORD = { "1M": "monthly", "1W": "weekly", "1D": "daily", "60m": "hourly", "30m": "30-minute", "15m": "15-minute", "5m": "5-minute", "1m": "1-minute" };
-        const tfOf = (slot, fallback) => TFWORD[(study.tf || {})[slot]] || fallback;
+        // TradingView headers print bare minute counts ("5", "15") and letter codes ("D", "W") —
+        // vision-transcribed tf values arrive in that convention (TSLA batch 2026-08-03: "5" on six
+        // studies rendered as "Context · daily"). Normalize to our keys; identity for good values.
+        const normTf = (t) => ({ "1": "1m", "5": "5m", "15": "15m", "30": "30m", "60": "60m", "1h": "60m", "D": "1D", "W": "1W", "M": "1M" })[t] || t;
+        const tfOf = (slot, fallback) => TFWORD[normTf((study.tf || {})[slot])] || fallback;
         const chartBlock2 = (img, title, sub, top) => img ? `
           <div class="pcBlk${top ? "" : " pcRule"}" style="margin:${top ? "30px" : "34px"} 0 0;${top ? "" : "padding-top:30px"}">
             <div class="pcH" style="font-size:1.35rem;font-weight:700;letter-spacing:-0.015em;line-height:1.2">${title}</div>
@@ -1021,9 +1048,9 @@ function openProjectBookPdf(rows, coverTitle) {
         // Hero = the DAILY chart, whichever slot holds it (his setup slot is sometimes the 5-minute
         // entry chart; the daily then lives in the context slot). Everything else goes to the expander.
         const slots = [
-          { img: r.after_img, role: "setup", tf: (study.tf || {}).setup || "1D" },
-          { img: r.before_img, role: "context", tf: (study.tf || {}).context || "1W" },
-          { img: study.outcome_img, role: "outcome", tf: (study.tf || {}).outcome || "1D" },
+          { img: r.after_img, role: "setup", tf: normTf((study.tf || {}).setup) || "1D" },
+          { img: r.before_img, role: "context", tf: normTf((study.tf || {}).context) || "1W" },
+          { img: study.outcome_img, role: "outcome", tf: normTf((study.tf || {}).outcome) || "1D" },
         ].filter((x) => x.img);
         const heroSlot = slots.find((x) => x.tf === "1D" && x.role !== "outcome") || slots.find((x) => x.tf === "1D") || slots[0];
         const restSlots = slots.filter((x) => x !== heroSlot)
