@@ -203,11 +203,17 @@ export const STUDY_SETUPS = {
       ]},
       { title: "Shakeout & reclaim (the trigger)", items: [
         ["undercut", "Real dip BELOW a prior low / obvious support — the shakeout"],
-        // Valen 2026-08-03: the reclaim needs a BENCHMARK, not just "back above the level".
-        // Either a 6/20 EMA-or-SMA reclaim upwards, or a VWAP reclaim. Which one is recorded in
-        // the sub-category (reclaim_ref) so the lift table can rank the benchmarks against each other.
-        ["reclaim", "Reclaimed the benchmark upwards — 6/20 EMA or SMA, or VWAP"], // sub-cat reclaim_ref
+        ["reclaim", "Closed back ABOVE the undercut level — the reclaim IS the entry"],
         ["higher_lows", "Higher lows forming after the undercut, into the reclaim"],
+        // Valen 2026-08-03, corrected same day: "6/20 EMA/SMA" is ONE signal — the 6MA crossing UP
+        // through the 20MA — not two separate moving averages. And the confirmations are
+        // MULTI-SELECT ("reclaim can be chosen multiple at once"), so they are independent ticks,
+        // never a single-choice sub-category. BONUS: either one alone is a valid entry per his
+        // wording, so scoring them would make A+ unreachable on a legitimate single-confirmation
+        // trade. They still feed the lift table — if cross+VWAP together beats either alone at
+        // n>=50, promote to scored then (the `inside` tick's documented path).
+        ["reclaim_cross", "6MA crossed UP through the 20MA", "bonus"], // sub-cat ma_type: EMA|SMA
+        ["reclaim_vwap", "Reclaimed VWAP", "bonus"],
         ["closehi", "Closed ≥70% of the day's range"],
         ["vol_exp", "Volume expansion on the reclaim day"],
         ["rev_bar", "Reversal bar on the reclaim day", "bonus"],
@@ -481,10 +487,15 @@ export const SUBCATS = {
   // Valen 2026-07-24: coil duration band on the tightening tick; retrace depth on the shallow-retrace bonus tick.
   tight: { store: "coil_len", options: [["<10", "<10d"], ["10-20", "10–20d"], [">20", ">20d"]] },
   shallow_retrace: { store: "retrace_ma", options: [["10ma", "10MA"], ["20ma", "20MA"], ["50ma", "50MA"], ["deeper", "deeper"], ["none", "no touch"]] },
-  // Valen 2026-08-03 (Undercut & Rally): WHICH benchmark the reclaim happened against. He named
-  // "6/20 EMA or SMA reclaim upwards, or VWAP" — each option is its own lift row, so the data can
-  // eventually say which reclaim benchmark actually produces the winners.
-  reclaim: { store: "reclaim_ref", options: [["6ema", "6 EMA"], ["20ema", "20 EMA"], ["6sma", "6 SMA"], ["20sma", "20 SMA"], ["vwap", "VWAP"]] },
+  // Valen 2026-08-03 (Undercut & Rally). Two single-choice refinements on the reclaim:
+  //  · WHICH TIMEFRAME he made the call on — "the reclaim most often times is going into 5min
+  //    timeframe to decide" (matches the standing 5-min-ORH entry rule). Default reality is 5-min,
+  //    but it is recorded, never assumed, so the lift can test whether the daily-read reclaims differ.
+  //  · EMA vs SMA on the 6/20 cross — his "EMA/SMA" means either flavour of the same cross.
+  // The benchmarks THEMSELVES (cross / VWAP) are independent ticks, not options here — he can pick
+  // more than one at once, and SUBCATS is single-choice by design.
+  reclaim: { store: "reclaim_tf", options: [["5min", "5-min"], ["15min", "15-min"], ["hourly", "Hourly"], ["daily", "Daily"]] },
+  reclaim_cross: { store: "ma_type", options: [["ema", "EMA"], ["sma", "SMA"]] },
 };
 
 // Quality is AUTO-COMPUTED from how many checklist criteria are ticked (Valen 2026-07-14) —
