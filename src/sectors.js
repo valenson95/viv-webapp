@@ -5,13 +5,24 @@
 // member pick). Sector strings mirror DeepVue's GROUPING (thematic, not GICS).
 // Each ticker appears ONCE in its primary theme; some are judgment calls
 // (SMCI=AI, PLTR=Software, OKLO=Uranium) — correct as DeepVue annotates.
+//
+// ⚠️ AUTHORITY (settled 2026-08-03). DeepVue exposes TWO different lenses and they disagree:
+//   1. the GICS INDUSTRY on a chart header  ("CRWD — Software")
+//   2. THEME-TRACKER MEMBERSHIP in themeConstituents-data.js  (CRWD ∈ Software+Cybersecurity+Growth)
+// Only lens 2 drives the in/off-theme chip, because only lens 2 is what the tracker ranks.
+// Tagging off the industry header breaks names like NET: the header says Software, but DeepVue's
+// Software theme list is COMPLETE at 106/106 and does not contain NET — it is Cybersecurity.
+//
+// RULE when a ticker sits in several themes (Valen 2026-08-03): MOST SPECIFIC WINS.
+//   Cybersecurity > Software > Growth Stocks.   CRWD/NET → Cybersecurity · DDOG → Software.
+// A name whose ONLY membership is a broad theme takes that one (NTAP → Growth Stocks).
 // ─────────────────────────────────────────────────────────────
 const G = (theme, ...tickers) => tickers.reduce((o, t) => (o[t] = theme, o), {});
 
 const SECTORS = {
   ...G("Semiconductors","NVDA","AMD","AVGO","MU","MRVL","ARM","TSM","ASML","AMAT","KLAC","LRCX","QCOM","ON","LSCC","MCHP","ALAB","CRDO","AMKR","ACLS","MXL","GFS","INTC","COHR","LITE","AAOI","FN","MTSI","QRVO","SWKS","WOLF","NVTS","POWI","MPWR","CIEN","FORM","VECO","UCTT","ONTO","CAMT","NVMI","AEHR","INDI","SITM","RMBS","SYNA","ALGM","DIOD","HIMX","TSEM","ADI","TXN","NXPI","STM","ENTG","COHU","AOSL","SLAB","MRCY","CRUS"),
-  ...G("AI","NBIS","SMCI","VRT","BBAI","SOUN","AI","AMBA","TQQQ","SQQQ","QQQ"),
-  ...G("Software","MSFT","ORCL","NOW","NTNX","CRM","SNOW","DDOG","MDB","TEAM","TWLO","DOCN","SHOP","PLTR","HUBS","WDAY","ADBE","INTU","APP","DOCU","PATH","GTLB","ESTC","CFLT","BILL","ASAN","MNDY","PCOR","BRZE","FROG","U","RBLX","NTAP","PSTG","FIVN","INOD","FIG","BASE","CVLT","NCNO","DBX","BOX","SMAR","PD","APPN","AYX","WK","YEXT","BL","GWRE","MANH","TYL","SPT","ZI"),
+  ...G("AI","NBIS","SMCI","VRT","BBAI","SOUN","AI","AMBA","TQQQ","SQQQ","QQQ","HPE"),
+  ...G("Software","MSFT","ORCL","NOW","NTNX","CRM","SNOW","DDOG","MDB","TEAM","TWLO","DOCN","SHOP","PLTR","HUBS","WDAY","ADBE","INTU","APP","DOCU","PATH","GTLB","ESTC","CFLT","BILL","ASAN","MNDY","PCOR","BRZE","FROG","U","RBLX","PSTG","FIVN","INOD","FIG","BASE","CVLT","NCNO","DBX","BOX","SMAR","PD","APPN","AYX","WK","YEXT","BL","GWRE","MANH","TYL","SPT","ZI"),
   ...G("Cybersecurity","CRWD","PANW","ZS","S","OKTA","NET","FTNT","TENB","RBRK","CYBR","VRNS","RPD","QLYS","AKAM","GEN","CHKP"),
   ...G("Biotechnology","MRNA","BNTX","VRTX","REGN","GILD","BIIB","AMGN","PTCT","SRPT","RARE","BMRN","IONS","ARWR","ALNY","INCY","EXEL","HALO","CYTK","KRYS","MDGL","VKTX","KYMR","SEPN","SYRE","TNGX","BRKR","ADPT","TVTX","KOD","HROW","CPRX","RYTM","INSM","AXSM","IMVT","ARDX","BBIO","ACAD","NBIX","JAZZ","APLS","IOVA","RXRX","VERV","DVAX","CORT","SMMT","PCVX","RVMD"),
   ...G("Genomics","CRSP","NTLA","BEAM","EDIT","GH","TXG","PACB","NVTA","EXAS","VCYT","DNA","TWST","FLGT","NTRA"),
@@ -31,7 +42,10 @@ const SECTORS = {
   ...G("Aerospace","ASTS","RKLB","WWD","LUNR","RDW","KTOS","AVAV","LMT","RTX","NOC","GD","BA","HWM","HEI","TDG","LHX","CW","AXON","RCAT","PL","ACHR","JOBY","EH"),
   ...G("Airlines","DAL","UAL","AAL","LUV","ALK","JBLU","SAVE","CPA","SKYW","ALGT","RYAAY"),
   ...G("Financials","HOOD","SOFI","AFRM","UPST","NU","DAVE","CRCL","PYPL","XYZ","FUTU","IBKR","LMND","TOST","BULL","STNE","PAGS","FOUR","GPN","WEX","JPM","GS","MS","BAC","C","SCHW","KKR","APO","BX","ARES","OWL"),
-  ...G("Growth Stocks","TSLA","RIVN","LCID","CAVA","DKNG","SN","CELH","ELF","DUOL","ONON","BROS","WING","ANF","RH","CROX","DECK","SG","CART","LULU","CMG","TTD","AS","BIRK","MELI"),
+  // NTAP moved out of Software 2026-08-03: DeepVue's Software theme list is COMPLETE (106/106)
+  // and does not contain it; Growth Stocks is its only DeepVue theme membership.
+  // Authority = themeConstituents-data.js (his tracker), NOT the GICS industry on a chart header.
+  ...G("Growth Stocks","NTAP","TSLA","RIVN","LCID","CAVA","DKNG","SN","CELH","ELF","DUOL","ONON","BROS","WING","ANF","RH","CROX","DECK","SG","CART","LULU","CMG","TTD","AS","BIRK","MELI"),
   ...G("Social Media","META","RDDT","SNAP","PINS","BMBL","MTCH","RSI","GRND"),
   ...G("China Internet","BABA","PDD","JD","BIDU","NTES","LI","XPEV","NIO","TME","BILI","ZK","BEKE","MNSO","VIPS","YMM"),
   ...G("Communication","GOOGL","GOOG","NFLX","DIS","ROKU","SPOT","WBD","PARA","FUBO","TTWO","EA"),
@@ -44,7 +58,9 @@ const SECTORS = {
   ...G("Real Estate","PLD","AMT","EQIX","DLR","O","SPG","CBRE","WELL","VICI","IRM","SBAC","EXR","AMH"),
   ...G("Banks","WFC","USB","PNC","TFC","COF","FITB","MTB","HBAN","RF","KEY","CFG","ZION","WAL","EWBC"),
   ...G("Data Center","CRWV","CORZ","GDS","SWCH"),
-  ...G("Technology","DELL","HPQ","HPE","ANET","WDC","STX","JBL","FLEX","CLS","APH","GLW","TEL"),
+  // HPE moved to AI 2026-08-03 (his call): DeepVue lists it in AI + Quantum only. "Technology"
+  // is NOT a tracker theme, so anything left here can never earn an in/off-theme chip.
+  ...G("Technology","DELL","HPQ","ANET","WDC","STX","JBL","FLEX","CLS","APH","GLW","TEL"),
 };
 
 import { useEffect, useState } from "react";
