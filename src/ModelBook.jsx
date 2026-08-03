@@ -259,9 +259,10 @@ const DEEP_DIVES = [
     title: "AMD — 26 Years Through Every Market Cycle", // HIS title, 2026-08-01 (was 20 Years)
     premise: "Hold the company constant and the regimes become the variable. Twenty-six years of AMD — the dot-com mania, the first cycle, the turnaround, two crashes, a long bear, and the AI era — every setup class graded on the same card.",
     updated: "2026-08-01",
-    // v2 2026-08-03 (his ask): sketched AMD arrow-mark, same noir family as the TSLA cover —
-    // versioned filename so the CDN can't serve the old mountain-range art.
-    cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/amd-chronicle-cover-v2.png",
+    // v3 2026-08-03 (his ask, twice-refined): sketched AMD arrow-mark + hand-lettered
+    // "ADVANCED MICRO DEVICES" above it, same noir family as the TSLA cover. Versioned filename
+    // so the CDN can't serve stale art.
+    cover: "https://ifahfxsqgmzyxcebslwe.supabase.co/storage/v1/object/public/trade-charts/modelbook/dives/amd-chronicle-cover-v3.png",
   },
   {
     // STATIC dive (2026-08-01): no study rows behind it — `static` names the builder that opens it.

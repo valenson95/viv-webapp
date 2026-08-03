@@ -758,6 +758,17 @@ function PlaybookTracker({ trades, uid, setPage }) {
 const WHATS_NEW = [
   {
     tag: "New",
+    date: "August 3, 2026",
+    title: "🚗 Sixteen Years of Tesla — new Deep Dive",
+    items: [
+      "One ticker, sixteen years, twenty studies. From the first base Tesla ever built after its 2010 IPO to the 973-day base that finally broke in 2024.",
+      "Every setup in the playbook is in here — VCP, high tight flag context, episodic pivots, the delayed episodic pivot, and the undercut & rally — each graded on the same card.",
+      "Grouped into eras so you can read it as one story: the listing year, the re-rate, the Model 3 run, the turn, the parabola, the top, and the second act.",
+      "Model Book → Deep Dives → Sixteen Years of Tesla.",
+    ],
+  },
+  {
+    tag: "New",
     date: "August 2, 2026",
     title: "📘 21 Building Blocks to Profitability — the handbook is live",
     items: [
