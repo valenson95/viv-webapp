@@ -88,14 +88,24 @@ for (const e of entries) {
   });
 
   // 3) mirror into the grader (gold dots included) so opening the ticker matches the post
-  const gr = await fetch(`${URL_}/rest/v1/setup_grades?on_conflict=user_id,symbol`, {
-    method: "POST", headers: { ...H, Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify([{
-      user_id: UID, symbol: ticker, stars: g.stars, letter: g.letter, pct: g.pct,
-      star_hit: g.starHit, starmakers: STARMAKERS, ticked: storedTicked, auto,
-      updated_at: new Date().toISOString(),
-    }]),
-  });
+  //
+  // ⛔ UNGRADED batches never touch setup_grades (Valen 2026-07-27: no pre-trade scoring).
+  // With no scored ticks the upsert would write a 0★ "—" row — and because setup_grades is keyed
+  // (user_id, symbol), that OVERWRITES whatever real grade he set for that symbol earlier.
+  // Caught before it shipped 2026-08-03: the batch would have wiped his live NTAP/HPE/NET/DDOG rows.
+  let gr = { ok: true, skipped: true };
+  if (g.passed > 0) {
+    gr = await fetch(`${URL_}/rest/v1/setup_grades?on_conflict=user_id,symbol`, {
+      method: "POST", headers: { ...H, Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify([{
+        user_id: UID, symbol: ticker, stars: g.stars, letter: g.letter, pct: g.pct,
+        star_hit: g.starHit, starmakers: STARMAKERS, ticked: storedTicked, auto,
+        updated_at: new Date().toISOString(),
+      }]),
+    });
+  }
 
-  console.log(`${ticker} ${date}: ${g.stars}★ ${g.letter} (${g.passed}/${TOTAL} · ${g.starHit}/${STARMAKERS}) — post ${ins.ok ? "PUBLISHED ✓" : "FAILED: " + await ins.text()} · grade ${gr.ok ? "synced ✓" : "FAILED"}${chartUrl ? " · chart ✓" : ""}`);
+  const gradeMsg = gr.skipped ? "grade untouched (ungraded post)" : `grade ${gr.ok ? "synced ✓" : "FAILED"}`;
+  const scoreMsg = g.passed > 0 ? `${g.stars}★ ${g.letter} (${g.passed}/${TOTAL} · ${g.starHit}/${STARMAKERS})` : "UNGRADED";
+  console.log(`${ticker} ${date}: ${scoreMsg} — post ${ins.ok ? "PUBLISHED ✓" : "FAILED: " + await ins.text()} · ${gradeMsg}${chartUrl ? " · chart ✓" : ""}`);
 }

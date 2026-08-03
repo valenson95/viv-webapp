@@ -24,7 +24,7 @@ const SECTORS = {
   ...G("Solar","FSLR","ENPH","SEDG","RUN","NXT","ARRY","SHLS","CSIQ","JKS","TAN","MAXN","FLNC","NOVA"),
   ...G("Uranium","CCJ","UEC","UUUU","DNN","NXE","LEU","OKLO","SMR","URA","URNM","URG"),
   ...G("Utilities","VST","CEG","NRG","TLN","GEV","BE","NEE","SO","DUK","PWR","D","AEP","EXC","ETR","PEG","FE","CNP","NRGV"),
-  ...G("Oil & Gas","XOM","CVX","OXY","DVN","FANG","EQT","VLO","MPC","PSX","SLB","HAL","TRGP","LNG","CTRA","AR","RRC","OVV","MTDR","CHRD","EOG","COP","APA","HES"),
+  ...G("Oil & Gas","XOM","CVX","OXY","DVN","FANG","EQT","VLO","MPC","PSX","DINO","SLB","HAL","TRGP","LNG","CTRA","AR","RRC","OVV","MTDR","CHRD","EOG","COP","APA","HES"),
   ...G("Steel","NUE","STLD","X","CLF","MT","RS","CMC","TX","GGB","ZEUS"),
   ...G("Gold Miners","GOLD","NEM","AEM","KGC","AU","WPM","FNV","AGI","GFI","HMY","BTG","EGO","IAG","OR"),
   ...G("Silver Miners","PAAS","HL","CDE","AG","SSRM","EXK","MAG","SILV","FSM","GATO"),
