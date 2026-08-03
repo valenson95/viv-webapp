@@ -186,6 +186,51 @@ export const STUDY_SETUPS = {
       ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
     ],
   },
+  // Undercut & Rally (UnR) — the 3rd of his five setups. The checklist is transcribed from HIS OWN
+  // published wording: 21 Building Blocks piece 10, "What I need to see" (ModelBook.jsx PLAYBOOK_PIECES).
+  // Do not add ticks he did not name for THIS setup — the 200-day rule etc. belong to other pieces.
+  "Undercut & Rally": {
+    buckets: [
+      { title: "Trend & context", items: [
+        ["ma_rising", "Short-term MAs still rising — price above the longer ones"],
+        ["young", "Young trend — 1st–3rd pullback, not the 4th+"], // sub-cat young_leg
+        ["rs_intact", "Relative strength holding — the group is still being bought"],
+      ]},
+      { title: "The pullback", items: [
+        ["pb_into_ma", "Pulled back INTO the rising short-term moving averages"],
+        ["vol_dry", "Volume drying up on the way down (resting, not selling)"],
+        ["trend_intact", "Uptrend unbroken — a pullback, not a breakdown"],
+      ]},
+      { title: "Shakeout & reclaim (the trigger)", items: [
+        ["undercut", "Real dip BELOW a prior low / obvious support — the shakeout"],
+        ["reclaim", "Closed back ABOVE that level — the reclaim IS the entry"],
+        ["closehi", "Closed ≥70% of the day's range"],
+        ["vol_exp", "Volume expansion on the reclaim day"],
+        ["rev_bar", "Reversal bar on the reclaim day", "bonus"],
+      ]},
+      { title: "Risk", items: [
+        ["stop_tight", "Stop at the pullback low, under one daily range"],
+      ]},
+    ],
+    metrics: [
+      ["rs", "AS/RS rank"], ["adr20", "ADR20 %"], ["dolvol_m", "DolVol $M (20d)"],
+      ["reclaim_level", "Level undercut & reclaimed ($)"], ["undercut_depth_pct", "Undercut depth below that level (%)"],
+      ["days_below", "Sessions spent below the level before the reclaim"],
+      ["pullback_depth_pct", "Pullback depth from the swing high (%)"], ["pullback_days", "Pullback length (days)"],
+      ["pullback_num", "Pullback # in trend (1st/2nd/3rd…)"],
+      ["ext_50ma", "Ext from 50MA (×ATR%)"], ["from_high_pct", "% below 52wk high"],
+      ["re_pct", "Reclaim day % move"], ["gap_pct", "Gap % (open vs prior close)"], ["vol_ratio", "Volume ÷ prior day"],
+      ["rvol_eod", "RVol 50d EOD"], ["rvol_30m", "RVOL 1st 30min (vs same window, 20d)"], ["vol30_adv_pct", "1st-30min vol as % of ADV"],
+      ["closing_range", "Closing range % (C−L)/(H−L)"], ["entry_px", "Entry (5-min ORH — standing rule)"],
+      ["stop_width_adr", "LoD stop width from entry (×ADR)"],
+      ["adv_dollar", "ADV $ (20d avg vol × trigger close)"], ["turnover_pct", "Turnover % ($ADV ÷ cap)"],
+      ["invaded_half", "Invaded day-1 half? (low d2–5 < midpoint)"], ["d3_moved", "Follow-through by D3? (new high by d2/d3)"],
+      ["d_below_ma10", "Sessions to 1st close below 10MA"], ["d_below_ma20", "Sessions to 1st close below 20MA"],
+      ["ext_at_peak", "Ext from 50MA at burst peak (×ATR%)"],
+      ["theme", "Theme / group (if known)"], ["regime", "Regime (SPY 10>20) Y/N"],
+      ["spy_10d20", "SPY condition (10 sessions vs 20SMA)"],
+    ],
+  },
   "Episodic Pivot": {
     buckets: [
       { title: "Before the gap", items: [
