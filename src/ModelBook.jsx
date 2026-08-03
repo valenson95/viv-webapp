@@ -377,10 +377,12 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <h2 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, margin: 0 }}>Deep Dives</h2>
         {onMyBook && (
-          <span onClick={onMyBook} style={{ fontSize: "0.82rem", color: C.muted, cursor: "pointer", whiteSpace: "nowrap" }}
-            onMouseEnter={e => { e.currentTarget.style.color = C.white; }}
-            onMouseLeave={e => { e.currentTarget.style.color = C.muted; }}>
-            {myCount ? `Your book (${myCount})` : "Start your own book"} <span style={{ opacity: 0.6 }}>→</span>
+          // Backdropped pill (Valen 2026-08-03: "make it slightly more obvious") — this is the
+          // doorway to their personal book AND the Make-it-a-Deep-Dive flow behind it.
+          <span onClick={onMyBook} style={{ fontSize: "0.8rem", fontWeight: 700, color: C.gold, cursor: "pointer", whiteSpace: "nowrap", background: "rgba(201,152,42,0.10)", border: `1px solid ${C.borderGold || "rgba(201,152,42,0.35)"}`, borderRadius: 99, padding: "9px 18px", transition: "background .15s" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(201,152,42,0.2)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(201,152,42,0.10)"; }}>
+            📖 {myCount ? `Your book (${myCount})` : "Start your own book"} <span style={{ opacity: 0.6 }}>→</span>
           </span>
         )}
       </div>
