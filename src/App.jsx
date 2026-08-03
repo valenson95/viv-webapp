@@ -759,6 +759,16 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "August 3, 2026",
+    title: "🎮 Demo mode + publish your own Deep Dive",
+    items: [
+      "Demo mode: hit the 🎮 Demo button next to Simple/Pro. Everything switches to a practice book — positions, journal, stats — completely separate from your real trades. Add trades, get stopped out, learn. Flip it off and your real book is exactly as you left it.",
+      "Your Deep Dive: open Your Book in the Model Book and hit “Make it a Deep Dive”. Your studies get typeset with the same template as the VIV dives — title, premise, your name on it.",
+      "Keep it as a private draft, or flip it live so other members can read it in the new “From the community” section. On and off any time, instantly.",
+    ],
+  },
+  {
+    tag: "New",
+    date: "August 3, 2026",
     title: "🚗 Sixteen Years of Tesla — new Deep Dive",
     items: [
       "One ticker, sixteen years, twenty studies. From the first base Tesla ever built after its 2010 IPO to the 973-day base that finally broke in 2024.",
@@ -5706,7 +5716,7 @@ const excTime = (bt, res) => {
   return String(bt);
 };
 
-function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit }) {
+function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit, demoMode = false, onToggleDemo }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   useSectors((journaledTrades || []).map(t => t.ticker)); // theme fallback for tickers not in the curated map
   const gradesV = useSavedGrades(); // re-render + re-run the freeze when grades save/sync
@@ -8523,6 +8533,9 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <div className="seg" id="viewSeg">
                 <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
                 <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro · all columns</button>
+                {onToggleDemo && <button className={demoMode ? "on" : ""} onClick={onToggleDemo}
+                  title={demoMode ? "Demo mode is ON — this is your practice book. Click to return to your real book." : "Switch to your demo book — practice positions and trades, fully separate from your real ones."}
+                  style={demoMode ? { background: "#7c5cff", color: "#fff", borderColor: "#7c5cff" } : {}}>🎮 Demo</button>}
               </div>
             </div>
             <div className="tablewrap">
@@ -8957,6 +8970,9 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           <div className="seg" id="viewSeg">
             <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
             <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro · all columns</button>
+                {onToggleDemo && <button className={demoMode ? "on" : ""} onClick={onToggleDemo}
+                  title={demoMode ? "Demo mode is ON — this is your practice book. Click to return to your real book." : "Switch to your demo book — practice positions and trades, fully separate from your real ones."}
+                  style={demoMode ? { background: "#7c5cff", color: "#fff", borderColor: "#7c5cff" } : {}}>🎮 Demo</button>}
           </div>
         </div>
 
@@ -9563,7 +9579,7 @@ function AllocDonut({ pct, over, size = 104 }) {
   );
 }
 
-function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, rNumStocks, setRNumStocks, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning, displayName }) {
+function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, rNumStocks, setRNumStocks, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning, displayName, demoMode = false, onToggleDemo }) {
   // Alias so existing `INTRADAY_FEATURE_ENABLED` references inside this component keep reading as a single
   // flag without rewriting every callsite. Reactive — flipping the Settings toggle re-renders the table.
   const INTRADAY_FEATURE_ENABLED = intradayFeatureEnabled;
@@ -9912,6 +9928,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           exit_reason: tradeObj.reason, notes: tradeObj.notes,
           chart_url: tradeObj.chartUrl, chart_image: tradeObj.chartImage, trade_type: tradeObj.tradeType,
           is_deleted: false, // explicit so a missing column default can't leave it NULL (the load drops NULLs)
+          is_demo: !!demoMode, // closing a demo position books a demo trade — worlds never cross
           // position_id intentionally OMITTED (not even written as null): the trades.position_id column may
           // not exist on every member's DB, and writing the key — even as null — makes the INSERT reference a
           // missing column so the whole insert fails (and the trade silently falls back to state-only, then
@@ -11005,6 +11022,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <div className="seg" id="viewSeg">
                 <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
                 <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
+                {onToggleDemo && <button className={demoMode ? "on" : ""} onClick={onToggleDemo}
+                  title={demoMode ? "Demo mode is ON — this is your practice book. Click to return to your real book." : "Switch to your demo book — practice positions and trades, fully separate from your real ones."}
+                  style={demoMode ? { background: "#7c5cff", color: "#fff", borderColor: "#7c5cff" } : {}}>🎮 Demo</button>}
               </div>
             </div>
             <div className="allocstrip">
@@ -11236,6 +11256,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <div className="seg" id="viewSeg">
             <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
             <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
+                {onToggleDemo && <button className={demoMode ? "on" : ""} onClick={onToggleDemo}
+                  title={demoMode ? "Demo mode is ON — this is your practice book. Click to return to your real book." : "Switch to your demo book — practice positions and trades, fully separate from your real ones."}
+                  style={demoMode ? { background: "#7c5cff", color: "#fff", borderColor: "#7c5cff" } : {}}>🎮 Demo</button>}
           </div>
           <button className="btn" onClick={fetchLivePrices} disabled={priceLoading}>{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
           <button
@@ -13098,6 +13121,15 @@ function AppInner() {
   const [exitReasons, setExitReasons] = useState(DEFAULT_EXIT_REASONS);
   const [journaledTrades, setJournaledTrades] = useState([]);
   const [positions, setPositions] = useState([]);
+  // ── DEMO MODE (Valen 2026-08-03): one switch, two worlds. ON = every query, insert and surface
+  // works the demo book; OFF = the real book, zero demo pollution. Same discipline machinery both
+  // sides. IBKR sync is real-world only. The ref keeps the bulk writer's closure honest.
+  const [demoMode, setDemoMode] = useState(() => { try { return localStorage.getItem("viv-demo-mode") === "1"; } catch { return false; } });
+  const demoModeRef = useRef(demoMode);
+  const toggleDemoMode = useCallback(() => {
+    setDemoMode(d => { const next = !d; demoModeRef.current = next; try { localStorage.setItem("viv-demo-mode", next ? "1" : "0"); } catch {} return next; });
+  }, []);
+  useEffect(() => { demoModeRef.current = demoMode; }, [demoMode]);
   const [portfolioSize, setPortfolioSize] = useState("10000");
 
   // ─── IBKR sync (read-only preview — Phase 1) ───
@@ -13177,6 +13209,7 @@ function AppInner() {
     catch { /* quota — drop silently rather than break the sync */ }
   }, [undoStorageKey]);
   const runIbkrSync = useCallback(async () => {
+    if (demoModeRef.current) { alert("IBKR sync is for your real book. Switch Demo mode off first."); return; }
     // ADMIN GUARD: the admin journal is AI-OS-curated (single-writer) — self-sync would
     // duplicate the curated rows (the 2026-07-09 incident). Server enforces this too (403).
     if ((session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
@@ -13531,8 +13564,8 @@ function AppInner() {
     // 7) Re-hydrate state from the DB (one source of truth — avoids drift from per-row in-memory patches).
     try {
       const [tradesRes, posRes, softDelsRes] = await Promise.all([
-        supabase.from("trades").select("*").eq("user_id", uid).or("is_deleted.is.null,is_deleted.eq.false").order("created_at", { ascending: false }),
-        supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false),
+        supabase.from("trades").select("*").eq("user_id", uid).eq("is_demo", demoModeRef.current).or("is_deleted.is.null,is_deleted.eq.false").order("created_at", { ascending: false }),
+        supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).eq("is_demo", demoModeRef.current),
         supabase.from("trades").select("ib_exec_id").eq("user_id", uid).eq("is_deleted", true).not("ib_exec_id", "is", null),
       ]);
       if (softDelsRes.data) setSoftDeletedExecIds(new Set(softDelsRes.data.map(r => r.ib_exec_id).filter(Boolean)));
@@ -13656,6 +13689,7 @@ function AppInner() {
           trade_type: p.tradeType || "Long",
           source: p.source || "manual", ib_conid: p.ibConid || null, ib_synced_at: p.ibSyncedAt || null, // preserve IBKR identity through bulk Save
           is_closed: false, // bulk Save only ever holds OPEN positions; archived (closed) rows live untouched in the DB
+          is_demo: demoModeRef.current, // the writer serves whichever world is on screen
         };
         // CRITICAL: carries the intraday activity log through bulk Save unchanged. Only included when the
         // DB column actually exists (detected on load) — protects against deploying the code before the
@@ -13673,7 +13707,8 @@ function AppInner() {
           return;
         }
         // User intentionally cleared all — safe to delete OPEN rows only (archived/closed history is preserved)
-        await supabase.from("positions").delete().eq("user_id", uid).eq("is_closed", false);
+        // Scoped to the CURRENT WORLD: clearing the demo book must never touch a real position (and vice versa).
+        await supabase.from("positions").delete().eq("user_id", uid).eq("is_closed", false).eq("is_demo", demoModeRef.current);
         isSaving.current = false;
         setPositionSaveStatus("saved");
         if (positionSaveTimer.current) clearTimeout(positionSaveTimer.current);
@@ -13702,7 +13737,9 @@ function AppInner() {
       // SCOPED to is_closed=false so archived (auto-closed) positions are NEVER swept up by the bulk Save.
       const newIds = inserted.map(r => r.id);
       if (newIds.length > 0) {
-        await supabase.from("positions").delete().eq("user_id", uid).eq("is_closed", false).not("id", "in", `(${newIds.join(",")})`);
+        // is_demo scope is LOAD-BEARING: in demo mode the on-screen list is demo-only, so an
+        // unscoped sweep here would DELETE every real open position. Never remove this predicate.
+        await supabase.from("positions").delete().eq("user_id", uid).eq("is_closed", false).eq("is_demo", demoModeRef.current).not("id", "in", `(${newIds.join(",")})`);
       }
 
       // Step 3: Sync local state with real DB IDs so next save doesn't create duplicates
@@ -13848,7 +13885,7 @@ function AppInner() {
       }
 
       // Positions — CRITICAL: check for query errors. A failed query MUST NOT trigger position deletion.
-      const { data: pos, error: posErr } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).order("created_at");
+      const { data: pos, error: posErr } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).eq("is_demo", demoMode).order("created_at");
       if (posErr) {
         // ABORT position loading — do NOT touch state, do NOT set lastLoadedCount to 0.
         // This prevents autosave from wiping the DB when a network blip returns null data.
@@ -13908,7 +13945,7 @@ function AppInner() {
       // Treat is_deleted NULL as "not deleted" — rows inserted before the column had a DEFAULT can be
       // NULL, and `.eq("is_deleted", false)` silently drops NULLs (NULL ≠ false in SQL), which made most
       // historical trades vanish from the journal even though they're still in the DB.
-      const { data: trades, error: tradesErr } = await supabase.from("trades").select("*").eq("user_id", uid).or("is_deleted.is.null,is_deleted.eq.false").order("created_at", { ascending: false });
+      const { data: trades, error: tradesErr } = await supabase.from("trades").select("*").eq("user_id", uid).eq("is_demo", demoMode).or("is_deleted.is.null,is_deleted.eq.false").order("created_at", { ascending: false });
       if (tradesErr) { console.error("Trades load failed:", tradesErr.message); }
       console.log(`[load] trades fetched: ${(trades || []).length}`);
       if (trades && trades.length > 0) {
@@ -13942,7 +13979,7 @@ function AppInner() {
           if (Array.isArray(emergencyPos) && emergencyPos.length > 0) {
             console.log(`RECOVERY: Found ${emergencyPos.length} positions saved offline. Merging with DB...`);
             // Merge: for each emergency position, if it doesn't exist in DB (by symbol+entry+shares), insert it
-            const { data: currentPos } = await supabase.from("positions").select("*").eq("user_id", uid);
+            const { data: currentPos } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_demo", false);
             const existingKeys = new Set((currentPos || []).map(p => `${p.symbol}|${p.entry_date}|${p.entry_price}|${p.shares}`));
             const toInsert = emergencyPos.filter(p => !existingKeys.has(`${p.sym}|${p.entry}|${p.ep}|${p.shares}`));
             if (toInsert.length > 0) {
@@ -13956,7 +13993,7 @@ function AppInner() {
               await supabase.from("positions").insert(rows);
               console.log(`RECOVERY: Inserted ${toInsert.length} positions from offline save.`);
               // Re-load positions to get consistent state
-              const { data: refreshed } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).order("created_at");
+              const { data: refreshed } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).eq("is_demo", demoMode).order("created_at");
               if (refreshed && refreshed.length > 0) {
                 lastLoadedCount.current = refreshed.length;
                 const snap2 = new Map();
@@ -13976,7 +14013,7 @@ function AppInner() {
       setAuthLoading(false);
     };
     load();
-  }, [session]);
+  }, [session, demoMode]); // demoMode: flipping the switch reloads the whole book in the other world
 
   // ─── Device sync: re-fetch positions when tab becomes visible again ───
   // This handles the phone/laptop sync issue — if member edits on laptop then switches to phone,
@@ -13998,7 +14035,7 @@ function AppInner() {
       lastSyncTime.current = Date.now();
       try {
         const uid = session.user.id;
-        const { data: pos, error: posErr } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).order("created_at");
+        const { data: pos, error: posErr } = await supabase.from("positions").select("*").eq("user_id", uid).eq("is_closed", false).eq("is_demo", demoModeRef.current).order("created_at");
         if (posErr || !pos) return; // silently skip — don't disrupt user
         // Deduplicate
         const seen = new Map();
@@ -14343,9 +14380,22 @@ function AppInner() {
           <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
-      {page === "dashboard" && <DashboardPage setPage={setPage} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} rNumStocks={rNumStocks} setRNumStocks={setRNumStocks} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} />}
+      {demoMode && (
+        // The purple DEMO overlay (Valen 2026-08-03: "so members know that it's demo"): a fixed
+        // frame around the whole viewport + corner tag, visible over everything including modals
+        // and while scrolled. pointer-events:none — it never blocks a click.
+        <div style={{ position: "fixed", inset: 0, zIndex: 2000, pointerEvents: "none", border: "3px solid #7c5cff", boxShadow: "inset 0 0 42px rgba(124,92,255,0.16)" }}>
+          <div style={{ position: "absolute", bottom: 0, right: 18, background: "#7c5cff", color: "#fff", fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", padding: "4px 12px", borderRadius: "8px 8px 0 0" }}>🎮 Demo</div>
+        </div>
+      )}
+      {demoMode && page !== "settings" && (
+        <div style={{ background: "linear-gradient(90deg, #7c5cff, #5b3df0)", color: "#fff", textAlign: "center", fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", padding: "7px 12px" }}>
+          🎮 Demo mode — practice book. Your real positions and stats are untouched.
+        </div>
+      )}
+      {page === "dashboard" && <DashboardPage setPage={setPage} onJournalTrade={handleJournalTrade} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} positions={positions} setPositions={setPositions} portfolioSize={portfolioSize} setPortfolioSize={setPortfolioSize} lastLoadedCountRef={lastLoadedCount} lastSaveIdMapRef={lastSaveIdMap} session={session} targetRote={targetRote} setTargetRote={setTargetRote} rNumStocks={rNumStocks} setRNumStocks={setRNumStocks} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} onManualSave={handleManualSave} saveStatus={positionSaveStatus} positionsRef={positionsRef} saveErrorMsg={saveErrorMsg} onIbkrSync={runIbkrSync} intradayColumnAvailable={intradayColumnAvailable} intradayFeatureEnabled={intradayFeatureEnabled} onRunIntegrity={runIntegrityCheck} integrityReport={integrityReport} integrityRunning={integrityRunning} displayName={displayName} demoMode={demoMode} onToggleDemo={toggleDemoMode} />}
       {page === "tools" && <PremiumToolsPage setPage={setPage} session={session} demo={true} portfolioSize={portfolioSize} journaledTrades={journaledTrades} positions={positions} displayName={displayName} />}
-      {page === "journal" && <TradeJournalPage setPage={setPage} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} />}
+      {page === "journal" && <TradeJournalPage setPage={setPage} journaledTrades={journaledTrades} setJournaledTrades={setJournaledTrades} setupTypes={setupTypes} tags={tags} exitReasons={exitReasons} session={session} onManualSave={handleManualTradeSave} onSavePositions={handleManualSave} saveStatus={tradeSaveStatus} positions={positions} setPositions={setPositions} positionsRef={positionsRef} portfolioSize={portfolioSize} displayName={displayName} isIbkrMode={isIbkrMode} ibkrSyncInfo={ibkrSyncInfo} onIbkrTradeEdit={handleIbkrTradeEdit} demoMode={demoMode} onToggleDemo={toggleDemoMode} />}
       {page === "daily" && <DailySetupsShell setPage={setPage} session={session} displayName={displayName} />}
       {page === "modelbook" && <ModelBookShell setPage={setPage} session={session} displayName={displayName} journaledTrades={journaledTrades} />}
       {page === "practice" && practiceAllowed(session) && <PracticeShell setPage={setPage} session={session} />}

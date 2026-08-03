@@ -28,7 +28,7 @@ async function main() {
 
   // entry_gates is a late migration (supabase/entry-gates.sql) — fall back gracefully until it exists.
   const SEL = "ticker,entry_date,entry_time,exit_date,entry_price,exit_price,shares,stop_price,pl_dollar,r_mult,exit_reason,position_id,ext_entry,ext_exit,trade_type,source,is_sample,is_deleted,grade_snapshot,ib_exec_id";
-  const getTrades = (sel) => fetch(`${URL_}/rest/v1/trades?select=${sel}&user_id=eq.${UID}&exit_date=gte.${SINCE}&order=exit_date.asc&limit=2000`, { headers: H }).then(j);
+  const getTrades = (sel) => fetch(`${URL_}/rest/v1/trades?select=${sel}&user_id=eq.${UID}&is_demo=eq.false&exit_date=gte.${SINCE}&order=exit_date.asc&limit=2000`, { headers: H }).then(j); // demo trades never enter the edge ledger (2026-08-03)
   let rawFetched = await getTrades(SEL + ",entry_gates");
   if (!Array.isArray(rawFetched)) rawFetched = await getTrades(SEL);
   if (!Array.isArray(rawFetched)) throw new Error("trades fetch failed: " + JSON.stringify(rawFetched).slice(0, 200));
@@ -77,7 +77,7 @@ async function main() {
   });
   const provenance = { window: SINCE + " → today", fillsAll: rawTrades.length, fillsVerified: trades.length, recoveredLegacy: recovered, legacyExcluded: unparseable, unparseableRows, outOfWindow, dupesDropped, impossibleTimesDropped: badTimes, rCrossCheck: { checked: rChecked, mismatched: rSuspects.length, rows: rSuspects.slice(0, 12) }, noStopExcluded: 0 };
 
-  const positions = (await fetch(`${URL_}/rest/v1/positions?select=symbol,shares,entry_price,stop_price,trailing_stop,current_price,ext_mult&user_id=eq.${UID}&is_closed=eq.false`, { headers: H }).then(j))
+  const positions = (await fetch(`${URL_}/rest/v1/positions?select=symbol,shares,entry_price,stop_price,trailing_stop,current_price,ext_mult&user_id=eq.${UID}&is_closed=eq.false&is_demo=eq.false`, { headers: H }).then(j))
     .filter((p) => +p.shares > 0);
 
   // ---------- campaigns ----------

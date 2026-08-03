@@ -287,7 +287,61 @@ const DEEP_DIVES = [
 // The dives INDEX — faithful to nickschmidt.so/report as rendered: plain heading · auto-scrolling
 // ruled proof marquee (ticker + green %) · open-type latest hero with illustration thumb · archive
 // in LIST (dotted leaders) or GRID (illustration cards) — the toggle mirrors his two formats.
-export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, onTogglePublish }) {
+// Member "Make it a Deep Dive" (Valen 2026-08-03, self-serve — his word: "it's for their own
+// purposes… they can publish live"). A member wraps their Study-Book project (or whole book, '*')
+// in a member_dives row and flips it live themselves. No review gate; the RLS policy
+// mb_read_community exposes their study rows to other members ONLY while the dive is live.
+// Module scope — an editor defined inside its page remounts on every parent render (hard-won rule).
+export function MemberDiveModal({ C, font, dive, projects, defaultAuthor, onSave, onDelete, onClose }) {
+  const [title, setTitle] = useState(dive?.title || "");
+  const [premise, setPremise] = useState(dive?.premise || "");
+  const [author, setAuthor] = useState(dive?.author_name || defaultAuthor || "");
+  const [project, setProject] = useState(dive?.project || (projects[0] ?? "*"));
+  const [live, setLive] = useState(!!dive?.is_live);
+  const [busy, setBusy] = useState(false);
+  const inp = { width: "100%", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.86rem", padding: "10px 12px", outline: "none", boxSizing: "border-box" };
+  const lab = { fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted, margin: "16px 0 6px" };
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1500, background: "rgba(5,5,10,0.72)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 100%)", maxHeight: "88vh", overflowY: "auto", background: "#0d0d14", border: `1px solid ${C.border}`, borderRadius: 18, padding: "26px 28px", fontFamily: font }}>
+        <div style={{ fontSize: "1.15rem", fontWeight: 800, color: C.white, letterSpacing: "-0.02em" }}>{dive ? "Your Deep Dive" : "Make it a Deep Dive"}</div>
+        <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 8, lineHeight: 1.6 }}>
+          Your studies, typeset as a proper research report — the same template the VIV dives use.
+          Keep it to yourself as a draft, or flip it live so other members can read it.
+        </div>
+        <div style={lab}>Title</div>
+        <input style={inp} value={title} onChange={(e) => setTitle(e.target.value)} placeholder='e.g. "My First Fifty Breakouts"' maxLength={90} />
+        <div style={lab}>One-line premise <span style={{ opacity: 0.6, textTransform: "none", letterSpacing: 0 }}>(optional)</span></div>
+        <input style={inp} value={premise} onChange={(e) => setPremise(e.target.value)} placeholder="What is this dive trying to show?" maxLength={200} />
+        <div style={lab}>Your name on it</div>
+        <input style={inp} value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Shown as the author" maxLength={50} />
+        <div style={lab}>Which studies</div>
+        <select style={{ ...inp, cursor: "pointer" }} value={project} onChange={(e) => setProject(e.target.value)}>
+          <option value="*">My whole book — every study</option>
+          {projects.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
+        </select>
+        <div onClick={() => setLive(!live)} style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 0", cursor: "pointer", padding: "12px 14px", borderRadius: 12, border: `1px solid ${live ? "rgba(34,197,94,0.4)" : C.border}`, background: live ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)" }}>
+          <span style={{ width: 34, height: 20, borderRadius: 99, background: live ? "#22c55e" : "rgba(255,255,255,0.14)", position: "relative", flex: "none", transition: "background .15s" }}>
+            <span style={{ position: "absolute", top: 2, left: live ? 16 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+          </span>
+          <span style={{ fontSize: "0.82rem", color: C.text }}>
+            <b style={{ color: C.white }}>{live ? "Live — other members can read it" : "Draft — only you can see it"}</b>
+            <span style={{ display: "block", fontSize: "0.72rem", color: C.muted, marginTop: 2 }}>You can flip this on and off any time. Off hides it instantly.</span>
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 24, alignItems: "center" }}>
+          <button disabled={busy || !title.trim()} onClick={async () => { setBusy(true); await onSave({ title: title.trim(), premise: premise.trim() || null, author_name: author.trim() || null, project, is_live: live }); setBusy(false); }}
+            style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.8rem", padding: "11px 22px", borderRadius: 99, cursor: title.trim() ? "pointer" : "not-allowed", opacity: title.trim() ? 1 : 0.5 }}>
+            {busy ? "Saving…" : "Save"}</button>
+          <button onClick={onClose} style={{ background: "none", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontWeight: 700, fontSize: "0.8rem", padding: "11px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
+          {dive && onDelete && <span onClick={() => window.confirm("Remove this dive? Your studies are untouched — only the dive listing goes away.") && onDelete()}
+            style={{ marginLeft: "auto", fontSize: "0.74rem", color: "#f87171", cursor: "pointer" }}>Remove dive</span>}
+        </div>
+      </div>
+    </div>, document.body);
+}
+
+export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, onTogglePublish, community = [], onOpenCommunity, uid }) {
   // Dive publish state is DERIVED from its rows (any is_published → LIVE). Members never reach
   // this branch for draft dives — RLS returns zero rows and diveList drops them upstream.
   // Static dives (no rows) carry their own switch: draft:true = admin-only, draft:false = LIVE.
@@ -382,11 +436,31 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, 
           )}
         </>
       )}
+      {community.length > 0 && (
+        <>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 14, margin: "52px 0 0", paddingTop: 26, borderTop: `1px solid ${C.border}` }}>
+            <span style={{ fontSize: "0.66rem", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: C.muted }}>From the community</span>
+            <span style={{ fontSize: "0.7rem", color: C.muted, opacity: 0.7 }}>member research, self-published</span>
+          </div>
+          <div style={{ margin: "6px 0 0" }}>
+            {community.map((d) => (
+              <div key={d.id} onClick={() => onOpenCommunity && onOpenCommunity(d)} style={{ display: "flex", alignItems: "baseline", gap: 14, padding: "15px 0", cursor: "pointer" }}>
+                <span style={{ fontSize: "0.92rem", fontWeight: 600, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "24ch" }}>{d.title}</span>
+                <span style={{ flex: 1, borderBottom: "1px dotted rgba(255,255,255,0.18)", transform: "translateY(-4px)" }} />
+                <span style={{ fontSize: "0.76rem", color: C.muted, whiteSpace: "nowrap" }}>{d.author_name || "a member"}</span>
+                {d.created_by === uid && (
+                  <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: d.is_live ? "#22c55e" : C.muted, border: `1px solid ${d.is_live ? "rgba(34,197,94,0.35)" : C.border}`, padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>{d.is_live ? "LIVE" : "DRAFT"}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
+export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle } = {}) {
   // Project-book export (Valen 2026-07-28): a coverTitle'd book whose rows are ALL non-H-domain studies
   // (e.g. "Market Bottom") gets the gallery-grade minimal book instead of the classic model-book layout.
   // The classic path below is byte-identical when this guard doesn't fire.
@@ -397,7 +471,7 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
   if (coverTitle && _pbStudies.length > 0 && _pbStudies.length === rows.length &&
     (_pbStudies.every((r) => r.metrics.study.project === coverTitle) ||
       !_pbStudies.some((r) => H_DOMAIN.has(r.metrics.study.setup)))) {
-    return openProjectBookPdf(rows, coverTitle);
+    return openProjectBookPdf(rows, coverTitle, diveTitle);
   }
   // Chronicle order (Valen 2026-07-28): the book reads BY TICKER, each ticker chronological from
   // its first study — one ticker = one chapter of legs, like a single name's history album.
@@ -858,7 +932,7 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
     </div>
     <div class="page cover">
       <div class="brand">Valen Insiders Vault</div>
-      <h1>${coverTitle ? esc(coverTitle) : "My Model Book"}</h1>
+      <h1>${diveTitle ? esc(diveTitle) : coverTitle ? esc(coverTitle) : "My Model Book"}</h1>
       <div class="sub">${coverTitle ? "VIV Model Book" : `${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${today}`}</div>
       ${coverTitle ? `<div class="sub">${rows.length} ${rows.length === 1 ? "entry" : "entries"} · exported ${today}</div>` : ""}
       <div class="sub" style="margin-top:26px;max-width:60ch;line-height:1.6">Your own pattern library — the setup, the factors that were present, and the outcome. Study the pairs; the commonalities are the edge.</div>
@@ -882,7 +956,7 @@ export function openMyBookPdf(rows, { makerGate, coverTitle } = {}) {
 //    giant year-divider, then two pages per study (vs-QQQ chart, then daily chart + data strip + ticked
 //    checklist + thesis). Order = year ascending then ticker, matching the Contents. e{idx} anchors on the
 //    first page of each study keep the Contents links clickable in the saved PDF.
-function openProjectBookPdf(rows, coverTitle) {
+function openProjectBookPdf(rows, coverTitle, diveTitle) {
   const today = new Date().toISOString().slice(0, 10);
   const yearOf = (r) => (mbISO(r.entry_date) || "").slice(0, 4) || "—";
   const ordered = [...rows].sort((a, b) => yearOf(a).localeCompare(yearOf(b)) || String(a.ticker).localeCompare(String(b.ticker)) ||
@@ -896,7 +970,8 @@ function openProjectBookPdf(rows, coverTitle) {
   const isMB = coverTitle === "Finding the Market's Bottom";
   // Cover prints the dive's display title (HIS wording) when one exists; coverTitle stays the
   // project key for EPISODES/PREFACE lookups and the isMB/theme switches.
-  const displayTitle = DEEP_DIVES.find((d) => d.project === coverTitle)?.title || coverTitle;
+  // Member dives (2026-08-03) pass their own diveTitle — their projects are never in the registry.
+  const displayTitle = diveTitle || DEEP_DIVES.find((d) => d.project === coverTitle)?.title || coverTitle;
   // ── format helpers (blank → "—", never invented) ──
   const fmtPct = (v) => (v === "" || v == null) ? "—" : `${+v >= 0 && !String(v).startsWith("-") ? "+" : ""}${esc(v)}%`;
   const fmtPp = (v) => (v === "" || v == null) ? "—" : `${+v >= 0 && !String(v).startsWith("-") ? "+" : ""}${esc(v)} pp`;
@@ -3380,6 +3455,15 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [studyMode, setStudyMode] = useState(mbDeepLink === "studies"); // 📚 Studies view (admin, inside My Book)
   const [book, setBook] = useState("__all__"); // active project book in My Research: "__all__" | "__none__" (Winner DNA) | project name
   const [memberView, setMemberView] = useState("dives"); // members: "dives" (report index, default) | "mine" (their own book)
+  // Member self-serve dives (2026-08-03): member_dives rows — live ones (community shelf) + the
+  // member's own (any state). Author identity is denormalized on the row (no profiles dependency).
+  const [memberDives, setMemberDives] = useState([]);
+  const [diveModal, setDiveModal] = useState(false);
+  const loadMemberDives = useCallback(async () => {
+    const { data } = await supabase.from("member_dives").select("*").order("updated_at", { ascending: false });
+    setMemberDives(data || []);
+  }, []);
+  useEffect(() => { loadMemberDives(); }, [loadMemberDives]);
   // Studies-list column sort (Valen 2026-07-28): [{ key: "entry"|"trigger", dir: 1|-1 }, …] — index 0 = primary,
   // later entries = secondary (multi-sort: clicking a new column makes it primary, the old primary demotes).
   // Clicking the active primary toggles asc→desc→off. Empty array = the default ticker-chronicle order.
@@ -3463,12 +3547,44 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   // RLS lets them read (published); a dive with zero readable rows stays hidden.
   // Static dives (project:null) carry no rows — they'd otherwise scoop up every project-less study.
   // They survive the filter on their own draft flag: admin-only while draft, everyone once published.
-  const diveList = DEEP_DIVES.map(d => ({ ...d, rows: d.static ? [] : rows.filter(r => isStudyRow(r) && studyProject(r) === d.project) }))
+  // Registry dives take rows from the OFFICIAL account ONLY (2026-08-03): the community read
+  // policy lets other members' live-dive rows into this fetch, and a member project named like a
+  // registry project must never inject rows into the VIV shelf.
+  const OFFICIAL_UID = "0e32b092-029a-436d-8cb5-67621e1467b0"; // vc-lv@live.com
+  const diveList = DEEP_DIVES.map(d => ({ ...d, rows: d.static ? [] : rows.filter(r => isStudyRow(r) && studyProject(r) === d.project && r.created_by === OFFICIAL_UID) }))
     .filter(d => d.static ? (isAdmin || !d.draft) : d.rows.length > 0);
 
   // Admin click-to-publish (Valen 2026-07-31): flips is_published on the dive's project rows —
   // the SAME mechanism as the scripted launch, now a button. Mentor-name sweep gates every publish;
   // this is an admin CLICK, never a deploy-time write (deploys-never-touch-member-data).
+  const myDive = memberDives.find((d) => d.created_by === uid) || null; // v1: one dive per member (first project wins the modal)
+  const communityDives = memberDives.filter((d) => d.is_live && d.created_by !== "0e32b092-029a-436d-8cb5-67621e1467b0");
+  const saveMemberDive = async (fields) => {
+    const row = { ...fields, created_by: uid, updated_at: new Date().toISOString() };
+    const q = myDive
+      ? supabase.from("member_dives").update(row).eq("id", myDive.id)
+      : supabase.from("member_dives").insert(row);
+    const { error } = await q;
+    if (error) { alert("Could not save the dive: " + error.message); return; }
+    setDiveModal(false); loadMemberDives();
+  };
+  const deleteMemberDive = async () => {
+    if (!myDive) return;
+    await supabase.from("member_dives").delete().eq("id", myDive.id);
+    setDiveModal(false); loadMemberDives();
+  };
+  const openCommunityDive = async (d) => {
+    // Owner opens from local rows; other members fetch the author's rows — readable only while
+    // the dive is live (mb_read_community). Project '*' = the author's whole study book.
+    let src = rows.filter((r) => r.created_by === d.created_by && isStudyRow(r));
+    if (!src.length) {
+      const { data } = await supabase.from("model_book").select("*").eq("created_by", d.created_by);
+      src = (data || []).filter(isStudyRow);
+    }
+    const mine = d.project === "*" ? src : src.filter((r) => studyProject(r) === d.project);
+    if (!mine.length) { alert("This dive has no readable studies right now."); return; }
+    openMyBookPdf(mine, { coverTitle: d.project !== "*" ? d.project : undefined, diveTitle: d.title });
+  };
   const DIVE_SWEEP = /qulla|kullam|minervini|o['’]?neil\b|zanger|bonde|stockbee|jlaw|jeff\s*sun|martin\s*luk|pradeep|easyguru|ritchie|hernandez/i;
   const toggleDivePublish = async (d) => {
     const live = d.rows.some(r => r.is_published);
@@ -3661,12 +3777,17 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {loading ? <div style={{ color: C.muted, fontSize: "0.8rem", padding: "30px 0" }}>Loading…</div>
         : <DiveIndex C={C} font={font} dives={diveList}
             onOpen={(d) => d.static === "playbook" ? openPlaybookBook() : openMyBookPdf(d.rows, { coverTitle: d.project })}
-            onMyBook={() => { setFScope("mine"); setMemberView("mine"); }} myCount={mineCount} />}
+            onMyBook={() => { setFScope("mine"); setMemberView("mine"); }} myCount={mineCount}
+            community={memberDives.filter((d) => d.is_live || d.created_by === uid)} onOpenCommunity={openCommunityDive} uid={uid} />}
     </div>
   );
 
   return (
     <div style={{ fontFamily: font }}>
+      {diveModal && <MemberDiveModal C={C} font={font} dive={myDive}
+        projects={[...new Set(studyRows.map(studyProject).filter(Boolean))].sort()}
+        defaultAuthor={(session?.user?.email || "").split("@")[0]}
+        onSave={saveMemberDive} onDelete={myDive ? deleteMemberDive : undefined} onClose={() => setDiveModal(false)} />}
       {/* command header */}
       <div className="toolbar" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap", marginBottom: 20 }}>
         <div>
@@ -3676,7 +3797,15 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
             onMouseEnter={guideEnter ? guideEnter("modelbook", "Model Book", "Two books in one: the ⭐ VIV Official library — curated elite setups, read-only — and 🔒 My Book, your private collection only you can see. Study the before chart, the exact factors that made it elite, then the outcome. Stars are computed from the Setup Grader ticks (objective, no bias). Fields marked with a gold dot were auto-read off the chart by VIV — edit any that look off. Pattern recognition is built by reps: same patterns, hundreds of examples.", undefined) : undefined}
             onMouseLeave={guideLeave ? guideLeave("modelbook") : undefined}
             style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, marginTop: 5 }}>The Pattern Library</h2>) : (
-            <h2 className="sech" style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, marginTop: 5 }}>Your Book</h2>
+            <>
+              <h2 className="sech" style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, marginTop: 5 }}>Your Book</h2>
+              <div onClick={() => setDiveModal(true)} style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: "0.76rem", color: C.gold, cursor: "pointer" }}>
+                {myDive ? <>📖 {myDive.title}
+                  <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: myDive.is_live ? "#22c55e" : C.muted, border: `1px solid ${myDive.is_live ? "rgba(34,197,94,0.35)" : C.border}`, padding: "2px 8px", borderRadius: 99 }}>{myDive.is_live ? "LIVE" : "DRAFT"}</span>
+                  <span style={{ color: C.muted }}>edit</span></>
+                  : <>📖 Make it a Deep Dive <span style={{ color: C.muted }}>— publish your book like the VIV dives</span></>}
+              </div>
+            </>
           )}
           {isAdmin && <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 6 }}>{visible.length} {visible.length === 1 ? "entry" : "entries"} · the best setups, kept for study — before → factors → after</div>}
         </div>
@@ -4062,7 +4191,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {/* Deep Dives (admin-first): the index; opening a dive opens the exported BOOK page itself,
           so the lab-style research UI is never member-visible. */}
       {fScope === "dives" && !loading && !error && (
-        <DiveIndex C={C} font={font} dives={diveList} onOpen={(d) => d.static === "playbook" ? openPlaybookBook() : openMyBookPdf(d.rows, { coverTitle: d.project })} isAdmin={isAdmin} onTogglePublish={toggleDivePublish} />
+        <DiveIndex C={C} font={font} dives={diveList} onOpen={(d) => d.static === "playbook" ? openPlaybookBook() : openMyBookPdf(d.rows, { coverTitle: d.project })} isAdmin={isAdmin} onTogglePublish={toggleDivePublish}
+          community={communityDives} onOpenCommunity={openCommunityDive} uid={uid} />
       )}
 
       {/* card grid — mobile-safe auto-fit (min() caps the track so a card never overflows a narrow screen).
