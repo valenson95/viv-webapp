@@ -54,7 +54,7 @@ const SECTORS = {
   ...G("Industrials","GE","ETN","EMR","HON","CAT","DE","PH","AZZ","AAON","NVT","CECO","POWL","CSWI","FIX","LII","VMI","ATKR","HUBB","AME","ROK","GNRC","IR","DOV","PNR","ITT"),
   ...G("Transports","UBER","LYFT","FDX","UPS","ODFL","CHRW","XPO","GXO","ZIM","SAIA","JBHT","KNX","ARCB","MATX"),
   ...G("Materials","LIN","APD","SHW","FCX","ALB","MP","CE","VMC","MLM","SCCO","CRML","USAR","TMC"),
-  ...G("Retail","WMT","CHEF","COST","TGT","DKS","BURL","ULTA","DPZ","TJX","ROST","FIVE","BOOT","WSM","ORLY","AZO","URBN","VSXY"/* Victoria's Secret — DeepVue chart annotation "Specialty Retail", Valen 2026-08-04 */),
+  ...G("Retail","WMT","CHEF","COST","TGT","DKS","BURL","ULTA","DPZ","TJX","ROST","FIVE","BOOT","WSM","ORLY","AZO","URBN","VSXY","AMZN"/* Victoria's Secret — DeepVue chart annotation "Specialty Retail", Valen 2026-08-04 */),
   ...G("Real Estate","PLD","AMT","EQIX","DLR","O","SPG","CBRE","WELL","VICI","IRM","SBAC","EXR","AMH"),
   ...G("Banks","WFC","USB","PNC","TFC","COF","FITB","MTB","HBAN","RF","KEY","CFG","ZION","WAL","EWBC"),
   ...G("Data Center","CRWV","CORZ","GDS","SWCH"),
