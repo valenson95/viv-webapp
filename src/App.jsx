@@ -772,10 +772,12 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "August 5, 2026",
-    title: "⚡ Prices refresh themselves when you open the Dashboard",
+    title: "⚡ Auto price refresh · cleaner positions table · risk energy bar",
     items: [
-      "No more clicking Refresh Prices on arrival — the Dashboard now pulls the latest market prices automatically the moment your positions load.",
-      "Pro view: a second Refresh Prices button now sits right on the Open Positions card, so you don't have to scroll back to the top. (Thanks Estrid! 🙌)",
+      "No more clicking Refresh Prices on arrival — the Dashboard now pulls the latest market prices automatically the moment your positions load. Pro view also gets a second Refresh button right on the Open Positions card. (Thanks Estrid! 🙌)",
+      "Position size now shows the % of your account above the dollar amount — see concentration at a glance.",
+      "The Grade column is retired from Open Positions (your grades still live in Manage, trade views and the Setup Grader).",
+      "Risk Allocation is now an energy bar — it fills as you deploy risk, turns gold past 70% and red when you're over budget. Much easier to read than the old ring.",
     ],
   },
   {
@@ -10575,7 +10577,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 <th className="pro-only"><span className="term" data-tip="Your average entry price per share.">Avg Cost</span></th>
                 <th className="pro-only"><span className="term" data-tip="Total broker fees paid on this position so far.">Commission</span></th>
                 <th className="pro-only" onClick={() => togglePosSort("themeName")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "themeName" ? C.gold : undefined }} title="Sort by theme"><span className="term" data-tip="DeepVue-style sector, auto-recognized from the ticker — no AI needed. Unknown tickers show a dash. Click to sort by theme.">Theme</span>{posSort && posSort.key === "themeName" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
-                <th className="pro-only"><span className="term" data-tip="The Setup Grader score for this position (★ / letter / %). Grade a name in Premium Tools → Setup Grader, then Sync to Open Position.">Grade</span></th>
+                {false && <th className="pro-only"><span className="term" data-tip="The Setup Grader score for this position (★ / letter / %). Grade a name in Premium Tools → Setup Grader, then Sync to Open Position.">Grade</span></th> /* GRADE COLUMN HIDDEN (Valen 2026-08-05) — grade still lives in Manage + trade views */}
                 <th onClick={() => togglePosSort("posValue")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "posValue" ? C.gold : undefined }} title="Sort by position size"><span className="term" data-tip="Total dollars in this position — shares × average cost.">Position size</span>{posSort && posSort.key === "posValue" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th><span className="term" data-tip="Profit banked from partial sells of this position. The bar fills to the percentage of your original shares you've sold (trimmed).">Realized</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="Your current protective stop price.">Stop</span></th>
@@ -10626,7 +10628,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                         const g = fit === "in", bg = g ? "var(--greenDim)" : "var(--redDim)", bd = g ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)", cl = g ? "var(--green)" : "var(--red)";
                         return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.66rem", fontWeight: 700, background: bg, border: `1px solid ${bd}`, color: cl, whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
                       })()}</td>
-                      <td className="pro-only" data-l="Grade">{(() => {
+                      {false && <td className="pro-only" data-l="Grade">{(() => {
                         const gr = getSavedGrade(p.sym);
                         if (!gr) return <span className="term" data-tip="Not graded yet. Grade it in Premium Tools → Setup Grader, then Sync to Open Position." style={{ color: "var(--faint)" }}>—</span>;
                         const col = gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--goldBright)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
@@ -10635,8 +10637,11 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                           <b style={{ color: col, fontSize: "0.72rem" }}>{gr.letter}</b>
                           <span style={{ color: "var(--muted)", fontSize: "0.68rem", fontVariantNumeric: "tabular-nums" }}>{Math.round((gr.pct || 0) * 100)}%</span>
                         </span>;
-                      })()}</td>
-                      <td data-l="Position size">{usd0(p.posValue)}</td>
+                      })()}</td> /* GRADE CELL HIDDEN with its header (Valen 2026-08-05) */}
+                      <td data-l="Position size" style={{ whiteSpace: "nowrap" }}>
+                        {compEquity > 0 && <div className="term" data-tip="This position's size as a percentage of your account value — the honest gauge of how concentrated you are." style={{ fontSize: "0.63rem", fontWeight: 700, color: "var(--muted)", fontVariantNumeric: "tabular-nums", cursor: "help" }}>{((p.posValue / compEquity) * 100).toFixed(1)}%</div>}
+                        {usd0(p.posValue)}
+                      </td>
                       <td data-l="Realized">
                         <span className="sizebar" title={p.realizedShares > 0 ? `${p.realizedShares} of ${p.origShares} shares sold (${p.trimPct.toFixed(0)}% trimmed)` : "Nothing sold yet — fully unrealized"}>
                           <span className="track"><span className="fill" style={{ width: (p.realizedShares > 0 ? Math.max(6, Math.min(100, p.trimPct)) : 0) + "%", background: p.realizedPL >= 0 ? "var(--green)" : "var(--red)" }}></span></span>
@@ -10656,7 +10661,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                       </td>
                     </tr>
                     {isOpen && (
-                      <tr className="mgrow"><td colSpan={16}>
+                      <tr className="mgrow"><td colSpan={15}>
                         <div className="mgpanel">
                           <div className="mghead">
                             <span className={"status " + sc}><span className="d"></span>{p.riskStatus === "—" ? "Risk-Free" : p.riskStatus}</span>
@@ -10780,7 +10785,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 );
               })}
               {enriched.filter(p => p.sym).length === 0 && (
-                <tr><td colSpan={16} style={{ padding: "32px 14px", textAlign: "center", color: "var(--muted)" }}>No open positions yet. Click <b style={{ color: "var(--goldBright)" }}>+ Add Position</b> to start.</td></tr>
+                <tr><td colSpan={15} style={{ padding: "32px 14px", textAlign: "center", color: "var(--muted)" }}>No open positions yet. Click <b style={{ color: "var(--goldBright)" }}>+ Add Position</b> to start.</td></tr>
               )}
             </tbody>
           </table>
@@ -11103,7 +11108,17 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <button className="btn ghost" onClick={fetchLivePrices} disabled={priceLoading} title="Pull the latest market prices for every open position">{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
             </div>
             <div className="allocstrip">
-              <AllocDonut pct={allocPct} over={over} size={54} />
+              {/* Energy-bar gauge (Valen 2026-08-05 — replaced the 54px donut, unreadable at strip size).
+                  Guided's full Risk Allocation card keeps its 112px donut. */}
+              <div className="term" data-tip={over ? "You're over your risk budget — the bar is maxed and red." : "How much of your total risk budget is deployed across your open stops right now. Fills up as you add risk; empties as stops move to breakeven."} style={{ display: "flex", flexDirection: "column", gap: 4, width: 150, flex: "none", cursor: "help" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <span style={{ fontSize: "0.66rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", color: over ? "var(--red)" : allocPct >= 70 ? "var(--goldBright)" : "var(--text)" }}>{Math.round(allocPct)}%</span>
+                  <span style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)" }}>deployed</span>
+                </div>
+                <div style={{ height: 9, borderRadius: 99, background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.07)", overflow: "hidden" }}>
+                  <div style={{ width: `${Math.min(100, allocPct)}%`, height: "100%", borderRadius: 99, background: over ? "var(--red)" : allocPct >= 70 ? "linear-gradient(90deg, var(--gold), var(--goldBright))" : "linear-gradient(90deg, rgba(34,197,94,0.75), var(--green))", transition: "width 0.5s ease" }}></div>
+                </div>
+              </div>
               <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--muted)", marginRight: 2 }}>Risk Allocation</span>
               <Tip className="leg" tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></Tip>
               <Tip className="leg" tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></Tip>
