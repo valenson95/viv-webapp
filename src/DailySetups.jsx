@@ -302,7 +302,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
             return (
               <>
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse", fontSize: "0.76rem", minWidth: 520 }}>
+                  <table className="minitable" style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse", fontSize: "0.76rem", minWidth: 520 }}>
                     <colgroup>
                       <col style={{ width: "10%" }} />{/* ticker  */}
                       <col style={{ width: "13%" }} />{/* grade   */}

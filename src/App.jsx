@@ -316,30 +316,43 @@ function useCardArrange(keys, storageKey) {
     },
     onDrop: (e) => {
       e.preventDefault();
-      const from = dragFrom.current;
-      if (from == null || from === vi) { reset(); return; }
-      let movedKey = null, partnerKey = null;
-      setOrder(prev => {
-        const cur = sanitize(prev);                         // validate on read
-        if (from < 0 || from >= cur.length) return cur;     // guard against a stale index
-        const n = [...cur];
-        movedKey = n[from]; partnerKey = n[Math.min(vi, n.length - 1)];
-        const [r] = n.splice(from, 1);
-        n.splice(Math.max(0, Math.min(vi, n.length)), 0, r);
-        const clean = sanitize(n);                          // validate before write
-        persist(clean);
-        return clean;
-      });
-      const fk = [movedKey, partnerKey].filter(Boolean);    // snap-flash the moved card + its partner
-      if (fk.length) { setFlash(fk); if (flashT.current) clearTimeout(flashT.current); flashT.current = setTimeout(() => setFlash([]), 420); }
-      reset();
+      moveTo(dragFrom.current, vi);
     },
     onDragEnd: reset,                                       // ALWAYS fires (drop OR cancel) → cleanup
   });
+  // Shared move logic — the drop handler and the touch tap-to-move path both land here.
+  const moveTo = (from, vi) => {
+    if (from == null || from === vi) { reset(); return; }
+    let movedKey = null, partnerKey = null;
+    setOrder(prev => {
+      const cur = sanitize(prev);                         // validate on read
+      if (from < 0 || from >= cur.length) return cur;     // guard against a stale index
+      const n = [...cur];
+      movedKey = n[from]; partnerKey = n[Math.min(vi, n.length - 1)];
+      const [r] = n.splice(from, 1);
+      n.splice(Math.max(0, Math.min(vi, n.length)), 0, r);
+      const clean = sanitize(n);                          // validate before write
+      persist(clean);
+      return clean;
+    });
+    const fk = [movedKey, partnerKey].filter(Boolean);    // snap-flash the moved card + its partner
+    if (fk.length) { setFlash(fk); if (flashT.current) clearTimeout(flashT.current); flashT.current = setTimeout(() => setFlash([]), 420); }
+    reset();
+  };
+  // Touch devices can't HTML5-drag (mobile audit A8) — the handle becomes TAP-TO-MOVE there:
+  // tap a ⠿ to arm the card (handle lights gold via [data-armed]), tap another card's ⠿ to move
+  // it there, tap the same ⠿ again to cancel. Desktop keeps press-to-drag unchanged.
+  const isCoarse = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
   const handleProps = (vi) => ({
-    onMouseDown: () => setArmed(vi),
-    onMouseUp: () => setArmed(null),
-    title: "Drag to rearrange — your layout is saved to this browser",
+    onMouseDown: () => { if (!isCoarse) setArmed(vi); },
+    onMouseUp: () => { if (!isCoarse) setArmed(null); },
+    onClick: () => {
+      if (!isCoarse) return;
+      if (armed === vi) { setArmed(null); return; }
+      if (armed != null) { moveTo(armed, vi); } else setArmed(vi);
+    },
+    "data-armed": isCoarse && armed === vi ? "1" : undefined,
+    title: isCoarse ? "Tap to pick this card up, then tap another card's ⠿ to move it there" : "Drag to rearrange — your layout is saved to this browser",
   });
   // drag-state class suffix, shared by every surface (KPI / stack / lens / analytics)
   const cls = (vi, key) => (
@@ -5130,6 +5143,13 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .revcol:first-child{padding-top:0}
 .vj table thead{display:none}
 .vj table,.vj tbody,.vj tr,.vj td{display:block; width:100%}
+/* Compact tables opt OUT of the card-izing above (same escape as .vd .minitable — mobile audit
+   A4/A5: the Daily Setups funnel board + return-distribution sheet stacked into unlabeled lines). */
+.vj .minitable{display:table}
+.vj .minitable thead{display:table-header-group}
+.vj .minitable tbody{display:table-row-group}
+.vj .minitable tr{display:table-row; width:auto}
+.vj .minitable td,.vj .minitable th{display:table-cell; width:auto}
 .vj tbody tr.traderow{border:1px solid var(--border); border-radius:16px; padding:8px 4px; margin-bottom:12px}
 .vj tbody tr.traderow td{display:flex; justify-content:space-between; align-items:center; text-align:right; border:none; padding:8px 14px}
 .vj tbody tr.traderow td::before{content:attr(data-l); color:var(--muted); font-size:0.66rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:700}
@@ -7749,7 +7769,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             <div className="ds"><div className="dsk">Win rate</div><div className="dsv">{distTotal ? Math.round(distWins / distTotal * 100) : 0}%</div></div>
             <div className="ds"><div className="dsk">Return / trade</div><div className={"dsv " + (distRpt >= 0 ? "green" : "red")}>{distFmtPct(distRpt)}</div></div>
           </div>
-          <table className="disttable">
+          <table className="disttable minitable">
             <thead><tr><th>Return bucket</th><th>Side</th><th># Trades</th><th>Midpoint</th><th>Contribution</th></tr></thead>
             <tbody>
               {DIST_BUCKETS.map((b, i) => {
@@ -12854,6 +12874,14 @@ const mobileCSS = `
   .hcLabel { display: none !important; }
   /* Toasts must clear the ~56px bottom tab bar (audit A6; Feedback.jsx already does this). */
   .vj .toast, .vs .toast { bottom: 96px !important; }
+}
+/* Touch devices (any width) — audit A8/A11: reorder handles must be VISIBLE (hover can't reveal
+   them) and armed state must read; small icon buttons get real tap targets. */
+@media (pointer: coarse) {
+  .vd .dragwrap .draghandle, .vj .dragwrap .draghandle { display: inline-flex !important; opacity: 0.75; padding: 6px 10px !important; }
+  .vd .draghandle[data-armed], .vj .draghandle[data-armed] { color: var(--goldBright) !important; opacity: 1; text-shadow: 0 0 8px rgba(240,192,80,0.5); }
+}
+@media (max-width: 767px) {
   /* Global font baseline — slightly smaller body text on phones */
   body, .viv-mobile-root { font-size: 14px; }
   h1 { font-size: 1.35rem !important; line-height: 1.2 !important; letter-spacing: -0.03em !important; }
@@ -12868,12 +12896,16 @@ const mobileCSS = `
   /* Large card paddings → compact (selectors MUST match React's serialized inline style:
      kebab-case, no quotes — e.g. style="padding: 32px 28px") */
   [style*='padding: 32px 28px'],
-  [style*='padding: 24px 32px'],
   [style*='padding: 24px 28px'] { padding: 14px 14px !important; }
+  [style*='padding: 22px 24px'],
   [style*='padding: 20px 24px'],
-  [style*='padding: 18px 24px'] { padding: 12px 14px !important; }
+  [style*='padding: 18px 24px'],
+  [style*='padding: 18px 20px'] { padding: 12px 14px !important; }
   [style*='padding: 16px 18px'],
   [style*='padding: 14px 16px'] { padding: 10px 12px !important; }
+  /* Pro-mode card padding is CLASS-based, not inline — the attribute layer can't reach it
+     (mobile audit B): compact the four page scopes directly. */
+  .vp.expert .card, .vj.expert .card, .vd.expert .card, .vs.expert .card { padding: 12px 14px; }
 
   /* Generous grid / flex gaps → tighter */
   [style*='gap: 24'] { gap: 10px !important; }
@@ -12884,7 +12916,6 @@ const mobileCSS = `
   [style*='gap: 14'] { gap: 8px !important; }
 
   /* Bottom margins between sections → tighter */
-  [style*='margin-bottom: 28px'],
   [style*='margin-bottom: 24px'],
   [style*='margin-bottom: 22px'],
   [style*='margin-bottom: 20px'] { margin-bottom: 14px !important; }
@@ -12902,6 +12933,7 @@ const mobileCSS = `
   [style*='grid-template-columns: repeat(auto-fit, minmax(210px'],
   [style*='grid-template-columns: repeat(auto-fit, minmax(220px'],
   [style*='grid-template-columns: repeat(auto-fit, minmax(230px'],
+  [style*='grid-template-columns: repeat(auto-fit,minmax(230px'],
   [style*='grid-template-columns: repeat(auto-fit, minmax(250px'],
   [style*='grid-template-columns: repeat(auto-fit, minmax(260px'] {
     grid-template-columns: repeat(2, 1fr) !important;
@@ -12910,7 +12942,6 @@ const mobileCSS = `
 
   /* Big hero numbers (1.5rem+, 2rem) → scale down */
   [style*='font-size: 2rem'] { font-size: 1.4rem !important; }
-  [style*='font-size: 1.8rem'] { font-size: 1.3rem !important; }
   [style*='font-size: 1.5rem'] { font-size: 1.15rem !important; }
 }
 @media (max-width: 420px) {
@@ -13073,6 +13104,34 @@ const NAV = [
 
 
 function AppInner() {
+  // Tap-to-open tooltips on touch (mobile audit A9): the whole data-tip guided layer is CSS
+  // :hover-only, which never fires on phones. Coarse pointers get a floating tip on tap —
+  // imperative (one delegated listener + one fixed-position node), so none of the 7 scoped
+  // hover stylesheets needed changing. Doesn't preventDefault: taps still do what they did.
+  useEffect(() => {
+    if (typeof window === "undefined" || !(window.matchMedia && window.matchMedia("(pointer: coarse)").matches)) return;
+    const tip = document.createElement("div");
+    tip.style.cssText = "position:fixed;z-index:4500;max-width:min(78vw,300px);background:rgba(10,10,18,0.97);border:1px solid rgba(255,255,255,0.18);border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.5;color:#e8e8f0;box-shadow:0 8px 28px rgba(0,0,0,0.5);display:none;pointer-events:none;font-family:" + font;
+    document.body.appendChild(tip);
+    let hideT = null;
+    const hide = () => { tip.style.display = "none"; if (hideT) clearTimeout(hideT); };
+    const onTap = (e) => {
+      const el = e.target && e.target.closest ? e.target.closest("[data-tip]") : null;
+      const text = el && el.getAttribute("data-tip");
+      if (!text) { hide(); return; }
+      tip.textContent = text;
+      tip.style.display = "block";
+      const r = el.getBoundingClientRect();
+      tip.style.left = Math.max(8, Math.min(window.innerWidth - 308, r.left)) + "px";
+      tip.style.top = r.bottom + 8 + "px";
+      const h = tip.offsetHeight; // flip above the element if it would run under the bottom bar
+      if (r.bottom + 8 + h > window.innerHeight - 64) tip.style.top = Math.max(8, r.top - h - 8) + "px";
+      if (hideT) clearTimeout(hideT);
+      hideT = setTimeout(hide, 6000);
+    };
+    document.addEventListener("click", onTap, true);
+    return () => { document.removeEventListener("click", onTap, true); tip.remove(); if (hideT) clearTimeout(hideT); };
+  }, []);
   // Inject the global mobile-responsive stylesheet once on mount. Lives in <head> for the lifetime of
   // the app (no cleanup — removing it would just bounce the UI for nothing).
   // (grade sync: initGrades(session) is wired further down, after session state exists)

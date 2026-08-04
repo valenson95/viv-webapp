@@ -389,7 +389,7 @@ export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = fa
           <textarea style={{ ...inp, minHeight: 84, resize: "vertical" }} value={intro} maxLength={1200}
             onChange={(e) => setIntro(e.target.value)}
             placeholder="In your own words. This becomes page one of your dive." />
-          <div onClick={() => setHideNotes(!hideNotes)} style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0 0", cursor: "pointer" }}>
+          <div onClick={() => setHideNotes(!hideNotes)} style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0 0", padding: "8px 0", cursor: "pointer" }}>
             <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", border: `1px solid ${hideNotes ? C.gold : C.border}`, background: hideNotes ? C.gold : "none", color: "#08080e", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{hideNotes ? "✓" : ""}</span>
             <span style={{ fontSize: "0.8rem", color: C.text }}>Hide my notes — charts and numbers show, personal notes stay private</span>
           </div>

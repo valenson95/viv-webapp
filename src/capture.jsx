@@ -51,7 +51,7 @@ export function LensCamera({ getEl, name, C, style }) {
   return (
     <button type="button" data-html2canvas-ignore="true" onClick={onClick}
       title={done ? "Copied to clipboard" : "Copy this card as an image"} aria-label="Copy card as image"
-      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: 22, minWidth: 22, padding: done ? "0 6px" : 0, borderRadius: 7, cursor: "pointer", flex: "none", background: "transparent", border: "none", color: done ? green : muted, transition: "color .15s", ...style }}
+      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: 30, minWidth: 30, padding: done ? "0 6px" : 0, borderRadius: 7, cursor: "pointer", flex: "none", background: "transparent", border: "none", color: done ? green : muted, transition: "color .15s", ...style }}
       onMouseEnter={(e) => { if (!done) e.currentTarget.style.color = gold; }}
       onMouseLeave={(e) => { if (!done) e.currentTarget.style.color = muted; }}>
       {done ? (
@@ -118,7 +118,7 @@ export function XShare({ getEl, text, C, style, label }) {
     : (label || "Post to X — copies this card as an image, then opens a blank post for you to paste into");
   return (
     <button type="button" data-html2canvas-ignore="true" onClick={onClick} title={msg} aria-label="Post to X"
-      style={{ display: "inline-flex", alignItems: "center", gap: 5, height: 22, padding: state ? "0 8px" : "0 5px", borderRadius: 7, cursor: "pointer", flex: "none", background: state ? "rgba(201,152,42,0.14)" : "transparent", border: "none", color: state ? gold : muted, transition: "color .15s", fontSize: "0.56rem", fontWeight: 800, whiteSpace: "nowrap", ...style }}
+      style={{ display: "inline-flex", alignItems: "center", gap: 5, height: 30, padding: state ? "0 8px" : "0 5px", borderRadius: 7, cursor: "pointer", flex: "none", background: state ? "rgba(201,152,42,0.14)" : "transparent", border: "none", color: state ? gold : muted, transition: "color .15s", fontSize: "0.56rem", fontWeight: 800, whiteSpace: "nowrap", ...style }}
       onMouseEnter={(e) => { if (!state) e.currentTarget.style.color = gold; }}
       onMouseLeave={(e) => { if (!state) e.currentTarget.style.color = muted; }}>
       <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
@@ -138,7 +138,7 @@ export function SectionCamera({ sel = "section", name, C, style, top = 9, right 
   return (
     <span ref={ref} data-html2canvas-ignore="true" className="seccam"
       onClick={(e) => e.stopPropagation()}
-      style={{ position: "absolute", top, right, zIndex: 4, lineHeight: 0, opacity: 0.32, transition: "opacity .15s", ...style }}
+      style={{ position: "absolute", top, right, zIndex: 4, lineHeight: 0, opacity: (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ? 0.85 : 0.32, transition: "opacity .15s", ...style }}
       onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
       onMouseLeave={(e) => { e.currentTarget.style.opacity = 0.32; }}>
       <LensCamera getEl={() => ref.current && ref.current.closest(sel)} name={name} C={C} />
