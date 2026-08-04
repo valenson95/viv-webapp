@@ -18,6 +18,16 @@ const PROXY = "https://www.valensontrades.com/api/candles";
 // ── UNIVERSE (ticker → group label). Transcribed from Valen's reference rotation table.
 // Keep as a plain const so it's trivial to extend. SPY is the benchmark (fetched, not a row).
 const UNIVERSE = [
+  // 2026-08-04 additions — groups from Jeff's 08-03 print that weren't in the universe
+  // (JH also asked for the aerospace pure-plays). Needed ONE full slow run to backfill 420d.
+  ["XAR", "Aerospace & Defense (Equal)"],
+  ["SHLD", "Global Defense Tech"],
+  ["IYZ", "US Telecommunications"],
+  ["WGMI", "Bitcoin Miners"],
+  ["PAVE", "US Infrastructure"],
+  ["ROBO", "Robotics & Automation"],
+  ["UFO", "Space Industry"],
+  ["NLR", "Nuclear Energy"],
   ["KWEB", "Chinese Tech & E-commerce"],
   ["CHIQ", "China Consumer"],
   ["IYT", "Transportation"],
