@@ -771,6 +771,15 @@ function PlaybookTracker({ trades, uid, setPage }) {
 const WHATS_NEW = [
   {
     tag: "New",
+    date: "August 5, 2026",
+    title: "⚡ Prices refresh themselves when you open the Dashboard",
+    items: [
+      "No more clicking Refresh Prices on arrival — the Dashboard now pulls the latest market prices automatically the moment your positions load.",
+      "Pro view: a second Refresh Prices button now sits right on the Open Positions card, so you don't have to scroll back to the top. (Thanks Estrid! 🙌)",
+    ],
+  },
+  {
+    tag: "New",
     date: "August 4, 2026",
     title: "📝 Trade plans on open positions · your own hypotheses · one-click scorecards",
     items: [
@@ -9770,6 +9779,17 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
     setPriceLoading(false);
   }, [positions, setPositions]);
 
+  // Auto-refresh prices once per dashboard visit, as soon as positions are loaded
+  // (member request, Estrid 2026-08-05 — no manual click needed on first open).
+  // Ref-guarded: fetchLivePrices updates `positions`, so an unguarded effect would loop.
+  const autoPriceRef = useRef(false);
+  useEffect(() => {
+    if (autoPriceRef.current) return;
+    if (!positions.some(p => p.sym && p.sym.trim())) return;
+    autoPriceRef.current = true;
+    fetchLivePrices();
+  }, [positions, fetchLivePrices]);
+
   // Upload chart image for a position
   const uploadPosChartImage = async (posId, file) => {
     setPosUploadingImage(true);
@@ -11080,6 +11100,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
                 <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
               </div>
+              <button className="btn ghost" onClick={fetchLivePrices} disabled={priceLoading} title="Pull the latest market prices for every open position">{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
             </div>
             <div className="allocstrip">
               <AllocDonut pct={allocPct} over={over} size={54} />
