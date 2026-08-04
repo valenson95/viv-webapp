@@ -778,6 +778,8 @@ const WHATS_NEW = [
       "Position size now shows the % of your account above the dollar amount — see concentration at a glance.",
       "The Grade column is retired from Open Positions (your grades still live in Manage, trade views and the Setup Grader).",
       "Risk Allocation is now an energy bar — it fills as you deploy risk, turns gold past 70% and red when you're over budget. Much easier to read than the old ring.",
+      "The position count next to 'Open Positions' now splits by status color: red = At Risk, gold = Risk-Free, green = Profit Locked. One glance tells you how protected your book is.",
+      "New Exposure figure in the risk strip — the total dollars across all your open positions and its % of account, right beside Risk-Free.",
     ],
   },
   {
@@ -10498,6 +10500,12 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
 
   // hero figures
   const openCount = enriched.filter(p => p.sym && p.sharesN > 0).length;
+  // Status-split counts + gross exposure (Valen 2026-08-05: colored count chips + Exposure leg).
+  const openEnriched = enriched.filter(p => p.sym && p.sharesN > 0);
+  const nAtRisk = openEnriched.filter(p => p.riskStatus === "At Risk").length;
+  const nRiskFree = openEnriched.filter(p => p.riskStatus === "Risk-Free" || p.riskStatus === "—").length;
+  const nLocked = openEnriched.filter(p => p.riskStatus === "Profit Locked").length;
+  const totalExposure = openEnriched.reduce((s, p) => s + (p.posValue || 0), 0);
   const heroCostBasis = enriched.filter(p => p.sym).reduce((s, p) => s + p.epN * p.sharesN, 0);
   const openPL = budget.totalUnrealized;
   const openPLpct = heroCostBasis > 0 ? (openPL / heroCostBasis) * 100 : 0;
@@ -11098,7 +11106,11 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <div className="card poscard" style={{ marginTop: 14 }}>
             <div className="cardhead poshead">
               <h2>Open Positions</h2>
-              <span className="countchip">{openCount}</span>
+              {/* Status-colored counts (Valen 2026-08-05): red = At Risk · gold = Risk-Free · green = Profit Locked */}
+              {openCount === 0 && <span className="countchip">0</span>}
+              {nAtRisk > 0 && <span className="countchip term" data-tip={`${nAtRisk} position${nAtRisk === 1 ? "" : "s"} At Risk — stop below entry, a stop-out costs money.`} style={{ background: "var(--redDim)", color: "var(--red)", cursor: "help" }}>{nAtRisk}</span>}
+              {nRiskFree > 0 && <span className="countchip term" data-tip={`${nRiskFree} position${nRiskFree === 1 ? "" : "s"} Risk-Free — stop at breakeven, worst case $0.`} style={{ cursor: "help" }}>{nRiskFree}</span>}
+              {nLocked > 0 && <span className="countchip term" data-tip={`${nLocked} position${nLocked === 1 ? "" : "s"} Profit Locked — stop above entry, gains are protected.`} style={{ background: "var(--greenDim)", color: "var(--green)", cursor: "help" }}>{nLocked}</span>}
               <span className="infodot" data-tip="Every trade you currently hold. The colored status shows which positions are at risk.">i</span>
               <div className="spacer"></div>
               <div className="seg" id="viewSeg">
@@ -11123,6 +11135,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <Tip className="leg" tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></Tip>
               <Tip className="leg" tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></Tip>
               <Tip className="leg" tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></Tip>
+              <Tip className="leg" tip="Total dollars across all open positions (the sum of the Position size column) — your gross exposure, with its % of account."><span className="legdot" style={{ background: "var(--goldBright)" }}></span>Exposure&nbsp;<b>{usd0(totalExposure)}</b>{compEquity > 0 && <span style={{ color: "var(--muted)", fontWeight: 600 }}>&nbsp;· {((totalExposure / compEquity) * 100).toFixed(1)}%</span>}</Tip>
               <span className="allocnote" style={{ marginLeft: "auto" }}>{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</span>
             </div>
             <div className="pos-scroll">
