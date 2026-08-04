@@ -75,6 +75,12 @@ alter table public.member_dives add column if not exists chapters     jsonb;   -
 alter table public.member_dives add column if not exists intro        text;    -- opening page, their words
 alter table public.member_dives add column if not exists hide_notes   boolean not null default false;
 
+-- ── 4 · MEMBER HYPOTHESES (2026-08-04, JH: "ability to add our own new hypotheses to test").
+--        Plain list of claim strings, printed on the "Working hypotheses" page of their dive.
+--        Deploy-safe: the modal probes this column and hides the section until the SQL runs.
+alter table public.member_dives add column if not exists hypotheses jsonb;  -- ["claim", ...]
+
+
 -- Visibility follows the TICKED set exactly when one exists; falls back to the project rule.
 drop policy if exists mb_read_community on public.model_book;
 create policy mb_read_community on public.model_book for select to authenticated

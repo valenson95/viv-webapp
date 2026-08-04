@@ -292,7 +292,7 @@ const DEEP_DIVES = [
 // in a member_dives row and flips it live themselves. No review gate; the RLS policy
 // mb_read_community exposes their study rows to other members ONLY while the dive is live.
 // Module scope — an editor defined inside its page remounts on every parent render (hard-won rule).
-export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = false, defaultAuthor, onSave, onDelete, onClose }) {
+export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = false, v3 = false, defaultAuthor, onSave, onDelete, onClose }) {
   const [title, setTitle] = useState(dive?.title || "");
   const [premise, setPremise] = useState(dive?.premise || "");
   const [author, setAuthor] = useState(dive?.author_name || defaultAuthor || "");
@@ -307,6 +307,10 @@ export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = fa
   const [chapters, setChapters] = useState(dive?.chapters && typeof dive.chapters === "object" ? { ...dive.chapters } : {});
   const [intro, setIntro] = useState(dive?.intro || "");
   const [hideNotes, setHideNotes] = useState(!!dive?.hide_notes);
+  // v3 (JH 2026-08-04): the member's own hypotheses — plain claims their book sets out to test.
+  // Printed on the "Working hypotheses" page of their dive; the verdict engine stays VIV-side.
+  const [hyps, setHyps] = useState(() => Array.isArray(dive?.hypotheses) ? dive.hypotheses.map(String) : []);
+  const seedHyps = () => setHyps((PROJECT_HYPOTHESES["Finding the Market's Bottom"] || []).map((h) => h.short || h.text));
   const tickAll = (on) => setSel(on ? new Set(entries.map((e) => String(e.id))) : new Set());
   const years = [...new Set(entries.filter((e) => sel.has(String(e.id))).map((e) => String(e.date || "").slice(0, 4)).filter((y) => /^\d{4}$/.test(y)))].sort();
   const inp = { width: "100%", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.86rem", padding: "10px 12px", outline: "none", boxSizing: "border-box" };
@@ -361,6 +365,25 @@ export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = fa
             </div>
           ))}
         </>)}
+        {v3 && (<>
+          <div style={{ ...lab, display: "flex", alignItems: "baseline", gap: 12 }}>Your hypotheses
+            <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 600, opacity: 0.6 }}>(optional — claims your book sets out to test)</span>
+          </div>
+          {hyps.map((h, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: C.muted, width: 28, flex: "none" }}>H{i + 1}</span>
+              <input style={{ ...inp, marginTop: 0 }} value={h} maxLength={200}
+                onChange={(e) => setHyps((prev) => prev.map((x, k) => k === i ? e.target.value : x))}
+                placeholder='e.g. "My best trades come from tight ranges after a correction"' />
+              <span onClick={() => setHyps((prev) => prev.filter((_, k) => k !== i))}
+                style={{ color: C.muted, cursor: "pointer", fontSize: "0.9rem", padding: "0 4px" }} title="Remove">✕</span>
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 14, marginTop: 8 }}>
+            {hyps.length < 10 && <span onClick={() => setHyps((prev) => [...prev, ""])} style={{ color: C.gold, cursor: "pointer", fontSize: "0.76rem", fontWeight: 700 }}>＋ Add a hypothesis</span>}
+            {hyps.length === 0 && <span onClick={seedHyps} style={{ color: C.muted, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>Start from the VIV correction checklist</span>}
+          </div>
+        </>)}
         {v2 && (<>
           <div style={lab}>Opening page <span style={{ opacity: 0.6, textTransform: "none", letterSpacing: 0 }}>(optional — why does this book exist?)</span></div>
           <textarea style={{ ...inp, minHeight: 84, resize: "vertical" }} value={intro} maxLength={1200}
@@ -386,6 +409,7 @@ export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = fa
               ...(v2 ? { selected_ids: entries.length ? [...sel] : null,
                 chapters: Object.fromEntries(Object.entries(chapters).filter(([, v]) => v && String(v).trim())),
                 intro: intro.trim() || null, hide_notes: hideNotes } : {}),
+              ...(v3 ? { hypotheses: (() => { const c = hyps.map((h) => h.trim()).filter(Boolean); return c.length ? c : null; })() } : {}),
             }); setBusy(false); }}
             style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.8rem", padding: "11px 22px", borderRadius: 99, cursor: title.trim() ? "pointer" : "not-allowed", opacity: title.trim() ? 1 : 0.5 }}>
             {busy ? "Saving…" : "Save"}</button>
@@ -518,7 +542,7 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, 
   );
 }
 
-export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle, episodesOverride, introText, forceProject } = {}) {
+export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle, episodesOverride, introText, forceProject, hypothesesOverride } = {}) {
   // Project-book export (Valen 2026-07-28): a coverTitle'd book whose rows are ALL non-H-domain studies
   // (e.g. "Market Bottom") gets the gallery-grade minimal book instead of the classic model-book layout.
   // The classic path below is byte-identical when this guard doesn't fire.
@@ -532,7 +556,7 @@ export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle, episodes
     // Member dives (2026-08-03): all-study selections take the typeset chronicle layout even
     // without a shared project string — that IS "the template like mine".
     (forceProject && rows.length > 0 && _pbStudies.length === rows.length)) {
-    return openProjectBookPdf(rows, coverTitle || diveTitle || "", { diveTitle, episodesOverride, introText });
+    return openProjectBookPdf(rows, coverTitle || diveTitle || "", { diveTitle, episodesOverride, introText, hypothesesOverride });
   }
   // Chronicle order (Valen 2026-07-28): the book reads BY TICKER, each ticker chronological from
   // its first study — one ticker = one chapter of legs, like a single name's history album.
@@ -1017,7 +1041,7 @@ export function openMyBookPdf(rows, { makerGate, coverTitle, diveTitle, episodes
 //    giant year-divider, then two pages per study (vs-QQQ chart, then daily chart + data strip + ticked
 //    checklist + thesis). Order = year ascending then ticker, matching the Contents. e{idx} anchors on the
 //    first page of each study keep the Contents links clickable in the saved PDF.
-function openProjectBookPdf(rows, coverTitle, { diveTitle, episodesOverride, introText } = {}) {
+function openProjectBookPdf(rows, coverTitle, { diveTitle, episodesOverride, introText, hypothesesOverride } = {}) {
   const today = new Date().toISOString().slice(0, 10);
   const yearOf = (r) => (mbISO(r.entry_date) || "").slice(0, 4) || "—";
   const ordered = [...rows].sort((a, b) => yearOf(a).localeCompare(yearOf(b)) || String(a.ticker).localeCompare(String(b.ticker)) ||
@@ -1092,7 +1116,9 @@ function openProjectBookPdf(rows, coverTitle, { diveTitle, episodesOverride, int
   // ── WORKING HYPOTHESES & CHECKLIST TALLY ── (same content as the classic project branch, restyled:
   //    hanging-indent hypothesis list + hairline tally table, no boxed warnings)
   const studyRows = rows.filter((r) => r.metrics?.study);
-  const hyps = PROJECT_HYPOTHESES[coverTitle];
+  // Member dives (JH request 2026-08-04): their own hypotheses list overrides the registry —
+  // rendered as open claims (no verdict engine; that stays a VIV-side instrument).
+  const hyps = hypothesesOverride || PROJECT_HYPOTHESES[coverTitle];
   const tallyGroups = checklistTally(studyRows);
   // Evidence engine (Valen 2026-07-29): the Market-Bottom book prints its descriptive verdict + ALWAYS the
   // audit lines under each hypothesis (paper equivalent of the app's "show studies ▾" expander).
@@ -1128,7 +1154,7 @@ function openProjectBookPdf(rows, coverTitle, { diveTitle, episodesOverride, int
     <div class="pbexphint">Verdicts always print. Expand a row — or use Expand all — before Save as PDF to include its evidence.</div>
     ${hyps ? (pbEvidence
       ? `<div class="pbhyps">${hyps.map((h) => pbEvCard(h)).join("")}</div><div class="pbvcaption">n=${studyRows.length} · descriptive only — pre-registered ladder, threshold notch at 70%.</div>`
-      : `<div class="pbhyps">${hyps.map((h) => `<div class="pbhrow"><span class="pbhid">${esc(h.id)}</span><div class="pbhbody"><div class="pbhtext">${esc(h.text)}</div><div class="pbhmeasure">measure: ${esc(h.measure)}</div></div></div>`).join("")}</div>`) : ""}
+      : `<div class="pbhyps">${hyps.map((h) => `<div class="pbhrow"><span class="pbhid">${esc(h.id)}</span><div class="pbhbody"><div class="pbhtext">${esc(h.text)}</div>${h.measure ? `<div class="pbhmeasure">measure: ${esc(h.measure)}</div>` : ""}</div></div>`).join("")}</div>`) : ""}
     ${tallyGroups.map((g) => `<details open class="pbtwrap"><summary class="pbtsec"><span class="pbvchev"></span>Checklist tally — ${g.n} stud${g.n === 1 ? "y" : "ies"}${tallyGroups.length > 1 ? ` · ${esc(g.setup)}` : ""}</summary>
       <table class="pbttab"><tbody>${g.items.map((it) => { const p = g.n ? Math.round((it.count / g.n) * 100) : 0;
         return `<tr><td class="pbtlabel">${esc(it.label)}${it.bonus ? ` <span class="pbbtag">bonus</span>` : ""}</td><td class="pbtbarcell"><div class="pbtbar"><div class="pbtfill" style="width:${p}%"></div></div></td><td class="pbtcount">${it.count}/${g.n}</td></tr>`; }).join("")}</tbody></table></details>`).join("")}
@@ -3530,6 +3556,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   const [memberDives, setMemberDives] = useState([]);
   const [diveModal, setDiveModal] = useState(false);
   const [diveColsV2, setDiveColsV2] = useState(false); // customisation columns present? (deploy-safe probe)
+  const [diveColsV3, setDiveColsV3] = useState(false); // hypotheses column present? (same probe pattern)
   const loadMemberDives = useCallback(async () => {
     const { data } = await supabase.from("member_dives").select("*").order("updated_at", { ascending: false });
     setMemberDives(data || []);
@@ -3538,6 +3565,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
     // sections instead of failing saves. They light up on their own once the SQL is run.
     const probe = await supabase.from("member_dives").select("selected_ids,chapters,intro,hide_notes").limit(1);
     setDiveColsV2(!probe.error);
+    const probe3 = await supabase.from("member_dives").select("hypotheses").limit(1);
+    setDiveColsV3(!probe3.error);
   }, []);
   useEffect(() => { loadMemberDives(); }, [loadMemberDives]);
   // Studies-list column sort (Valen 2026-07-28): [{ key: "entry"|"trigger", dir: 1|-1 }, …] — index 0 = primary,
@@ -3674,6 +3703,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       diveTitle: d.title,
       episodesOverride: eps && Object.keys(eps).length ? eps : undefined,
       introText: d.intro || undefined,
+      hypothesesOverride: Array.isArray(d.hypotheses) && d.hypotheses.length
+        ? d.hypotheses.map((t, i) => ({ id: `H${i + 1}`, text: String(t) })) : undefined,
       forceProject: true,
     });
   };
@@ -3876,7 +3907,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
   return (
     <div style={{ fontFamily: font }}>
-      {diveModal && <MemberDiveModal C={C} font={font} dive={myDive} v2={diveColsV2}
+      {diveModal && <MemberDiveModal C={C} font={font} dive={myDive} v2={diveColsV2} v3={diveColsV3}
         projects={[...new Set(studyRows.map(studyProject).filter(Boolean))].sort()}
         entries={studyRows.map((r) => ({ id: r.id, ticker: r.ticker, date: mbISO(r.entry_date) || r.entry_date || "", setup: r.metrics?.study?.setup || r.pattern || "" }))}
         defaultAuthor={(session?.user?.email || "").split("@")[0]}

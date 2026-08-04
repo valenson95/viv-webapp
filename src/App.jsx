@@ -758,6 +758,16 @@ function PlaybookTracker({ trades, uid, setPage }) {
 const WHATS_NEW = [
   {
     tag: "New",
+    date: "August 4, 2026",
+    title: "📝 Trade plans on open positions · your own hypotheses · one-click scorecards",
+    items: [
+      "Trade plan & notes: open Manage on any open position — there's now a notes box for your trade-management plan (targets, trim rules, invalidation). It saves when you click away, and travels into your journal when the position closes.",
+      "Your hypotheses: “Make it a Deep Dive” now lets you write the claims your book sets out to test — they print on their own Working Hypotheses page, just like the VIV dives. Start blank or from the VIV correction checklist.",
+      "Daily Setups: taking a posted trade? Hit “📥 I took this” on the post — the scorecard copies into YOUR Setup Grader, so your open position and journal show the grade automatically.",
+    ],
+  },
+  {
+    tag: "New",
     date: "August 3, 2026",
     title: "🎮 Demo mode + publish your own Deep Dive",
     items: [
@@ -4554,6 +4564,14 @@ function notesPreview(raw) {
   if (n._plain) return n._plain;
   const parts = [n.right && `✓ ${n.right}`, n.wrong && `✗ ${n.wrong}`, n.lessons && `💡 ${n.lessons}`].filter(Boolean);
   return parts.join(" | ") || "";
+}
+// Open-position notes edit as PLAIN text (member request JH 2026-08-04: trade-management plan on
+// open trades). Old structured {right,wrong,lessons} notes flatten to readable lines for editing;
+// new saves store the plain string — the close flow already carries pos.notes into the journal trade.
+function notesToPlain(raw) {
+  const n = parseNotes(raw);
+  if (n._plain) return n._plain;
+  return [n.right && `✓ ${n.right}`, n.wrong && `✗ ${n.wrong}`, n.lessons && `💡 ${n.lessons}`].filter(Boolean).join("\n");
 }
 
 // Trade-review candlestick chart (TradingView Lightweight Charts via CDN). TradingView-style chrome:
@@ -10588,7 +10606,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                       <td data-l="P/L"><span className={"pl " + (p.plD >= 0 ? "up" : "dn")}>{usdSigned(p.plD)}<span className="pct">{pctSigned(p.plPct)}</span></span></td>
                       <td className="pro-only" data-l="Setup"><select value={p.setup || ""} onChange={e => updateField(p.id, "setup", e.target.value)} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 7, color: p.setup ? "var(--text)" : "var(--faint)", fontFamily: font, fontSize: "0.68rem", fontWeight: 600, padding: "4px 8px", outline: "none", cursor: "pointer", maxWidth: 130 }}><option value="">— Setup —</option>{(setupTypes || []).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
                       <td className="mgcell" data-l="">
-                        <button className="mgbtn" onClick={() => openManage(p)}>Manage</button>
+                        <button className="mgbtn" title={notesPreview(p.notes) || undefined} onClick={() => openManage(p)}>{notesPreview(p.notes) ? "Manage 📝" : "Manage"}</button>
                         <button className="mgbtn sell" title="Sell or close this position" onClick={() => openSell(p)}>Sell</button>
                       </td>
                     </tr>
@@ -10636,6 +10654,15 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                                 <div className="mgr"><span className="term tipright" data-tip="Broker fees paid on this position so far.">Commission</span><b>${(p.commN || 0).toFixed(2)}</b></div>
                               </div>
                             </div>
+                          </div>
+
+                          <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+                            <div className="mgcoltitle"><span className="term" data-tip="Your management plan for this open trade — targets, trim rules, invalidation, what you're watching. Private to you; it travels into your journal when the position closes.">📝 Trade plan &amp; notes</span></div>
+                            <textarea className="mgin" rows={4} defaultValue={notesToPlain(p.notes)}
+                              placeholder="e.g. Trim 25% at 2R · stop to breakeven after 3 days · out on a close below the 10-MA…"
+                              style={{ width: "100%", resize: "vertical", minHeight: 74, lineHeight: 1.55, fontSize: "0.74rem", padding: "10px 12px", fontFamily: "inherit", height: "auto" }}
+                              onBlur={e => { const v = e.target.value; if (v !== notesToPlain(p.notes)) { updateField(p.id, "notes", v); setTimeout(() => onManualSave && onManualSave(), 80); } }} />
+                            <div style={{ fontSize: 10.5, color: "var(--faint)", marginTop: 4 }}>Saves when you click away · goes with the trade into your journal on close</div>
                           </div>
 
                           {isAdmin && p.rationale && <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border)" }}><RationaleBlock rationale={p.rationale} /></div>}

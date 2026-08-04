@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { listSetups, deleteSetup, markTaken } from "./dailySetups.js";
+import { saveGrade } from "./grades.js";
 import { sectionsFor, scoreTicked, versionOf } from "./SetupGrader.jsx";
 import { themeFit, themeRanks } from "./themes.js";
 
@@ -59,6 +60,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   const [rows, setRows] = useState(null); // null = loading
   const [tableMissing, setTableMissing] = useState(false);
   const [openId, setOpenId] = useState(null);   // expanded scorecard
+  const [importedIds, setImportedIds] = useState(() => new Set()); // posts whose scorecard was copied to MY grades this session (JH 2026-08-04)
   const [lightbox, setLightbox] = useState(null); // chart url
   const [sortBy, setSortBy] = useState("date");   // "date" | "grade"
   const [view, setView] = useState("all");        // "all" | "taken"
@@ -602,10 +604,28 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                       {r.pct != null ? `${Math.round(r.pct * 100)}% of criteria` : ""}{r.star_hit != null ? ` · ${r.star_hit}/${r.starmakers} ★-makers` : ""}
                     </div>
                     {r.note && <div style={{ fontSize: "0.84rem", color: C.text, lineHeight: 1.58, marginTop: 11 }}>{r.note}</div>}
-                    <button onClick={() => setOpenId(expanded ? null : r.id)}
-                      style={{ marginTop: 11, background: "rgba(201,152,42,0.08)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer" }}>
-                      {expanded ? "Hide the scorecard ▴" : "See the scorecard ▾"}
-                    </button>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 11 }}>
+                      <button onClick={() => setOpenId(expanded ? null : r.id)}
+                        style={{ background: "rgba(201,152,42,0.08)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer" }}>
+                        {expanded ? "Hide the scorecard ▴" : "See the scorecard ▾"}
+                      </button>
+                      {/* JH 2026-08-04: taking the same trade → one click copies this post's scorecard into
+                          THEIR Setup Grader, so their open position and journal show the grade (snapshot
+                          freezes on close as usual). Members only — and only when the post carries ticks. */}
+                      {!isAdmin && (r.ticked || []).length > 0 && (
+                        <button
+                          title="Taking this trade? Copies this scorecard into YOUR Setup Grader for this ticker — your open position and journal then show the grade. You can adjust any tick afterwards in Premium Tools → Setup Grader."
+                          onClick={() => {
+                            saveGrade(r.ticker, { stars: r.stars || 0, letter: r.letter || null, pct: r.pct ?? null,
+                              starHit: r.star_hit ?? null, starmakers: r.starmakers ?? null, ticked: r.ticked || [],
+                              auto: r.auto || [], note: r.note || "", chart_img: r.chart_img || "" });
+                            setImportedIds((s) => { const nx = new Set(s); nx.add(r.id); return nx; });
+                          }}
+                          style={{ background: importedIds.has(r.id) ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.05)", color: importedIds.has(r.id) ? "#22c55e" : C.text, border: `1px solid ${importedIds.has(r.id) ? "rgba(34,197,94,0.4)" : C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer" }}>
+                          {importedIds.has(r.id) ? "✓ In your grades" : "📥 I took this — copy the scorecard"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
