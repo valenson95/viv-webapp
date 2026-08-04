@@ -7,6 +7,14 @@
 // ─────────────────────────────────────────────────────────────
 
 export const THEME_SNAPSHOTS = {
+  // 2026-08-04 — his Tue-AM-MYT drop; data = the US Mon 08-03 close. day = Since Open (Monday's
+  // intraday move, ex-gap). Week board flipped risk-on: Software #1 (+10.73), Robotics enters the
+  // 1W top-5, AI complex repairing on the week while still broken on the month.
+  "2026-08-04": {
+    week: [["Software", 10.73], ["China Internet", 9.32], ["Airlines", 8.54], ["Medical", 7.92], ["Robotics", 6.21], ["Social Media", 5.75], ["Retail", 5.11], ["Genomics", 4.79], ["Quantum", 4.61], ["AI", 4.47], ["Cybersecurity", 4.25], ["Telecom", 3.04], ["Aerospace", 2.47], ["Bitcoin Miners", 2.16], ["Steel", 2.03], ["Banks", 1.67], ["Gold Miners", 1.09], ["Silver Miners", 0.46], ["Industrials", 0.27], ["Home Construction", -0.08], ["Solar", -0.08], ["HealthCare", -0.18], ["Materials", -0.49], ["Growth Stocks", -0.51], ["Bitcoin", -0.52], ["Biotechnology", -1.19], ["Real Estate", -1.68], ["Transports", -2.43], ["Oil & Gas", -2.43], ["Semiconductors", -2.80], ["Utilities", -4.17]],
+    month: [["China Internet", 12.31], ["Oil & Gas", 6.19], ["Steel", 5.45], ["Retail", 4.38], ["Medical", 4.03], ["Software", 2.77], ["Real Estate", 2.01], ["Banks", 1.91], ["Social Media", 1.00], ["Bitcoin", 0.11], ["HealthCare", -0.42], ["Cybersecurity", -0.56], ["Industrials", -1.29], ["Transports", -1.74], ["Aerospace", -1.87], ["Materials", -1.87], ["Airlines", -2.01], ["Utilities", -2.08], ["Telecom", -2.21], ["Bitcoin Miners", -3.06], ["Gold Miners", -3.42], ["Home Construction", -4.24], ["Biotechnology", -4.81], ["Silver Miners", -4.91], ["AI", -5.12], ["Robotics", -6.07], ["Quantum", -6.98], ["Genomics", -9.07], ["Semiconductors", -9.74], ["Growth Stocks", -10.36], ["Solar", -10.95]],
+    day: [["Bitcoin Miners", 7.73], ["Quantum", 3.28], ["Silver Miners", 3.26], ["Solar", 3.26], ["Semiconductors", 2.83], ["Telecom", 2.83], ["Genomics", 2.72], ["Gold Miners", 2.34], ["Robotics", 2.20], ["Bitcoin", 1.89], ["AI", 1.88], ["Airlines", 1.84], ["Medical", 1.73], ["Aerospace", 1.71], ["Industrials", 1.50], ["Cybersecurity", 1.45], ["Steel", 1.41], ["Home Construction", 1.38], ["Social Media", 1.07], ["Banks", 1.00], ["Oil & Gas", 0.92], ["Software", 0.70], ["Retail", 0.62], ["Materials", 0.53], ["Transports", 0.33], ["China Internet", 0.28], ["Utilities", 0.27], ["Real Estate", 0.22], ["Growth Stocks", 0.16], ["Biotechnology", -0.29], ["HealthCare", -0.45]],
+  },
   // 2026-08-02 — his Sunday-MYT drop; data = the US Fri 07-31 close (same session as the 08-02
   // rotation + breadth push). day = Since Open (Friday's intraday move, ex-gap).
   "2026-08-02": {

@@ -17,38 +17,38 @@
 //
 // Voice: plain, short, punchy (skill `plain-voice`). Describe what the lenses show — never instruct.
 export const SITUATIONAL = {
-  asof: "2026-07-31",     // the market close this read describes (matches the lens data)
-  updated: "2026-08-02",  // when it was written (Valen's clock)
+  asof: "2026-08-03",     // the market close this read describes (matches the lens data)
+  updated: "2026-08-04",  // when it was written (Valen's clock)
 
   // "RISK ON" | "NEUTRAL" | "RISK OFF" — rendered as the coloured chip that closes the verdict.
-  // 07-31 basis: the primary quarter switch flipped red, the daily trend signal is broken, and
-  // the index advanced on fewer names than declined.
-  stance: "RISK OFF",
+  // 08-03 basis: the quarter switch flipped back GREEN and both buy/sell ratios crossed above 1
+  // on a 573-vs-74 accumulation day — but the month pair is still red (79 up vs 162 down), so
+  // one horizon is green, one is not. One more strong follow-through day converts this.
+  stance: "NEUTRAL",
 
-  headline: "The index rose while more stocks fell — a narrow advance, and the main breadth switch flipped red. Thursday's big surge did not follow through.",
+  headline: "Monday was the strongest buying day of this correction — 573 stocks up 4%+ against just 74 down — and the main breadth switch flipped back green. One horizon confirmed; the month has not.",
 
   weather: `<ul>
-    <li>S&amp;P closed <b>+0.7%</b> on Friday — but <b>216 stocks fell 4%+</b> against only <b>179</b> that rose.</li>
-    <li>Thursday's 437-name surge did not follow through. One day, not a turn.</li>
-    <li><b>The main switch flipped red:</b> 1,171 stocks up 25% this quarter vs 1,235 down. It was green the day before.</li>
-    <li>The month is worse — 74 up vs 206 down.</li>
-    <li>The 5- and 10-day buy/sell ratios are both still under 1.</li>
-    <li>Fewer and fewer names are carrying the index.</li>
+    <li>S&amp;P closed <b>+1.5%</b> and this time breadth agreed: <b>573 stocks up 4%+ vs 74 down</b>.</li>
+    <li><b>The main switch flipped GREEN:</b> 1,304 stocks up 25% this quarter vs 1,160 down. It was red on Friday.</li>
+    <li>The 5- and 10-day buy/sell ratios are both back above 1 (<b>1.19</b> and <b>1.12</b>).</li>
+    <li>Still missing: the month pair is red — <b>79 up 25%+ vs 162 down</b>. The turn is days old, not weeks.</li>
+    <li>Friday's warning (index up, more stocks down) was answered, not repeated.</li>
   </ul>`,
 
   shop: `<ul>
-    <li><b>Cloud and Software lead AND sit near their highs</b> — CLOU −5%, WCLD −4%, XSW −11% off their 52-week highs.</li>
-    <li>Software is up <b>+6.3%</b> this week and finally green on the month.</li>
-    <li>Cybersecurity is turning the same way — up Friday, up on the week.</li>
-    <li><b>China ranks just as high but sits 24–34% below its highs.</b> That is a bounce, not a breakout.</li>
-    <li>Also strong and near highs: Global Shipping, Capital Markets, Steel, Oil &amp; Gas E&amp;P.</li>
+    <li><b>Software is the strongest theme in the market</b> — up <b>+10.7%</b> on the week, and the internet/software groups sit at the very top of the rotation table near their highs.</li>
+    <li>China Internet leads BOTH windows (+9.3% week, +12.3% month).</li>
+    <li><b>Airlines +8.5%</b> on the week — oil dropping 6% Monday poured fuel on it.</li>
+    <li>The beaten growth complex is repairing on the week — Robotics +6.2, Quantum +4.6, AI +4.5, Cybersecurity +4.3 — but every one of them is still red on the month.</li>
+    <li>Defensives were abandoned: staples and health-care sector strength went <b>negative</b> the same week risk themes turned up.</li>
   </ul>`,
 
   flip: `<ul>
-    <li>The quarter switch turning green again.</li>
-    <li>The 5-day ratio getting back above 1.</li>
-    <li><b>Still getting weaker:</b> Semiconductors −7.9% week / −12.9% month · Solar −8.2% / −14.7% · Bitcoin Miners −10.0% / −12.4%.</li>
-    <li>Bottom of the rotation table: healthcare providers, healthcare facilities, biotech.</li>
+    <li>The month pair (25%-in-a-month up vs down) turning green would confirm the turn.</li>
+    <li>A genuine follow-through day in the next few sessions — Monday was the setup, not yet the proof.</li>
+    <li><b>Still broken on the month:</b> Semiconductors −9.7% · Solar −11.0% · Growth Stocks −10.4% · Genomics −9.1%.</li>
+    <li>If the 5-day ratio slips back under 1, the flip failed.</li>
   </ul>`,
 
   // Optional free-form commentary block — usually Valen's own words via the in-app editor.
