@@ -1421,20 +1421,20 @@ function HeaderControls({ onLogout, inline, demoMode = false, onToggleDemo }) {
       <WhatsNew />
       <button onClick={() => broadcastUiMode(pro ? "guided" : "pro")} title={pro ? "Pro Mode is on — click for Guided (plain-English explainers everywhere)" : "Pro Mode is off — click to strip the guided teaching layer"}
         style={{ display: "inline-flex", alignItems: "center", gap: 8, background: pro ? C.goldDim : "rgba(255,255,255,0.05)", border: `1px solid ${pro ? C.borderGold : C.border}`, borderRadius: 980, padding: "6px 10px 6px 13px", cursor: "pointer", fontFamily: font, transition: "background .18s, border-color .18s" }}>
-        <span style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: pro ? C.goldBright : C.muted, whiteSpace: "nowrap" }}>Pro Mode</span>
+        <span className="hcLabel" style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: pro ? C.goldBright : C.muted, whiteSpace: "nowrap" }}>Pro Mode</span>
         <span style={{ position: "relative", width: 32, height: 17, borderRadius: 980, background: pro ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.14)", transition: "background .18s", flex: "none" }}>
           <span style={{ position: "absolute", top: 2, left: pro ? 17 : 2, width: 13, height: 13, borderRadius: "50%", background: pro ? "#08080e" : "rgba(255,255,255,0.75)", transition: "left .18s" }} />
         </span>
-        <span style={{ fontSize: "0.62rem", fontWeight: 800, width: 20, textAlign: "left", color: pro ? C.goldBright : C.muted }}>{pro ? "On" : "Off"}</span>
+        <span className="hcLabel" style={{ fontSize: "0.62rem", fontWeight: 800, width: 20, textAlign: "left", color: pro ? C.goldBright : C.muted }}>{pro ? "On" : "Off"}</span>
       </button>
       {onToggleDemo && (
         <button onClick={onToggleDemo} title={demoMode ? "Demo mode is ON — the whole app is your practice book. Click to return to your real book." : "Switch the whole app to your demo book — practice positions and trades, fully separate from the real ones."}
           style={{ display: "inline-flex", alignItems: "center", gap: 8, background: demoMode ? "rgba(124,92,255,0.18)" : "rgba(255,255,255,0.05)", border: `1px solid ${demoMode ? DV : C.border}`, borderRadius: 980, padding: "6px 10px 6px 13px", cursor: "pointer", fontFamily: font, transition: "background .18s, border-color .18s" }}>
-          <span style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: demoMode ? "#a78bfa" : C.muted, whiteSpace: "nowrap" }}>🎮 Demo</span>
+          <span style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: demoMode ? "#a78bfa" : C.muted, whiteSpace: "nowrap" }}>🎮<span className="hcLabel"> Demo</span></span>
           <span style={{ position: "relative", width: 32, height: 17, borderRadius: 980, background: demoMode ? `linear-gradient(135deg, #a78bfa, ${DV})` : "rgba(255,255,255,0.14)", transition: "background .18s", flex: "none" }}>
             <span style={{ position: "absolute", top: 2, left: demoMode ? 17 : 2, width: 13, height: 13, borderRadius: "50%", background: demoMode ? "#08080e" : "rgba(255,255,255,0.75)", transition: "left .18s" }} />
           </span>
-          <span style={{ fontSize: "0.62rem", fontWeight: 800, width: 20, textAlign: "left", color: demoMode ? "#a78bfa" : C.muted }}>{demoMode ? "On" : "Off"}</span>
+          <span className="hcLabel" style={{ fontSize: "0.62rem", fontWeight: 800, width: 20, textAlign: "left", color: demoMode ? "#a78bfa" : C.muted }}>{demoMode ? "On" : "Off"}</span>
         </button>
       )}
       {!inline && <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer", whiteSpace: "nowrap" }}>Sign out</button>}
@@ -8166,6 +8166,10 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   );
   const linkModalPortal = (
         linkWizardOpen && linkWizardData && createPortal(
+          // Portaled to body = OUTSIDE the .vj scope — the .modal/.modalcard CSS only exists under .vj,
+          // so the wrapper below re-establishes it (same fix as the edit-modal portal above; mobile
+          // audit A2 2026-08-04: without it the modal rendered unstyled at the page bottom).
+          <div className="vj" style={{ background: "none", minHeight: 0 }}>
           <div onClick={() => linkStatus !== "applying" && setLinkWizardOpen(false)} className="modal open">
             <div onClick={e => e.stopPropagation()} className="modalcard">
               <div className="modalhead">
@@ -8215,6 +8219,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 {linkWizardData.length > 0 && <button className="btn gold" onClick={linkApply} disabled={linkStatus === "applying"}>{linkStatus === "applying" ? "Applying…" : linkStatus === "done" ? "Done ✓" : (linkError ? "Retry" : "Apply links")}</button>}
               </div>
             </div>
+          </div>
           </div>,
           document.body
         )
@@ -9538,7 +9543,7 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 /* GUIDED market-lens duo — mobile-safe minmax (min(300px,100%) so a 390px phone can't overflow); static, no drag */
 .vd .lensduo{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap:14px; margin-top:14px}
 .vd .lensduo > *{min-width:0}
-.vd.expert .lensrowA{display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px; align-items:stretch}
+.vd.expert .lensrowA{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap:14px; align-items:stretch}
 .vd.expert .lensrowA > *{min-width:0; height:100%}
 /* NEW second lens row — fixed 3-col template so a lone mini occupies ONE column (empty space to
    its right is fine) instead of stretching absurdly wide; collapses to full width on phones. */
@@ -12841,7 +12846,14 @@ const mobileCSS = `
 /* Mobile shell height — 100dvh tracks the real viewport as iOS Safari's URL bar shows/hides;
    100vh first as the fallback for browsers without dvh support (double declaration = fallback chain). */
 .mobshell{height:100vh;height:100dvh;}
-@media (max-width: 640px) {
+@media (max-width: 767px) {
+  /* NOTE: gate aligned to the shell's isMobile (<768) — the old 640px gate left a 641–767px band
+     where the bottom tab bar AND the page's own top tabs both rendered (mobile audit A10). */
+  /* Header pills shed their text labels on phones — with 🎮 Demo added the full row exceeded a
+     390px viewport and forced page-wide horizontal scroll (mobile audit A1). */
+  .hcLabel { display: none !important; }
+  /* Toasts must clear the ~56px bottom tab bar (audit A6; Feedback.jsx already does this). */
+  .vj .toast, .vs .toast { bottom: 96px !important; }
   /* Global font baseline — slightly smaller body text on phones */
   body, .viv-mobile-root { font-size: 14px; }
   h1 { font-size: 1.35rem !important; line-height: 1.2 !important; letter-spacing: -0.03em !important; }

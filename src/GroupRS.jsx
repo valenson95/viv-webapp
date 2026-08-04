@@ -926,7 +926,9 @@ export function RotationMini({ C, font, session, noStamp }) {
       </div>
       {open && createPortal(
         <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "32px 16px" }}>
-          <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1480, margin: "0 auto" }}>
+          <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1480, margin: "0 auto", position: "relative" }}>
+            {/* explicit close (mobile audit A7 2026-08-04): on phones the inner div fills the popup and stops propagation, leaving only 16px backdrop strips to tap */}
+            <button onClick={() => setOpen(false)} aria-label="Close" style={{ position: "sticky", top: 0, float: "right", zIndex: 5, width: 38, height: 38, borderRadius: "50%", background: "rgba(8,8,14,0.9)", border: `1px solid ${C.border}`, color: C.muted, fontSize: "1.05rem", cursor: "pointer", lineHeight: 1 }}>✕</button>
             <GroupRS C={C} font={font} session={session} />
           </div>
         </div>, document.body)}
