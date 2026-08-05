@@ -4235,7 +4235,7 @@ if (expert) return (
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
           <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
@@ -4283,7 +4283,7 @@ return (
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
           <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
@@ -8376,7 +8376,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
               <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
               {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
@@ -8716,7 +8716,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
             {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
@@ -10345,8 +10345,7 @@ function WatchlistCard({ C, font, session }) {
         <b style={{ color: "#fca5a5" }}>red 6+</b> · <b style={{ color: "rgba(255,255,255,0.42)" }}>grey not tracked</b>, read off the latest theme snapshot{snapDate ? ` (${snapDate})` : ""}.
         {" "}Group columns = the industry group's numbers; Stock columns = the name's own.
         {" "}Thrust % and RS rank in the two Group columns are the INDUSTRY GROUP's numbers (RSP benchmark, same formulas as the rotation table); a theme with no matching group shows “—”.
-        {" "}Multi-sort: click one column, then another to stack a second sort (the small number shows the order); click again to flip direction; × reset clears.
-        {" "}Educational, not advice — this is Valen's personal watchlist, shared so you can study the process.
+        {" "}Multi-sort: click one column, then another to stack a second sort (the small number shows the order); click again to flip direction; × reset clears. 
       </div>
 
       {flagPopover}
@@ -11595,7 +11594,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
               <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
               {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
@@ -11977,7 +11976,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
@@ -12915,7 +12914,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
             {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
@@ -13095,7 +13094,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
           <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
@@ -13376,7 +13375,7 @@ function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
             <a className="on" style={{ cursor: "pointer" }}>Model Book</a>
             {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip to relaunch */}
@@ -13403,7 +13402,7 @@ function DailySetupsShell({ setPage, session, displayName }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-            <a className="on" style={{ cursor: "pointer" }}>Daily Setups</a>
+            <a className="on" style={{ cursor: "pointer" }}>Hunt List</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
@@ -13434,7 +13433,7 @@ function MentorShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
             <a className="on" style={{ cursor: "pointer" }}>Mentor</a>
@@ -13468,7 +13467,7 @@ function QuantShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
             <a className="on" style={{ cursor: "pointer" }}>Quant</a>
@@ -13496,7 +13495,7 @@ function BurstLogShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a>
@@ -13525,7 +13524,7 @@ function PracticeShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("dashboard")}>Dashboard</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("journal")}>Journal</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("tools")}>Premium tools</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Daily Setups</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("daily")}>Hunt List</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("modelbook")}>Model Book</a>
             <a className="on" style={{ cursor: "pointer" }}>Practice</a>
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
