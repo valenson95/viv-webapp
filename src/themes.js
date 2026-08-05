@@ -7,8 +7,8 @@
 // ─────────────────────────────────────────────────────────────
 
 export const THEME_SNAPSHOTS = {
-  // 2026-08-05 — his Wed-AM-MYT drop; data = the US Mon 08-04 close (all four panels fresh).
-  // day = Since Open (Monday's intraday move, ex-gap). Follow-through session: Software runaway
+  // 2026-08-05 — his Wed-AM-MYT drop; data = the US Tue 08-04 close (all four panels fresh).
+  // day = Since Open (Tuesday's intraday move, ex-gap). Follow-through session: Software runaway
   // 1W #1 (+16.07), Quantum + Robotics enter the 1W top-5, Semis led the day (+5.51) as the
   // beaten growth complex repaired. Month pair flipped green same session (breadth file).
   "2026-08-05": {
