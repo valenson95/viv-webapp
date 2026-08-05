@@ -412,7 +412,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
               title="Type a ticker to see its full history in the feed — every post, oldest thesis to latest"
               style={{ background: "rgba(255,255,255,0.04)", color: C.white, border: `1px solid ${q.trim() ? C.borderGold : C.border}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: q.trim() ? "7px 26px 7px 14px" : "7px 14px", borderRadius: 980, width: 130, outline: "none", textTransform: "uppercase" }} />
             {q.trim() && (
-              <button onClick={() => setQ("")} aria-label="Clear search" style={{ position: "absolute", right: 8, background: "transparent", border: "none", color: faint, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
+              <button onClick={() => setQ("")} aria-label="Clear search" style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", color: faint, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
             )}
           </div>
           {(themeOptions.length > 0 || gradeOptions.length > 0) && <span style={{ width: 1, height: 18, background: C.border }} />}
@@ -639,7 +639,13 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                   <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
                     <div style={{ ...cardHead, paddingBottom: 9, marginBottom: 11 }}>
                       <span style={{ ...microLabel }}>Setup-Grader Scorecard</span>
-                      <span title="Scored criteria — ★ marks a confluence factor (★-maker), a Bonus tick is tracked but not scored; a gold dot ● marks a tick VIV auto-read off the chart. Every grade is auditable: each star traces to its ticks." style={{ width: 15, height: 15, borderRadius: "50%", border: `1px solid ${C.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 700, fontStyle: "italic", color: faint, cursor: "help", flex: "none" }}>i</span>
+                      {/* 30×30 tap target (the tip layer is tap-driven on phones); negative margin keeps
+                          the dot looking the same 15px and the header the same height as before. */}
+                      <span data-tip="Scored criteria — ★ marks a confluence factor (★-maker), a Bonus tick is tracked but not scored; a gold dot ● marks a tick VIV auto-read off the chart. Every grade is auditable: each star traces to its ticks."
+                        title="Scored criteria — ★ marks a confluence factor (★-maker), a Bonus tick is tracked but not scored; a gold dot ● marks a tick VIV auto-read off the chart. Every grade is auditable: each star traces to its ticks."
+                        style={{ width: 30, height: 30, margin: "-7px", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "help", flex: "none" }}>
+                        <span style={{ width: 15, height: 15, borderRadius: "50%", border: `1px solid ${C.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 700, fontStyle: "italic", color: faint, flex: "none" }}>i</span>
+                      </span>
                       <span style={{ background: C.goldDim, color: C.goldBright, fontSize: "0.62rem", fontWeight: 800, padding: "2px 9px", borderRadius: 980, marginLeft: "auto" }}>{sec2.passed}/{sec2.total} criteria</span>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 12, alignItems: "stretch" }}>

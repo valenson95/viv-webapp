@@ -1379,7 +1379,7 @@ function WhatsNew() {
                 <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>What's New</div>
                 <div style={{ fontSize: "1.25rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white }}>Product updates</div>
               </div>
-              <button onClick={closeModal} aria-label="Close" style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.5rem", lineHeight: 1, cursor: "pointer", padding: 2 }}>&times;</button>
+              <button onClick={closeModal} aria-label="Close" style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.5rem", lineHeight: 1, cursor: "pointer", padding: 0, width: 38, height: 38, flex: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>&times;</button>
             </div>
             {/* Grouped by date (Valen 2026-07-24): one date header + one NEW badge per DAY, then all that
                 day's entries beneath (title + items, no repeated date). Same-day updates no longer repeat the
@@ -5041,7 +5041,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .revtick{font-size:1.05rem; font-weight:800; color:var(--white)}
 .vj .revmeta{font-size:0.74rem; color:var(--muted)}
 .vj .revmeta b{color:var(--text); font-weight:700}
-.vj .revclose{margin-left:auto; background:transparent; border:none; color:var(--faint); font-size:1.4rem; line-height:1; cursor:pointer}
+.vj .revclose{margin-left:auto; background:transparent; border:none; color:var(--faint); font-size:1.4rem; line-height:1; cursor:pointer; width:38px; height:38px; display:grid; place-items:center; padding:0}
 .vj .revclose:hover{color:var(--text)}
 .vj .revgrid{display:grid; grid-template-columns:1fr 1fr; gap:0}
 .vj .revchart{margin-top:16px; padding-top:16px; border-top:1px solid var(--border)}
@@ -7447,7 +7447,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                     );
                   })() : (
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem", tableLayout: "fixed" }}>
+                    <table className="minitable" style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem", tableLayout: "fixed" }}>
                       <colgroup><col style={{ width: "16%" }} /><col style={{ width: "22%" }} /><col style={{ width: "14%" }} /><col style={{ width: "15%" }} /><col style={{ width: "13%" }} /><col style={{ width: "14%" }} /><col style={{ width: "6%" }} /></colgroup>
                       <thead><tr style={{ color: "var(--muted)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                         <th style={{ textAlign: "left", padding: "4px 8px" }}>Grade</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Theme</th>
@@ -7540,7 +7540,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           return (<>
             <div className="toolbar" style={{ marginTop: 26 }}><h2 className="sech guide" onMouseEnter={guideEnter("objedge", "Objective edge", "This connects your process to your results across three dimensions judged at entry: the setup grade you gave the trade, whether its sector was in-theme, and the market context — was SPY trending, choppy or in a downtrend versus its 21-day EMA. The 3-D matrix crosses all three so you see exactly which combination your edge lives in.", undefined)} onMouseLeave={guideLeave("objedge")}>Objective edge</h2></div>
             <div className="card reveal" style={{ padding: "16px 20px", marginBottom: 18 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))", gap: 20 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By setup grade</div>
                   {byGrade.map(g => <Row key={g.L} id={"g:" + g.L} label={g.L + " setups"} s={g} />)}
@@ -7622,8 +7622,9 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <div className="chartwrap">
                 <div className="yaxis">{eqSvg.yLabels.map((l, i) => <span key={i}>{l}</span>)}</div>
                 <div className="plot" style={{ position: "relative" }}
-                  onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); if (!r.width || !eqSvg.pts || !eqSvg.pts.length) return; const sx = ((e.clientX - r.left) / r.width) * eqSvg.W; let bi = 0, bd = 1e18; eqSvg.pts.forEach((p, i) => { const d = Math.abs(p.x - sx); if (d < bd) { bd = d; bi = i; } }); setEqHover(bi); }}
-                  onMouseLeave={() => setEqHover(null)}>
+                  onPointerMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); if (!r.width || !eqSvg.pts || !eqSvg.pts.length) return; const sx = ((e.clientX - r.left) / r.width) * eqSvg.W; let bi = 0, bd = 1e18; eqSvg.pts.forEach((p, i) => { const d = Math.abs(p.x - sx); if (d < bd) { bd = d; bi = i; } }); setEqHover(bi); }}
+                  onPointerLeave={() => setEqHover(null)}
+                  onPointerCancel={() => setEqHover(null)}>
                   <svg viewBox="0 0 600 210" preserveAspectRatio="none" className="eqsvg" role="img" aria-label="Equity curve">
                     <defs>
                       <linearGradient id="jeqgPos" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(34,197,94,0.32)" /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient>
@@ -8273,7 +8274,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               {linkWizardData.length === 0 ? (
                 <div className="nodata">All journal trades are already linked. 🎉 No backfill needed.</div>
               ) : (
-                <table className="linktable">
+                <table className="linktable minitable">
                   <thead><tr><th>Ticker</th><th>Entry</th><th>Exit</th><th>Shares</th><th>P/L %</th><th>State</th><th>Set to</th></tr></thead>
                   <tbody>
                     {linkWizardData.map(({ t, lots, suggestion, state }) => {
@@ -9671,7 +9672,7 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .allocstrip .allocnote{font-size:0.7rem}
 .vd .allocstrip .leg{font-size:0.74rem; color:var(--muted)}
 .vd .allocstrip .leg b{color:var(--text); font-weight:700}
-@media(max-width:640px){.vd .allocstrip .allocnote{flex-basis:100%; margin-left:0 !important}}
+@media(max-width:767px){.vd .allocstrip .allocnote{flex-basis:100%; margin-left:0 !important}}
 .vd.expert .poshead h2{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
 .vd.expert .countchip{background:var(--goldDim); color:var(--goldBright); font-size:0.66rem; font-weight:800; padding:3px 10px; border-radius:980px}
 @media(min-width:761px){
@@ -10732,7 +10733,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                         </span>;
                       })()}</td> /* GRADE CELL HIDDEN with its header (Valen 2026-08-05) */}
                       <td data-l="Position size" style={{ whiteSpace: "nowrap" }}>
-                        {compEquity > 0 && <div className="term" data-tip="This position's size as a percentage of your account value — the honest gauge of how concentrated you are." style={{ fontSize: "0.63rem", fontWeight: 700, color: "var(--muted)", fontVariantNumeric: "tabular-nums", cursor: "help" }}>{((p.posValue / compEquity) * 100).toFixed(1)}%</div>}
+                        {compEquity > 0 && <div className="term" data-tip="This position's size as a percentage of your account value — the honest gauge of how concentrated you are." style={{ fontSize: "0.63rem", fontWeight: 700, color: "var(--muted)", fontVariantNumeric: "tabular-nums", cursor: "help", borderBottom: "none" }}>{((p.posValue / compEquity) * 100).toFixed(1)}%</div>}
                         {usd0(p.posValue)}
                       </td>
                       <td data-l="Realized">
@@ -11216,12 +11217,12 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
                 <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
               </div>
-              <button className="btn ghost" onClick={fetchLivePrices} disabled={priceLoading} title="Pull the latest market prices for every open position">{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
+              <button className="btn ghost posRefreshBtn" onClick={fetchLivePrices} disabled={priceLoading} title="Pull the latest market prices for every open position">{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
             </div>
             <div className="allocstrip">
               {/* Energy-bar gauge (Valen 2026-08-05 — replaced the 54px donut, unreadable at strip size).
                   Guided's full Risk Allocation card keeps its 112px donut. */}
-              <div className="term" data-tip={over ? "You're over your risk budget — the bar is maxed and red." : "How much of your total risk budget is deployed across your open stops right now. Fills up as you add risk; empties as stops move to breakeven."} style={{ display: "flex", flexDirection: "column", gap: 4, width: 150, flex: "none", cursor: "help" }}>
+              <div className="term" data-tip={over ? "You're over your risk budget — the bar is maxed and red." : "How much of your total risk budget is deployed across your open stops right now. Fills up as you add risk; empties as stops move to breakeven."} style={{ display: "flex", flexDirection: "column", gap: 4, width: 150, flex: "none", cursor: "help", borderBottom: "none" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                   <span style={{ fontSize: "0.66rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", color: over ? "var(--red)" : allocPct >= 70 ? "var(--goldBright)" : "var(--text)" }}>{Math.round(allocPct)}%</span>
                   <span style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)" }}>deployed</span>
@@ -12924,7 +12925,7 @@ function AuthPage() {
   const inp = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 16px", color: C.white, fontSize: "0.88rem", fontWeight: 500, fontFamily: font, outline: "none" };
 
   return (
-    <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased", color: C.text, position: "relative", overflow: "hidden" }}>
+    <div style={{ fontFamily: font, background: C.bg, minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased", color: C.text, position: "relative", overflow: "hidden" }}>
       <AppBackground intensity="serene" />
       {/* Radial vignette overlay */}
       <div style={{ position:"absolute",inset:0,zIndex:1,background:"radial-gradient(ellipse at center, transparent 30%, rgba(8,8,14,0.85) 100%)",pointerEvents:"none" }} />
@@ -13022,12 +13023,19 @@ const mobileCSS = `
   .hcLabel { display: none !important; }
   /* Toasts must clear the ~56px bottom tab bar (audit A6; Feedback.jsx already does this). */
   .vj .toast, .vs .toast { bottom: 96px !important; }
+  /* Duplicate refresh on phones: the Pro positions header repeats the command-header Refresh Prices
+     button. The top button + auto-refresh already cover mobile, so drop this one. */
+  .vd .posRefreshBtn { display: none !important; }
 }
 /* Touch devices (any width) — audit A8/A11: reorder handles must be VISIBLE (hover can't reveal
    them) and armed state must read; small icon buttons get real tap targets. */
 @media (pointer: coarse) {
   .vd .dragwrap .draghandle, .vj .dragwrap .draghandle { display: inline-flex !important; opacity: 0.75; padding: 6px 10px !important; }
   .vd .draghandle[data-armed], .vj .draghandle[data-armed] { color: var(--goldBright) !important; opacity: 1; text-shadow: 0 0 8px rgba(240,192,80,0.5); }
+  /* Status count chips carry data-tip (tap targets) but sit at ~17px tall — pad them out on touch.
+     .vd.expert is also listed because the base padding lives on .vd.expert .countchip, which
+     out-specifies a plain .vd rule (media queries add no specificity). */
+  .vd .countchip, .vd.expert .countchip { padding: 7px 11px; }
 }
 @media (max-width: 767px) {
   /* Global font baseline — slightly smaller body text on phones */
@@ -14628,7 +14636,7 @@ function AppInner() {
   // ─── Loading / Auth Gate ───
   if (authLoading) {
     return (
-      <div style={{ fontFamily: font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased" }}>
+      <div style={{ fontFamily: font, background: C.bg, minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased" }}>
         <div style={{ textAlign: "center" }}>
           <Wordmark size="1.3rem" style={{ marginBottom: 12 }} />
           <div style={{ fontSize: "0.78rem", color: C.muted }}>Loading...</div>

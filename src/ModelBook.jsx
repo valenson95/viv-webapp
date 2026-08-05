@@ -3371,7 +3371,7 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
             onChange={(nl) => setRow(r => ({ ...r, metrics: { ...(r.metrics || {}), charts: nl } }))}
             onUpload={onUpload} />
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))", gap: 12, marginBottom: 16 }}>
           <div><span style={lbl}>The thesis (why it was A+ BEFORE the move)<AutoDot k="thesis" /></span><textarea rows={3} style={{ ...inputS, resize: "vertical" }} value={row.thesis || ""} onChange={e => setField("thesis", e.target.value)} /></div>
           <div><span style={lbl}>The lesson (what to internalize)<AutoDot k="lesson" /></span><textarea rows={3} style={{ ...inputS, resize: "vertical" }} value={row.lesson || ""} onChange={e => setField("lesson", e.target.value)} /></div>
         </div>
@@ -3459,7 +3459,7 @@ function ExportDialog({ C, font, isAdmin, pop, gradeBadge, onClose, coverTitle }
             <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>Export</div>
             <div style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white, marginTop: 3 }}>Export your book</div>
           </div>
-          <button onClick={onClose} aria-label="Close" style={{ marginLeft: "auto", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, width: 34, height: 34, borderRadius: 10, fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }}>&times;</button>
+          <button onClick={onClose} aria-label="Close" style={{ marginLeft: "auto", flex: "none", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, width: 34, height: 34, display: "grid", placeItems: "center", padding: 0, borderRadius: 10, fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }}>&times;</button>
         </div>
         <div style={{ fontSize: "0.74rem", color: C.muted, marginBottom: 16, lineHeight: 1.5 }}>Pick what to export — filter, then tick the entries. PDF = a branded study book; CSV = a flat sheet for any analysis tool.</div>
 
@@ -4165,7 +4165,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                   backImg = r.after_img || null;
                 }
                 return (
-                  <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 4, marginLeft: indent ? 22 : 0, fontSize: "0.78rem", cursor: "pointer" }}
+                  <div key={r.id} style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 4, marginLeft: indent ? 22 : 0, fontSize: "0.78rem", cursor: "pointer" }}
                     onClick={() => setStudyEditing(r)}
                     onMouseEnter={e => e.currentTarget.style.borderColor = C.borderGold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
                     {indent

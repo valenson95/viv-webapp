@@ -295,7 +295,7 @@ function RadarStrip({ radar, today, onChipClick, interactive = true, C, autoScro
             <div key={d} ref={i === anchorIdx ? anchorRef : undefined} className={"radar-day" + (past ? " past" : "") + (isLast ? " last" : "")}>
               <div className={"radar-hd" + (d === today ? " today" : "")}>{ordDay(d)}</div>
               {MACRO_BY_DATE[d] && (
-                <div className="radar-macro" title={`${MACRO_BY_DATE[d].label} — ${MACRO_BY_DATE[d].detail}`}>⚡</div>
+                <Tip as="div" className="radar-macro" tip={`${MACRO_BY_DATE[d].label} — ${MACRO_BY_DATE[d].detail}`}>⚡</Tip>
               )}
               {past ? (
                 rows.length === 0 ? (
@@ -426,7 +426,7 @@ function EarningsDetailPopup({ target, C, font, onClose }) {
               <span style={{ fontSize: "1.15rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{r.t}</span>
               {leader && <span title="One of the liquid leaders" style={{ fontSize: "0.62rem", fontWeight: 800, color: "#08080e", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, borderRadius: 980, padding: "2px 8px" }}>★ Liquid leader</span>}
             </div>
-            <button onClick={onClose} title="Close" style={{ flex: "none", width: 26, height: 26, borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", color: C.muted, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, fontFamily: font }}>×</button>
+            <button onClick={onClose} title="Close" style={{ flex: "none", width: 38, height: 38, display: "grid", placeItems: "center", padding: 0, borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", color: C.muted, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, fontFamily: font }}>×</button>
           </div>
           {r.name && <div style={{ marginTop: 4, fontSize: "0.76rem", fontWeight: 600, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>}
         </div>

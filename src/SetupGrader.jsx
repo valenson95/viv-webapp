@@ -666,7 +666,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                         <button onClick={(e) => { e.stopPropagation(); opened ? setOpenSym("") : openRow(g); }} style={{ background: opened ? C.goldDim : "transparent", border: `1px solid ${opened ? C.borderGold : C.border}`, color: opened ? C.goldBright : C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 11px", borderRadius: 8, cursor: "pointer" }}>{opened ? "Close" : "Open"}</button>
                         <button title={`Attach ${g.sym}'s saved grade to an open position of your choice`} onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setRowSync(p => p?.sym === g.sym ? null : { sym: g.sym, x: r.right, y: r.bottom }); }} style={{ marginLeft: 6, background: rowSync?.sym === g.sym ? "rgba(59,130,246,0.18)" : "rgba(59,130,246,0.10)", border: "1px solid rgba(59,130,246,0.3)", color: C.blue, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 9px", borderRadius: 8, cursor: "pointer" }}>⇄</button>
                       </td>
-                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button title="Remove from this list (grade is kept)" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Remove ${g.sym} from the screening watchlist?\n\nThe saved grade is KEPT everywhere it's used — Open Positions' Grade column, the Model Book, and any published Daily Setups. This only clears ${g.sym} from this list; grade it again anytime to bring it back.`)) archiveGrade(g.sym); }} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>×</button></td>
+                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button title="Remove from this list (grade is kept)" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Remove ${g.sym} from the screening watchlist?\n\nThe saved grade is KEPT everywhere it's used — Open Positions' Grade column, the Model Book, and any published Daily Setups. This only clears ${g.sym} from this list; grade it again anytime to bring it back.`)) archiveGrade(g.sym); }} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1, width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", verticalAlign: "middle", padding: 0 }}>×</button></td>
                     </tr>
                     {opened && (() => {
                       // Inline editor — VERSION-AWARE: a legacy row keeps its own list, denominator
@@ -724,7 +724,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                                   {sec.items.map((it, ii) => {
                                     const key = si + "-" + ii, isOn = editOn.has(key);
                                     return (
-                                      <div key={ii} onClick={() => editToggle(key)} title={it.s}
+                                      <div key={ii} onClick={() => editToggle(key)} title={it.s} data-tip={it.s}
                                         style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.74rem", lineHeight: 1.6, color: isOn ? C.text : "rgba(255,255,255,0.35)", cursor: "pointer", userSelect: "none", borderRadius: 6, padding: "1px 4px" }}
                                         onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                                         <span style={{ color: isOn ? C.goldBright : "rgba(255,255,255,0.22)", fontWeight: 800 }}>{isOn ? "✓" : "·"}</span>
@@ -968,7 +968,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
               {sec.items.map((it, ii) => {
                 const key = si + "-" + ii, isOn = on.has(key);
                 return (
-                  <div key={ii} onClick={() => toggle(key)} title={it.s} style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.74rem", lineHeight: 1.45, padding: "3px 2px", borderRadius: 6, cursor: "pointer", userSelect: "none", color: isOn ? C.text : "rgba(255,255,255,0.55)" }}
+                  <div key={ii} onClick={() => toggle(key)} title={it.s} data-tip={it.s} style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.74rem", lineHeight: 1.45, padding: "3px 2px", borderRadius: 6, cursor: "pointer", userSelect: "none", color: isOn ? C.text : "rgba(255,255,255,0.55)" }}
                     onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                     <span style={{ color: isOn ? C.blue : "rgba(255,255,255,0.3)", fontWeight: 800, flex: "0 0 auto" }}>{isOn ? "✓" : "○"}</span>
                     <span>{it.c}{it.key && <span style={{ marginLeft: 5, fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.blue }}>· R:R</span>}</span>

@@ -43,7 +43,7 @@ const FB_CSS = `
 .vivfb-toast{animation:vivfbUp .32s cubic-bezier(0.22,1,0.36,1)}
 @keyframes vivfbDrawerIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
 .vivfb-drawer{animation:vivfbDrawerIn .32s cubic-bezier(0.22,1,0.36,1); height:100vh; height:100dvh;}
-@media (max-width: 640px){ .vivfb-drawer{ width:100vw !important; border-radius:0 !important; } }
+@media (max-width: 767px){ .vivfb-drawer{ width:100vw !important; border-radius:0 !important; } }
 `;
 
 export default function FeedbackWidget({ session, isAdmin, displayName, C, font, isMobile }) {

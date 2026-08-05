@@ -100,9 +100,10 @@ function RichField({ C, font, label, value, onChange, minH = 96 }) {
           <button type="button" style={tbtn} onMouseDown={cmd("removeFormat")} title="Clear formatting">✕</button>
         </span>
       </div>
+      {/* fontSize 1rem = 16px: anything smaller makes iOS Safari zoom the page the moment this gets focus. */}
       <div ref={ref} className="sitedit" contentEditable suppressContentEditableWarning
         onInput={() => ref.current && onChange(ref.current.innerHTML)}
-        style={{ minHeight: minH, background: "rgba(0,0,0,0.3)", border: `1px solid ${C.border}`, borderRadius: 9, color: C.text, fontFamily: font, fontSize: "0.75rem", lineHeight: 1.65, padding: "10px 12px", outline: "none", overflowWrap: "break-word" }} />
+        style={{ minHeight: minH, background: "rgba(0,0,0,0.3)", border: `1px solid ${C.border}`, borderRadius: 9, color: C.text, fontFamily: font, fontSize: "1rem", lineHeight: 1.65, padding: "10px 12px", outline: "none", overflowWrap: "break-word" }} />
     </div>
   );
 }

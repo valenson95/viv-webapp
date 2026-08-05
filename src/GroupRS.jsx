@@ -238,7 +238,7 @@ function HoldingsPopup({ target, onClose, C, font }) {
               <span style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{target.t}</span>
               <span style={{ fontSize: "0.72rem", fontWeight: 600, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{target.name || ""}</span>
             </div>
-            <button onClick={onClose} title="Close" style={{ flex: "none", width: 26, height: 26, borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", color: C.muted, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, fontFamily: font }}>×</button>
+            <button onClick={onClose} title="Close" style={{ flex: "none", width: 38, height: 38, display: "grid", placeItems: "center", padding: 0, borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", color: C.muted, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, fontFamily: font }}>×</button>
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 7 }}>
             <span style={label}>{holdings ? `Top ${holdings.length} holdings · weighted` : "Holdings"}</span>

@@ -61,7 +61,7 @@ function ThemeConstituentsPopup({ theme, onClose, C, font }) {
             <div style={{ display: "flex", alignItems: "baseline", gap: 9, minWidth: 0 }}>
               <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "rgba(255,255,255,0.96)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{theme}</span>
             </div>
-            <button onClick={onClose} title="Close" style={{ flex: "none", width: 26, height: 26, borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", color: C.muted, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, fontFamily: font }}>×</button>
+            <button onClick={onClose} title="Close" style={{ flex: "none", width: 38, height: 38, display: "grid", placeItems: "center", padding: 0, borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", color: C.muted, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, fontFamily: font }}>×</button>
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 7 }}>
             <span style={label}>{countLine || "Constituents"}</span>

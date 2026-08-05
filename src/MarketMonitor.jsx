@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MARKET_MONITOR } from "./marketMonitor-data.js";
-import { InfoDot } from "./GroupRS.jsx";
+import { InfoDot, Tip } from "./GroupRS.jsx";
 import { LensCamera, SectionCamera, XShare } from "./capture.jsx";
 
 // ── BREADTH — market monitor ─────────────────────────────────────────────────
@@ -564,9 +564,15 @@ export default function MarketMonitor({ C, font, session }) {
                       return <td key={col.key} style={td}>{v == null ? "—" : (+v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>;
                     const cf = sheetCF(row, col.key);
                     const tip = cellTip(row, col.key);
-                    if (isRatio(col.key) || col.key === "t2108")
-                      return <td key={col.key} title={tip} style={{ ...td, ...(col.key === "t2108" && !cf ? { color: C.blue } : {}), ...(cf || {}) }}>{rat(v)}</td>;
-                    return <td key={col.key} title={tip} style={{ ...td, ...(cf || {}), ...(col.key === "up4" || col.key === "down4" ? { fontWeight: 700 } : {}) }}>{num(v)}</td>;
+                    // Tip (portal + tap-aware) instead of a native title= — a title tooltip never opens
+                    // on a phone. Only the cells that actually carry an explanation get wrapped.
+                    const ratio = isRatio(col.key) || col.key === "t2108";
+                    const cs = ratio
+                      ? { ...td, ...(col.key === "t2108" && !cf ? { color: C.blue } : {}), ...(cf || {}) }
+                      : { ...td, ...(cf || {}), ...(col.key === "up4" || col.key === "down4" ? { fontWeight: 700 } : {}) };
+                    const cv = ratio ? rat(v) : num(v);
+                    if (tip) return <Tip as="td" key={col.key} tip={tip} style={cs}>{cv}</Tip>;
+                    return <td key={col.key} style={cs}>{cv}</td>;
                   })}
                 </tr>
               ))}
