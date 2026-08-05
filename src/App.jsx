@@ -774,6 +774,7 @@ const WHATS_NEW = [
     date: "August 5, 2026",
     title: "⚡ Auto price refresh · cleaner positions table · risk energy bar",
     items: [
+      "Closing a trade now lets you upload your own chart with your review — and you can add a chart to any closed trade from its details page. (Thanks JH! 🙌)",
       "No more clicking Refresh Prices on arrival — the Dashboard now pulls the latest market prices automatically the moment your positions load. Pro view also gets a second Refresh button right on the Open Positions card. (Thanks Estrid! 🙌)",
       "Position size now shows the % of your account above the dollar amount — see concentration at a glance.",
       "The Grade column is retired from Open Positions (your grades still live in Manage, trade views and the Setup Grader).",
@@ -6458,8 +6459,11 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   const [reviewSavedId, setReviewSavedId] = useState(null);
   const [closingReview, setClosingReview] = useState(false); // plays the collapse animation before unmount
   const [deleteStep, setDeleteStep] = useState(0); // 0 = none, 1 = first confirm, 2 = second (double) confirm
+  const [reviewChartUploading, setReviewChartUploading] = useState(false); // upload-in-flight for the details-page chart
+  const [reviewChartZoom, setReviewChartZoom] = useState(null); // image URL shown full-screen, or null
   const closeReview = () => {
     setDeleteStep(0);
+    setReviewChartZoom(null);
     setClosingReview(true);
     setTimeout(() => { setExpandedTrade(null); setClosingReview(false); }, 230); // matches the collapse keyframe duration
   };
@@ -6469,6 +6473,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
     setReviewDraft({ right: n.right || "", wrong: n.wrong || "", lessons: n.lessons || n._plain || "" });
     setReviewSavedId(null);
     setDeleteStep(0);
+    setReviewChartZoom(null);
+    setReviewChartUploading(false);
     setTdTab("chart");
     setClosingReview(false);
     setExpandedTrade(t.id);
@@ -6551,6 +6557,28 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
     } catch (err) { console.error("Upload failed:", err); alert("Upload failed"); }
     setUploadingImage(false);
   };
+
+  // Add (or replace) the chart on a trade you've already closed, straight from its details page.
+  // Writes the one column and mirrors it into local state so the view updates without a reload.
+  const addTradeChartImage = async (tradeId, file) => {
+    if (!file) return;
+    setReviewChartUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const uid = session?.user?.id || "anon";
+      // Same path shape as the sell-time upload (uid as its own segment — see uploadSellChartImage).
+      const path = `trades/${uid}/${Date.now()}.${ext}`.replace(/[^a-zA-Z0-9./_-]/g, "_");
+      const { error: uploadErr } = await supabase.storage.from("trade-charts").upload(path, file, { upsert: true });
+      if (uploadErr) { console.error("Upload error:", uploadErr.message); alert("Upload failed: " + uploadErr.message); setReviewChartUploading(false); return; }
+      const { data: urlData } = supabase.storage.from("trade-charts").getPublicUrl(path);
+      const publicUrl = urlData?.publicUrl || "";
+      const { error: updErr } = await supabase.from("trades").update({ chart_image: publicUrl }).eq("id", tradeId);
+      if (updErr) { console.error("Chart save error:", updErr.message); alert("Couldn't save the chart to this trade: " + updErr.message); setReviewChartUploading(false); return; }
+      setJournaledTrades(prev => prev.map(t => t.id === tradeId ? { ...t, chartImage: publicUrl } : t));
+    } catch (err) { console.error("Upload failed:", err); alert("Upload failed"); }
+    setReviewChartUploading(false);
+  };
+
   const deleteTrade = (id, skipConfirm) => {
     const trade = journaledTrades.find(t => t.id === id);
     if (!skipConfirm && !window.confirm(`Delete ${trade?.ticker || "this"} trade from journal? This cannot be undone.`)) return;
@@ -7993,6 +8021,13 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   <Row k="Commission" v={privacyMode ? "••••" : "$" + (parseFloat(t.commission) || 0).toFixed(2)} />
                 </div>
                 {t.reason && <div className="tp-reason"><div className="tp-reason-h">Exit reason</div><div className="tp-reason-b">{t.reason}</div></div>}
+                {/* Your uploaded chart, at a glance — tap to open the full review. */}
+                {t.chartImage && (
+                  <div className="tp-reason" style={{ padding: 11 }}>
+                    <div className="tp-reason-h">Your chart</div>
+                    <img src={t.chartImage} alt={`${t.ticker} chart`} onClick={() => { setPreviewTrade(null); openReview(t); }} title="Open the full trade details" style={{ display: "block", width: "100%", height: "auto", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }} />
+                  </div>
+                )}
                 <div className="tp-foot">
                   <button className="tp-go" onClick={() => { setPreviewTrade(null); openReview(t); }}>Go to trade details ›</button>
                   <button className="revbtn" title="Import this trade into the Model Book — everything already known is pre-filled" onClick={async () => {
@@ -8136,6 +8171,21 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                                   <div><div className="nlabel w">What went wrong</div><textarea className="mgta" value={reviewDraft.wrong} onChange={e => setReviewDraft(r => ({ ...r, wrong: e.target.value }))} placeholder="What went wrong..." /></div>
                                   <div><div className="nlabel l">Lesson learned</div><textarea className="mgta" value={reviewDraft.lessons} onChange={e => setReviewDraft(r => ({ ...r, lessons: e.target.value }))} placeholder="Lesson learned..." /></div>
                                 </div>
+                                {/* Your own chart for this trade — uploaded when you closed it, or added here later. */}
+                                <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: t.chartImage ? 10 : 0 }}>
+                                    <span style={{ fontFamily: font, fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted }}>Your chart</span>
+                                    <div style={{ flex: 1 }}></div>
+                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 32, padding: "7px 12px", borderRadius: 8, cursor: reviewChartUploading ? "wait" : "pointer", background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, opacity: reviewChartUploading ? 0.6 : 1 }}>
+                                      {reviewChartUploading ? "Uploading…" : t.chartImage ? "📷 Replace chart" : "📷 Add chart"}
+                                      <input type="file" accept="image/*" disabled={reviewChartUploading} style={{ display: "none" }} onChange={e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) addTradeChartImage(t.id, f); }} />
+                                    </label>
+                                  </div>
+                                  {t.chartImage
+                                    ? <img src={t.chartImage} alt={`${t.ticker} chart`} onClick={() => setReviewChartZoom(t.chartImage)} title="Click to view full size" style={{ display: "block", maxWidth: "100%", height: "auto", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", cursor: "zoom-in" }} />
+                                    : <div style={{ fontFamily: font, fontSize: "0.72rem", color: C.muted }}>No chart yet. Upload your marked-up screenshot so this review has the picture with it.</div>}
+                                  {t.chartUrl && <div style={{ marginTop: 8 }}><a href={t.chartUrl} target="_blank" rel="noreferrer" style={{ fontFamily: font, fontSize: "0.72rem", color: C.goldBright, textDecoration: "none" }}>Open chart link ↗</a></div>}
+                                </div>
                               </div>
                             </>
                           )}
@@ -8150,6 +8200,14 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   </div>
                 </div>
               </div>
+              {/* Full-size chart viewer. Lives INSIDE the details layer (z 1300), so it sits at 1450
+                  to clear the page under it while the edit modal (1400, separate body portal) still wins. */}
+              {reviewChartZoom && (
+                <div onClick={() => setReviewChartZoom(null)} style={{ position: "fixed", inset: 0, zIndex: 1450, background: "rgba(4,4,8,0.92)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, cursor: "zoom-out" }}>
+                  <button aria-label="Close chart" onClick={e => { e.stopPropagation(); setReviewChartZoom(null); }} style={{ position: "absolute", top: 14, right: 14, width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, fontFamily: font, fontSize: "1.2rem", lineHeight: 1, cursor: "pointer" }}>&times;</button>
+                  <img src={reviewChartZoom} alt="Trade chart, full size" onClick={e => e.stopPropagation()} style={{ maxWidth: "100%", maxHeight: "92vh", objectFit: "contain", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)" }} />
+                </div>
+              )}
             </div>
           );
         })(), document.body)
@@ -9739,6 +9797,10 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
   const [sellNotes, setSellNotes] = useState("");
   const [sellComm, setSellComm] = useState("");
   const [sellChartUrl, setSellChartUrl] = useState("");
+  // Your own chart image for this close — uploaded while you write the review, saved onto the closed
+  // trade. Separate from the position's own chart: this one is the picture of how the trade ENDED.
+  const [sellChartImage, setSellChartImage] = useState("");
+  const [sellUploadingImage, setSellUploadingImage] = useState(false);
   const [sellNotesStruct, setSellNotesStruct] = useState({ right: "", wrong: "", lessons: "" });
   const [displayMode, setDisplayMode] = useState("%"); // "%", "$", or "R"
   const [priceLoading, setPriceLoading] = useState(false);
@@ -9807,6 +9869,24 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
       setPositions(prev => { const next = prev.map(p => p.id === posId ? { ...p, chartImage: publicUrl } : p); positionsRef.current = next; return next; });
     } catch (err) { console.error("Upload failed:", err); alert("Upload failed"); }
     setPosUploadingImage(false);
+  };
+
+  // Upload your own chart image while closing a trade — lands on the closed trade, not the position.
+  const uploadSellChartImage = async (file) => {
+    if (!file) return;
+    setSellUploadingImage(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const uid = session?.user?.id || "anon";
+      // uid is its OWN path segment — same shape as the Model Book / Setup Grader uploaders, which are
+      // the two member-facing uploads proven against this bucket's policy.
+      const path = `trades/${uid}/${Date.now()}.${ext}`.replace(/[^a-zA-Z0-9./_-]/g, "_");
+      const { error: uploadErr } = await supabase.storage.from("trade-charts").upload(path, file, { upsert: true });
+      if (uploadErr) { console.error("Upload error:", uploadErr.message); alert("Upload failed: " + uploadErr.message); setSellUploadingImage(false); return; }
+      const { data: urlData } = supabase.storage.from("trade-charts").getPublicUrl(path);
+      setSellChartImage(urlData?.publicUrl || "");
+    } catch (err) { console.error("Upload failed:", err); alert("Upload failed"); }
+    setSellUploadingImage(false);
   };
 
   // Toggle expand/collapse for position notes/chart
@@ -9931,10 +10011,13 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
       }
     }
     setSellId(p.id); setSellQty(p.shares); setSellPrice(p.cp); setSellReason(exitReasons[0] || "Sold Into Strength"); setSellTags([]); setSellAddJournal(true); setSellNotes(""); setSellComm(""); setSellChartUrl(p.chartUrl || "");
+    // Start every close with a blank chart slot — the upload is about THIS close, so it must never
+    // carry over from the last position you sold.
+    setSellChartImage(""); setSellUploadingImage(false);
     const posNotes = parseNotes(p.notes);
     setSellNotesStruct({ right: posNotes.right || "", wrong: posNotes.wrong || "", lessons: posNotes.lessons || "" });
   };
-  const cancelSell = () => setSellId(null);
+  const cancelSell = () => { setSellId(null); setSellChartImage(""); setSellUploadingImage(false); };
   // Helper: find position by sellId, with ID-map fallback to survive autosave ID sync
   const findSellPos = useCallback(() => {
     if (!sellId) return null;
@@ -9983,7 +10066,8 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
         entryP: epN, exitP, shares: soldShares, stop: stopN, setup: pos.setup,
         tags: [...(pos.tags || []), ...sellTags], plPct, plDollar, rMult,
         commission: commPortion, tradeType: pos.tradeType || "Long",
-        reason: sellReason, notes: finalNotes, chartUrl: sellChartUrl || pos.chartUrl || "", chartImage: pos.chartImage || "",
+        // Chart you uploaded on this close wins; otherwise inherit the position's chart.
+        reason: sellReason, notes: finalNotes, chartUrl: sellChartUrl || pos.chartUrl || "", chartImage: sellChartImage || pos.chartImage || "",
         positionId: pos.id,    // ← Option C: auto-link this trade to the open lot it came from
         _fromDashboard: true,
       };
@@ -10038,6 +10122,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
       removeRow(pos.id, true); // skip confirm — sell modal already confirmed
     }
     setSellId(null);
+    setSellChartImage(""); setSellUploadingImage(false); // next close starts with an empty chart slot
     // CRITICAL: trigger immediate save after sell — saves position changes to Supabase.
     // Trade is already saved atomically above, so only position state needs saving here.
     setTimeout(() => onManualSaveRef.current(), 50); // ref avoids stale closure
@@ -10767,6 +10852,20 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                                     <textarea className="mgta" value={sellNotesStruct.wrong} onChange={e => setSellNotesStruct(s => ({ ...s, wrong: e.target.value }))} placeholder="What went wrong?"></textarea>
                                     <textarea className="mgta" value={sellNotesStruct.lessons} onChange={e => setSellNotesStruct(s => ({ ...s, lessons: e.target.value }))} placeholder="What I learned"></textarea>
                                     <input className="mgin wide" value={sellChartUrl} onChange={e => setSellChartUrl(e.target.value)} placeholder="tradingview.com/… (chart link)" />
+                                    {/* Upload your own marked-up chart with the review — saved onto the closed trade. */}
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+                                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 32, padding: "7px 12px", borderRadius: 8, cursor: sellUploadingImage ? "wait" : "pointer", background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, opacity: sellUploadingImage ? 0.6 : 1 }}>
+                                        {sellUploadingImage ? "Uploading…" : sellChartImage ? "📷 Replace chart" : "📷 Upload chart"}
+                                        <input type="file" accept="image/*" disabled={sellUploadingImage} style={{ display: "none" }} onChange={e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) uploadSellChartImage(f); }} />
+                                      </label>
+                                      {sellChartImage && (
+                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                          <img src={sellChartImage} alt="Chart for this close" style={{ height: 40, width: "auto", maxWidth: 120, objectFit: "cover", borderRadius: 6, border: `1px solid ${C.border}` }} />
+                                          <button type="button" aria-label="Remove chart" title="Remove this chart" onClick={() => setSellChartImage("")} style={{ minWidth: 32, minHeight: 32, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.95rem", lineHeight: 1, cursor: "pointer" }}>&times;</button>
+                                        </span>
+                                      )}
+                                      {!sellChartImage && !sellUploadingImage && <span style={{ color: C.muted, fontFamily: font, fontSize: "0.68rem" }}>Optional — your screenshot travels with this trade.</span>}
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="mgsellcol">
