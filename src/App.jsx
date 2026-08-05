@@ -10964,7 +10964,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <div className="cmdmeta">{openCount} open position{openCount === 1 ? "" : "s"}{refreshedAgo ? ` · prices refreshed ${refreshedAgo}` : ""}</div>
             </div>
             <div className="cmdactions">
-              <button className="btn ghost" onClick={fetchLivePrices} disabled={priceLoading}>{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
+              {/* Refresh Prices moved to the Open Positions card only (Valen 2026-08-05) — auto-refresh covers arrival */}
               <button
                 className="btn gold"
                 onClick={() => onManualSave && onManualSave()}
@@ -13088,7 +13088,7 @@ const mobileCSS = `
   .vj .toast, .vs .toast { bottom: 96px !important; }
   /* Duplicate refresh on phones: the Pro positions header repeats the command-header Refresh Prices
      button. The top button + auto-refresh already cover mobile, so drop this one. */
-  .vd .posRefreshBtn { display: none !important; }
+  /* posRefreshBtn now the ONLY refresh button (top one removed 2026-08-05) — visible on mobile too */
 }
 /* Touch devices (any width) — audit A8/A11: reorder handles must be VISIBLE (hover can't reveal
    them) and armed state must read; small icon buttons get real tap targets. */
