@@ -9831,20 +9831,26 @@ const WL_STAGE_FALLBACK = { fg: "rgba(255,255,255,0.55)", fg2: "rgba(255,255,255
 // Tooltips spell the numbers out — GROUP columns say they are the group's, STOCK columns say they
 // are the name's own, so the two pairs can never be read as the same measurement.
 const WL_COLS = [
-  { key: "t",       label: "Ticker",               align: "left",  tip: "The stock this row tracks. Names and order mirror the TradingView list exactly." },
-  { key: "six",     label: "TradingView Category", align: "left",  tip: "Which TradingView watchlist section the name sits in — the exact same segmentation as the TradingView list." },
-  { key: "rank",    label: "Theme",                align: "left",  tip: "The name's theme and where that theme ranks on the 1-week board. Green = top 3, orange = 4-5, red = the rest." },
-  { key: "grp",     label: "Industry group",       align: "left",  tip: "The rotation-table industry group this name maps to through its theme. The Group Thrust % and Group RS rank columns are THIS group's numbers." },
-  { key: "thrust",  label: "Group Thrust %",       align: "right", tip: "The INDUSTRY GROUP's thrust — this week's momentum, 0-100, same formula and benchmark (RSP) as the rotation table. The pop quiz. This is the whole industry group's number, not this stock's." },
-  { key: "rs",      label: "Group RS rank",        align: "right", tip: "The INDUSTRY GROUP's 1-month relative-strength rank, 0-100, straight from the rotation table. The semester grade. This is the whole industry group's number, not this stock's." },
-  { key: "sthrust", label: "Stock Thrust %",       align: "right", tip: "THIS stock's own thrust — this week's momentum vs the equal-weight market (RSP), 0-100, same formula as the group number. The pop quiz, for the name itself." },
-  { key: "srs",     label: "Stock RS rank",        align: "right", tip: "THIS stock's own 1-month relative-strength rank, 0-100, measured against the same benchmark as the group number. The semester grade, for the name itself." },
-  { key: "earnDay", label: "Earnings",             align: "right", tip: "Next scheduled earnings date. Turns red when it lands within 3 days. Scheduled dates can move." },
+  { key: "t",       label: "Ticker",               align: "left",   tip: "The stock this row tracks. Names and order mirror the TradingView list exactly." },
+  { key: "six",     label: "TradingView Category", align: "center", tip: "Which TradingView watchlist section the name sits in — the exact same segmentation as the TradingView list." },
+  { key: "rank",    label: "Theme",                align: "center", tip: "The name's theme and where that theme ranks on the 1-week board. Green = top 3, orange = 4-5, red = the rest." },
+  { key: "grp",     label: "Industry group",       align: "center", tip: "The rotation-table industry group this name maps to through its theme. The Group Thrust % and Group RS rank columns are THIS group's numbers." },
+  { key: "thrust",  label: "Group Thrust %",       align: "center", tip: "The INDUSTRY GROUP's thrust — this week's momentum, 0-100, same formula and benchmark (RSP) as the rotation table. The pop quiz. This is the whole industry group's number, not this stock's." },
+  { key: "rs",      label: "Group RS rank",        align: "center", tip: "The INDUSTRY GROUP's 1-month relative-strength rank, 0-100, straight from the rotation table. The semester grade. This is the whole industry group's number, not this stock's." },
+  { key: "sthrust", label: "Stock Thrust %",       align: "center", tip: "THIS stock's own thrust — this week's momentum vs the equal-weight market (RSP), 0-100, same formula as the group number. The pop quiz, for the name itself." },
+  { key: "srs",     label: "Stock RS rank",        align: "center", tip: "THIS stock's own 1-month relative-strength rank, 0-100, measured against the same benchmark as the group number. The semester grade, for the name itself." },
+  { key: "earnDay", label: "Earnings",             align: "center", tip: "Next scheduled earnings date. Turns red when it lands within 3 days. Scheduled dates can move." },
 ];
 // String-ish columns read best low-to-high; the strength columns read best strongest-first.
 const WL_ASC_KEYS = new Set(["t", "six", "rank", "grp", "earnDay"]);
 const WL_SORT_KEYS = new Set(WL_COLS.map(c => c.key));
 const WL_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WL_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// "2026-08-05" → "(Wed)" — the dashboard stamp convention, weekday behind the date.
+const wlWkd = (iso) => {
+  const d = new Date(String(iso) + "T00:00:00");
+  return isNaN(d) ? "" : `(${WL_DAYS[d.getDay()]})`;
+};
 const WL_SUP = ["¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
 
 // "2026-08-06" → "Aug 6". Parsed by hand so no timezone can shift the day.
@@ -9899,6 +9905,18 @@ function WatchlistCard({ C, font, session }) {
         setFlagsReady(true);
       } catch { /* no flags — never a crash */ }
     })();
+    return () => { dead = true; };
+  }, []);
+
+  // INDEX ribbon day-% — served by api/indices.js (2-min cached). Missing endpoint or a symbol
+  // it can't quote → that ticker simply shows no number; never a crash, never a fake value.
+  const [idxPct, setIdxPct] = useState(null);
+  useEffect(() => {
+    let dead = false;
+    fetch("/api/indices")
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => { if (!dead && j && typeof j === "object") setIdxPct(j); })
+      .catch(() => {});
     return () => { dead = true; };
   }, []);
 
@@ -10133,7 +10151,7 @@ function WatchlistCard({ C, font, session }) {
     color: on ? (meta ? meta.fg2 : "rgba(240,192,80,0.7)") : "rgba(255,255,255,0.4)",
   });
   const td = { padding: isMobileVP ? "6px 7px" : "7px 9px", borderBottom: `1px solid ${C.border}`, fontSize: isMobileVP ? "0.7rem" : "0.74rem", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: C.text };
-  const jc = (align) => (align === "right" ? "flex-end" : "flex-start");
+  const jc = (align) => (align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start");
 
   // Sortable header cell. The superscript only appears once a second column joins the chain, so a
   // single sort stays visually quiet.
@@ -10162,7 +10180,7 @@ function WatchlistCard({ C, font, session }) {
 
   // Heat cell — the same green ramp as the rotation table. "—" when there is no number to show.
   const heatCell = (v, key) => (
-    <td key={key} style={{ ...td, textAlign: "right", background: wlHeat(v) }}>
+    <td key={key} style={{ ...td, textAlign: "center", background: wlHeat(v) }}>
       {v == null ? <span style={{ color: "rgba(255,255,255,0.28)" }}>—</span> : <span style={{ fontWeight: 700 }}>{Math.round(v)}</span>}
     </td>
   );
@@ -10189,12 +10207,12 @@ function WatchlistCard({ C, font, session }) {
 
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingBottom: 9, borderBottom: `1px solid ${C.border}` }}>
-        <span style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "-0.01em", color: "rgba(255,255,255,0.95)" }}>🎯 The Hunt List</span>
+        <span style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "-0.01em", color: "rgba(255,255,255,0.95)" }}>The Hunt List</span>
         <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{rows.length}</span>
         <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={stampStyle}>list {WATCHLIST?.asof || "—"}</span>
-          <span style={stampStyle}>groups {GROUP_RS?.asof || "—"}</span>
-          {showStockStamp && <span style={stampStyle}>stocks {stockAsof}</span>}
+          <span style={stampStyle}>list {WATCHLIST?.asof || "—"} {wlWkd(WATCHLIST?.asof)}</span>
+          <span style={stampStyle}>groups {GROUP_RS?.asof || "—"} {wlWkd(GROUP_RS?.asof)}</span>
+          {showStockStamp && <span style={stampStyle}>stocks {stockAsof} {wlWkd(stockAsof)}</span>}
         </span>
       </div>
 
@@ -10202,21 +10220,30 @@ function WatchlistCard({ C, font, session }) {
         The watchlist, cross-checked against the leading themes and industry groups.
       </div>
 
-      {/* INDEX ribbon — names only. There is no live quote source in this card, so no numbers. */}
+      {/* INDEX ribbon — live day-% from /api/indices beside each name (green up · red down). */}
       {indexTickers.length > 0 && (
         <div style={{
           display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 0, marginBottom: 11,
           padding: isMobileVP ? "8px 4px" : "9px 6px", borderRadius: 12,
           background: "rgba(255,255,255,0.028)", border: `1px solid ${C.border}`,
         }}>
-          {indexTickers.map((t, i) => (
-            <span key={String(t)} style={{
-              display: "inline-flex", alignItems: "baseline", padding: "1px 12px",
-              borderRight: i === indexTickers.length - 1 ? "none" : `1px solid ${C.border}`,
-            }}>
-              <span style={{ fontSize: "0.68rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{String(t)}</span>
-            </span>
-          ))}
+          {indexTickers.map((t, i) => {
+            const pct = idxPct ? idxPct[String(t)] : null;
+            const pcol = pct == null ? null : pct > 0 ? "#86efac" : pct < 0 ? "#fca5a5" : "rgba(255,255,255,0.5)";
+            return (
+              <span key={String(t)} style={{
+                display: "inline-flex", alignItems: "baseline", gap: 7, padding: "1px 12px",
+                borderRight: i === indexTickers.length - 1 ? "none" : `1px solid ${C.border}`,
+              }}>
+                <span style={{ fontSize: "0.68rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{String(t)}</span>
+                {pct != null && (
+                  <span style={{ fontSize: "0.64rem", fontWeight: 700, color: pcol, fontVariantNumeric: "tabular-nums" }}>
+                    {pct > 0 ? "+" : ""}{pct.toFixed(2)}%
+                  </span>
+                )}
+              </span>
+            );
+          })}
         </div>
       )}
 
@@ -10267,14 +10294,14 @@ function WatchlistCard({ C, font, session }) {
                 <tr key={r.sec + "|" + r.tk}>
                   <td style={{ ...td, padding: "4px 0 4px 2px" }}>{flagCell(r)}</td>
                   <td style={{ ...td, fontWeight: 800, color: C.white }}><span className="wlh-tk">{r.tk}</span></td>
-                  <td style={td}>
+                  <td style={{ ...td, textAlign: "center" }}>
                     <span style={{
                       display: "inline-flex", alignItems: "center", fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.03em",
                       padding: "2px 8px", borderRadius: 980, lineHeight: 1.45, whiteSpace: "nowrap",
                       color: meta.fg, background: meta.bg, border: `1px solid ${meta.bd}`,
                     }}>{r.secLabel}</span>
                   </td>
-                  <td style={td}>
+                  <td style={{ ...td, textAlign: "center" }}>
                     {!r.theme ? <span style={{ color: "rgba(255,255,255,0.28)" }}>—</span> : (
                       <>
                         <span style={{ color: "rgba(255,255,255,0.66)" }}>{r.theme}</span>{" "}
@@ -10282,7 +10309,7 @@ function WatchlistCard({ C, font, session }) {
                       </>
                     )}
                   </td>
-                  <td style={td}>
+                  <td style={{ ...td, textAlign: "center" }}>
                     {r.grp
                       ? <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>{r.grp}</span>
                       : <span style={{ color: "rgba(255,255,255,0.28)" }}>—</span>}
@@ -10291,7 +10318,7 @@ function WatchlistCard({ C, font, session }) {
                   {heatCell(r.rs1m, "gr")}
                   {heatCell(r.sthrust, "st")}
                   {heatCell(r.srs1m, "sr")}
-                  <td style={{ ...td, textAlign: "right", color: r.earn ? (soon ? "#fca5a5" : "rgba(255,255,255,0.48)") : "transparent", fontWeight: soon ? 700 : 500 }}>
+                  <td style={{ ...td, textAlign: "center", color: r.earn ? (soon ? "#fca5a5" : "rgba(255,255,255,0.48)") : "transparent", fontWeight: soon ? 700 : 500 }}>
                     {r.earn ? wlFmtDay(r.earn) : ""}
                   </td>
                 </tr>
