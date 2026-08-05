@@ -480,7 +480,7 @@ async function main() {
     const realized = round(realizedForPos(p), 0);
     return {
       sym: p.symbol, shares: sh, entry, stop, trail, cp, ext: p.ext_mult != null ? round(+p.ext_mult, 2) : null,
-      riskFree: eff > -1e17 && entry != null && eff >= entry,
+      riskFree: eff > -1e17 && entry != null && eff >= entry * 0.999, // 0.1% breakeven band (Valen 2026-08-05)
       unrealUsd: round(unreal, 0),
       unrealR: riskPS && unreal != null ? round((cp - entry) / riskPS) : null,
       realizedUsd: realized,

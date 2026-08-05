@@ -10309,7 +10309,8 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
     const tier = autoTier(roteD, rSizer); // risk-first: tier by $-at-risk vs per-trade risk budget
     const rotePct = compEquity > 0 ? (roteD / compEquity) * 100 : 0; // same base as the aggregate/budget panel (was ÷ raw portfolioSize — rows didn't reconcile once realized P/L ≠ 0)
     const currentRiskPerShare = dir * (epN - activeStop); // >0 = still at risk, <=0 = risk-free / locked
-    const currentRoteD = currentRiskPerShare <= 0 ? 0 : currentRiskPerShare * sharesN;
+    // Same 0.1%-of-entry breakeven band as riskStatus: a hair of residual risk counts as $0.
+    const currentRoteD = currentRiskPerShare <= epN * 0.001 ? 0 : currentRiskPerShare * sharesN;
     const currentRotePct = compEquity > 0 ? (currentRoteD / compEquity) * 100 : 0;
 
     // Risk-free exposure: use trail stop if set, otherwise original stops
@@ -10327,11 +10328,14 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
     }
     const riskExposurePct = 100 - riskFreePct;
 
-    // Risk Status
+    // Risk Status. Breakeven band (Valen 2026-08-05): a stop within 0.1% of entry counts as
+    // breakeven — brokers/rounding put "BE" stops a fraction of a cent off exact cost
+    // (his SOXL 115.45 vs cost 115.4583 read At Risk over $1.85 of residual).
     const anyStop = hasS1 || hasS2;
+    const beTolD = epN * 0.001 * sharesN;
     const riskStatus = !epN || !anyStop ? "—"
-      : rtsD < 0 ? "Profit Locked"
-      : rtsD === 0 ? "Risk-Free"
+      : rtsD < -beTolD ? "Profit Locked"
+      : rtsD <= beTolD ? "Risk-Free"
       : "At Risk";
 
     // R-based fields — ALWAYS use original stops for R calculation
@@ -10468,7 +10472,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
       const initRiskD = dir * ((epN - s1) * h1 + (isDual ? (epN - s2) * h2 : 0));
       const activeStop = tsN > 0 ? tsN : (isDual ? (s1 * h1 + s2 * h2) / (h1 + h2) : s1);
       const currentRiskD = dir * (epN - activeStop) * sharesN;
-      const isRiskFree = dir * (activeStop - epN) >= 0 && epN > 0 && (s1 > 0 || s2 > 0);
+      const isRiskFree = dir * (activeStop - epN) >= -epN * 0.001 && epN > 0 && (s1 > 0 || s2 > 0); // 0.1% breakeven band
       const roteD = initRiskD > 0 ? initRiskD : 0;
       const rotePct = compEquity > 0 ? (roteD / compEquity) * 100 : 0;
       const currentRoteD = isRiskFree ? 0 : Math.max(0, currentRiskD);
@@ -10664,7 +10668,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <table>
             <thead>
               <tr>
-                <th><span className="term" data-tip="Where this position sits on risk.&#10;At Risk = stop below entry.&#10;Risk-Free = stop at entry.&#10;Profit Locked = stop above entry.">Status</span></th>
+                <th><span className="term" data-tip="Where this position sits on risk.&#10;At Risk = stop below entry.&#10;Risk-Free = stop at (or within a hair of) entry.&#10;Profit Locked = stop above entry.">Status</span></th>
                 <th onClick={() => togglePosSort("sym")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "sym" ? C.gold : undefined }} title="Sort by ticker"><span className="term" data-tip="The ticker symbol. The dot shows the source: gold = auto-synced from IBKR, grey = entered manually.">Symbol</span>{posSort && posSort.key === "sym" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th onClick={() => togglePosSort("holdDays")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "holdDays" ? C.gold : undefined }} title="Sort by days held"><span className="term" data-tip="How many calendar days you've held this position since your entry date.">Days</span>{posSort && posSort.key === "holdDays" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th className="pro-only"><span className="term" data-tip="How many shares you currently hold.">Shares</span></th>
