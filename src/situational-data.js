@@ -17,38 +17,38 @@
 //
 // Voice: plain, short, punchy (skill `plain-voice`). Describe what the lenses show — never instruct.
 export const SITUATIONAL = {
-  asof: "2026-08-03",     // the market close this read describes (matches the lens data)
-  updated: "2026-08-04",  // when it was written (Valen's clock)
+  asof: "2026-08-04",     // the market close this read describes (matches the lens data)
+  updated: "2026-08-05",  // when it was written (Valen's clock)
 
   // "RISK ON" | "NEUTRAL" | "RISK OFF" — rendered as the coloured chip that closes the verdict.
-  // 08-03 basis: the quarter switch flipped back GREEN and both buy/sell ratios crossed above 1
-  // on a 573-vs-74 accumulation day — but the month pair is still red (79 up vs 162 down), so
-  // one horizon is green, one is not. One more strong follow-through day converts this.
-  stance: "NEUTRAL",
+  // 08-04 basis: the 08-03 card said "one more strong follow-through day converts this" — it came.
+  // 718 up-4% vs 114 down, the MONTH pair flipped green (112 vs 109) joining the quarter pair
+  // (1,495 vs 1,055), both buy/sell ratios rising (r5 1.81 · r10 1.23). Both horizons now agree.
+  stance: "RISK ON",
 
-  headline: "Monday was the strongest buying day of this correction — 573 stocks up 4%+ against just 74 down — and the main breadth switch flipped back green. One horizon confirmed; the month has not.",
+  headline: "The follow-through day came: 718 stocks up 4%+ against 114 down, and the month switch flipped green to join the quarter. Both breadth horizons now agree for the first time since the correction began.",
 
   weather: `<ul>
-    <li>S&amp;P closed <b>+1.5%</b> and this time breadth agreed: <b>573 stocks up 4%+ vs 74 down</b>.</li>
-    <li><b>The main switch flipped GREEN:</b> 1,304 stocks up 25% this quarter vs 1,160 down. It was red on Friday.</li>
-    <li>The 5- and 10-day buy/sell ratios are both back above 1 (<b>1.19</b> and <b>1.12</b>).</li>
-    <li>Still missing: the month pair is red — <b>79 up 25%+ vs 162 down</b>. The turn is days old, not weeks.</li>
-    <li>Friday's warning (index up, more stocks down) was answered, not repeated.</li>
+    <li><b>718 stocks up 4%+ vs 114 down</b> — a second, bigger buying day right after Monday's 573/74.</li>
+    <li><b>The month switch flipped GREEN:</b> 112 stocks up 25% this month vs 109 down (it was 79 vs 162 two sessions ago).</li>
+    <li>The quarter switch widened: <b>1,495 up vs 1,055 down</b>.</li>
+    <li>Buy/sell ratios strengthening: 5-day <b>1.81</b>, 10-day <b>1.23</b>.</li>
+    <li>Not frothy yet: only 19 stocks up 50% in a month (red zone starts at 20) and T2108 at 55 — mid-range, room to run.</li>
   </ul>`,
 
   shop: `<ul>
-    <li><b>Software is the strongest theme in the market</b> — up <b>+10.7%</b> on the week, and the internet/software groups sit at the very top of the rotation table near their highs.</li>
-    <li>China Internet leads BOTH windows (+9.3% week, +12.3% month).</li>
-    <li><b>Airlines +8.5%</b> on the week — oil dropping 6% Monday poured fuel on it.</li>
-    <li>The beaten growth complex is repairing on the week — Robotics +6.2, Quantum +4.6, AI +4.5, Cybersecurity +4.3 — but every one of them is still red on the month.</li>
-    <li>Defensives were abandoned: staples and health-care sector strength went <b>negative</b> the same week risk themes turned up.</li>
+    <li><b>Software is the runaway weekly leader: +16.1%</b> — and its earnings gaps are HOLDING, which this market had refused to do for months.</li>
+    <li>The beaten growth complex led the session — <b>Semiconductors +5.5% on the day</b>, Quantum +4.9, AI +4.2, Cybersecurity +4.1 — the worst monthly groups bounced hardest.</li>
+    <li>Fresh money on the week: <b>Quantum +9.7 and Robotics +9.6 entered the weekly top-5</b>, alongside Software, Airlines (+11.0) and China Internet (+9.9).</li>
+    <li>Intraday demand was real: Software +3.8 and Cybersecurity +3.6 <b>since the open</b> — buying all day, not a gap.</li>
+    <li>Month board still shows the repair job: Semis −4.8, Solar −7.4, Growth −8.1 on the month — bounces becoming trends, not yet leaders.</li>
   </ul>`,
 
   flip: `<ul>
-    <li>The month pair (25%-in-a-month up vs down) turning green would confirm the turn.</li>
-    <li>A genuine follow-through day in the next few sessions — Monday was the setup, not yet the proof.</li>
-    <li><b>Still broken on the month:</b> Semiconductors −9.7% · Solar −11.0% · Growth Stocks −10.4% · Genomics −9.1%.</li>
-    <li>If the 5-day ratio slips back under 1, the flip failed.</li>
+    <li>The 5-day buy/sell ratio slipping back under 1 would mean the thrust failed.</li>
+    <li>The month pair is barely green (112 vs 109) — one heavy selling day re-reds it.</li>
+    <li>A 300+ down-4% day = the documented selling extreme; that word overrides everything.</li>
+    <li>Watch whether this week's big earnings gaps keep holding — leaders failing their gaps was the old market's tell.</li>
   </ul>`,
 
   // Optional free-form commentary block — usually Valen's own words via the in-app editor.
