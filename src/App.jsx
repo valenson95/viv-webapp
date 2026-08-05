@@ -774,6 +774,7 @@ const WHATS_NEW = [
     date: "August 5, 2026",
     title: "⚡ Auto price refresh · cleaner positions table · risk energy bar",
     items: [
+      "Big phone clean-up: every page now fits your screen properly. Headers are smaller, cards are tighter, and on the Dashboard the Open Positions header and risk strip fold into one slim bar — tap it to see the full breakdown. Your first position now shows up right away instead of after a scroll. Nothing was removed, just folded away until you want it.",
       "Closing a trade now lets you upload your own chart with your review — and you can add a chart to any closed trade from its details page. (Thanks JH! 🙌)",
       "No more clicking Refresh Prices on arrival — the Dashboard now pulls the latest market prices automatically the moment your positions load. Pro view also gets a second Refresh button right on the Open Positions card. (Thanks Estrid! 🙌)",
       "Position size now shows the % of your account above the dollar amount — see concentration at a glance.",
@@ -5781,6 +5782,12 @@ const excTime = (bt, res) => {
 
 function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit, demoMode = false, onToggleDemo }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  // MOBILE-ONLY gate (2026-08-05 mobile polish) — same <768 breakpoint the shell uses. Only shortens
+  // labels that would otherwise force a wrap on a 390px screen; desktop output is unchanged.
+  const isMobileVP = useScreenWidth() < 768;
+  // Phone: the VIV Analytics block (4 wide cards) starts COLLAPSED so the closed-trades table is
+  // reachable without a long scroll. Tap the heading to open it. Desktop always renders it expanded.
+  const [vaOpenMob, setVaOpenMob] = useState(false);
   useSectors((journaledTrades || []).map(t => t.ticker)); // theme fallback for tickers not in the curated map
   const gradesV = useSavedGrades(); // re-render + re-run the freeze when grades save/sync
   // Freeze the symbol's CURRENT setup grade onto each closed trade once (grade_snapshot) —
@@ -8551,15 +8558,17 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           {/* P6. OBJECTIVE EDGE + EDGE MATRIX (two cards) */}
           {objectiveEdge(true)}
 
-          {/* P7. ANALYTICS ROW */}
-          <div className="toolbar" style={{ marginTop: 20, display: "flex", alignItems: "center" }}>
-            <h2 className="sech">VIV Analytics</h2>
+          {/* P7. ANALYTICS ROW — on phones the heading is a tap target that folds the whole block. */}
+          <div className="toolbar vahead" style={{ marginTop: 20, display: "flex", alignItems: "center" }}>
+            <h2 className="sech" {...(isMobileVP ? { onClick: () => setVaOpenMob(o => !o), style: { cursor: "pointer" } } : {})}>VIV Analytics{isMobileVP ? <span className="vachev">{vaOpenMob ? " \u25B2" : " \u25BC"}</span> : null}</h2>
             <div className="spacer"></div>
+            {(!isMobileVP || vaOpenMob) && (
             <div className="seg vaseg" title="Scope the analytics below to a time window">
               {[["all", "All time"], ["month", "Month"], ["week", "Week"], ["day", "Day"]].map(([k, l]) => <button key={k} className={vaPeriod === k ? "on" : ""} onClick={() => setVaPeriod(k)}>{l}</button>)}
             </div>
+            )}
           </div>
-          {(() => {
+          {(!isMobileVP || vaOpenMob) && (() => {
             // Pro VIV Analytics: Recap | Insights | (Winners over Losers), drag-to-rearrange (⋮⋮).
             const vaCards = {
               recap: (
@@ -8658,7 +8667,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <div className="spacer"></div>
               <div className="seg" id="viewSeg">
                 <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
-                <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro · all columns</button>
+                <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>{isMobileVP ? "Pro" : "Pro · all columns"}</button>
               </div>
             </div>
             <div className="tablewrap">
@@ -9092,7 +9101,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           <div className="spacer"></div>
           <div className="seg" id="viewSeg">
             <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
-            <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro · all columns</button>
+            <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>{isMobileVP ? "Pro" : "Pro · all columns"}</button>
           </div>
         </div>
 
@@ -9707,6 +9716,14 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
   useSectors((positions || []).map(p => p.sym)); // resolve unknown tickers' themes via /api/sector fallback
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const [compactTable, setCompactTable] = useState(false);
+  // MOBILE-ONLY layout gate (2026-08-05 mobile polish). Same <768 breakpoint the app shell uses, read
+  // from the module-scope useScreenWidth hook so there is one source of truth. Used ONLY to swap in the
+  // compact phone markup below — every desktop branch renders exactly as before.
+  const isMobileVP = useScreenWidth() < 768;
+  // Phone: the Open Positions header + risk-allocation strip collapse into ONE tappable summary row.
+  // Closed by default so a position row is visible without scrolling; tap expands the full
+  // At Risk / Available / Risk-Free / Exposure legend (collapse ≠ remove).
+  const [allocOpen, setAllocOpen] = useState(false);
   // Open Positions zoom — scales the whole table (5 steps each way, 70%–130%, 6% per step). Persisted as a UI-only pref.
   const [posZoom, setPosZoom] = useState(() => { const s = parseFloat(localStorage.getItem("viv-pos-zoom")); return Number.isFinite(s) ? Math.min(1.3, Math.max(0.7, s)) : 1; });
   const stepZoom = (dir) => setPosZoom(z => { const v = Math.min(1.3, Math.max(0.7, +(z + dir * 0.06).toFixed(2))); localStorage.setItem("viv-pos-zoom", String(v)); return v; });
@@ -11208,6 +11225,46 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               Available / Risk-Free + deploy note), one row instead of a whole slot. Dollar figures stay
               out of the Daily Plan capture because this card sits below the capture wrapper. */}
           <div className="card poscard" style={{ marginTop: 14 }}>
+            {isMobileVP ? (
+              /* ── PHONE ONLY (2026-08-05): the header chrome + the whole risk-allocation strip fuse
+                 into one compact summary. ~230px of chrome before row one becomes ~72px. Tapping the
+                 summary reveals the identical At Risk / Available / Risk-Free / Exposure legend, so
+                 nothing is removed — just folded. Desktop renders the original markup below. */
+              <>
+                <div className="cardhead poshead mobposhead">
+                  <h2>Open Positions</h2>
+                  {openCount === 0 && <span className="countchip">0</span>}
+                  {nAtRisk > 0 && <span className="countchip term" data-tip={`${nAtRisk} position${nAtRisk === 1 ? "" : "s"} At Risk — stop below entry, a stop-out costs money.`} style={{ background: "var(--redDim)", color: "var(--red)" }}>{nAtRisk}</span>}
+                  {nRiskFree > 0 && <span className="countchip term" data-tip={`${nRiskFree} position${nRiskFree === 1 ? "" : "s"} Risk-Free — stop at breakeven, worst case $0.`}>{nRiskFree}</span>}
+                  {nLocked > 0 && <span className="countchip term" data-tip={`${nLocked} position${nLocked === 1 ? "" : "s"} Profit Locked — stop above entry, gains are protected.`} style={{ background: "var(--greenDim)", color: "var(--green)" }}>{nLocked}</span>}
+                  <span className="infodot" data-tip="Every trade you currently hold. The colored status shows which positions are at risk.">i</span>
+                  <div className="spacer"></div>
+                  <div className="seg" id="viewSeg">
+                    <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
+                    <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro</button>
+                  </div>
+                </div>
+                <div className="allocstrip moballoc">
+                  <button type="button" className="allocsum" onClick={() => setAllocOpen(o => !o)} aria-expanded={allocOpen}>
+                    <span className="allocsumpct" style={{ color: over ? "var(--red)" : allocPct >= 70 ? "var(--goldBright)" : "var(--text)" }}>{Math.round(allocPct)}%</span>
+                    <span className="allocsumlbl">risk used</span>
+                    <span className="allocsumbar"><span style={{ width: `${Math.min(100, allocPct)}%`, background: over ? "var(--red)" : allocPct >= 70 ? "linear-gradient(90deg, var(--gold), var(--goldBright))" : "linear-gradient(90deg, rgba(34,197,94,0.75), var(--green))" }}></span></span>
+                    <span className="allocsumexp">Exposure <b>{usd0(totalExposure)}</b></span>
+                    <span className="allocsumchev">{allocOpen ? "▲" : "▼"}</span>
+                  </button>
+                  {allocOpen && (
+                    <div className="allocdet">
+                      <Tip className="leg" tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></Tip>
+                      <Tip className="leg" tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></Tip>
+                      <Tip className="leg" tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></Tip>
+                      <Tip className="leg" tip="Total dollars across all open positions (the sum of the Position size column) — your gross exposure, with its % of account."><span className="legdot" style={{ background: "var(--goldBright)" }}></span>Exposure&nbsp;<b>{usd0(totalExposure)}</b>{compEquity > 0 && <span style={{ color: "var(--muted)", fontWeight: 600 }}>&nbsp;· {((totalExposure / compEquity) * 100).toFixed(1)}%</span>}</Tip>
+                      <span className="allocnote">{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
             <div className="cardhead poshead">
               <h2>Open Positions</h2>
               {/* Status-colored counts (Valen 2026-08-05): red = At Risk · gold = Risk-Free · green = Profit Locked */}
@@ -11242,6 +11299,8 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <Tip className="leg" tip="Total dollars across all open positions (the sum of the Position size column) — your gross exposure, with its % of account."><span className="legdot" style={{ background: "var(--goldBright)" }}></span>Exposure&nbsp;<b>{usd0(totalExposure)}</b>{compEquity > 0 && <span style={{ color: "var(--muted)", fontWeight: 600 }}>&nbsp;· {((totalExposure / compEquity) * 100).toFixed(1)}%</span>}</Tip>
               <span className="allocnote" style={{ marginLeft: "auto" }}>{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</span>
             </div>
+              </>
+            )}
             <div className="pos-scroll">
               {positionsTable}
             </div>
@@ -11462,7 +11521,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <div className="spacer"></div>
           <div className="seg" id="viewSeg">
             <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
-            <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
+            <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>{isMobileVP ? "Pro" : <>Pro &middot; all columns</>}</button>
           </div>
           <button className="btn" onClick={fetchLivePrices} disabled={priceLoading}>{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
           <button
@@ -13109,6 +13168,217 @@ const mobileCSS = `
   [style*='grid-template-columns: repeat(auto-fit, minmax(150px'] {
     grid-template-columns: 1fr 1fr !important;
   }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════════
+   MOBILE REAL-ESTATE PASS — 2026-08-05
+   Everything below is inside a ≤767px (or pointer:coarse) gate, so desktop rendering
+   is byte-identical. Rules are !important because these scoped page stylesheets are
+   injected in <body> (via dangerouslySetInnerHTML) and therefore beat this <head>
+   sheet on equal specificity.
+   ⚠ The [style*='…'] rules must match React's SERIALIZED inline style exactly:
+     kebab-case, no quotes, numeric values suffixed px (padding: 20px 22px / gap: 26px).
+     If a literal changes in the JSX, grep this block for the old value.
+   ═════════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+
+  /* ── 1. PAGE SHELL — reclaim the double gutter + the duplicate wordmark ──
+     Each scoped shell adds 18px of side padding INSIDE the app's own 16px mobile
+     gutter: 68px of a 390px screen spent on nothing. The .navbar under it repeats
+     the sticky header's VIV wordmark and its tabs are already hidden (the bottom
+     tab bar owns navigation), so it is pure height. */
+  .vp .shell, .vj .shell, .vd .shell, .vs .shell { padding: 4px 0 24px !important; }
+  .vp .navbar, .vj .navbar, .vd .navbar, .vs .navbar { display: none !important; }
+
+  /* ── 2. COMMAND HEADER (Pro — Dashboard / Journal / Tools / Settings) ──
+     Was eyebrow + 1.5rem title + meta + a wrapping action row ≈ 150px.
+     Eyebrow goes (the bottom bar already names the page), title shrinks, and the
+     buttons share one flexible row instead of stacking. */
+  .vp.expert .cmdheader, .vj.expert .cmdheader, .vd.expert .cmdheader, .vs.expert .cmdheader {
+    gap: 8px !important; margin-top: 2px !important; margin-bottom: 10px !important;
+  }
+  .vp.expert .cmdheader .eyebrow, .vj.expert .cmdheader .eyebrow,
+  .vd.expert .cmdheader .eyebrow, .vs.expert .cmdheader .eyebrow { display: none !important; }
+  .vp.expert .cmdleft .ch1, .vj.expert .cmdleft .ch1,
+  .vd.expert .cmdleft .ch1, .vs.expert .cmdleft .ch1 {
+    font-size: 1.15rem !important; margin-top: 0 !important; line-height: 1.2 !important;
+  }
+  .vp.expert .cmdmeta, .vj.expert .cmdmeta, .vd.expert .cmdmeta, .vs.expert .cmdmeta {
+    font-size: 0.66rem !important; margin-top: 3px !important; line-height: 1.4 !important;
+  }
+  .vp.expert .cmdactions, .vj.expert .cmdactions, .vd.expert .cmdactions, .vs.expert .cmdactions {
+    width: 100% !important; gap: 6px !important;
+  }
+  .vp.expert .cmdactions > *, .vj.expert .cmdactions > *,
+  .vd.expert .cmdactions > *, .vs.expert .cmdactions > * { flex: 1 1 auto !important; min-width: 0 !important; }
+  .vp.expert .cmdactions .btn, .vj.expert .cmdactions .btn,
+  .vd.expert .cmdactions .btn, .vs.expert .cmdactions .btn {
+    display: inline-flex !important; align-items: center !important; justify-content: center !important;
+    width: 100% !important; box-sizing: border-box !important;
+    padding: 8px 8px !important; font-size: 0.64rem !important; min-height: 32px !important; white-space: nowrap !important;
+  }
+  .vj.expert .cmdactions .ddwrap { display: flex !important; }
+
+  /* ── 3. GUIDED HEADERS — same idea, one size down ── */
+  .vp .h1, .vj .h1, .vd .h1, .vs .h1 { font-size: 1.28rem !important; letter-spacing: -0.03em !important; }
+  .vp .sub, .vj .sub, .vd .sub, .vs .sub { font-size: 0.72rem !important; line-height: 1.45 !important; margin-top: 4px !important; }
+  .vd .hero { gap: 10px !important; margin-top: 12px !important; }
+
+  /* ── 4. CARD CHROME — tighter radius + padding reads as an app, not a web page ── */
+  .vp .card, .vj .card, .vd .card, .vs .card { border-radius: 16px !important; }
+  .vp .card, .vj .card, .vd .card, .vs .card,
+  .vp.expert .card, .vj.expert .card, .vd.expert .card, .vs.expert .card { padding: 12px 13px !important; }
+  .vd.expert .poscard { padding: 12px 10px 14px !important; }
+  .vd.expert .kpi { padding: 12px 13px !important; min-height: 0 !important; }
+  .vj.expert .vacard, .vj .vacard { padding: 12px 13px !important; }
+  .vd .cardhead, .vj .cardhead, .vp .cardhead, .vs .cardhead,
+  .vd.expert .cardhead, .vj.expert .cardhead { padding-bottom: 8px !important; margin-bottom: 10px !important; gap: 6px !important; }
+  .vd .toolbar, .vj .toolbar, .vp .toolbar, .vs .toolbar { margin: 14px 0 8px !important; gap: 8px !important; }
+  .vd .sech, .vj .sech, .vp .sech, .vs .sech,
+  .vd .toolbar h2, .vj .toolbar h2 { font-size: 0.86rem !important; }
+
+  /* ── 5. SEGMENTED CONTROLS — "Pro · all columns" was ~222px wide and forced a wrap.
+     The label itself is shortened to "Pro" in JSX on mobile; this shrinks the pill. ── */
+  .vp .seg button, .vj .seg button, .vd .seg button, .vs .seg button {
+    padding: 6px 11px !important; font-size: 0.66rem !important;
+  }
+  .vp .seg, .vj .seg, .vd .seg, .vs .seg { max-width: 100% !important; }
+  .vp.expert .toolseg { margin: 10px 0 12px !important; }
+  .vp.expert .toolseg button { padding: 7px 12px !important; font-size: 0.68rem !important; }
+
+  /* ── 6. OPEN POSITIONS (Pro) — the fused mobile summary strip.
+     ~230px of header + allocation chrome before row one becomes ~72px; tapping the
+     summary reveals the identical legend (see .allocdet). ── */
+  .vd.expert .poshead.mobposhead { padding-bottom: 8px !important; margin-bottom: 0 !important; gap: 6px !important; }
+  .vd.expert .poshead.mobposhead h2 { font-size: 0.82rem !important; }
+  .vd .allocstrip.moballoc { display: block !important; padding: 8px 0 6px !important; margin-bottom: 6px !important; }
+  .vd .allocstrip.moballoc .allocsum {
+    display: flex !important; align-items: center !important; gap: 8px !important; width: 100% !important;
+    padding: 5px 0 !important; min-height: 32px !important; background: transparent !important; border: none !important;
+    cursor: pointer !important; font-family: var(--font) !important; text-align: left !important;
+  }
+  .vd .allocstrip.moballoc .allocsumpct { flex: none !important; font-size: 0.74rem !important; font-weight: 800 !important; font-variant-numeric: tabular-nums !important; }
+  .vd .allocstrip.moballoc .allocsumlbl { flex: none !important; font-size: 0.55rem !important; font-weight: 700 !important; letter-spacing: 0.1em !important; text-transform: uppercase !important; color: var(--muted) !important; }
+  .vd .allocstrip.moballoc .allocsumbar {
+    flex: 1 1 auto !important; min-width: 34px !important; height: 8px !important; display: block !important;
+    border-radius: 99px !important; background: rgba(255,255,255,0.09) !important;
+    border: 1px solid rgba(255,255,255,0.07) !important; overflow: hidden !important;
+  }
+  .vd .allocstrip.moballoc .allocsumbar > span { display: block !important; height: 100% !important; border-radius: 99px !important; transition: width 0.5s ease !important; }
+  .vd .allocstrip.moballoc .allocsumexp { flex: none !important; font-size: 0.62rem !important; color: var(--muted) !important; white-space: nowrap !important; }
+  .vd .allocstrip.moballoc .allocsumexp b { color: var(--text) !important; font-weight: 700 !important; }
+  .vd .allocstrip.moballoc .allocsumchev { flex: none !important; width: 14px !important; text-align: right !important; font-size: 0.55rem !important; color: var(--goldBright) !important; }
+  .vd .allocstrip.moballoc .allocdet {
+    display: flex !important; flex-wrap: wrap !important; gap: 7px 14px !important;
+    padding: 9px 0 2px !important; margin-top: 6px !important; border-top: 1px solid var(--border) !important;
+  }
+  .vd .allocstrip.moballoc .allocdet .leg { font-size: 0.68rem !important; }
+  .vd .allocstrip.moballoc .allocnote { flex-basis: 100% !important; font-size: 0.62rem !important; color: var(--faint) !important; margin-left: 0 !important; }
+
+  /* ── 7. JOURNAL FILTER BAR — 5 controls on one ruled row; only the chrome shrinks.
+     Select/date font-size is left alone: sub-16px triggers iOS zoom-on-focus. ── */
+  .vj .filterbar { gap: 8px !important; padding: 9px 10px !important; margin-bottom: 10px !important; border-radius: 12px !important; }
+  .vj .filterbar .flabel { font-size: 0.6rem !important; letter-spacing: 0.06em !important; }
+  .vj .fctl { font-size: 0.6rem !important; gap: 5px !important; }
+  .vj .filterbar .btn { padding: 6px 11px !important; font-size: 0.66rem !important; }
+  .vj .filterbar .filtsel { padding: 5px 9px !important; }
+  .vj .fcount { font-size: 0.68rem !important; }
+  .vj.expert .metricsmini { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; grid-auto-rows: minmax(64px, auto) !important; }
+  .vj.expert .mmtile { padding: 10px 11px !important; }
+  .vj.expert .mmv { font-size: 0.95rem !important; }
+  /* VIV Analytics folds on phones — its heading is the tap target (.vahead, gated in the JSX). */
+  .vj .vahead .sech { min-height: 30px !important; display: inline-flex !important; align-items: center !important; }
+  .vj .vahead .vachev { color: var(--goldBright) !important; font-size: 0.62rem !important; }
+
+  /* ── 8. PREMIUM TOOLS — the explainer box never collapses, and the desktop
+     ≤600px rule STACKS it (icon above text), making it taller on the exact screens
+     that can least afford it. Keep it a row, drop the icon, shrink the copy. ── */
+  .vp .intro { flex-direction: row !important; padding: 10px 12px !important; margin-bottom: 10px !important; gap: 9px !important; border-radius: 12px !important; }
+  .vp .intro .ico { display: none !important; }
+  .vp .intro h3 { font-size: 0.84rem !important; }
+  .vp .intro p { font-size: 0.72rem !important; line-height: 1.45 !important; }
+  .vp .panelhead { margin-bottom: 9px !important; }
+  .vp .io { grid-template-columns: 1fr !important; gap: 12px !important; }
+  .vp .iogrid { gap: 10px !important; }
+  .vp .tile { padding: 10px 12px !important; }
+  .vp .tile .v { font-size: 1.15rem !important; }
+
+  /* ── 9. LENS / SUB-PAGE CARDS (Rotation, Breadth, Earnings) — these files carry
+     their own scoped stylesheets with no mobile rules at all. ── */
+  .grs .grs-card, .mm .mm-card, .earn .earn-card { padding: 11px 12px !important; margin-bottom: 10px !important; }
+  .grs .grs-card h1, .mm .mm-card h1, .earn .earn-card h1 { font-size: 1.15rem !important; margin: 0 0 4px !important; }
+  .grs .grs-card p, .mm .mm-card p, .earn .earn-card p { font-size: 0.72rem !important; line-height: 1.45 !important; }
+  .vd.expert .lensrowA, .vd.expert .lensrowB, .vd .lensduo, .vd.expert .lensstack, .vd.expert .ctxrow, .vd.expert .ctxstack { gap: 10px !important; margin-top: 10px !important; }
+  .vd.expert .kpistrip { gap: 8px !important; }
+
+  /* ── 10. DAILY SETUPS header ── */
+  .dspagehead { margin-bottom: 10px !important; }
+  .dspagehead .dseyebrow { display: none !important; }
+  .dspagehead h1 { font-size: 1.18rem !important; margin: 0 !important; }
+  .dspagehead .dsmeta { font-size: 0.68rem !important; margin-top: 4px !important; line-height: 1.4 !important; }
+  .dstoolbar { gap: 7px !important; margin-bottom: 10px !important; }
+
+  /* ── 11. PERFORMANCE CALENDAR — the 8th "Week" column stole ~130px of a 390px
+     row, squeezing each day to ~30px. Phones get the 7 day columns only; the week
+     totals live in the monthly stats chip above. Cells lose their 96px floor. ── */
+  .calgrid { grid-template-columns: repeat(7, 1fr) !important; gap: 4px !important; }
+  .calgrid .calweekcol { display: none !important; }
+  [style*='min-height: 96px'] { min-height: 52px !important; }
+
+  /* ── 12. PADDING / MARGIN / GAP SWEEP — inline literals the earlier layer missed ── */
+  [style*='padding: 26px 28px'],
+  [style*='padding: 22px 22px'],
+  [style*='padding: 22px 20px'],
+  [style*='padding: 20px 22px'] { padding: 12px 14px !important; }
+  [style*='padding: 16px 20px'],
+  [style*='padding: 13px 15px'],
+  [style*='padding: 12px 16px'] { padding: 10px 12px !important; }
+  [style*='padding: 48px'],
+  [style*='padding: 40px 16px'],
+  [style*='padding: 34px 20px'],
+  [style*='padding: 34px 16px'],
+  [style*='padding: 32px 16px'] { padding: 18px 12px !important; }
+  [style*='padding: 30px 0'] { padding: 16px 0 !important; }
+  [style*='padding: 24px'],
+  [style*='padding: 20px'],
+  [style*='padding: 18px'] { padding: 12px !important; }
+  [style*='margin-bottom: 26px'],
+  [style*='margin-bottom: 18px'] { margin-bottom: 12px !important; }
+  [style*='margin-top: 28px'],
+  [style*='margin-top: 26px'],
+  [style*='margin-top: 24px'],
+  [style*='margin-top: 22px'],
+  [style*='margin-top: 20px'] { margin-top: 12px !important; }
+  [style*='margin: 26px'],
+  [style*='margin: 24px'],
+  [style*='margin: 22px'],
+  [style*='margin: 30px'] { margin: 12px !important; }
+  [style*='margin: 52px 0 0'],
+  [style*='margin: 40px 0 0'] { margin: 18px 0 0 !important; }
+  [style*='gap: 52'],
+  [style*='gap: 38'],
+  [style*='gap: 36'],
+  [style*='gap: 28'],
+  [style*='gap: 26'] { gap: 12px !important; }
+
+  /* ── 13. TYPOGRAPHY FLOOR — nothing member-facing below 0.56rem on a phone.
+     (0.54rem is left alone; it is legible and lifting it re-wraps dense chips.) ── */
+  [style*='font-size: 0.46rem'],
+  [style*='font-size: 0.48rem'],
+  [style*='font-size: 0.5rem'],
+  [style*='font-size: 0.52rem'] { font-size: 0.56rem !important; }
+  [style*='font-size: 1.7rem'],
+  [style*='font-size: 2.1rem'],
+  [style*='font-size: 2.6rem'] { font-size: 1.4rem !important; }
+
+  /* ── 14. TABLES — a wide table must scroll inside its own box, never the page ── */
+  .vd .pos-scroll, .vj .hscroll, .earn .hscroll { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+}
+
+/* Touch devices — real tap targets on the small controls the mobile layer shrank. */
+@media (pointer: coarse) {
+  .vd .allocstrip.moballoc .allocsum { touch-action: manipulation; }
+  .vp .seg button, .vj .seg button, .vd .seg button, .vs .seg button { min-height: 30px; }
 }
 `;
 

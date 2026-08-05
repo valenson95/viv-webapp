@@ -287,7 +287,13 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL;
   const [filter, setFilter] = useState("all"); // all | buy | fresh | resting | warn
   const [tab, setTab] = useState(initialTab);   // groups | planfocus | liquid
-  const [howOpen, setHowOpen] = useState(true);
+  // "How to read this" stays OPEN by default on desktop (unchanged) but starts CLOSED on phones —
+  // the 8-row explainer wraps to ~380px of copy at 390px wide and buries the rotation tables it is
+  // meant to explain. Mobile-only default; the toggle is still one tap away (2026-08-05).
+  const [howOpen, setHowOpen] = useState(() => {
+    try { return !(typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 767px)").matches); }
+    catch { return true; }
+  });
   const [methodOpen, setMethodOpen] = useState(false);
   const [holdingsFor, setHoldingsFor] = useState(null); // {t, name} of the ticker whose holdings popup is open
   const [llFilter, setLLFilter] = useState("all");     // Liquid Leaders state filter: all | buy | fresh | resting | warn

@@ -138,9 +138,9 @@ function Monthly({ daily, C, font, ym, setYm, onOpenTrade, unit }) {
           <span style={{ fontSize: "0.78rem", fontWeight: 700, padding: "5px 11px", borderRadius: 9, background: C.goldDim, color: C.gold }}>{monthDays} day{monthDays !== 1 ? "s" : ""}</span>
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr) 130px", gap: 7 }}>
+      <div className="calgrid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr) 130px", gap: 7 }}>
         {DOW.map(d => <div key={d} style={dowStyle(C)}>{d}</div>)}
-        <div style={dowStyle(C)}>Week</div>
+        <div className="calweekcol" style={dowStyle(C)}>Week</div>
         {weeks.map((wk, wi) => {
           let wnet = 0, wdays = 0, wr = 0, wrN = 0, wpct = 0;
           wk.forEach(c => { if (c && c.info) { wnet += c.info.net; wdays++; wr += c.info.r; wrN += c.info.rN; wpct += c.info.pct; } });
@@ -163,7 +163,7 @@ function Monthly({ daily, C, font, ym, setYm, onOpenTrade, unit }) {
                   </div>
                 );
               })}
-              <div style={{ background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: 10, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <div className="calweekcol" style={{ background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: 10, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                 <div style={{ fontSize: "0.58rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.gold, fontWeight: 800 }}>Week {wi + 1}</div>
                 <div style={{ fontWeight: 800, fontSize: "1rem", marginTop: 3, color: wcv > 0 ? C.green : wcv < 0 ? C.red : C.muted }}>{wdays ? unitMain(wAgg, unit) : "—"}</div>
                 <div style={{ fontSize: "0.56rem", color: C.muted }}>{wdays} day{wdays !== 1 ? "s" : ""}</div>

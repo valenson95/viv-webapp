@@ -245,10 +245,10 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
   return (
     <div id="panel-daily" style={{ fontFamily: font }}>
       {/* command header — page top (approved mockup): eyebrow · h1 · muted meta */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold }}>Daily Setups</div>
+      <div className="dspagehead" style={{ marginBottom: 20 }}>
+        <div className="dseyebrow" style={{ fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold }}>Daily Setups</div>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, margin: "5px 0 0" }}>On the Radar</h1>
-        <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+        <div className="dsmeta" style={{ fontSize: "0.8rem", color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
           Posted fresh each market day{rows && rows.length ? ` · ${rows.length} idea${rows.length !== 1 ? "s" : ""} on the radar` : ""} · the chart, the read, and the full auditable scorecard behind every star · educational, not trade signals
         </div>
       </div>
@@ -389,7 +389,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
       )}
 
       {rows && rows.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
+        <div className="dstoolbar" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
           {/* sort — pill segmented control */}
           <div style={segWrap}>
             {[["date", "Newest"], ["grade", "Top graded"]].map(([k, lbl]) => (
