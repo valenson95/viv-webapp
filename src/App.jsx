@@ -8,6 +8,10 @@ import TradeCalendar from "./Calendar.jsx";
 import TradeReplayChart from "./TradeReplayChart.jsx";
 import { sectorFor, useSectors, setSectorOverrides } from "./sectors.js";
 import { themeFit, themeRanks, consistentTop, top5, latestSnapshot, THEME_COVERAGE_START } from "./themes.js";
+import { WATCHLIST } from "./watchlist-data.js";
+import { groupForTheme } from "./themeGroups.js";
+import { GROUP_RS } from "./groupRS-data.js";
+import { EARNINGS } from "./earnings-data.js";
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import MarketContext from "./MarketContext.jsx";
@@ -9708,6 +9712,229 @@ function AllocDonut({ pct, over, size = 104 }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎯 WATCHLIST — ADMIN ONLY (Valen 2026-08-05). MODULE scope (never nested).
+// ═══════════════════════════════════════════════════════════════════════════
+// A read-only mirror of Valen's TradingView funnel. He sends the screenshots, Claude transcribes
+// them into src/watchlist-data.js, and this card decorates every name with the context that
+// already lives in the app:
+//   theme       sectors.js sectorFor() — DeepVue grouping, never self-categorised here
+//   theme fit   themeFit() against the LATEST snapshot (a current-view widget read, NOT the
+//               entry-frozen judgement the positions table uses — nothing here touches that)
+//   group       themeGroups.js → the rotation table's group ETF → its thrust / rs1m
+//   ⚡          the ticker also appeared in the published Daily Setups feed in the last 5 days
+//   E          next scheduled earnings date from earnings-data.js
+// One read query (daily_setups), zero writes. Members never see it, so no What's New entry.
+//
+// LAYOUT (Valen 2026-08-05): TradingView's watchlist grammar — dense single-line rows under slim
+// section dividers, with a 4px coloured flag down the left edge as the instant read. VIV skin
+// (glass, palette C, gold) on TV's layout, because that's the shape his eye already parses.
+//
+// Group-row index, built once. GROUP_RS.rows can carry a duplicate ticker (SHLD ships twice) —
+// last row wins, which is the freshest computed row for that ticker.
+const WATCHLIST_GROUP_ROWS = (() => {
+  const m = {};
+  for (const r of (GROUP_RS && GROUP_RS.rows) || []) if (r && r.t) m[String(r.t).toUpperCase()] = r;
+  return m;
+})();
+const WATCHLIST_LEAD = 85;   // "leading group" floor for BOTH thrust and rs1m
+
+// Ticker → ascending list of [scheduled date, "bmo"|"amc"|null], built once from the earnings file.
+// Dates are SCHEDULED and can shift until confirmed (the source file says so) — the chip says
+// "scheduled", never "confirmed".
+const WATCHLIST_EARNINGS = (() => {
+  const m = {};
+  const days = (EARNINGS && EARNINGS.days) || {};
+  for (const d of Object.keys(days).sort()) {
+    for (const r of (days[d] && days[d].rows) || []) {
+      const t = String((r && r.t) || "").toUpperCase().trim();
+      if (!t) continue;
+      (m[t] || (m[t] = [])).push([d, (r && r.time) || null]);
+    }
+  }
+  return m;
+})();
+// Local copy of EarningsCalendar.jsx's todayISO (not exported there; the repo already carries
+// documented duplications rather than re-plumbing shared helpers). US market day, not UTC.
+const wlTodayISO = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+const wlDaysBetween = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
+
+function WatchlistCard({ C, font, session }) {
+  const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isMobileVP = useScreenWidth() < 768;
+  const sections = (WATCHLIST && WATCHLIST.sections) || [];
+  // Let the app's own background resolver fill in themes it doesn't know yet (read-only /api/sector).
+  useSectors(sections.flatMap(s => (s.tickers || [])));
+
+  // ⚡ chip source — tickers published to the Daily Setups feed in the last 5 days. One fetch on
+  // mount; any failure leaves this null and the chips are simply omitted (the card never crashes).
+  const [recentSetups, setRecentSetups] = useState(null);
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const since = new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10);
+        const { data, error } = await supabase.from("daily_setups").select("ticker,trade_date").gte("trade_date", since);
+        if (dead || error || !Array.isArray(data)) return;
+        setRecentSetups(new Set(data.map(r => String(r?.ticker || "").toUpperCase().trim()).filter(Boolean)));
+      } catch { /* no chips — never a crash */ }
+    })();
+    return () => { dead = true; };
+  }, []);
+
+  if (!isAdmin) return null;
+
+  // LATEST snapshot only. Passing its date into the shared helper keeps this identical to the
+  // machinery the rest of the app uses, without borrowing the entry-frozen path.
+  const snapDate = latestSnapshot()?.date || null;
+  const today = wlTodayISO();
+
+  const decorate = (t) => {
+    const tk = String(t || "").toUpperCase().trim();
+    const theme = sectorFor(tk);
+    const ranks = theme && snapDate ? themeRanks(theme, snapDate) : null;
+    // themeFit() is the app's helper and calls anything outside the top-5 "off". A theme the
+    // tracker doesn't rank AT ALL (e.g. "Technology" — sectors.js notes it is not a tracker theme)
+    // has no week and no month rank, so calling it "off" would be a verdict the data can't support.
+    // Those stay UNRANKED (grey), and the tooltip says so.
+    const ranked = !!(ranks && (ranks.week != null || ranks.month != null));
+    const fit = theme && snapDate && ranked ? themeFit(theme, snapDate) : null;   // "in" | "off" | null
+    const g = groupForTheme(theme);
+    const row = g ? WATCHLIST_GROUP_ROWS[g] : null;
+    const thrust = row && typeof row.thrust === "number" ? row.thrust : null;
+    const rs1m = row && typeof row.rs1m === "number" ? row.rs1m : null;
+    const hasG = thrust != null && rs1m != null;
+    const hits = hasG ? (thrust >= WATCHLIST_LEAD ? 1 : 0) + (rs1m >= WATCHLIST_LEAD ? 1 : 0) : 0;
+    const groupStrong = hits === 2;
+    const themeStrong = fit === "in";
+    // Flag = the instant read, judged only on what is actually knowable for this name:
+    //   green  both measures known and both strong
+    //   gold   at least one strong
+    //   red    every measure we can judge is weak
+    //   grey   nothing to judge (no theme / theme unranked AND no group data)
+    const judgeable = fit != null || hasG;
+    const flag = !judgeable ? "grey"
+      : (themeStrong && groupStrong) ? "green"
+      : (themeStrong || groupStrong) ? "gold"
+      : "red";
+    // Next SCHEDULED report, if it's inside the next 14 days.
+    const sched = (WATCHLIST_EARNINGS[tk] || []).find(([d]) => d >= today);
+    const earn = sched && wlDaysBetween(today, sched[0]) <= 14 ? { date: sched[0], time: sched[1], inDays: wlDaysBetween(today, sched[0]) } : null;
+    return { tk, theme, fit, ranks, ranked, g, thrust, rs1m, hasG, hits, themeStrong, groupStrong, flag, earn, zap: recentSetups ? recentSetups.has(tk) : false };
+  };
+
+  const decorated = sections.map(s => ({ ...s, rows: (s.tickers || []).map(decorate) }));
+  const total = decorated.reduce((n, s) => n + s.rows.length, 0);
+
+  // One-line verdict — Focus names whose group is leading on BOTH measures.
+  const focus = decorated.find(s => s.key === "focus");
+  const leaders = (focus?.rows || []).filter(r => r.groupStrong);
+  const verdict = !focus || !focus.rows.length
+    ? "No Focus names on file yet."
+    : leaders.length
+      ? `${leaders.length} of your ${focus.rows.length} Focus names sit in leading groups (T&M ≥85): ${leaders.map(r => r.tk).join(" · ")}`
+      : `None of your ${focus.rows.length} Focus names sit in a leading group right now (T&M ≥85).`;
+
+  const FLAG = { green: C.green, gold: C.goldBright, red: C.red, grey: "rgba(255,255,255,0.22)" };
+  const groupColor = (r) => (!r.hasG ? "rgba(255,255,255,0.34)" : r.hits === 2 ? C.green : r.hits === 1 ? C.goldBright : C.muted);
+  const rk = (x) => (x ? "#" + x : "—");
+
+  const tipFor = (r) => {
+    const bits = [r.tk];
+    bits.push(!r.theme ? "no theme mapped yet"
+      : !r.ranked ? `${r.theme} — not ranked in the theme tracker`
+      : r.fit === "in" ? `${r.theme} — top-5 leader (1W ${rk(r.ranks.week)} · 1M ${rk(r.ranks.month)})`
+      : `${r.theme} — outside the top-5 (1W ${rk(r.ranks.week)} · 1M ${rk(r.ranks.month)})`);
+    bits.push(r.hasG ? `group ${r.g}: thrust ${r.thrust} · 1M rank ${Math.round(r.rs1m)}`
+      : r.g ? `group ${r.g} — no rotation row computed yet`
+      : "no group ETF mapped for this theme");
+    if (r.zap) bits.push("published to Daily Setups in the last 5 days");
+    if (r.earn) bits.push(`earnings scheduled ${r.earn.date}${r.earn.time === "bmo" ? " before the open" : r.earn.time === "amc" ? " after the close" : ""} — in ${r.earn.inDays} day${r.earn.inDays === 1 ? "" : "s"}`);
+    return bits.join("   ·   ");
+  };
+
+  const micro = { fontSize: "0.57rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: C.gold };
+  const rowH = isMobileVP ? 36 : 34;
+
+  return (
+    <div style={{
+      marginTop: 14, fontFamily: font, position: "relative",
+      background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16,
+      backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)",
+      padding: isMobileVP ? "13px 12px 14px" : "16px 18px 17px",
+    }}>
+      {/* header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingBottom: 10, marginBottom: 11, borderBottom: `1px solid ${C.border}` }}>
+        <span style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "-0.01em", color: "rgba(255,255,255,0.95)" }}>🎯 Watchlist</span>
+        <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{total}</span>
+        <InfoDot tip={{
+          lead: "Your TradingView funnel, read against the app's own data.",
+          points: [
+            "The bar down the left of each row is the quick read: green = the theme is a top-5 leader AND its group ETF is strong · gold = one of the two is strong · red = everything we can measure is weak · grey = there isn't enough data to judge this one.",
+            "T/M is the group ETF behind that theme: T = thrust, M = 1-month RS rank. Green when both are ≥85, gold when one is.",
+            "⚡ = the ticker was published to Daily Setups in the last 5 days.",
+            "E = the next scheduled earnings date, within 14 days. Red when it's 3 days out or less. Scheduled dates can move.",
+            "Admin only, and read-only — nothing here places, sizes or changes a trade.",
+          ],
+        }} />
+        <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>
+          asof {WATCHLIST?.asof || "—"}
+        </span>
+      </div>
+
+      {/* one-line verdict */}
+      <div style={{ fontSize: "0.72rem", lineHeight: 1.55, color: C.text, marginBottom: 12 }}>{verdict}</div>
+
+      {/* sections — TradingView grammar: slim divider, then dense one-line rows */}
+      {decorated.map(sec => (
+        <div key={sec.key} style={{ marginBottom: 11 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 2px 6px", borderBottom: `1px solid ${C.border}` }}>
+            <span style={micro}>{sec.label}</span>
+            <span style={{ fontSize: "0.57rem", fontWeight: 800, color: "rgba(255,255,255,0.34)", fontVariantNumeric: "tabular-nums" }}>{sec.rows.length}</span>
+          </div>
+          {sec.rows.length === 0 ? (
+            <div style={{ padding: "9px 2px 0", fontSize: "0.66rem", color: "rgba(255,255,255,0.36)", fontStyle: "italic" }}>— not provided —</div>
+          ) : (
+            <div>
+              {sec.rows.map((r, i) => (
+                // className="term" wires the app's own tooltip layers: CSS :hover on desktop, the
+                // delegated tap layer (any [data-tip]) on touch. The inline borderBottom
+                // out-specifies .term's dotted underline so rows keep their hairline rule.
+                <div key={sec.key + r.tk} className="term" data-tip={tipFor(r)} style={{
+                  display: "flex", alignItems: "center", gap: 8, minWidth: 0,
+                  height: rowH, paddingRight: 2, cursor: "help",
+                  borderBottom: i === sec.rows.length - 1 ? "none" : "1px solid rgba(255,255,255,0.045)",
+                }}>
+                  <span aria-hidden style={{ flex: "none", width: 4, height: rowH - 10, borderRadius: 2, background: FLAG[r.flag] }} />
+                  <span style={{ flex: "none", minWidth: 54, fontSize: "0.78rem", fontWeight: 800, color: C.text, letterSpacing: "-0.01em" }}>{r.tk}</span>
+                  <span style={{ flex: "1 1 auto", minWidth: 0, fontSize: "0.63rem", fontWeight: 600, color: r.theme ? C.muted : "rgba(255,255,255,0.32)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {r.theme || "Untagged"}
+                  </span>
+                  <span style={{ flex: "none", fontSize: "0.62rem", fontWeight: 800, color: groupColor(r), fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                    {r.hasG ? `T${r.thrust}/M${Math.round(r.rs1m)}` : "—"}
+                  </span>
+                  <span style={{ flex: "none", width: 14, textAlign: "center", fontSize: "0.6rem", lineHeight: 1 }}>{r.zap ? "⚡" : ""}</span>
+                  <span style={{
+                    flex: "none", minWidth: 27, textAlign: "right", fontSize: "0.56rem", fontWeight: 800,
+                    fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
+                    color: r.earn && r.earn.inDays <= 3 ? C.red : C.goldBright,
+                  }}>{r.earn ? `E${r.earn.inDays}d` : ""}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+
+      <div style={{ fontSize: "0.57rem", color: "rgba(255,255,255,0.36)", lineHeight: 1.55, marginTop: 4 }}>
+        Theme fit is judged against the latest theme snapshot{snapDate ? ` (${snapDate})` : ""}, not the day a trade was opened.
+        Group numbers come from the rotation table{GROUP_RS?.asof ? ` (asof ${GROUP_RS.asof})` : ""}; a theme with no matching group ETF shows “—”.
+        Earnings dates are scheduled{EARNINGS?.asof ? ` (through ${EARNINGS.asof})` : ""} and can move.
+      </div>
+    </div>
+  );
+}
+
 function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exitReasons, positions, setPositions, portfolioSize, setPortfolioSize, lastLoadedCountRef, lastSaveIdMapRef, session, targetRote, setTargetRote, rNumStocks, setRNumStocks, journaledTrades, setJournaledTrades, onManualSave, saveStatus, positionsRef, saveErrorMsg, onIbkrSync, intradayColumnAvailable, intradayFeatureEnabled, onRunIntegrity, integrityReport, integrityRunning, displayName, demoMode = false, onToggleDemo }) {
   // Alias so existing `INTRADAY_FEATURE_ENABLED` references inside this component keep reading as a single
   // flag without rewriting every callsite. Reactive — flipping the Settings toggle re-renders the table.
@@ -11219,6 +11446,11 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           )}
 
+          {/* 🎯 WATCHLIST — admin only (Valen 2026-08-05). Sits after the market-lens rows and
+              before the positions card: the funnel you hunt from, read against the same theme +
+              rotation data the lenses above it show. Members render nothing. */}
+          {isAdmin && <WatchlistCard C={C} font={font} session={session} />}
+
           {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS.
               RISK ALLOCATION now lives HERE as a slim strip over the table (Valen 2026-08-02 — "overlay
               it on top of the open position card"): same numbers as the old lens card (donut + At Risk /
@@ -11514,6 +11746,10 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
         <div className="lensduo" style={{ gridTemplateColumns: "1fr" }}>
           <SituationalRead C={C} font={font} session={session} isAdmin={isAdmin} />
         </div>
+
+        {/* 🎯 WATCHLIST — admin only (Valen 2026-08-05); same card the Pro layout renders, placed
+            after the market lenses and before the positions table. Members render nothing. */}
+        {isAdmin && <WatchlistCard C={C} font={font} session={session} />}
 
         {/* TABLE */}
         <div className="toolbar">

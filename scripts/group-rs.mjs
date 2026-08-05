@@ -28,6 +28,13 @@ const UNIVERSE = [
   ["ROBO", "Robotics & Automation"],
   ["UFO", "Space Industry"],
   ["NLR", "Nuclear Energy"],
+  // 2026-08-05 batch (Valen "go" — gaps vs DeepVue thematic ETF list): needs ONE full slow run
+  ["TAN", "Solar"],
+  ["GDX", "Gold Miners"],
+  ["JETS", "Airlines"],
+  ["ITB", "Home Construction"],
+  ["ARTY", "Artificial Intelligence"],
+  ["URA", "Uranium Miners"],
   ["KWEB", "Chinese Tech & E-commerce"],
   ["CHIQ", "China Consumer"],
   ["IYT", "Transportation"],
