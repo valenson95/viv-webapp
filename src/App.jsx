@@ -778,6 +778,7 @@ const WHATS_NEW = [
     date: "August 5, 2026",
     title: "⚡ Auto price refresh · cleaner positions table · risk energy bar",
     items: [
+      "🎯 Valen's Watchlist is now on your Dashboard — the same list he watches in TradingView, in his order. Every name shows the theme it belongs to, where that theme ranks over the last week, and two numbers for its industry group: Thrust % (how hot the group is this week) and RS rank (how its 1-month strength stacks up against every other group). Sort by any of those, or leave it in his order. His own colour flags show up too. It's what he's watching, not a buy list — educational, not advice.",
       "Big phone clean-up: every page now fits your screen properly. Headers are smaller, cards are tighter, and on the Dashboard the Open Positions header and risk strip fold into one slim bar — tap it to see the full breakdown. Your first position now shows up right away instead of after a scroll. Nothing was removed, just folded away until you want it.",
       "Closing a trade now lets you upload your own chart with your review — and you can add a chart to any closed trade from its details page. (Thanks JH! 🙌)",
       "No more clicking Refresh Prices on arrival — the Dashboard now pulls the latest market prices automatically the moment your positions load. Pro view also gets a second Refresh button right on the Open Positions card. (Thanks Estrid! 🙌)",
@@ -9713,22 +9714,33 @@ function AllocDonut({ pct, over, size = 104 }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🎯 WATCHLIST — ADMIN ONLY (Valen 2026-08-05). MODULE scope (never nested).
+// 🎯 WATCHLIST — MEMBER-FACING (Valen 2026-08-05). MODULE scope (never nested).
 // ═══════════════════════════════════════════════════════════════════════════
 // A read-only mirror of Valen's TradingView funnel. He sends the screenshots, Claude transcribes
 // them into src/watchlist-data.js, and this card decorates every name with the context that
 // already lives in the app:
+//   🚩          Valen's own colour flag (watchlist_flags) — members see it, only he sets it
 //   theme       sectors.js sectorFor() — DeepVue grouping, never self-categorised here
 //   theme fit   themeFit() against the LATEST snapshot (a current-view widget read, NOT the
 //               entry-frozen judgement the positions table uses — nothing here touches that)
+//   1W#         that theme's rank in the LATEST snapshot's 1-week board (index + 1)
 //   group       themeGroups.js → the rotation table's group ETF → its thrust / rs1m
 //   ⚡          the ticker also appeared in the published Daily Setups feed in the last 5 days
 //   E          next scheduled earnings date from earnings-data.js
-// One read query (daily_setups), zero writes. Members never see it, so no What's New entry.
+//
+// VISIBILITY (Valen 2026-08-05): members now SEE this card. `isAdmin` no longer gates the RENDER —
+// it gates flag EDITING only. Member-facing means the standing rules apply: the educational line is
+// not optional, and there is deliberately NO grade anywhere on this card (a grade needs the trigger
+// context a watchlist doesn't carry — his explicit call).
+//
+// Reads: daily_setups (⚡ chips) + watchlist_flags (colours). Writes: watchlist_flags ONLY, and only
+// from the admin session. No other write path is touched by this card.
 //
 // LAYOUT (Valen 2026-08-05): TradingView's watchlist grammar — dense single-line rows under slim
-// section dividers, with a 4px coloured flag down the left edge as the instant read. VIV skin
-// (glass, palette C, gold) on TV's layout, because that's the shape his eye already parses.
+// section dividers. Two different marks live at the left edge and they mean different things:
+//   🚩 flag  Valen's own colour tag, stored in watchlist_flags. Human, not computed.
+//   4px bar  the COMPUTED instant read (theme fit × group strength). Never editable.
+// VIV skin (glass, palette C, gold) on TV's layout, because that's the shape his eye already parses.
 //
 // Group-row index, built once. GROUP_RS.rows can carry a duplicate ticker (SHLD ships twice) —
 // last row wins, which is the freshest computed row for that ticker.
@@ -9759,6 +9771,41 @@ const WATCHLIST_EARNINGS = (() => {
 const wlTodayISO = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
 const wlDaysBetween = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
 
+// TradingView's watchlist flag palette (approximated to the six TV ships). Stored as the hex string
+// in watchlist_flags.color, so the DB row is self-describing and a palette tweak can't orphan data.
+const WL_FLAG_COLORS = [
+  { key: "red",    hex: "#f23645" },
+  { key: "orange", hex: "#ff9800" },
+  { key: "yellow", hex: "#fbc02d" },
+  { key: "green",  hex: "#22ab94" },
+  { key: "blue",   hex: "#2962ff" },
+  { key: "purple", hex: "#9c27b0" },
+];
+const WL_FLAG_EMPTY = "rgba(255,255,255,0.30)";   // no colour set → subtle outline only
+
+// The flag glyph. Coloured → solid pennant. No colour → hairline outline, nothing else.
+function WlFlagGlyph({ color, size = 13 }) {
+  const on = !!color;
+  const c = on ? color : WL_FLAG_EMPTY;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden focusable="false" style={{ display: "block" }}>
+      <path d="M6.2 3.2V21" fill="none" stroke={c} strokeWidth="2.1" strokeLinecap="round" />
+      <path d="M7.6 4.4h11.1l-2.9 4.3 2.9 4.3H7.6z" fill={on ? c : "none"} stroke={c} strokeWidth={on ? 0.9 : 1.5} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// Sort options for the card header. "my" = the array order in watchlist-data.js (his TV order) and
+// is the DEFAULT. Sorting only ever reorders rows INSIDE a section — sections never move.
+// NO letter shorthand anywhere (his hard rule 2026-08-05) — the labels are the words themselves.
+const WL_SORTS = [
+  { key: "my",     label: "My order" },
+  { key: "thrust", label: "Thrust %" },
+  { key: "rs",     label: "RS rank" },
+  { key: "theme",  label: "Theme rank" },
+  { key: "az",     label: "A–Z" },
+];
+
 function WatchlistCard({ C, font, session }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   const isMobileVP = useScreenWidth() < 768;
@@ -9782,7 +9829,77 @@ function WatchlistCard({ C, font, session }) {
     return () => { dead = true; };
   }, []);
 
-  if (!isAdmin) return null;
+  // 🚩 FLAGS — DEPLOY-SAFE PROBE (the house pattern, same as ModelBook's diveColsV2/V3).
+  // The select runs on mount; PostgREST errors when the table isn't there yet, which is the whole
+  // signal. Error → flagsReady stays false → every flag renders as an empty outline, editing is off,
+  // nothing throws. The card lights up on its own once supabase/watchlist-flags.sql is run.
+  const [flags, setFlags] = useState({});          // { TICKER: "#hex" }
+  const [flagsReady, setFlagsReady] = useState(false);
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.from("watchlist_flags").select("ticker,color");
+        if (dead) return;
+        if (error) { setFlagsReady(false); return; }   // table absent → outlines only, no editing
+        const m = {};
+        for (const r of Array.isArray(data) ? data : []) {
+          const t = String(r?.ticker || "").toUpperCase().trim();
+          if (t && r?.color) m[t] = String(r.color);
+        }
+        setFlags(m);
+        setFlagsReady(true);
+      } catch { /* no flags — never a crash */ }
+    })();
+    return () => { dead = true; };
+  }, []);
+
+  // Editing is admin-only AND table-only. Members get read-only flags with a default cursor.
+  const canEditFlags = isAdmin && flagsReady;
+  const [flagOpen, setFlagOpen] = useState(null);   // ticker whose colour popover is open, or null
+
+  // Outside-click close. mousedown/touchstart (not click) so the tap that OPENED the popover has
+  // already fired before this listener exists — no open-then-instantly-close race. Both listeners
+  // are removed on close and on unmount.
+  useEffect(() => {
+    if (!flagOpen) return;
+    const onDoc = (e) => {
+      const t = e.target;
+      if (t && t.closest && t.closest("[data-wlflag]")) return;   // inside a flag/popover — keep open
+      setFlagOpen(null);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("touchstart", onDoc, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+    };
+  }, [flagOpen]);
+
+  // Set (hex) or clear (null) a flag. Optimistic local state; the row is rolled back if the write
+  // fails. watchlist_flags is the ONLY table this card writes to.
+  const writeFlag = async (tk, hex) => {
+    if (!canEditFlags) return;
+    setFlagOpen(null);
+    const prev = flags;
+    setFlags(f => { const n = { ...f }; if (hex) n[tk] = hex; else delete n[tk]; return n; });
+    try {
+      const { error } = hex
+        ? await supabase.from("watchlist_flags").upsert({ ticker: tk, color: hex, updated_at: new Date().toISOString() }, { onConflict: "ticker" })
+        : await supabase.from("watchlist_flags").delete().eq("ticker", tk);
+      if (error) setFlags(prev);       // RLS refusal / network — put the old colour back
+    } catch { setFlags(prev); }
+  };
+
+  // Sort choice, per user. "my" (his TV order) is the default and the fallback for anything unknown.
+  const sortUid = session?.user?.id || "anon";
+  const sortKey = `viv-wl-sort-${sortUid}`;
+  const readSort = (k) => { try { const s = localStorage.getItem(k); return WL_SORTS.some(o => o.key === s) ? s : null; } catch { return null; } };
+  const [sortBy, setSortBy] = useState(() => readSort(`viv-wl-sort-${session?.user?.id || "anon"}`) || "my");
+  // Re-read only if the uid changes (session lands after mount) AND that uid has a stored choice —
+  // never clobber what's already on screen back to the default.
+  useEffect(() => { const s = readSort(sortKey); if (s) setSortBy(s); }, [sortKey]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const pickSort = (v) => { setSortBy(v); try { localStorage.setItem(sortKey, v); } catch {} };
 
   // LATEST snapshot only. Passing its date into the shared helper keeps this identical to the
   // machinery the rest of the app uses, without borrowing the entry-frozen path.
@@ -9820,10 +9937,33 @@ function WatchlistCard({ C, font, session }) {
     // Next SCHEDULED report, if it's inside the next 14 days.
     const sched = (WATCHLIST_EARNINGS[tk] || []).find(([d]) => d >= today);
     const earn = sched && wlDaysBetween(today, sched[0]) <= 14 ? { date: sched[0], time: sched[1], inDays: wlDaysBetween(today, sched[0]) } : null;
-    return { tk, theme, fit, ranks, ranked, g, thrust, rs1m, hasG, hits, themeStrong, groupStrong, flag, earn, zap: recentSetups ? recentSetups.has(tk) : false };
+    // 1-week rank of the theme in the LATEST snapshot (index + 1); null when the theme is unranked
+    // or the row has no theme at all (INDEX rows). ≤5 = top-5 leader.
+    const wrank = ranks && ranks.week != null ? ranks.week : null;
+    return { tk, theme, fit, ranks, wrank, ranked, g, thrust, rs1m, hasG, hits, themeStrong, groupStrong, flag, earn, zap: recentSetups ? recentSetups.has(tk) : false, mark: flags[tk] || null };
   };
 
-  const decorated = sections.map(s => ({ ...s, rows: (s.tickers || []).map(decorate) }));
+  // SORT — applies WITHIN a section only; the sections themselves never reorder. Nulls always sort
+  // last, and the original array index is the tiebreak so equal values keep his TV order.
+  const sortRows = (rows) => {
+    if (sortBy === "my") return rows;
+    const metric = (r) => (sortBy === "thrust" ? r.thrust : sortBy === "rs" ? r.rs1m : sortBy === "theme" ? r.wrank : null);
+    return rows
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) => {
+        if (sortBy === "az") return a.r.tk.localeCompare(b.r.tk) || a.i - b.i;
+        const av = metric(a.r), bv = metric(b.r);
+        const an = !Number.isFinite(av), bn = !Number.isFinite(bv);
+        if (an && bn) return a.i - b.i;
+        if (an) return 1;
+        if (bn) return -1;
+        // thrust / RS: bigger is stronger → descending.  Theme rank: #1 is strongest → ascending.
+        return (sortBy === "theme" ? av - bv : bv - av) || a.i - b.i;
+      })
+      .map(x => x.r);
+  };
+
+  const decorated = sections.map(s => ({ ...s, rows: sortRows((s.tickers || []).map(decorate)) }));
   const total = decorated.reduce((n, s) => n + s.rows.length, 0);
 
   // One-line verdict — Focus names whose group is leading on BOTH measures.
@@ -9832,8 +9972,8 @@ function WatchlistCard({ C, font, session }) {
   const verdict = !focus || !focus.rows.length
     ? "No Focus names on file yet."
     : leaders.length
-      ? `${leaders.length} of your ${focus.rows.length} Focus names sit in leading groups (T&M ≥85): ${leaders.map(r => r.tk).join(" · ")}`
-      : `None of your ${focus.rows.length} Focus names sit in a leading group right now (T&M ≥85).`;
+      ? `${leaders.length} of his ${focus.rows.length} Focus names sit in a leading industry group — Thrust % and RS rank both 85 or higher: ${leaders.map(r => r.tk).join(" · ")}`
+      : `None of his ${focus.rows.length} Focus names sit in a leading industry group right now (Thrust % and RS rank both 85 or higher).`;
 
   const FLAG = { green: C.green, gold: C.goldBright, red: C.red, grey: "rgba(255,255,255,0.22)" };
   const groupColor = (r) => (!r.hasG ? "rgba(255,255,255,0.34)" : r.hits === 2 ? C.green : r.hits === 1 ? C.goldBright : C.muted);
@@ -9845,9 +9985,9 @@ function WatchlistCard({ C, font, session }) {
       : !r.ranked ? `${r.theme} — not ranked in the theme tracker`
       : r.fit === "in" ? `${r.theme} — top-5 leader (1W ${rk(r.ranks.week)} · 1M ${rk(r.ranks.month)})`
       : `${r.theme} — outside the top-5 (1W ${rk(r.ranks.week)} · 1M ${rk(r.ranks.month)})`);
-    bits.push(r.hasG ? `group ${r.g}: thrust ${r.thrust} · 1M rank ${Math.round(r.rs1m)}`
-      : r.g ? `group ${r.g} — no rotation row computed yet`
-      : "no group ETF mapped for this theme");
+    bits.push(r.hasG ? `industry group ${r.g}: Thrust % ${r.thrust} · RS rank ${Math.round(r.rs1m)}`
+      : r.g ? `industry group ${r.g} — no rotation row computed yet`
+      : "no industry group mapped for this theme");
     if (r.zap) bits.push("published to Daily Setups in the last 5 days");
     if (r.earn) bits.push(`earnings scheduled ${r.earn.date}${r.earn.time === "bmo" ? " before the open" : r.earn.time === "amc" ? " after the close" : ""} — in ${r.earn.inDays} day${r.earn.inDays === 1 ? "" : "s"}`);
     return bits.join("   ·   ");
@@ -9855,6 +9995,75 @@ function WatchlistCard({ C, font, session }) {
 
   const micro = { fontSize: "0.57rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: C.gold };
   const rowH = isMobileVP ? 36 : 34;
+
+  // 🚩 one row's flag: a ≥30px tap target wrapping a small glyph, plus (admin) the colour popover.
+  // data-wlflag marks the whole wrapper so the outside-click listener can tell inside from outside.
+  const flagCell = (r) => {
+    const open = flagOpen === r.tk;
+    const hit = 30;
+    return (
+      <span data-wlflag style={{ position: "relative", flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", width: hit, height: Math.min(rowH, hit + 6) }}>
+        <button
+          type="button"
+          aria-label={canEditFlags ? `Flag ${r.tk}` : `${r.tk} flag`}
+          aria-expanded={canEditFlags ? open : undefined}
+          disabled={!canEditFlags}
+          onClick={canEditFlags ? (e) => { e.stopPropagation(); setFlagOpen(o => (o === r.tk ? null : r.tk)); } : undefined}
+          style={{
+            width: hit, height: hit, padding: 0, margin: 0, border: "none", background: "none",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: canEditFlags ? "pointer" : "default", WebkitTapHighlightColor: "transparent",
+            borderRadius: 8, outline: open ? `1px solid ${C.border}` : "none",
+          }}
+        >
+          <WlFlagGlyph color={r.mark} size={13} />
+        </button>
+        {canEditFlags && open && (
+          // z-index 500: above the card's own content, deliberately BELOW the app's modal ladder
+          // (1000 / 1250 / 1450 / 2000 / 4000) so a dialog is never covered by a watchlist popover.
+          <div
+            role="menu"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 500,
+              display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap",
+              width: "max-content", maxWidth: "min(268px, calc(100vw - 32px))",
+              padding: "6px 7px", borderRadius: 12,
+              background: "rgba(10,10,18,0.97)", border: `1px solid ${C.border}`,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.55)",
+            }}
+          >
+            {WL_FLAG_COLORS.map(c => (
+              <button
+                key={c.key}
+                type="button"
+                title={c.key}
+                aria-label={c.key}
+                onClick={() => writeFlag(r.tk, c.hex)}
+                style={{
+                  width: 30, height: 30, padding: 0, borderRadius: 999, cursor: "pointer",
+                  background: c.hex, WebkitTapHighlightColor: "transparent",
+                  border: r.mark === c.hex ? "2px solid rgba(255,255,255,0.92)" : "1px solid rgba(255,255,255,0.16)",
+                }}
+              />
+            ))}
+            <button
+              type="button"
+              title="clear"
+              aria-label="clear flag"
+              onClick={() => writeFlag(r.tk, null)}
+              style={{
+                width: 30, height: 30, padding: 0, borderRadius: 999, cursor: "pointer",
+                background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+                color: "rgba(255,255,255,0.7)", fontSize: "0.72rem", fontWeight: 800, lineHeight: 1,
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >✕</button>
+          </div>
+        )}
+      </span>
+    );
+  };
 
   return (
     <div style={{
@@ -9868,18 +10077,42 @@ function WatchlistCard({ C, font, session }) {
         <span style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "-0.01em", color: "rgba(255,255,255,0.95)" }}>🎯 Watchlist</span>
         <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{total}</span>
         <InfoDot tip={{
-          lead: "Your TradingView funnel, read against the app's own data.",
+          lead: "Valen's TradingView list, read against the app's own data.",
           points: [
-            "The bar down the left of each row is the quick read: green = the theme is a top-5 leader AND its group ETF is strong · gold = one of the two is strong · red = everything we can measure is weak · grey = there isn't enough data to judge this one.",
-            "T/M is the group ETF behind that theme: T = thrust, M = 1-month RS rank. Green when both are ≥85, gold when one is.",
+            "🚩 is Valen's own colour flag on a name. He sets them; you see them. No colour means he hasn't flagged it.",
+            "The bar down the left of each row is the quick read: green = the theme is a top-5 leader AND its industry group is strong · gold = one of the two is strong · red = everything we can measure is weak · grey = there isn't enough data to judge this one.",
+            "1W# is where that theme ranks over the last week. Green when it's top 5.",
+            "Thrust % = this week's strength score of its industry group (higher = hotter this week, max ~110).",
+            "RS rank = where that group's 1-month relative strength ranks against all groups, 0–100. Both numbers turn green at 85 or higher, gold when only one is.",
             "⚡ = the ticker was published to Daily Setups in the last 5 days.",
             "E = the next scheduled earnings date, within 14 days. Red when it's 3 days out or less. Scheduled dates can move.",
-            "Admin only, and read-only — nothing here places, sizes or changes a trade.",
+            "Sort changes the order inside each list. The lists themselves stay put.",
+            "Read-only — nothing here places, sizes or changes a trade. It's what he's watching, not a buy list.",
           ],
         }} />
-        <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>
+        <label style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <span style={{ fontSize: "0.57rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>Sort</span>
+          <select
+            value={sortBy}
+            onChange={(e) => pickSort(e.target.value)}
+            aria-label="Sort the watchlist"
+            style={{
+              height: 30, maxWidth: 132, fontFamily: font, fontSize: "0.63rem", fontWeight: 700,
+              color: C.text, background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+              borderRadius: 999, padding: "0 8px", cursor: "pointer", outline: "none",
+            }}
+          >
+            {WL_SORTS.map(o => <option key={o.key} value={o.key} style={{ background: "#0d0d16", color: "#e8e8f0" }}>{o.label}</option>)}
+          </select>
+        </label>
+        <span style={{ fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>
           asof {WATCHLIST?.asof || "—"}
         </span>
+      </div>
+
+      {/* Standing member-facing line — this card is now visible to everyone. */}
+      <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "rgba(255,255,255,0.4)", lineHeight: 1.5, marginBottom: 8 }}>
+        Educational, not advice — Valen's personal watchlist.
       </div>
 
       {/* one-line verdict */}
@@ -9901,19 +10134,41 @@ function WatchlistCard({ C, font, session }) {
                 // delegated tap layer (any [data-tip]) on touch. The inline borderBottom
                 // out-specifies .term's dotted underline so rows keep their hairline rule.
                 <div key={sec.key + r.tk} className="term" data-tip={tipFor(r)} style={{
-                  display: "flex", alignItems: "center", gap: 8, minWidth: 0,
+                  display: "flex", alignItems: "center", gap: isMobileVP ? 6 : 8, minWidth: 0,
                   height: rowH, paddingRight: 2, cursor: "help",
                   borderBottom: i === sec.rows.length - 1 ? "none" : "1px solid rgba(255,255,255,0.045)",
                 }}>
+                  {/* 🚩 Valen's flag — leads the row, TradingView-style. Read-only for members. */}
+                  {flagCell(r)}
                   <span aria-hidden style={{ flex: "none", width: 4, height: rowH - 10, borderRadius: 2, background: FLAG[r.flag] }} />
-                  <span style={{ flex: "none", minWidth: 54, fontSize: "0.78rem", fontWeight: 800, color: C.text, letterSpacing: "-0.01em" }}>{r.tk}</span>
+                  <span style={{ flex: "none", minWidth: isMobileVP ? 48 : 54, fontSize: "0.78rem", fontWeight: 800, color: C.text, letterSpacing: "-0.01em" }}>{r.tk}</span>
                   <span style={{ flex: "1 1 auto", minWidth: 0, fontSize: "0.63rem", fontWeight: 600, color: r.theme ? C.muted : "rgba(255,255,255,0.32)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {r.theme || "Untagged"}
                   </span>
-                  <span style={{ flex: "none", fontSize: "0.62rem", fontWeight: 800, color: groupColor(r), fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                    {r.hasG ? `T${r.thrust}/M${Math.round(r.rs1m)}` : "—"}
+                  {/* 1-week theme rank from the latest snapshot. Green = top-5. "—" = unranked. */}
+                  <span style={{
+                    flex: "none", fontSize: "0.6rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
+                    color: r.wrank == null ? "rgba(255,255,255,0.34)" : r.wrank <= 5 ? C.green : C.muted,
+                  }}>{r.wrank == null ? "—" : `1W#${r.wrank}`}</span>
+                  {/* Industry-group strength, SPELLED OUT — no letter shorthand (his hard rule).
+                      Desktop: one line, "Thrust 102 · RS 100". Phone: the same two numbers stacked,
+                      so a 390px row never has to abbreviate them away. */}
+                  <span style={{
+                    flex: "none", fontWeight: 800, color: groupColor(r), fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap", textAlign: "right",
+                    fontSize: isMobileVP ? "0.5rem" : "0.62rem", lineHeight: isMobileVP ? 1.18 : 1,
+                    display: isMobileVP ? "flex" : "block", flexDirection: "column", alignItems: "flex-end",
+                  }}>
+                    {!r.hasG ? "—" : isMobileVP ? (
+                      <>
+                        <span>Thrust {r.thrust}</span>
+                        <span>RS {Math.round(r.rs1m)}</span>
+                      </>
+                    ) : (
+                      <>Thrust {r.thrust} <span style={{ color: "rgba(255,255,255,0.28)" }}>·</span> RS {Math.round(r.rs1m)}</>
+                    )}
                   </span>
-                  <span style={{ flex: "none", width: 14, textAlign: "center", fontSize: "0.6rem", lineHeight: 1 }}>{r.zap ? "⚡" : ""}</span>
+                  <span style={{ flex: "none", width: isMobileVP ? 12 : 14, textAlign: "center", fontSize: "0.6rem", lineHeight: 1 }}>{r.zap ? "⚡" : ""}</span>
                   <span style={{
                     flex: "none", minWidth: 27, textAlign: "right", fontSize: "0.56rem", fontWeight: 800,
                     fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
@@ -9927,9 +10182,10 @@ function WatchlistCard({ C, font, session }) {
       ))}
 
       <div style={{ fontSize: "0.57rem", color: "rgba(255,255,255,0.36)", lineHeight: 1.55, marginTop: 4 }}>
-        Theme fit is judged against the latest theme snapshot{snapDate ? ` (${snapDate})` : ""}, not the day a trade was opened.
-        Group numbers come from the rotation table{GROUP_RS?.asof ? ` (asof ${GROUP_RS.asof})` : ""}; a theme with no matching group ETF shows “—”.
+        Theme fit and 1W# are judged against the latest theme snapshot{snapDate ? ` (${snapDate})` : ""}, not the day a trade was opened.
+        Thrust % and RS rank come from the rotation table{GROUP_RS?.asof ? ` (asof ${GROUP_RS.asof})` : ""}; a theme with no matching industry group shows “—”.
         Earnings dates are scheduled{EARNINGS?.asof ? ` (through ${EARNINGS.asof})` : ""} and can move.
+        Index and commodity rows carry no theme or group — they're here to match his TradingView list.
       </div>
     </div>
   );
@@ -11429,9 +11685,10 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               </div>
             );
           })()}
-          {/* admin-only Edge Ledger: wrapped so the 14px row rhythm holds (its own card has no top
-              margin and previously sat flush under the tall theme card); members render nothing. */}
-          {isAdmin && (
+          {/* Edge Ledger HIDDEN from the dashboard (Valen 2026-08-05: "it should be at the daily
+              setup — I don't think we need this section for now"). Future home = Daily Setups page.
+              Flip false&& to resurrect here. */}
+          {false && isAdmin && (
             <div style={{ marginTop: 14 }}>
               {edgeShown ? (
                 <>
@@ -11446,10 +11703,10 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           )}
 
-          {/* 🎯 WATCHLIST — admin only (Valen 2026-08-05). Sits after the market-lens rows and
-              before the positions card: the funnel you hunt from, read against the same theme +
-              rotation data the lenses above it show. Members render nothing. */}
-          {isAdmin && <WatchlistCard C={C} font={font} session={session} />}
+          {/* 🎯 WATCHLIST — MEMBER-FACING (Valen 2026-08-05). Sits after the market-lens rows and
+              before the positions card: the funnel he hunts from, read against the same theme +
+              rotation data the lenses above it show. The card itself gates flag EDITING on isAdmin. */}
+          <WatchlistCard C={C} font={font} session={session} />
 
           {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS.
               RISK ALLOCATION now lives HERE as a slim strip over the table (Valen 2026-08-02 — "overlay
@@ -11747,9 +12004,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <SituationalRead C={C} font={font} session={session} isAdmin={isAdmin} />
         </div>
 
-        {/* 🎯 WATCHLIST — admin only (Valen 2026-08-05); same card the Pro layout renders, placed
-            after the market lenses and before the positions table. Members render nothing. */}
-        {isAdmin && <WatchlistCard C={C} font={font} session={session} />}
+        {/* 🎯 WATCHLIST — MEMBER-FACING (Valen 2026-08-05); same card the Pro layout renders, placed
+            after the market lenses and before the positions table. Flag editing is admin-only. */}
+        <WatchlistCard C={C} font={font} session={session} />
 
         {/* TABLE */}
         <div className="toolbar">
