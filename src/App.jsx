@@ -10216,8 +10216,20 @@ function WatchlistCard({ C, font, session }) {
         </span>
       </div>
 
-      <div style={{ fontSize: "0.68rem", fontWeight: 500, color: C.muted, lineHeight: 1.55, margin: "9px 0 11px" }}>
-        The watchlist, cross-checked against the leading themes and industry groups.
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", margin: "9px 0 11px" }}>
+        <span style={{ fontSize: "0.68rem", fontWeight: 500, color: C.muted, lineHeight: 1.55 }}>
+          The watchlist, cross-checked against the leading themes and industry groups.
+        </span>
+        {/* The live TradingView list itself — members can follow it there (Valen 2026-08-05). */}
+        <a
+          href="https://www.tradingview.com/watchlists/328880788/"
+          target="_blank" rel="noopener noreferrer"
+          style={{
+            marginLeft: "auto", fontSize: "0.66rem", fontWeight: 700, color: C.goldBright,
+            textDecoration: "underline", textDecorationColor: "rgba(201,152,42,0.4)",
+            textUnderlineOffset: 3, textDecorationThickness: 1, whiteSpace: "nowrap",
+          }}
+        >Open in TradingView ↗</a>
       </div>
 
       {/* INDEX ribbon — live day-% from /api/indices beside each name (green up · red down). */}
