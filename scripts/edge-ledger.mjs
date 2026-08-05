@@ -592,7 +592,7 @@ async function main() {
     const cost = +p.entry_price || 0, sh = +p.shares || 0;
     const eff = Math.max(p.stop_price ? +p.stop_price : -1e18, p.trailing_stop ? +p.trailing_stop : -1e18);
     if (eff < -1e17) { naked++; return; }
-    if (eff >= cost) free++; else { atRisk++; openRisk += (cost - eff) * sh; }
+    if (eff >= cost * 0.999) free++; else { atRisk++; openRisk += (cost - eff) * sh; } // 0.1% breakeven band (Valen 2026-08-05)
   });
 
   // ---------- verdict ----------
