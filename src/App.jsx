@@ -779,7 +779,7 @@ const WHATS_NEW = [
     date: "August 5, 2026",
     title: "🎯 The Hunt List — the watchlist as one sortable table",
     items: [
-      "The Hunt List is on your Dashboard: the watchlist as one sortable table. Every name shows its TradingView category, its theme with that theme's 1-week rank, the industry group it belongs to with the group's Thrust % and RS rank, the stock's own Thrust % and RS rank, and its next earnings date.",
+      "The Daily Setups page is now The Hunt List: the watchlist as one sortable table. Every name shows its TradingView category, its theme with that theme's 1-week rank, the industry group it belongs to with the group's Thrust % and RS rank, the stock's own Thrust % and RS rank, and its next earnings date.",
       "Filter by category with one tap, or switch on “Leading groups only” to keep just the names whose industry group scores 85 or higher on both numbers.",
       "Sorts stack. Click a column to sort by it, then click a second column to sort inside that — the small number tells you the order. Click a column again to flip it, and × reset puts the list back in its original order. Your sort is remembered.",
     ],
@@ -11827,10 +11827,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           )}
 
-          {/* 🎯 THE HUNT LIST — LIVE. Approved Option-B master-table design (Valen 2026-08-05):
-              one sortable table with TradingView categories, theme rank, industry-group and
-              per-stock strength, and next earnings. Replaces the v1 stacked-section layout. */}
-          <WatchlistCard C={C} font={font} session={session} />
+          {/* 🎯 THE HUNT LIST — moved OFF the dashboard to the Daily Setups page
+              (Valen 2026-08-05: "it shouldn't be in dashboard, it should be under daily trade setup"). */}
+          {false && <WatchlistCard C={C} font={font} session={session} />}
 
           {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS.
               RISK ALLOCATION now lives HERE as a slim strip over the table (Valen 2026-08-02 — "overlay
@@ -12129,9 +12128,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <SituationalRead C={C} font={font} session={session} isAdmin={isAdmin} />
         </div>
 
-        {/* 🎯 THE HUNT LIST — LIVE. Approved Option-B master-table design (Valen 2026-08-05):
-            the same sortable table the Pro layout gets, so both views stay in step. */}
-        <WatchlistCard C={C} font={font} session={session} />
+        {/* 🎯 THE HUNT LIST — moved OFF the dashboard to the Daily Setups page
+            (Valen 2026-08-05: "it shouldn't be in dashboard, it should be under daily trade setup"). */}
+        {false && <WatchlistCard C={C} font={font} session={session} />}
 
         {/* TABLE */}
         <div className="toolbar">
@@ -13371,7 +13370,11 @@ function DailySetupsShell({ setPage, session, displayName }) {
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
         </div>
-        <DailySetupsTab C={C} font={font} session={session} isAdmin={isAdmin} setPage={setPage} />
+        {/* 🎯 THE HUNT LIST lives HERE (Valen 2026-08-05: "it shouldn't be in dashboard, it should be
+            under daily trade setup — have this new one instead"). The old setups feed is HIDDEN, not
+            deleted — posts stay in daily_setups; flip the false && to bring the feed back. */}
+        <WatchlistCard C={C} font={font} session={session} />
+        {false && <DailySetupsTab C={C} font={font} session={session} isAdmin={isAdmin} setPage={setPage} />}
       </div>
     </div>
   );
