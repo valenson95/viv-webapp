@@ -11703,10 +11703,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           )}
 
-          {/* 🎯 WATCHLIST — MEMBER-FACING (Valen 2026-08-05). Sits after the market-lens rows and
-              before the positions card: the funnel he hunts from, read against the same theme +
-              rotation data the lenses above it show. The card itself gates flag EDITING on isAdmin. */}
-          <WatchlistCard C={C} font={font} session={session} />
+          {/* 🎯 WATCHLIST — HIDDEN (Valen 2026-08-05 "remove it first"): the v1 layout he rejected
+              stays off the dashboard until the approved Option-B master-table redesign ships. */}
+          {false && <WatchlistCard C={C} font={font} session={session} />}
 
           {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS.
               RISK ALLOCATION now lives HERE as a slim strip over the table (Valen 2026-08-02 — "overlay
@@ -11723,9 +11722,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 <div className="cardhead poshead mobposhead">
                   <h2>Open Positions</h2>
                   {openCount === 0 && <span className="countchip">0</span>}
-                  {nAtRisk > 0 && <span className="countchip term" data-tip={`${nAtRisk} position${nAtRisk === 1 ? "" : "s"} At Risk — stop below entry, a stop-out costs money.`} style={{ background: "var(--redDim)", color: "var(--red)" }}>{nAtRisk}</span>}
-                  {nRiskFree > 0 && <span className="countchip term" data-tip={`${nRiskFree} position${nRiskFree === 1 ? "" : "s"} Risk-Free — stop at breakeven, worst case $0.`}>{nRiskFree}</span>}
-                  {nLocked > 0 && <span className="countchip term" data-tip={`${nLocked} position${nLocked === 1 ? "" : "s"} Profit Locked — stop above entry, gains are protected.`} style={{ background: "var(--greenDim)", color: "var(--green)" }}>{nLocked}</span>}
+                  {nAtRisk > 0 && <span className="countchip term" data-tip={`${nAtRisk} of your ${openCount} open positions are At Risk — stop below entry, a stop-out costs money.`} style={{ background: "var(--redDim)", color: "var(--red)" }}>{nAtRisk}/{openCount} at risk</span>}
+                  {nRiskFree > 0 && <span className="countchip term" data-tip={`${nRiskFree} of your ${openCount} open positions are Risk-Free — stop at breakeven, worst case $0.`}>{nRiskFree}/{openCount} risk-free</span>}
+                  {nLocked > 0 && <span className="countchip term" data-tip={`${nLocked} of your ${openCount} open positions are Profit Locked — stop above entry, gains are protected.`} style={{ background: "var(--greenDim)", color: "var(--green)" }}>{nLocked}/{openCount} profit locked</span>}
                   <span className="infodot" data-tip="Every trade you currently hold. The colored status shows which positions are at risk.">i</span>
                   <div className="spacer"></div>
                   <div className="seg" id="viewSeg">
@@ -11756,11 +11755,12 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <>
             <div className="cardhead poshead">
               <h2>Open Positions</h2>
-              {/* Status-colored counts (Valen 2026-08-05): red = At Risk · gold = Risk-Free · green = Profit Locked */}
+              {/* Self-explanatory status counts (Valen 2026-08-05): "n/total at risk" — total trades
+                  visible in every chip, zero-count statuses not rendered. */}
               {openCount === 0 && <span className="countchip">0</span>}
-              {nAtRisk > 0 && <span className="countchip term" data-tip={`${nAtRisk} position${nAtRisk === 1 ? "" : "s"} At Risk — stop below entry, a stop-out costs money.`} style={{ background: "var(--redDim)", color: "var(--red)", cursor: "help" }}>{nAtRisk}</span>}
-              {nRiskFree > 0 && <span className="countchip term" data-tip={`${nRiskFree} position${nRiskFree === 1 ? "" : "s"} Risk-Free — stop at breakeven, worst case $0.`} style={{ cursor: "help" }}>{nRiskFree}</span>}
-              {nLocked > 0 && <span className="countchip term" data-tip={`${nLocked} position${nLocked === 1 ? "" : "s"} Profit Locked — stop above entry, gains are protected.`} style={{ background: "var(--greenDim)", color: "var(--green)", cursor: "help" }}>{nLocked}</span>}
+              {nAtRisk > 0 && <span className="countchip term" data-tip={`${nAtRisk} of your ${openCount} open positions are At Risk — stop below entry, a stop-out costs money.`} style={{ background: "var(--redDim)", color: "var(--red)", cursor: "help" }}>{nAtRisk}/{openCount} at risk</span>}
+              {nRiskFree > 0 && <span className="countchip term" data-tip={`${nRiskFree} of your ${openCount} open positions are Risk-Free — stop at breakeven, worst case $0.`} style={{ cursor: "help" }}>{nRiskFree}/{openCount} risk-free</span>}
+              {nLocked > 0 && <span className="countchip term" data-tip={`${nLocked} of your ${openCount} open positions are Profit Locked — stop above entry, gains are protected.`} style={{ background: "var(--greenDim)", color: "var(--green)", cursor: "help" }}>{nLocked}/{openCount} profit locked</span>}
               <span className="infodot" data-tip="Every trade you currently hold. The colored status shows which positions are at risk.">i</span>
               <div className="spacer"></div>
               <div className="seg" id="viewSeg">
@@ -12004,9 +12004,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <SituationalRead C={C} font={font} session={session} isAdmin={isAdmin} />
         </div>
 
-        {/* 🎯 WATCHLIST — MEMBER-FACING (Valen 2026-08-05); same card the Pro layout renders, placed
-            after the market lenses and before the positions table. Flag editing is admin-only. */}
-        <WatchlistCard C={C} font={font} session={session} />
+        {/* 🎯 WATCHLIST — HIDDEN (Valen 2026-08-05 "remove it first"): v1 layout rejected; off the
+            dashboard until the approved Option-B master-table redesign ships. */}
+        {false && <WatchlistCard C={C} font={font} session={session} />}
 
         {/* TABLE */}
         <div className="toolbar">

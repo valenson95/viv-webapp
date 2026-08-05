@@ -6,7 +6,7 @@ const env=Object.fromEntries(readFileSync('.env.local','utf8').split('\n').filte
 const sb=createClient(env.SUPABASE_URL||env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}});
 const UID='0e32b092-029a-436d-8cb5-67621e1467b0';
 // Paste live IBKR truth here each pull: symbol -> {shares, avg, realized90d}
-const IBKR={DDOG:{shares:190,avg:248.555},NTAP:{shares:525,avg:160.305},RBRK:{shares:642,avg:74.745},TWLO:{shares:325,avg:197.985}}; // 2026-07-13 ~10:55 ET pull (OSCR stopped BE +0.02R · CRWD intraday RT −$799.82 · IBKR ticker = broker-paid interest, ignored)
+const IBKR={UAL:{shares:500,avg:128.255},NAVN:{shares:1700,avg:27.915},HPE:{shares:1250,avg:47.484}}; // 2026-08-03 ~10:20 ET pull (3 fresh entries, stops resting: UAL 125.31 · NAVN 27.06 · HPE 46.30 · IBKR ticker = broker-paid interest, ignored)
 const {data:pos}=await sb.from('positions').select('*').eq('user_id',UID).eq('is_closed',false);
 const {data:tr}=await sb.from('trades').select('ticker,exit_date,shares,pl_dollar,exit_reason,position_id').eq('user_id',UID).eq('is_deleted',false).eq('is_sample',false); // LIVE rows only (quarantined dupes excluded)
 let red=0;
