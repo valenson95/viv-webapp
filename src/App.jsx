@@ -11,6 +11,7 @@ import { themeFit, themeRanks, consistentTop, top5, latestSnapshot, THEME_COVERA
 import { WATCHLIST } from "./watchlist-data.js";
 import { groupForTheme } from "./themeGroups.js";
 import { GROUP_RS } from "./groupRS-data.js";
+import { WATCHLIST_RS } from "./watchlistRS-data.js";
 import { EARNINGS } from "./earnings-data.js";
 import ThemeTracker from "./ThemeTracker.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
@@ -773,6 +774,16 @@ function PlaybookTracker({ trades, uid, setPage }) {
 }
 
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "August 5, 2026",
+    title: "🎯 The Hunt List — the watchlist as one sortable table",
+    items: [
+      "The Hunt List is on your Dashboard: the watchlist as one sortable table. Every name shows its TradingView category, its theme with that theme's 1-week rank, the industry group it belongs to with the group's Thrust % and RS rank, the stock's own Thrust % and RS rank, and its next earnings date.",
+      "Filter by category with one tap, or switch on “Leading groups only” to keep just the names whose industry group scores 85 or higher on both numbers.",
+      "Sorts stack. Click a column to sort by it, then click a second column to sort inside that — the small number tells you the order. Click a column again to flip it, and × reset puts the list back in its original order. Your sort is remembered.",
+    ],
+  },
   {
     tag: "New",
     date: "August 5, 2026",
@@ -9714,33 +9725,31 @@ function AllocDonut({ pct, over, size = 104 }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🎯 WATCHLIST — MEMBER-FACING (Valen 2026-08-05). MODULE scope (never nested).
+// 🎯 THE HUNT LIST — MEMBER-FACING (Valen 2026-08-05). MODULE scope (never nested).
 // ═══════════════════════════════════════════════════════════════════════════
-// A read-only mirror of Valen's TradingView funnel. He sends the screenshots, Claude transcribes
-// them into src/watchlist-data.js, and this card decorates every name with the context that
-// already lives in the app:
-//   🚩          Valen's own colour flag (watchlist_flags) — members see it, only he sets it
-//   theme       sectors.js sectorFor() — DeepVue grouping, never self-categorised here
-//   theme fit   themeFit() against the LATEST snapshot (a current-view widget read, NOT the
+// A read-only mirror of Valen's TradingView funnel, rebuilt to the approved "Option B" master-table
+// design (his sign-off 2026-08-05). ONE sortable table, not stacked sections. Each row carries the
+// context that already lives in the app:
+//   🚩 flag     Valen's own colour flag (watchlist_flags) — members see it, only he sets it
+//   ticker      verbatim from src/watchlist-data.js — never added to, dropped or reordered here
+//   category    which TradingView section the name sits in, as a tinted text chip
+//   theme       sectors.js sectorFor() — DeepVue grouping, never self-categorised here — plus that
+//               theme's 1-week rank in the LATEST snapshot (a current-view widget read, NOT the
 //               entry-frozen judgement the positions table uses — nothing here touches that)
-//   1W#         that theme's rank in the LATEST snapshot's 1-week board (index + 1)
-//   group       themeGroups.js → the rotation table's group ETF → its thrust / rs1m
-//   ⚡          the ticker also appeared in the published Daily Setups feed in the last 5 days
-//   E          next scheduled earnings date from earnings-data.js
+//   group       themeGroups.js → the rotation table's group ETF, then ITS thrust / rs1m. Those two
+//               numbers are always the GROUP's, never the stock's.
+//   earnings    next scheduled report date from earnings-data.js
 //
-// VISIBILITY (Valen 2026-08-05): members now SEE this card. `isAdmin` no longer gates the RENDER —
-// it gates flag EDITING only. Member-facing means the standing rules apply: the educational line is
-// not optional, and there is deliberately NO grade anywhere on this card (a grade needs the trigger
-// context a watchlist doesn't carry — his explicit call).
+// The INDEX section renders as a ribbon strip above the table: indices and commodities aren't
+// theme-mappable, and this card has NO live quote source for them — so no percentages are shown
+// rather than invented ones.
 //
-// Reads: daily_setups (⚡ chips) + watchlist_flags (colours). Writes: watchlist_flags ONLY, and only
-// from the admin session. No other write path is touched by this card.
+// VISIBILITY (Valen 2026-08-05): members SEE this card. `isAdmin` gates flag EDITING only, and there
+// is deliberately NO grade anywhere on this card (a grade needs the trigger context a watchlist
+// doesn't carry — his explicit call).
 //
-// LAYOUT (Valen 2026-08-05): TradingView's watchlist grammar — dense single-line rows under slim
-// section dividers. Two different marks live at the left edge and they mean different things:
-//   🚩 flag  Valen's own colour tag, stored in watchlist_flags. Human, not computed.
-//   4px bar  the COMPUTED instant read (theme fit × group strength). Never editable.
-// VIV skin (glass, palette C, gold) on TV's layout, because that's the shape his eye already parses.
+// Reads: watchlist_flags (colours). Writes: watchlist_flags ONLY, and only from the admin session.
+// No other write path is touched by this card.
 //
 // Group-row index, built once. GROUP_RS.rows can carry a duplicate ticker (SHLD ships twice) —
 // last row wins, which is the freshest computed row for that ticker.
@@ -9795,16 +9804,72 @@ function WlFlagGlyph({ color, size = 13 }) {
   );
 }
 
-// Sort options for the card header. "my" = the array order in watchlist-data.js (his TV order) and
-// is the DEFAULT. Sorting only ever reorders rows INSIDE a section — sections never move.
-// NO letter shorthand anywhere (his hard rule 2026-08-05) — the labels are the words themselves.
-const WL_SORTS = [
-  { key: "my",     label: "My order" },
-  { key: "thrust", label: "Thrust %" },
-  { key: "rs",     label: "RS rank" },
-  { key: "theme",  label: "Theme rank" },
-  { key: "az",     label: "A–Z" },
+// Per-STOCK rotation row index (the name's OWN thrust / rs1m), built once. Same shape rules as the
+// group index above: last row for a ticker wins, so a regenerated file's freshest row is the one used.
+const WATCHLIST_STOCK_ROWS = (() => {
+  const m = {};
+  for (const r of (WATCHLIST_RS && WATCHLIST_RS.rows) || []) if (r && r.t) m[String(r.t).toUpperCase()] = r;
+  return m;
+})();
+
+// Display metadata per TradingView section. `name` is the title-case chip label; the table cell
+// prints the section's VERBATIM TV label instead. Tints carry the funnel's meaning (gold = live
+// position, green = the hunting end, blue/grey = colder, purple = earnings-driven).
+const WL_STAGE_META = {
+  longs:    { name: "Longs (In-Position)",          fg: "#f0c050",                fg2: "rgba(240,192,80,0.70)",   bg: "rgba(201,152,42,0.14)",  bd: "rgba(201,152,42,0.40)" },
+  focus:    { name: "Focus List (Ideas)",           fg: "#7ef0a0",                fg2: "rgba(126,240,160,0.70)",  bg: "rgba(34,197,94,0.12)",   bd: "rgba(34,197,94,0.35)" },
+  strong:   { name: "Strong Stocks (Stalking)",     fg: "#5fbf83",                fg2: "rgba(95,191,131,0.70)",   bg: "rgba(34,197,94,0.06)",   bd: "rgba(34,197,94,0.20)" },
+  mediocre: { name: "Mediocre Stocks (Setting Up)", fg: "#93c5fd",                fg2: "rgba(147,197,253,0.70)",  bg: "rgba(59,130,246,0.12)",  bd: "rgba(59,130,246,0.35)" },
+  weak:     { name: "Weak Stocks (Watching)",       fg: "rgba(255,255,255,0.55)", fg2: "rgba(255,255,255,0.40)",  bg: "rgba(255,255,255,0.04)", bd: "rgba(255,255,255,0.13)" },
+  peg:      { name: "Post Earnings Gap (PEG)",      fg: "#c4b5fd",                fg2: "rgba(196,181,253,0.70)",  bg: "rgba(167,139,250,0.12)", bd: "rgba(167,139,250,0.32)" },
+  earnup:   { name: "Earnings Upcoming",            fg: "#a78bfa",                fg2: "rgba(167,139,250,0.70)",  bg: "rgba(167,139,250,0.06)", bd: "rgba(167,139,250,0.20)" },
+};
+// A section key the map doesn't know still renders — neutral tint, its own TV label. Never dropped.
+const WL_STAGE_FALLBACK = { fg: "rgba(255,255,255,0.55)", fg2: "rgba(255,255,255,0.40)", bg: "rgba(255,255,255,0.04)", bd: "rgba(255,255,255,0.13)" };
+
+// The master table's columns, in order. `key` is also the multi-sort key; the flag column has none.
+// Tooltips spell the numbers out — GROUP columns say they are the group's, STOCK columns say they
+// are the name's own, so the two pairs can never be read as the same measurement.
+const WL_COLS = [
+  { key: "t",       label: "Ticker",               align: "left",  tip: "The stock this row tracks. Names and order mirror the TradingView list exactly." },
+  { key: "six",     label: "TradingView Category", align: "left",  tip: "Which TradingView watchlist section the name sits in — the exact same segmentation as the TradingView list." },
+  { key: "rank",    label: "Theme",                align: "left",  tip: "The name's theme and where that theme ranks on the 1-week board. Green = top 3, orange = 4-5, red = the rest." },
+  { key: "grp",     label: "Industry group",       align: "left",  tip: "The rotation-table industry group this name maps to through its theme. The Group Thrust % and Group RS rank columns are THIS group's numbers." },
+  { key: "thrust",  label: "Group Thrust %",       align: "right", tip: "The INDUSTRY GROUP's thrust — this week's momentum, 0-100, same formula and benchmark (RSP) as the rotation table. The pop quiz. This is the whole industry group's number, not this stock's." },
+  { key: "rs",      label: "Group RS rank",        align: "right", tip: "The INDUSTRY GROUP's 1-month relative-strength rank, 0-100, straight from the rotation table. The semester grade. This is the whole industry group's number, not this stock's." },
+  { key: "sthrust", label: "Stock Thrust %",       align: "right", tip: "THIS stock's own thrust — this week's momentum vs the equal-weight market (RSP), 0-100, same formula as the group number. The pop quiz, for the name itself." },
+  { key: "srs",     label: "Stock RS rank",        align: "right", tip: "THIS stock's own 1-month relative-strength rank, 0-100, measured against the same benchmark as the group number. The semester grade, for the name itself." },
+  { key: "earnDay", label: "Earnings",             align: "right", tip: "Next scheduled earnings date. Turns red when it lands within 3 days. Scheduled dates can move." },
 ];
+// String-ish columns read best low-to-high; the strength columns read best strongest-first.
+const WL_ASC_KEYS = new Set(["t", "six", "rank", "grp", "earnDay"]);
+const WL_SORT_KEYS = new Set(WL_COLS.map(c => c.key));
+const WL_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WL_SUP = ["¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
+
+// "2026-08-06" → "Aug 6". Parsed by hand so no timezone can shift the day.
+const wlFmtDay = (iso) => {
+  const p = String(iso || "").split("-");
+  const mi = Number(p[1]) - 1;
+  return (WL_MONTHS[mi] || "") + " " + Number(p[2]);
+};
+// Heat fill, identical to the rotation table's: rgba(34,197,94, 0.06 + 0.4·v/100).
+const wlHeat = (v) => (v == null ? "transparent" : `rgba(34,197,94,${(0.06 + 0.4 * Math.max(0, Math.min(1, v / 100))).toFixed(3)})`);
+// Theme-rank colour: green top 3 · orange 4-5 · red the rest · grey when the tracker doesn't rank it.
+const wlRankColor = (rank) => (rank == null ? "rgba(255,255,255,0.35)" : rank <= 3 ? "#86efac" : rank <= 5 ? "#f0a03c" : "#fca5a5");
+
+// Stored multi-sort chain, per user. Anything malformed or referencing a column that no longer
+// exists is discarded rather than half-applied — a bad localStorage row can never break the table.
+const wlReadChain = (k) => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(k) || "[]");
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter(c => c && WL_SORT_KEYS.has(c.key) && (c.dir === "asc" || c.dir === "desc"))
+      .map(c => ({ key: c.key, dir: c.dir }))
+      .slice(0, WL_COLS.length);
+  } catch { return []; }
+};
 
 function WatchlistCard({ C, font, session }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
@@ -9813,26 +9878,9 @@ function WatchlistCard({ C, font, session }) {
   // Let the app's own background resolver fill in themes it doesn't know yet (read-only /api/sector).
   useSectors(sections.flatMap(s => (s.tickers || [])));
 
-  // ⚡ chip source — tickers published to the Daily Setups feed in the last 5 days. One fetch on
-  // mount; any failure leaves this null and the chips are simply omitted (the card never crashes).
-  const [recentSetups, setRecentSetups] = useState(null);
-  useEffect(() => {
-    let dead = false;
-    (async () => {
-      try {
-        const since = new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10);
-        const { data, error } = await supabase.from("daily_setups").select("ticker,trade_date").gte("trade_date", since);
-        if (dead || error || !Array.isArray(data)) return;
-        setRecentSetups(new Set(data.map(r => String(r?.ticker || "").toUpperCase().trim()).filter(Boolean)));
-      } catch { /* no chips — never a crash */ }
-    })();
-    return () => { dead = true; };
-  }, []);
-
-  // 🚩 FLAGS — DEPLOY-SAFE PROBE (the house pattern, same as ModelBook's diveColsV2/V3).
-  // The select runs on mount; PostgREST errors when the table isn't there yet, which is the whole
-  // signal. Error → flagsReady stays false → every flag renders as an empty outline, editing is off,
-  // nothing throws. The card lights up on its own once supabase/watchlist-flags.sql is run.
+  // 🚩 FLAGS — DEPLOY-SAFE PROBE (the house pattern, same as ModelBook's diveColsV2/V3). The table
+  // exists in production now, but the probe stays: any environment where the migration hasn't run
+  // degrades to empty outlines with editing off, instead of throwing. Error → flagsReady false.
   const [flags, setFlags] = useState({});          // { TICKER: "#hex" }
   const [flagsReady, setFlagsReady] = useState(false);
   useEffect(() => {
@@ -9856,7 +9904,9 @@ function WatchlistCard({ C, font, session }) {
 
   // Editing is admin-only AND table-only. Members get read-only flags with a default cursor.
   const canEditFlags = isAdmin && flagsReady;
-  const [flagOpen, setFlagOpen] = useState(null);   // ticker whose colour popover is open, or null
+  // { tk, x, y } of the open colour popover, or null. The popover is portalled to <body> so the
+  // table's own horizontal scroller can never clip it.
+  const [flagOpen, setFlagOpen] = useState(null);
 
   // Outside-click close. mousedown/touchstart (not click) so the tap that OPENED the popover has
   // already fired before this listener exists — no open-then-instantly-close race. Both listeners
@@ -9891,302 +9941,376 @@ function WatchlistCard({ C, font, session }) {
     } catch { setFlags(prev); }
   };
 
-  // Sort choice, per user. "my" (his TV order) is the default and the fallback for anything unknown.
-  const sortUid = session?.user?.id || "anon";
-  const sortKey = `viv-wl-sort-${sortUid}`;
-  const readSort = (k) => { try { const s = localStorage.getItem(k); return WL_SORTS.some(o => o.key === s) ? s : null; } catch { return null; } };
-  const [sortBy, setSortBy] = useState(() => readSort(`viv-wl-sort-${session?.user?.id || "anon"}`) || "my");
-  // Re-read only if the uid changes (session lands after mount) AND that uid has a stored choice —
-  // never clobber what's already on screen back to the default.
-  useEffect(() => { const s = readSort(sortKey); if (s) setSortBy(s); }, [sortKey]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const pickSort = (v) => { setSortBy(v); try { localStorage.setItem(sortKey, v); } catch {} };
+  // ── FILTERS ───────────────────────────────────────────────────────────────
+  const [stage, setStage] = useState("all");     // "all" or a TradingView section key
+  const [leadOnly, setLeadOnly] = useState(false);
+
+  // ── MULTI-SORT CHAIN, persisted per user ─────────────────────────────────
+  // Clicking a header appends {key,dir}; clicking one already in the chain flips its direction.
+  // An empty chain means the verbatim TradingView order: section order, then ticker order inside it.
+  const chainKey = `viv-wl-sort2-${session?.user?.id || "anon"}`;
+  const [chain, setChain] = useState(() => wlReadChain(`viv-wl-sort2-${session?.user?.id || "anon"}`));
+  // Re-read only when the uid changes (the session lands after mount) AND that uid has a stored
+  // chain — never clobber what's already on screen back to the default.
+  useEffect(() => { const c = wlReadChain(chainKey); if (c.length) setChain(c); }, [chainKey]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const putChain = (next) => { setChain(next); try { localStorage.setItem(chainKey, JSON.stringify(next)); } catch {} };
+  const onSort = (k) => {
+    const i = chain.findIndex(c => c.key === k);
+    if (i >= 0) putChain(chain.map((c, j) => (j === i ? { key: c.key, dir: c.dir === "desc" ? "asc" : "desc" } : c)));
+    else putChain([...chain, { key: k, dir: WL_ASC_KEYS.has(k) ? "asc" : "desc" }]);
+  };
 
   // LATEST snapshot only. Passing its date into the shared helper keeps this identical to the
   // machinery the rest of the app uses, without borrowing the entry-frozen path.
   const snapDate = latestSnapshot()?.date || null;
   const today = wlTodayISO();
 
-  const decorate = (t) => {
-    const tk = String(t || "").toUpperCase().trim();
-    const theme = sectorFor(tk);
-    const ranks = theme && snapDate ? themeRanks(theme, snapDate) : null;
-    // themeFit() is the app's helper and calls anything outside the top-5 "off". A theme the
-    // tracker doesn't rank AT ALL (e.g. "Technology" — sectors.js notes it is not a tracker theme)
-    // has no week and no month rank, so calling it "off" would be a verdict the data can't support.
-    // Those stay UNRANKED (grey), and the tooltip says so.
-    const ranked = !!(ranks && (ranks.week != null || ranks.month != null));
-    const fit = theme && snapDate && ranked ? themeFit(theme, snapDate) : null;   // "in" | "off" | null
-    const g = groupForTheme(theme);
-    const row = g ? WATCHLIST_GROUP_ROWS[g] : null;
-    const thrust = row && typeof row.thrust === "number" ? row.thrust : null;
-    const rs1m = row && typeof row.rs1m === "number" ? row.rs1m : null;
-    const hasG = thrust != null && rs1m != null;
-    const hits = hasG ? (thrust >= WATCHLIST_LEAD ? 1 : 0) + (rs1m >= WATCHLIST_LEAD ? 1 : 0) : 0;
-    const groupStrong = hits === 2;
-    const themeStrong = fit === "in";
-    // Flag = the instant read, judged only on what is actually knowable for this name:
-    //   green  both measures known and both strong
-    //   gold   at least one strong
-    //   red    every measure we can judge is weak
-    //   grey   nothing to judge (no theme / theme unranked AND no group data)
-    const judgeable = fit != null || hasG;
-    const flag = !judgeable ? "grey"
-      : (themeStrong && groupStrong) ? "green"
-      : (themeStrong || groupStrong) ? "gold"
-      : "red";
-    // Next SCHEDULED report, if it's inside the next 14 days.
-    const sched = (WATCHLIST_EARNINGS[tk] || []).find(([d]) => d >= today);
-    const earn = sched && wlDaysBetween(today, sched[0]) <= 14 ? { date: sched[0], time: sched[1], inDays: wlDaysBetween(today, sched[0]) } : null;
-    // 1-week rank of the theme in the LATEST snapshot (index + 1); null when the theme is unranked
-    // or the row has no theme at all (INDEX rows). ≤5 = top-5 leader.
-    const wrank = ranks && ranks.week != null ? ranks.week : null;
-    return { tk, theme, fit, ranks, wrank, ranked, g, thrust, rs1m, hasG, hits, themeStrong, groupStrong, flag, earn, zap: recentSetups ? recentSetups.has(tk) : false, mark: flags[tk] || null };
-  };
+  // ── ROWS ──────────────────────────────────────────────────────────────────
+  // INDEX is the ribbon; every other section becomes table rows, in file order.
+  const indexTickers = (sections.find(s => String(s.key) === "index")?.tickers) || [];
+  const bodySections = sections.filter(s => String(s.key) !== "index");
 
-  // SORT — applies WITHIN a section only; the sections themselves never reorder. Nulls always sort
-  // last, and the original array index is the tiebreak so equal values keep his TV order.
-  const sortRows = (rows) => {
-    if (sortBy === "my") return rows;
-    const metric = (r) => (sortBy === "thrust" ? r.thrust : sortBy === "rs" ? r.rs1m : sortBy === "theme" ? r.wrank : null);
-    return rows
-      .map((r, i) => ({ r, i }))
-      .sort((a, b) => {
-        if (sortBy === "az") return a.r.tk.localeCompare(b.r.tk) || a.i - b.i;
-        const av = metric(a.r), bv = metric(b.r);
-        const an = !Number.isFinite(av), bn = !Number.isFinite(bv);
-        if (an && bn) return a.i - b.i;
-        if (an) return 1;
-        if (bn) return -1;
-        // thrust / RS: bigger is stronger → descending.  Theme rank: #1 is strongest → ascending.
-        return (sortBy === "theme" ? av - bv : bv - av) || a.i - b.i;
+  const rows = [];
+  bodySections.forEach((s, si) => {
+    (s.tickers || []).forEach(t => {
+      const tk = String(t || "").toUpperCase().trim();
+      if (!tk) return;
+      const theme = sectorFor(tk) || null;
+      // 1-week rank of the theme in the LATEST snapshot (index + 1); null when the tracker doesn't
+      // rank that theme at all — grey "untracked", never a made-up number.
+      const ranks = theme && snapDate ? themeRanks(theme, snapDate) : null;
+      const rank = ranks && ranks.week != null ? ranks.week : null;
+      const grp = (theme ? groupForTheme(theme) : null) || null;
+      const grow = grp ? WATCHLIST_GROUP_ROWS[grp] : null;
+      const srow = WATCHLIST_STOCK_ROWS[tk] || null;
+      const sched = (WATCHLIST_EARNINGS[tk] || []).find(([d]) => d >= today);
+      rows.push({
+        tk, sec: String(s.key), secLabel: s.label, six: si, ix: rows.length,
+        theme, rank, grp,
+        thrust:  grow && typeof grow.thrust === "number" ? grow.thrust : null,
+        rs1m:    grow && typeof grow.rs1m   === "number" ? grow.rs1m   : null,
+        sthrust: srow && typeof srow.thrust === "number" ? srow.thrust : null,
+        srs1m:   srow && typeof srow.rs1m   === "number" ? srow.rs1m   : null,
+        earn: sched ? sched[0] : null,
+        dte:  sched ? wlDaysBetween(today, sched[0]) : null,
+        mark: flags[tk] || null,
+      });
+    });
+  });
+
+  // Chip counts are the section's FULL size — they don't move when a filter is on.
+  const counts = {};
+  for (const r of rows) counts[r.sec] = (counts[r.sec] || 0) + 1;
+
+  const shown = rows.filter(r => {
+    if (stage !== "all" && r.sec !== stage) return false;
+    if (leadOnly && !(r.thrust != null && r.rs1m != null && r.thrust >= WATCHLIST_LEAD && r.rs1m >= WATCHLIST_LEAD)) return false;
+    return true;
+  });
+
+  const sortVal = (r, k) =>
+    k === "t"       ? r.tk
+    : k === "six"     ? r.six
+    : k === "rank"    ? r.rank
+    : k === "grp"     ? r.grp
+    : k === "thrust"  ? r.thrust
+    : k === "rs"      ? r.rs1m
+    : k === "sthrust" ? r.sthrust
+    : k === "srs"     ? r.srs1m
+    : k === "earnDay" ? r.dte
+    : null;
+
+  // Nulls always sort last, whichever direction the column is running. The file index is the final
+  // tiebreak so equal values keep his TradingView order.
+  const sorted = chain.length
+    ? [...shown].sort((a, b) => {
+        for (const c of chain) {
+          const va = sortVal(a, c.key), vb = sortVal(b, c.key);
+          const an = va == null || va === "", bn = vb == null || vb === "";
+          if (an && bn) continue;
+          if (an) return 1;
+          if (bn) return -1;
+          const cmp = (typeof va === "string" || typeof vb === "string")
+            ? String(va).localeCompare(String(vb))
+            : va - vb;
+          if (cmp !== 0) return cmp * (c.dir === "asc" ? 1 : -1);
+        }
+        return a.ix - b.ix;
       })
-      .map(x => x.r);
-  };
+    : shown;
 
-  const decorated = sections.map(s => ({ ...s, rows: sortRows((s.tickers || []).map(decorate)) }));
-  const total = decorated.reduce((n, s) => n + s.rows.length, 0);
+  const stageMeta = (key) => WL_STAGE_META[key] || WL_STAGE_FALLBACK;
 
-  // One-line verdict — Focus names whose group is leading on BOTH measures.
-  const focus = decorated.find(s => s.key === "focus");
-  const leaders = (focus?.rows || []).filter(r => r.groupStrong);
-  const verdict = !focus || !focus.rows.length
-    ? "No Focus names on file yet."
-    : leaders.length
-      ? `${leaders.length} of his ${focus.rows.length} Focus names sit in a leading industry group — Thrust % and RS rank both 85 or higher: ${leaders.map(r => r.tk).join(" · ")}`
-      : `None of his ${focus.rows.length} Focus names sit in a leading industry group right now (Thrust % and RS rank both 85 or higher).`;
-
-  const FLAG = { green: C.green, gold: C.goldBright, red: C.red, grey: "rgba(255,255,255,0.22)" };
-  const groupColor = (r) => (!r.hasG ? "rgba(255,255,255,0.34)" : r.hits === 2 ? C.green : r.hits === 1 ? C.goldBright : C.muted);
-  const rk = (x) => (x ? "#" + x : "—");
-
-  const tipFor = (r) => {
-    const bits = [r.tk];
-    bits.push(!r.theme ? "no theme mapped yet"
-      : !r.ranked ? `${r.theme} — not ranked in the theme tracker`
-      : r.fit === "in" ? `${r.theme} — top-5 leader (1W ${rk(r.ranks.week)} · 1M ${rk(r.ranks.month)})`
-      : `${r.theme} — outside the top-5 (1W ${rk(r.ranks.week)} · 1M ${rk(r.ranks.month)})`);
-    bits.push(r.hasG ? `industry group ${r.g}: Thrust % ${r.thrust} · RS rank ${Math.round(r.rs1m)}`
-      : r.g ? `industry group ${r.g} — no rotation row computed yet`
-      : "no industry group mapped for this theme");
-    if (r.zap) bits.push("published to Daily Setups in the last 5 days");
-    if (r.earn) bits.push(`earnings scheduled ${r.earn.date}${r.earn.time === "bmo" ? " before the open" : r.earn.time === "amc" ? " after the close" : ""} — in ${r.earn.inDays} day${r.earn.inDays === 1 ? "" : "s"}`);
-    return bits.join("   ·   ");
-  };
-
-  const micro = { fontSize: "0.57rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: C.gold };
-  const rowH = isMobileVP ? 36 : 34;
-
-  // 🚩 one row's flag: a ≥30px tap target wrapping a small glyph, plus (admin) the colour popover.
-  // data-wlflag marks the whole wrapper so the outside-click listener can tell inside from outside.
+  // ── 🚩 one row's flag: a tap target wrapping the glyph. data-wlflag marks the wrapper (and the
+  // portalled popover) so the outside-click listener can tell inside from outside.
   const flagCell = (r) => {
-    const open = flagOpen === r.tk;
-    const hit = 30;
+    const open = !!flagOpen && flagOpen.tk === r.tk;
     return (
-      <span data-wlflag style={{ position: "relative", flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", width: hit, height: Math.min(rowH, hit + 6) }}>
+      <span data-wlflag style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 24 }}>
         <button
           type="button"
           aria-label={canEditFlags ? `Flag ${r.tk}` : `${r.tk} flag`}
           aria-expanded={canEditFlags ? open : undefined}
           disabled={!canEditFlags}
-          onClick={canEditFlags ? (e) => { e.stopPropagation(); setFlagOpen(o => (o === r.tk ? null : r.tk)); } : undefined}
+          onClick={canEditFlags ? (e) => {
+            e.stopPropagation();
+            if (open) { setFlagOpen(null); return; }
+            const b = e.currentTarget.getBoundingClientRect();
+            setFlagOpen({ tk: r.tk, x: b.left, y: b.bottom + 6 });
+          } : undefined}
           style={{
-            width: hit, height: hit, padding: 0, margin: 0, border: "none", background: "none",
+            width: 24, height: 24, padding: 0, margin: 0, border: "none", background: "none",
             display: "flex", alignItems: "center", justifyContent: "center",
             cursor: canEditFlags ? "pointer" : "default", WebkitTapHighlightColor: "transparent",
-            borderRadius: 8, outline: open ? `1px solid ${C.border}` : "none",
+            borderRadius: 7, outline: open ? `1px solid ${C.border}` : "none",
           }}
         >
           <WlFlagGlyph color={r.mark} size={13} />
         </button>
-        {canEditFlags && open && (
-          // z-index 500: above the card's own content, deliberately BELOW the app's modal ladder
-          // (1000 / 1250 / 1450 / 2000 / 4000) so a dialog is never covered by a watchlist popover.
-          <div
-            role="menu"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 500,
-              display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap",
-              width: "max-content", maxWidth: "min(268px, calc(100vw - 32px))",
-              padding: "6px 7px", borderRadius: 12,
-              background: "rgba(10,10,18,0.97)", border: `1px solid ${C.border}`,
-              boxShadow: "0 10px 30px rgba(0,0,0,0.55)",
-            }}
-          >
-            {WL_FLAG_COLORS.map(c => (
-              <button
-                key={c.key}
-                type="button"
-                title={c.key}
-                aria-label={c.key}
-                onClick={() => writeFlag(r.tk, c.hex)}
-                style={{
-                  width: 30, height: 30, padding: 0, borderRadius: 999, cursor: "pointer",
-                  background: c.hex, WebkitTapHighlightColor: "transparent",
-                  border: r.mark === c.hex ? "2px solid rgba(255,255,255,0.92)" : "1px solid rgba(255,255,255,0.16)",
-                }}
-              />
-            ))}
-            <button
-              type="button"
-              title="clear"
-              aria-label="clear flag"
-              onClick={() => writeFlag(r.tk, null)}
-              style={{
-                width: 30, height: 30, padding: 0, borderRadius: 999, cursor: "pointer",
-                background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
-                color: "rgba(255,255,255,0.7)", fontSize: "0.72rem", fontWeight: 800, lineHeight: 1,
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >✕</button>
-          </div>
-        )}
       </span>
     );
   };
 
+  // The colour popover lives OUTSIDE the table, portalled to <body> with fixed coordinates, so the
+  // table's overflow-x scroller can't clip it. z-index 500: above the card, deliberately BELOW the
+  // app's modal ladder (1000 / 1250 / 1450 / 2000 / 4000).
+  const flagPopover = (canEditFlags && flagOpen) ? createPortal(
+    <div
+      data-wlflag
+      role="menu"
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: "fixed",
+        top: Math.min(flagOpen.y, (typeof window !== "undefined" ? window.innerHeight : 800) - 60),
+        left: Math.max(8, Math.min(flagOpen.x, (typeof window !== "undefined" ? window.innerWidth : 1200) - 276)),
+        zIndex: 500, display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap",
+        width: "max-content", maxWidth: "min(268px, calc(100vw - 32px))",
+        padding: "6px 7px", borderRadius: 12, fontFamily: font,
+        background: "rgba(10,10,18,0.97)", border: `1px solid ${C.border}`,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.55)",
+      }}
+    >
+      {WL_FLAG_COLORS.map(c => (
+        <button
+          key={c.key}
+          type="button"
+          title={c.key}
+          aria-label={c.key}
+          onClick={() => writeFlag(flagOpen.tk, c.hex)}
+          style={{
+            width: 30, height: 30, padding: 0, borderRadius: 999, cursor: "pointer",
+            background: c.hex, WebkitTapHighlightColor: "transparent",
+            border: flags[flagOpen.tk] === c.hex ? "2px solid rgba(255,255,255,0.92)" : "1px solid rgba(255,255,255,0.16)",
+          }}
+        />
+      ))}
+      <button
+        type="button"
+        title="clear"
+        aria-label="clear flag"
+        onClick={() => writeFlag(flagOpen.tk, null)}
+        style={{
+          width: 30, height: 30, padding: 0, borderRadius: 999, cursor: "pointer",
+          background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+          color: "rgba(255,255,255,0.7)", fontSize: "0.72rem", fontWeight: 800, lineHeight: 1,
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >✕</button>
+    </div>, document.body) : null;
+
+  // ── style primitives, borrowed from the rotation table so the two read as one system ──
+  const cardLabel = { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.gold };
+  const stampStyle = { fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
+  const fchip = (on, meta) => ({
+    display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", fontFamily: font,
+    fontSize: "0.66rem", fontWeight: 700, padding: "5px 11px", borderRadius: 99, cursor: "pointer", transition: "all .14s",
+    border: `1px solid ${on ? (meta ? meta.bd : "rgba(201,152,42,0.55)") : C.border}`,
+    color: on ? (meta ? meta.fg : C.goldBright) : C.muted,
+    background: on ? (meta ? meta.bg : "rgba(201,152,42,0.10)") : "rgba(255,255,255,0.03)",
+  });
+  const fnum = (on, meta) => ({
+    fontSize: "0.6rem", fontWeight: 800, fontVariantNumeric: "tabular-nums",
+    color: on ? (meta ? meta.fg2 : "rgba(240,192,80,0.7)") : "rgba(255,255,255,0.4)",
+  });
+  const td = { padding: isMobileVP ? "6px 7px" : "7px 9px", borderBottom: `1px solid ${C.border}`, fontSize: isMobileVP ? "0.7rem" : "0.74rem", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: C.text };
+  const jc = (align) => (align === "right" ? "flex-end" : "flex-start");
+
+  // Sortable header cell. The superscript only appears once a second column joins the chain, so a
+  // single sort stays visually quiet.
+  const thCell = (c) => {
+    const ci = chain.findIndex(x => x.key === c.key);
+    const on = ci >= 0;
+    return (
+      <th
+        key={c.key}
+        onClick={() => onSort(c.key)}
+        style={{
+          padding: isMobileVP ? "7px 7px" : "8px 9px", fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.09em",
+          textTransform: "uppercase", color: on ? C.goldBright : C.muted, borderBottom: `1px solid ${C.border}`,
+          textAlign: c.align, whiteSpace: "nowrap", cursor: "pointer", userSelect: "none",
+        }}
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, justifyContent: jc(c.align) }}>
+          {c.label}
+          {on ? (chain[ci].dir === "desc" ? " ▾" : " ▴") : ""}
+          {on && chain.length > 1 ? <span style={{ fontSize: "0.5rem", opacity: 0.75 }}>{WL_SUP[ci] || ci + 1}</span> : null}
+          <InfoDot tip={c.tip} />
+        </span>
+      </th>
+    );
+  };
+
+  // Heat cell — the same green ramp as the rotation table. "—" when there is no number to show.
+  const heatCell = (v, key) => (
+    <td key={key} style={{ ...td, textAlign: "right", background: wlHeat(v) }}>
+      {v == null ? <span style={{ color: "rgba(255,255,255,0.28)" }}>—</span> : <span style={{ fontWeight: 700 }}>{Math.round(v)}</span>}
+    </td>
+  );
+
+  // Header stamps. The stock file's own vintage is only shown when it differs from the group
+  // file's — no point stamping the same date twice.
+  const stockAsof = WATCHLIST_RS && WATCHLIST_RS.asof ? String(WATCHLIST_RS.asof) : null;
+  const showStockStamp = !!stockAsof && stockAsof !== String(GROUP_RS?.asof || "");
+
   return (
-    <div style={{
+    <div className="wlh" style={{
       marginTop: 14, fontFamily: font, position: "relative",
       background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16,
       backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)",
       padding: isMobileVP ? "13px 12px 14px" : "16px 18px 17px",
     }}>
+      <style>{`
+        .wlh table{border-collapse:collapse;width:100%}
+        .wlh thead th{position:sticky;top:0;background:#0c0c14;z-index:2}
+        .wlh tbody tr{transition:background .12s}
+        .wlh tbody tr:hover{background:rgba(255,255,255,0.028)}
+        .wlh .wlh-tk{text-decoration:underline;text-decoration-color:rgba(201,152,42,0.4);text-underline-offset:3px;text-decoration-thickness:1px}
+      `}</style>
+
       {/* header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingBottom: 10, marginBottom: 11, borderBottom: `1px solid ${C.border}` }}>
-        <span style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "-0.01em", color: "rgba(255,255,255,0.95)" }}>🎯 Watchlist</span>
-        <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{total}</span>
-        <InfoDot tip={{
-          lead: "Valen's TradingView list, read against the app's own data.",
-          points: [
-            "🚩 is Valen's own colour flag on a name. He sets them; you see them. No colour means he hasn't flagged it.",
-            "The bar down the left of each row is the quick read: green = the theme is a top-5 leader AND its industry group is strong · gold = one of the two is strong · red = everything we can measure is weak · grey = there isn't enough data to judge this one.",
-            "1W# is where that theme ranks over the last week. Green when it's top 5.",
-            "Thrust % = this week's strength score of its industry group (higher = hotter this week, max ~110).",
-            "RS rank = where that group's 1-month relative strength ranks against all groups, 0–100. Both numbers turn green at 85 or higher, gold when only one is.",
-            "⚡ = the ticker was published to Daily Setups in the last 5 days.",
-            "E = the next scheduled earnings date, within 14 days. Red when it's 3 days out or less. Scheduled dates can move.",
-            "Sort changes the order inside each list. The lists themselves stay put.",
-            "Read-only — nothing here places, sizes or changes a trade. It's what he's watching, not a buy list.",
-          ],
-        }} />
-        <label style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <span style={{ fontSize: "0.57rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>Sort</span>
-          <select
-            value={sortBy}
-            onChange={(e) => pickSort(e.target.value)}
-            aria-label="Sort the watchlist"
-            style={{
-              height: 30, maxWidth: 132, fontFamily: font, fontSize: "0.63rem", fontWeight: 700,
-              color: C.text, background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
-              borderRadius: 999, padding: "0 8px", cursor: "pointer", outline: "none",
-            }}
-          >
-            {WL_SORTS.map(o => <option key={o.key} value={o.key} style={{ background: "#0d0d16", color: "#e8e8f0" }}>{o.label}</option>)}
-          </select>
-        </label>
-        <span style={{ fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>
-          asof {WATCHLIST?.asof || "—"}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingBottom: 9, borderBottom: `1px solid ${C.border}` }}>
+        <span style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "-0.01em", color: "rgba(255,255,255,0.95)" }}>🎯 The Hunt List</span>
+        <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{rows.length}</span>
+        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={stampStyle}>list {WATCHLIST?.asof || "—"}</span>
+          <span style={stampStyle}>groups {GROUP_RS?.asof || "—"}</span>
+          {showStockStamp && <span style={stampStyle}>stocks {stockAsof}</span>}
         </span>
       </div>
 
-      {/* Standing member-facing line — this card is now visible to everyone. */}
-      <div style={{ fontSize: "0.6rem", fontWeight: 600, color: "rgba(255,255,255,0.4)", lineHeight: 1.5, marginBottom: 8 }}>
-        Educational, not advice — Valen's personal watchlist.
+      <div style={{ fontSize: "0.68rem", fontWeight: 500, color: C.muted, lineHeight: 1.55, margin: "9px 0 11px" }}>
+        The watchlist, cross-checked against the leading themes and industry groups.
       </div>
 
-      {/* one-line verdict */}
-      <div style={{ fontSize: "0.72rem", lineHeight: 1.55, color: C.text, marginBottom: 12 }}>{verdict}</div>
-
-      {/* sections — TradingView grammar: slim divider, then dense one-line rows */}
-      {decorated.map(sec => (
-        <div key={sec.key} style={{ marginBottom: 11 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 2px 6px", borderBottom: `1px solid ${C.border}` }}>
-            <span style={micro}>{sec.label}</span>
-            <span style={{ fontSize: "0.57rem", fontWeight: 800, color: "rgba(255,255,255,0.34)", fontVariantNumeric: "tabular-nums" }}>{sec.rows.length}</span>
-          </div>
-          {sec.rows.length === 0 ? (
-            <div style={{ padding: "9px 2px 0", fontSize: "0.66rem", color: "rgba(255,255,255,0.36)", fontStyle: "italic" }}>— not provided —</div>
-          ) : (
-            <div>
-              {sec.rows.map((r, i) => (
-                // className="term" wires the app's own tooltip layers: CSS :hover on desktop, the
-                // delegated tap layer (any [data-tip]) on touch. The inline borderBottom
-                // out-specifies .term's dotted underline so rows keep their hairline rule.
-                <div key={sec.key + r.tk} className="term" data-tip={tipFor(r)} style={{
-                  display: "flex", alignItems: "center", gap: isMobileVP ? 6 : 8, minWidth: 0,
-                  height: rowH, paddingRight: 2, cursor: "help",
-                  borderBottom: i === sec.rows.length - 1 ? "none" : "1px solid rgba(255,255,255,0.045)",
-                }}>
-                  {/* 🚩 Valen's flag — leads the row, TradingView-style. Read-only for members. */}
-                  {flagCell(r)}
-                  <span aria-hidden style={{ flex: "none", width: 4, height: rowH - 10, borderRadius: 2, background: FLAG[r.flag] }} />
-                  <span style={{ flex: "none", minWidth: isMobileVP ? 48 : 54, fontSize: "0.78rem", fontWeight: 800, color: C.text, letterSpacing: "-0.01em" }}>{r.tk}</span>
-                  <span style={{ flex: "1 1 auto", minWidth: 0, fontSize: "0.63rem", fontWeight: 600, color: r.theme ? C.muted : "rgba(255,255,255,0.32)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {r.theme || "Untagged"}
-                  </span>
-                  {/* 1-week theme rank from the latest snapshot. Green = top-5. "—" = unranked. */}
-                  <span style={{
-                    flex: "none", fontSize: "0.6rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
-                    color: r.wrank == null ? "rgba(255,255,255,0.34)" : r.wrank <= 5 ? C.green : C.muted,
-                  }}>{r.wrank == null ? "—" : `1W#${r.wrank}`}</span>
-                  {/* Industry-group strength, SPELLED OUT — no letter shorthand (his hard rule).
-                      Desktop: one line, "Thrust 102 · RS 100". Phone: the same two numbers stacked,
-                      so a 390px row never has to abbreviate them away. */}
-                  <span style={{
-                    flex: "none", fontWeight: 800, color: groupColor(r), fontVariantNumeric: "tabular-nums",
-                    whiteSpace: "nowrap", textAlign: "right",
-                    fontSize: isMobileVP ? "0.5rem" : "0.62rem", lineHeight: isMobileVP ? 1.18 : 1,
-                    display: isMobileVP ? "flex" : "block", flexDirection: "column", alignItems: "flex-end",
-                  }}>
-                    {!r.hasG ? "—" : isMobileVP ? (
-                      <>
-                        <span>Thrust {r.thrust}</span>
-                        <span>RS {Math.round(r.rs1m)}</span>
-                      </>
-                    ) : (
-                      <>Thrust {r.thrust} <span style={{ color: "rgba(255,255,255,0.28)" }}>·</span> RS {Math.round(r.rs1m)}</>
-                    )}
-                  </span>
-                  <span style={{ flex: "none", width: isMobileVP ? 12 : 14, textAlign: "center", fontSize: "0.6rem", lineHeight: 1 }}>{r.zap ? "⚡" : ""}</span>
-                  <span style={{
-                    flex: "none", minWidth: 27, textAlign: "right", fontSize: "0.56rem", fontWeight: 800,
-                    fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
-                    color: r.earn && r.earn.inDays <= 3 ? C.red : C.goldBright,
-                  }}>{r.earn ? `E${r.earn.inDays}d` : ""}</span>
-                </div>
-              ))}
-            </div>
-          )}
+      {/* INDEX ribbon — names only. There is no live quote source in this card, so no numbers. */}
+      {indexTickers.length > 0 && (
+        <div style={{
+          display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 0, marginBottom: 11,
+          padding: isMobileVP ? "8px 4px" : "9px 6px", borderRadius: 12,
+          background: "rgba(255,255,255,0.028)", border: `1px solid ${C.border}`,
+        }}>
+          {indexTickers.map((t, i) => (
+            <span key={String(t)} style={{
+              display: "inline-flex", alignItems: "baseline", padding: "1px 12px",
+              borderRight: i === indexTickers.length - 1 ? "none" : `1px solid ${C.border}`,
+            }}>
+              <span style={{ fontSize: "0.68rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{String(t)}</span>
+            </span>
+          ))}
         </div>
-      ))}
+      )}
 
-      <div style={{ fontSize: "0.57rem", color: "rgba(255,255,255,0.36)", lineHeight: 1.55, marginTop: 4 }}>
-        Theme fit and 1W# are judged against the latest theme snapshot{snapDate ? ` (${snapDate})` : ""}, not the day a trade was opened.
-        Thrust % and RS rank come from the rotation table{GROUP_RS?.asof ? ` (asof ${GROUP_RS.asof})` : ""}; a theme with no matching industry group shows “—”.
-        Earnings dates are scheduled{EARNINGS?.asof ? ` (through ${EARNINGS.asof})` : ""} and can move.
-        Index and commodity rows carry no theme or group — they're here to match his TradingView list.
+      {/* filters */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7, alignItems: "center", marginBottom: 11 }}>
+        <button onClick={() => setStage("all")} style={fchip(stage === "all", null)}>
+          All<span style={fnum(stage === "all", null)}>{rows.length}</span>
+        </button>
+        {bodySections.map(s => {
+          const key = String(s.key);
+          const on = stage === key;
+          const meta = stageMeta(key);
+          return (
+            <button key={key} onClick={() => setStage(key)} title={s.label} style={fchip(on, meta)}>
+              {meta.name || s.label}
+              <span style={fnum(on, meta)}>{counts[key] || 0}</span>
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setLeadOnly(v => !v)}
+          title="Industry group Thrust % and RS rank both 85 or higher — the zone worth fishing in."
+          style={fchip(leadOnly, null)}
+        >Leading groups only</button>
+        {chain.length > 0 && (
+          <button onClick={() => putChain([])} title="Back to the TradingView order" style={{ ...fchip(false, null), marginLeft: "auto" }}>
+            × reset sort
+          </button>
+        )}
       </div>
+
+      {/* the master table — scrolls inside the card, never pushes the page sideways */}
+      <div style={{ overflowX: "auto" }}>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: 30, padding: "8px 0 8px 2px", borderBottom: `1px solid ${C.border}` }} />
+              {WL_COLS.map(thCell)}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.length === 0 ? (
+              <tr><td colSpan={10} style={{ ...td, textAlign: "center", color: "rgba(255,255,255,0.5)", padding: "24px 9px" }}>No names match this filter.</td></tr>
+            ) : sorted.map(r => {
+              const meta = stageMeta(r.sec);
+              const soon = r.dte != null && r.dte <= 3;
+              return (
+                <tr key={r.sec + "|" + r.tk}>
+                  <td style={{ ...td, padding: "4px 0 4px 2px" }}>{flagCell(r)}</td>
+                  <td style={{ ...td, fontWeight: 800, color: C.white }}><span className="wlh-tk">{r.tk}</span></td>
+                  <td style={td}>
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.03em",
+                      padding: "2px 8px", borderRadius: 980, lineHeight: 1.45, whiteSpace: "nowrap",
+                      color: meta.fg, background: meta.bg, border: `1px solid ${meta.bd}`,
+                    }}>{r.secLabel}</span>
+                  </td>
+                  <td style={td}>
+                    {!r.theme ? <span style={{ color: "rgba(255,255,255,0.28)" }}>—</span> : (
+                      <>
+                        <span style={{ color: "rgba(255,255,255,0.66)" }}>{r.theme}</span>{" "}
+                        <span style={{ fontWeight: 800, color: wlRankColor(r.rank) }}>{r.rank == null ? "untracked" : "#" + r.rank}</span>
+                      </>
+                    )}
+                  </td>
+                  <td style={td}>
+                    {r.grp
+                      ? <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>{r.grp}</span>
+                      : <span style={{ color: "rgba(255,255,255,0.28)" }}>—</span>}
+                  </td>
+                  {heatCell(r.thrust, "gt")}
+                  {heatCell(r.rs1m, "gr")}
+                  {heatCell(r.sthrust, "st")}
+                  {heatCell(r.srs1m, "sr")}
+                  <td style={{ ...td, textAlign: "right", color: r.earn ? (soon ? "#fca5a5" : "rgba(255,255,255,0.48)") : "transparent", fontWeight: soon ? 700 : 500 }}>
+                    {r.earn ? wlFmtDay(r.earn) : ""}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.45)", lineHeight: 1.7, marginTop: 10 }}>
+        Theme rank — <b style={{ color: "#86efac" }}>green top 3</b> · <b style={{ color: "#f0a03c" }}>orange 4–5</b> ·{" "}
+        <b style={{ color: "#fca5a5" }}>red 6+</b> · <b style={{ color: "rgba(255,255,255,0.42)" }}>grey not tracked</b>, read off the latest theme snapshot{snapDate ? ` (${snapDate})` : ""}.
+        {" "}Group columns = the industry group's numbers; Stock columns = the name's own.
+        {" "}Thrust % and RS rank in the two Group columns are the INDUSTRY GROUP's numbers (RSP benchmark, same formulas as the rotation table); a theme with no matching group shows “—”.
+        {" "}Multi-sort: click one column, then another to stack a second sort (the small number shows the order); click again to flip direction; × reset clears.
+        {" "}Educational, not advice — this is Valen's personal watchlist, shared so you can study the process.
+      </div>
+
+      {flagPopover}
     </div>
   );
 }
@@ -11703,9 +11827,10 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           )}
 
-          {/* 🎯 WATCHLIST — HIDDEN (Valen 2026-08-05 "remove it first"): the v1 layout he rejected
-              stays off the dashboard until the approved Option-B master-table redesign ships. */}
-          {false && <WatchlistCard C={C} font={font} session={session} />}
+          {/* 🎯 THE HUNT LIST — LIVE. Approved Option-B master-table design (Valen 2026-08-05):
+              one sortable table with TradingView categories, theme rank, industry-group and
+              per-stock strength, and next earnings. Replaces the v1 stacked-section layout. */}
+          <WatchlistCard C={C} font={font} session={session} />
 
           {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS.
               RISK ALLOCATION now lives HERE as a slim strip over the table (Valen 2026-08-02 — "overlay
@@ -12004,9 +12129,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           <SituationalRead C={C} font={font} session={session} isAdmin={isAdmin} />
         </div>
 
-        {/* 🎯 WATCHLIST — HIDDEN (Valen 2026-08-05 "remove it first"): v1 layout rejected; off the
-            dashboard until the approved Option-B master-table redesign ships. */}
-        {false && <WatchlistCard C={C} font={font} session={session} />}
+        {/* 🎯 THE HUNT LIST — LIVE. Approved Option-B master-table design (Valen 2026-08-05):
+            the same sortable table the Pro layout gets, so both views stay in step. */}
+        <WatchlistCard C={C} font={font} session={session} />
 
         {/* TABLE */}
         <div className="toolbar">
