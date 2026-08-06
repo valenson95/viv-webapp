@@ -8,18 +8,13 @@
 // half-up. Every number is bar-derived; failed fetches are kept as rows with thrust:null/rs1m:null.
 // DeepVue stays the source of truth for single-stock RS and sector grouping.
 export const WATCHLIST_RS = {
-  "asof": "2026-08-04",
-  "refreshed": "2026-08-05",
+  "asof": "2026-08-05",
+  "refreshed": "2026-08-06",
   "rows": [
     {
-      "t": "SOXL",
-      "thrust": 81,
-      "rs1m": 35
-    },
-    {
-      "t": "TQQQ",
-      "thrust": 97,
-      "rs1m": 75
+      "t": "HPE",
+      "thrust": 107,
+      "rs1m": 100
     },
     {
       "t": "UAL",
@@ -27,39 +22,19 @@ export const WATCHLIST_RS = {
       "rs1m": 95
     },
     {
-      "t": "HPE",
-      "thrust": 107,
-      "rs1m": 100
+      "t": "TQQQ",
+      "thrust": 97,
+      "rs1m": 75
     },
     {
-      "t": "NAVN",
-      "thrust": 82,
-      "rs1m": 85
-    },
-    {
-      "t": "CRWD",
-      "thrust": 99,
-      "rs1m": 90
-    },
-    {
-      "t": "FTNT",
-      "thrust": 96,
-      "rs1m": 85
+      "t": "SOXL",
+      "thrust": 81,
+      "rs1m": 35
     },
     {
       "t": "DELL",
-      "thrust": 105,
-      "rs1m": 95
-    },
-    {
-      "t": "NET",
-      "thrust": 100,
-      "rs1m": 100
-    },
-    {
-      "t": "DDOG",
-      "thrust": 100,
-      "rs1m": 100
+      "thrust": 87,
+      "rs1m": 85
     },
     {
       "t": "PANW",
@@ -72,13 +47,8 @@ export const WATCHLIST_RS = {
       "rs1m": 100
     },
     {
-      "t": "NTAP",
-      "thrust": 100,
-      "rs1m": 100
-    },
-    {
-      "t": "MSFT",
-      "thrust": 86,
+      "t": "PLTR",
+      "thrust": 91,
       "rs1m": 95
     },
     {
@@ -87,19 +57,44 @@ export const WATCHLIST_RS = {
       "rs1m": 60
     },
     {
-      "t": "GOOGL",
-      "thrust": 88,
+      "t": "CRWD",
+      "thrust": 99,
       "rs1m": 90
     },
     {
-      "t": "GGLL",
-      "thrust": 101,
-      "rs1m": 95
+      "t": "NAVN",
+      "thrust": 82,
+      "rs1m": 85
     },
     {
-      "t": "VSXY",
-      "thrust": 31,
-      "rs1m": 60
+      "t": "GOOGL",
+      "thrust": 47,
+      "rs1m": 55.00000000000001
+    },
+    {
+      "t": "NTAP",
+      "thrust": 100,
+      "rs1m": 100
+    },
+    {
+      "t": "DDOG",
+      "thrust": 100,
+      "rs1m": 100
+    },
+    {
+      "t": "FTNT",
+      "thrust": 96,
+      "rs1m": 85
+    },
+    {
+      "t": "BROS",
+      "thrust": 17,
+      "rs1m": 10
+    },
+    {
+      "t": "AMZN",
+      "thrust": 59,
+      "rs1m": 85
     },
     {
       "t": "VLO",
@@ -107,14 +102,39 @@ export const WATCHLIST_RS = {
       "rs1m": 45
     },
     {
+      "t": "MSFT",
+      "thrust": 73,
+      "rs1m": 90
+    },
+    {
       "t": "DINO",
       "thrust": 4,
       "rs1m": 35
     },
     {
-      "t": "AMZN",
-      "thrust": 76,
-      "rs1m": 90
+      "t": "VSXY",
+      "thrust": 31,
+      "rs1m": 60
+    },
+    {
+      "t": "NET",
+      "thrust": 100,
+      "rs1m": 100
+    },
+    {
+      "t": "CHYM",
+      "thrust": 100,
+      "rs1m": 100
+    },
+    {
+      "t": "NVDA",
+      "thrust": 101,
+      "rs1m": 95
+    },
+    {
+      "t": "ETON",
+      "thrust": 43,
+      "rs1m": 75
     },
     {
       "t": "RNG",
@@ -122,9 +142,29 @@ export const WATCHLIST_RS = {
       "rs1m": 100
     },
     {
-      "t": "CHYM",
-      "thrust": 100,
+      "t": "AVGO",
+      "thrust": 102,
       "rs1m": 100
+    },
+    {
+      "t": "KARO",
+      "thrust": 10,
+      "rs1m": 45
+    },
+    {
+      "t": "KMX",
+      "thrust": 7,
+      "rs1m": 30
+    },
+    {
+      "t": "RHI",
+      "thrust": 98,
+      "rs1m": 75
+    },
+    {
+      "t": "GRND",
+      "thrust": 88,
+      "rs1m": 95
     },
     {
       "t": "OII",
@@ -137,38 +177,33 @@ export const WATCHLIST_RS = {
       "rs1m": 95
     },
     {
-      "t": "GRND",
-      "thrust": 88,
-      "rs1m": 95
+      "t": "PTRN",
+      "thrust": 35,
+      "rs1m": 20
     },
     {
-      "t": "KMX",
-      "thrust": 7,
-      "rs1m": 30
+      "t": "LLY",
+      "thrust": 0,
+      "rs1m": 0
     },
     {
-      "t": "KARO",
-      "thrust": 10,
-      "rs1m": 45
+      "t": "STX",
+      "thrust": 56,
+      "rs1m": 35
     },
     {
-      "t": "RHI",
-      "thrust": 98,
-      "rs1m": 75
+      "t": "HUT",
+      "thrust": 15,
+      "rs1m": 20
     },
     {
-      "t": "ETON",
-      "thrust": 43,
-      "rs1m": 75
+      "t": "EVC",
+      "thrust": 76,
+      "rs1m": 70
     },
     {
-      "t": "AVGO",
-      "thrust": 103,
-      "rs1m": 100
-    },
-    {
-      "t": "NVDA",
-      "thrust": 91,
+      "t": "DLO",
+      "thrust": 39,
       "rs1m": 60
     },
     {
@@ -177,24 +212,9 @@ export const WATCHLIST_RS = {
       "rs1m": 65
     },
     {
-      "t": "PTRN",
-      "thrust": 35,
-      "rs1m": 20
-    },
-    {
-      "t": "CRSR",
-      "thrust": 102,
-      "rs1m": 100
-    },
-    {
-      "t": "EVC",
-      "thrust": 76,
-      "rs1m": 70
-    },
-    {
-      "t": "STX",
-      "thrust": 56,
-      "rs1m": 35
+      "t": "ORKA",
+      "thrust": 73,
+      "rs1m": 90
     },
     {
       "t": "NTNX",
@@ -202,42 +222,27 @@ export const WATCHLIST_RS = {
       "rs1m": 95
     },
     {
-      "t": "DLO",
-      "thrust": 39,
-      "rs1m": 60
-    },
-    {
-      "t": "LLY",
-      "thrust": 0,
-      "rs1m": 0
-    },
-    {
-      "t": "ORKA",
-      "thrust": 73,
-      "rs1m": 90
-    },
-    {
-      "t": "CBRS",
-      "thrust": 101,
-      "rs1m": 95
-    },
-    {
-      "t": "HUT",
-      "thrust": 15,
-      "rs1m": 20
-    },
-    {
       "t": "CIFR",
       "thrust": 13,
       "rs1m": 15
     },
     {
-      "t": "FIG",
-      "thrust": 103,
+      "t": "CBRS",
+      "thrust": 70,
+      "rs1m": 70
+    },
+    {
+      "t": "CRSR",
+      "thrust": 102,
       "rs1m": 100
     },
     {
-      "t": "ZS",
+      "t": "SAIL",
+      "thrust": 86,
+      "rs1m": 95
+    },
+    {
+      "t": "FIG",
       "thrust": 103,
       "rs1m": 100
     },
@@ -247,14 +252,24 @@ export const WATCHLIST_RS = {
       "rs1m": 100
     },
     {
+      "t": "ADBE",
+      "thrust": 88,
+      "rs1m": 95
+    },
+    {
+      "t": "ZS",
+      "thrust": 103,
+      "rs1m": 100
+    },
+    {
       "t": "MDB",
       "thrust": 100,
       "rs1m": 100
     },
     {
-      "t": "SAIL",
-      "thrust": 86,
-      "rs1m": 95
+      "t": "NOW",
+      "thrust": 74,
+      "rs1m": 90
     },
     {
       "t": "GTLB",
@@ -262,29 +277,9 @@ export const WATCHLIST_RS = {
       "rs1m": 100
     },
     {
-      "t": "NOW",
-      "thrust": 88,
+      "t": "AXTI",
+      "thrust": 86,
       "rs1m": 95
-    },
-    {
-      "t": "ADBE",
-      "thrust": 88,
-      "rs1m": 95
-    },
-    {
-      "t": "BLZE",
-      "thrust": 103,
-      "rs1m": 100
-    },
-    {
-      "t": "NEO",
-      "thrust": 100,
-      "rs1m": 100
-    },
-    {
-      "t": "MANH",
-      "thrust": 47,
-      "rs1m": 80
     },
     {
       "t": "GH",
@@ -292,9 +287,14 @@ export const WATCHLIST_RS = {
       "rs1m": 50
     },
     {
-      "t": "PRCH",
-      "thrust": 100,
-      "rs1m": 100
+      "t": "ANET",
+      "thrust": 101,
+      "rs1m": 90
+    },
+    {
+      "t": "MANH",
+      "thrust": 47,
+      "rs1m": 80
     },
     {
       "t": "THC",
@@ -302,44 +302,29 @@ export const WATCHLIST_RS = {
       "rs1m": 75
     },
     {
-      "t": "AXTI",
-      "thrust": 93,
-      "rs1m": 95
-    },
-    {
-      "t": "ANET",
-      "thrust": 101,
-      "rs1m": 90
-    },
-    {
-      "t": "PLTR",
-      "thrust": 108,
+      "t": "NEO",
+      "thrust": 100,
       "rs1m": 100
+    },
+    {
+      "t": "PRCH",
+      "thrust": 100,
+      "rs1m": 100
+    },
+    {
+      "t": "BLZE",
+      "thrust": 103,
+      "rs1m": 100
+    },
+    {
+      "t": "WDC",
+      "thrust": 27,
+      "rs1m": 30
     },
     {
       "t": "SNDK",
-      "thrust": 79,
-      "rs1m": 35
-    },
-    {
-      "t": "ALAB",
-      "thrust": 89,
-      "rs1m": 65
-    },
-    {
-      "t": "SEZL",
-      "thrust": 88,
-      "rs1m": 50
-    },
-    {
-      "t": "AMD",
-      "thrust": 83,
-      "rs1m": 40
-    },
-    {
-      "t": "FSLY",
-      "thrust": 100,
-      "rs1m": 100
+      "thrust": 67,
+      "rs1m": 30
     },
     {
       "t": "HNGE",
@@ -347,9 +332,9 @@ export const WATCHLIST_RS = {
       "rs1m": 35
     },
     {
-      "t": "NBIS",
-      "thrust": 101,
-      "rs1m": 90
+      "t": "COMP",
+      "thrust": 62,
+      "rs1m": 50
     },
     {
       "t": "GRPN",
@@ -357,44 +342,9 @@ export const WATCHLIST_RS = {
       "rs1m": 45
     },
     {
-      "t": "COMP",
-      "thrust": 62,
+      "t": "SEZL",
+      "thrust": 88,
       "rs1m": 50
-    },
-    {
-      "t": "WDC",
-      "thrust": 74,
-      "rs1m": 55.00000000000001
-    },
-    {
-      "t": "RVMD",
-      "thrust": 76,
-      "rs1m": 70
-    },
-    {
-      "t": "TRVI",
-      "thrust": 74,
-      "rs1m": 65
-    },
-    {
-      "t": "AVPT",
-      "thrust": 82,
-      "rs1m": 75
-    },
-    {
-      "t": "PSNL",
-      "thrust": 81,
-      "rs1m": 45
-    },
-    {
-      "t": "NTRA",
-      "thrust": 66,
-      "rs1m": 45
-    },
-    {
-      "t": "MRVI",
-      "thrust": 5,
-      "rs1m": 20
     },
     {
       "t": "OSCR",
@@ -402,14 +352,64 @@ export const WATCHLIST_RS = {
       "rs1m": 25
     },
     {
+      "t": "FSLY",
+      "thrust": 100,
+      "rs1m": 100
+    },
+    {
+      "t": "TRVI",
+      "thrust": 74,
+      "rs1m": 65
+    },
+    {
+      "t": "RVMD",
+      "thrust": 76,
+      "rs1m": 70
+    },
+    {
       "t": "XERS",
       "thrust": -7,
       "rs1m": 0
     },
     {
+      "t": "NTRA",
+      "thrust": 66,
+      "rs1m": 45
+    },
+    {
       "t": "TGTX",
       "thrust": 10,
       "rs1m": 5
+    },
+    {
+      "t": "MRVI",
+      "thrust": 5,
+      "rs1m": 20
+    },
+    {
+      "t": "PSNL",
+      "thrust": 81,
+      "rs1m": 45
+    },
+    {
+      "t": "AVPT",
+      "thrust": 82,
+      "rs1m": 75
+    },
+    {
+      "t": "NBIS",
+      "thrust": 76,
+      "rs1m": 65
+    },
+    {
+      "t": "AMD",
+      "thrust": 24,
+      "rs1m": 10
+    },
+    {
+      "t": "ALAB",
+      "thrust": 52,
+      "rs1m": 35
     }
   ]
 };
