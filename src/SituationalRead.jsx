@@ -69,7 +69,7 @@ export function sanitizeRich(html) {
 const NEAR_HIGH = -8;   // % off the 52-week high still counted as "near its high"
 const DEEP = -15;       // matches the rotation table's own off-floor flag
 
-const PALETTE = ["#f0c050", "#7ef0a0", "#fca5a5", "#93c5fd", "#e8e6e0"];
+const PALETTE = ["var(--white)", "var(--greenFg)", "var(--redFg)", "var(--blueFg)", "var(--muted)"];
 const SIZES = [["S", "12px"], ["M", "14px"], ["L", "17px"]];
 
 // One rich-text field: label + toolbar + contentEditable box. execCommand is deprecated but
@@ -79,22 +79,22 @@ function RichField({ C, font, label, value, onChange, minH = 96 }) {
   // Seed once; afterwards the DOM owns the content (re-seeding on each keystroke resets the caret).
   useEffect(() => { if (ref.current && ref.current.innerHTML !== value) ref.current.innerHTML = value || ""; }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const cmd = (c, arg) => (e) => { e.preventDefault(); document.execCommand(c, false, arg); if (ref.current) onChange(ref.current.innerHTML); };
-  const tbtn = { fontFamily: font, fontSize: "0.64rem", fontWeight: 800, minWidth: 22, height: 22, padding: "0 5px", borderRadius: 6, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.04)", color: C.text, cursor: "pointer", lineHeight: 1 };
+  const tbtn = { fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, minWidth: 22, height: 22, padding: "0 5px", borderRadius: 999, border: `1px solid ${C.border}`, background: "var(--w04)", color: C.text, cursor: "pointer", lineHeight: 1 };
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-        <span style={{ fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: C.goldBright || C.gold }}>{label}</span>
+        <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>{label}</span>
         <span style={{ display: "inline-flex", gap: 4, marginLeft: "auto", alignItems: "center" }}>
           <button type="button" style={tbtn} onMouseDown={cmd("bold")} title="Bold"><b>B</b></button>
           <button type="button" style={{ ...tbtn, fontStyle: "italic" }} onMouseDown={cmd("italic")} title="Italic">I</button>
           <button type="button" style={{ ...tbtn, textDecoration: "underline" }} onMouseDown={cmd("underline")} title="Underline">U</button>
           {SIZES.map(([t, px]) => (
-            <button key={t} type="button" style={{ ...tbtn, fontSize: t === "S" ? "0.56rem" : t === "L" ? "0.72rem" : "0.64rem" }} title={`Text size ${t}`}
+            <button key={t} type="button" style={{ ...tbtn, fontSize: t === "S" ? "0.6875rem" : t === "L" ? "0.8125rem" : "0.75rem" }} title={`Text size ${t}`}
               onMouseDown={(e) => { e.preventDefault(); document.execCommand("fontSize", false, "7"); if (ref.current) { ref.current.querySelectorAll('font[size="7"]').forEach(f => { const s = document.createElement("span"); s.style.fontSize = px; s.innerHTML = f.innerHTML; f.replaceWith(s); }); onChange(ref.current.innerHTML); } }}>{t}</button>
           ))}
           {PALETTE.map(col => (
             <button key={col} type="button" title="Text colour" onMouseDown={cmd("foreColor", col)}
-              style={{ ...tbtn, minWidth: 16, width: 16, height: 16, padding: 0, borderRadius: 99, background: col, border: "1px solid rgba(0,0,0,0.4)" }} />
+              style={{ ...tbtn, minWidth: 16, width: 16, height: 16, padding: 0, borderRadius: 999, background: col, border: "1px solid rgba(0,0,0,0.4)" }} />
           ))}
           <button type="button" style={tbtn} onMouseDown={cmd("insertUnorderedList")} title="Bullet list">•</button>
           <button type="button" style={tbtn} onMouseDown={cmd("removeFormat")} title="Clear formatting">✕</button>
@@ -199,18 +199,18 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
   const save = () => send("POST", { ...form, asof: spine.dataAsof || read.asof, updated: todayLocal() });
   const reset = () => { if (window.confirm("Clear your note and show the written read that ships with the app?")) send("DELETE"); };
 
-  const blockLabel = { fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: C.goldBright || C.gold, marginBottom: 7 };
+  const blockLabel = { fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)", marginBottom: 7 };
   const blockBody = { fontSize: "0.75rem", lineHeight: 1.65, color: C.text, overflowWrap: "break-word" };
-  const btn = (primary) => ({ fontFamily: font, fontSize: "0.66rem", fontWeight: 700, padding: "7px 14px", borderRadius: 99, cursor: saving ? "wait" : "pointer", border: `1px solid ${primary ? "rgba(201,152,42,0.5)" : C.border}`, background: primary ? "rgba(201,152,42,0.16)" : "rgba(255,255,255,0.03)", color: primary ? (C.goldBright || C.gold) : C.muted });
+  const btn = (primary) => ({ fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "7px 14px", borderRadius: 999, cursor: saving ? "wait" : "pointer", border: `1px solid ${primary ? "var(--borderGold)" : C.border}`, background: primary ? "var(--goldDim)" : "var(--w03)", color: primary ? (C.goldBright || C.gold) : C.muted });
 
   const Rich = ({ html, style }) => <div className="sitrich" style={style} dangerouslySetInnerHTML={{ __html: sanitizeRich(html) }} />;
 
   // STANCE — the one word the whole card exists to deliver, shown as a badge in the header.
   // Colour carries the meaning: green = risk on · gold = neutral · red = risk off.
   const STANCE = {
-    "RISK ON": { fg: "#7ef0a0", bg: "rgba(34,197,94,0.14)", bd: "rgba(34,197,94,0.4)" },
-    "NEUTRAL": { fg: "#f0c050", bg: "rgba(201,152,42,0.15)", bd: "rgba(201,152,42,0.42)" },
-    "RISK OFF": { fg: "#fca5a5", bg: "rgba(239,68,68,0.14)", bd: "rgba(239,68,68,0.4)" },
+    "RISK ON": { fg: "var(--greenFg)", bg: "rgba(0,200,5,0.14)", bd: "rgba(0,200,5,0.4)" },
+    "NEUTRAL": { fg: "var(--blueFg)", bg: "rgba(59,158,255,0.14)", bd: "rgba(59,158,255,0.4)" },
+    "RISK OFF": { fg: "var(--redFg)", bg: "rgba(255,80,0,0.14)", bd: "rgba(255,80,0,0.4)" },
   };
   const st = STANCE[(read.stance || "").toUpperCase()];
 
@@ -222,16 +222,16 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
         .sitrich ul, .sitedit ul{margin:0; padding-left:16px; list-style:none}
         .sitrich li, .sitedit li{position:relative; padding-left:2px; margin:0 0 7px}
         .sitrich li:last-child, .sitedit li:last-child{margin-bottom:0}
-        .sitrich li::before, .sitedit li::before{content:'▸'; position:absolute; left:-14px; color:${C.goldBright || C.gold}; font-size:0.7em; top:0.15em}
+        .sitrich li::before, .sitedit li::before{content:'▸'; position:absolute; left:-14px; color:var(--faint); font-size:0.7em; top:0.15em}
         .sitrich b, .sitedit b, .sitrich strong{color:${C.white}; font-weight:700}
       `}</style>
       <div className="cardhead">
         <span className="label" style={{ flex: "none" }}>Situational Awareness</span>
         {st && (
           <span title={`Stance: ${read.stance.toUpperCase()}`}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 4, padding: "3px 10px", borderRadius: 99, background: st.bg, border: `1px solid ${st.bd}` }}>
-            <span style={{ fontSize: "0.48rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted }}>Stance</span>
-            <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.05em", color: st.fg }}>{read.stance.toUpperCase()}</span>
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 4, padding: "3px 10px", borderRadius: 999, background: st.bg, border: `1px solid ${st.bd}` }}>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: C.muted }}>Stance</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 600, letterSpacing: "0.02em", color: st.fg }}>{read.stance.toUpperCase()}</span>
           </span>
         )}
         <InfoDot tip={{ lead: "Every table above, boiled down to one verdict.", points: [
@@ -252,13 +252,13 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
               style={{ ...btn(false), padding: "5px 11px" }}>✎ Edit</button>
           )}
           {isOverride && read.updated && (
-            <span style={{ fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>note · {read.updated}</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums" }}>note · {read.updated}</span>
           )}
         </span>
       </div>
 
       {stale && (
-        <div style={{ marginBottom: 12, fontSize: "0.64rem", lineHeight: 1.5, color: "#f0c050", background: "rgba(201,152,42,0.1)", border: "1px solid rgba(201,152,42,0.28)", borderRadius: 9, padding: "7px 11px" }}>
+        <div style={{ marginBottom: 12, fontSize: "0.75rem", lineHeight: 1.5, color: C.muted, background: "var(--w06)", border: "1px solid var(--w14)", borderRadius: 9, padding: "7px 11px" }}>
           Written for the {read.asof} close — the tables above have since updated to {spine.dataAsof}. The chips below are current.
         </div>
       )}
@@ -267,14 +267,14 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
         <div style={{ display: "grid", gap: 13 }}>
           <RichField C={C} font={font} label="The call — one or two lines" value={form.headline} onChange={(v) => setForm(f => ({ ...f, headline: v }))} minH={44} />
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: C.goldBright || C.gold }}>Stance</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>Stance</span>
             {["RISK ON", "NEUTRAL", "RISK OFF"].map(k => {
               const on = (form.stance || "").toUpperCase() === k;
               const c = STANCE[k];
               return (
                 <button key={k} type="button" onClick={() => setForm(f => ({ ...f, stance: k }))}
-                  style={{ fontFamily: font, fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.05em", padding: "5px 13px", borderRadius: 99, cursor: "pointer",
-                    border: `1px solid ${on ? c.bd : C.border}`, background: on ? c.bg : "rgba(255,255,255,0.03)", color: on ? c.fg : C.muted }}>{k}</button>
+                  style={{ fontFamily: font, fontSize: "0.75rem", fontWeight: 500, letterSpacing: "0.02em", padding: "5px 13px", borderRadius: 999, cursor: "pointer",
+                    border: `1px solid ${on ? c.bd : C.border}`, background: on ? c.bg : "var(--w03)", color: on ? c.fg : C.muted }}>{k}</button>
               );
             })}
           </div>
@@ -284,7 +284,7 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
             <RichField C={C} font={font} label="What would change it" value={form.flip} onChange={(v) => setForm(f => ({ ...f, flip: v }))} />
           </div>
           <RichField C={C} font={font} label="Market commentary — optional, your own words" value={form.commentary} onChange={(v) => setForm(f => ({ ...f, commentary: v }))} minH={70} />
-          {err && <div style={{ fontSize: "0.68rem", color: C.red }}>{err}</div>}
+          {err && <div style={{ fontSize: "0.75rem", color: C.red }}>{err}</div>}
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <button onClick={save} disabled={saving} style={btn(true)}>{saving ? "Saving…" : "Save — live for members"}</button>
             <button onClick={() => setEditing(false)} disabled={saving} style={btn(false)}>Cancel</button>
@@ -295,7 +295,7 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
         <>
           {/* THE CALL — one punchy line, gold rule on the left so it reads as the verdict */}
           {read.headline && (
-            <Rich html={read.headline} style={{ borderLeft: `2px solid ${C.goldBright || C.gold}`, paddingLeft: 13, marginBottom: 15, fontSize: "0.92rem", fontWeight: 700, lineHeight: 1.5, color: C.white, letterSpacing: "-0.01em" }} />
+            <Rich html={read.headline} style={{ borderLeft: `2px solid var(--w35)`, paddingLeft: 13, marginBottom: 15, fontSize: "0.875rem", fontWeight: 600, lineHeight: 1.5, color: C.white, letterSpacing: "-0.012em" }} />
           )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20 }}>
             <div><div style={blockLabel}>The weather</div><Rich html={read.weather} style={blockBody} /></div>
@@ -303,7 +303,7 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
             <div><div style={blockLabel}>What would change it</div><Rich html={read.flip} style={blockBody} /></div>
           </div>
           {read.commentary && (
-            <div style={{ marginTop: 15, padding: "11px 14px", borderRadius: 11, background: "rgba(255,255,255,0.025)", border: `1px solid ${C.border}` }}>
+            <div style={{ marginTop: 15, padding: "11px 14px", borderRadius: 11, background: "var(--w02)", border: `1px solid ${C.border}` }}>
               <div style={blockLabel}>Market commentary</div>
               <Rich html={read.commentary} style={blockBody} />
             </div>
@@ -324,7 +324,7 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
         {spine.themes.length > 0 && (
           <Chip C={C} label="Themes this week" value={spine.themes.join(" · ")} title={spine.themeAsof ? `Theme tracker, updated ${spine.themeAsof}` : undefined} />
         )}
-        <span style={{ marginLeft: "auto", fontSize: "0.6rem", color: C.muted, opacity: 0.8 }}>
+        <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: C.muted, opacity: 0.8 }}>
           A read of the lenses above.
         </span>
       </div>
@@ -337,13 +337,13 @@ export default function SituationalRead({ C, font, session, isAdmin }) {
 // clips it inside the card, which is exactly what Valen flagged 2026-08-02. Never use `title`
 // for anything a member is meant to read.
 function Chip({ C, label, value, tone, title }) {
-  const fg = tone === "green" ? C.green : tone === "red" ? C.red : tone === "amber" ? (C.goldBright || C.gold) : C.text;
+  const fg = tone === "green" ? C.green : tone === "red" ? C.red : tone === "amber" ? C.orange : C.text;
   const body = (
     <>
-      <span style={{ fontSize: "0.53rem", fontWeight: 800, letterSpacing: "0.11em", textTransform: "uppercase", color: C.muted }}>{label}</span>
-      <span style={{ fontSize: "0.68rem", fontWeight: 800, color: fg, whiteSpace: "nowrap" }}>{value}</span>
+      <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--faint)" }}>{label}</span>
+      <span style={{ fontSize: "0.75rem", fontWeight: 600, color: fg, whiteSpace: "nowrap" }}>{value}</span>
     </>
   );
-  const style = { display: "inline-flex", alignItems: "baseline", gap: 7, padding: "5px 11px", borderRadius: 99, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", cursor: title ? "help" : "default" };
+  const style = { display: "inline-flex", alignItems: "baseline", gap: 7, padding: "5px 11px", borderRadius: 999, border: `1px solid ${C.border}`, background: "var(--w03)", cursor: title ? "help" : "default" };
   return title ? <Tip tip={title} style={style}>{body}</Tip> : <span style={style}>{body}</span>;
 }

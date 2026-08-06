@@ -3,6 +3,13 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    // Dev-only: /api/* doesn't exist under `npm run dev` (they're Vercel functions),
+    // so forward to production read-only for a fully working localhost preview.
+    proxy: {
+      '/api': { target: 'https://valensontrades.com', changeOrigin: true },
+    },
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,

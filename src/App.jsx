@@ -42,13 +42,13 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) { this.setState({ errorInfo }); console.error("ErrorBoundary caught:", error, errorInfo); }
   render() {
     if (this.state.hasError) {
-      return React.createElement("div", { style: { padding: 40, background: "#08080e", minHeight: "100vh", color: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif" } },
-        React.createElement("h2", { style: { color: "#ef4444", marginBottom: 16 } }, "Something went wrong"),
-        React.createElement("p", { style: { color: "rgba(255,255,255,0.6)", marginBottom: 16 } }, "The app hit an error. Your data is safe — refresh to try again."),
-        React.createElement("pre", { style: { background: "rgba(255,255,255,0.05)", padding: 16, borderRadius: 10, overflow: "auto", fontSize: "0.72rem", color: "#f0c050", maxHeight: 300 } },
+      return React.createElement("div", { style: { padding: 40, background: "var(--bg, #08080e)", minHeight: "100vh", color: "var(--white, #fff)", fontFamily: "'Plus Jakarta Sans', sans-serif" } },
+        React.createElement("h2", { style: { color: "var(--red)", marginBottom: 16 } }, "Something went wrong"),
+        React.createElement("p", { style: { color: "var(--muted)", marginBottom: 16 } }, "The app hit an error. Your data is safe — refresh to try again."),
+        React.createElement("pre", { style: { background: "var(--w06)", padding: 16, borderRadius: 10, overflow: "auto", fontSize: "0.75rem", color: "var(--muted)", maxHeight: 300 } },
           String(this.state.error) + "\n\n" + (this.state.errorInfo?.componentStack || "")
         ),
-        React.createElement("button", { onClick: () => window.location.reload(), style: { marginTop: 16, padding: "10px 24px", borderRadius: 980, border: "1px solid rgba(201,152,42,0.3)", background: "rgba(201,152,42,0.15)", color: "#c9982a", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" } }, "Reload App")
+        React.createElement("button", { onClick: () => window.location.reload(), style: { marginTop: 16, padding: "10px 24px", borderRadius: 980, border: "1px solid rgba(201,152,42,0.3)", background: "rgba(201,152,42,0.15)", color: "#c9982a", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer" } }, "Reload App")
       );
     }
     return this.props.children;
@@ -67,20 +67,727 @@ function useScreenWidth() {
 }
 
 // ─── VIV Design Tokens ───
+// PHASE 2 (2026-08-06) — every entry is now a CSS custom property reference, not a literal.
+// React writes `color: var(--green)` into the inline style and the cascade resolves it against
+// whatever theme class <body> carries, so EVERY inline style in App.jsx *and* in every sibling
+// that receives the `C` prop themes itself for free. Two rules follow from that:
+//   1. NEVER hand a `C` value to a <canvas> 2D context, html2canvas `backgroundColor`, or any
+//      other consumer that parses colour strings itself — var() is not a colour there.
+//      Use resolveThemeColor(name) below, which reads the computed value off <html>.
+//   2. NEVER re-inline a literal hex "because it's quicker" — that spot stops theming silently.
 const C = {
-  bg: "#08080e", bg2: "#0c0c14", white: "#ffffff", text: "rgba(255,255,255,0.92)",
-  muted: "rgba(255,255,255,0.70)", gold: "#c9982a", goldBright: "#f0c050",
-  goldMid: "#b8820a", goldDeep: "#7a4f00",
-  goldDim: "rgba(201,152,42,0.15)", borderGold: "rgba(201,152,42,0.22)",
-  glass: "rgba(255,255,255,0.042)", border: "rgba(255,255,255,0.09)",
-  green: "#22c55e", greenDim: "rgba(34,197,94,0.10)", red: "#ef4444", redDim: "rgba(239,68,68,0.08)",
-  blue: "#3b82f6", blueDim: "rgba(59,130,246,0.10)",
-  purple: "#a78bfa", purpleDim: "rgba(167,139,250,0.10)",
+  bg: "var(--bg)", bg2: "var(--bg2)", white: "var(--white)", text: "var(--text)",
+  muted: "var(--muted)", faint: "var(--faint)",
+  gold: "var(--gold)", goldBright: "var(--goldBright)", goldPill: "var(--goldPill)",
+  goldMid: "var(--goldMid)", goldDeep: "var(--goldDeep)",
+  goldDim: "var(--goldDim)", borderGold: "var(--borderGold)",
+  glass: "var(--card)", card: "var(--card)", cardHi: "var(--cardHi)",
+  border: "var(--border)", hair: "var(--hair)", rule: "var(--rule)",
+  green: "var(--green)", greenDim: "var(--greenDim)", red: "var(--red)", redDim: "var(--redDim)",
+  blue: "var(--blue)", blueDim: "var(--blueDim)",
+  orange: "var(--orange)", orangeDim: "var(--orangeDim)",
+  purple: "var(--purple)", purpleDim: "var(--purpleDim)",
 };
+// Resolve a token to a real colour string — for <canvas>, html2canvas, and any chart library
+// (Lightweight-Charts, recharts custom renderers) that will not accept var(). Re-read it on
+// every theme change; do not cache across a toggle.
+const resolveThemeColor = (name, fallback = "#000000") => {
+  if (typeof window === "undefined" || typeof document === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name.startsWith("--") ? name : `--${name}`);
+  return (v || "").trim() || fallback;
+};
+// Is the light theme currently painted? Chart helpers branch on this.
+const isLightTheme = () => typeof document !== "undefined" && document.body.classList.contains("theme-light");
 // Geist-first (Valen 2026-08-06: "ensure the entire webapp is using clear fonts like my model
 // book"). Jakarta stays as fallback; Zella's Inter override still wins where chosen.
 const font = "'Geist', 'Plus Jakarta Sans', -apple-system, sans-serif";
+const mono = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
 const fmt$ = (v, dec = 0) => `$${Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── ROBINHOOD REGISTER — shared design tokens + system layer (2026-08-06) ───
+// One typeface (Geist) everywhere; Geist Mono reserved for tabular numeric columns and
+// hero/stat values. Surfaces separate with SPACE and type hierarchy, not boxes: flat
+// opaque cards, near-invisible hairlines, pill buttons, quiet sentence-case labels,
+// hero numbers with tight negative tracking. Gold survives ONLY as brand chrome (logo,
+// active nav, primary CTA, Live Trades / Feedback launchers, LIVE dots, focus rings) —
+// never on numbers, labels, meters, chips or stamps.
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── THEME LADDER (2026-08-06, Phase 2) ───
+// DARK is Robinhood's shipped ladder, verbatim: base #000, card #1e2124, elevated/hover
+// #30363a, glass rgba(32,32,32,0.6), and a THREE-STEP text hierarchy (#fff / 0.65 / 0.45).
+// LIGHT keeps the same three relationships against a white base (#fff / #f7f8f8 / #eff1f1,
+// text #0b0d0e / 0.62 / 0.42). Dark separates surfaces with SURFACE STEPS; light is allowed
+// a whisper of shadow, because a step of 8 grey levels is invisible on paper-white.
+//
+// The `--wNN` ladder is the app's white-alpha wash, inverted to black-alpha on light. Any
+// hardcoded rgba(255,255,255,x) in a surface must become the nearest --wNN or it will glow
+// on the light theme. Text tiers are --text / --muted / --faint; never a raw alpha.
+//
+// GOLD is brand chrome only. It splits into two tokens because it plays two roles:
+//   --goldBright  gold as TEXT / border / stroke  → darkens to #a67c1e on light for contrast
+//   --goldPill    gold as a PILL BACKGROUND       → stays bright in both themes, near-black
+//                                                   text (--goldOn) sits on it either way
+// SEMANTICS are Robinhood's own: green #00c805, red #ff5000, "sol" amber var(--orange). Blue
+// #3b9eff is ours (they ship no semantic blue) and is unchanged. On light the green/red
+// darken — #00c805 on white is 2.3:1 and unreadable as a number; the hue is preserved.
+// ═══════════════════════════════════════════════════════════════════════════
+const THEME_TOKENS = `:root{
+    color-scheme:dark;
+    --bg:#000000; --bg2:#0b0c0e;
+    --card:#1e2124; --cardHi:#30363a; --glass:rgba(32,32,32,0.6); --sheet:#16181a;
+    --white:#ffffff;
+    --text:#ffffff;
+    --muted:rgba(255,255,255,0.65);
+    --faint:rgba(255,255,255,0.45);
+    --border:rgba(255,255,255,0.06); --hair:rgba(255,255,255,0.06); --rule:rgba(255,255,255,0.05);
+    --w02:rgba(255,255,255,0.02); --w03:rgba(255,255,255,0.03); --w04:rgba(255,255,255,0.045);
+    --w06:rgba(255,255,255,0.06); --w08:rgba(255,255,255,0.08); --w10:rgba(255,255,255,0.10);
+    --w14:rgba(255,255,255,0.14); --w22:rgba(255,255,255,0.22); --w35:rgba(255,255,255,0.35);
+    --w55:rgba(255,255,255,0.55); --w82:rgba(255,255,255,0.82); --wHover:rgba(255,255,255,0.03);
+    --rule2:rgba(255,255,255,0.10); --ruleMax:rgba(255,255,255,0.15); --ruleOpaque:#30363a;
+    --scrim:rgba(0,0,0,0.58); --lightbox:rgba(0,0,0,0.86); --recess:rgba(0,0,0,0.32);
+    --shadow:none; --shadowLg:none;
+    /* Elevation that must exist in BOTH themes (drawers, popovers, tooltips): dark separates
+       with a surface step AND a soft drop, light with the drop alone. */
+    --shadowOv:0 24px 60px rgba(0,0,0,0.55);
+    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
+    --goldPill:#f0c050; --goldPillMid:#b8820a; --goldPillDeep:#7a4f00; --goldOn:#0a0a0a;
+    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
+    --green:#00c805; --red:#ff5000; --blue:#3b9eff; --orange:#ffaa05; --purple:#a78bfa;
+    --greenDim:#2b3502; --redDim:#351111;
+    --blueDim:rgba(59,158,255,0.10); --orangeDim:rgba(255,170,5,0.14); --purpleDim:rgba(167,139,250,0.10);
+    --greenFg:#8ff59a; --redFg:#ffb497; --blueFg:#8db8ff; --orangeFg:#ffd27a;
+    --gridline:rgba(255,255,255,0.05); --axis:rgba(255,255,255,0.45);
+    --tipbg:#1e2124; --tipbd:rgba(255,255,255,0.10);
+    --font:'Geist','Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+    --mono:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --ease:cubic-bezier(.2,.8,.3,1); --t-fast:120ms; --t-med:200ms; --t-slow:320ms;}
+body.theme-light{
+    color-scheme:light;
+    --bg:#ffffff; --bg2:#f7f8f8;
+    --card:#f7f8f8; --cardHi:#eff1f1; --glass:rgba(255,255,255,0.78); --sheet:#ffffff;
+    --white:#0b0d0e;
+    --text:#0b0d0e;
+    --muted:rgba(0,0,0,0.62);
+    --faint:rgba(0,0,0,0.42);
+    --border:rgba(0,0,0,0.08); --hair:rgba(0,0,0,0.08); --rule:rgba(0,0,0,0.06);
+    --w02:rgba(0,0,0,0.02); --w03:rgba(0,0,0,0.03); --w04:rgba(0,0,0,0.04);
+    --w06:rgba(0,0,0,0.055); --w08:rgba(0,0,0,0.065); --w10:rgba(0,0,0,0.075);
+    --w14:rgba(0,0,0,0.11); --w22:rgba(0,0,0,0.17); --w35:rgba(0,0,0,0.30);
+    --w55:rgba(0,0,0,0.50); --w82:rgba(0,0,0,0.78); --wHover:rgba(0,0,0,0.03);
+    --rule2:rgba(0,0,0,0.10); --ruleMax:rgba(0,0,0,0.12); --ruleOpaque:#e2e5e5;
+    --scrim:rgba(0,0,0,0.42); --lightbox:rgba(0,0,0,0.82); --recess:rgba(0,0,0,0.035);
+    --shadow:0 1px 2px rgba(11,13,14,0.06); --shadowLg:0 10px 32px rgba(11,13,14,0.12);
+    --shadowOv:0 8px 30px rgba(11,13,14,0.12);
+    --gold:#a67c1e; --goldBright:#a67c1e; --goldMid:#8a6414; --goldDeep:#6b4d0f;
+    --goldPill:#f0c050; --goldPillMid:#b8820a; --goldPillDeep:#7a4f00; --goldOn:#0a0a0a;
+    --goldDim:rgba(166,124,30,0.11); --borderGold:rgba(166,124,30,0.30);
+    --green:#008a06; --red:#d94300; --blue:#1a72d6; --orange:#9a6600; --purple:#6d4bd8;
+    --greenDim:rgba(0,200,5,0.10); --redDim:rgba(255,80,0,0.10);
+    --blueDim:rgba(26,114,214,0.09); --orangeDim:rgba(255,170,5,0.18); --purpleDim:rgba(109,75,216,0.09);
+    --greenFg:#04670a; --redFg:#a83500; --blueFg:#14589f; --orangeFg:#7a5200;
+    --gridline:rgba(0,0,0,0.06); --axis:rgba(0,0,0,0.45);
+    --tipbg:#ffffff; --tipbd:rgba(0,0,0,0.10);}
+/* Accessible variant — Robinhood's shipped colourblind mode swaps their red for magenta
+   #ff5a87 so the gain/loss pair separates on a deuteranopic display. Tokens only: no UI is
+   wired to it yet (add the class theme-cb to <body> to try it). */
+body.theme-cb{ --red:#ff5a87; --redDim:rgba(255,90,135,0.14); --redFg:#ffa8c0; }
+body.theme-light.theme-cb{ --red:#d61e56; --redDim:rgba(214,30,86,0.10); --redFg:#a3153f; }`;
+// Kept under the old name: the four page sheets interpolate RH_TOKENS at their head.
+const RH_TOKENS = THEME_TOKENS;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── GLOBAL SHEET — tokens + motion + interaction primitives (Phase 2) ───
+// Injected ONCE into <head> on mount, so the tokens exist for every surface that renders
+// OUTSIDE the four page sheets: the Live Trades drawer, Feedback, What's New, Model Book,
+// Study Book, the auth screen and the mobile layer. The page sheets still carry their own
+// copy (harmless duplicate — identical values, same specificity).
+//
+// MOTION is one system, defined here and nowhere else:
+//   --ease cubic-bezier(.2,.8,.3,1) · --t-fast 120ms (press) · --t-med 200ms (everything else)
+// Every rule below sits inside @media (prefers-reduced-motion: no-preference), so a member
+// who asks their OS for less motion gets the same UI with none of it.
+// ═══════════════════════════════════════════════════════════════════════════
+const GLOBAL_THEME_CSS = `${THEME_TOKENS}
+/* ── Base surface follows the theme (index.html hardcodes the dark one for first paint) ── */
+html,body{background:var(--bg); color:var(--text);}
+body{font-family:var(--font);}
+::-webkit-scrollbar-thumb{background:var(--w10);}
+::-webkit-scrollbar-thumb:hover{background:var(--w22);}
+::selection{background:rgba(240,192,80,0.28); color:var(--white);}
+
+/* ── Theme switch: 200ms cross-tint. The class is added for the length of the switch and
+   removed after, so normal renders never carry a global transition. ── */
+body.theme-anim,body.theme-anim *,body.theme-anim *::before,body.theme-anim *::after{
+  transition:background-color var(--t-med) var(--ease),background var(--t-med) var(--ease),
+    border-color var(--t-med) var(--ease),color var(--t-med) var(--ease),
+    fill var(--t-med) var(--ease),stroke var(--t-med) var(--ease),
+    box-shadow var(--t-med) var(--ease) !important;
+  animation:none !important;
+}
+
+/* ══════════ SECTION SEGMENTATION — Robinhood's grammar (owner directive, 2026-08-06) ══════════
+   SPACE FIRST · ONE LINE SECOND · BOXES LAST. A section is separated by whitespace on the 4px
+   grid and, where a line is genuinely needed, by ONE full-width 1px hairline. Bordered boxes are
+   reserved for discrete widgets (lens cards, popups, drawers) — never for a run of sibling
+   sections in a page flow.
+   HAIRLINES: 1px, always. Dark — rows var(--rule) 0.05 · section rules var(--hair) 0.06 ·
+   elevated/glass separators var(--rule2) 0.10, hard ceiling var(--ruleMax) 0.15. Light — rows
+   0.06 · sections 0.08 · ceiling 0.12. var(--ruleOpaque) is the opaque alternative (#30363a on
+   dark) for surfaces where an alpha line renders muddy.
+   NO DOUBLE LINES: a card's own border never meets an inner table/section border; the last row
+   of any list carries no divider; dividers are HORIZONTAL only. */
+:is(.vd,.vj,.vp,.vs) hr,:is(.vd,.vj,.vp,.vs) .rule,:is(.vd,.vj,.vp,.vs) .divider{
+  border:none; border-top:1px solid var(--hair); height:0; margin:24px 0;}
+/* A section heading sits 12-16px above its content, never on top of a second line. */
+:is(.vd,.vj,.vp,.vs) :is(.sech,.cardtitle,.collapsetitle){margin-bottom:14px;}
+:is(.vd,.vj,.vp,.vs) .sech.ruled{border-bottom:1px solid var(--hair); padding-bottom:12px;}
+/* Collapse card-border-meets-inner-border. The card already draws the outer line. */
+:is(.vd,.vj,.vp,.vs) .card > :first-child{border-top:none;}
+:is(.vd,.vj,.vp,.vs) .card > table:first-child thead th{border-top:none;}
+/* Last row of any list or table never carries a divider. */
+:is(.vd,.vj,.vp,.vs) tbody tr:last-child > td{border-bottom:none;}
+:is(.vd,.vj,.vp,.vs) :is(.disttable,.rtable,.wlh) tbody tr:last-child > td{border-bottom:none;}
+/* Full-width rows get horizontal dividers only. The one sanctioned vertical rule is between
+   stats in the stat rail, at the ROW alpha. */
+:is(.vd,.vj,.vp,.vs) tbody td{border-left:none; border-right:none;}
+:is(.vd,.vj,.vp,.vs) .statrail > * + *{border-left:1px solid var(--rule);}
+/* Elevation. Dark overlays use Robinhood's glass recipe; light uses a white panel + one soft
+   drop — a 60%-opaque grey panel over white reads as dirt, not depth. */
+.viv-glass{background:var(--glass); border:1px solid var(--rule2); box-shadow:var(--shadowOv);}
+@supports (backdrop-filter: blur(1px)){ .viv-glass{backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);} }
+body.theme-light .viv-glass{background:var(--sheet); border:1px solid var(--hair);
+  backdrop-filter:none; -webkit-backdrop-filter:none;}
+.viv-scrim{background:var(--scrim);}
+
+/* ── Theme toggle button — one component, same spot in all 14 navbars ── */
+.themetgl{display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;
+  border-radius:999px; border:1px solid var(--hair); background:transparent; color:var(--muted);
+  cursor:pointer; padding:0; flex:0 0 auto; line-height:0;}
+.themetgl:hover{background:var(--w06); color:var(--text); border-color:var(--w14);}
+.themetgl svg{width:15px; height:15px; display:block;}
+/* Same spot in all 14 navbars: pushed to the far right, vertically centred with the tabs. */
+.navbar .themetgl{margin-left:auto;}
+@media(max-width:760px){ .navbar .themetgl{margin-left:auto; order:2;} }
+
+@media (prefers-reduced-motion: no-preference){
+  /* Buttons · chips · pills — press = 0.97, colour = 200ms */
+  :is(.vd,.vj,.vp,.vs,.viv-ov,body) :is(.btn,.mgbtn,.chipbtn,.ghostchip,.tag,.countchip,.kpichip,
+    .seg button,.miniseg button,.toolseg button,.distbtn,.filtsel,.tooltab,.pill,.addrow,
+    .simbtn,.supbtn,.revbtn,.tp-go,.tdz-tab,.conn,.stepper,.themetgl,.rangechip){
+    transition:background-color var(--t-med) var(--ease),border-color var(--t-med) var(--ease),
+      color var(--t-med) var(--ease),opacity var(--t-med) var(--ease),
+      transform var(--t-fast) var(--ease);
+  }
+  :is(.vd,.vj,.vp,.vs,.viv-ov,body) :is(.btn,.mgbtn,.chipbtn,.ghostchip,.seg button,.miniseg button,
+    .toolseg button,.distbtn,.filtsel,.tooltab,.addrow,.simbtn,.supbtn,.revbtn,.tp-go,.tdz-tab,
+    .themetgl,.rangechip):active{ transform:scale(0.97); }
+
+  /* Surfaces — a card lifts one surface step. The translate is reserved for the tiles a member
+     actually clicks; full-width table cards must not nudge under the cursor. */
+  :is(.vd,.vj,.vp,.vs) .card{
+    transition:background-color var(--t-med) var(--ease),border-color var(--t-med) var(--ease),
+      box-shadow var(--t-med) var(--ease),transform var(--t-med) var(--ease);
+  }
+  :is(.vd,.vj,.vp,.vs) :is(.card.kpi,.card.stat,.tile,.mini,.scencard,.tourcard,.postercard):hover{
+    background:var(--cardHi); transform:translateY(-1px); box-shadow:var(--shadow);
+  }
+  :is(.vd,.vj,.vp,.vs) tbody tr{ transition:background-color var(--t-med) var(--ease); }
+
+  /* Overlays — one slide/fade grammar for drawers, modals, popups. */
+  .viv-ov-fade{ animation:vivOvFade var(--t-med) var(--ease) both; }
+  .viv-ov-pop{ animation:vivOvPop var(--t-med) var(--ease) both; }
+  .viv-ov-slide{ animation:vivOvSlide var(--t-med) var(--ease) both; }
+  /* Page switch — a 180ms crossfade. Each page root mounts fresh when the route changes
+     (they are conditionally rendered), so the mount animation IS the transition: no wrapper
+     element, no layout risk, nothing to unwind. */
+  .vd,.vj,.vp,.vs,.viv-page-fade{ animation:vivOvFade 180ms var(--ease) both; }
+}
+@keyframes vivOvFade{from{opacity:0}to{opacity:1}}
+@keyframes vivOvPop{from{opacity:0; transform:translateY(10px) scale(0.985)}to{opacity:1; transform:none}}
+@keyframes vivOvSlide{from{transform:translateX(100%)}to{transform:translateX(0)}}
+
+/* ── Digit roll — the hero equity number. Each digit is a 0-9 strip translated to its value;
+   only the digits that CHANGED move, so the number reads as a ticker, not a re-render.
+   Everything else in the string (currency sign, commas, the privacy dots) renders flat. ── */
+.viv-roll{display:inline-flex; align-items:flex-start; font-variant-numeric:tabular-nums;
+  position:relative; --rh:1.16em;}
+.viv-roll .rd{display:block; overflow:hidden; height:var(--rh);}
+.viv-roll .rd .rs{display:block; will-change:transform;}
+.viv-roll .rd .rs > span{display:block; height:var(--rh); line-height:var(--rh);}
+@media (prefers-reduced-motion: no-preference){
+  .viv-roll .rd .rs{transition:transform var(--t-med) var(--ease);}
+}
+
+/* ── Value flash — a number that changed tints its direction for 400ms, then settles. ── */
+@media (prefers-reduced-motion: no-preference){
+  .viv-flash-up{animation:vivFlashUp 400ms var(--ease) 1;}
+  .viv-flash-dn{animation:vivFlashDn 400ms var(--ease) 1;}
+}
+@keyframes vivFlashUp{0%{color:var(--green)}70%{color:var(--green)}100%{color:inherit}}
+@keyframes vivFlashDn{0%{color:var(--red)}70%{color:var(--red)}100%{color:inherit}}
+
+/* ── Skeletons — shape-matched blocks with the drawer's shimmer, not the word "Loading". ── */
+.sk{background:var(--w06); border-radius:6px; position:relative; overflow:hidden;}
+.sk::after{content:""; position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent,var(--w08),transparent); transform:translateX(-100%);}
+@media (prefers-reduced-motion: no-preference){
+  .sk::after{animation:vivSk 1.25s var(--ease) infinite;}
+}
+@keyframes vivSk{100%{transform:translateX(100%)}}
+.sk-line{height:11px; margin:8px 0;}
+.sk-row{display:flex; gap:12px; align-items:center; padding:14px 16px; border-bottom:1px solid var(--rule);}
+
+/* ── Time-range chips under the hero chart. Active = white text on a hairline pill; gold is
+   reserved for nav + primary CTA, so it never appears here. ── */
+.rangebar{display:flex; gap:4px; margin-top:10px;}
+.rangechip{appearance:none; background:transparent; border:1px solid transparent; color:var(--muted);
+  font:inherit; font-size:0.75rem; font-weight:500; letter-spacing:0.02em; padding:5px 12px;
+  border-radius:999px; cursor:pointer;}
+.rangechip:hover:not(:disabled){color:var(--text); background:var(--w06);}
+.rangechip.on{color:var(--white); border-color:var(--w22); background:var(--w06);}
+.rangechip:disabled{opacity:0.32; cursor:default;}`;
+
+// Scoped system layer — appended to the END of each page stylesheet so it wins on source
+// order at equal specificity. `s` is the page scope class ('.vd' | '.vj' | '.vp' | '.vs').
+// Journal · Premium Tools · Settings — restyle only (no structural rearrangement). These pick
+// up RH_SYS above, then override the few selectors that out-specify it, and strip gold from
+// every data/filter surface (gold stays on nav + primary CTA + Feedback/Live-Trades chrome).
+const JOUR_RH = `
+/* ══════════ ROBINHOOD REGISTER — Journal refinements ══════════ */
+.vj .big{font-family:var(--font); font-size:clamp(2.2rem,4.6vw,2.9rem); font-weight:600;
+  letter-spacing:-0.03em; line-height:1.05; font-variant-numeric:tabular-nums}
+@media(min-width:761px){
+.vj thead th,.vj.expert .tablewrap thead th{font-size:0.6875rem; font-weight:500; letter-spacing:0.06em;
+  color:var(--faint); padding:12px 16px; border-bottom:1px solid var(--rule)}
+.vj tbody tr.traderow td,.vj.expert .tablewrap tbody tr.traderow td{font-size:0.75rem;
+  padding:12px 16px; height:52px; border-bottom:1px solid var(--rule)}
+.vj tbody tr.traderow:hover{background:var(--w02)}
+}
+.vj.expert .countchip{font-size:0.75rem; font-weight:500; padding:4px 12px; border-radius:999px;
+  background:var(--w06); color:var(--muted)}
+/* Filter / sort / distribution controls are DATA chrome — pills with a neutral active state. */
+.vj .filtsel{border-radius:999px; font-size:0.75rem; font-weight:500; letter-spacing:0}
+.vj .filtsel.active{border-color:var(--w14); color:var(--white); background:var(--w10)}
+.vj .filterbar .flabel{font-weight:500; font-size:0.75rem; letter-spacing:0; text-transform:none}
+.vj .filterbar .btn{font-size:0.75rem; padding:8px 16px}
+.vj .distbtn{border-radius:999px; font-weight:500}
+.vj .distbtn.on,.vj .distbtn:hover{color:var(--white); border-color:var(--w14); background:var(--w10)}
+.vj .seg button.on{background:var(--w10); color:var(--white)}
+.vj .simbtn,.vj .supbtn{font-weight:500; border-radius:999px; color:var(--text);
+  background:var(--w06); border-color:var(--w14)}
+.vj .simlegend .dot.p{background:var(--w55)}
+.vj .eqdot{background:var(--white)}
+.vj .metricsdd .ddreset{color:var(--text); font-size:0.75rem; font-weight:500}
+.vj .edgeadmin{background:var(--w03); border-color:var(--hair)}
+.vj .edgelever.focus{border-color:var(--w14); background:var(--w08)}
+.vj .edgelever.focus .lk{color:var(--white)}
+.vj .welcome{background:var(--w03); border:1px solid var(--hair); border-radius:14px}
+/* Primary CTAs keep the gold pill. */
+.vj .tp-go,.vj .tdz-tab.on{background:var(--goldPill); color:var(--goldOn); border:none; font-weight:600;
+  border-radius:999px; box-shadow:none}
+.vj .charthint,.vj.expert .charthint{font-size:0.75rem}
+.vj .disttable th{font-size:0.6875rem; font-weight:500; letter-spacing:0.06em; color:var(--faint)}
+.vj .disttable td{font-size:0.75rem}
+.vj .distsum .dsk{font-size:0.75rem}
+.vj .bar.pos,.vj .dbar.dpos{background:var(--green)}
+.vj .bar.neg,.vj .dbar.dneg{background:var(--red)}
+.vj.expert .kpisub{font-size:0.75rem; color:var(--faint)}
+.vj .sech,.vj.expert .tradehead .sech{font-size:1.125rem; font-weight:600; letter-spacing:-0.012em}
+.vj .traderow.rev-open .revbtn{background:var(--w10); color:var(--white); border-color:var(--w14)}
+.vj .distin.edited{border-color:var(--w22); background:var(--w06)}
+.vj .distin:focus{border-color:var(--goldBright)}
+.vj .simlegend .dot.x{background:var(--w35)}
+`;
+
+const PREM_RH = `
+/* ══════════ ROBINHOOD REGISTER — Premium Tools refinements ══════════ */
+.vp .tooltab{font-size:0.875rem; font-weight:500; letter-spacing:0; text-transform:none; padding:12px 16px}
+.vp .tooltab.on{color:var(--goldBright); border-bottom-color:var(--goldBright)}
+.vp .tooltabs{gap:2px; margin:24px 0 20px; border-bottom:1px solid var(--hair)}
+.vp .seg button.on,.vp .toolseg button.on{background:var(--w10); color:var(--white)}
+.vp .sech{font-size:1.125rem; font-weight:600; letter-spacing:-0.012em}
+.vp .tourchip{font-size:0.75rem; font-weight:500; letter-spacing:0; text-transform:none}
+.vp .tourtitle{font-weight:600; letter-spacing:-0.02em}
+.vp .postertitle{font-size:1.125rem; font-weight:600}
+.vp .postersub{font-size:0.75rem}
+.vp .tourtime{font-size:0.75rem}
+.vp .welcome{background:var(--w03); border:1px solid var(--hair); border-radius:14px}
+.vp .outval{font-family:var(--font); font-weight:500; letter-spacing:-0.025em; font-variant-numeric:tabular-nums}
+.vp .rtable td,.vp .tile .v{font-variant-numeric:tabular-nums}
+.vp .miniseg button.on{background:var(--w10); color:var(--white)}
+.vp .rtable th{font-size:0.6875rem; font-weight:500; letter-spacing:0.06em; color:var(--faint)}
+`;
+
+const SET_RH = `
+/* ══════════ ROBINHOOD REGISTER — Settings refinements ══════════ */
+.vs .cardtitle,.vs .sech{font-size:1.125rem; font-weight:600; letter-spacing:-0.012em; text-transform:none}
+.vs .carddesc,.vs .hint{font-size:0.75rem; color:var(--muted); line-height:1.6}
+.vs .eyebrow{font-size:0.75rem; font-weight:500; letter-spacing:0; text-transform:none; color:var(--faint)}
+.vs .conn{border-radius:999px; font-size:0.75rem; font-weight:500; letter-spacing:0; text-transform:none}
+.vs .seg button.on{background:var(--w10); color:var(--white)}
+.vs .chip,.vs .pill{border-radius:999px; font-weight:500; letter-spacing:0; text-transform:none}
+.vs .step .sn{font-size:0.75rem; font-weight:500; letter-spacing:0; text-transform:none; color:var(--faint)}
+.vs .exhead{font-size:0.875rem; font-weight:500}
+/* Settings chips are DATA/preference chrome — neutral active state, not gold. */
+.vs.expert .ghostchip.on{background:var(--w10); color:var(--white); border-color:var(--w14)}
+`;
+
+const RH_SYS = (s) => `
+/* ══════════ ROBINHOOD REGISTER — system layer for ${s} ══════════ */
+${s}{background:radial-gradient(1100px 620px at 72% -12%, rgba(201,152,42,0.035), transparent 62%), var(--bg);
+  font-family:var(--font); line-height:1.55; letter-spacing:0;}
+
+/* ── Surfaces: flat, opaque, hairline-bounded. No glass sheen, no box-in-box. ── */
+${s} .card,${s}.expert .card{background:var(--card); border:1px solid var(--hair); border-radius:16px;
+  padding:20px 24px; backdrop-filter:none; -webkit-backdrop-filter:none; box-shadow:none;}
+${s} .card::before,${s}.expert .card::before{display:none !important;}
+${s} .card .card{background:transparent; border:none; box-shadow:none;}
+
+/* ── Type: quiet sentence-case labels replace the mono micro-caps kicker. ── */
+${s} .label,${s} .eyebrow,${s} .outlabel,${s} .mgcoltitle,${s} .cardhead .label,${s} .cfghint{
+  font-size:0.75rem; font-weight:500; letter-spacing:0; text-transform:none; color:var(--muted);}
+${s} .eyebrow{color:var(--faint);}
+/* Every remaining micro-caps kicker in the scoped sheets drops to the quiet register.
+   Uppercase survives ONLY in dense <th> headers and the mobile ::before cell labels. */
+${s} .panelhead,${s} .field label,${s} .scencard .n,${s} .tourchip,${s} .edgetitle,
+${s} .edgestat .edgek,${s} .projlabel,${s} .vak,${s} .edgelever .lk,${s} .distsum .dsk,
+${s} .eqtip .tt,${s} .revcoltitle,${s} .nlabel,${s} .metricsdd .ddhdr span,${s} .tp-pnl-lbl,
+${s} .tp-reason-h,${s} .tz-npl span,${s} .tz-sect,${s}.expert .mmk,${s} .sparklabel,
+${s} .step .sn,${s} .cardtitle,${s} .rtable .rhead td{
+  text-transform:none; letter-spacing:0; font-weight:500;}
+${s} .provischip,${s} .vachip,${s} .ownerbadge,${s} .mgls{text-transform:none; letter-spacing:0;
+  font-weight:500; border-radius:999px;}
+${s} .h1,${s} .ch1,${s}.expert .cmdleft .ch1{font-size:clamp(1.6rem,2.6vw,2rem); font-weight:600;
+  letter-spacing:-0.02em; color:var(--white); line-height:1.15;}
+${s} .sech,${s} .toolbar h2,${s} .poshead h2,${s}.expert .poshead h2,${s} .collapsetitle{
+  font-size:1.125rem; font-weight:600; letter-spacing:-0.012em; text-transform:none; color:var(--white);}
+${s} .sub,${s} .cmdmeta,${s}.expert .cmdmeta{font-size:0.875rem; color:var(--muted); letter-spacing:0;}
+
+/* ── Nothing below 11px: floor the micro register. ── */
+${s} .kpisub,${s} .kpichip,${s} .outsub,${s} .ctrlhint,${s} .mgnote,${s} .mgof,${s} .mgfoot-hint,
+${s} .pro-note,${s} .sparklabel,${s} .tllabel .gtip,${s} .allocnote,${s} .mgactlist,${s} .mgls,
+${s} .tag,${s} .countchip,${s} .chipbtn,${s} .ghostchip,${s} .kpitip,${s} .deploysub,${s} .mgmeta{
+  font-size:0.75rem; letter-spacing:0;}
+${s} .sparklabel,${s} .mgls{text-transform:none;}
+
+/* ── Numbers: hero + sub-hero register, tight tracking, tabular.
+   PROPORTIONAL Geist — NOT mono (Valen 2026-08-06: mono read as a wide terminal number,
+   which is not the Robinhood register). Mono is reserved for dense data-table columns and
+   the Live Trades drawer; everywhere else tabular-nums alone gives the column alignment. ── */
+${s} .heronum{font-family:var(--font); font-size:clamp(2.75rem,5.6vw,3.25rem); font-weight:600;
+  letter-spacing:-0.03em; line-height:1.02; color:var(--white); font-variant-numeric:tabular-nums;}
+${s} .herochg{font-family:var(--font); font-size:1rem; font-weight:500; letter-spacing:-0.02em;
+  font-variant-numeric:tabular-nums;}
+${s} .kpinum,${s}.expert .kpinum,${s} .mini .val,${s} .statval{font-family:var(--font);
+  font-size:1.75rem; font-weight:500; letter-spacing:-0.025em; line-height:1.1;
+  font-variant-numeric:tabular-nums;}
+${s} .outval,${s} .stepval{font-family:var(--font); font-weight:500; letter-spacing:-0.02em;
+  font-variant-numeric:tabular-nums;}
+
+/* ── Buttons are pills. Primary = solid gold, secondary = white-alpha outline. ── */
+${s} .btn,${s} .mgbtn,${s} .chipbtn,${s} .ghostchip,${s} .seg,${s} .seg button,${s} .stepper,
+${s} .tag,${s} .countchip,${s} .kpichip{border-radius:999px;}
+${s} .btn{border:1px solid var(--w14); background:transparent; color:var(--text);
+  font-size:0.75rem; font-weight:500; letter-spacing:0; padding:8px 20px;}
+${s} .btn:hover{background:var(--w06); border-color:var(--w22); color:var(--white);}
+${s} .btn.gold{background:var(--goldPill); color:var(--goldOn); border:none; font-weight:600; box-shadow:none;}
+${s} .btn.gold:hover{background:#f6cd6a; color:var(--goldOn);}
+${s} .btn.goldoutline,${s}.expert .btn.goldoutline{background:transparent; border:1px solid var(--borderGold); color:var(--goldBright);}
+${s} .mgbtn{font-size:0.75rem; font-weight:500; padding:8px 16px; border-color:var(--w10);}
+${s} .seg{border-color:var(--hair); background:var(--w02);}
+${s} .seg button{font-size:0.75rem; font-weight:500; letter-spacing:0; padding:8px 16px;}
+${s} .addrow{border-radius:999px; font-size:0.75rem; font-weight:500; letter-spacing:0;}
+
+/* ── Nav: brand left, quiet text links, gold = active only, hairline bottom rule. ── */
+${s} .navbar{min-height:60px; align-items:center; gap:16px; margin-bottom:24px; padding-bottom:0;
+  border-bottom:1px solid var(--hair);}
+${s} .brand{font-weight:700; font-size:0.875rem; letter-spacing:-0.015em;}
+${s} .tabs{background:transparent; border:none; padding:0; gap:2px;}
+${s} .tabs a{font-size:0.875rem; font-weight:500; letter-spacing:0; color:var(--muted);
+  padding:8px 16px; border-radius:999px; transition:color .15s, background .15s;}
+${s} .tabs a.on{background:transparent; color:var(--goldBright); font-weight:600;}
+${s} .tabs a:hover:not(.on){color:var(--white); background:var(--w04);}
+
+/* ── Rows: ~52px, hairline dividers, no zebra, generous side padding.
+   DESKTOP-ONLY: below 761px every table re-renders as stacked mobile cards with its own
+   padding grammar — this density pass must not reach that layer. ── */
+@media(min-width:761px){
+${s} thead th{font-size:0.6875rem; font-weight:500; letter-spacing:0.06em; text-transform:uppercase;
+  color:var(--faint); padding:12px 16px; border-bottom:1px solid var(--rule);}
+${s} tbody td{padding:14px 16px; font-size:0.875rem; border-bottom:1px solid var(--rule);}
+${s} tbody tr:hover{background:var(--w02);}
+}
+${s} tbody td{font-variant-numeric:tabular-nums;}
+${s} .tick{font-weight:600; font-size:0.875rem; letter-spacing:-0.01em;}
+
+/* ── Inputs ── */
+${s} input,${s} select,${s} textarea{font-family:var(--font); letter-spacing:0;}
+${s} .capinput,${s} .numfield,${s} .mgin,${s} .mgsel,${s} .mgta{border-radius:10px; font-weight:500;
+  border-color:var(--hair);}
+${s} .numfield,${s} .mgin,${s} .capinput{font-family:var(--font); font-variant-numeric:tabular-nums;}
+
+/* ── Chips: pills, quiet, never gold. ── */
+${s} .tag,${s} .countchip,${s} .chipbtn,${s} .ghostchip,${s} .kpichip{font-weight:500; letter-spacing:0;
+  text-transform:none; border-radius:999px;}
+`;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── THEME CONTROLLER (Phase 2) ───
+// Preference is one of "auto" | "dark" | "light", persisted in localStorage("viv-theme").
+// "auto" follows prefers-color-scheme and keeps following it live, which is what Robinhood
+// does — a member who flips their Mac to Night Shift gets the dark app without touching us.
+//
+// Deliberately a MODULE-level store, not React context: the toggle appears in 14 separate
+// navbars spread across five page components, and threading a provider through all of them
+// would mean adding hooks to components that already have early returns. `<ThemeToggle />`
+// owns its own hook, so no existing component's hook order moves.
+// ═══════════════════════════════════════════════════════════════════════════
+const THEME_KEY = "viv-theme";
+const THEME_PREFS = ["auto", "dark", "light"];
+let _themePref = (() => { try { const v = localStorage.getItem(THEME_KEY); return THEME_PREFS.includes(v) ? v : "dark"; } catch { return "dark"; } })();
+// Light theme is ADMIN-ONLY until its QA pass finishes (Valen 2026-08-06): members always get
+// dark; the toggle/choice UI renders null for them. setThemeUiAllowed(isAdmin) is wired in
+// AppInner once the session lands.
+let _themeUiOn = false;
+function setThemeUiAllowed(on) {
+  if (_themeUiOn === !!on) return;
+  _themeUiOn = !!on;
+  applyTheme(_themePref, { animate: false });
+  _themeSubs.forEach(f => f(_themePref));
+}
+let _uiSkin = "geist";                       // mirrored from the interface-style state below
+const _themeSubs = new Set();
+const _prefersLight = () => typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+const resolvedTheme = (pref = _themePref) => (pref === "light" ? "light" : pref === "dark" ? "dark" : (_prefersLight() ? "light" : "dark"));
+let _themeAnimT = null;
+function applyTheme(pref = _themePref, { animate = true } = {}) {
+  if (typeof document === "undefined" || !document.body) return;
+  const body = document.body;
+  const light = _themeUiOn && resolvedTheme(pref) === "light";
+  const flipping = body.classList.contains("theme-light") !== light;
+  // The 200ms cross-tint is opt-in per switch: the class is added only while the theme is
+  // actually changing and pulled straight back off, so normal renders never carry a global
+  // `transition: … !important` (which would make every list update feel syrupy).
+  if (flipping && animate) {
+    body.classList.add("theme-anim");
+    if (_themeAnimT) clearTimeout(_themeAnimT);
+    _themeAnimT = setTimeout(() => body.classList.remove("theme-anim"), 260);
+  }
+  body.classList.toggle("theme-light", light);
+  // Legacy interface styles are dark-only (their own near-black ladder out-specifies the light
+  // tokens). Under the light theme the app falls back to the default "Book"/geist skin.
+  body.classList.toggle("theme-zella", _uiSkin === "zella" && !light);
+  body.classList.toggle("theme-geist", _uiSkin === "geist" || (_uiSkin === "zella" && light));
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", light ? "#ffffff" : "#000000");
+}
+function setVivTheme(pref) {
+  _themePref = THEME_PREFS.includes(pref) ? pref : "auto";
+  try { localStorage.setItem(THEME_KEY, _themePref); } catch { /* private mode — ignore */ }
+  applyTheme(_themePref);
+  _themeSubs.forEach(f => f(_themePref));
+}
+function setVivSkin(skin) { _uiSkin = skin; applyTheme(_themePref, { animate: false }); }
+applyTheme(_themePref, { animate: false });   // paint the saved choice before React mounts
+function useVivTheme() {
+  const [pref, setPref] = useState(_themePref);
+  useEffect(() => {
+    const fn = (p) => setPref(p);
+    _themeSubs.add(fn);
+    return () => { _themeSubs.delete(fn); };
+  }, []);
+  // Keep following the OS while the preference is "auto".
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const on = () => { if (_themePref === "auto") { applyTheme("auto"); setPref("auto"); } };
+    if (mq.addEventListener) { mq.addEventListener("change", on); return () => mq.removeEventListener("change", on); }
+    mq.addListener(on); return () => mq.removeListener(on);           // Safari < 14
+  }, []);
+  return [pref, resolvedTheme(pref)];
+}
+// Sun / moon, 15px, currentColor — one glyph, no library.
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.2" /><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.4 5.4l1.6 1.6M17 17l1.6 1.6M18.6 5.4L17 7M7 17l-1.6 1.6" />
+    </svg>
+  );
+}
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1Z" />
+    </svg>
+  );
+}
+// The navbar control. One tap flips dark ↔ light (and drops "auto" the moment a member states
+// a preference — the three-way choice lives in Settings, where there is room to explain it).
+function ThemeToggle({ style }) {
+  const [pref, mode] = useVivTheme();
+  const next = mode === "light" ? "dark" : "light";
+  if (!_themeUiOn) return null;   // hooks above run every render — order never changes
+  return (
+    <button
+      className="themetgl"
+      onClick={() => setVivTheme(next)}
+      title={pref === "auto" ? `Following your system (${mode}) — switch to ${next}` : `Switch to ${next} theme`}
+      aria-label={`Switch to ${next} theme`}
+      style={style}
+    >{mode === "light" ? <MoonIcon /> : <SunIcon />}</button>
+  );
+}
+// Settings row — the full three-way choice, including "Auto" (the default).
+function ThemeChoice() {
+  const [pref, mode] = useVivTheme();
+  if (!_themeUiOn) return null;   // admin-only while light QA is open; hooks stay first
+  return (
+    // The hint sits OUTSIDE the segmented control — a stray <span> inside `.seg` inherits the
+    // button chrome and reads as a dead fourth option.
+    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div className="seg" id="prefAppearance">
+        {THEME_PREFS.map(p => (
+          <button key={p} className={pref === p ? "on" : ""} onClick={() => setVivTheme(p)}>
+            {p === "auto" ? "Auto" : p === "dark" ? "Dark" : "Light"}
+          </button>
+        ))}
+      </div>
+      {pref === "auto" && (
+        <span style={{ fontSize: "0.75rem", color: "var(--faint)" }}>Following your system · {mode}</span>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── INTERACTION LAYER (Phase 2) ───
+// Robinhood's appeal WITHOUT its gamification: no confetti, no streak rewards, no celebration
+// mechanics. What we take is the part that makes a number feel alive — the digit roll, the
+// direction flash, the range chips — and nothing that rewards a member for trading more.
+// ═══════════════════════════════════════════════════════════════════════════
+const ROLL_DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+// Per-digit vertical roll. Each digit is a 0-9 strip translated to its own value; React only
+// changes the transform, so the browser tweens it and unchanged digits never move. On first
+// mount the strip is already at its final offset, so nothing rolls until a value CHANGES.
+// Keys count from the RIGHT so growing past a power of ten adds a digit on the left instead of
+// shifting every place. Non-digits (currency sign, commas, the privacy dots) ride in the same
+// box so every glyph shares one baseline.
+function RollNumber({ text, style }) {
+  const s = String(text ?? "");
+  const chars = s.split("");
+  return (
+    <span className="viv-roll" style={style}>
+      <span className="sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>{s}</span>
+      {chars.map((ch, i) => {
+        const key = "c" + (chars.length - i);
+        const d = ROLL_DIGITS.indexOf(ch);
+        return (
+          <span className="rd" key={key} aria-hidden="true">
+            {d >= 0
+              ? <span className="rs" style={{ transform: `translateY(${(-d * 10).toFixed(0)}%)` }}>{ROLL_DIGITS.map(n => <span key={n}>{n}</span>)}</span>
+              : <span className="rs"><span>{ch}</span></span>}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+// A live number that flashes its DIRECTION for 400ms when it changes, then settles back to its
+// own colour. Silent on first render and whenever the value is unchanged or unknown.
+function useValueFlash(num) {
+  const prev = useRef(num);
+  const [cls, setCls] = useState("");
+  useEffect(() => {
+    const p = prev.current;
+    prev.current = num;
+    if (p == null || num == null || !Number.isFinite(+p) || !Number.isFinite(+num) || +p === +num) return;
+    setCls(+num > +p ? "viv-flash-up" : "viv-flash-dn");
+    const t = setTimeout(() => setCls(""), 420);
+    return () => clearTimeout(t);
+  }, [num]);
+  return cls;
+}
+// The hero equity figure: rolling digits + direction flash, in its own component so the page
+// components' hook order is untouched.
+function LiveFigure({ text, value, className = "", style, roll = true }) {
+  const flash = useValueFlash(value);
+  return (
+    <div className={(className + " " + flash).trim()} style={style}>
+      {roll ? <RollNumber text={text} /> : text}
+    </div>
+  );
+}
+// Same, inline (for a stat value inside an existing layout).
+function LiveValue({ text, value, className = "", style, roll = false }) {
+  const flash = useValueFlash(value);
+  return (
+    <span className={(className + " " + flash).trim()} style={style}>
+      {roll ? <RollNumber text={text} /> : text}
+    </span>
+  );
+}
+
+// ─── Equity-curve builder — shared by the full curve and every filtered range ───
+// Lifted out of the dashboard's useMemo unchanged so the hero's time-range chips can rebuild
+// the SAME curve over a subset without a second implementation drifting from the first.
+function buildEquityCurve(tradesNewestFirst) {
+  const tr = (tradesNewestFirst || []).slice().reverse();
+  if (tr.length < 2) return null;
+  let cum = 0; const pts = tr.map(t => { cum += (t.plDollar || 0); return cum; });
+  const min = Math.min(0, ...pts), max = Math.max(0, ...pts), range = (max - min) || 1;
+  const W = 320, H = 56, step = W / (pts.length - 1);
+  const xy = pts.map((v, i) => [+(i * step).toFixed(1), +(H - ((v - min) / range) * (H - 6) - 3).toFixed(1)]);
+  const line = xy.map((p, i) => (i ? "L" : "M") + p[0] + "," + p[1]).join(" ");
+  const area = "M" + xy[0][0] + "," + H + " " + xy.map(p => "L" + p[0] + "," + p[1]).join(" ") + " L" + xy[xy.length - 1][0] + "," + H + " Z";
+  const smaOf = (p) => pts.map((_, i) => i + 1 >= p ? pts.slice(i + 1 - p, i + 1).reduce((s, v) => s + v, 0) / p : null);
+  const smaPath = (arr) => { let out = "", pen = false; arr.forEach((v, i) => { if (v == null) { pen = false; return; } out += (pen ? " L" : " M") + (i * step).toFixed(1) + "," + (H - ((v - min) / range) * (H - 6) - 3).toFixed(1); pen = true; }); return out.trim(); };
+  const smas = { s5: smaPath(smaOf(5)), s10: smaPath(smaOf(10)), s20: smaPath(smaOf(20)) };
+  const scrub = xy.map((p, i) => ({
+    xf: p[0] / W, yf: p[1] / H,
+    cum: pts[i],
+    date: tradeDateISO(tr[i]?.exit || tr[i]?.entry) || "",
+    sym: tr[i]?.sym || "",
+  }));
+  return { line, area, smas, up: pts[pts.length - 1] >= 0, scrub };
+}
+// Robinhood's signature range row. Windows are counted from TODAY against each trade's EXIT
+// date (the date the P/L was actually banked), which is the same date the curve plots.
+const HERO_RANGES = ["1W", "1M", "3M", "YTD", "ALL"];
+function heroRangeStartISO(key) {
+  if (key === "ALL") return null;
+  const now = new Date();
+  if (key === "YTD") return `${now.getFullYear()}-01-01`;
+  const days = key === "1W" ? 7 : key === "1M" ? 30 : 91;
+  const d = new Date(now.getTime() - days * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+function tradesInHeroRange(trades, key) {
+  const from = heroRangeStartISO(key);
+  if (!from) return trades || [];
+  return (trades || []).filter(t => {
+    const iso = tradeDateISO(t?.exit || t?.entry);
+    return iso ? iso >= from : false;
+  });
+}
+
+// ─── Skeletons — shape-matched loading blocks (the shimmer lives in the global sheet) ───
+function SkLine({ w = "100%", h = 11, style }) { return <div className="sk" style={{ width: w, height: h, margin: "8px 0", ...style }} />; }
+function SkRows({ rows = 5, cols = 4 }) {
+  return (
+    <div>
+      {Array.from({ length: rows }).map((_, r) => (
+        <div className="sk-row" key={r}>
+          {Array.from({ length: cols }).map((_, c) => (
+            <div className="sk" key={c} style={{ height: 11, flex: c === 0 ? "0 0 64px" : 1, opacity: 1 - r * 0.09 }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ─── Brand wordmark — tri-color lockup (Valen / Insiders / Vault) ───
 function Wordmark({ size, style }) {
@@ -148,11 +855,11 @@ function sortArrow(sorts, key) {
 // ─── Slider CSS ───
 const sliderCSS = `
 input[type=range].viv-slider{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;outline:none;cursor:pointer}
-input[type=range].viv-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:${C.goldBright};border:3px solid #08080e;box-shadow:0 0 10px rgba(201,152,42,0.45),0 0 0 1px rgba(201,152,42,0.3);cursor:pointer;margin-top:-8px}
-input[type=range].viv-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:${C.goldBright};border:3px solid #08080e;box-shadow:0 0 10px rgba(201,152,42,0.45);cursor:pointer}
+input[type=range].viv-slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:${C.goldBright};border:3px solid var(--bg);box-shadow:0 0 10px rgba(201,152,42,0.45),0 0 0 1px rgba(201,152,42,0.3);cursor:pointer;margin-top:-8px}
+input[type=range].viv-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:${C.goldBright};border:3px solid var(--bg);box-shadow:0 0 10px rgba(201,152,42,0.45);cursor:pointer}
 input[type=range].viv-slider::-webkit-slider-runnable-track{height:4px;border-radius:2px}
-@keyframes rtsGlow{0%,100%{text-shadow:0 0 6px rgba(239,68,68,0.6),0 0 12px rgba(239,68,68,0.3)}50%{text-shadow:0 0 10px rgba(239,68,68,0.9),0 0 20px rgba(239,68,68,0.5)}}
-@keyframes rtsGlowGreen{0%,100%{text-shadow:0 0 6px rgba(34,197,94,0.5),0 0 12px rgba(34,197,94,0.25)}50%{text-shadow:0 0 10px rgba(34,197,94,0.8),0 0 20px rgba(34,197,94,0.4)}}
+@keyframes rtsGlow{0%,100%{text-shadow:0 0 6px rgba(255,80,0,0.6),0 0 12px rgba(255,80,0,0.3)}50%{text-shadow:0 0 10px rgba(255,80,0,0.9),0 0 20px rgba(255,80,0,0.5)}}
+@keyframes rtsGlowGreen{0%,100%{text-shadow:0 0 6px rgba(0,200,5,0.5),0 0 12px rgba(0,200,5,0.25)}50%{text-shadow:0 0 10px rgba(0,200,5,0.8),0 0 20px rgba(0,200,5,0.4)}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes intradayPulse{0%,100%{box-shadow:0 0 0 0 rgba(201,152,42,0.4)}50%{box-shadow:0 0 0 4px rgba(201,152,42,0)}}
 `;
@@ -171,23 +878,22 @@ const DEMO_FINANCE = { buyPrice: "142.50", shares: "575", stopPrice: "133.80", s
 // ═══════════════════════════════════════
 function GlassCard({ children, style, small, onClick, className }) {
   return (
-    <div onClick={onClick} className={className} style={{ background: C.glass, backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", border: `1px solid ${C.border}`, borderRadius: small ? 13 : 22, position: "relative", overflow: "hidden", ...style }}>
-      <div style={{ position: "absolute", inset: 0, borderRadius: small ? 13 : 22, background: "linear-gradient(135deg, rgba(255,255,255,0.055) 0%, transparent 50%, rgba(255,255,255,0.02) 100%)", pointerEvents: "none" }} />
+    <div onClick={onClick} className={className} style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: small ? 12 : 16, position: "relative", overflow: "hidden", ...style }}>
       <div style={{ position: "relative", zIndex: 1 }}>{children}</div>
     </div>
   );
 }
-function Eyebrow({ children }) { return <div style={{ fontWeight: 700, fontSize: "0.62rem", letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>{children}</div>; }
+function Eyebrow({ children }) { return <div style={{ fontWeight: 500, fontSize: "0.75rem", letterSpacing: 0, color: "var(--faint)", marginBottom: 8 }}>{children}</div>; }
 
 function CalcInput({ label, value, onChange, suffix = "$", placeholder = "0.00", style }) {
   return (
     <div style={{ flex: 1, ...style }}>
-      {label && <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" }}>{label}</label>}
+      {label && <label style={{ fontWeight: 500, fontSize: "0.75rem", letterSpacing: 0, color: C.muted, marginBottom: 7, display: "block" }}>{label}</label>}
       <div style={{ position: "relative" }}>
         <input type="number" step="any" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)}
-          style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: suffix ? "11px 36px 11px 14px" : "11px 14px", color: C.white, fontSize: "0.88rem", fontWeight: 500, fontFamily: font, outline: "none" }}
+          style={{ width: "100%", boxSizing: "border-box", background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: suffix ? "11px 36px 11px 14px" : "11px 14px", color: C.white, fontSize: "0.875rem", fontWeight: 500, fontFamily: font, outline: "none" }}
           onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
-        {suffix && <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: C.muted, fontSize: "0.74rem", fontWeight: 600 }}>{suffix}</span>}
+        {suffix && <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: C.muted, fontSize: "0.75rem", fontWeight: 600 }}>{suffix}</span>}
       </div>
     </div>
   );
@@ -195,27 +901,27 @@ function CalcInput({ label, value, onChange, suffix = "$", placeholder = "0.00",
 function TextInput({ label, value, onChange, placeholder, style, upper = true }) {
   return (
     <div style={{ flex: 1, ...style }}>
-      {label && <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" }}>{label}</label>}
+      {label && <label style={{ fontWeight: 500, fontSize: "0.75rem", letterSpacing: 0, color: C.muted, marginBottom: 7, display: "block" }}>{label}</label>}
       <input type="text" placeholder={placeholder} value={value} onChange={e => onChange(upper ? e.target.value.toUpperCase() : e.target.value)}
-        style={{ width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "11px 14px", color: C.white, fontSize: "0.88rem", fontWeight: 500, fontFamily: font, outline: "none", ...(upper ? { textTransform: "uppercase" } : {}) }}
+        style={{ width: "100%", boxSizing: "border-box", background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "11px 14px", color: C.white, fontSize: "0.875rem", fontWeight: 500, fontFamily: font, outline: "none", ...(upper ? { textTransform: "uppercase" } : {}) }}
         onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
     </div>
   );
 }
 function ResultRow({ label, value, color, highlight }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 8px", marginLeft: -8, marginRight: -8, borderBottom: "1px solid rgba(255,255,255,0.04)", background: highlight ? "rgba(255,255,255,0.03)" : "transparent", borderRadius: highlight ? 6 : 0 }}>
-      <span style={{ fontWeight: 400, fontSize: "0.78rem", color: C.muted }}>{label}</span>
-      <span style={{ fontWeight: 700, fontSize: "0.88rem", color: color || C.white, textAlign: "right" }}>{value}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 8px", marginLeft: -8, marginRight: -8, borderBottom: "1px solid var(--w04)", background: highlight ? "var(--w03)" : "transparent", borderRadius: highlight ? 6 : 0 }}>
+      <span style={{ fontWeight: 400, fontSize: "0.75rem", color: C.muted }}>{label}</span>
+      <span style={{ fontWeight: 500, fontSize: "0.875rem", color: color || C.white, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{value}</span>
     </div>
   );
 }
 function Badge({ positive, children }) {
-  return <span style={{ display: "inline-block", padding: "4px 14px", borderRadius: 980, fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", background: positive ? C.greenDim : C.redDim, color: positive ? C.green : C.red, border: `1px solid ${positive ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.25)"}` }}>{children}</span>;
+  return <span style={{ display: "inline-block", padding: "4px 13px", borderRadius: 999, fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, background: positive ? C.greenDim : C.redDim, color: positive ? C.green : C.red, border: `1px solid ${positive ? "rgba(0,200,5,0.25)" : "rgba(255,80,0,0.25)"}` }}>{children}</span>;
 }
 function Alert({ type, children }) {
   const isRed = type === "red";
-  return <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: "0.74rem", fontWeight: 500, lineHeight: 1.5, marginTop: 8, background: isRed ? C.redDim : C.goldDim, border: `1px solid ${isRed ? "rgba(239,68,68,0.2)" : C.borderGold}`, color: isRed ? "#fca5a5" : C.goldBright }}>{children}</div>;
+  return <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: "0.75rem", fontWeight: 500, lineHeight: 1.5, marginTop: 8, background: isRed ? C.redDim : "var(--w04)", border: `1px solid ${isRed ? "rgba(255,80,0,0.2)" : "var(--w10)"}`, color: isRed ? "var(--redFg)" : C.white }}>{children}</div>;
 }
 // ─── Drag Reorder Utility ───
 // Makes any list of elements reorderable via HTML5 drag-and-drop.
@@ -532,19 +1238,19 @@ function PlaybookTracker({ trades, uid, setPage }) {
   const edgeAhead = proj.evSim != null && proj.evAct != null && proj.evAct >= proj.evSim;
   const fmtEv = (v) => (v >= 0 ? "+" : "") + v.toFixed(2) + proj.suffix;
   const verdict = failList.length === 0
-    ? { word: "ON TRACK", col: "var(--green)", bd: "rgba(34,197,94,0.35)", bg: "rgba(34,197,94,0.07)", why: `all ${checksN} checks passing` }
+    ? { word: "ON TRACK", col: "var(--green)", bd: "rgba(0,200,5,0.35)", bg: "rgba(0,200,5,0.07)", why: `all ${checksN} checks passing` }
     : (ratioFails.length === 0 && tiersBehind.length > 0 && edgeAhead)
-      ? { word: "AHEAD ON EDGE · BEHIND ON SHAPE", col: "var(--goldBright)", bd: "rgba(240,192,80,0.35)", bg: "rgba(201,152,42,0.07)", why: `every ratio passes and your expectancy (${fmtEv(proj.evAct)}/trade) beats the design (${fmtEv(proj.evSim)}) — but ${tiersBehind.length} winner tier${tiersBehind.length === 1 ? " is" : "s are"} behind pace. The edge is being carried by a higher win rate and smaller losses, NOT the big winners the design counts on — it holds only while the win rate does. Land the tail to make it robust.` }
+      ? { word: "AHEAD ON EDGE · BEHIND ON SHAPE", col: "var(--orange)", bd: "rgba(255,170,5,0.35)", bg: "rgba(255,170,5,0.07)", why: `every ratio passes and your expectancy (${fmtEv(proj.evAct)}/trade) beats the design (${fmtEv(proj.evSim)}) — but ${tiersBehind.length} winner tier${tiersBehind.length === 1 ? " is" : "s are"} behind pace. The edge is being carried by a higher win rate and smaller losses, NOT the big winners the design counts on — it holds only while the win rate does. Land the tail to make it robust.` }
       : (tiersBehind.length === 0 && failList.length === 1)
-        ? { word: "DRIFTING", col: "var(--goldBright)", bd: "rgba(240,192,80,0.35)", bg: "rgba(201,152,42,0.07)", why: "1 check failing: " + failList[0] }
-        : { word: "OFF TRACK", col: "var(--red)", bd: "rgba(239,68,68,0.35)", bg: "rgba(239,68,68,0.07)", why: `${failList.length} of ${checksN} checks failing — ` + failList.join(" · ") };
+        ? { word: "DRIFTING", col: "var(--orange)", bd: "rgba(255,170,5,0.35)", bg: "rgba(255,170,5,0.07)", why: "1 check failing: " + failList[0] }
+        : { word: "OFF TRACK", col: "var(--red)", bd: "rgba(255,80,0,0.35)", bg: "rgba(255,80,0,0.07)", why: `${failList.length} of ${checksN} checks failing — ` + failList.join(" · ") };
   const GRID = "minmax(150px,1.5fr) minmax(120px,1fr) minmax(110px,1fr) 90px";
   const goDesign = () => { try { sessionStorage.setItem("viv-goto-sim", "1"); } catch { /* private mode */ } setPage && setPage("tools"); };
   // No design yet → the invitation, not an empty preset (member ask 2026-07-11)
   if (!pb.designed) return (
     <div className="card reveal" style={{ padding: "26px 24px", marginBottom: 18, textAlign: "center" }}>
-      <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--goldBright)", marginBottom: 8 }}>Design your playbook to track your performance live</div>
-      <div style={{ fontSize: "0.76rem", color: "var(--muted)", lineHeight: 1.7, maxWidth: 620, margin: "0 auto 14px" }}>
+      <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--white)", marginBottom: 8 }}>Design your playbook to track your performance live</div>
+      <div style={{ fontSize: "0.75rem", color: "var(--muted)", lineHeight: 1.7, maxWidth: 620, margin: "0 auto 14px" }}>
         Build your system in the Return Simulator — your win rate, average loss, winner sizes — then hit <b style={{ color: "var(--goldBright)" }}>💾 Save playbook design</b>.
         It becomes your benchmark here: one verdict, a design-vs-live scoreboard, and a winner ladder that checks the big winners are landing on schedule. The best feedback loop a trader can have.
       </div>
@@ -555,76 +1261,76 @@ function PlaybookTracker({ trades, uid, setPage }) {
     <div className="card reveal" style={{ padding: "16px 20px", marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
         <input value={pb.name} onChange={e => setPb(p => ({ ...p, name: e.target.value }))} title="Name your playbook"
-          style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, color: "var(--goldBright)", fontWeight: 800, fontSize: "0.86rem", padding: "5px 10px", minWidth: 200 }} />
+          style={{ background: "transparent", border: "1px solid var(--w10)", borderRadius: 8, color: "var(--white)", fontWeight: 800, fontSize: "0.875rem", padding: "5px 10px", minWidth: 200 }} />
         <span className="infodot" data-tip="Your saved trading plan vs what you're actually delivering — same trades, same math. Each metric gets a PASS or FAIL, and the winner ladder checks whether the big R-multiple wins are landing on schedule. Targets come from the design you saved in the Return Simulator.">i</span>
         <button className="distbtn" style={{ marginLeft: "auto" }} onClick={goDesign} title="Rework the design in the Return Simulator, then save — nothing here changes until you do">✎ Edit playbook design</button>
       </div>
       {/* ── ONE verdict — the whole card answered in a glance. The only loud colour on this card. ── */}
       <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "4px 12px", padding: "12px 16px", borderRadius: 12, background: verdict.bg, border: `1px solid ${verdict.bd}`, marginBottom: 12 }}>
-        <b style={{ color: verdict.col, fontSize: "0.95rem", fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{verdict.word}</b>
-        <span style={{ fontSize: "0.7rem", color: "var(--muted)", lineHeight: 1.5, flex: "1 1 220px", minWidth: 0 }}>{verdict.why}</span>
-        <span style={{ fontSize: "0.64rem", color: "var(--muted)", whiteSpace: "nowrap" }}>{m.n} closed trade{m.n === 1 ? "" : "s"} in this view</span>
+        <b style={{ color: verdict.col, fontSize: "1rem", fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{verdict.word}</b>
+        <span style={{ fontSize: "0.6875rem", color: "var(--muted)", lineHeight: 1.5, flex: "1 1 220px", minWidth: 0 }}>{verdict.why}</span>
+        <span style={{ fontSize: "0.6875rem", color: "var(--muted)", whiteSpace: "nowrap" }}>{m.n} closed trade{m.n === 1 ? "" : "s"} in this view</span>
       </div>
       {/* Progress through the design's trade count */}
       {pace && (
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, margin: "0 2px 10px" }}>
-          <span className="term" data-tip="Your playbook's math is defined over a total number of trades — the expectancy only shows up across the full count. This is how far through the design you are." style={{ fontSize: "0.74rem", fontWeight: 700 }}>
+          <span className="term" data-tip="Your playbook's math is defined over a total number of trades — the expectancy only shows up across the full count. This is how far through the design you are." style={{ fontSize: "0.75rem", fontWeight: 700 }}>
             Trades taken <b style={{ fontVariantNumeric: "tabular-nums" }}>{pace.taken.toLocaleString()} of {pace.total.toLocaleString()}</b>
           </span>
-          <div style={{ flex: "1 1 140px", minWidth: 100, height: 5, borderRadius: 4, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
-            <div style={{ width: (pace.frac * 100).toFixed(1) + "%", height: "100%", background: "var(--gold)" }} />
+          <div style={{ flex: "1 1 140px", minWidth: 100, height: 5, borderRadius: 4, background: "var(--w08)", overflow: "hidden" }}>
+            <div style={{ width: (pace.frac * 100).toFixed(1) + "%", height: "100%", background: "var(--w35)" }} />
           </div>
-          <span style={{ fontSize: "0.68rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{pace.remaining.toLocaleString()} to go · {(pace.frac * 100).toFixed(0)}%</span>
+          <span style={{ fontSize: "0.6875rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{pace.remaining.toLocaleString()} to go · {(pace.frac * 100).toFixed(0)}%</span>
         </div>
       )}
       {/* ── Scoreboard: design vs live. Numbers stay neutral — colour marks only the verdict. ── */}
-      <div style={{ display: "grid", gridTemplateColumns: GRID, gap: "0 10px", alignItems: "center", padding: "2px 6px 6px", fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: GRID, gap: "0 10px", alignItems: "center", padding: "2px 6px 6px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>
         <span>Metric</span><span>Your design</span><span>Live</span><span style={{ textAlign: "right" }}>Verdict</span>
       </div>
       {ROWS.map(r => (
-        <div key={r.k} style={{ display: "grid", gridTemplateColumns: GRID, gap: "2px 10px", alignItems: "center", padding: "9px 6px", borderTop: "1px solid rgba(255,255,255,0.05)", fontSize: "0.78rem", minWidth: 0 }}>
+        <div key={r.k} style={{ display: "grid", gridTemplateColumns: GRID, gap: "2px 10px", alignItems: "center", padding: "9px 6px", borderTop: "1px solid var(--w06)", fontSize: "0.75rem", minWidth: 0 }}>
           <span className="term" data-tip={r.tip} style={{ fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</span>
           <span style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.design}</span>
           <b style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.live ?? "—"}</b>
-          <span style={{ textAlign: "right", fontWeight: 800, fontSize: "0.62rem", whiteSpace: "nowrap", color: r.ok == null ? "var(--muted)" : r.ok ? "var(--green)" : "var(--red)" }}>{r.ok == null ? "—" : r.ok ? "✓ PASS" : "✕ MISS"}</span>
+          <span style={{ textAlign: "right", fontWeight: 800, fontSize: "0.6875rem", whiteSpace: "nowrap", color: r.ok == null ? "var(--muted)" : r.ok ? "var(--green)" : "var(--red)" }}>{r.ok == null ? "—" : r.ok ? "✓ PASS" : "✕ MISS"}</span>
         </div>
       ))}
       {/* ── Winner ladder — are the BIG winners landing on schedule? ── */}
       {pace && (
-        <div style={{ marginTop: 12, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px 14px", background: "rgba(255,255,255,0.015)" }}>
-          <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 2 }}>Winner ladder — are the big ones landing on schedule?</div>
+        <div style={{ marginTop: 12, border: "1px solid var(--w08)", borderRadius: 12, padding: "10px 14px", background: "var(--w02)" }}>
+          <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--faint)", marginBottom: 2 }}>Winner ladder — are the big ones landing on schedule?</div>
           {pace.tiers.map((tr, i) => {
             const due = tr.expectedNow; // unrounded — "0.5 due" is real information, never floored to 0
             return (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: GRID, gap: "2px 10px", alignItems: "center", padding: "8px 0", borderTop: i ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.76rem", minWidth: 0 }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: GRID, gap: "2px 10px", alignItems: "center", padding: "8px 0", borderTop: i ? "1px solid var(--w06)" : "none", fontSize: "0.75rem", minWidth: 0 }}>
                 <span className="term" data-tip={`The design plans ${tr.planned} winners of +${tr.gain}${pace.suffix} or larger across the full ${pace.total.toLocaleString()}-trade cycle. "Due by now" pro-rates that to your ${pace.taken.toLocaleString()} trades so far — a playbook dies silently when the big tiers stop landing while every ratio still looks fine.`} style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>+{tr.gain}{pace.suffix}+ winners</span>
                 <span style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{tr.planned} planned · {due < 10 ? due.toFixed(1) : Math.round(due)} due by now</span>
                 <b style={{ fontVariantNumeric: "tabular-nums" }}>{tr.actual} landed</b>
-                <span style={{ textAlign: "right", fontWeight: 800, fontSize: "0.62rem", whiteSpace: "nowrap", color: tr.ok ? "var(--green)" : "var(--red)" }}>{tr.ok ? "✓ ON PACE" : `✕ NEED ${Math.max(1, Math.ceil(due - tr.actual))} MORE`}</span>
+                <span style={{ textAlign: "right", fontWeight: 800, fontSize: "0.6875rem", whiteSpace: "nowrap", color: tr.ok ? "var(--green)" : "var(--red)" }}>{tr.ok ? "✓ ON PACE" : `✕ NEED ${Math.max(1, Math.ceil(due - tr.actual))} MORE`}</span>
               </div>
             );
           })}
-          {uR && m.noR > 0 && <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 6 }}>{m.noR} trade{m.noR === 1 ? "" : "s"} without a recorded R (no original stop) excluded from R-based rows — never guessed.</div>}
-          <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Every ratio above can pass while the design still fails — if the big winners aren't landing at pace, the expectancy math never materializes. This ladder is the honest check.</div>
+          {uR && m.noR > 0 && <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 6 }}>{m.noR} trade{m.noR === 1 ? "" : "s"} without a recorded R (no original stop) excluded from R-based rows — never guessed.</div>}
+          <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Every ratio above can pass while the design still fails — if the big winners aren't landing at pace, the expectancy math never materializes. This ladder is the honest check.</div>
         </div>
       )}
-      {!pace && <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 10, lineHeight: 1.5 }}>Re-save your design in the Return Simulator to unlock trade-count and winner-ladder pacing — older saves stored only the ratio targets.</div>}
+      {!pace && <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 10, lineHeight: 1.5 }}>Re-save your design in the Return Simulator to unlock trade-count and winner-ladder pacing — older saves stored only the ratio targets.</div>}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
-        <div style={{ fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, flex: 1 }}>Verdicts recompute from the same trades this page shows — use the date filter to score a specific period. Targets come from your saved design; change them in the Return Simulator.</div>
+        <div style={{ fontSize: "0.6875rem", color: "var(--muted)", lineHeight: 1.5, flex: 1 }}>Verdicts recompute from the same trades this page shows — use the date filter to score a specific period. Targets come from your saved design; change them in the Return Simulator.</div>
         <button className="distbtn" onClick={() => setMore(o => !o)}>{more ? "Hide projection ▴" : "Projection ▾"}</button>
       </div>
       {more && (
-        <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px 18px", fontSize: "0.74rem" }}>
+        <div style={{ marginTop: 12, borderTop: "1px solid var(--w06)", paddingTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px 18px", fontSize: "0.75rem" }}>
             <span className="term" data-tip={proj.unitR ? "Expectancy in R: the average R you'd make per trade — win-rate × avg win(R) − loss-rate × avg loss(R)." : "Expectancy: the average % you'd make per trade — win-rate × avg win − loss-rate × avg loss."} style={{ color: "var(--muted)" }}>Expectancy / trade</span>
             <span style={{ whiteSpace: "nowrap" }}>design <b style={{ fontVariantNumeric: "tabular-nums" }}>{proj.evSim == null ? "—" : (proj.evSim >= 0 ? "+" : "") + proj.evSim.toFixed(2) + proj.suffix}</b></span>
             <span style={{ whiteSpace: "nowrap" }}>you <b style={{ fontVariantNumeric: "tabular-nums" }}>{proj.evAct == null ? "—" : (proj.evAct >= 0 ? "+" : "") + proj.evAct.toFixed(2) + proj.suffix}</b></span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: "0.68rem", whiteSpace: "nowrap" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: "0.6875rem", whiteSpace: "nowrap" }}>
               at <input type="number" min={proj.unitR ? 0.1 : 1} max="100" step={proj.unitR ? 0.1 : 1} value={pb.simSize ?? (proj.unitR ? 0.5 : 15)} onChange={e => setPb(p => ({ ...p, simSize: e.target.value === "" ? "" : Number(e.target.value) }))}
-                style={{ width: 56, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: "var(--text)", padding: "3px 8px", fontSize: "0.7rem" }} /> {proj.sizeLabel}
+                style={{ width: 56, background: "var(--w04)", border: "1px solid var(--w10)", borderRadius: 7, color: "var(--text)", padding: "3px 8px", fontSize: "0.6875rem" }} /> {proj.sizeLabel}
             </span>
             {proj.evSim != null && proj.evAct != null && (
-              <b style={{ marginLeft: "auto", fontSize: "0.7rem", color: proj.evAct >= proj.evSim ? "var(--green)" : "var(--red)" }}>
+              <b style={{ marginLeft: "auto", fontSize: "0.6875rem", color: proj.evAct >= proj.evSim ? "var(--green)" : "var(--red)" }}>
                 {proj.evAct >= proj.evSim ? (tiersBehind.length ? "ahead on edge — shape behind (see ladder)" : "trading ahead of the design") : `lagging the design by ${(proj.evSim - proj.evAct).toFixed(2)}${proj.suffix}/trade`}
               </b>
             )}
@@ -636,7 +1342,7 @@ function PlaybookTracker({ trades, uid, setPage }) {
               another equally-likely future. INTERACTIVE: glide across to inspect any trade. */}
           {proj.evSim != null && proj.evAct != null && (() => {
             const projToggle = (
-              <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", fontSize: "0.6rem", fontWeight: 800 }} title="Switch the projection between cumulative R and compounded × equity">
+              <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", fontSize: "0.6875rem", fontWeight: 800 }} title="Switch the projection between cumulative R and compounded × equity">
                 {[["r", "R"], ["x", "× equity"]].map(([k, l]) => (
                   <button key={k} type="button" onClick={() => setProjView(k)} style={{ padding: "3px 10px", border: "none", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.04em", background: projView === k ? "rgba(240,192,80,0.14)" : "transparent", color: projView === k ? "var(--goldBright)" : "var(--muted)" }}>{l}</button>
                 ))}
@@ -660,8 +1366,8 @@ function PlaybookTracker({ trades, uid, setPage }) {
               return (
                 <div style={{ marginTop: 12 }}>
                   <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "2px 12px", marginBottom: 6 }}>
-                    <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)" }}>Cumulative R — {takenN} of {total} trades taken</span>
-                    <span style={{ fontSize: "0.7rem", color: h == null ? "var(--muted)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+                    <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>Cumulative R — {takenN} of {total} trades taken</span>
+                    <span style={{ fontSize: "0.6875rem", color: h == null ? "var(--muted)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
                       {h == null
                         ? (gap == null ? "glide across the chart to inspect any trade" : <b style={{ color: gap >= 0 ? "var(--green)" : "var(--red)" }}>{gap >= 0 ? "ahead of" : "behind"} the design by {Math.abs(gap).toFixed(1)}R at trade {takenN}</b>)
                         : <>trade {h} · design <b style={{ color: "var(--goldBright)" }}>{desAtH == null ? "—" : (desAtH >= 0 ? "+" : "") + desAtH.toFixed(1) + "R"}</b> · you <b>{actAtH == null ? "—" : (actAtH >= 0 ? "+" : "") + actAtH.toFixed(1) + "R"}</b></>}
@@ -669,35 +1375,35 @@ function PlaybookTracker({ trades, uid, setPage }) {
                     <span style={{ marginLeft: "auto" }} />
                     {projToggle}
                   </div>
-                  <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 10px", background: "rgba(255,255,255,0.015)", touchAction: "none", cursor: "crosshair" }}
+                  <div style={{ border: "1px solid var(--w08)", borderRadius: 12, padding: "8px 10px", background: "var(--w02)", touchAction: "none", cursor: "crosshair" }}
                     onPointerMove={e => { const r = e.currentTarget.getBoundingClientRect(); const f = Math.min(1, Math.max(0, (e.clientX - r.left - 10) / Math.max(1, r.width - 20))); setHov(Math.round(f * total)); }}
                     onPointerLeave={() => setHov(null)}>
                     <svg viewBox="0 0 600 180" style={{ width: "100%", height: 160, display: "block" }} preserveAspectRatio="none" role="img" aria-label="Design vs actual cumulative R">
-                      <line x1="0" y1={Y(0).toFixed(1)} x2="600" y2={Y(0).toFixed(1)} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                      <line x1="0" y1={Y(0).toFixed(1)} x2="600" y2={Y(0).toFixed(1)} stroke="var(--w08)" strokeWidth="1" />
                       {band && <path d={"M" + band.map((b, i) => `${X(i).toFixed(1)},${Y(b[1]).toFixed(1)}`).join(" L") + " L" + band.slice().reverse().map((b, i) => `${X(total - i).toFixed(1)},${Y(b[0]).toFixed(1)}`).join(" L") + " Z"} fill="rgba(201,152,42,0.08)" stroke="none" />}
                       {designR != null && takenN > 0 && (() => {
                         const top = [], bot = [];
                         for (let i = 0; i <= takenN; i++) { top.push(`${X(i).toFixed(1)},${Y(i * designR).toFixed(1)}`); bot.push(`${X(takenN - i).toFixed(1)},${Y(cumByTrade[takenN - i]).toFixed(1)}`); }
-                        return <path d={"M" + top.join(" L") + " L" + bot.join(" L") + " Z"} fill={gap >= 0 ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.06)"} stroke="none" />;
+                        return <path d={"M" + top.join(" L") + " L" + bot.join(" L") + " Z"} fill={gap >= 0 ? "rgba(0,200,5,0.06)" : "rgba(255,80,0,0.06)"} stroke="none" />;
                       })()}
                       {desEnd != null && <line x1={X(0).toFixed(1)} y1={Y(0).toFixed(1)} x2={X(total).toFixed(1)} y2={Y(desEnd).toFixed(1)} stroke="var(--goldBright)" strokeWidth="2" vectorEffect="non-scaling-stroke" />}
-                      <path d={"M" + cumByTrade.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" L")} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                      {takenN > 0 && <circle cx={X(takenN).toFixed(1)} cy={Y(actualCumR).toFixed(1)} r="4" fill="#ffffff" />}
+                      <path d={"M" + cumByTrade.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" L")} fill="none" stroke="var(--w82)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                      {takenN > 0 && <circle cx={X(takenN).toFixed(1)} cy={Y(actualCumR).toFixed(1)} r="4" fill="var(--white)" />}
                       {h != null && (<>
-                        <line x1={X(h).toFixed(1)} y1="0" x2={X(h).toFixed(1)} y2="180" stroke="rgba(255,255,255,0.22)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                        <line x1={X(h).toFixed(1)} y1="0" x2={X(h).toFixed(1)} y2="180" stroke="var(--w22)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
                         {desAtH != null && <circle cx={X(h).toFixed(1)} cy={Y(desAtH).toFixed(1)} r="3.5" fill="var(--goldBright)" />}
-                        {actAtH != null && <circle cx={X(h).toFixed(1)} cy={Y(actAtH).toFixed(1)} r="3.5" fill="#ffffff" />}
+                        {actAtH != null && <circle cx={X(h).toFixed(1)} cy={Y(actAtH).toFixed(1)} r="3.5" fill="var(--white)" />}
                       </>)}
                     </svg>
                   </div>
-                  {takenN > 0 && <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 4 }}>◗ you are here — trade {takenN} of {total}, cumulative <b style={{ color: actualCumR >= 0 ? "var(--green)" : "var(--red)" }}>{(actualCumR >= 0 ? "+" : "") + actualCumR.toFixed(1)}R</b></div>}
-                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "0.64rem", color: "var(--muted)", marginTop: 6 }}>
+                  {takenN > 0 && <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 4 }}>◗ you are here — trade {takenN} of {total}, cumulative <b style={{ color: actualCumR >= 0 ? "var(--green)" : "var(--red)" }}>{(actualCumR >= 0 ? "+" : "") + actualCumR.toFixed(1)}R</b></div>}
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "0.6875rem", color: "var(--muted)", marginTop: 6 }}>
                     {designR != null && <span className="term" data-tip="The design's expectancy per trade in R, drawn straight — where a system with your planned win rate, average loss and winner tiers should sit after each trade."><i style={{ display: "inline-block", width: 12, height: 2, background: "var(--goldBright)", verticalAlign: "middle", marginRight: 5 }} />design slope <b style={{ color: "var(--goldBright)" }}>{(designR >= 0 ? "+" : "") + designR.toFixed(2)}R/trade</b></span>}
                     {band && <span className="term" data-tip="120 Monte-Carlo runs of the design's exact trade mix in R — 80% of futures stay inside this cone. Judge yourself against the BAND, not one line."><i style={{ display: "inline-block", width: 12, height: 8, background: "rgba(201,152,42,0.25)", verticalAlign: "middle", marginRight: 5 }} />band = 80% of design futures</span>}
-                    <span className="term" data-tip="Your real closed trades in order, cumulative sum of R — only trades with a recorded R count."><i style={{ display: "inline-block", width: 12, height: 2, background: "rgba(255,255,255,0.75)", verticalAlign: "middle", marginRight: 5 }} />your actual cumulative R → <b>{(actualCumR >= 0 ? "+" : "") + actualCumR.toFixed(1)}R</b></span>
+                    <span className="term" data-tip="Your real closed trades in order, cumulative sum of R — only trades with a recorded R count."><i style={{ display: "inline-block", width: 12, height: 2, background: "var(--w82)", verticalAlign: "middle", marginRight: 5 }} />your actual cumulative R → <b>{(actualCumR >= 0 ? "+" : "") + actualCumR.toFixed(1)}R</b></span>
                   </div>
-                  {noR > 0 && <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 5 }}>{noR} trade{noR === 1 ? "" : "s"} without a recorded R excluded — never guessed.</div>}
-                  {designR == null && <div style={{ fontSize: "0.62rem", color: "var(--muted)", marginTop: 5 }}>Design line &amp; band need an R-unit design — switch the Return Simulator to R multiples to see them here.</div>}
+                  {noR > 0 && <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 5 }}>{noR} trade{noR === 1 ? "" : "s"} without a recorded R excluded — never guessed.</div>}
+                  {designR == null && <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 5 }}>Design line &amp; band need an R-unit design — switch the Return Simulator to R multiples to see them here.</div>}
                 </div>
               );
             }
@@ -738,33 +1444,33 @@ function PlaybookTracker({ trades, uid, setPage }) {
             return (
               <div style={{ marginTop: 12 }}>
                 <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "2px 12px", marginBottom: 6 }}>
-                  <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)" }}>Projected equity — next 100 trades, simulated</span>
-                  <span style={{ fontSize: "0.7rem", color: h == null ? "var(--muted)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>Projected equity — next 100 trades, simulated</span>
+                  <span style={{ fontSize: "0.6875rem", color: h == null ? "var(--muted)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
                     {h == null ? "glide across the chart to inspect any trade" : <>trade {h} · design <b style={{ color: "var(--goldBright)" }}>×{simC[h].toFixed(3)}</b> · you <b>×{actC[h].toFixed(3)}</b> · gap <b style={{ color: actC[h] >= simC[h] ? "var(--green)" : "var(--red)" }}>{(actC[h] - simC[h] >= 0 ? "+" : "") + (actC[h] - simC[h]).toFixed(3)}</b></>}
                   </span>
                   <span style={{ marginLeft: "auto" }} />
-                  {paths && <button className="distbtn" style={{ fontSize: "0.62rem", padding: "3px 10px" }} onClick={() => setRoll(r => r + 1)} title="Both lines are ONE possible future drawn from the trade mix — roll the dice again to see another equally-likely path">↻ another future</button>}
+                  {paths && <button className="distbtn" style={{ fontSize: "0.6875rem", padding: "3px 10px" }} onClick={() => setRoll(r => r + 1)} title="Both lines are ONE possible future drawn from the trade mix — roll the dice again to see another equally-likely path">↻ another future</button>}
                   {projToggle}
                 </div>
-                <div style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "8px 10px", background: "rgba(255,255,255,0.015)", touchAction: "none", cursor: "crosshair" }}
+                <div style={{ border: "1px solid var(--w08)", borderRadius: 12, padding: "8px 10px", background: "var(--w02)", touchAction: "none", cursor: "crosshair" }}
                   onPointerMove={e => { const r = e.currentTarget.getBoundingClientRect(); const f = Math.min(1, Math.max(0, (e.clientX - r.left - 10) / Math.max(1, r.width - 20))); setHov(Math.round(f * N)); }}
                   onPointerLeave={() => setHov(null)}>
                   <svg viewBox="0 0 600 180" style={{ width: "100%", height: 160, display: "block" }} preserveAspectRatio="none" role="img" aria-label="Designed vs actual projected equity">
-                    <line x1="0" y1={Y(1).toFixed(1)} x2="600" y2={Y(1).toFixed(1)} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+                    <line x1="0" y1={Y(1).toFixed(1)} x2="600" y2={Y(1).toFixed(1)} stroke="var(--w08)" strokeWidth="1" />
                     {band && <path d={"M" + band.map((b, i) => `${X(i).toFixed(1)},${Y(b[1]).toFixed(1)}`).join(" L") + " L" + band.slice().reverse().map((b, i) => `${X(N - i).toFixed(1)},${Y(b[0]).toFixed(1)}`).join(" L") + " Z"} fill="rgba(201,152,42,0.08)" stroke="none" />}
                     <path d={path(simC)} fill="none" stroke="var(--goldBright)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                    <path d={path(actC)} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeDasharray="5 3" vectorEffect="non-scaling-stroke" />
+                    <path d={path(actC)} fill="none" stroke="var(--w55)" strokeWidth="2" strokeDasharray="5 3" vectorEffect="non-scaling-stroke" />
                     {h != null && (<>
-                      <line x1={X(h).toFixed(1)} y1="0" x2={X(h).toFixed(1)} y2="180" stroke="rgba(255,255,255,0.22)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                      <line x1={X(h).toFixed(1)} y1="0" x2={X(h).toFixed(1)} y2="180" stroke="var(--w22)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
                       <circle cx={X(h).toFixed(1)} cy={Y(simC[h]).toFixed(1)} r="3.5" fill="var(--goldBright)" />
-                      <circle cx={X(h).toFixed(1)} cy={Y(actC[h]).toFixed(1)} r="3.5" fill="#ffffff" />
+                      <circle cx={X(h).toFixed(1)} cy={Y(actC[h]).toFixed(1)} r="3.5" fill="var(--white)" />
                     </>)}
                   </svg>
                 </div>
-                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "0.64rem", color: "var(--muted)", marginTop: 6 }}>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "0.6875rem", color: "var(--muted)", marginTop: 6 }}>
                   <span className="term" data-tip={paths ? "One simulated run of the design's exact trade mix — its losses, small wins and homers in random order. The jagged dips are REAL: they're the drawdowns your design implies even when it works." : "Smooth expectancy compounding (re-save your design in the simulator to unlock the trade-mix simulation)."}><i style={{ display: "inline-block", width: 12, height: 2, background: "var(--goldBright)", verticalAlign: "middle", marginRight: 5 }} />the design, one run of {N} trades → <b style={{ color: "var(--goldBright)" }}>×{simC[N].toFixed(2)}</b></span>
                   {paths && <span className="term" data-tip="120 simulated runs of the same design — 80% of futures end inside this band. Judge yourself against the BAND, not one line."><i style={{ display: "inline-block", width: 12, height: 8, background: "rgba(201,152,42,0.25)", verticalAlign: "middle", marginRight: 5 }} />80% of design futures → median <b style={{ color: "var(--goldBright)" }}>×{medSim.toFixed(2)}</b>, band ×{finals[Math.floor(RUNS * 0.1)].toFixed(2)}–×{finals[Math.floor(RUNS * 0.9)].toFixed(2)}</span>}
-                  <span className="term" data-tip="The same 100 trades drawn from YOUR actual recorded outcomes instead of the design's — what continuing to trade exactly as you have would look like."><i style={{ display: "inline-block", width: 12, height: 2, background: "rgba(255,255,255,0.55)", verticalAlign: "middle", marginRight: 5 }} />your actual trade mix, one run → <b>×{actC[N].toFixed(2)}</b></span>
+                  <span className="term" data-tip="The same 100 trades drawn from YOUR actual recorded outcomes instead of the design's — what continuing to trade exactly as you have would look like."><i style={{ display: "inline-block", width: 12, height: 2, background: "var(--w55)", verticalAlign: "middle", marginRight: 5 }} />your actual trade mix, one run → <b>×{actC[N].toFixed(2)}</b></span>
                 </div>
               </div>
             );
@@ -776,6 +1482,17 @@ function PlaybookTracker({ trades, uid, setPage }) {
 }
 
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "August 6, 2026",
+    title: "A brand-new look — the whole app, redesigned",
+    items: [
+      "Everything has been redrawn around one idea: your money first, at a glance. The dashboard now opens with your equity as one big number, your open profit right under it, and your equity curve below — drag along the curve to see the value at any point, and use the 1W · 1M · 3M · YTD · ALL chips to change the window.",
+      "Your open positions moved above the market plan, each with its protection status spelled out — At Risk in red, Risk-Free in blue, Profit Locked in green — the same three colors everywhere in the app, so one glance always means the same thing.",
+      "Cleaner everywhere else too: quieter headers, thinner lines, smoother movement, and numbers that are easier to read on every page. Every feature is exactly where it was — nothing was removed.",
+      "The Live Trades panel now opens instantly.",
+    ],
+  },
   {
     tag: "New",
     date: "August 6, 2026",
@@ -808,7 +1525,7 @@ const WHATS_NEW = [
       "Position size now shows the % of your account above the dollar amount — see concentration at a glance.",
       "The Grade column is retired from Open Positions (your grades still live in Manage, trade views and the Setup Grader).",
       "Risk Allocation is now an energy bar — it fills as you deploy risk, turns gold past 70% and red when you're over budget. Much easier to read than the old ring.",
-      "The position count next to 'Open Positions' now splits by status color: red = At Risk, gold = Risk-Free, green = Profit Locked. One glance tells you how protected your book is.",
+      "The position count next to 'Open Positions' now splits by status color: red = At Risk, blue = Risk-Free, green = Profit Locked. One glance tells you how protected your book is.",
       "New Exposure figure in the risk strip — the total dollars across all your open positions and its % of account, right beside Risk-Free.",
     ],
   },
@@ -1401,14 +2118,14 @@ function WhatsNew() {
         {unread && <span style={{ position: "absolute", top: 5, right: 6, width: 7, height: 7, borderRadius: "50%", background: C.goldBright, boxShadow: `0 0 8px ${C.goldBright}` }} />}
       </button>
       {open && (
-        <div onClick={closeModal} className="viv-wn-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "6vh 16px", overflowY: "auto", animation: (closing ? "wnOverlayOut" : "wnOverlayIn") + " 0.2s ease forwards" }}>
-          <div onClick={e => e.stopPropagation()} className="viv-wn-card" style={{ width: 580, maxWidth: "100%", background: C.bg2, border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "24px 28px 28px", boxShadow: "0 30px 80px rgba(0,0,0,0.6)", fontFamily: font, animation: (closing ? "wnCardOut 0.2s cubic-bezier(0.4,0,1,1)" : "wnCardIn 0.28s cubic-bezier(0.22,1,0.36,1)") + " forwards" }}>
+        <div onClick={closeModal} className="viv-wn-overlay" style={{ position: "fixed", inset: 0, background: "var(--scrim)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "6vh 16px", overflowY: "auto", animation: (closing ? "wnOverlayOut" : "wnOverlayIn") + " var(--t-med) var(--ease) forwards" }}>
+          <div onClick={e => e.stopPropagation()} className="viv-wn-card" style={{ width: 580, maxWidth: "100%", background: C.bg2, border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "24px 28px 28px", boxShadow: "var(--shadowOv)", fontFamily: font, animation: (closing ? "wnCardOut var(--t-med) var(--ease)" : "wnCardIn var(--t-med) var(--ease)") + " forwards" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 18 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>What's New</div>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--faint)", marginBottom: 6 }}>What's New</div>
                 <div style={{ fontSize: "1.25rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white }}>Product updates</div>
               </div>
-              <button onClick={closeModal} aria-label="Close" style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.5rem", lineHeight: 1, cursor: "pointer", padding: 0, width: 38, height: 38, flex: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>&times;</button>
+              <button onClick={closeModal} aria-label="Close" style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.25rem", lineHeight: 1, cursor: "pointer", padding: 0, width: 38, height: 38, flex: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>&times;</button>
             </div>
             {/* Grouped by date (Valen 2026-07-24): one date header + one NEW badge per DAY, then all that
                 day's entries beneath (title + items, no repeated date). Same-day updates no longer repeat the
@@ -1419,17 +2136,17 @@ function WhatsNew() {
               return groups.map((g, gi) => (
                 <div key={gi} style={{ paddingTop: gi ? 20 : 0, marginTop: gi ? 20 : 0, borderTop: gi ? `1px solid ${C.border}` : "none" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                    <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.goldBright, background: C.goldDim, border: `1px solid ${C.borderGold}`, borderRadius: 980, padding: "2px 9px" }}>{g.tag}</span>
-                    <span style={{ fontSize: "0.7rem", color: C.muted, fontWeight: 600 }}>🆕 {g.date}</span>
+                    <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.text, background: "var(--w06)", border: "1px solid var(--w14)", borderRadius: 980, padding: "2px 9px" }}>{g.tag}</span>
+                    <span style={{ fontSize: "0.6875rem", color: C.muted, fontWeight: 600 }}>🆕 {g.date}</span>
                   </div>
                   {g.entries.map((e, ei) => (
-                    <div key={ei} style={{ paddingTop: ei ? 14 : 0, marginTop: ei ? 14 : 0, borderTop: ei ? `1px solid rgba(255,255,255,0.05)` : "none" }}>
+                    <div key={ei} style={{ paddingTop: ei ? 14 : 0, marginTop: ei ? 14 : 0, borderTop: ei ? `1px solid var(--w06)` : "none" }}>
                       <div style={{ fontSize: "1rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em", marginBottom: 12 }}>{e.title}</div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                         {e.items.map((it, j) => (
                           <div key={j} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                             <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.goldBright, marginTop: 7, flex: "none", boxShadow: `0 0 8px ${C.goldBright}` }} />
-                            <span style={{ fontSize: "0.82rem", color: C.text, lineHeight: 1.55 }}>{it}</span>
+                            <span style={{ fontSize: "0.875rem", color: C.text, lineHeight: 1.55 }}>{it}</span>
                           </div>
                         ))}
                       </div>
@@ -1476,24 +2193,24 @@ function HeaderControls({ onLogout, inline, demoMode = false, onToggleDemo }) {
       {!inline && <style dangerouslySetInnerHTML={{ __html: `.vp .navbar,.vj .navbar,.vd .navbar,.vs .navbar{padding-right:430px}` }} />}
       <WhatsNew />
       <button onClick={() => broadcastUiMode(pro ? "guided" : "pro")} title={pro ? "Pro Mode is on — click for Guided (plain-English explainers everywhere)" : "Pro Mode is off — click to strip the guided teaching layer"}
-        style={{ display: "inline-flex", alignItems: "center", gap: 8, background: pro ? C.goldDim : "rgba(255,255,255,0.05)", border: `1px solid ${pro ? C.borderGold : C.border}`, borderRadius: 980, padding: "6px 10px 6px 13px", cursor: "pointer", fontFamily: font, transition: "background .18s, border-color .18s" }}>
-        <span className="hcLabel" style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: pro ? C.goldBright : C.muted, whiteSpace: "nowrap" }}>Pro Mode</span>
-        <span style={{ position: "relative", width: 32, height: 17, borderRadius: 980, background: pro ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.14)", transition: "background .18s", flex: "none" }}>
-          <span style={{ position: "absolute", top: 2, left: pro ? 17 : 2, width: 13, height: 13, borderRadius: "50%", background: pro ? "#08080e" : "rgba(255,255,255,0.75)", transition: "left .18s" }} />
+        style={{ display: "inline-flex", alignItems: "center", gap: 8, background: pro ? C.goldDim : "var(--w06)", border: `1px solid ${pro ? C.borderGold : C.border}`, borderRadius: 980, padding: "6px 10px 6px 13px", cursor: "pointer", fontFamily: font, transition: "background .18s, border-color .18s" }}>
+        <span className="hcLabel" style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: pro ? C.goldBright : C.muted, whiteSpace: "nowrap" }}>Pro Mode</span>
+        <span style={{ position: "relative", width: 32, height: 17, borderRadius: 980, background: pro ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "var(--w14)", transition: "background .18s", flex: "none" }}>
+          <span style={{ position: "absolute", top: 2, left: pro ? 17 : 2, width: 13, height: 13, borderRadius: "50%", background: pro ? "var(--goldOn)" : "var(--w82)", transition: "left .18s" }} />
         </span>
-        <span className="hcLabel" style={{ fontSize: "0.62rem", fontWeight: 800, width: 20, textAlign: "left", color: pro ? C.goldBright : C.muted }}>{pro ? "On" : "Off"}</span>
+        <span className="hcLabel" style={{ fontSize: "0.6875rem", fontWeight: 800, width: 20, textAlign: "left", color: pro ? C.goldBright : C.muted }}>{pro ? "On" : "Off"}</span>
       </button>
       {onToggleDemo && (
         <button onClick={onToggleDemo} title={demoMode ? "Demo mode is ON — the whole app is your practice book. Click to return to your real book." : "Switch the whole app to your demo book — practice positions and trades, fully separate from the real ones."}
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, background: demoMode ? "rgba(124,92,255,0.18)" : "rgba(255,255,255,0.05)", border: `1px solid ${demoMode ? DV : C.border}`, borderRadius: 980, padding: "6px 10px 6px 13px", cursor: "pointer", fontFamily: font, transition: "background .18s, border-color .18s" }}>
-          <span style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: demoMode ? "#a78bfa" : C.muted, whiteSpace: "nowrap" }}>🎮<span className="hcLabel"> Demo</span></span>
-          <span style={{ position: "relative", width: 32, height: 17, borderRadius: 980, background: demoMode ? `linear-gradient(135deg, #a78bfa, ${DV})` : "rgba(255,255,255,0.14)", transition: "background .18s", flex: "none" }}>
-            <span style={{ position: "absolute", top: 2, left: demoMode ? 17 : 2, width: 13, height: 13, borderRadius: "50%", background: demoMode ? "#08080e" : "rgba(255,255,255,0.75)", transition: "left .18s" }} />
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, background: demoMode ? "rgba(124,92,255,0.18)" : "var(--w06)", border: `1px solid ${demoMode ? DV : C.border}`, borderRadius: 980, padding: "6px 10px 6px 13px", cursor: "pointer", fontFamily: font, transition: "background .18s, border-color .18s" }}>
+          <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: demoMode ? "#a78bfa" : C.muted, whiteSpace: "nowrap" }}>🎮<span className="hcLabel"> Demo</span></span>
+          <span style={{ position: "relative", width: 32, height: 17, borderRadius: 980, background: demoMode ? `linear-gradient(135deg, #a78bfa, ${DV})` : "var(--w14)", transition: "background .18s", flex: "none" }}>
+            <span style={{ position: "absolute", top: 2, left: demoMode ? 17 : 2, width: 13, height: 13, borderRadius: "50%", background: demoMode ? "var(--goldOn)" : "var(--w82)", transition: "left .18s" }} />
           </span>
-          <span className="hcLabel" style={{ fontSize: "0.62rem", fontWeight: 800, width: 20, textAlign: "left", color: demoMode ? "#a78bfa" : C.muted }}>{demoMode ? "On" : "Off"}</span>
+          <span className="hcLabel" style={{ fontSize: "0.6875rem", fontWeight: 800, width: 20, textAlign: "left", color: demoMode ? "#a78bfa" : C.muted }}>{demoMode ? "On" : "Off"}</span>
         </button>
       )}
-      {!inline && <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer", whiteSpace: "nowrap" }}>Sign out</button>}
+      {!inline && <button onClick={() => onLogout && onLogout()} title="Sign out" style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.75rem", fontWeight: 700, padding: "7px 14px", borderRadius: 980, cursor: "pointer", whiteSpace: "nowrap" }}>Sign out</button>}
     </div>
   );
 }
@@ -1552,13 +2269,13 @@ function StatTile({ label, value, color, prefix, sub, big, tip }) {
   const animated = useCountUp(display);
   const len = display.length;
   const fs = big
-    ? (len > 15 ? "1.2rem" : len > 12 ? "1.45rem" : len > 8 ? "1.72rem" : "1.95rem")
-    : (len > 14 ? "0.94rem" : len > 11 ? "1.08rem" : len > 8 ? "1.2rem" : "1.34rem");
+    ? (len > 15 ? "1.4rem" : len > 12 ? "1.7rem" : len > 8 ? "1.9rem" : "2rem")
+    : (len > 14 ? "1.15rem" : len > 11 ? "1.3rem" : len > 8 ? "1.45rem" : "1.625rem");
   return (
-    <GlassCard small className="viv-tile-enter viv-lift" style={{ padding: big ? "22px 24px" : "18px 20px", minHeight: big ? 118 : 98, height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", boxSizing: "border-box" }}>
-      <div style={{ fontWeight: 700, fontSize: big ? "0.62rem" : "0.57rem", letterSpacing: "0.13em", textTransform: "uppercase", color: C.muted, marginBottom: big ? 10 : 8 }}>{tip ? <Abbr tip={tip} underline={false}>{label}</Abbr> : label}</div>
-      <div style={{ fontWeight: 800, fontSize: fs, letterSpacing: "-0.035em", color: color || C.white, whiteSpace: "nowrap", transition: "color 0.3s" }}>{animated}</div>
-      {sub && <div style={{ fontWeight: 500, fontSize: big ? "0.68rem" : "0.64rem", color: C.muted, marginTop: 7 }}>{sub}</div>}
+    <GlassCard small className="viv-tile-enter" style={{ padding: big ? "22px 24px" : "20px 22px", minHeight: big ? 118 : 98, height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", boxSizing: "border-box" }}>
+      <div style={{ fontWeight: 500, fontSize: "0.75rem", letterSpacing: 0, color: C.muted, marginBottom: big ? 10 : 8 }}>{tip ? <Abbr tip={tip} underline={false}>{label}</Abbr> : label}</div>
+      <div style={{ fontWeight: 500, fontFamily: font, fontSize: fs, letterSpacing: "-0.025em", color: color || C.white, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", transition: "color 0.3s" }}>{animated}</div>
+      {sub && <div style={{ fontWeight: 500, fontSize: "0.75rem", color: C.muted, marginTop: 7 }}>{sub}</div>}
     </GlassCard>
   );
 }
@@ -1567,12 +2284,12 @@ function ChartTip({ active, payload, label, fmt }) {
   if (!active || !payload || !payload.length) return null;
   return (
     <div style={{ background: "rgba(12,12,20,0.97)", border: `1px solid ${C.borderGold}`, borderRadius: 10, padding: "9px 12px", boxShadow: "0 10px 34px rgba(0,0,0,0.65)", fontFamily: font, minWidth: 132 }}>
-      <div style={{ fontSize: "0.58rem", fontWeight: 700, color: C.gold, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: "0.6875rem", fontWeight: 500, color: "var(--faint)", letterSpacing: 0, marginBottom: 6 }}>{label}</div>
       {payload.map((p, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: i ? 5 : 0 }}>
           <span style={{ width: 9, height: 9, borderRadius: 3, background: p.color || p.stroke || C.gold, flexShrink: 0 }} />
-          <span style={{ fontSize: "0.66rem", color: C.muted, flex: 1, whiteSpace: "nowrap" }}>{p.name}</span>
-          <span style={{ fontSize: "0.74rem", color: C.white, fontWeight: 700 }}>{fmt ? fmt(p.value) : p.value}</span>
+          <span style={{ fontSize: "0.6875rem", color: C.muted, flex: 1, whiteSpace: "nowrap" }}>{p.name}</span>
+          <span style={{ fontSize: "0.75rem", color: C.white, fontWeight: 700 }}>{fmt ? fmt(p.value) : p.value}</span>
         </div>
       ))}
     </div>
@@ -1592,11 +2309,11 @@ function Abbr({ children, tip, underline = true }) {
   return (
     <>
       <span ref={ref} onMouseEnter={enter} onMouseLeave={() => setShow(false)}
-        style={{ borderBottom: underline ? "1px dotted rgba(255,255,255,0.32)" : "none", cursor: "help" }}>
+        style={{ borderBottom: underline ? "1px dotted var(--w35)" : "none", cursor: "help" }}>
         {children}
       </span>
       {show && createPortal(
-        <div style={{ position: "fixed", left: pos.x, top: pos.y, transform: "translate(-50%,-100%) translateY(-9px)", background: "rgba(12,12,20,0.98)", border: `1px solid ${C.borderGold}`, borderRadius: 8, padding: "8px 12px", fontSize: "0.68rem", fontWeight: 500, color: C.text, fontFamily: font, maxWidth: 252, lineHeight: 1.55, boxShadow: "0 12px 34px rgba(0,0,0,0.7)", zIndex: 99999, pointerEvents: "none", textTransform: "none", letterSpacing: "normal" }}>
+        <div style={{ position: "fixed", left: pos.x, top: pos.y, transform: "translate(-50%,-100%) translateY(-9px)", background: "rgba(12,12,20,0.98)", border: `1px solid ${C.borderGold}`, borderRadius: 8, padding: "8px 12px", fontSize: "0.6875rem", fontWeight: 500, color: C.text, fontFamily: font, maxWidth: 252, lineHeight: 1.55, boxShadow: "0 12px 34px rgba(0,0,0,0.7)", zIndex: 99999, pointerEvents: "none", textTransform: "none", letterSpacing: "normal" }}>
           {tip}
         </div>,
         document.body
@@ -1610,20 +2327,20 @@ function SliderRow({ label, min, max, step, value, onChange, suffix = "", calcTe
     <div style={{ marginBottom: 20 }}>
       <style>{sliderCSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
-        <div style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted }}>{label}</div>
-        {calcText && <div style={{ fontWeight: 600, fontSize: "0.76rem", color: C.goldBright }}>{calcText}</div>}
+        <div style={{ fontWeight: 500, fontSize: "0.6875rem", letterSpacing: 0, color: C.muted }}>{label}</div>
+        {calcText && <div style={{ fontWeight: 600, fontSize: "0.75rem", color: C.white }}>{calcText}</div>}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <div style={{ flex: 1 }}>
           <input type="range" className="viv-slider" min={min} max={max} step={step} value={value} onChange={e => onChange(+e.target.value)}
-            style={{ width: "100%", background: `linear-gradient(to right, ${C.gold} 0%, ${C.gold} ${pct}%, rgba(255,255,255,0.06) ${pct}%, rgba(255,255,255,0.06) 100%)` }} />
+            style={{ width: "100%", background: `linear-gradient(to right, ${C.gold} 0%, ${C.gold} ${pct}%, var(--w06) ${pct}%, var(--w06) 100%)` }} />
         </div>
         <div style={{ position: "relative", flexShrink: 0 }}>
           <input type="number" min={min} max={max} step={step} value={value}
             onChange={e => { let v = +e.target.value; if (v >= min && v <= max) onChange(v); }}
-            style={{ width: 58, boxSizing: "border-box", textAlign: "center", background: C.goldDim, border: `1px solid ${C.borderGold}`, borderRadius: 10, padding: "9px 4px", color: C.goldBright, fontSize: "0.88rem", fontWeight: 800, fontFamily: font, outline: "none" }}
+            style={{ width: 58, boxSizing: "border-box", textAlign: "center", background: C.goldDim, border: `1px solid ${C.borderGold}`, borderRadius: 10, padding: "9px 4px", color: C.white, fontSize: "0.875rem", fontWeight: 800, fontFamily: font, outline: "none" }}
             onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.borderGold} />
-          {suffix && <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: C.gold, fontSize: "0.62rem", fontWeight: 700, pointerEvents: "none" }}>{suffix}</span>}
+          {suffix && <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", color: C.muted, fontSize: "0.6875rem", fontWeight: 700, pointerEvents: "none" }}>{suffix}</span>}
         </div>
       </div>
     </div>
@@ -1632,11 +2349,11 @@ function SliderRow({ label, min, max, step, value, onChange, suffix = "", calcTe
 
 // ─── Tag Chip + Tag Selector ───
 function TagChip({ label, color, onRemove, small }) {
-  const c = color || C.gold;
+  const c = color || C.muted;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: small ? "2px 7px" : "3px 10px", borderRadius: 980, fontSize: small ? "0.52rem" : "0.58rem", fontWeight: 600, background: `${c}18`, color: c, border: `1px solid ${c}33`, whiteSpace: "nowrap" }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: small ? "3px 9px" : "4px 11px", borderRadius: 999, fontSize: small ? "0.6875rem" : "0.75rem", fontWeight: 500, background: `${c}18`, color: c, border: `1px solid ${c}33`, whiteSpace: "nowrap" }}>
       {label}
-      {onRemove && <span onClick={onRemove} style={{ cursor: "pointer", opacity: 0.6, fontSize: "0.7rem", lineHeight: 1 }}>&times;</span>}
+      {onRemove && <span onClick={onRemove} style={{ cursor: "pointer", opacity: 0.6, fontSize: "0.6875rem", lineHeight: 1 }}>&times;</span>}
     </span>
   );
 }
@@ -1647,14 +2364,14 @@ function TagSelector({ selected, allTags, onChange, small }) {
     <div style={{ position: "relative", display: "inline-flex", flexWrap: "wrap", gap: 3, alignItems: "center" }}>
       {selected.map(t => <TagChip key={t} label={t} small={small} onRemove={() => onChange(selected.filter(s => s !== t))} />)}
       {available.length > 0 && (
-        <button onClick={() => setOpen(!open)} style={{ padding: "2px 6px", borderRadius: 6, border: `1px dashed ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.56rem", cursor: "pointer", fontFamily: font }}>+</button>
+        <button onClick={() => setOpen(!open)} style={{ padding: "2px 6px", borderRadius: 6, border: `1px dashed ${C.border}`, background: "transparent", color: C.muted, fontSize: "0.6875rem", cursor: "pointer", fontFamily: font }}>+</button>
       )}
       {open && (
         <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 50, marginTop: 4, background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 10, padding: 6, display: "flex", flexDirection: "column", gap: 2, minWidth: 120, maxHeight: 200, overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
           {available.map(t => (
             <button key={t} onClick={() => { onChange([...selected, t]); setOpen(false); }}
-              style={{ padding: "6px 10px", borderRadius: 6, border: "none", background: "transparent", color: C.text, fontSize: "0.70rem", fontWeight: 500, cursor: "pointer", fontFamily: font, textAlign: "left" }}
-              onMouseEnter={e => e.target.style.background = "rgba(255,255,255,0.06)"} onMouseLeave={e => e.target.style.background = "transparent"}>{t}</button>
+              style={{ padding: "6px 10px", borderRadius: 6, border: "none", background: "transparent", color: C.text, fontSize: "0.6875rem", fontWeight: 500, cursor: "pointer", fontFamily: font, textAlign: "left" }}
+              onMouseEnter={e => e.target.style.background = "var(--w06)"} onMouseLeave={e => e.target.style.background = "transparent"}>{t}</button>
           ))}
         </div>
       )}
@@ -1665,7 +2382,7 @@ function TagSelector({ selected, allTags, onChange, small }) {
 // ─── Select Dropdown ───
 function MiniSelect({ value, onChange, options, width = 100 }) {
   return (
-    <select value={value} onChange={e => onChange(e.target.value)} style={{ width, boxSizing: "border-box", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 8px", color: C.white, fontSize: "0.70rem", fontFamily: font, outline: "none" }}>
+    <select value={value} onChange={e => onChange(e.target.value)} style={{ width, boxSizing: "border-box", background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 8px", color: C.white, fontSize: "0.6875rem", fontFamily: font, outline: "none" }}>
       {options.map(o => <option key={o} value={o}>{o}</option>)}
     </select>
   );
@@ -1675,8 +2392,8 @@ function MiniSelect({ value, onChange, options, width = 100 }) {
 function CellInput({ value, onChange, width = 76, gold, placeholder = "0" }) {
   return (
     <input type="number" step="any" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)}
-      style={{ width, boxSizing: "border-box", textAlign: "right", background: gold ? "rgba(201,152,42,0.08)" : "rgba(255,255,255,0.03)", border: `1px solid ${gold ? C.borderGold : "rgba(255,255,255,0.06)"}`, borderRadius: 5, padding: "5px 7px", color: gold ? C.goldBright : C.white, fontSize: "0.73rem", fontWeight: 600, fontFamily: font, outline: "none" }}
-      onFocus={e => { e.target.style.borderColor = C.gold; }} onBlur={e => { e.target.style.borderColor = gold ? C.borderGold : "rgba(255,255,255,0.06)"; }}
+      style={{ width, boxSizing: "border-box", textAlign: "right", background: gold ? "rgba(201,152,42,0.08)" : "var(--w03)", border: `1px solid ${gold ? C.borderGold : "var(--w06)"}`, borderRadius: 5, padding: "5px 7px", color: C.white, fontSize: "0.75rem", fontWeight: 600, fontFamily: font, outline: "none" }}
+      onFocus={e => { e.target.style.borderColor = C.gold; }} onBlur={e => { e.target.style.borderColor = gold ? C.borderGold : "var(--w06)"; }}
     />
   );
 }
@@ -1687,8 +2404,8 @@ function getTickerLogo(ticker) { const d = TICKER_DOMAINS[ticker]; return d ? `h
 function TickerInput({ value, onChange, width = 64 }) {
   return (
     <input type="text" placeholder="SYM" value={value} onChange={e => onChange(e.target.value.toUpperCase())}
-      style={{ width, boxSizing: "border-box", textAlign: "left", background: "rgba(255,255,255,0.03)", border: `1px solid rgba(255,255,255,0.06)`, borderRadius: 5, padding: "5px 7px", textTransform: "uppercase", color: C.gold, fontSize: "0.73rem", fontWeight: 800, fontFamily: font, outline: "none", letterSpacing: "-0.01em" }}
-      onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.06)"} />
+      style={{ width, boxSizing: "border-box", textAlign: "left", background: "var(--w03)", border: `1px solid var(--w06)`, borderRadius: 5, padding: "5px 7px", color: C.white, fontSize: "0.75rem", fontWeight: 500, fontFamily: font, outline: "none", letterSpacing: "-0.01em" }}
+      onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = "var(--w06)"} />
   );
 }
 
@@ -1701,24 +2418,24 @@ function LockableCellInput({ value, onChange, width = 72, placeholder = "0" }) {
         readOnly={!unlocked}
         onChange={e => onChange(e.target.value)}
         style={{ width: unlocked ? width : Math.min(width, 58), boxSizing: "border-box", textAlign: "right",
-          background: unlocked ? "rgba(239,68,68,0.08)" : "transparent",
-          border: unlocked ? "1px solid rgba(239,68,68,0.4)" : "1px solid transparent",
-          borderRadius: 5, padding: "5px 5px", color: C.white, fontSize: "0.73rem", fontWeight: 600, fontFamily: font, outline: "none",
+          background: unlocked ? "rgba(255,80,0,0.08)" : "transparent",
+          border: unlocked ? "1px solid rgba(255,80,0,0.4)" : "1px solid transparent",
+          borderRadius: 5, padding: "5px 5px", color: C.white, fontSize: "0.75rem", fontWeight: 600, fontFamily: font, outline: "none",
           cursor: unlocked ? "text" : "default", pointerEvents: unlocked ? "auto" : "none" }} />
       <button onClick={() => setUnlocked(u => !u)}
         title={unlocked ? "Lock stop value" : "Unlock to edit stop"}
-        style={{ padding: "2px 4px", borderRadius: 4, border: `1px solid ${unlocked ? "rgba(239,68,68,0.4)" : C.border}`,
-          background: unlocked ? "rgba(239,68,68,0.1)" : "transparent",
-          color: unlocked ? C.red : C.muted, fontSize: "0.50rem", cursor: "pointer", fontFamily: font, lineHeight: 1, flexShrink: 0 }}>{unlocked ? "🔓" : "🔒"}</button>
+        style={{ padding: "2px 4px", borderRadius: 4, border: `1px solid ${unlocked ? "rgba(255,80,0,0.4)" : C.border}`,
+          background: unlocked ? "rgba(255,80,0,0.1)" : "transparent",
+          color: unlocked ? C.red : C.muted, fontSize: "0.6875rem", cursor: "pointer", fontFamily: font, lineHeight: 1, flexShrink: 0 }}>{unlocked ? "🔓" : "🔒"}</button>
     </div>
   );
 }
 
 // ─── Tier logic ───
 const TIER_STYLES = {
-  Full: { bg: C.greenDim, color: C.green, border: "rgba(34,197,94,0.25)" },
-  Half: { bg: C.goldDim, color: C.gold, border: C.borderGold },
-  Quarter: { bg: C.blueDim, color: C.blue, border: "rgba(59,130,246,0.25)" },
+  Full: { bg: C.greenDim, color: C.green, border: "rgba(0,200,5,0.25)" },
+  Half: { bg: "var(--w06)", color: C.text, border: "var(--w14)" },
+  Quarter: { bg: C.blueDim, color: C.blue, border: "rgba(59,158,255,0.25)" },
   Pilot: { bg: C.purpleDim, color: C.purple, border: "rgba(167,139,250,0.25)" },
 };
 // A position's tier = how much RISK it carries vs the per-trade risk budget (risk-first).
@@ -1736,30 +2453,27 @@ function autoTier(riskD, rSizer) {
 // ExposureGrid removed — Compounder now embedded in DashboardPage
 // ─── Gold CTA Button ───
 function GoldBtn({ children, onClick, small }) {
-  const rest = "0 0 12px rgba(201,152,42,0.25), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.3)";
-  const lift = "0 0 20px rgba(201,152,42,0.4), 0 4px 12px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.4)";
+  // Primary CTA: the ONE surface gold still owns. Solid pill, no gradient/glow/lift.
   return (
-    <button onClick={onClick} className="viv-sheen" style={{ background: `linear-gradient(135deg, ${C.goldMid}, ${C.goldBright}, ${C.goldDeep})`, color: "#000", fontWeight: 800, fontSize: small ? "0.72rem" : "0.82rem", padding: small ? "8px 16px" : "12px 28px", borderRadius: 980, border: "none", cursor: "pointer", fontFamily: font, boxShadow: rest, transition: "box-shadow 0.2s ease, transform 0.12s cubic-bezier(0.22,1,0.36,1)", position: "relative", overflow: "hidden" }}
-    onMouseEnter={e => { e.currentTarget.style.boxShadow = lift; e.currentTarget.style.transform = "translateY(-1px)"; }}
-    onMouseLeave={e => { e.currentTarget.style.boxShadow = rest; e.currentTarget.style.transform = "translateY(0)"; }}
-    onMouseDown={e => { e.currentTarget.style.transform = "translateY(0) scale(0.97)"; }}
-    onMouseUp={e => { e.currentTarget.style.transform = "translateY(-1px) scale(1)"; }}
-    ><span style={{ position: "relative", zIndex: 1 }}>{children}</span><span className="viv-btn-sheen" /></button>
+    <button onClick={onClick} style={{ background: C.goldPill, color: "var(--goldOn)", fontWeight: 600, fontSize: small ? "0.8125rem" : "0.875rem", padding: small ? "9px 18px" : "12px 26px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: font, letterSpacing: 0, transition: "background 0.15s ease", position: "relative", overflow: "hidden" }}
+    onMouseEnter={e => { e.currentTarget.style.background = "#f6cd6a"; }}
+    onMouseLeave={e => { e.currentTarget.style.background = C.goldBright; }}
+    ><span style={{ position: "relative", zIndex: 1 }}>{children}</span></button>
   );
 }
 
-// Source indicator — tiny dot: faint grey = manual · solid gold = IBKR auto-synced · hollow gold ring = reconciled (IBKR figures + your notes)
+// Source indicator — tiny dot: faint grey = manual · solid white = IBKR auto-synced · hollow white ring = reconciled (IBKR figures + your notes)
 function SourceDot({ source }) {
   const ibkr = source === "ibkr";
   const rec = source === "reconciled";
   const tip = ibkr
-    ? <><strong style={{ color: C.gold }}>Auto-synced from IBKR.</strong><br />Pulled straight from your broker — exact prices, shares, commission and times.</>
+    ? <><strong style={{ color: C.white }}>Auto-synced from IBKR.</strong><br />Pulled straight from your broker — exact prices, shares, commission and times.</>
     : rec
-    ? <><strong style={{ color: C.gold }}>Reconciled.</strong><br />IBKR's exact figures merged into your manual entry, keeping your own notes, tags and stop.</>
+    ? <><strong style={{ color: C.white }}>Reconciled.</strong><br />IBKR's exact figures merged into your manual entry, keeping your own notes, tags and stop.</>
     : <><strong style={{ color: C.white }}>Manual entry.</strong><br />You keyed this in yourself — not from IBKR.</>;
   return (
     <Abbr tip={tip} underline={false}>
-      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", flexShrink: 0, marginRight: 6, verticalAlign: "middle", cursor: "help", background: rec ? "transparent" : (ibkr ? C.gold : "rgba(255,255,255,0.28)"), border: rec ? `2px solid ${C.gold}` : "none", boxShadow: ibkr ? `0 0 5px ${C.gold}` : "none" }} />
+      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", flexShrink: 0, marginRight: 6, verticalAlign: "middle", cursor: "help", background: rec ? "transparent" : (ibkr ? C.white : "var(--w35)"), border: rec ? `2px solid ${C.white}` : "none", boxShadow: ibkr ? "0 0 5px var(--w55)" : "none" }} />
     </Abbr>
   );
 }
@@ -2641,7 +3355,7 @@ function IntegrityReportModal({ open, onClose, report, onReRun, running }) {
     setExpandedId(null);
   }, [report]);
   if (!open || !report) return null;
-  const sevColor = s => s === "critical" ? C.red : s === "warn" ? C.gold : C.muted;
+  const sevColor = s => s === "critical" ? C.red : s === "warn" ? "var(--orange)" : C.muted;
   const sevLabel = s => s === "critical" ? "Critical" : s === "warn" ? "Warn" : "Info";
   const catMaxSev = key => {
     const inCat = report.findings.filter(f => f.category === key);
@@ -2658,39 +3372,39 @@ function IntegrityReportModal({ open, onClose, report, onReRun, running }) {
         <div style={{ position: "sticky", top: 0, background: C.bg2, borderBottom: `1px solid ${C.border}`, padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1, gap: 12, flexWrap: "wrap" }}>
           <div>
             <Eyebrow>Data Integrity</Eyebrow>
-            <div style={{ fontWeight: 800, fontSize: "1.05rem", color: C.white }}>Integrity Report</div>
+            <div style={{ fontWeight: 800, fontSize: "1rem", color: C.white }}>Integrity Report</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button onClick={onReRun} disabled={running} style={{ padding: "7px 14px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.66rem", cursor: running ? "default" : "pointer", fontFamily: font, opacity: running ? 0.6 : 1, display: "flex", alignItems: "center", gap: 6 }}>{running ? <><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 999, border: `2px solid ${C.gold}`, borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />Scanning…</> : "↻ Re-run"}</button>
-            <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.1rem", cursor: "pointer", fontFamily: font }}>✕</button>
+            <button onClick={onReRun} disabled={running} style={{ padding: "7px 14px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.6875rem", cursor: running ? "default" : "pointer", fontFamily: font, opacity: running ? 0.6 : 1, display: "flex", alignItems: "center", gap: 6 }}>{running ? <><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 999, border: `2px solid ${C.gold}`, borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />Scanning…</> : "↻ Re-run"}</button>
+            <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.125rem", cursor: "pointer", fontFamily: font }}>✕</button>
           </div>
         </div>
         <div style={{ padding: "20px 24px" }}>
           {/* Summary tiles */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 10, marginBottom: 18 }}>
-            <div style={{ padding: "12px 14px", borderRadius: 12, background: report.counts.critical > 0 ? "rgba(239,68,68,0.10)" : "rgba(34,197,94,0.08)", border: `1px solid ${report.counts.critical > 0 ? "rgba(239,68,68,0.30)" : "rgba(34,197,94,0.22)"}` }}>
-              <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Critical</div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: report.counts.critical > 0 ? C.red : C.green }}>{report.counts.critical}</div>
+            <div style={{ padding: "12px 14px", borderRadius: 12, background: report.counts.critical > 0 ? "rgba(255,80,0,0.10)" : "rgba(0,200,5,0.08)", border: `1px solid ${report.counts.critical > 0 ? "rgba(255,80,0,0.30)" : "rgba(0,200,5,0.22)"}` }}>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.muted, marginBottom: 4 }}>Critical</div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: report.counts.critical > 0 ? C.red : C.green }}>{report.counts.critical}</div>
             </div>
-            <div style={{ padding: "12px 14px", borderRadius: 12, background: report.counts.warn > 0 ? "rgba(201,152,42,0.10)" : "rgba(255,255,255,0.03)", border: `1px solid ${report.counts.warn > 0 ? C.borderGold : C.border}` }}>
-              <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Warn</div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: report.counts.warn > 0 ? C.goldBright : C.muted }}>{report.counts.warn}</div>
+            <div style={{ padding: "12px 14px", borderRadius: 12, background: report.counts.warn > 0 ? "rgba(255,170,5,0.10)" : "var(--w03)", border: `1px solid ${report.counts.warn > 0 ? "rgba(255,170,5,0.30)" : C.border}` }}>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.muted, marginBottom: 4 }}>Warn</div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: report.counts.warn > 0 ? "var(--orange)" : C.muted }}>{report.counts.warn}</div>
             </div>
-            <div style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Info</div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: C.text }}>{report.counts.info}</div>
+            <div style={{ padding: "12px 14px", borderRadius: 12, background: "var(--w03)", border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.muted, marginBottom: 4 }}>Info</div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: C.text }}>{report.counts.info}</div>
             </div>
-            <div style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Scanned</div>
-              <div style={{ fontSize: "0.84rem", fontWeight: 800, color: C.text, lineHeight: 1.2 }}>{report.stats.trades} trades<br />{report.stats.positions} positions</div>
+            <div style={{ padding: "12px 14px", borderRadius: 12, background: "var(--w03)", border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.muted, marginBottom: 4 }}>Scanned</div>
+              <div style={{ fontSize: "0.875rem", fontWeight: 800, color: C.text, lineHeight: 1.2 }}>{report.stats.trades} trades<br />{report.stats.positions} positions</div>
             </div>
           </div>
           {/* All-clean state */}
           {totalFindings === 0 ? (
-            <div style={{ padding: "40px 16px", textAlign: "center", borderRadius: 12, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.22)" }}>
-              <div style={{ fontSize: "2.4rem", marginBottom: 8 }}>✓</div>
+            <div style={{ padding: "40px 16px", textAlign: "center", borderRadius: 12, background: "rgba(0,200,5,0.06)", border: "1px solid rgba(0,200,5,0.22)" }}>
+              <div style={{ fontSize: "2.75rem", marginBottom: 8 }}>✓</div>
               <div style={{ fontWeight: 800, fontSize: "1rem", color: C.green, marginBottom: 6 }}>All clean</div>
-              <div style={{ fontSize: "0.72rem", color: C.muted, lineHeight: 1.6 }}>Zero duplicates, zero orphans, zero formula glitches. Scan took {report.stats.elapsedMs}ms.</div>
+              <div style={{ fontSize: "0.75rem", color: C.muted, lineHeight: 1.6 }}>Zero duplicates, zero orphans, zero formula glitches. Scan took {report.stats.elapsedMs}ms.</div>
             </div>
           ) : (
             <>
@@ -2702,10 +3416,10 @@ function IntegrityReportModal({ open, onClose, report, onReRun, running }) {
                   const sev = catMaxSev(c.key);
                   const isActive = activeCat === c.key;
                   return (
-                    <button key={c.key} onClick={() => { setActiveCat(c.key); setExpandedId(null); }} style={{ padding: "7px 14px", borderRadius: 980, border: `1px solid ${isActive ? sevColor(sev) : C.border}`, background: isActive ? `${sevColor(sev)}1a` : "transparent", color: isActive ? sevColor(sev) : C.muted, fontWeight: 700, fontSize: "0.66rem", cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 6 }}>
+                    <button key={c.key} onClick={() => { setActiveCat(c.key); setExpandedId(null); }} style={{ padding: "7px 14px", borderRadius: 980, border: `1px solid ${isActive ? sevColor(sev) : C.border}`, background: isActive ? `${sevColor(sev)}1a` : "transparent", color: isActive ? sevColor(sev) : C.muted, fontWeight: 700, fontSize: "0.6875rem", cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ width: 6, height: 6, borderRadius: 999, background: sevColor(sev), display: "inline-block" }} />
                       {c.label}
-                      <span style={{ fontSize: "0.6rem", padding: "1px 7px", borderRadius: 980, background: isActive ? `${sevColor(sev)}33` : "rgba(255,255,255,0.06)", color: isActive ? sevColor(sev) : C.muted }}>{inCat.length}</span>
+                      <span style={{ fontSize: "0.6875rem", padding: "1px 7px", borderRadius: 980, background: isActive ? `${sevColor(sev)}33` : "var(--w06)", color: isActive ? sevColor(sev) : C.muted }}>{inCat.length}</span>
                     </button>
                   );
                 })}
@@ -2715,26 +3429,26 @@ function IntegrityReportModal({ open, onClose, report, onReRun, running }) {
                 {visible.map(f => {
                   const isOpen = expandedId === f.id;
                   return (
-                    <div key={f.id} style={{ border: `1px solid ${isOpen ? sevColor(f.severity) + "55" : C.border}`, borderRadius: 12, background: isOpen ? `${sevColor(f.severity)}0d` : "rgba(255,255,255,0.02)", overflow: "hidden", transition: "border 120ms" }}>
+                    <div key={f.id} style={{ border: `1px solid ${isOpen ? sevColor(f.severity) + "55" : C.border}`, borderRadius: 12, background: isOpen ? `${sevColor(f.severity)}0d` : "var(--w02)", overflow: "hidden", transition: "border 120ms" }}>
                       <button onClick={() => setExpandedId(isOpen ? null : f.id)} style={{ width: "100%", padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, background: "transparent", border: "none", cursor: "pointer", fontFamily: font, textAlign: "left", color: C.text }}>
                         <span style={{ width: 9, height: 9, borderRadius: 999, background: sevColor(f.severity), flexShrink: 0 }} />
-                        <span style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: sevColor(f.severity), minWidth: 56 }}>{sevLabel(f.severity)}</span>
-                        <span style={{ fontWeight: 700, fontSize: "0.74rem", color: C.white, flex: 1 }}>{f.name}</span>
-                        <span style={{ color: C.muted, fontSize: "0.66rem" }}>{isOpen ? "▴" : "▾"}</span>
+                        <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: sevColor(f.severity), minWidth: 56 }}>{sevLabel(f.severity)}</span>
+                        <span style={{ fontWeight: 700, fontSize: "0.75rem", color: C.white, flex: 1 }}>{f.name}</span>
+                        <span style={{ color: C.muted, fontSize: "0.6875rem" }}>{isOpen ? "▴" : "▾"}</span>
                       </button>
                       {isOpen && (
                         <div style={{ padding: "0 14px 14px 14px" }}>
-                          <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.6, marginBottom: 10 }}>{f.description}</div>
+                          <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.6, marginBottom: 10 }}>{f.description}</div>
                           {f.details.length > 0 && (
                             <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(0,0,0,0.30)", border: `1px solid ${C.border}`, marginBottom: 10 }}>
                               {f.details.map((d, i) => (
-                                <div key={i} style={{ fontSize: "0.66rem", color: C.text, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{d}</div>
+                                <div key={i} style={{ fontSize: "0.6875rem", color: C.text, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{d}</div>
                               ))}
                             </div>
                           )}
                           {f.suggestedAction && (
-                            <div style={{ fontSize: "0.66rem", color: C.muted, lineHeight: 1.5, fontStyle: "italic" }}>
-                              <strong style={{ color: C.goldBright, fontStyle: "normal" }}>Suggested next step: </strong>{f.suggestedAction}
+                            <div style={{ fontSize: "0.6875rem", color: C.muted, lineHeight: 1.5, fontStyle: "italic" }}>
+                              <strong style={{ color: C.white, fontStyle: "normal" }}>Suggested next step: </strong>{f.suggestedAction}
                             </div>
                           )}
                         </div>
@@ -2747,8 +3461,8 @@ function IntegrityReportModal({ open, onClose, report, onReRun, running }) {
           )}
           {/* Footer */}
           <div style={{ marginTop: 18, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-            <div style={{ fontSize: "0.62rem", color: C.muted }}>Scan ran in {report.stats.elapsedMs}ms over {report.stats.trades} trades and {report.stats.positions} positions · read-only (no data changed)</div>
-            <button onClick={onClose} style={{ padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font }}>Close</button>
+            <div style={{ fontSize: "0.6875rem", color: C.muted }}>Scan ran in {report.stats.elapsedMs}ms over {report.stats.trades} trades and {report.stats.positions} positions · read-only (no data changed)</div>
+            <button onClick={onClose} style={{ padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.75rem", cursor: "pointer", fontFamily: font }}>Close</button>
           </div>
         </div>
       </div>
@@ -2788,14 +3502,14 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
   if (!open) return null;
 
   const chip = (action) => {
-    const map = { new: { c: C.green, t: "New" }, synced: { c: C.muted, t: "Already synced" }, reconcile: { c: C.gold, t: "Matches manual" }, review: { c: C.red, t: "Needs review" }, close: { c: C.goldBright, t: "Closed at IBKR" }, duplicate: { c: C.goldBright, t: "Already in journal" } };
+    const map = { new: { c: C.green, t: "New" }, synced: { c: C.muted, t: "Already synced" }, reconcile: { c: C.white, t: "Matches manual" }, review: { c: C.red, t: "Needs review" }, close: { c: C.white, t: "Closed at IBKR" }, duplicate: { c: C.muted, t: "Already in journal" } };
     const m = map[action] || map.new;
-    return <span style={{ fontSize: "0.5rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: m.c, border: `1px solid ${m.c}55`, borderRadius: 980, padding: "2px 7px", whiteSpace: "nowrap" }}>{m.t}</span>;
+    return <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: m.c, border: `1px solid ${m.c}55`, borderRadius: 980, padding: "2px 7px", whiteSpace: "nowrap" }}>{m.t}</span>;
   };
   const setChoice = (kind, i, v) => setChoices(prev => ({ ...prev, [kind]: { ...prev[kind], [i]: v } }));
   const sel = (kind, i, r) => (
     <select value={choices[kind][i] || "skip"} onChange={e => setChoice(kind, i, e.target.value)} disabled={status === "writing"}
-      style={{ background: "rgba(255,255,255,0.05)", color: C.white, border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 6px", fontSize: "0.62rem", fontFamily: font, outline: "none" }}>
+      style={{ background: "var(--w06)", color: C.white, border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 6px", fontSize: "0.6875rem", fontFamily: font, outline: "none" }}>
       {ibkrChoiceOpts(r).map(([v, label]) => <option key={v} value={v} style={{ background: C.bg2 }}>{label}</option>)}
     </select>
   );
@@ -2813,53 +3527,53 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
         <div style={{ position: "sticky", top: 0, background: C.bg2, borderBottom: `1px solid ${C.border}`, padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 1 }}>
           <div>
             <Eyebrow>Interactive Brokers</Eyebrow>
-            <div style={{ fontWeight: 800, fontSize: "1.05rem", color: C.white }}>Sync from IBKR</div>
+            <div style={{ fontWeight: 800, fontSize: "1rem", color: C.white }}>Sync from IBKR</div>
           </div>
-          <button onClick={onClose} disabled={status === "writing"} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.1rem", cursor: status === "writing" ? "default" : "pointer", fontFamily: font }}>✕</button>
+          <button onClick={onClose} disabled={status === "writing"} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1.125rem", cursor: status === "writing" ? "default" : "pointer", fontFamily: font }}>✕</button>
         </div>
         <div style={{ padding: "20px 24px" }}>
-          {status === "loading" && <div style={{ textAlign: "center", padding: "40px 0", color: C.muted, fontSize: "0.84rem" }}>Pulling your latest statement from IBKR… <span style={{ display: "block", marginTop: 6, fontSize: "0.66rem" }}>(generation can take a few seconds)</span></div>}
+          {status === "loading" && <div style={{ textAlign: "center", padding: "40px 0", color: C.muted, fontSize: "0.875rem" }}>Pulling your latest statement from IBKR… <span style={{ display: "block", marginTop: 6, fontSize: "0.6875rem" }}>(generation can take a few seconds)</span></div>}
           {status === "error" && (
-            <div style={{ padding: "16px 18px", background: "rgba(239,68,68,0.08)", border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 12, color: C.text, fontSize: "0.76rem", lineHeight: 1.6 }}>
+            <div style={{ padding: "16px 18px", background: "rgba(255,80,0,0.08)", border: `1px solid rgba(255,80,0,0.3)`, borderRadius: 12, color: C.text, fontSize: "0.75rem", lineHeight: 1.6 }}>
               <strong style={{ color: C.red }}>Couldn't sync.</strong><div style={{ marginTop: 6 }}>{error}</div>
-              <button onClick={onRetry} style={{ marginTop: 14, padding: "8px 16px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.7rem", cursor: "pointer", fontFamily: font }}>Try again</button>
+              <button onClick={onRetry} style={{ marginTop: 14, padding: "8px 16px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 700, fontSize: "0.6875rem", cursor: "pointer", fontFamily: font }}>Try again</button>
             </div>
           )}
           {status === "done" && result && (
             <div style={{ textAlign: "center", padding: "30px 10px" }}>
               <div style={{ fontSize: "2rem", marginBottom: 8 }}>✓</div>
               <div style={{ fontWeight: 800, fontSize: "1rem", color: C.green, marginBottom: 10 }}>Sync complete</div>
-              <div style={{ fontSize: "0.76rem", color: C.text, lineHeight: 1.8 }}>
+              <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.8 }}>
                 Trades: <strong style={{ color: C.white }}>{result.tInserted}</strong> new · <strong style={{ color: C.white }}>{result.tReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.tUpdated}</strong> refreshed<br />
                 Positions: <strong style={{ color: C.white }}>{result.pInserted}</strong> new · <strong style={{ color: C.white }}>{result.pReconciled}</strong> reconciled · <strong style={{ color: C.white }}>{result.pUpdated}</strong> refreshed · <strong style={{ color: C.white }}>{result.pClosed || 0}</strong> closed out
                 {(result.partialsInserted || 0) > 0 && <><br />Partial sells: <strong style={{ color: C.white }}>{result.partialsInserted}</strong> imported</>}
                 {(result.dupesResolved || 0) > 0 && <><br />Cleanup: <strong style={{ color: C.white }}>{result.dupesResolved}</strong> duplicate group{result.dupesResolved === 1 ? "" : "s"} resolved · <strong style={{ color: C.white }}>{result.dupesDeleted}</strong> row{result.dupesDeleted === 1 ? "" : "s"} soft-deleted</>}
                 {(result.intradayReconciled || 0) > 0 && <><br />Intraday: <strong style={{ color: C.white }}>{result.intradayReconciled}</strong> event{result.intradayReconciled === 1 ? "" : "s"} confirmed by IBKR</>}
               </div>
-              {result.errors && result.errors.length > 0 && <div style={{ marginTop: 12, fontSize: "0.66rem", color: C.red }}>{result.errors.length} row(s) failed and were skipped: {result.errors.slice(0, 3).join("; ")}{result.errors.length > 3 ? "…" : ""}</div>}
+              {result.errors && result.errors.length > 0 && <div style={{ marginTop: 12, fontSize: "0.6875rem", color: C.red }}>{result.errors.length} row(s) failed and were skipped: {result.errors.slice(0, 3).join("; ")}{result.errors.length > 3 ? "…" : ""}</div>}
               <div style={{ marginTop: 18, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
                 {lastSync && result.syncId && lastSync.syncId === result.syncId && (
                   <button
                     onClick={() => { if (window.confirm("Undo this sync? All new rows will be soft-deleted, all reconciled rows will be restored to their pre-sync values, all auto-closed positions will be re-opened, and all cleanup-deleted duplicates will be restored. Notes/tags/setup/stops you've added since the sync are preserved.")) onUndo(); }}
                     disabled={undoStatus === "running"}
-                    style={{ padding: "9px 18px", borderRadius: 980, border: `1px solid rgba(239,68,68,0.30)`, background: "rgba(239,68,68,0.08)", color: C.red, fontWeight: 700, fontSize: "0.72rem", cursor: undoStatus === "running" ? "default" : "pointer", fontFamily: font }}>
+                    style={{ padding: "9px 18px", borderRadius: 980, border: `1px solid rgba(255,80,0,0.30)`, background: "rgba(255,80,0,0.08)", color: C.red, fontWeight: 700, fontSize: "0.75rem", cursor: undoStatus === "running" ? "default" : "pointer", fontFamily: font }}>
                     {undoStatus === "running" ? "Undoing…" : "↶ Undo this sync"}
                   </button>
                 )}
-                <button onClick={onClose} style={{ padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.74rem", cursor: "pointer", fontFamily: font }}>Done</button>
+                <button onClick={onClose} style={{ padding: "9px 22px", borderRadius: 980, border: `1px solid ${C.borderGold}`, background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.75rem", cursor: "pointer", fontFamily: font }}>Done</button>
               </div>
             </div>
           )}
           {(status === "preview" || status === "writing") && data && (
             <>
               {lastSync && lastSync.expiresAt && Date.parse(lastSync.expiresAt) > Date.now() && (
-                <div style={{ padding: "8px 12px", background: "rgba(239,68,68,0.06)", border: `1px solid rgba(239,68,68,0.25)`, borderRadius: 10, fontSize: "0.66rem", color: C.text, lineHeight: 1.5, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ padding: "8px 12px", background: "rgba(255,80,0,0.06)", border: `1px solid rgba(255,80,0,0.25)`, borderRadius: 10, fontSize: "0.6875rem", color: C.text, lineHeight: 1.5, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <span><strong style={{ color: C.red }}>↶ Previous sync recoverable</strong> · {lastSync.label || lastSync.syncedAt} · expires {new Date(lastSync.expiresAt).toLocaleString()}</span>
-                  <button onClick={() => { if (window.confirm("Undo the PREVIOUS sync (not this preview)? All rows that sync inserted will be soft-deleted, reconciled rows restored to prior values, auto-closed positions re-opened, and cleanup-deleted duplicates restored.")) onUndo(); }} disabled={undoStatus === "running" || status === "writing"} style={{ padding: "6px 12px", borderRadius: 980, border: `1px solid rgba(239,68,68,0.30)`, background: "rgba(239,68,68,0.10)", color: C.red, fontWeight: 700, fontSize: "0.64rem", cursor: undoStatus === "running" ? "default" : "pointer", fontFamily: font, whiteSpace: "nowrap" }}>{undoStatus === "running" ? "Undoing…" : "Undo previous sync"}</button>
+                  <button onClick={() => { if (window.confirm("Undo the PREVIOUS sync (not this preview)? All rows that sync inserted will be soft-deleted, reconciled rows restored to prior values, auto-closed positions re-opened, and cleanup-deleted duplicates restored.")) onUndo(); }} disabled={undoStatus === "running" || status === "writing"} style={{ padding: "6px 12px", borderRadius: 980, border: `1px solid rgba(255,80,0,0.30)`, background: "rgba(255,80,0,0.10)", color: C.red, fontWeight: 700, fontSize: "0.6875rem", cursor: undoStatus === "running" ? "default" : "pointer", fontFamily: font, whiteSpace: "nowrap" }}>{undoStatus === "running" ? "Undoing…" : "Undo previous sync"}</button>
                 </div>
               )}
-              <div style={{ padding: "10px 14px", background: "rgba(201,152,42,0.08)", border: `1px solid ${C.borderGold}`, borderRadius: 10, fontSize: "0.7rem", color: C.text, lineHeight: 1.6, marginBottom: 18 }}>
-                <strong style={{ color: C.goldBright }}>Review before importing.</strong> Closed on/after {IBKR_SYNC_FLOOR} (trades that closed before this date stay out of the journal even if their entry was earlier). <strong style={{ color: C.white }}>Reconcile</strong> updates a manual entry with IBKR's exact figures and keeps your notes/tags. Nothing is ever deleted; manual rows you don't reconcile are untouched.
+              <div style={{ padding: "10px 14px", background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: "0.6875rem", color: C.text, lineHeight: 1.6, marginBottom: 18 }}>
+                <strong style={{ color: C.white }}>Review before importing.</strong> Closed on/after {IBKR_SYNC_FLOOR} (trades that closed before this date stay out of the journal even if their entry was earlier). <strong style={{ color: C.white }}>Reconcile</strong> updates a manual entry with IBKR's exact figures and keeps your notes/tags. Nothing is ever deleted; manual rows you don't reconcile are untouched.
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 10, marginBottom: 18 }}>
                 <StatTile label="Account" value={data.account || "—"} />
@@ -2870,52 +3584,52 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
               </div>
               {/* ─── LOUD BANNERS ─── catch silent statement failures that previously slipped past unnoticed. */}
               {data.diagnostics && !data.diagnostics.haveTradeData && data.diagnostics.positionsReturned === 0 && (
-                <div style={{ padding: "12px 14px", background: "rgba(239,68,68,0.10)", border: `1px solid rgba(239,68,68,0.45)`, borderRadius: 10, fontSize: "0.74rem", color: C.text, lineHeight: 1.55, marginBottom: 14 }}>
+                <div style={{ padding: "12px 14px", background: "rgba(255,80,0,0.10)", border: `1px solid rgba(255,80,0,0.45)`, borderRadius: 10, fontSize: "0.75rem", color: C.text, lineHeight: 1.55, marginBottom: 14 }}>
                   <strong style={{ color: C.red }}>⚠ IBKR returned no data.</strong> Statement is empty — your Flex Query may still be regenerating, or the period setting excludes recent days. Check Settings → IBKR Connection (Period = "Last 365 Calendar Days") and retry in a few minutes.
                 </div>
               )}
               {data.diagnostics && !data.diagnostics.haveTradeData && data.diagnostics.positionsReturned > 0 && (
-                <div style={{ padding: "12px 14px", background: "rgba(255,200,40,0.10)", border: `1px solid rgba(255,200,40,0.40)`, borderRadius: 10, fontSize: "0.74rem", color: C.text, lineHeight: 1.55, marginBottom: 14 }}>
-                  <strong style={{ color: C.goldBright }}>⚠ No trade executions in this statement.</strong> IBKR returned your open positions but zero executions, so close-detection, partial-sell import, and reconcile are OFF for this sync. If you traded recently, the statement likely hasn't refreshed yet — retry later.
+                <div style={{ padding: "12px 14px", background: "rgba(255,200,40,0.10)", border: `1px solid rgba(255,200,40,0.40)`, borderRadius: 10, fontSize: "0.75rem", color: C.text, lineHeight: 1.55, marginBottom: 14 }}>
+                  <strong style={{ color: "var(--orange)" }}>⚠ No trade executions in this statement.</strong> IBKR returned your open positions but zero executions, so close-detection, partial-sell import, and reconcile are OFF for this sync. If you traded recently, the statement likely hasn't refreshed yet — retry later.
                 </div>
               )}
               {/* ─── DIAGNOSTICS PANEL ─── per-symbol gate trace. Collapsed by default; expand to see exactly
                    what IBKR returned for each ticker and which output bucket it landed in (or why it didn't). */}
               {data.diagnostics && (data.diagnostics.symbolReport || []).length > 0 && (
-                <details style={{ marginBottom: 18, border: `1px solid ${C.border}`, borderRadius: 10, background: "rgba(255,255,255,0.02)" }}>
-                  <summary style={{ padding: "10px 14px", cursor: "pointer", fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <details style={{ marginBottom: 18, border: `1px solid ${C.border}`, borderRadius: 10, background: "var(--w02)" }}>
+                  <summary style={{ padding: "10px 14px", cursor: "pointer", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--faint)", listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span>🔍 Diagnostics · per-symbol gate trace</span>
-                    <span style={{ fontSize: "0.58rem", color: C.muted, fontWeight: 600, letterSpacing: 0, textTransform: "none" }}>
+                    <span style={{ fontSize: "0.6875rem", color: C.muted, fontWeight: 600, letterSpacing: 0, textTransform: "none" }}>
                       {data.diagnostics.tradesReturned} execs · {data.diagnostics.closedBuilt} round-trips · {data.diagnostics.partialsBuilt} partials · floor {data.diagnostics.sinceFloor}
                     </span>
                   </summary>
                   <div style={{ padding: "0 14px 12px 14px" }}>
-                    <div style={{ fontSize: "0.62rem", color: C.muted, marginBottom: 10, lineHeight: 1.55 }}>
+                    <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 10, lineHeight: 1.55 }}>
                       For every ticker either on your dashboard or in this IBKR statement, here's what was emitted (or why nothing was). If you expected an action that's missing, the <strong style={{ color: C.text }}>Notes</strong> column tells you the gate that blocked it.
                     </div>
                     <div style={{ overflowX: "auto", border: `1px solid ${C.border}`, borderRadius: 8 }}>
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.66rem" }}>
-                        <thead><tr style={{ borderBottom: `1px solid ${C.border}`, background: "rgba(255,255,255,0.02)" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.6875rem" }}>
+                        <thead><tr style={{ borderBottom: `1px solid ${C.border}`, background: "var(--w02)" }}>
                           {["Symbol", "IBKR Execs", "Net Qty", "IBKR Open?", "On Dashboard?", "Round-Trips Built", "Partials Built", "Action", "Notes"].map(h => (
-                            <th key={h} style={{ padding: "7px 8px", textAlign: "left", fontSize: "0.48rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, fontWeight: 700, whiteSpace: "nowrap" }}>{h}</th>
+                            <th key={h} style={{ padding: "7px 8px", textAlign: "left", fontSize: "0.6875rem", letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, fontWeight: 500, whiteSpace: "nowrap" }}>{h}</th>
                           ))}
                         </tr></thead>
                         <tbody>
                           {data.diagnostics.symbolReport.map((r, i) => {
                             const action = r.tradeAction || r.partialAction || r.closeAction || r.posAction || null;
-                            const actionColor = action === "new" ? C.green : action === "reconcile" ? C.gold : action === "close" ? C.goldBright : action === "review" ? C.red : action === "synced" ? C.muted : C.muted;
+                            const actionColor = action === "new" ? C.green : action === "reconcile" ? C.white : action === "close" ? C.white : action === "review" ? C.red : action === "synced" ? C.muted : C.muted;
                             const hasIssue = r.notes.length > 0;
                             return (
-                              <tr key={r.sym} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, background: hasIssue ? "rgba(239,68,68,0.04)" : "transparent" }}>
+                              <tr key={r.sym} style={{ borderBottom: `1px solid var(--w04)`, background: hasIssue ? "rgba(255,80,0,0.04)" : "transparent" }}>
                                 <td style={{ padding: "6px 8px", color: C.white, fontWeight: 700 }}>{r.sym}</td>
                                 <td style={{ padding: "6px 8px", color: r.execs > 0 ? C.text : C.muted }}>{r.execs}</td>
                                 <td style={{ padding: "6px 8px", color: r.netQty === 0 ? C.muted : (r.netQty > 0 ? C.green : C.red) }}>{r.netQty}</td>
                                 <td style={{ padding: "6px 8px", color: C.text }}>{r.ibkrHasOpen ? "✓" : "—"}</td>
                                 <td style={{ padding: "6px 8px", color: C.text }}>{r.userHasOpen ? (r.userSource === "manual" ? "✓ manual" : `✓ ${r.userSource}`) : "—"}</td>
-                                <td style={{ padding: "6px 8px", color: r.closedBuilt > 0 ? C.gold : C.muted, fontWeight: r.closedBuilt > 0 ? 700 : 400 }}>{r.closedBuilt}</td>
-                                <td style={{ padding: "6px 8px", color: r.partialsBuilt > 0 ? C.gold : C.muted, fontWeight: r.partialsBuilt > 0 ? 700 : 400 }}>{r.partialsBuilt}</td>
-                                <td style={{ padding: "6px 8px", color: actionColor, fontWeight: action ? 700 : 400, textTransform: "uppercase", fontSize: "0.56rem", letterSpacing: "0.06em" }}>{action || "—"}</td>
-                                <td style={{ padding: "6px 8px", color: hasIssue ? C.red : C.muted, fontSize: "0.60rem", lineHeight: 1.45 }}>{r.notes.length ? r.notes.join(" · ") : "ok"}</td>
+                                <td style={{ padding: "6px 8px", color: r.closedBuilt > 0 ? C.white : C.muted, fontWeight: r.closedBuilt > 0 ? 700 : 400 }}>{r.closedBuilt}</td>
+                                <td style={{ padding: "6px 8px", color: r.partialsBuilt > 0 ? C.white : C.muted, fontWeight: r.partialsBuilt > 0 ? 700 : 400 }}>{r.partialsBuilt}</td>
+                                <td style={{ padding: "6px 8px", color: actionColor, fontWeight: action ? 700 : 400, fontSize: "0.6875rem", letterSpacing: 0 }}>{action || "—"}</td>
+                                <td style={{ padding: "6px 8px", color: hasIssue ? C.red : C.muted, fontSize: "0.6875rem", lineHeight: 1.45 }}>{r.notes.length ? r.notes.join(" · ") : "ok"}</td>
                               </tr>
                             );
                           })}
@@ -2930,21 +3644,21 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                 ...(data.partialRows && data.partialRows.length ? [{ kind: "partial", title: "Partial Sells (from still-open positions)", rows: data.partialRows, cols: ["ticker", "shares", "entryP", "exitP", "plDollar", "exit"], head: ["Symbol", "Shares", "Avg Cost", "Exit", "P/L $", "Sold"] }] : []),
                 ...(data.closeRows && data.closeRows.length ? [{ kind: "close", title: "Closed at IBKR — remove from Open Positions", rows: data.closeRows, cols: ["sym", "shares", "entry", "exit"], head: ["Symbol", "Shares", "Opened", "Closed"] }] : [])].map(sec => (
                 <div key={sec.title} style={{ marginBottom: 18 }}>
-                  <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: sec.kind === "close" ? C.goldBright : C.gold, marginBottom: 8 }}>{sec.title} ({sec.rows.length})</div>
-                  {sec.kind === "close" && <div style={{ fontSize: "0.64rem", color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>These came in from IBKR and are now fully closed there. <strong style={{ color: C.text }}>Close out</strong> files the closed trade into your Journal and removes it from Open Positions (the record is archived, never destroyed, and recoverable). Choose <strong style={{ color: C.text }}>Keep open</strong> to leave it on the Dashboard.</div>}
-                  {sec.kind === "partial" && <div style={{ fontSize: "0.64rem", color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>Trims you took in IBKR that did <strong style={{ color: C.text }}>not</strong> fully close the position. Importing each one logs it to your Journal and surfaces it on the still-open position as realized P/L + "% Trimmed" in the Dashboard. Dedup is by IBKR execution id, so re-syncs are safe.</div>}
-                  {sec.rows.length === 0 ? <div style={{ fontSize: "0.72rem", color: C.muted, padding: "8px 0" }}>None closed on/after {IBKR_SYNC_FLOOR}. (Expand <strong style={{ color: C.text }}>Diagnostics</strong> above to see why a specific symbol isn't here.)</div> : (
+                  <div style={{ fontWeight: 500, fontSize: "0.6875rem", letterSpacing: 0, color: "var(--faint)", marginBottom: 8 }}>{sec.title} ({sec.rows.length})</div>
+                  {sec.kind === "close" && <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>These came in from IBKR and are now fully closed there. <strong style={{ color: C.text }}>Close out</strong> files the closed trade into your Journal and removes it from Open Positions (the record is archived, never destroyed, and recoverable). Choose <strong style={{ color: C.text }}>Keep open</strong> to leave it on the Dashboard.</div>}
+                  {sec.kind === "partial" && <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 8, lineHeight: 1.5 }}>Trims you took in IBKR that did <strong style={{ color: C.text }}>not</strong> fully close the position. Importing each one logs it to your Journal and surfaces it on the still-open position as realized P/L + "% Trimmed" in the Dashboard. Dedup is by IBKR execution id, so re-syncs are safe.</div>}
+                  {sec.rows.length === 0 ? <div style={{ fontSize: "0.75rem", color: C.muted, padding: "8px 0" }}>None closed on/after {IBKR_SYNC_FLOOR}. (Expand <strong style={{ color: C.text }}>Diagnostics</strong> above to see why a specific symbol isn't here.)</div> : (
                     <div style={{ overflowX: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
-                        <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{sec.head.map(h => <th key={h} style={{ padding: "8px 8px", textAlign: "left", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>{h}</th>)}<th style={{ padding: "8px 8px", textAlign: "center", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Status</th><th style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, fontSize: "0.5rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Action</th></tr></thead>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.6875rem" }}>
+                        <thead><tr style={{ borderBottom: `1px solid ${C.border}` }}>{sec.head.map(h => <th key={h} style={{ padding: "8px 8px", textAlign: "left", fontWeight: 500, fontSize: "0.6875rem", letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, whiteSpace: "nowrap" }}>{h}</th>)}<th style={{ padding: "8px 8px", textAlign: "center", fontWeight: 500, fontSize: "0.6875rem", letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted }}>Status</th><th style={{ padding: "8px 8px", textAlign: "right", fontWeight: 500, fontSize: "0.6875rem", letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted }}>Action</th></tr></thead>
                         <tbody>{sec.rows.map((r, i) => (
-                          <tr key={i} style={{ borderBottom: `1px solid rgba(255,255,255,0.04)`, opacity: (choices[sec.kind][i] === "skip") ? 0.45 : 1 }}>
+                          <tr key={i} style={{ borderBottom: `1px solid var(--w04)`, opacity: (choices[sec.kind][i] === "skip") ? 0.45 : 1 }}>
                             {sec.cols.map(col => <td key={col} style={{ padding: "7px 8px", color: col === "plDollar" ? (r[col] >= 0 ? C.green : C.red) : C.text, fontWeight: col === sec.cols[0] ? 700 : 400, whiteSpace: "nowrap" }}>{col === "ep" || col === "entryP" || col === "exitP" ? (r[col] !== undefined && r[col] !== "" ? Number(r[col]).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—") : col === "plDollar" ? `${r[col] >= 0 ? "+" : ""}${Number(r[col]).toLocaleString()}` : (col === "entry" || col === "exit") ? (tradeDateISO(r[col]) || r[col] || "—") : (r[col] ?? "—")}</td>)}
                             <td style={{ padding: "7px 8px", textAlign: "center" }}>
                               <div style={{ display: "inline-flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
                                 {chip(r.action)}
                                 {r.ignored && (
-                                  <span title="On your Ignore list — defaulted to Skip. Toggle the Action dropdown to import this one." style={{ fontSize: "0.46rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 980, padding: "2px 6px", background: "rgba(255,255,255,0.03)", whiteSpace: "nowrap" }}>⊘ Ignored</span>
+                                  <span title="On your Ignore list — defaulted to Skip. Toggle the Action dropdown to import this one." style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 980, padding: "2px 6px", background: "var(--w03)", whiteSpace: "nowrap" }}>⊘ Ignored</span>
                                 )}
                               </div>
                             </td>
@@ -2962,23 +3676,23 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                    is the journal record (which gets imported by the Partial Sells section above). */}
               {data.intradayMatches && data.intradayMatches.length > 0 && (
                 <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 8 }}>✓ Intraday events confirmed by IBKR ({data.intradayMatches.length})</div>
-                  <div style={{ fontSize: "0.64rem", color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
+                  <div style={{ fontWeight: 500, fontSize: "0.6875rem", letterSpacing: 0, color: "var(--faint)", marginBottom: 8 }}>✓ Intraday events confirmed by IBKR ({data.intradayMatches.length})</div>
+                  <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
                     These are events you logged in the dashboard's <strong style={{ color: C.text }}>Today</strong> panel that match an incoming IBKR partial. On confirm they'll be marked <strong style={{ color: C.green }}>IBKR ✓</strong> in your timeline. No new trade rows are created here — IBKR's actual fill is imported by the <strong style={{ color: C.text }}>Partial Sells</strong> section above (that's the canonical journal record).
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {data.intradayMatches.map((m, i) => (
-                      <div key={`${m.positionId}-${m.eventId}-${i}`} style={{ display: "grid", gridTemplateColumns: "min-content 1fr 1fr min-content", gap: 12, alignItems: "center", padding: "8px 12px", borderRadius: 8, background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}` }}>
-                        <span style={{ fontSize: "0.78rem", color: C.goldBright, fontWeight: 800 }}>{m.ticker}</span>
-                        <div style={{ fontSize: "0.64rem", color: C.text, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                          <div style={{ color: C.muted, fontSize: "0.52rem", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>You logged</div>
+                      <div key={`${m.positionId}-${m.eventId}-${i}`} style={{ display: "grid", gridTemplateColumns: "min-content 1fr 1fr min-content", gap: 12, alignItems: "center", padding: "8px 12px", borderRadius: 8, background: "var(--w03)", border: `1px solid ${C.border}` }}>
+                        <span style={{ fontSize: "0.75rem", color: C.white, fontWeight: 800 }}>{m.ticker}</span>
+                        <div style={{ fontSize: "0.6875rem", color: C.text, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                          <div style={{ color: C.muted, fontSize: "0.6875rem", letterSpacing: 0, marginBottom: 2 }}>You logged</div>
                           {m.eventShares} sh{m.eventPrice > 0 ? ` @ $${m.eventPrice.toFixed(2)}` : ""}
                         </div>
-                        <div style={{ fontSize: "0.64rem", color: C.text, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                          <div style={{ color: C.muted, fontSize: "0.52rem", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>IBKR confirmed</div>
+                        <div style={{ fontSize: "0.6875rem", color: C.text, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                          <div style={{ color: C.muted, fontSize: "0.6875rem", letterSpacing: 0, marginBottom: 2 }}>IBKR confirmed</div>
                           {m.ibkrShares} sh @ ${m.ibkrPrice.toFixed(2)}
                         </div>
-                        <span style={{ fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.green, padding: "3px 9px", borderRadius: 980, background: "rgba(34,197,94,0.10)", border: "1px solid rgba(34,197,94,0.32)" }}>Match</span>
+                        <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.green, padding: "3px 9px", borderRadius: 980, background: "rgba(0,200,5,0.10)", border: "1px solid rgba(0,200,5,0.32)" }}>Match</span>
                       </div>
                     ))}
                   </div>
@@ -2986,38 +3700,38 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
               )}
               {data.dupeJournalGroups && data.dupeJournalGroups.length > 0 && (
                 <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontWeight: 700, fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.red, marginBottom: 8 }}>⚠ Existing duplicates in your journal ({data.dupeJournalGroups.length})</div>
-                  <div style={{ fontSize: "0.64rem", color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
-                    Each group below is one manual aggregate trade + a set of IBKR-imported rows whose shares <strong style={{ color: C.text }}>sum to the same total</strong> — so they're double-counting the same fills. Default is to <strong style={{ color: C.text }}>keep your manual entry (with R-multiple, notes, tags)</strong> and soft-delete the IBKR rows. Nothing is hard-deleted — every removal sets <code style={{ color: C.gold }}>is_deleted=true</code> and is recoverable from the DB.
+                  <div style={{ fontWeight: 500, fontSize: "0.6875rem", letterSpacing: 0, color: C.red, marginBottom: 8 }}>⚠ Existing duplicates in your journal ({data.dupeJournalGroups.length})</div>
+                  <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>
+                    Each group below is one manual aggregate trade + a set of IBKR-imported rows whose shares <strong style={{ color: C.text }}>sum to the same total</strong> — so they're double-counting the same fills. Default is to <strong style={{ color: C.text }}>keep your manual entry (with R-multiple, notes, tags)</strong> and soft-delete the IBKR rows. Nothing is hard-deleted — every removal sets <code style={{ color: C.white }}>is_deleted=true</code> and is recoverable from the DB.
                   </div>
                   {data.dupeJournalGroups.map((g, i) => {
                     const ch = choices.dupes[i] || "skip";
                     const sharesMatch = Math.abs(g.ibkrTotalShares - g.manualShares) <= Math.max(1, g.manualShares * 0.05);
                     return (
-                      <div key={i} style={{ marginBottom: 12, padding: 12, borderRadius: 10, border: `1px solid ${ch === "skip" ? C.border : C.borderGold}`, background: ch === "skip" ? "rgba(255,255,255,0.02)" : "rgba(201,152,42,0.05)" }}>
+                      <div key={i} style={{ marginBottom: 12, padding: 12, borderRadius: 10, border: `1px solid ${C.border}`, background: ch === "skip" ? "var(--w02)" : "var(--w04)" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
-                          <div style={{ fontWeight: 800, fontSize: "0.78rem", color: C.goldBright }}>{g.ticker} <span style={{ color: C.muted, fontWeight: 500, fontSize: "0.66rem" }}>· {sharesMatch ? "shares match exactly" : "shares within 5%"}</span></div>
-                          <select value={ch} onChange={e => setChoice("dupes", i, e.target.value)} disabled={status === "writing"} style={{ background: "rgba(255,255,255,0.05)", color: C.white, border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 8px", fontSize: "0.66rem", fontFamily: font, outline: "none", minWidth: 220 }}>
+                          <div style={{ fontWeight: 800, fontSize: "0.75rem", color: C.white }}>{g.ticker} <span style={{ color: C.muted, fontWeight: 500, fontSize: "0.6875rem" }}>· {sharesMatch ? "shares match exactly" : "shares within 5%"}</span></div>
+                          <select value={ch} onChange={e => setChoice("dupes", i, e.target.value)} disabled={status === "writing"} style={{ background: "var(--w06)", color: C.white, border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 8px", fontSize: "0.6875rem", fontFamily: font, outline: "none", minWidth: 220 }}>
                             <option value="delete-ibkr" style={{ background: C.bg2 }}>Keep manual · delete {g.ibkrRows.length} IBKR row{g.ibkrRows.length === 1 ? "" : "s"}</option>
                             <option value="delete-manual" style={{ background: C.bg2 }}>Keep IBKR · delete manual aggregate</option>
                             <option value="skip" style={{ background: C.bg2 }}>Skip (keep both)</option>
                           </select>
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: "0.66rem" }}>
-                          <div style={{ padding: 10, borderRadius: 8, background: ch === "delete-manual" ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.03)", border: `1px solid ${ch === "delete-manual" ? "rgba(239,68,68,0.30)" : C.border}`, opacity: ch === "delete-manual" ? 0.7 : 1 }}>
-                            <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>Your manual {ch === "delete-manual" && "· will be deleted"}</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: "0.6875rem" }}>
+                          <div style={{ padding: 10, borderRadius: 8, background: ch === "delete-manual" ? "rgba(255,80,0,0.10)" : "var(--w03)", border: `1px solid ${ch === "delete-manual" ? "rgba(255,80,0,0.30)" : C.border}`, opacity: ch === "delete-manual" ? 0.7 : 1 }}>
+                            <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.muted, marginBottom: 4 }}>Your manual {ch === "delete-manual" && "· will be deleted"}</div>
                             <div style={{ color: C.text, lineHeight: 1.5 }}>
                               {tradeDateISO(g.manualEntry) || g.manualEntry} → {tradeDateISO(g.manualExit) || g.manualExit} · {Number(g.manualShares).toLocaleString()} sh · <strong style={{ color: g.manualPL >= 0 ? C.green : C.red }}>{g.manualPL >= 0 ? "+" : ""}{fmt$(Math.abs(g.manualPL), 2)}</strong>{g.manualRMult != null && <> · {Number(g.manualRMult).toFixed(2)}R</>}
                             </div>
                           </div>
-                          <div style={{ padding: 10, borderRadius: 8, background: ch === "delete-ibkr" ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.03)", border: `1px solid ${ch === "delete-ibkr" ? "rgba(239,68,68,0.30)" : C.border}`, opacity: ch === "delete-ibkr" ? 0.7 : 1 }}>
-                            <div style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 4 }}>IBKR rows ({g.ibkrRows.length}) {ch === "delete-ibkr" && "· will be deleted"}</div>
+                          <div style={{ padding: 10, borderRadius: 8, background: ch === "delete-ibkr" ? "rgba(255,80,0,0.10)" : "var(--w03)", border: `1px solid ${ch === "delete-ibkr" ? "rgba(255,80,0,0.30)" : C.border}`, opacity: ch === "delete-ibkr" ? 0.7 : 1 }}>
+                            <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.muted, marginBottom: 4 }}>IBKR rows ({g.ibkrRows.length}) {ch === "delete-ibkr" && "· will be deleted"}</div>
                             {g.ibkrRows.map(r => (
                               <div key={r.id} style={{ color: C.text, lineHeight: 1.5 }}>
                                 {tradeDateISO(r.entry) || r.entry} → {tradeDateISO(r.exit) || r.exit} · {Number(r.shares).toLocaleString()} sh · <strong style={{ color: r.plDollar >= 0 ? C.green : C.red }}>{r.plDollar >= 0 ? "+" : ""}{fmt$(Math.abs(r.plDollar), 2)}</strong>
                               </div>
                             ))}
-                            <div style={{ marginTop: 4, paddingTop: 4, borderTop: `1px dashed ${C.border}`, color: C.muted, fontSize: "0.62rem" }}>Total: {Number(g.ibkrTotalShares).toLocaleString()} sh · {g.ibkrTotalPL >= 0 ? "+" : ""}{fmt$(Math.abs(g.ibkrTotalPL), 2)}</div>
+                            <div style={{ marginTop: 4, paddingTop: 4, borderTop: `1px dashed ${C.border}`, color: C.muted, fontSize: "0.6875rem" }}>Total: {Number(g.ibkrTotalShares).toLocaleString()} sh · {g.ibkrTotalPL >= 0 ? "+" : ""}{fmt$(Math.abs(g.ibkrTotalPL), 2)}</div>
                           </div>
                         </div>
                       </div>
@@ -3026,10 +3740,10 @@ function IbkrSyncModal({ open, onClose, status, data, error, result, onRetry, on
                 </div>
               )}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: "0.64rem", color: C.muted }}>{willWrite} row{willWrite === 1 ? "" : "s"} will be written · the rest skipped.</span>
+                <span style={{ fontSize: "0.6875rem", color: C.muted }}>{willWrite} row{willWrite === 1 ? "" : "s"} will be written · the rest skipped.</span>
                 <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={onClose} disabled={status === "writing"} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontWeight: 700, fontSize: "0.74rem", cursor: status === "writing" ? "default" : "pointer", fontFamily: font }}>Cancel</button>
-                  <button onClick={confirm} disabled={status === "writing" || willWrite === 0} style={{ padding: "10px 22px", borderRadius: 980, border: "none", background: willWrite === 0 ? "rgba(255,255,255,0.1)" : `linear-gradient(135deg, ${C.goldMid}, ${C.goldBright})`, color: willWrite === 0 ? C.muted : "#000", fontWeight: 800, fontSize: "0.74rem", cursor: (status === "writing" || willWrite === 0) ? "default" : "pointer", fontFamily: font }}>{status === "writing" ? "Importing…" : `Import ${willWrite}`}</button>
+                  <button onClick={onClose} disabled={status === "writing"} style={{ padding: "10px 20px", borderRadius: 980, border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontWeight: 700, fontSize: "0.75rem", cursor: status === "writing" ? "default" : "pointer", fontFamily: font }}>Cancel</button>
+                  <button onClick={confirm} disabled={status === "writing" || willWrite === 0} style={{ padding: "10px 22px", borderRadius: 980, border: "none", background: willWrite === 0 ? "var(--w10)" : `linear-gradient(135deg, ${C.goldMid}, ${C.goldBright})`, color: willWrite === 0 ? C.muted : "#000", fontWeight: 800, fontSize: "0.75rem", cursor: (status === "writing" || willWrite === 0) ? "default" : "pointer", fontFamily: font }}>{status === "writing" ? "Importing…" : `Import ${willWrite}`}</button>
                 </div>
               </div>
             </>
@@ -3121,8 +3835,8 @@ return (
           {r ? (<>
             <div className="results">
               <div className="tile big-emph"><div className="label"><span className="term" data-tip="How many shares to buy so a stop-out loses exactly the risk you chose. A tighter stop earns you more shares; a wider stop, fewer.">Shares to buy</span></div><div className="v gold">{f0(r.shares)}</div><div className="vsub">{money(r.posValue)} position</div></div>
-              <div className="tile big-emph"><div className="label"><span className="term" data-tip="The RESULT of fixing your risk — how much of your account this position works out to. Keep any single position under ~30%.">Position size</span></div><div className={"v " + (r.posSizePct > 30 ? "red" : r.posSizePct > 25 ? "gold" : "")}>{r.posSizePct.toFixed(1)}%</div><div className="vsub">of your account</div></div>
-              <div className="tile"><div className="label"><span className="term" data-tip="If your stop is hit, the loss as a percent of your whole account — this matches the risk you chose above.">Account risk</span></div><div className={"v " + (r.riskPctEquity > 2 ? "red" : r.riskPctEquity > 1.5 ? "gold" : "")}>{r.riskPctEquity.toFixed(2)}%</div><div className="vsub">= {money(r.totalRisk)} at risk</div></div>
+              <div className="tile big-emph"><div className="label"><span className="term" data-tip="The RESULT of fixing your risk — how much of your account this position works out to. Keep any single position under ~30%.">Position size</span></div><div className={"v " + (r.posSizePct > 30 ? "red" : r.posSizePct > 25 ? "warn" : "")}>{r.posSizePct.toFixed(1)}%</div><div className="vsub">of your account</div></div>
+              <div className="tile"><div className="label"><span className="term" data-tip="If your stop is hit, the loss as a percent of your whole account — this matches the risk you chose above.">Account risk</span></div><div className={"v " + (r.riskPctEquity > 2 ? "red" : r.riskPctEquity > 1.5 ? "warn" : "")}>{r.riskPctEquity.toFixed(2)}%</div><div className="vsub">= {money(r.totalRisk)} at risk</div></div>
               <div className="tile"><div className="label"><span className="term" data-tip="The price your stop sits at.">Stop price</span></div><div className="v">${f2(r.stopPrice)}</div><div className="vsub">sell-if-wrong level</div></div>
             </div>
             <div className="label" style={{ marginTop: 18 }}><span className="term" data-tip="R is your risk on the trade — one unit of what you'd lose if stopped. A 3R winner makes three times what you risked. Pros think in R, not dollars.">Profit targets in R (your unit of risk)</span></div>
@@ -3626,8 +4340,8 @@ return (
         <div>
           <div className="panelhead">Your assumptions</div>
           <div className="iogrid">
-            <div className="field"><label><span className="term" data-tip="The money you started the account with. Your total return is measured against this.">Starting capital</span></label><input className="in" value={simStart} onChange={e => setSimStart(e.target.value)} placeholder={baseStart ? Math.round(baseStart).toString() : "100000"} /><div className="hint">What you began with.{baseStart > 0 && <button onClick={() => setSimStart(String(Math.round(baseStart)))} style={{ background: "transparent", border: "none", color: "var(--goldBright)", cursor: "pointer", fontSize: "0.62rem", fontWeight: 700, padding: "0 0 0 6px" }}>↙ auto-fill</button>}</div></div>
-            <div className="field"><label><span className="term" data-tip="The money you have now. Compounding starts from here.">Current capital</span></label><input className="in" value={simCurrent} onChange={e => setSimCurrent(e.target.value)} placeholder={baseCurrent ? Math.round(baseCurrent).toString() : "100000"} /><div className="hint">What you have today.{baseCurrent > 0 && <button onClick={() => setSimCurrent(String(Math.round(baseCurrent)))} style={{ background: "transparent", border: "none", color: "var(--goldBright)", cursor: "pointer", fontSize: "0.62rem", fontWeight: 700, padding: "0 0 0 6px" }}>↙ auto-fill</button>}</div></div>
+            <div className="field"><label><span className="term" data-tip="The money you started the account with. Your total return is measured against this.">Starting capital</span></label><input className="in" value={simStart} onChange={e => setSimStart(e.target.value)} placeholder={baseStart ? Math.round(baseStart).toString() : "100000"} /><div className="hint">What you began with.{baseStart > 0 && <button onClick={() => setSimStart(String(Math.round(baseStart)))} style={{ background: "transparent", border: "none", color: "var(--goldBright)", cursor: "pointer", fontSize: "0.6875rem", fontWeight: 700, padding: "0 0 0 6px" }}>↙ auto-fill</button>}</div></div>
+            <div className="field"><label><span className="term" data-tip="The money you have now. Compounding starts from here.">Current capital</span></label><input className="in" value={simCurrent} onChange={e => setSimCurrent(e.target.value)} placeholder={baseCurrent ? Math.round(baseCurrent).toString() : "100000"} /><div className="hint">What you have today.{baseCurrent > 0 && <button onClick={() => setSimCurrent(String(Math.round(baseCurrent)))} style={{ background: "transparent", border: "none", color: "var(--goldBright)", cursor: "pointer", fontSize: "0.6875rem", fontWeight: 700, padding: "0 0 0 6px" }}>↙ auto-fill</button>}</div></div>
             <div className="field"><label><span className="term" data-tip="Design in R-multiples (each trade measured in units of risk — how most of us size) or in raw % moves of the position. Same compounding math, different unit.">Design unit</span></label>
               <div className="miniseg">
                 <button className={simUnit === "r" ? "on" : ""} onClick={() => setSimUnit("r")}>R-multiple</button>
@@ -3667,7 +4381,7 @@ return (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "flex-end", width: "100%" }}>
                           <input className="in" style={{ maxWidth: 120 }} value={row.count} onChange={e => setTiersNow(t => t.map((r, idx) => idx === i ? { ...r, count: e.target.value } : r))} />
                           <button title="Remove this winner tier" disabled={tiersNow.length <= 1} onClick={() => setTiersNow(t => t.filter((_, idx) => idx !== i))}
-                            style={{ background: "transparent", border: "none", color: tiersNow.length <= 1 ? "var(--faint)" : "var(--muted)", cursor: tiersNow.length <= 1 ? "default" : "pointer", fontSize: "0.85rem", padding: "0 2px" }}>✕</button>
+                            style={{ background: "transparent", border: "none", color: tiersNow.length <= 1 ? "var(--faint)" : "var(--muted)", cursor: tiersNow.length <= 1 ? "default" : "pointer", fontSize: "0.875rem", padding: "0 2px" }}>✕</button>
                         </span>
                       </td>
                     </tr>
@@ -3677,26 +4391,26 @@ return (
             );
           })()}
           </div>
-          <button className="btn" style={{ marginTop: 8, fontSize: "0.72rem", padding: "6px 12px" }} onClick={() => (simUnit === "r" ? setSimTiersR : setSimTiers)(t => [...t, { gain: "", count: "" }])}>＋ Add winner tier</button>
+          <button className="btn" style={{ marginTop: 8, fontSize: "0.75rem", padding: "6px 12px" }} onClick={() => (simUnit === "r" ? setSimTiersR : setSimTiers)(t => [...t, { gain: "", count: "" }])}>＋ Add winner tier</button>
           <div className="hint" style={{ marginTop: 8 }}>Most wins are small; a few are huge. That mix is what drives compounding.</div>
           {/* ── GOAL-SEEK: set the RETURN you want; the system tells you the trades you need.
                 Members can't plan a trade count — they can plan a target and a winner mix. ── */}
-          <div style={{ marginTop: 18, border: "1px solid var(--borderGold)", borderRadius: 12, padding: "12px 14px", background: "rgba(201,152,42,0.04)" }}>
+          <div style={{ marginTop: 18, border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", background: "var(--w03)" }}>
             <div className="panelhead" style={{ marginBottom: 8 }}>Plan backwards from a target</div>
-            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, fontSize: "0.76rem" }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, fontSize: "0.75rem" }}>
               <span className="term" data-tip="The total account growth you're planning for, in % of current capital. The solver uses your risk per trade, win rate and winner mix above to work out how many trades that takes.">Target total return</span>
               <input className="in" style={{ maxWidth: 90 }} value={planTarget} onChange={e => setPlanTarget(e.target.value)} placeholder="100" />
-              <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>%</span>
+              <span style={{ color: "var(--muted)", fontSize: "0.6875rem" }}>%</span>
             </div>
             {plan?.impossible ? (
-              <div style={{ marginTop: 10, fontSize: "0.74rem", color: "var(--red)", lineHeight: 1.6 }}>
+              <div style={{ marginTop: 10, fontSize: "0.75rem", color: "var(--red)", lineHeight: 1.6 }}>
                 This mix never reaches the target — expected growth per trade is zero or negative at a {plan.wr.toFixed(0)}% win rate. Raise the winner sizes, the win rate, or cut the average loss.
               </div>
             ) : plan ? (
-              <div style={{ marginTop: 10, fontSize: "0.76rem", lineHeight: 1.8 }}>
-                You need about <b style={{ color: "var(--goldBright)", fontSize: "0.95rem", fontVariantNumeric: "tabular-nums" }}>{plan.N.toLocaleString()} trades</b> at your {plan.wr.toFixed(0)}% win rate — <b style={{ fontVariantNumeric: "tabular-nums" }}>{plan.W} winners</b> ({plan.alloc.map((a, i) => `${a.n}× ${a.g}${plan.suffix === "R" ? "R" : "%"}`).join(" · ")}) and <b style={{ fontVariantNumeric: "tabular-nums" }}>{plan.L} losers</b>. That exact plan lands ≈ <b style={{ fontVariantNumeric: "tabular-nums" }}>{(plan.achieved >= 0 ? "+" : "") + plan.achieved.toFixed(1)}%</b>.
+              <div style={{ marginTop: 10, fontSize: "0.75rem", lineHeight: 1.8 }}>
+                You need about <b style={{ color: "var(--white)", fontSize: "1rem", fontVariantNumeric: "tabular-nums" }}>{plan.N.toLocaleString()} trades</b> at your {plan.wr.toFixed(0)}% win rate — <b style={{ fontVariantNumeric: "tabular-nums" }}>{plan.W} winners</b> ({plan.alloc.map((a, i) => `${a.n}× ${a.g}${plan.suffix === "R" ? "R" : "%"}`).join(" · ")}) and <b style={{ fontVariantNumeric: "tabular-nums" }}>{plan.L} losers</b>. That exact plan lands ≈ <b style={{ fontVariantNumeric: "tabular-nums" }}>{(plan.achieved >= 0 ? "+" : "") + plan.achieved.toFixed(1)}%</b>.
                 <div style={{ marginTop: 6 }}>
-                  <button className="btn" style={{ fontSize: "0.72rem", padding: "6px 12px" }} onClick={applyPlan} title="Writes these counts into the winner tiers and losers above — then hit Save playbook design to make it your benchmark">Use this plan → fill my design</button>
+                  <button className="btn" style={{ fontSize: "0.75rem", padding: "6px 12px" }} onClick={applyPlan} title="Writes these counts into the winner tiers and losers above — then hit Save playbook design to make it your benchmark">Use this plan → fill my design</button>
                 </div>
                 <div className="hint" style={{ marginTop: 8 }}>This is the EXPECTED path — real sequences land in a range around it. It's also very sensitive to risk per trade: half the risk ≈ double the trades. Adjust the mix above and watch this number move.</div>
               </div>
@@ -3736,7 +4450,7 @@ return (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, alignItems: "center" }}>
                 <button className="btn" disabled={!sim} onClick={() => { syncToPlaybook(false); setPbSaved(true); setTimeout(() => setPbSaved(false), 3000); }} title="Lock in this design as your Playbook benchmark — it stays until you save a new one">💾 Save playbook design</button>
                 <button className="btn" disabled={!sim} onClick={() => syncToPlaybook(true)} title="Save this design AND jump to the Playbook tracker: your live stats compared against it — the feedback loop">Compare stats → Playbook tracker</button>
-                {pbSaved && <span style={{ color: "var(--green)", fontSize: "0.72rem", fontWeight: 700 }}>design saved ✓ — the Playbook tracker now benchmarks against it</span>}
+                {pbSaved && <span style={{ color: "var(--green)", fontSize: "0.75rem", fontWeight: 700 }}>design saved ✓ — the Playbook tracker now benchmarks against it</span>}
               </div>
             );
           })()}
@@ -3757,10 +4471,10 @@ return (
                   {eqPath && [eqPath.hi, eqPath.lo + (eqPath.hi - eqPath.lo) * 0.5, eqPath.lo].map((v, i) => <span key={i}>${f0(v / 1000)}k</span>)}
                 </div>
                 <div className="eqplot"><svg viewBox="0 0 600 180" preserveAspectRatio="none" className="eqsvg">
-                  <defs><linearGradient id="sgPrem" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(201,152,42,0.30)" /><stop offset="100%" stopColor="rgba(201,152,42,0)" /></linearGradient></defs>
+                  <defs><linearGradient id="sgPrem" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--w22)" /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
                   <line x1="0" y1="45" x2="600" y2="45" className="grid" /><line x1="0" y1="90" x2="600" y2="90" className="grid" /><line x1="0" y1="135" x2="600" y2="135" className="grid" />
                   {eqPath && <path d={eqPath.area} fill="url(#sgPrem)" />}
-                  {eqPath && <path d={eqPath.line} fill="none" stroke="var(--goldBright)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+                  {eqPath && <path d={eqPath.line} fill="none" stroke="var(--w82)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
                 </svg></div>
               </div>
             </div>
@@ -3775,11 +4489,11 @@ return (
             <div className="scencompare">
               {simScenarios.slice().reverse().map((s, i) => (
                 <div className="scencard" key={s.id}>
-                  <span style={{ position: "absolute", top: 8, right: 11, color: "var(--faint)", cursor: "pointer", fontSize: "0.8rem" }} onClick={() => setSimScenarios(prev => prev.filter(x => x.id !== s.id))}>✕</span>
+                  <span style={{ position: "absolute", top: 8, right: 11, color: "var(--faint)", cursor: "pointer", fontSize: "0.75rem" }} onClick={() => setSimScenarios(prev => prev.filter(x => x.id !== s.id))}>✕</span>
                   <div className="n">Scenario {simScenarios.length - i}</div>
                   <div className="v gold" style={{ fontSize: "1.25rem", fontWeight: 800, margin: "4px 0" }}>{sgnPct(s.totalReturn)}</div>
-                  <div style={{ fontSize: "0.78rem", color: "var(--muted)" }}>{money(s.endEq)}</div>
-                  <div style={{ fontSize: "0.7rem", color: "var(--faint)", marginTop: 4 }}>size {s.posSize}% · {s.winRate.toFixed(1)}% win</div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>{money(s.endEq)}</div>
+                  <div style={{ fontSize: "0.6875rem", color: "var(--faint)", marginTop: 4 }}>size {s.posSize}% · {s.winRate.toFixed(1)}% win</div>
                 </div>
               ))}
             </div>
@@ -3791,13 +4505,7 @@ return (
 );
 }
 
-const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
-    --text:rgba(255,255,255,0.92); --muted:rgba(255,255,255,0.70); --faint:rgba(255,255,255,0.45);
-    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
-    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
-    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
-    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
-    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;}
+const PREM_CSS = `${RH_TOKENS}
 .vp *{box-sizing:border-box;margin:0;padding:0}
 .vp{background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
     color:var(--text); font-family:var(--font); line-height:1.58; font-size:16px; -webkit-font-smoothing:antialiased; min-height:100vh}
@@ -3811,11 +4519,11 @@ const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vp .tabnum,.vp .v,.vp .outval,.vp .rtable td,.vp .tile .v{font-variant-numeric:tabular-nums}
 .vp .card{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:22px;
     backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%); padding:24px 26px; overflow:hidden}
-.vp .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)}
-.vp .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+.vp .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, var(--w06), transparent 55%)}
+.vp .eyebrow{font-size:0.6875rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--faint)}
 .vp .h1{font-size:clamp(1.55rem,3vw,2.05rem); font-weight:800; letter-spacing:-0.04em; color:var(--white)}
-.vp .goldname{color:var(--goldBright)}
-.vp .sub{font-size:0.82rem; color:var(--muted); max-width:640px; margin-top:6px}
+.vp .goldname{color:var(--white)}
+.vp .sub{font-size:0.875rem; color:var(--muted); max-width:640px; margin-top:6px}
 .vp .reveal .h1{opacity:0; transform:translateY(14px)}
 .vp .reveal .sub{opacity:0}
 .vp .reveal.in-view .h1{animation:hRise 0.42s cubic-bezier(0.22,1,0.36,1) both}
@@ -3825,51 +4533,51 @@ const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 @media (prefers-reduced-motion: reduce){
 .vp .reveal .h1,.vp .reveal .sub{animation:none !important; opacity:1; transform:none}
   }
-.vp .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
-.vp .sech{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+.vp .label{font-size:0.6875rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+.vp .sech{font-size:1rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
 .vp .row{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
 .vp .spacer{flex:1}
 .vp .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:nowrap}
-.vp .brand{display:flex; align-items:center; gap:9px; font-weight:800; color:var(--white); font-size:0.95rem; flex:none; white-space:nowrap}
+.vp .brand{display:flex; align-items:center; gap:9px; font-weight:800; color:var(--white); font-size:1rem; flex:none; white-space:nowrap}
 .vp .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
-.vp .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px; min-width:0; overflow-x:auto; scrollbar-width:none}
+    background:linear-gradient(135deg,var(--goldPillMid),var(--goldPill)); color:var(--goldOn); font-weight:800; font-size:0.75rem}
+.vp .tabs{display:inline-flex; gap:4px; background:var(--w03); border:1px solid var(--border); border-radius:980px; padding:4px; min-width:0; overflow-x:auto; scrollbar-width:none}
 .vp .navbar .tabs::-webkit-scrollbar{display:none}
 .vp .tabs a{white-space:nowrap}
-.vp .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+.vp .tabs a{text-decoration:none; color:var(--muted); font-size:0.875rem; font-weight:700; padding:7px 18px; border-radius:980px}
 .vp .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
 .vp .tabs a:hover:not(.on){color:var(--text)}
 .vp .term{border-bottom:1px dotted var(--borderGold); cursor:help; position:relative}
 .vp .term:hover::after{content:attr(data-tip); position:absolute; left:0; top:150%; width:250px; background:#11111b;
-    border:1px solid var(--borderGold); border-radius:12px; padding:10px 12px; font-size:0.72rem; font-weight:400;
+    border:1px solid var(--borderGold); border-radius:12px; padding:10px 12px; font-size:0.75rem; font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--text); z-index:60; box-shadow:0 14px 40px rgba(0,0,0,0.55); line-height:1.45; white-space:pre-line}
 .vp .term.tipright:hover::after{left:auto; right:0}
-.vp .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
-.vp .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.74rem;
+.vp .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:var(--w02)}
+.vp .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.75rem;
     font-weight:700; padding:7px 16px; border-radius:980px; transition:all .15s}
 .vp .seg button.on{background:var(--goldDim); color:var(--goldBright)}
-.vp select{color-scheme:dark}
+.vp select{color-scheme:dark} body.theme-light .vp select{color-scheme:light}
 .vp .btn{transition:border-color .15s,color .15s,background .15s}
-.vp .btn:hover{border-color:var(--borderGold); color:var(--white); background:rgba(255,255,255,0.05)}
-.vp .btn{border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text); font-family:var(--font);
-    font-size:0.74rem; font-weight:700; padding:8px 16px; border-radius:980px; cursor:pointer}
-.vp .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+.vp .btn:hover{border-color:var(--borderGold); color:var(--white); background:var(--w06)}
+.vp .btn{border:1px solid var(--border); background:var(--w03); color:var(--text); font-family:var(--font);
+    font-size:0.75rem; font-weight:700; padding:8px 16px; border-radius:980px; cursor:pointer}
+.vp .btn.gold{background:linear-gradient(120deg,var(--goldPillMid),var(--goldPill),var(--goldPillDeep)); color:var(--goldOn); border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
 .vp .welcome{display:flex; gap:14px; align-items:flex-start; margin-top:20px; background:var(--goldDim);
     border:1px solid var(--borderGold); border-radius:16px; padding:15px 18px}
 .vp .welcome .wd{width:8px;height:8px;border-radius:50%;background:var(--goldBright);box-shadow:0 0 12px var(--goldBright);margin-top:6px;flex:none}
 .vp .welcome b{color:var(--white)}
-.vp .welcome .x{margin-left:auto; color:var(--faint); cursor:pointer; font-size:1.1rem; line-height:1}
+.vp .welcome .x{margin-left:auto; color:var(--faint); cursor:pointer; font-size:1.125rem; line-height:1}
 .vp.expert .welcome{display:none}
 .vp .tourwrap{margin-top:20px}
 .vp.expert .tourwrap{display:none}
 .vp .tour{position:relative; border:1px solid var(--borderGold); border-radius:20px; overflow:hidden; background:#0a0a12; aspect-ratio:16/6.5; min-height:230px}
 .vp .tourbg{position:absolute; inset:0; background:radial-gradient(680px 320px at 50% -10%, rgba(201,152,42,0.14), transparent 70%)}
 .vp .tourstage{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:34px 40px 56px; gap:12px}
-.vp .tourchip{font-size:0.6rem; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold)}
+.vp .tourchip{font-size:0.6875rem; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; color:var(--faint)}
 .vp .tourtitle{font-size:clamp(1.3rem,3.2vw,1.9rem); font-weight:800; letter-spacing:-0.03em; color:var(--white)}
-.vp .tourcap{font-size:0.9rem; color:var(--muted); max-width:560px; line-height:1.55}
+.vp .tourcap{font-size:0.875rem; color:var(--muted); max-width:560px; line-height:1.55}
 .vp .tourdots{display:flex; gap:7px; margin-top:6px}
-.vp .tourdots i{width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.18); transition:all .25s}
+.vp .tourdots i{width:8px; height:8px; border-radius:50%; background:var(--w22); transition:all .25s}
 .vp .tourdots i.on{background:var(--goldBright); width:22px; border-radius:5px}
 .vp .tourposter{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
     background:rgba(8,8,14,0.55); backdrop-filter:blur(2px); cursor:pointer; z-index:3}
@@ -3877,111 +4585,112 @@ const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vp .playbig{width:74px; height:74px; border-radius:50%; background:linear-gradient(135deg,var(--goldBright),var(--goldMid));
     display:flex; align-items:center; justify-content:center; box-shadow:0 12px 40px rgba(201,152,42,0.4); transition:transform .15s}
 .vp .tourposter:hover .playbig{transform:scale(1.07)}
-.vp .playbig svg{width:30px; height:30px; color:#0a0a0a; margin-left:4px}
-.vp .postertitle{font-size:1.05rem; font-weight:800; color:var(--white)}
-.vp .postersub{font-size:0.78rem; color:var(--muted)}
+.vp .playbig svg{width:30px; height:30px; color:var(--goldOn); margin-left:4px}
+.vp .postertitle{font-size:1rem; font-weight:800; color:var(--white)}
+.vp .postersub{font-size:0.75rem; color:var(--muted)}
 .vp .tourbar{position:absolute; left:0; right:0; bottom:0; display:flex; align-items:center; gap:12px; padding:12px 16px;
     background:linear-gradient(0deg, rgba(8,8,14,0.92), transparent); z-index:4}
-.vp .tourbtn{background:rgba(255,255,255,0.1); border:none; width:34px; height:34px; border-radius:50%; cursor:pointer;
+.vp .tourbtn{background:var(--w10); border:none; width:34px; height:34px; border-radius:50%; cursor:pointer;
     display:flex; align-items:center; justify-content:center; color:var(--white); flex:none}
-.vp .tourbtn:hover{background:rgba(255,255,255,0.18)}
+.vp .tourbtn:hover{background:var(--w22)}
 .vp .tourbtn svg{width:15px; height:15px}
-.vp .tourprog{flex:1; height:5px; background:rgba(255,255,255,0.14); border-radius:980px; overflow:hidden; cursor:default}
+.vp .tourprog{flex:1; height:5px; background:var(--w14); border-radius:980px; overflow:hidden; cursor:default}
 .vp .tourprog .fill{height:100%; width:0%; background:linear-gradient(90deg,var(--goldMid),var(--goldBright)); transition:width .2s linear}
-.vp .tourtime{font-size:0.68rem; color:var(--muted); font-variant-numeric:tabular-nums; flex:none; min-width:34px; text-align:right}
+.vp .tourtime{font-size:0.6875rem; color:var(--muted); font-variant-numeric:tabular-nums; flex:none; min-width:34px; text-align:right}
 .vp .tooltabs{display:flex; gap:4px; flex-wrap:wrap; margin:26px 0 20px; border-bottom:1px solid var(--border)}
 .vp .tooltab{background:transparent; border:none; border-bottom:2px solid transparent; color:var(--muted); font-family:var(--font);
-    font-size:0.85rem; font-weight:700; padding:11px 15px; cursor:pointer; margin-bottom:-1px; white-space:nowrap}
+    font-size:0.875rem; font-weight:700; padding:11px 15px; cursor:pointer; margin-bottom:-1px; white-space:nowrap}
 .vp .tooltab.on{color:var(--goldBright); border-bottom-color:var(--goldBright)}
 .vp .tooltab:hover:not(.on){color:var(--text)}
 .vp .toolpanel{display:none}
 .vp .toolpanel.on{display:block}
-.vp .intro{display:flex; gap:13px; align-items:flex-start; margin-bottom:18px; background:rgba(255,255,255,0.025);
+.vp .intro{display:flex; gap:13px; align-items:flex-start; margin-bottom:18px; background:var(--w03);
     border:1px solid var(--border); border-radius:16px; padding:15px 18px}
 .vp .intro .ico{flex:none; width:38px; height:38px; border-radius:11px; background:var(--goldDim); border:1px solid var(--borderGold);
     display:flex; align-items:center; justify-content:center; color:var(--goldBright)}
 .vp .intro .ico svg{width:19px; height:19px}
-.vp .intro h3{font-size:0.98rem; font-weight:800; color:var(--white); letter-spacing:-0.02em; margin-bottom:3px}
-.vp .intro p{font-size:0.82rem; color:var(--muted); line-height:1.55}
+.vp .intro h3{font-size:1rem; font-weight:800; color:var(--white); letter-spacing:-0.02em; margin-bottom:3px}
+.vp .intro p{font-size:0.875rem; color:var(--muted); line-height:1.55}
 .vp:not(.expert) .guide{transition:box-shadow .2s; border-radius:16px}
 .vp:not(.expert) .guide.guide-active{box-shadow:0 0 0 1px var(--borderGold), 0 0 50px rgba(201,152,42,0.13)}
 .vp .io{display:grid; grid-template-columns:0.92fr 1.08fr; gap:20px; align-items:start}
-.vp .panelhead{font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold); margin-bottom:14px}
+.vp .panelhead{font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--faint); margin-bottom:14px}
 .vp .iogrid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
 .vp .field{display:flex; flex-direction:column; gap:6px}
 .vp .field.full{grid-column:1/-1}
-.vp .field label{font-size:0.64rem; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--muted)}
-.vp .in{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--text);
-    font-family:var(--font); font-size:0.95rem; font-weight:600; padding:10px 12px; outline:none; width:100%; font-variant-numeric:tabular-nums}
+.vp .field label{font-size:0.6875rem; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--muted)}
+.vp .in{background:var(--w06); border:1px solid var(--border); border-radius:10px; color:var(--text);
+    font-family:var(--font); font-size:1rem; font-weight:600; padding:10px 12px; outline:none; width:100%; font-variant-numeric:tabular-nums}
 .vp .in:focus{border-color:var(--gold)}
 /* Example mode — pre-filled demo numbers render greyed (like a placeholder) so the diagram shows
    beside them; the moment the user types anywhere in the panel they switch back to normal text. */
 .vp .toolpanel.example .in{color:var(--faint)}
-.vp .field .hint{font-size:0.7rem; color:var(--faint); line-height:1.4}
+.vp .field .hint{font-size:0.6875rem; color:var(--faint); line-height:1.4}
 .vp.expert .field .hint{display:none}
 .vp .miniseg{display:inline-flex; border:1px solid var(--border); border-radius:9px; overflow:hidden}
-.vp .miniseg button{border:none; background:transparent; color:var(--muted); font-family:var(--font); font-size:0.78rem; font-weight:700; padding:9px 14px; cursor:pointer}
+.vp .miniseg button{border:none; background:transparent; color:var(--muted); font-family:var(--font); font-size:0.75rem; font-weight:700; padding:8px 16px; cursor:pointer}
 .vp .miniseg button.on{background:var(--goldDim); color:var(--goldBright)}
 .vp .results{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px}
 .vp .tile{background:var(--glass); border:1px solid var(--border); border-radius:14px; padding:14px 16px}
 .vp .tile .label{margin-bottom:8px}
-.vp .tile .v{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em}
+.vp .tile .v{font-size:1.25rem; font-weight:800; letter-spacing:-0.03em}
 .vp .tile .v.green{color:var(--green)}
 .vp .tile .v.red{color:var(--red)}
-.vp .tile .v.gold{color:var(--goldBright)}
-.vp .tile .vsub{font-size:0.68rem; color:var(--faint); margin-top:4px}
-.vp .big-emph{border-color:var(--borderGold); background:linear-gradient(140deg, rgba(201,152,42,0.10), transparent 75%)}
+.vp .tile .v.gold{color:var(--white)}
+.vp .tile .v.warn{color:var(--orange)}
+.vp .tile .vsub{font-size:0.6875rem; color:var(--faint); margin-top:4px}
+.vp .big-emph{border-color:var(--w14); background:linear-gradient(140deg, var(--w06), transparent 75%)}
 .vp .interp{display:flex; gap:11px; align-items:flex-start; margin-top:16px; background:var(--goldDim); border:1px solid var(--borderGold);
-    border-radius:14px; padding:13px 16px; font-size:0.82rem; color:var(--text); line-height:1.55}
-.vp .interp b{color:var(--goldBright)}
-.vp .interp .green{color:#86efac}
+    border-radius:14px; padding:13px 16px; font-size:0.875rem; color:var(--text); line-height:1.55}
+.vp .interp b{color:var(--white)}
+.vp .interp .green{color:var(--greenFg)}
 .vp .interp .red{color:#fda4a4}
-.vp .interp .ic{flex:none; width:17px;height:17px; color:var(--goldBright); margin-top:2px}
+.vp .interp .ic{flex:none; width:17px;height:17px; color:var(--muted); margin-top:2px}
 .vp.expert .interp{display:none}
-.vp .alert{display:flex; gap:9px; align-items:flex-start; margin-top:14px; border-radius:12px; padding:11px 14px; font-size:0.78rem; line-height:1.45}
+.vp .alert{display:flex; gap:9px; align-items:flex-start; margin-top:14px; border-radius:12px; padding:11px 14px; font-size:0.75rem; line-height:1.45}
 .vp .alert svg{width:15px;height:15px;flex:none;margin-top:1px}
-.vp .alert.warn{background:rgba(239,68,68,0.10); border:1px solid rgba(239,68,68,0.3); color:#fda4a4}
-.vp .alert.caution{background:rgba(201,152,42,0.12); border:1px solid var(--borderGold); color:var(--goldBright)}
-.vp .alert.ok{background:rgba(34,197,94,0.10); border:1px solid rgba(34,197,94,0.3); color:#86efac}
+.vp .alert.warn{background:rgba(255,80,0,0.10); border:1px solid rgba(255,80,0,0.3); color:#fda4a4}
+.vp .alert.caution{background:rgba(255,170,5,0.10); border:1px solid rgba(255,170,5,0.28); color:var(--orange)}
+.vp .alert.ok{background:rgba(0,200,5,0.10); border:1px solid rgba(0,200,5,0.3); color:var(--greenFg)}
 .vp .tbl-scroll{overflow-x:auto}
 .vp .rtable{width:100%; border-collapse:collapse; margin-top:16px}
-.vp .rtable th{font-size:0.58rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); text-align:right; padding:8px 9px; border-bottom:1px solid var(--border)}
+.vp .rtable th{font-size:0.6875rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); text-align:right; padding:8px 9px; border-bottom:1px solid var(--border)}
 .vp .rtable th:first-child,.vp .rtable td:first-child{text-align:left}
-.vp .rtable td{font-size:0.81rem; padding:9px 9px; border-bottom:1px solid rgba(255,255,255,0.05); text-align:right; font-variant-numeric:tabular-nums}
-.vp .rtable td.green{color:#86efac}
+.vp .rtable td{font-size:0.75rem; padding:9px 9px; border-bottom:1px solid var(--w06); text-align:right; font-variant-numeric:tabular-nums}
+.vp .rtable td.green{color:var(--greenFg)}
 .vp .rtable td.red{color:#fda4a4}
-.vp .rtable td.gold{color:var(--goldBright)}
-.vp .rtable .rhead td{color:var(--gold); font-weight:700; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.06em}
-.vp .badge{display:inline-flex; align-items:center; gap:7px; font-size:0.7rem; font-weight:700; padding:6px 13px; border-radius:980px}
+.vp .rtable td.gold{color:var(--white)}
+.vp .rtable .rhead td{color:var(--faint); font-weight:700; font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.06em}
+.vp .badge{display:inline-flex; align-items:center; gap:7px; font-size:0.6875rem; font-weight:700; padding:6px 13px; border-radius:980px}
 .vp .badge .d{width:7px;height:7px;border-radius:50%}
-.vp .badge.pos{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+.vp .badge.pos{background:rgba(0,200,5,0.12); color:var(--greenFg); border:1px solid rgba(0,200,5,0.3)}
 .vp .badge.pos .d{background:var(--green)}
-.vp .badge.neg{background:rgba(239,68,68,0.12); color:#fda4a4; border:1px solid rgba(239,68,68,0.3)}
+.vp .badge.neg{background:rgba(255,80,0,0.12); color:#fda4a4; border:1px solid rgba(255,80,0,0.3)}
 .vp .badge.neg .d{background:var(--red)}
 .vp .eqbox{margin-top:18px}
 .vp .eqwrap{display:flex; gap:12px}
-.vp .eqy{display:flex; flex-direction:column; justify-content:space-between; font-size:0.62rem; color:var(--faint); min-width:46px; text-align:right; padding:2px 0; font-variant-numeric:tabular-nums}
+.vp .eqy{display:flex; flex-direction:column; justify-content:space-between; font-size:0.6875rem; color:var(--faint); min-width:46px; text-align:right; padding:2px 0; font-variant-numeric:tabular-nums}
 .vp .eqplot{flex:1; position:relative; height:180px}
 .vp .eqsvg{width:100%; height:100%; display:block}
-.vp .eqsvg .grid{stroke:rgba(255,255,255,0.06); stroke-width:1}
+.vp .eqsvg .grid{stroke:var(--w06); stroke-width:1}
 .vp .rangebar{position:relative; height:46px; margin:26px 0 8px; border-radius:980px;
-    background:linear-gradient(90deg, rgba(239,68,68,0.5), rgba(201,152,42,0.5) 50%, rgba(34,197,94,0.5)); border:1px solid var(--border)}
-.vp .rangebar .mid{position:absolute; left:50%; top:-7px; bottom:-7px; width:2px; background:var(--goldBright); transform:translateX(-50%)}
-.vp .rangebar .cap{position:absolute; top:-22px; font-size:0.66rem; font-weight:700; transform:translateX(-50%); white-space:nowrap}
-.vp .rangelabels{display:flex; justify-content:space-between; font-size:0.72rem; margin-top:6px}
+    background:linear-gradient(90deg, rgba(255,80,0,0.5), rgba(255,170,5,0.5) 50%, rgba(0,200,5,0.5)); border:1px solid var(--border)}
+.vp .rangebar .mid{position:absolute; left:50%; top:-7px; bottom:-7px; width:2px; background:var(--white); transform:translateX(-50%)}
+.vp .rangebar .cap{position:absolute; top:-22px; font-size:0.6875rem; font-weight:700; transform:translateX(-50%); white-space:nowrap}
+.vp .rangelabels{display:flex; justify-content:space-between; font-size:0.75rem; margin-top:6px}
 .vp .framebox{margin-top:18px; border:1px solid var(--border); border-radius:14px; overflow:hidden}
-.vp .framerow{display:grid; grid-template-columns:88px 1fr; gap:0; border-bottom:1px solid var(--border); font-size:0.8rem}
+.vp .framerow{display:grid; grid-template-columns:88px 1fr; gap:0; border-bottom:1px solid var(--border); font-size:0.75rem}
 .vp .framerow:last-child{border-bottom:none}
-.vp .frametag{padding:13px 14px; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:0.78rem; letter-spacing:0.04em}
-.vp .frametag.hold{background:rgba(34,197,94,0.12); color:#86efac}
-.vp .frametag.trim{background:var(--goldDim); color:var(--goldBright)}
-.vp .frametag.exit{background:rgba(239,68,68,0.12); color:#fda4a4}
+.vp .frametag{padding:13px 14px; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:0.75rem; letter-spacing:0.04em}
+.vp .frametag.hold{background:rgba(0,200,5,0.12); color:var(--greenFg)}
+.vp .frametag.trim{background:var(--w08); color:var(--text)}
+.vp .frametag.exit{background:rgba(255,80,0,0.12); color:#fda4a4}
 .vp .framerow div:last-child{padding:13px 16px; color:var(--muted); line-height:1.5}
 .vp.expert .framebox,.vp.expert .lossrec{display:none}
 .vp .lossrec{margin-top:16px}
 .vp .scencompare{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:16px}
-.vp .scencard{border:1px solid var(--borderGold); border-radius:14px; padding:13px 15px; background:rgba(201,152,42,0.05)}
-.vp .scencard .n{font-size:0.6rem; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold)}
+.vp .scencard{border:1px solid var(--border); border-radius:14px; padding:13px 15px; background:var(--w03)}
+.vp .scencard .n{font-size:0.6875rem; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:var(--faint)}
 .vp .guidepanel{position:fixed; right:24px; bottom:88px; width:330px; max-width:calc(100vw - 40px); z-index:200;
     background:#11111b; border:1px solid var(--borderGold); border-radius:16px; padding:15px 17px; box-shadow:0 22px 60px rgba(0,0,0,0.6); display:none}
 .vp:not(.expert) .guidepanel{display:block}
@@ -3990,12 +4699,12 @@ const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vp .gp-dot{width:8px; height:8px; border-radius:50%; background:var(--goldBright); flex:none}
 .vp .guidepanel.speaking .gp-dot{animation:gppulse 1s ease-in-out infinite}
 @keyframes gppulse{0%,100%{opacity:1; transform:scale(1)}50%{opacity:0.35; transform:scale(1.6)}}
-.vp .gp-title{font-size:0.82rem; font-weight:800; color:var(--goldBright); flex:1}
+.vp .gp-title{font-size:0.875rem; font-weight:800; color:var(--white); flex:1}
 .vp .gp-mute{background:transparent; border:none; cursor:pointer; color:var(--muted); padding:3px; line-height:0; display:flex}
 .vp .gp-mute:hover{color:var(--text)}
 .vp .gp-mute svg{width:18px; height:18px}
-.vp .gp-body{font-size:0.78rem; color:var(--text); line-height:1.55}
-.vp .gp-body b{color:var(--goldBright)}
+.vp .gp-body{font-size:0.75rem; color:var(--text); line-height:1.55}
+.vp .gp-body b{color:var(--white)}
 .vp.expert .term{border-bottom:none; cursor:default}
 .vp.expert .term:hover::after{content:none}
 @media(max-width:820px){
@@ -4012,15 +4721,15 @@ const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vp .tabs a{white-space:nowrap}
 .vp .tour{aspect-ratio:auto; height:300px; min-height:0}
 .vp .tourstage{padding:20px 16px 54px}
-.vp .tourtitle{font-size:1.1rem}
-.vp .tourcap{font-size:0.8rem}
+.vp .tourtitle{font-size:1.125rem}
+.vp .tourcap{font-size:0.75rem}
 .vp .tooltabs{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none}
 .vp .tooltabs::-webkit-scrollbar{display:none}
 .vp .tooltab{white-space:nowrap; padding:11px 12px}
 .vp .results{grid-template-columns:1fr 1fr}
 .vp .card{padding:18px 16px}
 .vp .intro{flex-direction:column}
-.vp .rtable th,.vp .rtable td{padding:8px 5px; font-size:0.74rem}
+.vp .rtable th,.vp .rtable td{padding:8px 5px; font-size:0.75rem}
   }
 /* ═══════════ PRO-MODE LAYOUT (.vp.expert) — ported from mockups/premium-pro.html ═══════════ */
 /* Uniform Pro card chrome (mirrors DashboardPage's .vd.expert): 16px radius, tighter padding, tooltips escape the card edge. */
@@ -4028,15 +4737,17 @@ const PREM_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vp.expert .card::before{border-radius:inherit}
 /* P1. Command header — eyebrow + h1 + muted meta (Pro drops the welcome banner + tutorial tour). */
 .vp.expert .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:8px}
-.vp.expert .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
-.vp.expert .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px; font-variant-numeric:tabular-nums}
+.vp.expert .cmdleft .ch1{font-size:1.25rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+.vp.expert .cmdmeta{font-size:0.75rem; color:var(--muted); margin-top:6px; font-variant-numeric:tabular-nums}
 /* P2. Tool tabs — compact pill segment row (reuses .seg / .seg button) */
 .vp.expert .toolseg{margin:18px 0 24px; flex-wrap:wrap}
-.vp.expert .toolseg button{padding:8px 16px; font-size:0.76rem}
+.vp.expert .toolseg button{padding:8px 16px; font-size:0.75rem}
 @media(max-width:600px){
 .vp.expert .toolseg{overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none}
 .vp.expert .toolseg::-webkit-scrollbar{display:none}
-  }`;
+  }
+${RH_SYS('.vp')}
+${PREM_RH}`;
 
 // ─── Count-up ("accelerometer" roll) — ports the mockup countUp; rolls a number's
 // text from 0 to its value once, on mount. Live updates after mount show instantly.
@@ -4130,7 +4841,7 @@ function PremiumTour({ onPlayStateChange }) {
         <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 13, height: 13, color: "var(--goldBright)" }}><path d="M8 5v14l11-7z" /></svg>
         Watch the 1-minute tour
       </button>
-      <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}>What this page is, and what each tool does</span>
+      <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>What this page is, and what each tool does</span>
     </div>
   );
   return (
@@ -4252,6 +4963,7 @@ if (expert) return (
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
+        <ThemeToggle />
       </div>
 
       {/* P1. COMMAND HEADER */}
@@ -4301,6 +5013,7 @@ return (
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}          <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
         </div>
+        <ThemeToggle />
       </div>
 
       {/* HEADER */}
@@ -4638,7 +5351,7 @@ function notesToPlain(raw) {
 // trade; scroll back for more). Marker placement matches the known fill PRICE within the bar — timezone-proof.
 // Read-only; data via /api/candles.
 const CHART_TFS = [["1m", "1min"], ["3m", "3min"], ["5m", "5min"], ["15m", "15min"], ["30m", "30min"], ["1h", "60min"], ["4h", "4h"], ["D", "1day"]];
-const MA_COLORS = { 10: "#3b82f6", 20: "#f0c050", 50: "#a78bfa" }; // MA10 blue · MA20 gold · MA50 violet — functional chart overlays
+const MA_COLORS = { 10: "#3b9eff", 20: "#f0c050", 50: "#a78bfa" }; // MA10 blue · MA20 gold · MA50 violet — functional chart overlays
 // Moving-average series data ([{time,value}]). SMA = rolling mean; EMA = exponential (seeded on first close).
 function maData(candles, period, type) {
   const out = [];
@@ -4671,15 +5384,7 @@ function volAvgData(candles, period) {
   return out;
 }
 
-const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
-    --text:rgba(255,255,255,0.92);
-    --muted:rgba(255,255,255,0.70);
-    --faint:rgba(255,255,255,0.45);
-    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
-    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
-    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
-    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
-    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;}
+const JOUR_CSS = `${RH_TOKENS}
 .vj *{box-sizing:border-box;margin:0;padding:0}
 .vj{background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
     color:var(--text); font-family:var(--font); line-height:1.58; font-size:16px;
@@ -4696,11 +5401,11 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj.prowide .shell{max-width:1680px} }
 .vj .card{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:22px;
     backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%); padding:26px 28px; overflow:hidden}
-.vj .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)}
-.vj .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+.vj .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, var(--w06), transparent 55%)}
+.vj .eyebrow{font-size:0.6875rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--faint)}
 .vj .h1{font-size:clamp(1.55rem,3vw,2.05rem); font-weight:800; letter-spacing:-0.04em; color:var(--white)}
-.vj .goldname{color:var(--goldBright)}
-.vj .sub{font-size:0.82rem; color:var(--muted); max-width:600px; margin-top:6px}
+.vj .goldname{color:var(--white)}
+.vj .sub{font-size:0.875rem; color:var(--muted); max-width:600px; margin-top:6px}
 .vj .reveal .h1{opacity:0; transform:translateY(14px)}
 .vj .reveal .sub{opacity:0}
 .vj .reveal.in-view .h1{animation:hRise 0.42s cubic-bezier(0.22,1,0.36,1) both}
@@ -4710,133 +5415,133 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 @media (prefers-reduced-motion: reduce){
 .vj .reveal .h1,.vj .reveal .sub{animation:none !important; opacity:1; transform:none}
   }
-.vj .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
-.vj .sech{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+.vj .label{font-size:0.6875rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+.vj .sech{font-size:1rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
 .vj .row{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
 .vj .spacer{flex:1}
 .vj .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:wrap}
-.vj .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem; flex:none; white-space:nowrap}
+.vj .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:1rem; flex:none; white-space:nowrap}
 .vj .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
-.vj .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
-.vj .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+    background:linear-gradient(135deg,var(--goldPillMid),var(--goldPill)); color:var(--goldOn); font-weight:800; font-size:0.75rem}
+.vj .tabs{display:inline-flex; gap:4px; background:var(--w03); border:1px solid var(--border); border-radius:980px; padding:4px}
+.vj .tabs a{text-decoration:none; color:var(--muted); font-size:0.75rem; font-weight:700; padding:7px 18px; border-radius:980px}
 .vj .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
 .vj .tabs a:hover:not(.on){color:var(--text)}
 .vj .term{border-bottom:1px dotted var(--borderGold); cursor:help; position:relative}
 .vj .term .plain{color:var(--faint); font-weight:500}
 .vj .term:hover::after{content:attr(data-tip); position:absolute; left:0; top:140%; width:240px; background:#11111b;
-    border:1px solid var(--borderGold); border-radius:12px; padding:10px 12px; font-size:0.72rem; font-weight:400;
+    border:1px solid var(--borderGold); border-radius:12px; padding:10px 12px; font-size:0.75rem; font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--text); z-index:30; box-shadow:0 14px 40px rgba(0,0,0,0.55); line-height:1.45; white-space:pre-line}
 .vj .term.tipright:hover::after{left:auto; right:0}
-.vj .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
-.vj .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.74rem;
+.vj .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:var(--w02)}
+.vj .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.75rem;
     font-weight:700; padding:7px 16px; border-radius:980px; letter-spacing:0.02em; transition:all .15s}
 .vj .seg button.on{background:var(--goldDim); color:var(--goldBright)}
 .vj .seg button.locked{opacity:0.4; cursor:not-allowed}
 .vj .seg button.locked::before{content:"🔒 "; font-size:0.7em}
 .vj .filterbar{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:20px;
-    border:1px solid var(--border); border-radius:16px; padding:12px 16px; background:rgba(255,255,255,0.025)}
-.vj .filterbar .flabel{display:inline-flex; align-items:center; gap:7px; color:var(--goldBright); font-weight:800;
-    font-size:0.74rem; text-transform:uppercase; letter-spacing:0.09em}
-.vj .fctl{display:inline-flex; align-items:center; gap:8px; color:var(--muted); font-size:0.72rem;
+    border:1px solid var(--border); border-radius:16px; padding:12px 16px; background:var(--w03)}
+.vj .filterbar .flabel{display:inline-flex; align-items:center; gap:7px; color:var(--muted); font-weight:800;
+    font-size:0.75rem; text-transform:uppercase; letter-spacing:0.09em}
+.vj .fctl{display:inline-flex; align-items:center; gap:8px; color:var(--muted); font-size:0.75rem;
     text-transform:uppercase; letter-spacing:0.06em; font-weight:700}
-.vj .filtsel{font-family:var(--font); font-size:0.82rem; font-weight:700; color:var(--text); text-transform:none;
-    letter-spacing:0; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:980px;
+.vj .filtsel{font-family:var(--font); font-size:0.875rem; font-weight:700; color:var(--text); text-transform:none;
+    letter-spacing:0; background:var(--w04); border:1px solid var(--border); border-radius:980px;
     padding:7px 13px; cursor:pointer; transition:all .15s}
 .vj .filtsel:hover{border-color:var(--borderGold)}
 .vj .filtsel.active{border-color:var(--borderGold); color:var(--goldBright); background:var(--goldDim)}
-.vj .fcount{color:var(--muted); font-size:0.78rem; font-weight:600; font-variant-numeric:tabular-nums}
-.vj .filterbar .btn{padding:7px 14px; font-size:0.74rem}
-.vj .nodata{padding:26px; text-align:center; color:var(--muted); font-size:0.86rem}
-.vj select{color-scheme:dark}
+.vj .fcount{color:var(--muted); font-size:0.75rem; font-weight:600; font-variant-numeric:tabular-nums}
+.vj .filterbar .btn{padding:7px 14px; font-size:0.75rem}
+.vj .nodata{padding:26px; text-align:center; color:var(--muted); font-size:0.875rem}
+.vj select{color-scheme:dark} body.theme-light .vj select{color-scheme:light}
 .vj .btn{transition:border-color .15s,color .15s,background .15s}
-.vj .btn:hover{border-color:var(--borderGold); color:var(--white); background:rgba(255,255,255,0.05)}
-.vj .btn{border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text); font-family:var(--font);
-    font-size:0.74rem; font-weight:700; padding:8px 16px; border-radius:980px; cursor:pointer}
-.vj .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
-.vj .status{display:inline-flex; align-items:center; gap:7px; font-size:0.7rem; font-weight:700; padding:6px 12px; border-radius:980px; letter-spacing:0.02em}
+.vj .btn:hover{border-color:var(--borderGold); color:var(--white); background:var(--w06)}
+.vj .btn{border:1px solid var(--border); background:var(--w03); color:var(--text); font-family:var(--font);
+    font-size:0.75rem; font-weight:700; padding:8px 16px; border-radius:980px; cursor:pointer}
+.vj .btn.gold{background:linear-gradient(120deg,var(--goldPillMid),var(--goldPill),var(--goldPillDeep)); color:var(--goldOn); border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+.vj .status{display:inline-flex; align-items:center; gap:7px; font-size:0.6875rem; font-weight:700; padding:6px 12px; border-radius:980px; letter-spacing:0.02em}
 .vj .status .d{width:7px;height:7px;border-radius:50%}
-.vj .st-win{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
+.vj .st-win{background:rgba(0,200,5,0.12); color:var(--greenFg); border:1px solid rgba(0,200,5,0.3)}
 .vj .st-win .d{background:var(--green)}
-.vj .st-loss{background:rgba(239,68,68,0.12); color:#fda4a4; border:1px solid rgba(239,68,68,0.3)}
+.vj .st-loss{background:rgba(255,80,0,0.12); color:#fda4a4; border:1px solid rgba(255,80,0,0.3)}
 .vj .st-loss .d{background:var(--red)}
-.vj .tag{display:inline-block; font-size:0.68rem; font-weight:600; color:var(--muted); background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:7px; padding:3px 9px}
+.vj .tag{display:inline-block; font-size:0.6875rem; font-weight:600; color:var(--muted); background:var(--w06); border:1px solid var(--border); border-radius:7px; padding:4px 8px}
 .vj .jhero{display:grid; grid-template-columns:1.4fr 1fr; gap:18px; margin-top:8px; align-items:start}
 .vj .north{display:flex; flex-direction:column; justify-content:center;
-    background:linear-gradient(140deg, rgba(34,197,94,0.10), transparent 70%); border:1px solid rgba(34,197,94,0.22)}
+    background:linear-gradient(140deg, rgba(0,200,5,0.10), transparent 70%); border:1px solid rgba(0,200,5,0.22)}
 .vj .north .big{font-size:clamp(2.4rem,6vw,3.6rem); font-weight:800; letter-spacing:-0.045em; color:var(--green); line-height:1; margin-top:8px;
     align-self:flex-start; min-width:8ch}
-.vj .north .meta{font-size:0.78rem; color:var(--muted); margin-top:10px}
+.vj .north .meta{font-size:0.75rem; color:var(--muted); margin-top:10px}
 .vj .spark{width:100%; height:50px; margin-top:16px; display:block}
-.vj .sparklabel{font-size:0.64rem; color:var(--faint); margin-top:5px; text-transform:uppercase; letter-spacing:0.1em; font-weight:600}
+.vj .sparklabel{font-size:0.6875rem; color:var(--faint); margin-top:5px; text-transform:uppercase; letter-spacing:0.1em; font-weight:600}
 .vj .edge{display:flex; flex-direction:column; justify-content:center}
 .vj .edgehead{display:flex; align-items:center; gap:9px; margin-bottom:10px}
 .vj .edgedot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}
 .vj .reveal.in-view .edgedot{animation:edgeBlink 1.7s ease-in-out infinite}
-@keyframes edgeBlink{0%,100%{opacity:1; box-shadow:0 0 10px var(--green)}50%{opacity:0.2; box-shadow:0 0 4px rgba(34,197,94,0.35)}}
-.vj .edgetitle{font-size:0.72rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
-.vj .edgebody{font-size:0.92rem; line-height:1.5; color:var(--text)}
-.vj .edgebody b{color:var(--goldBright); font-weight:700}
+@keyframes edgeBlink{0%,100%{opacity:1; box-shadow:0 0 10px var(--green)}50%{opacity:0.2; box-shadow:0 0 4px rgba(0,200,5,0.35)}}
+.vj .edgetitle{font-size:0.75rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+.vj .edgebody{font-size:0.875rem; line-height:1.5; color:var(--text)}
+.vj .edgebody b{color:var(--white); font-weight:700}
 .vj .edgerow{display:flex; gap:22px; margin-top:14px; flex-wrap:wrap}
-.vj .edgestat .edgeval{font-size:1.35rem; font-weight:800; letter-spacing:-0.03em}
-.vj .edgestat .edgek{font-size:0.62rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); margin-top:2px}
+.vj .edgestat .edgeval{font-size:1.25rem; font-weight:800; letter-spacing:-0.03em}
+.vj .edgestat .edgek{font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); margin-top:2px}
 .vj .edgeproj{margin-top:16px; padding-top:15px; border-top:1px dashed var(--borderGold)}
-.vj .projlabel{font-size:0.72rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted)}
-.vj .projlabel b{color:var(--goldBright); font-weight:800}
+.vj .projlabel{font-size:0.75rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted)}
+.vj .projlabel b{color:var(--white); font-weight:800}
 .vj .projrow{display:flex; gap:22px; margin-top:10px; flex-wrap:wrap}
-.vj .projstat .projval{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em}
+.vj .projstat .projval{font-size:1.25rem; font-weight:800; letter-spacing:-0.03em}
 .vj .projstat .projval.green{color:var(--green)}
 .vj .projstat .projval.red{color:var(--red)}
-.vj .projnote{font-size:0.72rem; color:var(--muted); margin-top:10px; line-height:1.45}
+.vj .projnote{font-size:0.75rem; color:var(--muted); margin-top:10px; line-height:1.45}
 .vj.expert .projnote{display:none}
 /* small-sample "early read" caveat — gold/caution tone (not red error). Stays visible in expert mode. */
-.vj .projprovis{display:flex; align-items:center; gap:9px; margin-top:12px; padding:9px 12px; border-radius:11px; background:var(--goldDim); border:1px solid var(--borderGold); font-size:0.72rem; color:var(--text); line-height:1.45}
-.vj .provischip{flex:none; font-size:0.56rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; padding:3px 9px; border-radius:980px; background:var(--goldMid); color:#1a1205; white-space:nowrap}
-.vj .projprovis b{color:var(--goldBright); font-weight:800}
+.vj .projprovis{display:flex; align-items:center; gap:9px; margin-top:12px; padding:9px 12px; border-radius:11px; background:rgba(255,170,5,0.10); border:1px solid rgba(255,170,5,0.26); font-size:0.75rem; color:var(--text); line-height:1.45}
+.vj .provischip{flex:none; font-size:0.6875rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; padding:4px 8px; border-radius:980px; background:var(--orange); color:#1a1205; white-space:nowrap}
+.vj .projprovis b{color:var(--orange); font-weight:800}
 .vj .filterbar .daterange{display:inline-flex; align-items:center; gap:8px}
 .vj .filterbar input[type=date].filtsel{padding:6px 9px; color-scheme:dark}
-.vj .vachip{font-size:0.66rem; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:var(--goldBright);
-    border:1px solid var(--borderGold); background:var(--goldDim); padding:6px 12px; border-radius:980px}
+.vj .vachip{font-size:0.6875rem; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:var(--text);
+    border:1px solid var(--w14); background:var(--w06); padding:6px 12px; border-radius:980px}
 .vj .vagrid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin-top:6px}
 @media (max-width:880px){
 .vj .vagrid{grid-template-columns:1fr} }
 .vj .vacard{padding:22px 22px}
 .vj .varecap{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:14px}
-.vj .vastat{background:rgba(255,255,255,0.035); border:1px solid var(--border); border-radius:13px; padding:13px 14px}
-.vj .vak{font-size:0.6rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); font-weight:700}
-.vj .vav{font-size:1.32rem; font-weight:800; letter-spacing:-0.03em; margin-top:6px}
+.vj .vastat{background:var(--w03); border:1px solid var(--border); border-radius:13px; padding:13px 14px}
+.vj .vak{font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); font-weight:700}
+.vj .vav{font-size:1.25rem; font-weight:800; letter-spacing:-0.03em; margin-top:6px}
 .vj .vav.green{color:var(--green)}
 .vj .vav.red{color:var(--red)}
-.vj .vav.gold{color:var(--goldBright)}
-.vj .vasub{font-size:0.66rem; color:var(--muted); margin-top:3px}
-.vj .vacommentary{font-size:0.9rem; line-height:1.55; color:var(--text); margin-top:16px; padding:13px 15px;
-    background:rgba(201,152,42,0.06); border-left:2px solid var(--gold); border-radius:0 10px 10px 0}
-.vj .vacommentary b{color:var(--goldBright); font-weight:700}
+.vj .vav.gold{color:var(--white)}
+.vj .vasub{font-size:0.6875rem; color:var(--muted); margin-top:3px}
+.vj .vacommentary{font-size:0.875rem; line-height:1.55; color:var(--text); margin-top:16px; padding:13px 15px;
+    background:var(--w03); border-left:2px solid var(--w22); border-radius:0 10px 10px 0}
+.vj .vacommentary b{color:var(--white); font-weight:700}
 .vj .vatagline{margin-top:16px}
 .vj .vatags{display:flex; flex-wrap:wrap; gap:7px; margin-top:8px}
-.vj .vatag{font-size:0.7rem; font-weight:700; color:var(--text); background:rgba(255,255,255,0.05);
-    border:1px solid var(--border); border-radius:980px; padding:4px 11px}
-.vj .vatag b{color:var(--goldBright); font-weight:800; margin-left:5px}
+.vj .vatag{font-size:0.6875rem; font-weight:700; color:var(--text); background:var(--w06);
+    border:1px solid var(--border); border-radius:980px; padding:4px 12px}
+.vj .vatag b{color:var(--white); font-weight:800; margin-left:5px}
 .vj .valist{list-style:none; margin:14px 0 0; padding:0; display:flex; flex-direction:column; gap:12px}
-.vj .valist li{display:flex; gap:11px; font-size:0.88rem; line-height:1.5; color:var(--text)}
+.vj .valist li{display:flex; gap:11px; font-size:0.875rem; line-height:1.5; color:var(--text)}
 .vj .valist li .ic{flex:none; width:22px; height:22px; border-radius:7px; display:flex; align-items:center; justify-content:center;
-    font-size:0.78rem; font-weight:800; margin-top:1px}
-.vj .valist li .ic.pos{background:rgba(34,197,94,0.16); color:#86efac}
-.vj .valist li .ic.neg{background:rgba(239,68,68,0.16); color:#fca5a5}
-.vj .valist li .ic.tip{background:var(--goldDim); color:var(--goldBright)}
-.vj .valist li b{color:var(--goldBright); font-weight:700}
+    font-size:0.75rem; font-weight:800; margin-top:1px}
+.vj .valist li .ic.pos{background:rgba(0,200,5,0.16); color:var(--greenFg)}
+.vj .valist li .ic.neg{background:rgba(255,80,0,0.16); color:var(--redFg)}
+.vj .valist li .ic.tip{background:var(--w08); color:var(--text)}
+.vj .valist li b{color:var(--white); font-weight:700}
 .vj .vatrades{display:flex; flex-direction:column; gap:9px; margin-top:14px}
 .vj .varow{display:flex; align-items:center; gap:12px; padding:11px 13px; border-radius:11px;
-    background:rgba(255,255,255,0.035); border:1px solid var(--border)}
-.vj .varow .vtk{font-weight:800; font-size:0.92rem; min-width:54px}
-.vj .varow .vsetup{font-size:0.72rem; color:var(--muted); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.vj .varow .vret{font-weight:800; font-size:0.86rem; text-align:right; min-width:62px}
-.vj .varow .vpl{font-weight:800; font-size:0.86rem; text-align:right; min-width:78px}
+    background:var(--w03); border:1px solid var(--border)}
+.vj .varow .vtk{font-weight:800; font-size:0.875rem; min-width:54px}
+.vj .varow .vsetup{font-size:0.75rem; color:var(--muted); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.vj .varow .vret{font-weight:800; font-size:0.875rem; text-align:right; min-width:62px}
+.vj .varow .vpl{font-weight:800; font-size:0.875rem; text-align:right; min-width:78px}
 .vj .varow.win{border-left:3px solid var(--green)}
 .vj .varow.loss{border-left:3px solid var(--red)}
 .vj .varow .green{color:var(--green)}
 .vj .varow .red{color:var(--red)}
-.vj .vaempty{font-size:0.82rem; color:var(--muted); padding:14px 4px}
+.vj .vaempty{font-size:0.875rem; color:var(--muted); padding:14px 4px}
 /* VIV Analytics winners/losers are clickable — jump to the trade row in Recent trades */
 .vj .varow.clickable{cursor:pointer; transition:border-color .15s, transform .15s, background .15s}
 .vj .varow.clickable:hover{border-color:var(--borderGold); transform:translateX(2px); background:rgba(201,152,42,0.07)}
@@ -4844,116 +5549,116 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .traderow.jumphl{animation:jumpFlash 1.9s cubic-bezier(0.22,1,0.36,1) both}
 @keyframes jumpFlash{0%{background:rgba(201,152,42,0.34); box-shadow:inset 3px 0 0 0 var(--goldBright), inset 0 0 0 1px var(--borderGold)} 55%{background:rgba(201,152,42,0.16); box-shadow:inset 3px 0 0 0 var(--goldBright), inset 0 0 0 1px transparent} 100%{background:transparent; box-shadow:inset 0 0 0 0 transparent}}
 @media(prefers-reduced-motion:reduce){.vj .traderow.jumphl{animation:none; background:rgba(201,152,42,0.16)} .vj .varow.clickable:hover{transform:none}}
-.vj .vaseg button{font-size:0.66rem; padding:6px 12px}
-.vj .edgediag{margin-top:16px; padding:14px 16px; background:rgba(239,68,68,0.07); border:1px solid rgba(239,68,68,0.28); border-radius:13px}
-.vj .edgediag .dq{font-size:0.88rem; line-height:1.55; color:var(--text); font-weight:600}
-.vj .edgediag .dq b{color:#fca5a5; font-weight:800}
+.vj .vaseg button{font-size:0.6875rem; padding:6px 12px}
+.vj .edgediag{margin-top:16px; padding:14px 16px; background:rgba(255,80,0,0.07); border:1px solid rgba(255,80,0,0.28); border-radius:13px}
+.vj .edgediag .dq{font-size:0.875rem; line-height:1.55; color:var(--text); font-weight:600}
+.vj .edgediag .dq b{color:var(--redFg); font-weight:800}
 .vj .edgelevers{display:flex; flex-direction:column; gap:8px; margin-top:13px}
-.vj .edgelever{display:flex; gap:11px; align-items:flex-start; font-size:0.8rem; line-height:1.45; color:var(--muted);
-    padding:9px 11px; border-radius:10px; background:rgba(255,255,255,0.03); border:1px solid var(--border)}
+.vj .edgelever{display:flex; gap:11px; align-items:flex-start; font-size:0.75rem; line-height:1.45; color:var(--muted);
+    padding:9px 11px; border-radius:10px; background:var(--w03); border:1px solid var(--border)}
 .vj .edgelever.focus{border-color:var(--borderGold); background:var(--goldDim); color:var(--text)}
-.vj .edgelever .lk{flex:none; font-weight:800; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.07em; color:var(--goldBright); min-width:86px; margin-top:1px}
+.vj .edgelever .lk{flex:none; font-weight:800; font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.07em; color:var(--faint); min-width:86px; margin-top:1px}
 .vj .edgelever.focus .lk{color:var(--goldBright)}
 .vj .edgelever b{color:var(--text); font-weight:700}
 .vj .edgeadmin{margin-top:12px; padding:12px 14px; border-radius:11px; background:var(--goldDim); border:1px solid var(--borderGold);
-    font-size:0.82rem; line-height:1.5; color:var(--text)}
-.vj .edgeadmin b{color:var(--goldBright); font-weight:800}
+    font-size:0.875rem; line-height:1.5; color:var(--text)}
+.vj .edgeadmin b{color:var(--white); font-weight:800}
 .vj .herocol{display:flex; flex-direction:column; gap:18px; min-width:0}
 .vj .supportcard{position:relative; padding:18px 20px; border-radius:16px; border:1px solid var(--borderGold);
-    background:linear-gradient(150deg, rgba(201,152,42,0.09), rgba(255,255,255,0.02) 60%)}
+    background:linear-gradient(150deg, rgba(201,152,42,0.09), var(--w02) 60%)}
 .vj .supportgrid{display:grid; grid-template-columns:1fr; gap:16px}
 .vj .supportblock{display:flex; gap:14px; align-items:flex-start}
 .vj .supicon{flex:none; width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center;
     font-size:1.25rem; background:var(--goldDim); border:1px solid var(--borderGold)}
-.vj .suptitle{font-size:0.92rem; font-weight:800; letter-spacing:-0.01em; color:var(--white); padding-right:26px}
-.vj .supbody{font-size:0.82rem; line-height:1.6; color:var(--muted); margin-top:6px}
-.vj .supbody b{color:var(--goldBright); font-weight:700}
-.vj .supbtn{display:inline-block; margin-top:11px; font-size:0.74rem; font-weight:800; color:var(--goldBright);
+.vj .suptitle{font-size:0.875rem; font-weight:800; letter-spacing:-0.01em; color:var(--white); padding-right:26px}
+.vj .supbody{font-size:0.875rem; line-height:1.6; color:var(--muted); margin-top:6px}
+.vj .supbody b{color:var(--white); font-weight:700}
+.vj .supbtn{display:inline-block; margin-top:11px; font-size:0.75rem; font-weight:800; color:var(--goldBright);
     background:var(--goldDim); border:1px solid var(--borderGold); border-radius:980px; padding:8px 16px;
     text-decoration:none; transition:background .15s}
 .vj .supbtn:hover{background:rgba(201,152,42,0.2)}
-.vj .winsharecard{position:relative; padding:18px 20px; border-radius:16px; border:1px solid rgba(34,197,94,0.34);
-    background:linear-gradient(150deg, rgba(34,197,94,0.13), rgba(255,255,255,0.02) 60%); animation:winRise 0.5s cubic-bezier(0.22,1,0.36,1) both}
+.vj .winsharecard{position:relative; padding:18px 20px; border-radius:16px; border:1px solid rgba(0,200,5,0.34);
+    background:linear-gradient(150deg, rgba(0,200,5,0.13), var(--w02) 60%); animation:winRise 0.5s cubic-bezier(0.22,1,0.36,1) both}
 @keyframes winRise{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
 .vj .winshareblock{display:flex; gap:14px; align-items:flex-start}
 .vj .winshareicon{flex:none; width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center;
-    font-size:1.25rem; background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.34); overflow:visible}
+    font-size:1.25rem; background:rgba(0,200,5,0.15); border:1px solid rgba(0,200,5,0.34); overflow:visible}
 .vj .winemoji{display:inline-block; transform-origin:70% 70%; animation:winCheer 1.6s ease-in-out infinite}
 @keyframes winCheer{0%,100%{transform:rotate(0deg) scale(1)}15%{transform:rotate(-16deg) scale(1.12)}30%{transform:rotate(14deg) scale(1.12)}45%{transform:rotate(-10deg) scale(1.06)}60%{transform:rotate(8deg) scale(1.06)}75%{transform:rotate(-4deg) scale(1.02)}}
 @media (prefers-reduced-motion: reduce){ .vj .winemoji{animation:none} }
-.vj .winsharetitle{font-size:0.92rem; font-weight:800; letter-spacing:-0.01em; color:var(--white); padding-right:26px}
-.vj .winsharebody{font-size:0.82rem; line-height:1.6; color:var(--muted); margin-top:6px}
-.vj .winsharebody b{color:#86efac; font-weight:700}
-.vj .winsharebtn{display:inline-block; margin-top:12px; font-size:0.74rem; font-weight:800; color:#08080e;
-    background:var(--green); border:1px solid rgba(34,197,94,0.5); border-radius:980px; padding:8px 16px;
+.vj .winsharetitle{font-size:0.875rem; font-weight:800; letter-spacing:-0.01em; color:var(--white); padding-right:26px}
+.vj .winsharebody{font-size:0.875rem; line-height:1.6; color:var(--muted); margin-top:6px}
+.vj .winsharebody b{color:var(--greenFg); font-weight:700}
+.vj .winsharebtn{display:inline-block; margin-top:12px; font-size:0.75rem; font-weight:800; color:var(--goldOn);
+    background:var(--green); border:1px solid rgba(0,200,5,0.5); border-radius:980px; padding:8px 16px;
     text-decoration:none; cursor:pointer; font-family:var(--font); transition:filter .15s}
 .vj .winsharebtn:hover{filter:brightness(1.08)}
 .vj .winsharebtn:disabled{cursor:wait; filter:none; opacity:0.7}
-.vj .seemore{color:var(--goldBright); font-weight:700; cursor:pointer; white-space:nowrap}
+.vj .seemore{color:var(--muted); font-weight:700; cursor:pointer; white-space:nowrap}
 .vj .seemore:hover{text-decoration:underline}
 .vj .winshare-x{position:absolute; top:12px; right:12px; width:26px; height:26px; border-radius:8px; cursor:pointer;
     display:flex; align-items:center; justify-content:center; background:transparent; border:1px solid var(--border);
-    color:var(--muted); font-size:0.82rem; line-height:1; font-family:var(--font); transition:background .15s,color .15s,border-color .15s}
-.vj .winshare-x:hover{background:rgba(255,255,255,0.06); color:var(--white); border-color:var(--muted)}
+    color:var(--muted); font-size:0.875rem; line-height:1; font-family:var(--font); transition:background .15s,color .15s,border-color .15s}
+.vj .winshare-x:hover{background:var(--w06); color:var(--white); border-color:var(--muted)}
 .vj .disthead{display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none}
-.vj .disthead .chev2{margin-left:auto; color:var(--muted); font-size:0.72rem; transition:transform .2s}
+.vj .disthead .chev2{margin-left:auto; color:var(--muted); font-size:0.75rem; transition:transform .2s}
 .vj .disthead.open .chev2{transform:rotate(180deg)}
-.vj .disthint2{font-size:0.62rem; color:var(--goldBright); font-weight:700}
+.vj .disthint2{font-size:0.6875rem; color:var(--white); font-weight:700}
 .vj .distpanel{display:grid; grid-template-rows:0fr; opacity:0; margin-top:0; padding-top:0; border-top:1px solid transparent;
     transition:grid-template-rows .8s cubic-bezier(0.22,1,0.36,1), opacity .6s ease, margin-top .8s ease, padding-top .8s ease, border-top-color .8s ease}
 .vj .distpanel.open{grid-template-rows:1fr; opacity:1; margin-top:16px; padding-top:16px; border-top-color:var(--border);
     transition:grid-template-rows 1.2s cubic-bezier(0.22,1,0.36,1), opacity .85s ease, margin-top 1.2s ease, padding-top 1.2s ease, border-top-color 1.2s ease}
 .vj .distpanel .distpanel-inner{overflow:hidden; min-height:0}
 .vj .disttoolbar{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center}
-.vj .distbtn{font-family:var(--font); font-size:0.62rem; font-weight:700; color:var(--muted); cursor:pointer;
-    background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:8px; padding:7px 13px}
+.vj .distbtn{font-family:var(--font); font-size:0.6875rem; font-weight:700; color:var(--muted); cursor:pointer;
+    background:var(--w04); border:1px solid var(--border); border-radius:8px; padding:7px 13px}
 .vj .distbtn.on,.vj .distbtn:hover{color:var(--gold); border-color:var(--borderGold); background:var(--goldDim)}
 .vj .distsum{display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:11px; margin-bottom:16px}
-.vj .distsum .ds{background:rgba(255,255,255,0.035); border:1px solid var(--border); border-radius:11px; padding:11px 13px}
-.vj .distsum .dsk{font-size:0.56rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); font-weight:700}
-.vj .distsum .dsv{font-size:1.12rem; font-weight:800; margin-top:4px; letter-spacing:-0.02em}
+.vj .distsum .ds{background:var(--w03); border:1px solid var(--border); border-radius:11px; padding:11px 13px}
+.vj .distsum .dsk{font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); font-weight:700}
+.vj .distsum .dsv{font-size:1.125rem; font-weight:800; margin-top:4px; letter-spacing:-0.02em}
 .vj .distsum .dsv.green{color:var(--green)}
 .vj .distsum .dsv.red{color:var(--red)}
-.vj .disttable{width:100%; border-collapse:collapse; font-size:0.72rem}
-.vj .disttable th{text-align:right; padding:7px 8px; font-size:0.54rem; text-transform:uppercase; letter-spacing:0.07em;
+.vj .disttable{width:100%; border-collapse:collapse; font-size:0.75rem}
+.vj .disttable th{text-align:right; padding:7px 8px; font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.07em;
     color:var(--muted); font-weight:700; border-bottom:1px solid var(--border)}
 .vj .disttable th:first-child{text-align:left}
-.vj .disttable td{padding:5px 8px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.04)}
+.vj .disttable td{padding:5px 8px; text-align:right; border-bottom:1px solid var(--w04)}
 .vj .disttable td:first-child{text-align:left; color:var(--text); font-weight:600}
 .vj .disttable td.g{color:var(--green); font-weight:700}
 .vj .disttable td.r{color:var(--red); font-weight:700}
-.vj .distin{width:46px; padding:4px 5px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);
-    border-radius:6px; color:var(--white); font-size:0.72rem; font-family:var(--font); text-align:center; outline:none}
+.vj .distin{width:46px; padding:4px 5px; background:var(--w06); border:1px solid var(--w10);
+    border-radius:6px; color:var(--white); font-size:0.75rem; font-family:var(--font); text-align:center; outline:none}
 .vj .distin:focus{border-color:var(--goldBright)}
 .vj .distin.edited{border-color:var(--gold); background:rgba(201,152,42,0.12)}
-.vj .distnote{font-size:0.7rem; color:var(--muted); margin-top:12px; line-height:1.45}
-.vj .distopenlink{color:var(--goldBright); font-weight:700; cursor:pointer; text-decoration:underline;
+.vj .distnote{font-size:0.6875rem; color:var(--muted); margin-top:12px; line-height:1.45}
+.vj .distopenlink{color:var(--muted); font-weight:700; cursor:pointer; text-decoration:underline;
     text-decoration-color:var(--borderGold); text-underline-offset:3px; transition:text-decoration-color .15s}
 .vj .distopenlink:hover{text-decoration-color:var(--goldBright)}
-.vj .streak{display:inline-flex; align-items:center; gap:7px; font-size:0.72rem; font-weight:700; color:#86efac;
-    background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.28); border-radius:980px; padding:5px 12px;
+.vj .streak{display:inline-flex; align-items:center; gap:7px; font-size:0.75rem; font-weight:700; color:var(--greenFg);
+    background:rgba(0,200,5,0.1); border:1px solid rgba(0,200,5,0.28); border-radius:980px; padding:5px 12px;
     opacity:0; transform:translateY(12px)}
 .vj .reveal.in-view .streak{animation:streakRise 0.5s cubic-bezier(0.22,1,0.36,1) both, streakGlow 2.4s ease-in-out 0.5s infinite}
 @keyframes streakRise{from{opacity:0; transform:translateY(12px)}to{opacity:1; transform:translateY(0)}}
-@keyframes streakGlow{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}50%{box-shadow:0 0 14px 1px rgba(34,197,94,0.45)}}
+@keyframes streakGlow{0%,100%{box-shadow:0 0 0 0 rgba(0,200,5,0)}50%{box-shadow:0 0 14px 1px rgba(0,200,5,0.45)}}
 .vj .metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:14px; margin-top:18px}
 .vj .mtile{background:var(--glass); border:1px solid var(--border); border-radius:16px; padding:16px 17px;
     cursor:grab; transition:box-shadow .15s, border-color .15s, opacity .12s; position:relative}
 .vj .mtile:hover{border-color:var(--borderGold)}
-.vj .mtile::after{content:"⠿"; position:absolute; top:11px; right:13px; color:var(--muted); font-size:0.78rem;
+.vj .mtile::after{content:"⠿"; position:absolute; top:11px; right:13px; color:var(--muted); font-size:0.75rem;
     opacity:0; transition:opacity .15s; pointer-events:none; letter-spacing:-1px}
 .vj .mtile:hover::after{opacity:0.45}
 .vj .mtile.dragging{opacity:0.4; cursor:grabbing; border-color:var(--borderGold)}
 .vj .mtile.dragging *{pointer-events:none}
 .vj .mtile .label{margin-bottom:9px}
-.vj .metricval{font-size:1.5rem; font-weight:800; letter-spacing:-0.035em; color:var(--white)}
+.vj .metricval{font-size:1.25rem; font-weight:800; letter-spacing:-0.035em; color:var(--white)}
 .vj .metricval.green{color:var(--green)}
 .vj .metricval.red{color:var(--red)}
-.vj .metricval.gold{color:var(--goldBright)}
-.vj .msub{font-size:0.68rem; color:var(--faint); margin-top:5px}
+.vj .metricval.gold{color:var(--white)}
+.vj .msub{font-size:0.6875rem; color:var(--faint); margin-top:5px}
 .vj .perfhdr{display:flex; align-items:center; gap:14px; width:100%; background:transparent; border:none; cursor:pointer;
     font-family:var(--font); padding:0; margin:34px 0 14px; text-align:left}
-.vj .perfhdr .chev{margin-left:auto; color:var(--gold); font-size:1.35rem; line-height:1; transition:transform .2s}
+.vj .perfhdr .chev{margin-left:auto; color:var(--muted); font-size:1.25rem; line-height:1; transition:transform .2s}
 .vj .perfhdr[aria-expanded="false"] .chev{transform:rotate(-90deg)}
 .vj .collapsible.is-collapsed{display:none}
 /* No-wrap flex so the half→full expansion animates smoothly: collapsing the equity column
@@ -4968,7 +5673,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .chartrow .chartcol{flex-basis:100%; flex-grow:1}
 .vj .chartrow.dist-open .eqcol{flex-grow:1; opacity:1; overflow:visible} }
 .vj .chartwrap{display:flex; gap:14px; margin-top:8px}
-.vj .yaxis{display:flex; flex-direction:column; justify-content:space-between; font-size:0.64rem; color:var(--faint);
+.vj .yaxis{display:flex; flex-direction:column; justify-content:space-between; font-size:0.6875rem; color:var(--faint);
     font-variant-numeric:tabular-nums; min-width:44px; text-align:right; padding:2px 0}
 .vj .plot{flex:1; position:relative; height:256px}
 .vj .eqsvg{width:100%; height:100%; display:block}
@@ -4978,16 +5683,16 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .eqtip{position:absolute; transform:translate(-50%,-118%); background:rgba(12,12,20,0.96); border:1px solid var(--borderGold);
     border-radius:9px; padding:7px 11px; pointer-events:none; white-space:nowrap; display:none; z-index:4;
     box-shadow:0 10px 30px rgba(0,0,0,0.55)}
-.vj .eqtip .tt{font-size:0.58rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted)}
-.vj .eqtip .tv{font-size:0.86rem; font-weight:800; letter-spacing:-0.02em; margin-top:2px; font-variant-numeric:tabular-nums}
-.vj .eqtip .td{font-size:0.62rem; margin-top:2px; font-variant-numeric:tabular-nums}
+.vj .eqtip .tt{font-size:0.6875rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted)}
+.vj .eqtip .tv{font-size:0.875rem; font-weight:800; letter-spacing:-0.02em; margin-top:2px; font-variant-numeric:tabular-nums}
+.vj .eqtip .td{font-size:0.6875rem; margin-top:2px; font-variant-numeric:tabular-nums}
 .vj .eqtip .td.g{color:var(--green)}
 .vj .eqtip .td.r{color:var(--red)}
-.vj .grid{stroke:rgba(255,255,255,0.06); stroke-width:1}
-.vj .xaxis{display:flex; justify-content:space-between; font-size:0.62rem; color:var(--faint); margin-top:9px; padding-left:52px}
+.vj .grid{stroke:var(--w06); stroke-width:1}
+.vj .xaxis{display:flex; justify-content:space-between; font-size:0.6875rem; color:var(--faint); margin-top:9px; padding-left:52px}
 .vj .xaxis.nopad{padding-left:0}
-.vj .charthint{font-size:0.74rem; color:var(--muted); margin-top:13px; line-height:1.5}
-.vj .charthint .g{color:var(--goldBright); font-weight:700}
+.vj .charthint{font-size:0.75rem; color:var(--muted); margin-top:13px; line-height:1.5}
+.vj .charthint .g{color:var(--white); font-weight:700}
 .vj .charthint .rd{color:var(--red); font-weight:700}
 .vj .bars{position:relative; display:flex; gap:10px; height:230px; margin-top:8px; align-items:stretch}
 .vj .zeroline{position:absolute; left:0; right:0; top:50%; border-top:1px dashed var(--border)}
@@ -4996,9 +5701,9 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .barcol .down{flex:1; display:flex; align-items:flex-start; justify-content:center}
 .vj .bar{width:64%; min-width:8px; max-width:44px; transition:opacity .15s; will-change:transform}
 .vj .barcol:hover .bar{opacity:0.8}
-.vj .bar.pos{background:linear-gradient(180deg,var(--green),rgba(34,197,94,0.45)); border-radius:5px 5px 0 0;
+.vj .bar.pos{background:linear-gradient(180deg,var(--green),rgba(0,200,5,0.45)); border-radius:5px 5px 0 0;
     transform-origin:bottom; transform:scaleY(0); opacity:0}
-.vj .bar.neg{background:linear-gradient(180deg,rgba(239,68,68,0.45),var(--red)); border-radius:0 0 5px 5px;
+.vj .bar.neg{background:linear-gradient(180deg,rgba(255,80,0,0.45),var(--red)); border-radius:0 0 5px 5px;
     transform-origin:top; transform:scaleY(0); opacity:0}
 .vj .reveal.in-view .bar.pos,.vj .reveal.in-view .bar.neg{animation:barRise 0.55s cubic-bezier(0.22,1,0.36,1) both}
 @keyframes barRise{from{transform:scaleY(0); opacity:0}to{transform:scaleY(1); opacity:1}}
@@ -5020,19 +5725,19 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .bar.pos,.vj .bar.neg{transform:none; opacity:1}
 .vj #eqRise,.vj #heroRise{transform:none; opacity:1}
   }
-.vj .distx{display:flex; justify-content:space-between; font-size:0.6rem; color:var(--faint); margin-top:8px}
+.vj .distx{display:flex; justify-content:space-between; font-size:0.6875rem; color:var(--faint); margin-top:8px}
 .vj .toolbar{display:flex; align-items:center; gap:10px; margin:6px 0 14px; flex-wrap:wrap}
 .vj table{width:100%; border-collapse:collapse}
-.vj thead th{font-size:0.6rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted);
+.vj thead th{font-size:0.6875rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted);
     text-align:right; padding:12px 14px; border-bottom:1px solid var(--border)}
 .vj thead th:first-child,.vj thead th:nth-child(2){text-align:left}
-.vj tbody td{padding:10px 12px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.84rem}
+.vj tbody td{padding:10px 12px; text-align:right; border-bottom:1px solid var(--w06); font-size:0.875rem}
 .vj tbody td:first-child,.vj tbody td:nth-child(2){text-align:left}
-.vj tbody tr.traderow:hover{background:rgba(255,255,255,0.025)}
-.vj .tick{font-weight:800; letter-spacing:-0.01em; font-size:0.92rem; display:flex; align-items:center; gap:9px}
+.vj tbody tr.traderow:hover{background:var(--w03)}
+.vj .tick{font-weight:800; letter-spacing:-0.01em; font-size:0.875rem; display:flex; align-items:center; gap:9px}
 .vj .srcdot{width:7px;height:7px;border-radius:50%}
-.vj .srcdot.ibkr{background:var(--goldBright); box-shadow:0 0 8px var(--goldBright)}
-.vj .srcdot.man{background:rgba(255,255,255,0.28)}
+.vj .srcdot.ibkr{background:var(--white); box-shadow:0 0 8px var(--w55)}
+.vj .srcdot.man{background:var(--w35)}
 .vj .pl.up{color:var(--green); font-weight:700}
 .vj .pl.dn{color:var(--red); font-weight:700}
 .vj .pro-only{display:none}
@@ -5041,75 +5746,75 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
    than the card — happens in Pro view and especially at Text Size = Large (zoom 1.15). */
 .vj .revcell{text-align:right; white-space:nowrap; position:static; background:transparent} /* keep static — sticky version overlapped the last column (bug fixed 2026-07-05, do not re-stick) */
 .vj thead th:last-child{position:static; background:transparent}
-.vj .revbtn{background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
-    font-size:0.68rem; font-weight:700; padding:6px 13px; border-radius:980px; cursor:pointer}
+.vj .revbtn{background:var(--w04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+    font-size:0.6875rem; font-weight:700; padding:6px 13px; border-radius:980px; cursor:pointer}
 .vj .revbtn:hover{color:var(--text); border-color:var(--borderGold)}
 .vj .traderow.rev-open .revbtn{background:var(--goldDim); color:var(--goldBright); border-color:var(--borderGold)}
-.vj .revrow > td{padding:0 !important; border-bottom:1px solid rgba(255,255,255,0.06)}
+.vj .revrow > td{padding:0 !important; border-bottom:1px solid var(--w06)}
 /* Wide trades table scrolls horizontally inside the card instead of being clipped by overflow:hidden
    (matters most at Text Size = Large, where zoom:1.15 widens everything). container-type lets the
    expanded review panel size to the VISIBLE width (100cqw) so nothing is cropped off the side. */
 .vj .tbl-scroll{overflow-x:auto; container-type:inline-size}
-.vj .revpanel{margin:2px 0 14px; width:100cqw; box-sizing:border-box; background:rgba(201,152,42,0.045); border:1px solid var(--borderGold); border-radius:16px; padding:18px 20px; overflow:hidden; animation:revExpand 0.23s cubic-bezier(0.22,1,0.36,1)}
-.vj .revpanel.closing{animation:revCollapse 0.23s cubic-bezier(0.4,0,1,1) forwards}
+.vj .revpanel{margin:2px 0 14px; width:100cqw; box-sizing:border-box; background:rgba(201,152,42,0.045); border:1px solid var(--borderGold); border-radius:16px; padding:18px 20px; overflow:hidden; animation:revExpand var(--t-med) var(--ease)}
+.vj .revpanel.closing{animation:revCollapse var(--t-med) var(--ease) forwards}
 @keyframes revExpand{from{opacity:0; max-height:0; transform:translateY(-8px); margin-top:0; margin-bottom:0; padding-top:0; padding-bottom:0} to{opacity:1; max-height:1600px; transform:translateY(0)}}
 @keyframes revCollapse{from{opacity:1; max-height:1600px; transform:translateY(0)} to{opacity:0; max-height:0; transform:translateY(-8px); margin-top:0; margin-bottom:0; padding-top:0; padding-bottom:0}}
 .vj .revfoot{display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border)}
-.vj .revdelconfirm{display:flex; align-items:center; flex-wrap:wrap; gap:10px; transform-origin:left center; animation:revConfirmIn 220ms cubic-bezier(0.16,1,0.3,1) both}
+.vj .revdelconfirm{display:flex; align-items:center; flex-wrap:wrap; gap:10px; transform-origin:left center; animation:revConfirmIn var(--t-med) var(--ease) both}
 /* step 2 (final confirm) escalates with a brief shake after sliding in — signals "this is permanent" */
-.vj .revdelconfirm.final{animation:revConfirmIn 220ms cubic-bezier(0.16,1,0.3,1) both, revConfirmShake 360ms ease-in-out 220ms forwards}
-.vj .revdelmsg{font-size:0.76rem; font-weight:600; color:#fca5a5; animation:revMsgGlow 1.8s ease-in-out infinite}
+.vj .revdelconfirm.final{animation:revConfirmIn var(--t-med) var(--ease) both, revConfirmShake 360ms ease-in-out var(--t-med) forwards}
+.vj .revdelmsg{font-size:0.75rem; font-weight:600; color:var(--redFg); animation:revMsgGlow 1.8s ease-in-out infinite}
 @keyframes revConfirmIn{from{opacity:0; transform:translateX(10px) scale(0.97)} to{opacity:1; transform:none}}
 @keyframes revConfirmShake{0%,100%{transform:translateX(0)} 20%{transform:translateX(-5px)} 40%{transform:translateX(5px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(2px)}}
-@keyframes revMsgGlow{0%,100%{text-shadow:0 0 6px rgba(239,68,68,0.25)} 50%{text-shadow:0 0 12px rgba(239,68,68,0.6)}}
+@keyframes revMsgGlow{0%,100%{text-shadow:0 0 6px rgba(255,80,0,0.25)} 50%{text-shadow:0 0 12px rgba(255,80,0,0.6)}}
 @media(prefers-reduced-motion:reduce){.vj .revdelconfirm,.vj .revdelconfirm.final{animation:revConfirmIn 1ms both} .vj .revdelmsg{animation:none}}
-.vj .revdelbtn{font-family:var(--font); font-size:0.74rem; font-weight:700; padding:8px 16px; border-radius:980px; cursor:pointer;
-  background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.5); color:#fca5a5; box-shadow:0 0 16px rgba(239,68,68,0.35)}
-.vj .revdelbtn:hover{background:rgba(239,68,68,0.2); box-shadow:0 0 22px rgba(239,68,68,0.5)}
+.vj .revdelbtn{font-family:var(--font); font-size:0.75rem; font-weight:700; padding:8px 16px; border-radius:980px; cursor:pointer;
+  background:rgba(255,80,0,0.12); border:1px solid rgba(255,80,0,0.5); color:var(--redFg); box-shadow:0 0 16px rgba(255,80,0,0.35)}
+.vj .revdelbtn:hover{background:rgba(255,80,0,0.2); box-shadow:0 0 22px rgba(255,80,0,0.5)}
 .vj .revhead{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding-bottom:15px; margin-bottom:16px; border-bottom:1px solid var(--border)}
-.vj .revtick{font-size:1.05rem; font-weight:800; color:var(--white)}
-.vj .revmeta{font-size:0.74rem; color:var(--muted)}
+.vj .revtick{font-size:1rem; font-weight:800; color:var(--white)}
+.vj .revmeta{font-size:0.75rem; color:var(--muted)}
 .vj .revmeta b{color:var(--text); font-weight:700}
-.vj .revclose{margin-left:auto; background:transparent; border:none; color:var(--faint); font-size:1.4rem; line-height:1; cursor:pointer; width:38px; height:38px; display:grid; place-items:center; padding:0}
+.vj .revclose{margin-left:auto; background:transparent; border:none; color:var(--faint); font-size:1.25rem; line-height:1; cursor:pointer; width:38px; height:38px; display:grid; place-items:center; padding:0}
 .vj .revclose:hover{color:var(--text)}
 .vj .revgrid{display:grid; grid-template-columns:1fr 1fr; gap:0}
 .vj .revchart{margin-top:16px; padding-top:16px; border-top:1px solid var(--border)}
 .vj .revchart-head{display:flex; align-items:center; gap:12px; margin-bottom:10px; flex-wrap:wrap}
 .vj .simcanvas{width:100%; height:200px; display:block; border:1px solid var(--borderGold); border-radius:13px;
     background:linear-gradient(180deg,#0a0a12,#0b0b14)}
-.vj .simbtn{font-family:var(--font); font-size:0.72rem; font-weight:700; color:var(--goldBright); cursor:pointer;
+.vj .simbtn{font-family:var(--font); font-size:0.75rem; font-weight:700; color:var(--goldBright); cursor:pointer;
     background:var(--goldDim); border:1px solid var(--borderGold); border-radius:980px; padding:6px 14px}
 .vj .simbtn:hover{background:rgba(201,152,42,0.22)}
-.vj .simlegend{display:inline-flex; align-items:center; gap:6px; font-size:0.66rem; color:var(--muted); flex-wrap:wrap}
+.vj .simlegend{display:inline-flex; align-items:center; gap:6px; font-size:0.6875rem; color:var(--muted); flex-wrap:wrap}
 .vj .simlegend .dot{width:8px; height:8px; border-radius:50%; margin-left:6px}
-.vj .simlegend .dot.e{background:#3b82f6}
+.vj .simlegend .dot.e{background:#3b9eff}
 .vj .simlegend .dot.p{background:var(--goldBright)}
 .vj .simlegend .dot.x{background:var(--gold)}
 .vj .simlegend .dot.s{background:rgba(201,152,42,0.6)}
-.vj .simnote{font-size:0.7rem; color:var(--muted); margin-top:9px; line-height:1.45}
+.vj .simnote{font-size:0.6875rem; color:var(--muted); margin-top:9px; line-height:1.45}
 .vj.expert .simnote{display:none}
 .vj .revcol{padding:0 22px; border-left:1px solid var(--border)}
 .vj .revcol:first-child{padding-left:0; border-left:none}
 .vj .revcol:last-child{padding-right:0}
-.vj .revcoltitle{font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold); margin-bottom:14px}
-.vj .mgr{display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.78rem}
+.vj .revcoltitle{font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--faint); margin-bottom:14px}
+.vj .mgr{display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid var(--w06); font-size:0.75rem}
 .vj .mgr span{color:var(--muted)}
 .vj .mgr b{color:var(--text); font-weight:700; font-variant-numeric:tabular-nums}
 .vj .mgr b.green{color:var(--green)}
 .vj .mgr b.red{color:var(--red)}
-.vj .mgr b.gold{color:var(--goldBright)}
+.vj .mgr b.gold{color:var(--white)}
 .vj .chartph{position:relative; height:150px; border:1px dashed var(--borderGold); border-radius:12px; overflow:hidden;
-    display:flex; align-items:flex-end; justify-content:center; background:rgba(255,255,255,0.02)}
+    display:flex; align-items:flex-end; justify-content:center; background:var(--w02)}
 .vj .chartph .phnote{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center;
-    font-size:0.72rem; color:var(--faint); padding:0 24px; line-height:1.5}
+    font-size:0.75rem; color:var(--faint); padding:0 24px; line-height:1.5}
 .vj .revnotes{margin-top:16px; padding-top:16px; border-top:1px solid var(--border)}
 .vj .notesgrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:10px}
-.vj .nlabel{font-size:0.62rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px}
-.vj .nlabel.r{color:#86efac}
+.vj .nlabel{font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px}
+.vj .nlabel.r{color:var(--greenFg)}
 .vj .nlabel.w{color:#fda4a4}
-.vj .nlabel.l{color:var(--goldBright)}
-.vj .mgta{width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--text);
-    font-family:var(--font); font-size:0.78rem; padding:8px 10px; outline:none; resize:vertical; min-height:64px; line-height:1.5}
+.vj .nlabel.l{color:var(--white)}
+.vj .mgta{width:100%; background:var(--w06); border:1px solid var(--border); border-radius:8px; color:var(--text);
+    font-family:var(--font); font-size:0.75rem; padding:8px 10px; outline:none; resize:vertical; min-height:64px; line-height:1.5}
 .vj .mgta:focus{border-color:var(--gold)}
 .vj .guidepanel{position:fixed; right:24px; bottom:88px; width:330px; max-width:calc(100vw - 40px); z-index:200;
     background:#11111b; border:1px solid var(--borderGold); border-radius:16px; padding:15px 17px; box-shadow:0 22px 60px rgba(0,0,0,0.6); display:none}
@@ -5119,12 +5824,12 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .gp-dot{width:8px; height:8px; border-radius:50%; background:var(--goldBright); flex:none}
 .vj .guidepanel.speaking .gp-dot{animation:gppulse 1s ease-in-out infinite}
 @keyframes gppulse{0%,100%{opacity:1; transform:scale(1)}50%{opacity:0.35; transform:scale(1.6)}}
-.vj .gp-title{font-size:0.82rem; font-weight:800; color:var(--goldBright); flex:1}
+.vj .gp-title{font-size:0.875rem; font-weight:800; color:var(--white); flex:1}
 .vj .gp-mute{background:transparent; border:none; cursor:pointer; color:var(--muted); padding:3px; line-height:0; display:flex}
 .vj .gp-mute:hover{color:var(--text)}
 .vj .gp-mute svg{width:18px; height:18px}
-.vj .gp-body{font-size:0.78rem; color:var(--text); line-height:1.55}
-.vj .gp-body b{color:var(--goldBright)}
+.vj .gp-body{font-size:0.75rem; color:var(--text); line-height:1.55}
+.vj .gp-body b{color:var(--white)}
 .vj:not(.expert) .guide{transition:box-shadow .2s}
 .vj:not(.expert) .guide.guide-active{box-shadow:0 0 0 1px var(--borderGold), 0 0 50px rgba(201,152,42,0.13)}
 .vj.expert .welcome{display:none}
@@ -5140,45 +5845,45 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
     border-radius:12px; padding:6px; min-width:210px; box-shadow:0 14px 40px rgba(0,0,0,0.55)}
 .vj .dd.open{display:block}
 .vj .dd button{display:block; width:100%; text-align:left; background:transparent; border:none; color:var(--text); font-family:var(--font);
-    font-size:0.78rem; font-weight:600; padding:9px 11px; border-radius:8px; cursor:pointer}
-.vj .dd button:hover{background:rgba(255,255,255,0.05)}
+    font-size:0.75rem; font-weight:600; padding:9px 11px; border-radius:8px; cursor:pointer}
+.vj .dd button:hover{background:var(--w06)}
 .vj .metricbar{display:flex; align-items:center; gap:10px; margin-bottom:14px}
-.vj .metricbar .btn{padding:7px 13px; font-size:0.74rem}
+.vj .metricbar .btn{padding:7px 13px; font-size:0.75rem}
 .vj .metricsdd{min-width:212px; max-height:340px; overflow:auto; padding:6px}
 .vj .metricsdd .ddhdr{display:flex; align-items:center; justify-content:space-between; padding:6px 10px 8px;
     border-bottom:1px solid var(--border); margin-bottom:4px}
-.vj .metricsdd .ddhdr span{font-size:0.64rem; text-transform:uppercase; letter-spacing:0.09em; color:var(--muted); font-weight:800}
-.vj .metricsdd .ddreset{background:none; border:none; color:var(--goldBright); font-family:var(--font); font-size:0.7rem;
+.vj .metricsdd .ddhdr span{font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.09em; color:var(--muted); font-weight:800}
+.vj .metricsdd .ddreset{background:none; border:none; color:var(--goldBright); font-family:var(--font); font-size:0.6875rem;
     font-weight:700; cursor:pointer; padding:0}
 .vj .metricopt{display:flex; align-items:center; gap:9px; padding:7px 10px; border-radius:8px; cursor:pointer;
-    font-size:0.8rem; color:var(--text); font-weight:600}
-.vj .metricopt:hover{background:rgba(255,255,255,0.05)}
+    font-size:0.75rem; color:var(--text); font-weight:600}
+.vj .metricopt:hover{background:var(--w06)}
 .vj .metricopt input{accent-color:var(--gold); width:14px; height:14px; cursor:pointer; flex:none}
 .vj .modal{display:none; position:fixed; inset:0; z-index:1400; background:rgba(8,8,14,0.72); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:24px}
 .vj .modal.open{display:flex}
-.vj .modalcard{background:#0c0c14; border:1px solid var(--borderGold); border-radius:20px; width:100%; max-width:780px; max-height:86vh; overflow:auto; padding:24px 26px}
+.vj .modalcard{background:var(--sheet); border:1px solid var(--borderGold); border-radius:20px; width:100%; max-width:780px; max-height:86vh; overflow:auto; padding:24px 26px}
 .vj .modalhead{display:flex; align-items:flex-start; gap:16px; margin-bottom:18px}
 .vj .modalhead .sub{max-width:560px}
 .vj .linktable{width:100%; border-collapse:collapse}
-.vj .linktable th{font-size:0.6rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); text-align:left; padding:8px 10px; border-bottom:1px solid var(--border)}
-.vj .linktable td{font-size:0.8rem; padding:11px 10px; border-bottom:1px solid rgba(255,255,255,0.05); vertical-align:middle; font-variant-numeric:tabular-nums}
-.vj .lk{font-size:0.6rem; font-weight:700; padding:3px 9px; border-radius:980px; white-space:nowrap}
-.vj .lk-linked{background:rgba(34,197,94,0.12); color:#86efac}
-.vj .lk-orphan{background:rgba(239,68,68,0.12); color:#fda4a4}
-.vj .lk-past{background:rgba(255,255,255,0.06); color:var(--muted)}
-.vj .lk-unlinked{background:var(--goldDim); color:var(--goldBright)}
-.vj .linksel{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:var(--font); font-size:0.74rem; padding:6px 9px; outline:none; cursor:pointer; max-width:200px}
+.vj .linktable th{font-size:0.6875rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); text-align:left; padding:8px 10px; border-bottom:1px solid var(--border)}
+.vj .linktable td{font-size:0.75rem; padding:11px 10px; border-bottom:1px solid var(--w06); vertical-align:middle; font-variant-numeric:tabular-nums}
+.vj .lk{font-size:0.6875rem; font-weight:700; padding:4px 8px; border-radius:980px; white-space:nowrap}
+.vj .lk-linked{background:rgba(0,200,5,0.12); color:var(--greenFg)}
+.vj .lk-orphan{background:rgba(255,80,0,0.12); color:#fda4a4}
+.vj .lk-past{background:var(--w06); color:var(--muted)}
+.vj .lk-unlinked{background:var(--w08); color:var(--text)}
+.vj .linksel{background:var(--w06); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:var(--font); font-size:0.75rem; padding:6px 9px; outline:none; cursor:pointer; max-width:200px}
 .vj .linksel:focus{border-color:var(--gold)}
 .vj .modalfoot{display:flex; align-items:center; gap:10px; margin-top:18px; padding-top:16px; border-top:1px solid var(--border)}
 .vj .toast{position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px); z-index:400; background:#11111b;
-    border:1px solid var(--borderGold); border-radius:12px; padding:12px 18px; font-size:0.8rem; color:var(--text);
+    border:1px solid var(--borderGold); border-radius:12px; padding:12px 18px; font-size:0.75rem; color:var(--text);
     box-shadow:0 14px 40px rgba(0,0,0,0.6); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:90vw}
 .vj .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
 .vj .welcome{display:flex; gap:14px; align-items:flex-start; margin-top:20px; background:var(--goldDim);
     border:1px solid var(--borderGold); border-radius:16px; padding:15px 18px}
 .vj .welcome .wd{width:8px;height:8px;border-radius:50%;background:var(--goldBright);box-shadow:0 0 12px var(--goldBright);margin-top:6px;flex:none}
 .vj .welcome b{color:var(--white)}
-.vj .welcome .x{margin-left:auto; color:var(--faint); cursor:pointer; font-size:1.1rem; line-height:1}
+.vj .welcome .x{margin-left:auto; color:var(--faint); cursor:pointer; font-size:1.125rem; line-height:1}
 @media(max-width:760px){
 .vj .jhero{grid-template-columns:1fr}
 .vj .revgrid,.vj .notesgrid{grid-template-columns:1fr}
@@ -5195,7 +5900,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj .minitable td,.vj .minitable th{display:table-cell; width:auto}
 .vj tbody tr.traderow{border:1px solid var(--border); border-radius:16px; padding:8px 4px; margin-bottom:12px}
 .vj tbody tr.traderow td{display:flex; justify-content:space-between; align-items:center; text-align:right; border:none; padding:8px 14px}
-.vj tbody tr.traderow td::before{content:attr(data-l); color:var(--muted); font-size:0.66rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:700}
+.vj tbody tr.traderow td::before{content:attr(data-l); color:var(--muted); font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:700}
 .vj tbody tr.traderow td.pro-only{display:none}
 .vj.pro tbody tr.traderow td.pro-only{display:flex}
 .vj tbody tr.traderow td.revcell{position:static; background:transparent; box-shadow:none}
@@ -5216,55 +5921,55 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj tbody tr.traderow td{white-space:nowrap; vertical-align:middle; height:52px}
 .vj .revbtn.tp-go,.vj button.tp-go{white-space:nowrap}
 /* ── Trade Preview (slide-in) ── */
-.vj.tp-back{position:fixed; inset:0; z-index:1200; background:rgba(4,4,8,0.62); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); display:flex; justify-content:flex-end; animation:tpFade .18s ease}
+.vj.tp-back{position:fixed; inset:0; z-index:1200; background:var(--scrim); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); display:flex; justify-content:flex-end; animation:tpFade var(--t-med) var(--ease)}
 @keyframes tpFade{from{opacity:0}to{opacity:1}}
 @keyframes tpSlide{from{transform:translateX(40px); opacity:0}to{transform:translateX(0); opacity:1}}
-.vj .tp-panel{width:min(440px,92vw); height:100%; overflow-y:auto; background:linear-gradient(180deg,#0c0c14,#08080e); border-left:1px solid var(--borderGold); box-shadow:-24px 0 60px rgba(0,0,0,0.6); padding:22px 22px 40px; animation:tpSlide .22s cubic-bezier(0.22,1,0.36,1); font-family:var(--font)}
+.vj .tp-panel{width:min(440px,92vw); height:100%; overflow-y:auto; background:var(--sheet); border-left:1px solid var(--borderGold); box-shadow:var(--shadowOv); padding:22px 22px 40px; animation:tpSlide var(--t-med) var(--ease); font-family:var(--font)}
 .vj .tp-head{display:flex; align-items:center; gap:12px}
-.vj .tp-tick{font-size:1.5rem; font-weight:800; color:var(--white); letter-spacing:-0.02em}
-.vj .tp-x{margin-left:auto; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--muted); width:32px; height:32px; border-radius:9px; font-size:1.2rem; cursor:pointer; line-height:1}
-.vj .tp-sub{color:var(--muted); font-size:0.74rem; margin:10px 0 16px}
+.vj .tp-tick{font-size:1.25rem; font-weight:800; color:var(--white); letter-spacing:-0.02em}
+.vj .tp-x{margin-left:auto; background:var(--w06); border:1px solid var(--border); color:var(--muted); width:32px; height:32px; border-radius:9px; font-size:1.25rem; cursor:pointer; line-height:1}
+.vj .tp-sub{color:var(--muted); font-size:0.75rem; margin:10px 0 16px}
 .vj .tp-pnl{border-radius:14px; padding:16px 18px; margin-bottom:18px; border:1px solid var(--border)}
-.vj .tp-pnl.up{background:rgba(34,197,94,0.08); border-color:rgba(34,197,94,0.28)}
-.vj .tp-pnl.dn{background:rgba(239,68,68,0.07); border-color:rgba(239,68,68,0.26)}
-.vj .tp-pnl-lbl{font-size:0.6rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted)}
+.vj .tp-pnl.up{background:rgba(0,200,5,0.08); border-color:rgba(0,200,5,0.28)}
+.vj .tp-pnl.dn{background:rgba(255,80,0,0.07); border-color:rgba(255,80,0,0.26)}
+.vj .tp-pnl-lbl{font-size:0.6875rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted)}
 .vj .tp-pnl.up .tp-pnl-v{color:var(--green)} .vj .tp-pnl.dn .tp-pnl-v{color:var(--red)}
-.vj .tp-pnl-v{font-size:1.9rem; font-weight:800; letter-spacing:-0.02em; margin:2px 0 4px; font-variant-numeric:tabular-nums}
-.vj .tp-pnl-meta{font-size:0.74rem; color:var(--muted)}
+.vj .tp-pnl-v{font-size:2rem; font-weight:800; letter-spacing:-0.02em; margin:2px 0 4px; font-variant-numeric:tabular-nums}
+.vj .tp-pnl-meta{font-size:0.75rem; color:var(--muted)}
 .vj .tp-grid{display:flex; flex-direction:column; border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:16px}
-.vj .tp-row{display:flex; justify-content:space-between; align-items:center; gap:14px; padding:11px 14px; border-bottom:1px solid rgba(255,255,255,0.05)}
+.vj .tp-row{display:flex; justify-content:space-between; align-items:center; gap:14px; padding:11px 14px; border-bottom:1px solid var(--w06)}
 .vj .tp-row:last-child{border-bottom:none}
-.vj .tp-row span{color:var(--muted); font-size:0.78rem}
-.vj .tp-row b{color:var(--text); font-size:0.84rem; font-weight:700; text-align:right}
-.vj .tp-reason{border:1px solid var(--border); border-radius:12px; padding:13px 15px; margin-bottom:18px; background:rgba(255,255,255,0.02)}
-.vj .tp-reason-h{font-size:0.6rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:7px}
-.vj .tp-reason-b{font-size:0.82rem; color:var(--text); line-height:1.5}
+.vj .tp-row span{color:var(--muted); font-size:0.75rem}
+.vj .tp-row b{color:var(--text); font-size:0.875rem; font-weight:700; text-align:right}
+.vj .tp-reason{border:1px solid var(--border); border-radius:12px; padding:13px 15px; margin-bottom:18px; background:var(--w02)}
+.vj .tp-reason-h{font-size:0.6875rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:7px}
+.vj .tp-reason-b{font-size:0.875rem; color:var(--text); line-height:1.5}
 .vj .tp-foot{display:flex; gap:10px; flex-wrap:wrap}
-.vj .tp-go{flex:1; background:linear-gradient(135deg,var(--goldBright),var(--goldMid)); color:#08080e; border:none; font-family:var(--font); font-weight:800; font-size:0.82rem; padding:12px 16px; border-radius:11px; cursor:pointer}
+.vj .tp-go{flex:1; background:linear-gradient(135deg,var(--goldPill),var(--goldPillMid)); color:var(--goldOn); border:none; font-family:var(--font); font-weight:800; font-size:0.875rem; padding:12px 16px; border-radius:11px; cursor:pointer}
 /* ── Trade Details (full page) ── */
-.vj.td-back{position:fixed; inset:0; z-index:1300; background:var(--bg); overflow-y:auto; animation:tpFade .16s ease}
+.vj.td-back{position:fixed; inset:0; z-index:1300; background:var(--bg); overflow-y:auto; animation:tpFade var(--t-med) var(--ease)}
 .vj .td-page{max-width:1080px; margin:0 auto; padding:22px 20px 60px; font-family:var(--font)}
 .vj .td-top{display:flex; align-items:center; gap:14px; padding:6px 0 18px; position:sticky; top:0; background:linear-gradient(180deg,var(--bg) 70%,transparent); z-index:2}
-.vj .td-top .revtick{font-size:1.4rem; font-weight:800; color:var(--white)}
-.vj .td-grade{font-size:0.78rem; font-weight:800; padding:4px 10px; border:1px solid var(--border); border-radius:99px}
+.vj .td-top .revtick{font-size:1.25rem; font-weight:800; color:var(--white)}
+.vj .td-grade{font-size:0.75rem; font-weight:800; padding:4px 10px; border:1px solid var(--border); border-radius:99px}
 .vj .td-top .spacer{flex:1}
 .vj .td-body .revgrid{margin-bottom:18px}
 /* ── TradeZella-style trade-details layout: left stats panel · right chart/notes ── */
 .vj .tdz{display:grid; grid-template-columns:340px minmax(0,1fr); gap:18px; align-items:start; margin-bottom:18px}
 .vj .tdz-left{background:var(--glass); border:1px solid var(--border); border-radius:16px; padding:14px 18px 10px; position:sticky; top:70px; max-height:calc(100vh - 150px); overflow-y:auto} /* top clears the sticky td-top header */
 .vj .tz-npl{display:flex; flex-direction:column; gap:2px; padding:4px 0 10px 12px; border-left:3px solid var(--green); margin-bottom:6px}
-.vj .tz-npl span{font-size:0.66rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted)}
-.vj .tz-npl b{font-size:1.5rem; font-weight:800; letter-spacing:-0.02em}
-.vj .tz-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.8rem}
+.vj .tz-npl span{font-size:0.6875rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted)}
+.vj .tz-npl b{font-size:1.25rem; font-weight:800; letter-spacing:-0.02em}
+.vj .tz-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid var(--w06); font-size:0.75rem}
 .vj .tz-row:last-child{border-bottom:none}
 .vj .tz-row>span{color:var(--muted); font-weight:600}
 .vj .tz-row>b{font-weight:700; color:var(--text); text-align:right}
-.vj .tz-sect{font-size:0.6rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); margin:12px 0 2px}
-.vj .tz-in{width:120px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--white); padding:6px 10px; font-family:var(--font); font-size:0.8rem; font-weight:700; outline:none; text-align:right; color-scheme:dark}
+.vj .tz-sect{font-size:0.6875rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--faint); margin:12px 0 2px}
+.vj .tz-in{width:120px; background:var(--w06); border:1px solid var(--border); border-radius:8px; color:var(--white); padding:6px 10px; font-family:var(--font); font-size:0.75rem; font-weight:700; outline:none; text-align:right; color-scheme:dark}
 .vj .tz-in:focus{border-color:var(--borderGold)}
 .vj .tdz-tabs{display:flex; gap:6px; margin-bottom:12px}
-.vj .tdz-tab{background:rgba(255,255,255,0.03); border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-weight:700; font-size:0.76rem; padding:8px 20px; border-radius:99px; cursor:pointer; transition:all .14s}
-.vj .tdz-tab.on{background:linear-gradient(135deg,var(--goldBright),var(--goldMid)); color:#08080e; border-color:transparent}
+.vj .tdz-tab{background:var(--w03); border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-weight:700; font-size:0.75rem; padding:8px 20px; border-radius:99px; cursor:pointer; transition:all .14s}
+.vj .tdz-tab.on{background:linear-gradient(135deg,var(--goldPill),var(--goldPillMid)); color:var(--goldOn); border-color:transparent}
 @media (max-width: 960px){ .vj .tdz{grid-template-columns:1fr} .vj .tdz-left{position:static; max-height:none} }
 
 /* ═══════════ PRO-MODE LAYOUT (.vj.expert) — ported from mockups/journal-pro.html ═══════════ */
@@ -5273,15 +5978,15 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj.expert .card::before{border-radius:inherit}
 .vj.expert .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
 .vj.expert .cardhead .label{flex:1}
-.vj.expert .infodot{position:relative; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none}
+.vj.expert .infodot{position:relative; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.6875rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none}
 .vj.expert .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
-.vj.expert .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+.vj.expert .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid var(--w14); border-radius:10px; padding:10px 12px; font-size:0.75rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
 .vj.expert .eyebrow-row{display:flex; align-items:center; gap:8px}
 .vj.expert .eyebrow-row .eyebrow{flex:1}
 /* P1. Command header */
 .vj.expert .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
-.vj.expert .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
-.vj.expert .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px; font-variant-numeric:tabular-nums}
+.vj.expert .cmdleft .ch1{font-size:1.25rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+.vj.expert .cmdmeta{font-size:0.75rem; color:var(--muted); margin-top:6px; font-variant-numeric:tabular-nums}
 .vj.expert .cmdactions{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
 .vj.expert .cmdactions .btn.ghost{background:transparent}
 .vj.expert .cmdactions .conn{margin-left:0}
@@ -5293,18 +5998,18 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj.expert .kpibody{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-height:0}
 .vj.expert .kpibody.stack{flex-direction:column; align-items:flex-start; justify-content:center; gap:5px}
 .vj.expert .kpimain{min-width:0}
-.vj.expert .kpinum{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; line-height:1.05; white-space:nowrap; font-variant-numeric:tabular-nums}
-.vj.expert .kpinum.green{color:var(--green)} .vj.expert .kpinum.red{color:var(--red)} .vj.expert .kpinum.gold{color:var(--goldBright)}
-.vj.expert .kpisub{font-size:0.68rem; color:var(--muted); margin-top:4px; white-space:nowrap}
+.vj.expert .kpinum{font-size:1.25rem; font-weight:800; letter-spacing:-0.03em; line-height:1.05; white-space:nowrap; font-variant-numeric:tabular-nums}
+.vj.expert .kpinum.green{color:var(--green)} .vj.expert .kpinum.red{color:var(--red)} .vj.expert .kpinum.gold{color:var(--white)}
+.vj.expert .kpisub{font-size:0.6875rem; color:var(--muted); margin-top:4px; white-space:nowrap}
 .vj.expert .kpiviz{flex:none; width:70px; height:40px}
 .vj.expert .kpiviz svg{width:100%; height:100%; display:block; overflow:visible}
 .vj.expert .wrviz{position:relative}
 .vj.expert .wrviz .wrzone{pointer-events:stroke; cursor:help}
-.vj.expert .wrtip{display:none; position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:8px 12px; box-shadow:0 10px 30px rgba(0,0,0,0.55); font-size:0.74rem; font-weight:700; white-space:nowrap}
-.vj.expert .wrtip.win{color:#86efac} .vj.expert .wrtip.loss{color:#fca5a5}
+.vj.expert .wrtip{display:none; position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; background:#13131c; border:1px solid var(--w14); border-radius:10px; padding:8px 12px; box-shadow:0 10px 30px rgba(0,0,0,0.55); font-size:0.75rem; font-weight:700; white-space:nowrap}
+.vj.expert .wrtip.win{color:var(--greenFg)} .vj.expert .wrtip.loss{color:var(--redFg)}
 .vj.expert .wrviz:has(.wrzone.win:hover) .wrtip.win{display:block}
 .vj.expert .wrviz:has(.wrzone.loss:hover) .wrtip.loss{display:block}
-.vj.expert .wlbar{display:flex; height:6px; width:100%; border-radius:980px; overflow:hidden; background:rgba(255,255,255,0.08)}
+.vj.expert .wlbar{display:flex; height:6px; width:100%; border-radius:980px; overflow:hidden; background:var(--w08)}
 .vj.expert .wlbar .win{background:var(--green)} .vj.expert .wlbar .loss{background:var(--red)}
 @media(max-width:1200px){ .vj.expert .kpistrip{grid-template-columns:repeat(3,1fr)} }
 @media(max-width:760px){ .vj.expert .kpistrip{grid-template-columns:repeat(2,1fr)} }
@@ -5319,11 +6024,11 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 @media(max-width:1000px){ .vj.expert .calmetrow{grid-template-columns:1fr} }
 /* Tiles sized to fill ~70% of the (calendar-height) card — roomier, not wall-to-wall (Valen 07-17). */
 .vj.expert .metricsmini{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; grid-auto-rows:minmax(84px,auto)}
-.vj.expert .mmtile{background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:12px; padding:14px 16px; cursor:grab; display:flex; flex-direction:column; justify-content:center; min-width:0}
+.vj.expert .mmtile{background:var(--w03); border:1px solid var(--border); border-radius:12px; padding:14px 16px; cursor:grab; display:flex; flex-direction:column; justify-content:center; min-width:0}
 .vj.expert .mmtile.dragging{opacity:0.4; border-color:var(--borderGold); cursor:grabbing}
-.vj.expert .mmk{font-size:0.64rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--faint); font-weight:700}
-.vj.expert .mmv{font-size:1.15rem; font-weight:800; margin-top:6px; letter-spacing:-0.01em; font-variant-numeric:tabular-nums; white-space:nowrap}
-.vj.expert .mmv.green{color:var(--green)} .vj.expert .mmv.red{color:var(--red)} .vj.expert .mmv.gold{color:var(--goldBright)}
+.vj.expert .mmk{font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--faint); font-weight:700}
+.vj.expert .mmv{font-size:1.125rem; font-weight:800; margin-top:6px; letter-spacing:-0.01em; font-variant-numeric:tabular-nums; white-space:nowrap}
+.vj.expert .mmv.green{color:var(--green)} .vj.expert .mmv.red{color:var(--red)} .vj.expert .mmv.gold{color:var(--white)}
 /* P5b. Playbook strip */
 .vj.expert .playbookstrip{margin-top:14px}
 /* P6. Objective edge + edge matrix */
@@ -5336,7 +6041,7 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vj.expert .vacard{padding:16px 17px}
 /* Drag-to-rearrange for the VIV Analytics cards (mirrors the dashboard .vd .dragwrap system) */
 .vj .dragwrap{position:relative; min-width:0}
-.vj .dragwrap .draghandle{position:absolute; top:-9px; right:12px; z-index:6; display:none; align-items:center; justify-content:center; padding:1px 8px; border-radius:7px; background:#14141e; border:1px solid var(--border); color:var(--muted); cursor:grab; font-size:0.72rem; letter-spacing:1px; user-select:none; line-height:1.5}
+.vj .dragwrap .draghandle{position:absolute; top:-9px; right:12px; z-index:6; display:none; align-items:center; justify-content:center; padding:1px 8px; border-radius:7px; background:var(--cardHi); border:1px solid var(--border); color:var(--muted); cursor:grab; font-size:0.75rem; letter-spacing:1px; user-select:none; line-height:1.5}
 .vj .dragwrap:hover .draghandle{display:inline-flex}
 .vj .dragwrap .draghandle:hover{color:var(--goldBright); border-color:var(--borderGold)}
 .vj .dragwrap .draghandle:active{cursor:grabbing}
@@ -5348,23 +6053,25 @@ const JOUR_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 @media(prefers-reduced-motion:reduce){.vj .dragwrap.snap{animation:none} .vj .dragwrap.snap::before{animation:none; opacity:0}}
 .vj .vawinlose{display:flex; flex-direction:column; gap:14px; min-width:0}
 /* P8. Closed trades table — dense Pro chrome, scoped to the Pro .tablewrap only (guided uses .tbl-scroll) */
-.vj.expert .tradehead .sech,.vj.expert .tradehead h2{font-size:0.95rem}
-.vj.expert .countchip{background:var(--goldDim); color:var(--goldBright); font-size:0.66rem; font-weight:800; padding:3px 10px; border-radius:980px}
+.vj.expert .tradehead .sech,.vj.expert .tradehead h2{font-size:1rem}
+.vj.expert .countchip{background:var(--w06); color:var(--text); font-size:0.6875rem; font-weight:800; padding:3px 10px; border-radius:980px}
 .vj.expert .tablewrap{overflow-x:auto; container-type:inline-size}
-.vj.expert .tablewrap thead th{position:sticky; top:0; z-index:2; background:rgba(9,9,15,0.94); font-size:0.58rem; padding:9px 10px}
-.vj.expert .tablewrap tbody tr.traderow td{height:auto; padding:8px 10px; font-size:0.74rem; font-variant-numeric:tabular-nums}
-@media(min-width:761px){ .vj.expert .tablewrap tbody tr.traderow td{white-space:nowrap} }`;
+.vj.expert .tablewrap thead th{position:sticky; top:0; z-index:2; background:rgba(9,9,15,0.94); font-size:0.6875rem; padding:9px 10px}
+.vj.expert .tablewrap tbody tr.traderow td{height:auto; padding:8px 10px; font-size:0.75rem; font-variant-numeric:tabular-nums}
+@media(min-width:761px){ .vj.expert .tablewrap tbody tr.traderow td{white-space:nowrap} }
+${RH_SYS('.vj')}
+${JOUR_RH}`;
 
 // Admin-only AI deep-review block — renders the ai_review JSON Claude writes to Supabase
 // (score · process dimensions · narrative/regime/SL · the read). Members never see this.
 function AiReviewBlock({ review }) {
-  const sc = (s) => s >= 85 ? C.green : s >= 70 ? C.gold : C.red;
-  const lbl = { fontSize: "0.55rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.muted };
+  const sc = (s) => s >= 85 ? C.green : s >= 70 ? "var(--orange)" : C.red;
+  const lbl = { fontSize: "0.6875rem", letterSpacing: ".06em", color: C.muted };
   if (!review || typeof review !== "object") {
     return (
       <div className="revnotes">
         <div className="revcoltitle" style={{ marginBottom: 8 }}>AI Review <span style={{ color: C.muted, fontWeight: 600 }}>· admin</span></div>
-        <div style={{ fontSize: "0.72rem", color: C.muted, lineHeight: 1.6 }}>No AI review yet. Close the position fully, then tell Claude <b style={{ color: C.goldBright }}>"log it"</b> — the deep analysis + score appear here.</div>
+        <div style={{ fontSize: "0.75rem", color: C.muted, lineHeight: 1.6 }}>No AI review yet. Close the position fully, then tell Claude <b style={{ color: C.white }}>"log it"</b> — the deep analysis + score appear here.</div>
       </div>
     );
   }
@@ -5373,10 +6080,10 @@ function AiReviewBlock({ review }) {
     <div className="revnotes">
       <div className="revcoltitle" style={{ marginBottom: 10 }}>AI Review <span style={{ color: C.muted, fontWeight: 600 }}>· admin · process score</span></div>
       <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 6 }}>
-        <div style={{ fontSize: "2.2rem", fontWeight: 800, lineHeight: 1, color: sc(Number(r.score) || 0) }}>{r.score}%</div>
-        <div style={{ fontSize: "0.72rem", color: C.text }}>{r.grade}</div>
+        <div style={{ fontSize: "2rem", fontWeight: 800, lineHeight: 1, color: sc(Number(r.score) || 0) }}>{r.score}%</div>
+        <div style={{ fontSize: "0.75rem", color: C.text }}>{r.grade}</div>
       </div>
-      {r.process_vs_outcome && <div style={{ fontSize: "0.66rem", color: C.muted, fontStyle: "italic", marginBottom: 10 }}>{r.process_vs_outcome}</div>}
+      {r.process_vs_outcome && <div style={{ fontSize: "0.6875rem", color: C.muted, fontStyle: "italic", marginBottom: 10 }}>{r.process_vs_outcome}</div>}
       <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 12 }}>
         {o.pl && <div><div style={lbl}>P/L</div><b style={{ color: C.green }}>{o.pl}</b></div>}
         {o.return && <div><div style={lbl}>Return</div><b style={{ color: C.green }}>{o.return}</b></div>}
@@ -5384,39 +6091,39 @@ function AiReviewBlock({ review }) {
       </div>
       {Array.isArray(r.dimensions) && r.dimensions.map((d, i) => (
         <div key={i} style={{ marginBottom: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.66rem", marginBottom: 3 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.6875rem", marginBottom: 3 }}>
             <span style={{ color: C.text }}>{d.name} <span style={{ color: C.muted }}>· {d.weight}%</span></span>
             <b style={{ color: sc(Number(d.score) || 0) }}>{d.score}</b>
           </div>
-          <div style={{ height: 7, background: "rgba(255,255,255,0.05)", borderRadius: 4, overflow: "hidden" }}><div style={{ width: (Number(d.score) || 0) + "%", height: "100%", background: sc(Number(d.score) || 0) }} /></div>
-          {d.note && <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 3, lineHeight: 1.45 }}>{d.note}</div>}
+          <div style={{ height: 7, background: "var(--w06)", borderRadius: 4, overflow: "hidden" }}><div style={{ width: (Number(d.score) || 0) + "%", height: "100%", background: sc(Number(d.score) || 0) }} /></div>
+          {d.note && <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 3, lineHeight: 1.45 }}>{d.note}</div>}
         </div>
       ))}
       {[["Your rationale check", r.rationale_check], ["Plan vs action", r.plan_vs_action], ["Narrative fit", r.narrative_fit], ["Regime fit", r.regime_fit], ["Stop-loss critique", r.sl_critique]].map(([t2, v], i) => v ? (
         <div key={i} style={{ marginTop: 10 }}>
-          <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.goldBright, fontWeight: 700, marginBottom: 2 }}>{t2}</div>
-          <div style={{ fontSize: "0.68rem", color: C.text, lineHeight: 1.5 }}>{v}</div>
+          <div style={{ fontSize: "0.6875rem", letterSpacing: ".06em", color: "var(--faint)", fontWeight: 500, marginBottom: 2 }}>{t2}</div>
+          <div style={{ fontSize: "0.6875rem", color: C.text, lineHeight: 1.5 }}>{v}</div>
         </div>
       ) : null)}
       {Array.isArray(r.mentor_board) && r.mentor_board.length > 0 && (() => {
-        const vc = (v) => ({ aligned: C.green, take: C.green, yes: C.green, pass: C.red, avoid: C.red, no: C.red, caution: C.gold, mixed: C.gold, wait: C.gold }[String(v || "").toLowerCase()] || C.muted);
+        const vc = (v) => ({ aligned: C.green, take: C.green, yes: C.green, pass: C.red, avoid: C.red, no: C.red, caution: "var(--orange)", mixed: "var(--orange)", wait: "var(--orange)" }[String(v || "").toLowerCase()] || C.muted);
         return (
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.goldBright, fontWeight: 700, marginBottom: 6 }}>Mentor board</div>
+            <div style={{ fontSize: "0.6875rem", letterSpacing: ".06em", color: "var(--faint)", fontWeight: 500, marginBottom: 6 }}>Mentor board</div>
             {r.mentor_board.map((m, i) => (
-              <div key={i} style={{ padding: "6px 0", borderBottom: i < r.mentor_board.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+              <div key={i} style={{ padding: "6px 0", borderBottom: i < r.mentor_board.length - 1 ? "1px solid var(--w06)" : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ width: 7, height: 7, borderRadius: "50%", background: vc(m.verdict) }} />
-                  <span style={{ fontSize: "0.68rem", flex: 1, color: C.text }}>{m.mentor}</span>
-                  <span style={{ fontSize: "0.56rem", fontWeight: 700, textTransform: "uppercase", color: vc(m.verdict) }}>{m.verdict}</span>
+                  <span style={{ fontSize: "0.6875rem", flex: 1, color: C.text }}>{m.mentor}</span>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 500, color: vc(m.verdict) }}>{m.verdict}</span>
                 </div>
-                {m.note && <div style={{ fontSize: "0.62rem", color: C.muted, marginLeft: 15, marginTop: 2, lineHeight: 1.45 }}>{m.note}</div>}
+                {m.note && <div style={{ fontSize: "0.6875rem", color: C.muted, marginLeft: 15, marginTop: 2, lineHeight: 1.45 }}>{m.note}</div>}
               </div>
             ))}
           </div>
         );
       })()}
-      {r.read && <div style={{ marginTop: 12, padding: "10px 13px", background: "rgba(255,255,255,0.02)", borderLeft: `3px solid ${C.gold}`, borderRadius: 6, fontSize: "0.72rem", lineHeight: 1.6, color: C.white }}>{r.read}</div>}
+      {r.read && <div style={{ marginTop: 12, padding: "10px 13px", background: "var(--w02)", borderLeft: "3px solid var(--w14)", borderRadius: 6, fontSize: "0.75rem", lineHeight: 1.6, color: C.white }}>{r.read}</div>}
     </div>
   );
 }
@@ -5446,11 +6153,11 @@ function RationaleBlock({ rationale }) {
   return (
     <div className="revnotes" style={{ marginBottom: 12 }}>
       <div className="revcoltitle" style={{ marginBottom: 8 }}>💭 Thought process <span style={{ color: C.muted, fontWeight: 600 }}>· admin · your why</span></div>
-      {r.summary && <div style={{ marginBottom: 10, padding: "10px 13px", background: "rgba(255,255,255,0.02)", borderLeft: `3px solid ${C.gold}`, borderRadius: 6, fontSize: "0.74rem", lineHeight: 1.6, color: C.white }}>{r.summary}</div>}
+      {r.summary && <div style={{ marginBottom: 10, padding: "10px 13px", background: "var(--w02)", borderLeft: "3px solid var(--w14)", borderRadius: 6, fontSize: "0.75rem", lineHeight: 1.6, color: C.white }}>{r.summary}</div>}
       {keys.map((k, i) => (
         <div key={i} style={{ marginBottom: 7 }}>
-          <div style={{ fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: ".06em", color: C.goldBright, fontWeight: 700, marginBottom: 2 }}>{LABELS[k] || k.replace(/_/g, " ")}</div>
-          <div style={{ fontSize: "0.68rem", color: C.text, lineHeight: 1.5 }}>{val(r[k])}</div>
+          <div style={{ fontSize: "0.6875rem", letterSpacing: ".06em", color: "var(--faint)", fontWeight: 500, marginBottom: 2 }}>{LABELS[k] || k.replace(/_/g, " ")}</div>
+          <div style={{ fontSize: "0.6875rem", color: C.text, lineHeight: 1.5 }}>{val(r[k])}</div>
         </div>
       ))}
     </div>
@@ -5464,49 +6171,49 @@ function CoachHero({ data, pro = false }) {
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem("viv-jarvis-collapsed") === "1"; } catch { return false; } });
   const toggleCollapsed = () => setCollapsed(c => { const n = !c; try { localStorage.setItem("viv-jarvis-collapsed", n ? "1" : "0"); } catch {} return n; });
   if (!data || typeof data !== "object") return null;
-  const vcol = (v) => ({ good: C.green, improving: C.green, aligned: C.green, holding: C.gold, watch: C.gold, risk: C.red, degrading: C.red }[String(v || "").toLowerCase()] || C.muted);
+  const vcol = (v) => ({ good: C.green, improving: C.green, aligned: C.green, holding: "var(--orange)", watch: "var(--orange)", risk: C.red, degrading: C.red }[String(v || "").toLowerCase()] || C.muted);
   const d = data.drift || {}, sc = data.scorecards || {}, pw = data.peak_window || {};
-  const bd = "1px solid rgba(255,255,255,0.08)";
+  const bd = "1px solid var(--w08)";
   const Card = ({ title, children, style }) => (
     <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "16px 18px", marginBottom: 14, backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", ...style }}>
-      {title && <div style={{ fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: ".13em", color: C.muted, paddingBottom: 11, marginBottom: 14, fontWeight: 700, borderBottom: `1px solid ${C.border}` }}>{title}</div>}
+      {title && <div style={{ fontSize: "0.6875rem", letterSpacing: ".13em", color: C.muted, paddingBottom: 11, marginBottom: 14, fontWeight: 500, borderBottom: `1px solid ${C.border}` }}>{title}</div>}
       {children}
     </div>
   );
   const Scorecard = ({ title, s, accent }) => (
-    <div style={{ background: "rgba(0,0,0,0.25)", border: `1px solid ${accent ? C.gold : "rgba(255,255,255,0.08)"}`, borderRadius: 10, padding: "12px 14px" }}>
-      <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, fontWeight: 700, marginBottom: 8 }}>{title}</div>
+    <div style={{ background: "rgba(0,0,0,0.25)", border: `1px solid ${accent ? "var(--w22)" : "var(--w08)"}`, borderRadius: 10, padding: "12px 14px" }}>
+      <div style={{ fontSize: "0.6875rem", letterSpacing: ".08em", color: "var(--faint)", fontWeight: 500, marginBottom: 8 }}>{title}</div>
       {[["Win rate", (s.win_rate ?? "—") + "%"], ["Expectancy", (s.expectancy ?? "—") + "R"], ["Profit factor", s.pf ?? "—"], ["In-theme", (s.pct_in_theme ?? "—") + "%"], ["Trades", s.n ?? "—"]].map(([k, v]) => (
-        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", padding: "2px 0" }}><span style={{ color: C.muted }}>{k}</span><b>{v}</b></div>
+        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", padding: "2px 0" }}><span style={{ color: C.muted }}>{k}</span><b>{v}</b></div>
       ))}
     </div>
   );
   const briefingCard = (
     <Card>
-      <div style={{ fontSize: "0.78rem", lineHeight: 1.55, fontWeight: 700, color: C.white }}>{data.headline}</div>
+      <div style={{ fontSize: "0.75rem", lineHeight: 1.55, fontWeight: 700, color: C.white }}>{data.headline}</div>
       <div style={{ display: "flex", gap: 8, margin: "12px 0 6px", flexWrap: "wrap" }}>
         {[["vs peak", d.vs_peak], ["vs system", d.vs_system]].map(([k, v]) => v ? (
-          <span key={k} style={{ fontSize: "0.58rem", fontWeight: 700, letterSpacing: ".04em", padding: "4px 11px", borderRadius: 20, border: `1px solid ${vcol(v)}`, color: vcol(v) }}>{k} · {v}</span>
+          <span key={k} style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: ".04em", padding: "4px 11px", borderRadius: 20, border: `1px solid ${vcol(v)}`, color: vcol(v) }}>{k} · {v}</span>
         ) : null)}
       </div>
-      {d.summary && <div style={{ fontSize: "0.72rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
+      {d.summary && <div style={{ fontSize: "0.75rem", color: C.muted, lineHeight: 1.5 }}>{d.summary}</div>}
     </Card>
   );
   const attentionCard = (Array.isArray(data.attention) && data.attention.length > 0) ? (
-    <Card title="Pay attention now" style={{ border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 0 24px rgba(239,68,68,0.15)" }}>
+    <Card title="Pay attention now" style={{ border: "1px solid rgba(255,80,0,0.35)", boxShadow: "0 0 24px rgba(255,80,0,0.15)" }}>
       {data.attention.map((a, i) => (
         <div key={i} style={{ borderLeft: `3px solid ${C.red}`, background: "rgba(0,0,0,0.25)", borderRadius: 6, padding: "10px 14px", marginBottom: 9 }}>
-          <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.red, fontWeight: 700 }}>{a.lens}</div>
-          <div style={{ fontSize: "0.78rem", fontWeight: 700, margin: "2px 0 4px" }}>{a.title}</div>
-          <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.55 }}>{a.detail}</div>
+          <div style={{ fontSize: "0.6875rem", letterSpacing: ".08em", color: C.red, fontWeight: 500 }}>{a.lens}</div>
+          <div style={{ fontSize: "0.75rem", fontWeight: 700, margin: "2px 0 4px" }}>{a.title}</div>
+          <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.55 }}>{a.detail}</div>
         </div>
       ))}
     </Card>
   ) : null;
   const workingCard = (Array.isArray(data.working) && data.working.length > 0) ? (
-    <Card title="Keep doing" style={{ border: "1px solid rgba(34,197,94,0.35)", boxShadow: "0 0 24px rgba(34,197,94,0.15)" }}>
+    <Card title="Keep doing" style={{ border: "1px solid rgba(0,200,5,0.35)", boxShadow: "0 0 24px rgba(0,200,5,0.15)" }}>
       <ul style={{ margin: 0, paddingLeft: 18 }}>
-        {data.working.map((w, i) => <li key={i} style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7 }}>{w}</li>)}
+        {data.working.map((w, i) => <li key={i} style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.7 }}>{w}</li>)}
       </ul>
     </Card>
   ) : null;
@@ -5516,10 +6223,10 @@ function CoachHero({ data, pro = false }) {
       <div onClick={toggleCollapsed} title={collapsed ? "Expand Jarvis" : "Collapse Jarvis"} aria-expanded={!collapsed}
         style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: collapsed ? 0 : 10, cursor: "pointer", userSelect: "none" }}>
         <span className="jarvisdot" style={{ width: 8, height: 8, borderRadius: "50%", background: C.gold }} />
-        <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: C.goldBright }}>Jarvis · admin</span>
-        {data.scope && <span style={{ fontSize: "0.66rem", color: C.muted }}>{data.scope}</span>}
-        {collapsed && <span style={{ fontSize: "0.72rem", color: C.text, fontWeight: 700, marginLeft: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.headline}</span>}
-        <span aria-hidden style={{ marginLeft: "auto", color: C.gold, fontSize: "1.05rem", lineHeight: 1, transition: "transform .2s", transform: collapsed ? "rotate(-90deg)" : "none" }}>▾</span>
+        <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: ".14em", color: C.goldBright }}>Jarvis · admin</span>
+        {data.scope && <span style={{ fontSize: "0.6875rem", color: C.muted }}>{data.scope}</span>}
+        {collapsed && <span style={{ fontSize: "0.75rem", color: C.text, fontWeight: 700, marginLeft: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{data.headline}</span>}
+        <span aria-hidden style={{ marginLeft: "auto", color: C.muted, fontSize: "1rem", lineHeight: 1, transition: "transform .2s", transform: collapsed ? "rotate(-90deg)" : "none" }}>▾</span>
       </div>
       {/* grid-rows 0fr→1fr animates the body's height smoothly on expand/collapse */}
       <div style={{ display: "grid", gridTemplateRows: collapsed ? "0fr" : "1fr", transition: "grid-template-rows 0.45s cubic-bezier(0.22,1,0.36,1)" }} aria-hidden={collapsed}>
@@ -5530,8 +6237,8 @@ function CoachHero({ data, pro = false }) {
       {false /* Goldilocks zone hidden per Valen (2026-07-04) */ && data.goldilocks && (() => { const g = data.goldilocks;
         const tile = (label, val, color) => (
           <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "10px 6px", textAlign: "center", flex: 1, minWidth: 64 }}>
-            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
-            <div style={{ fontSize: "0.46rem", textTransform: "uppercase", letterSpacing: ".04em", color: C.muted, marginTop: 5 }}>{label}</div>
+            <div style={{ fontSize: "1rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
+            <div style={{ fontSize: "0.6875rem", letterSpacing: ".04em", color: C.muted, marginTop: 5 }}>{label}</div>
           </div>);
         // Universal math: compounded return over N trades = (1+G)^(N·W) · (1−L)^(N·(1−W)) − 1
         const N = 10;
@@ -5539,7 +6246,7 @@ function CoachHero({ data, pro = false }) {
         const yourWR = Number(g.wr) || 0;
         const nearWR = WRS.reduce((b, w) => Math.abs(w - yourWR) < Math.abs(b - yourWR) ? w : b, WRS[0]);
         const comp = (gn, ls, w) => (Math.pow(1 + gn / 100, N * w / 100) * Math.pow(1 - ls / 100, N * (1 - w / 100)) - 1) * 100;
-        const cellBg = (v) => v <= 0 ? "rgba(239,68,68,0.20)" : v < 25 ? "rgba(34,197,94,0.10)" : v < 200 ? "rgba(34,197,94,0.32)" : "rgba(234,179,8,0.16)";
+        const cellBg = (v) => v <= 0 ? "rgba(255,80,0,0.20)" : v < 25 ? "rgba(0,200,5,0.10)" : v < 200 ? "rgba(0,200,5,0.32)" : "rgba(234,179,8,0.16)";
         const TABLES = [
           { rr: "2 : 1", zone: [14, 20, 24], rows: [[4, 2], [6, 3], [8, 4], [10, 5], [14, 7], [20, 10], [24, 12], [40, 20]] },
           { rr: "3 : 1", zone: [18, 21, 30], rows: [[6, 2], [9, 3], [12, 4], [15, 5], [18, 6], [21, 7], [30, 10], [60, 20]] },
@@ -5547,30 +6254,30 @@ function CoachHero({ data, pro = false }) {
         const fmtV = (v) => (v >= 0 ? "+" : "−") + Math.abs(Math.round(v)) + "%";
         const grid = (T, yourRow) => (
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: "0.55rem", textTransform: "uppercase", letterSpacing: ".05em", color: C.goldBright, fontWeight: 800, marginBottom: 6 }}>Reward : Risk = {T.rr} — return compounded over {N} trades</div>
-            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 2, fontSize: "0.58rem", tableLayout: "fixed" }}>
+            <div style={{ fontSize: "0.6875rem", letterSpacing: ".05em", color: C.goldBright, fontWeight: 500, marginBottom: 6 }}>Reward : Risk = {T.rr} — return compounded over {N} trades</div>
+            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 2, fontSize: "0.6875rem", tableLayout: "fixed" }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: "left", color: C.muted, fontWeight: 700, fontSize: "0.48rem", padding: "2px 4px", width: 86 }}>Win / Loss ↓</th>
-                  {WRS.map(w => <th key={w} style={{ textAlign: "center", padding: "3px 2px", borderRadius: 4, fontWeight: 800, fontSize: "0.6rem",
-                    color: w === nearWR ? "#0b0b10" : C.text, background: w === nearWR ? C.gold : "rgba(255,255,255,0.05)" }}>{w}%{w === nearWR ? " ◀" : ""}</th>)}
+                  <th style={{ textAlign: "left", color: C.muted, fontWeight: 700, fontSize: "0.6875rem", padding: "2px 4px", width: 86 }}>Win / Loss ↓</th>
+                  {WRS.map(w => <th key={w} style={{ textAlign: "center", padding: "3px 2px", borderRadius: 4, fontWeight: 800, fontSize: "0.6875rem",
+                    color: w === nearWR ? "#0b0b10" : C.text, background: w === nearWR ? C.gold : "var(--w06)" }}>{w}%{w === nearWR ? " ◀" : ""}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {T.rows.map(([gn, ls]) => { const inZone = T.zone.includes(gn); return (
                   <tr key={gn}>
-                    <td style={{ padding: "4px 4px", fontWeight: 700, whiteSpace: "nowrap", fontSize: "0.56rem", color: inZone ? C.goldBright : C.text, background: inZone ? "rgba(201,152,42,0.10)" : "transparent", borderRadius: 4 }}>+{gn}/−{ls}{inZone ? " ★" : ""}</td>
+                    <td style={{ padding: "4px 4px", fontWeight: 700, whiteSpace: "nowrap", fontSize: "0.6875rem", color: inZone ? C.goldBright : C.text, background: inZone ? "rgba(201,152,42,0.10)" : "transparent", borderRadius: 4 }}>+{gn}/−{ls}{inZone ? " ★" : ""}</td>
                     {WRS.map(w => { const v = comp(gn, ls, w); return (
-                      <td key={w} style={{ textAlign: "center", padding: "4px 1px", borderRadius: 4, fontWeight: 700, color: v < 0 ? "#fca5a5" : "#86efac", background: cellBg(v) }}>{fmtV(v)}</td>
+                      <td key={w} style={{ textAlign: "center", padding: "4px 1px", borderRadius: 4, fontWeight: 700, color: v < 0 ? "var(--redFg)" : "var(--greenFg)", background: cellBg(v) }}>{fmtV(v)}</td>
                     ); })}
                   </tr>
                 ); })}
                 {yourRow && (
                   <tr>
-                    <td style={{ padding: "6px 4px", fontWeight: 800, whiteSpace: "nowrap", fontSize: "0.52rem", color: "#0b0b10", background: C.gold, borderRadius: 4, borderTop: `2px solid ${C.white}` }}>📍 YOU +{yourRow.ag}/−{yourRow.al} ({yourRow.gl}:1)</td>
+                    <td style={{ padding: "6px 4px", fontWeight: 800, whiteSpace: "nowrap", fontSize: "0.6875rem", color: "var(--goldOn)", background: C.gold, borderRadius: 4, borderTop: `2px solid ${C.white}` }}>📍 YOU +{yourRow.ag}/−{yourRow.al} ({yourRow.gl}:1)</td>
                     {WRS.map(w => { const v = comp(Number(yourRow.ag), Number(yourRow.al), w); const you = w === nearWR; return (
-                      <td key={w} style={{ textAlign: "center", padding: "6px 1px", borderRadius: 4, fontWeight: 800, fontSize: "0.6rem", color: v < 0 ? "#fca5a5" : "#86efac",
-                        background: cellBg(v), outline: you ? "2.5px solid #fff" : "none" }}>{fmtV(v)}{you ? " ◀" : ""}</td>
+                      <td key={w} style={{ textAlign: "center", padding: "6px 1px", borderRadius: 4, fontWeight: 800, fontSize: "0.6875rem", color: v < 0 ? "var(--redFg)" : "var(--greenFg)",
+                        background: cellBg(v), outline: you ? "2.5px solid var(--white)" : "none" }}>{fmtV(v)}{you ? " ◀" : ""}</td>
                     ); })}
                   </tr>
                 )}
@@ -5579,7 +6286,7 @@ function CoachHero({ data, pro = false }) {
           </div>);
         return (
         <div style={{ background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "16px 18px", marginBottom: 14 }}>
-          <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, marginBottom: 10, fontWeight: 700 }}>⚖️ Goldilocks zone · where you stand</div>
+          <div style={{ fontSize: "0.6875rem", letterSpacing: ".08em", color: C.goldBright, marginBottom: 10, fontWeight: 500 }}>⚖️ Goldilocks zone · where you stand</div>
 
           {/* Your live stats strip */}
           <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
@@ -5594,23 +6301,23 @@ function CoachHero({ data, pro = false }) {
           {grid(TABLES[0], { ag: g.ag, al: g.al, gl: g.gl })}
           {grid(TABLES[1])}
 
-          <div style={{ fontSize: "0.52rem", color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>Gold column ◀ = your win rate (~{nearWR}%). The <b style={{ color: C.white }}>white-boxed cell on the 📍 YOU row = exactly where you stand now</b> ({g.gl}:1, {g.proj10}%/{N} trades). ★ rows = the Goldilocks zone. Red = loses money over {N} trades.</div>
-          <div style={{ fontSize: "0.52rem", color: C.muted, marginBottom: 12, lineHeight: 1.55, background: "rgba(255,255,255,0.03)", border: bd, borderRadius: 8, padding: "8px 10px" }}>💡 You size by <b style={{ color: C.goldBright }}>R (fixed risk — tighter stop = bigger position)</b>, so the "−loss %" = what each trade costs at stop. Two levers move you out of red: read <b style={{ color: C.white }}>across your row</b> (higher win rate) or jump to the <b style={{ color: C.white }}>3:1 table</b> (more reward:risk). Gap-trap to watch: a tight stop on a big position can gap <i>past</i> the stop and lose far more than 1R.</div>
+          <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 10, lineHeight: 1.5 }}>Gold column ◀ = your win rate (~{nearWR}%). The <b style={{ color: C.white }}>white-boxed cell on the 📍 YOU row = exactly where you stand now</b> ({g.gl}:1, {g.proj10}%/{N} trades). ★ rows = the Goldilocks zone. Red = loses money over {N} trades.</div>
+          <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 12, lineHeight: 1.55, background: "var(--w03)", border: bd, borderRadius: 8, padding: "8px 10px" }}>💡 You size by <b style={{ color: C.goldBright }}>R (fixed risk — tighter stop = bigger position)</b>, so the "−loss %" = what each trade costs at stop. Two levers move you out of red: read <b style={{ color: C.white }}>across your row</b> (higher win rate) or jump to the <b style={{ color: C.white }}>3:1 table</b> (more reward:risk). Gap-trap to watch: a tight stop on a big position can gap <i>past</i> the stop and lose far more than 1R.</div>
 
           {/* You-are-here callout */}
-          <div style={{ background: "rgba(239,68,68,0.10)", border: `1px solid ${C.red}`, borderRadius: 10, padding: "11px 13px", marginBottom: g.verdict ? 12 : 0 }}>
-            <div style={{ fontSize: "0.7rem", fontWeight: 800, color: C.white, marginBottom: 4 }}>📍 You are here: {g.wr}% win rate · +{g.ag}% / −{g.al}% = {g.gl}:1</div>
-            <div style={{ fontSize: "0.68rem", color: C.text, lineHeight: 1.6 }}>At a ~{nearWR}% win rate the <b style={{ color: C.red }}>2:1 table is mostly red</b> — 2:1 isn't enough edge. Your gold column only turns <b style={{ color: C.green }}>green on the 3:1 table</b> (the ★ zone). You're at {g.gl}:1, so you compound <b style={{ color: C.red }}>{g.proj10}% / {N} trades</b>. Climb toward ~3:1 by cutting avg loss toward {g.target_al}% or letting winners run toward +{g.target_ag}%.</div>
+          <div style={{ background: "rgba(255,80,0,0.10)", border: `1px solid ${C.red}`, borderRadius: 10, padding: "11px 13px", marginBottom: g.verdict ? 12 : 0 }}>
+            <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: C.white, marginBottom: 4 }}>📍 You are here: {g.wr}% win rate · +{g.ag}% / −{g.al}% = {g.gl}:1</div>
+            <div style={{ fontSize: "0.6875rem", color: C.text, lineHeight: 1.6 }}>At a ~{nearWR}% win rate the <b style={{ color: C.red }}>2:1 table is mostly red</b> — 2:1 isn't enough edge. Your gold column only turns <b style={{ color: C.green }}>green on the 3:1 table</b> (the ★ zone). You're at {g.gl}:1, so you compound <b style={{ color: C.red }}>{g.proj10}% / {N} trades</b>. Climb toward ~3:1 by cutting avg loss toward {g.target_al}% or letting winners run toward +{g.target_ag}%.</div>
           </div>
 
-          {g.verdict && <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.65 }}>{g.verdict}</div>}
+          {g.verdict && <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.65 }}>{g.verdict}</div>}
         </div>); })()}
       {data.charts && (() => {
         const ch = data.charts, hs = ch.headline_stats || {};
         const tile = (label, val, color) => (
           <div style={{ background: "rgba(0,0,0,0.25)", border: bd, borderRadius: 10, padding: "12px 10px", textAlign: "center", flex: 1, minWidth: 90 }}>
-            <div style={{ fontSize: "1.4rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
-            <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.muted, marginTop: 5 }}>{label}</div>
+            <div style={{ fontSize: "1.25rem", fontWeight: 800, color: color || C.white, lineHeight: 1 }}>{val}</div>
+            <div style={{ fontSize: "0.6875rem", letterSpacing: ".08em", color: C.muted, marginTop: 5 }}>{label}</div>
           </div>
         );
         const rc = Array.isArray(ch.r_curve) ? ch.r_curve : [];
@@ -5625,9 +6332,9 @@ function CoachHero({ data, pro = false }) {
           <>
             <Card title="Performance at a glance">
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {tile("Win rate", (hs.win_rate ?? "—") + "%", C.gold)}
+                {tile("Win rate", (hs.win_rate ?? "—") + "%", C.white)}
                 {tile("Expectancy", "+" + (hs.expectancy ?? "—") + "R", (hs.expectancy || 0) >= 0 ? C.green : C.red)}
-                {tile("Profit factor", hs.profit_factor ?? "—", (hs.profit_factor || 0) >= 2 ? C.green : C.gold)}
+                {tile("Profit factor", hs.profit_factor ?? "—", (hs.profit_factor || 0) >= 2 ? C.green : C.white)}
                 {tile("Net P/L", "$" + Math.round((hs.net || 0) / 1000) + "k", (hs.net || 0) >= 0 ? C.green : C.red)}
                 {tile("Avg win", "+" + (hs.avg_win_r ?? "—") + "R", C.green)}
                 {tile("Avg loss", (hs.avg_loss_r ?? "—") + "R", C.red)}
@@ -5636,11 +6343,11 @@ function CoachHero({ data, pro = false }) {
             {rc.length > 1 && (
               <Card title="Equity curve · cumulative R">
                 <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 110, display: "block" }} preserveAspectRatio="none">
-                  <line x1="0" y1={yy(0)} x2={W} y2={yy(0)} stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
-                  <path d={`${path} L ${W},${H} L 0,${H} Z`} fill="rgba(201,152,42,0.10)" />
-                  <path d={path} fill="none" stroke={C.gold} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                  <line x1="0" y1={yy(0)} x2={W} y2={yy(0)} stroke="var(--w10)" strokeWidth="0.5" />
+                  <path d={`${path} L ${W},${H} L 0,${H} Z`} fill="var(--w08)" />
+                  <path d={path} fill="none" stroke="var(--w55)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
                 </svg>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.58rem", color: C.muted, marginTop: 4 }}><span>{rc.length} trades</span><span style={{ color: C.green, fontWeight: 700 }}>+{(rsv[rsv.length - 1] || 0).toFixed(0)}R total</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.6875rem", color: C.muted, marginTop: 4 }}><span>{rc.length} trades</span><span style={{ color: C.green, fontWeight: 700 }}>+{(rsv[rsv.length - 1] || 0).toFixed(0)}R total</span></div>
               </Card>
             )}
             {/* "Avg R by setup" and "R distribution" removed per Valen (2026-06-26) — replaced by the Goldilocks card + single deep-dive analysis below. */}
@@ -5659,13 +6366,13 @@ function CoachHero({ data, pro = false }) {
       {Array.isArray(data.lenses) && data.lenses.length > 0 && (
         <Card title="Lens sweep">
           {data.lenses.map((l, i) => (
-            <div key={i} style={{ padding: "6px 0", borderBottom: i < data.lenses.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+            <div key={i} style={{ padding: "6px 0", borderBottom: i < data.lenses.length - 1 ? "1px solid var(--w06)" : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: vcol(l.verdict) }} />
-                <span style={{ fontSize: "0.72rem", flex: 1 }}>{l.name}</span>
-                <span style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", color: vcol(l.verdict) }}>{l.verdict}</span>
+                <span style={{ fontSize: "0.75rem", flex: 1 }}>{l.name}</span>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 500, color: vcol(l.verdict) }}>{l.verdict}</span>
               </div>
-              {l.note && <div style={{ fontSize: "0.66rem", color: C.muted, marginLeft: 16, marginTop: 2, lineHeight: 1.45 }}>{l.note}</div>}
+              {l.note && <div style={{ fontSize: "0.6875rem", color: C.muted, marginLeft: 16, marginTop: 2, lineHeight: 1.45 }}>{l.note}</div>}
             </div>
           ))}
         </Card>
@@ -5674,12 +6381,12 @@ function CoachHero({ data, pro = false }) {
         <Card title={`Behavioral metrics${data.viz.tagged_count != null ? ` · ${data.viz.tagged_count} trades tagged` : ""}`}>
           {[["Avg R by conviction", data.viz.conviction_calibration], ["Avg R by idea source", data.viz.idea_source]].map(([t2, arr]) => Array.isArray(arr) && arr.length ? (
             <div key={t2} style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, fontWeight: 700, marginBottom: 7 }}>{t2}</div>
+              <div style={{ fontSize: "0.6875rem", letterSpacing: ".08em", color: "var(--faint)", fontWeight: 500, marginBottom: 7 }}>{t2}</div>
               {arr.map((r, j) => { const v = Number(r.avg_r) || 0, w = Math.min(100, Math.abs(v) / 3 * 100); return (
-                <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, fontSize: "0.66rem" }}>
+                <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, fontSize: "0.6875rem" }}>
                   <div style={{ width: 130, color: C.text }}>{r.label} <span style={{ color: C.muted }}>· {r.n}</span></div>
-                  <div style={{ flex: 1, position: "relative", height: 14, background: "rgba(255,255,255,0.04)", borderRadius: 3 }}>
-                    <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "rgba(255,255,255,0.15)" }} />
+                  <div style={{ flex: 1, position: "relative", height: 14, background: "var(--w04)", borderRadius: 3 }}>
+                    <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "var(--w14)" }} />
                     <div style={{ position: "absolute", top: 2, bottom: 2, borderRadius: 2, ...(v >= 0 ? { left: "50%", width: (w / 2) + "%", background: C.green } : { right: "50%", width: (w / 2) + "%", background: C.red }) }} />
                   </div>
                   <div style={{ width: 48, textAlign: "right", color: v >= 0 ? C.green : C.red, fontWeight: 700 }}>{v >= 0 ? "+" : ""}{v.toFixed(2)}R</div>
@@ -5688,27 +6395,27 @@ function CoachHero({ data, pro = false }) {
           ) : null)}
           {Array.isArray(data.viz.plan_adherence) && data.viz.plan_adherence.length > 0 && (
             <div>
-              <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.goldBright, fontWeight: 700, marginBottom: 7 }}>Plan adherence</div>
+              <div style={{ fontSize: "0.6875rem", letterSpacing: ".08em", color: "var(--faint)", fontWeight: 500, marginBottom: 7 }}>Plan adherence</div>
               {data.viz.plan_adherence.map((r, j) => (
-                <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.66rem", padding: "2px 0" }}><span style={{ color: C.text }}>{r.label}</span><b style={{ color: r.good ? C.green : C.red }}>{r.n}</b></div>
+                <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.6875rem", padding: "2px 0" }}><span style={{ color: C.text }}>{r.label}</span><b style={{ color: r.good ? C.green : C.red }}>{r.n}</b></div>
               ))}
             </div>
           )}
-          {data.viz.note && <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 8, fontStyle: "italic" }}>{data.viz.note}</div>}
+          {data.viz.note && <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 8, fontStyle: "italic" }}>{data.viz.note}</div>}
         </Card>
       )}
       {Array.isArray(data.open_runners) && data.open_runners.length > 0 && (
         <Card title="Open runners — live read">
           {data.open_runners.map((p, i) => (
-            <div key={i} style={{ padding: "8px 0", borderBottom: i < data.open_runners.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "0.66rem" }}>
+            <div key={i} style={{ padding: "8px 0", borderBottom: i < data.open_runners.length - 1 ? "1px solid var(--w06)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "0.6875rem" }}>
                 <div style={{ width: 48 }}><b>{p.ticker}</b></div>
                 <div style={{ width: 54, color: (p.upl_pct || 0) >= 0 ? C.green : C.red }}>{p.upl_pct}%</div>
                 <div style={{ width: 62, color: C.muted }}>{p.stop || "—"}</div>
-                <div style={{ width: 66 }}><span style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", padding: "2px 7px", borderRadius: 20, border: `1px solid ${vcol(p.status)}`, color: vcol(p.status) }}>{p.status}</span></div>
-                <div style={{ flex: 1, color: C.muted, fontSize: "0.66rem", lineHeight: 1.4 }}>{(p.flags || []).join(" · ") || "ok"}</div>
+                <div style={{ width: 66 }}><span style={{ fontSize: "0.6875rem", fontWeight: 500, padding: "2px 7px", borderRadius: 20, border: `1px solid ${vcol(p.status)}`, color: vcol(p.status) }}>{p.status}</span></div>
+                <div style={{ flex: 1, color: C.muted, fontSize: "0.6875rem", lineHeight: 1.4 }}>{(p.flags || []).join(" · ") || "ok"}</div>
               </div>
-              {p.take && <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.55, marginTop: 6, paddingLeft: 11, borderLeft: `2px solid ${vcol(p.status)}` }}>{p.take}</div>}
+              {p.take && <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.55, marginTop: 6, paddingLeft: 11, borderLeft: `2px solid ${vcol(p.status)}` }}>{p.take}</div>}
             </div>
           ))}
         </Card>
@@ -5716,9 +6423,9 @@ function CoachHero({ data, pro = false }) {
       {Array.isArray(data.deep_dive) && data.deep_dive.length > 0 && (
         <Card title="The deep dive · all angles">
           {data.deep_dive.map((s, i) => (
-            <div key={i} style={{ marginBottom: 15, paddingBottom: 13, borderBottom: i < data.deep_dive.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
-              <div style={{ fontSize: "0.78rem", fontWeight: 800, color: C.goldBright, marginBottom: 5 }}>{s.title}</div>
-              <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7 }}>{s.body}</div>
+            <div key={i} style={{ marginBottom: 15, paddingBottom: 13, borderBottom: i < data.deep_dive.length - 1 ? "1px solid var(--w06)" : "none" }}>
+              <div style={{ fontSize: "0.75rem", fontWeight: 800, color: C.white, marginBottom: 5 }}>{s.title}</div>
+              <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.7 }}>{s.body}</div>
             </div>
           ))}
         </Card>
@@ -5726,15 +6433,15 @@ function CoachHero({ data, pro = false }) {
       {(Array.isArray(data.focus_on) || Array.isArray(data.avoid)) && (
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
           {Array.isArray(data.focus_on) && data.focus_on.length > 0 && (
-            <div style={{ flex: 1, minWidth: 240, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 12, padding: "14px 16px" }}>
-              <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.green, fontWeight: 800, marginBottom: 8 }}>✓ Focus on</div>
-              <ul style={{ margin: 0, paddingLeft: 16 }}>{data.focus_on.map((x, i) => <li key={i} style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7, marginBottom: 4 }}>{x}</li>)}</ul>
+            <div style={{ flex: 1, minWidth: 240, background: "rgba(0,200,5,0.06)", border: "1px solid rgba(0,200,5,0.25)", borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ fontSize: "0.6875rem", letterSpacing: ".08em", color: C.green, fontWeight: 500, marginBottom: 8 }}>✓ Focus on</div>
+              <ul style={{ margin: 0, paddingLeft: 16 }}>{data.focus_on.map((x, i) => <li key={i} style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.7, marginBottom: 4 }}>{x}</li>)}</ul>
             </div>
           )}
           {Array.isArray(data.avoid) && data.avoid.length > 0 && (
-            <div style={{ flex: 1, minWidth: 240, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 12, padding: "14px 16px" }}>
-              <div style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: ".08em", color: C.red, fontWeight: 800, marginBottom: 8 }}>✕ Don't focus on</div>
-              <ul style={{ margin: 0, paddingLeft: 16 }}>{data.avoid.map((x, i) => <li key={i} style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.7, marginBottom: 4 }}>{x}</li>)}</ul>
+            <div style={{ flex: 1, minWidth: 240, background: "rgba(255,80,0,0.06)", border: "1px solid rgba(255,80,0,0.25)", borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ fontSize: "0.6875rem", letterSpacing: ".08em", color: C.red, fontWeight: 500, marginBottom: 8 }}>✕ Don't focus on</div>
+              <ul style={{ margin: 0, paddingLeft: 16 }}>{data.avoid.map((x, i) => <li key={i} style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.7, marginBottom: 4 }}>{x}</li>)}</ul>
             </div>
           )}
         </div>
@@ -5742,13 +6449,13 @@ function CoachHero({ data, pro = false }) {
       {Array.isArray(data.mentor_lenses) && data.mentor_lenses.length > 0 && (
         <Card title="Mentor lenses · JLaw · Qullamaggie · Martin Luk">
           {data.mentor_lenses.map((m, i) => (
-            <div key={i} style={{ padding: "8px 0", borderBottom: i < data.mentor_lenses.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+            <div key={i} style={{ padding: "8px 0", borderBottom: i < data.mentor_lenses.length - 1 ? "1px solid var(--w06)" : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: vcol(m.verdict) }} />
-                <span style={{ fontSize: "0.72rem", flex: 1, fontWeight: 700 }}>{m.mentor}</span>
-                <span style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", color: vcol(m.verdict) }}>{m.verdict}</span>
+                <span style={{ fontSize: "0.75rem", flex: 1, fontWeight: 700 }}>{m.mentor}</span>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 500, color: vcol(m.verdict) }}>{m.verdict}</span>
               </div>
-              {m.note && <div style={{ fontSize: "0.66rem", color: C.muted, marginLeft: 16, marginTop: 3, lineHeight: 1.55 }}>{m.note}</div>}
+              {m.note && <div style={{ fontSize: "0.6875rem", color: C.muted, marginLeft: 16, marginTop: 3, lineHeight: 1.55 }}>{m.note}</div>}
             </div>
           ))}
         </Card>
@@ -5948,7 +6655,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
     const hideEls = el.querySelectorAll(".viv-share-btn, .viv-filter-bar, .viv-hide-screenshot");
     hideEls.forEach(e => e.style.display = "none");
     const { default: html2canvas } = await import("html2canvas"); // lazy: only fetched when sharing a win card
-    const content = await html2canvas(el, { backgroundColor: "#08080e", scale: 2, useCORS: true, logging: false });
+    const content = await html2canvas(el, { backgroundColor: resolveThemeColor("--bg", "#08080e"), scale: 2, useCORS: true, logging: false });
     if (brandEl) brandEl.style.display = "none";
     hideEls.forEach(e => e.style.display = "");
 
@@ -5961,7 +6668,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
     out.width = content.width + pad * 2;
     out.height = content.height + pad + footer;
     const ctx = out.getContext("2d");
-    ctx.fillStyle = "#08080e";
+    ctx.fillStyle = resolveThemeColor("--bg", "#08080e");
     ctx.fillRect(0, 0, out.width, out.height);
     ctx.drawImage(content, pad, pad);
 
@@ -6069,15 +6776,15 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   // Reusable Share dropdown button
   const ShareDropdown = useCallback(({ menuOpen, setMenuOpen, status, captureFn, label }) => (
     <div className="viv-share-btn" style={{ position:"relative" }}>
-      <button onClick={() => setMenuOpen(p => !p)} disabled={screenshotting} title={`Screenshot ${label}`} style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.borderGold}`,background:C.goldDim,color:C.gold,fontWeight:700,fontSize:"0.72rem",cursor:screenshotting?"wait":"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:5 }}>
+      <button onClick={() => setMenuOpen(p => !p)} disabled={screenshotting} title={`Screenshot ${label}`} style={{ padding:"8px 12px",borderRadius:980,border:`1px solid ${C.borderGold}`,background:C.goldDim,color:C.gold,fontWeight:700,fontSize:"0.75rem",cursor:screenshotting?"wait":"pointer",fontFamily:font,display:"flex",alignItems:"center",gap:5 }}>
         {screenshotting ? "Capturing..." : status === "copied" ? "Copied ✓" : status === "downloaded" ? "Downloaded ✓" : `📸 Share ${label}`}
       </button>
       {menuOpen && !screenshotting && (
         <div style={{ position:"absolute",top:"calc(100% + 6px)",right:0,background:"rgba(12,12,20,0.97)",border:`1px solid ${C.borderGold}`,borderRadius:10,padding:6,zIndex:100,minWidth:180,boxShadow:"0 8px 32px rgba(0,0,0,0.6)" }}>
-          <button onClick={() => captureFn("copy")} style={{ display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",border:"none",background:"transparent",color:C.white,fontSize:"0.72rem",fontWeight:600,cursor:"pointer",fontFamily:font,borderRadius:8,textAlign:"left" }} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.06)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+          <button onClick={() => captureFn("copy")} style={{ display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",border:"none",background:"transparent",color:C.white,fontSize:"0.75rem",fontWeight:600,cursor:"pointer",fontFamily:font,borderRadius:8,textAlign:"left" }} onMouseEnter={e=>e.currentTarget.style.background="var(--w06)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
             📋 Copy to Clipboard
           </button>
-          <button onClick={() => captureFn("download")} style={{ display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",border:"none",background:"transparent",color:C.white,fontSize:"0.72rem",fontWeight:600,cursor:"pointer",fontFamily:font,borderRadius:8,textAlign:"left" }} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.06)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+          <button onClick={() => captureFn("download")} style={{ display:"flex",alignItems:"center",gap:8,width:"100%",padding:"10px 14px",border:"none",background:"transparent",color:C.white,fontSize:"0.75rem",fontWeight:600,cursor:"pointer",fontFamily:font,borderRadius:8,textAlign:"left" }} onMouseEnter={e=>e.currentTarget.style.background="var(--w06)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
             💾 Download PNG
           </button>
         </div>
@@ -7333,7 +8040,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           const pfCell = (pf) => <span className="term" data-tip="Profit factor = gross $ won ÷ gross $ lost in this group. Above 1 = the group makes money; 2+ = every dollar lost buys two back." style={{ color: pf == null ? "var(--muted)" : "var(--text)", fontWeight: 600, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>PF {pf == null ? "—" : pf === Infinity ? "∞" : pf.toFixed(2)}</span>;
           const dot = (c) => <i style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: c, marginRight: 7, verticalAlign: "middle", flex: "none" }} />;
           const CTX_LABEL = { trend: "Trending", chop: "Choppy", down: "Downtrend" };
-          const CTX_DOT = { trend: "var(--green)", chop: "var(--gold)", down: "var(--red)" };
+          const CTX_DOT = { trend: "var(--green)", chop: "var(--orange)", down: "var(--red)" };
           // click a group → expand the exact trades behind the number (with sector + the snapshot ranks used)
           const groupTrades = (id) => {
             if (id === "t:in") return pop.filter(t => fitOf(t) === "in");
@@ -7364,13 +8071,13 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           const Row = ({ label, s, accent, id }) => (
             <div onClick={id ? () => setEdgeOpen(edgeOpen === id ? null : id) : undefined}
               title={id ? "Click to see the exact trades behind this number" : undefined}
-              style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 10px", padding: "8px 6px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: "0.8rem", cursor: id ? "pointer" : "default", background: edgeOpen === id ? "rgba(240,192,80,0.05)" : "transparent", borderRadius: 8, minWidth: 0 }}>
+              style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 10px", padding: "8px 6px", borderBottom: "1px solid var(--w06)", fontSize: "0.75rem", cursor: id ? "pointer" : "default", background: edgeOpen === id ? "rgba(240,192,80,0.05)" : "transparent", borderRadius: 8, minWidth: 0 }}>
               <span style={{ flex: "1 1 84px", minWidth: 0, fontWeight: 800, color: accent || "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
               <span style={{ color: "var(--muted)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{s.n} trade{s.n !== 1 ? "s" : ""}</span>
               <span style={{ color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{s.winPct}% win</span>
               {pfCell(s.pf)}
               {cell(s.avgR, (s.avgR || 0) >= 0)}
-              {id && <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>{edgeOpen === id ? "▴" : "▾"}</span>}
+              {id && <span style={{ color: "var(--muted)", fontSize: "0.6875rem" }}>{edgeOpen === id ? "▴" : "▾"}</span>}
             </div>
           );
           const EdgeList = ({ id }) => {
@@ -7378,8 +8085,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             if (!rows.length) return null;
             const isTheme = id.startsWith("t:");
             return (
-              <div style={{ gridColumn: "1 / -1", background: "rgba(255,255,255,0.02)", border: "1px solid var(--borderGold)", borderRadius: 12, padding: "10px 14px", marginTop: 4 }}>
-                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>
+              <div style={{ gridColumn: "1 / -1", background: "var(--w02)", border: "1px solid var(--borderGold)", borderRadius: 12, padding: "10px 14px", marginTop: 4 }}>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--faint)", marginBottom: 6 }}>
                   The {rows.length} trade{rows.length !== 1 ? "s" : ""} behind “{id === "t:in" ? "In-theme" : id === "t:off" ? "Off-theme" : id === "t:un" ? "Untagged"
                     : id === "m:trend" ? "Trending tape" : id === "m:chop" ? "Choppy tape" : id === "m:down" ? "Downtrend tape" : id === "m:un" ? "No market data"
                     : id.startsWith("x:") ? (() => { const [G, T] = id.slice(2).split("|"); return `${G === "un" ? "Ungraded" : G} · ${T === "in" ? "In-theme" : T === "off" ? "Off-theme" : "Untagged"}`; })()
@@ -7392,16 +8099,16 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   const rk = isTheme && th ? themeRanks(th, t.entry) : null;
                   return (
                     <div key={t.id || i} onClick={() => openReview(t)} title="Open trade details"
-                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 4px", borderTop: i ? "1px solid rgba(255,255,255,0.04)" : "none", fontSize: "0.78rem", cursor: "pointer", flexWrap: "wrap" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 4px", borderTop: i ? "1px solid var(--w04)" : "none", fontSize: "0.75rem", cursor: "pointer", flexWrap: "wrap" }}>
                       <b style={{ minWidth: 52, color: "var(--white)" }}>{t.ticker}</b>
-                      <span style={{ minWidth: 120, color: "var(--goldBright)", fontWeight: 600 }}>{th || "— no sector"}</span>
+                      <span style={{ minWidth: 120, color: "var(--white)", fontWeight: 600 }}>{th || "— no sector"}</span>
                       <span style={{ minWidth: 78, color: "var(--muted)" }}>{tradeDateISO(t.entry) || "—"}</span>
                       {isTheme && (rk
-                        ? <span style={{ color: "var(--muted)", fontSize: "0.72rem", whiteSpace: "nowrap" }}>wk #{rk.week ?? "–"} · mo #{rk.month ?? "–"} <span style={{ opacity: 0.7 }}>@ {rk.date}</span></span>
-                        : <span style={{ color: "var(--muted)", fontSize: "0.72rem", fontStyle: "italic" }}>{!th ? "sector unknown" : !tradeDateISO(t.entry) ? "no entry date — not judged" : "before theme coverage"}</span>)}
+                        ? <span style={{ color: "var(--muted)", fontSize: "0.75rem", whiteSpace: "nowrap" }}>wk #{rk.week ?? "–"} · mo #{rk.month ?? "–"} <span style={{ opacity: 0.7 }}>@ {rk.date}</span></span>
+                        : <span style={{ color: "var(--muted)", fontSize: "0.75rem", fontStyle: "italic" }}>{!th ? "sector unknown" : !tradeDateISO(t.entry) ? "no entry date — not judged" : "before theme coverage"}</span>)}
                       <span style={{ minWidth: 62, fontWeight: 700, color: (Number(t.plPct) || 0) > 0 ? "var(--green)" : "var(--red)" }}>{sgnPct(Number(t.plPct))}</span>
                       <span style={{ color: "var(--muted)" }}>{t.rMult != null ? sgnR(Number(t.rMult)) : "—"}</span>
-                      <span style={{ marginLeft: "auto", color: "var(--goldBright)", fontSize: "0.7rem" }}>details ›</span>
+                      <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: "0.6875rem" }}>details ›</span>
                     </div>
                   );
                 })}
@@ -7411,13 +8118,13 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           if (!byGrade.length && !inT.n && !offT.n) return null;
           // Theme columns for the matrix (grade × theme). Present-only, in a fixed order.
           const THEME_ORDER = ["in", "off", "un"];
-          const themeHead = (t) => t === "in" ? <>{dot("var(--green)")}In-theme</> : t === "off" ? <>{dot("var(--red)")}Off-theme</> : <>{dot("rgba(255,255,255,0.25)")}Untagged</>;
+          const themeHead = (t) => t === "in" ? <>{dot("var(--green)")}In-theme</> : t === "off" ? <>{dot("var(--red)")}Off-theme</> : <>{dot("var(--w22)")}Untagged</>;
           const matrixBlock = combos.length > 0 && (
                 <div style={{ marginTop: 18 }}>
                   <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
-                    <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)" }}>Edge matrix — grade × theme</div>
+                    <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--faint)" }}>Edge matrix — grade × theme</div>
                     {/* view toggle — heatmap (visual) vs the sortable table */}
-                    <div style={{ marginLeft: "auto", display: "inline-flex", border: "1px solid var(--borderGold)", borderRadius: 8, overflow: "hidden", fontSize: "0.62rem", fontWeight: 700 }}>
+                    <div style={{ marginLeft: "auto", display: "inline-flex", border: "1px solid var(--borderGold)", borderRadius: 8, overflow: "hidden", fontSize: "0.6875rem", fontWeight: 700 }}>
                       {[["heatmap", "Heatmap"], ["table", "Table"]].map(([v, lbl]) => (
                         <button key={v} type="button" onClick={() => setEdgeMatrixView(v)}
                           style={{ padding: "4px 10px", border: "none", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.04em",
@@ -7426,9 +8133,9 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                       ))}
                     </div>
                   </div>
-                  <div style={{ background: "rgba(201,152,42,0.06)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "8px 12px", fontSize: "0.66rem", color: "var(--muted)", lineHeight: 1.5, marginBottom: 8 }}>
-                    Starts at <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b> — the first theme snapshot
-                    <span onClick={() => setEdgeNotes(n => ({ ...n, matrix: !n.matrix }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.matrix ? "hide ▴" : "why? ▾"}</span>
+                  <div style={{ background: "var(--w03)", border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", fontSize: "0.6875rem", color: "var(--muted)", lineHeight: 1.5, marginBottom: 8 }}>
+                    Starts at <b style={{ color: "var(--white)" }}>{THEME_COVERAGE_START}</b> — the first theme snapshot
+                    <span onClick={() => setEdgeNotes(n => ({ ...n, matrix: !n.matrix }))} style={{ color: "var(--muted)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.matrix ? "hide ▴" : "why? ▾"}</span>
                     {edgeNotes.matrix && <div style={{ marginTop: 4 }}>Trades entered before that have no theme tracking, so crossing them here would be inaccurate; they're excluded from the matrix (the single-dimension groups on the left still cover every trade).</div>}
                   </div>
                   {edgeMatrixView === "heatmap" ? (() => {
@@ -7442,10 +8149,10 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                     if (!grades.length || !themes.length) return null;
                     const cellBg = (id) => {
                       const c = byId[id];
-                      if (!c || c.avgR == null) return "rgba(255,255,255,0.02)";
+                      if (!c || c.avgR == null) return "var(--w02)";
                       const a = Math.min(0.45, Math.abs(c.avgR) * 0.25);
-                      if (a < 0.02) return "rgba(255,255,255,0.03)";
-                      return c.avgR >= 0 ? `rgba(34,197,94,${a.toFixed(3)})` : `rgba(239,68,68,${a.toFixed(3)})`;
+                      if (a < 0.02) return "var(--w03)";
+                      return c.avgR >= 0 ? `rgba(0,200,5,${a.toFixed(3)})` : `rgba(255,80,0,${a.toFixed(3)})`;
                     };
                     return (
                       <div>
@@ -7454,22 +8161,22 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                             {/* header row: blank corner + theme columns */}
                             <div />
                             {themes.map(t => (
-                              <div key={t} style={{ fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)", fontWeight: 700, padding: "2px 4px", display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>{themeHead(t)}</div>
+                              <div key={t} style={{ fontSize: "0.6875rem", letterSpacing: 0, color: "var(--muted)", fontWeight: 500, padding: "2px 4px", display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>{themeHead(t)}</div>
                             ))}
                             {/* one row per grade */}
                             {grades.map(g => (
                               <React.Fragment key={g}>
-                                <div style={{ fontSize: "0.72rem", fontWeight: 800, color: g === "un" ? "var(--muted)" : "var(--text)", display: "flex", alignItems: "center", whiteSpace: "nowrap", paddingRight: 4 }}>{gradeLabel(g)}</div>
+                                <div style={{ fontSize: "0.75rem", fontWeight: 800, color: g === "un" ? "var(--muted)" : "var(--text)", display: "flex", alignItems: "center", whiteSpace: "nowrap", paddingRight: 4 }}>{gradeLabel(g)}</div>
                                 {themes.map(t => {
                                   const id = `x:${g}|${t}`;
                                   const c = byId[id];
                                   const open = edgeOpen === id;
-                                  if (!c) return <div key={t} style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: "0.8rem" }}>—</div>;
+                                  if (!c) return <div key={t} style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: "var(--w02)", border: "1px solid var(--w04)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: "0.75rem" }}>—</div>;
                                   return (
                                     <div key={t} onClick={() => setEdgeOpen(open ? null : id)} title="Click to see the exact trades behind this combination"
-                                      style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: cellBg(id), border: open ? "1px solid var(--goldBright)" : "1px solid rgba(255,255,255,0.06)", boxShadow: open ? "0 0 0 1px var(--goldBright)" : "none", padding: "5px 7px", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
-                                      <div style={{ fontSize: "0.82rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "var(--text)" }}>{c.avgR == null ? "—" : (c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2) + "R"}</div>
-                                      <div style={{ fontSize: "0.58rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>n={c.n} · {c.winPct}%</div>
+                                      style={{ minWidth: 0, minHeight: 46, borderRadius: 8, background: cellBg(id), border: open ? "1px solid var(--goldBright)" : "1px solid var(--w06)", boxShadow: open ? "0 0 0 1px var(--goldBright)" : "none", padding: "5px 7px", cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "center", gap: 1 }}>
+                                      <div style={{ fontSize: "0.875rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "var(--text)" }}>{c.avgR == null ? "—" : (c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2) + "R"}</div>
+                                      <div style={{ fontSize: "0.6875rem", color: "var(--muted)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>n={c.n} · {c.winPct}%</div>
                                     </div>
                                   );
                                 })}
@@ -7477,14 +8184,14 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                             ))}
                           </div>
                         </div>
-                        <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Colour = average R per trade. Click any cell to see its exact trades. Cells under ~10 trades are direction, not proof.</div>
+                        <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>Colour = average R per trade. Click any cell to see its exact trades. Cells under ~10 trades are direction, not proof.</div>
                       </div>
                     );
                   })() : (
                   <div style={{ overflowX: "auto" }}>
-                    <table className="minitable" style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem", tableLayout: "fixed" }}>
+                    <table className="minitable" style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem", tableLayout: "fixed" }}>
                       <colgroup><col style={{ width: "16%" }} /><col style={{ width: "22%" }} /><col style={{ width: "14%" }} /><col style={{ width: "15%" }} /><col style={{ width: "13%" }} /><col style={{ width: "14%" }} /><col style={{ width: "6%" }} /></colgroup>
-                      <thead><tr style={{ color: "var(--muted)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                      <thead><tr style={{ color: "var(--muted)", fontSize: "0.6875rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                         <th style={{ textAlign: "left", padding: "4px 8px" }}>Grade</th><th style={{ textAlign: "left", padding: "4px 8px" }}>Theme</th>
                         <th style={{ textAlign: "right", padding: "4px 8px" }}>Trades</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Win %</th><th style={{ textAlign: "right", padding: "4px 8px" }}>PF</th><th style={{ textAlign: "right", padding: "4px 8px" }}>Avg R</th><th></th>
                       </tr></thead>
@@ -7493,16 +8200,16 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                           /* NOTE: .vj tbody td right-aligns everything past column 2 — the first two
                              (text) columns need EXPLICIT textAlign:left or headers and cells drift apart. */
                           <tr key={c.id} onClick={() => setEdgeOpen(edgeOpen === c.id ? null : c.id)} title="Click to see the exact trades behind this combination"
-                            onMouseEnter={e => { if (edgeOpen !== c.id) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                            onMouseEnter={e => { if (edgeOpen !== c.id) e.currentTarget.style.background = "var(--w03)"; }}
                             onMouseLeave={e => { e.currentTarget.style.background = edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent"; }}
-                            style={{ cursor: "pointer", background: edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 800, color: c.G === "un" ? "var(--muted)" : "var(--text)" }}>{c.G === "un" ? "Ungraded" : c.G}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.78rem", fontWeight: 600, color: c.T === "un" ? "var(--muted)" : "var(--text)" }}>{c.T === "in" ? <>{dot("var(--green)")}In-theme</> : c.T === "off" ? <>{dot("var(--red)")}Off-theme</> : <>{dot("rgba(255,255,255,0.25)")}Untagged</>}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{c.n}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: "var(--text)" }}>{c.winPct}%</td>
-                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: c.pf == null ? "var(--muted)" : "var(--text)" }}>{c.pf == null ? "—" : c.pf === Infinity ? "∞" : c.pf.toFixed(2)}</td>
-                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.78rem", fontVariantNumeric: "tabular-nums" }}>{c.avgR == null ? <span style={{ color: "var(--muted)" }}>—</span> : <b style={{ color: c.avgR >= 0 ? "var(--green)" : "var(--red)" }}>{(c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2)}R</b>}</td>
-                            <td style={{ padding: "8px 4px", textAlign: "right", color: "var(--muted)", fontSize: "0.66rem" }}>{edgeOpen === c.id ? "▴" : "▾"}</td>
+                            style={{ cursor: "pointer", background: edgeOpen === c.id ? "rgba(240,192,80,0.05)" : "transparent", borderBottom: "1px solid var(--w06)" }}>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.75rem", fontWeight: 800, color: c.G === "un" ? "var(--muted)" : "var(--text)" }}>{c.G === "un" ? "Ungraded" : c.G}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "left", fontSize: "0.75rem", fontWeight: 600, color: c.T === "un" ? "var(--muted)" : "var(--text)" }}>{c.T === "in" ? <>{dot("var(--green)")}In-theme</> : c.T === "off" ? <>{dot("var(--red)")}Off-theme</> : <>{dot("var(--w22)")}Untagged</>}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.75rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{c.n}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.75rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: "var(--text)" }}>{c.winPct}%</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.75rem", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: c.pf == null ? "var(--muted)" : "var(--text)" }}>{c.pf == null ? "—" : c.pf === Infinity ? "∞" : c.pf.toFixed(2)}</td>
+                            <td style={{ padding: "8px 8px", textAlign: "right", fontSize: "0.75rem", fontVariantNumeric: "tabular-nums" }}>{c.avgR == null ? <span style={{ color: "var(--muted)" }}>—</span> : <b style={{ color: c.avgR >= 0 ? "var(--green)" : "var(--red)" }}>{(c.avgR >= 0 ? "+" : "") + c.avgR.toFixed(2)}R</b>}</td>
+                            <td style={{ padding: "8px 4px", textAlign: "right", color: "var(--muted)", fontSize: "0.6875rem" }}>{edgeOpen === c.id ? "▴" : "▾"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -7510,7 +8217,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   </div>
                   )}
                   {edgeOpen && edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
-                  {edgeMatrixView === "table" && <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 6 }}>Sorted by sample size. Small samples (under ~10 trades) are direction, not proof — click any row to inspect its exact trades before acting on it.</div>}
+                  {edgeMatrixView === "table" && <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 6 }}>Sorted by sample size. Small samples (under ~10 trades) are direction, not proof — click any row to inspect its exact trades before acting on it.</div>}
                 </div>
           );
           if (proLayout) return (
@@ -7527,20 +8234,20 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   {edgeGroup === "grade" && <>
                     {byGrade.map(g => <Row key={g.L} id={"g:" + g.L} label={g.L + " setups"} s={g} />)}
                     {ungraded.n > 0 && <Row id="g:un" label="Ungraded" s={ungraded} accent="var(--muted)" />}
-                    {byGrade.length === 0 && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Grade setups in Premium Tools → Setup Grader; results correlate here automatically.</div>}
+                    {byGrade.length === 0 && <div style={{ fontSize: "0.75rem", color: "var(--muted)", padding: "6px 2px" }}>Grade setups in Premium Tools → Setup Grader; results correlate here automatically.</div>}
                   </>}
                   {edgeGroup === "theme" && <>
                     {inT.n > 0 && <Row id="t:in" label={<>{dot("var(--green)")}In-theme</>} s={inT} />}
                     {offT.n > 0 && <Row id="t:off" label={<>{dot("var(--red)")}Off-theme</>} s={offT} />}
-                    {unT.n > 0 && <Row id="t:un" label={<>{dot("rgba(255,255,255,0.25)")}Untagged</>} s={unT} accent="var(--muted)" />}
-                    {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
+                    {unT.n > 0 && <Row id="t:un" label={<>{dot("var(--w22)")}Untagged</>} s={unT} accent="var(--muted)" />}
+                    {!inT.n && !offT.n && <div style={{ fontSize: "0.75rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
                   </>}
                   {edgeGroup === "context" && <>
                     {mTrend.n > 0 && <Row id="m:trend" label={<span className="term" data-tip="Trending market: SPY closed ABOVE its 21-day EMA for 10+ straight sessions before entry.">{dot(CTX_DOT.trend)}Trending</span>} s={mTrend} />}
                     {mChop.n > 0 && <Row id="m:chop" label={<span className="term" data-tip="Choppy market: within the last 10 sessions before entry, SPY crossed back and forth around its 21-day EMA.">{dot(CTX_DOT.chop)}Choppy</span>} s={mChop} />}
                     {mDown.n > 0 && <Row id="m:down" label={<span className="term" data-tip="Downtrend market: SPY closed BELOW its 21-day EMA for 10+ straight sessions before entry.">{dot(CTX_DOT.down)}Downtrend</span>} s={mDown} />}
-                    {mUn.n > 0 && <Row id="m:un" label={<>{dot("rgba(255,255,255,0.25)")}No data</>} s={mUn} accent="var(--muted)" />}
-                    {!spyCtxDays && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Loading SPY history… (needs the deployed /api — shows “No data” in local dev.)</div>}
+                    {mUn.n > 0 && <Row id="m:un" label={<>{dot("var(--w22)")}No data</>} s={mUn} accent="var(--muted)" />}
+                    {!spyCtxDays && <div style={{ padding: "6px 2px" }} aria-busy="true" aria-label="Loading SPY history"><SkLine w="100%" h={46} /><SkLine w="55%" h={9} /></div>}
                   </>}
                   {edgeOpen && !edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
                 </div>
@@ -7550,11 +8257,11 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 <div className="cardhead">
                   <span className="label">Edge Matrix</span>
                   <span className="infodot" data-tip="Setup grade × theme fit crossed in one view so you can see exactly which combination your edge lives in. Toggle the heatmap or the sortable table; click any cell/row for its exact trades.">i</span>
-                  {matrixBlock && <button type="button" onClick={() => setMatrixPopup(true)} title="Expand the full matrix" style={{ marginLeft: "auto", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", fontFamily: "inherit", fontSize: "0.62rem", fontWeight: 700, padding: "3px 9px", cursor: "pointer" }}>⤢ Expand</button>}
+                  {matrixBlock && <button type="button" onClick={() => setMatrixPopup(true)} title="Expand the full matrix" style={{ marginLeft: "auto", background: "var(--w06)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--muted)", fontFamily: "inherit", fontSize: "0.6875rem", fontWeight: 700, padding: "3px 9px", cursor: "pointer" }}>⤢ Expand</button>}
                 </div>
                 {matrixBlock
                   ? <div style={{ flex: 1, minHeight: 0, maxHeight: 420, overflowY: "auto", marginTop: -6 }}>{matrixBlock}</div>
-                  : <div style={{ fontSize: "0.72rem", color: "var(--muted)", padding: "4px 2px" }}>Not enough theme-tracked trades yet to cross grade × theme. The single-dimension groups on the left still cover every trade.</div>}
+                  : <div style={{ fontSize: "0.75rem", color: "var(--muted)", padding: "4px 2px" }}>Not enough theme-tracked trades yet to cross grade × theme. The single-dimension groups on the left still cover every trade.</div>}
                 {edgeOpen && edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
               </div>
               {matrixPopup && matrixBlock && createPortal((
@@ -7562,8 +8269,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   style={{ position: "fixed", inset: 0, zIndex: 1250, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}>
                   <div style={{ fontFamily: font, position: "relative", width: "min(94vw, 1040px)", maxHeight: "86vh", overflowY: "auto", background: "var(--glass)", border: "1px solid var(--border)", borderRadius: 18, padding: "20px 24px", backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", boxShadow: "0 30px 80px rgba(0,0,0,0.6)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                      <span style={{ fontSize: "0.92rem", fontWeight: 800, color: "var(--goldBright)" }}>Edge Matrix — grade × theme</span>
-                      <button type="button" aria-label="Close" onClick={() => setMatrixPopup(false)} style={{ marginLeft: "auto", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: "1.1rem", lineHeight: 1 }}>×</button>
+                      <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--white)" }}>Edge Matrix — grade × theme</span>
+                      <button type="button" aria-label="Close" onClick={() => setMatrixPopup(false)} style={{ marginLeft: "auto", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: "1.125rem", lineHeight: 1 }}>×</button>
                     </div>
                     {matrixBlock}
                     {edgeOpen && edgeOpen.startsWith("x:") && <EdgeList id={edgeOpen} />}
@@ -7577,33 +8284,33 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             <div className="card reveal" style={{ padding: "16px 20px", marginBottom: 18 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))", gap: 20 }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By setup grade</div>
+                  <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--faint)", marginBottom: 6 }}>By setup grade</div>
                   {byGrade.map(g => <Row key={g.L} id={"g:" + g.L} label={g.L + " setups"} s={g} />)}
                   {ungraded.n > 0 && <Row id="g:un" label="Ungraded" s={ungraded} accent="var(--muted)" />}
-                  {byGrade.length === 0 && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Grade setups in Premium Tools → Setup Grader; results correlate here automatically.</div>}
+                  {byGrade.length === 0 && <div style={{ fontSize: "0.75rem", color: "var(--muted)", padding: "6px 2px" }}>Grade setups in Premium Tools → Setup Grader; results correlate here automatically.</div>}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By theme fit (at entry)</div>
+                  <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--faint)", marginBottom: 6 }}>By theme fit (at entry)</div>
                   {inT.n > 0 && <Row id="t:in" label={<>{dot("var(--green)")}In-theme</>} s={inT} />}
                   {offT.n > 0 && <Row id="t:off" label={<>{dot("var(--red)")}Off-theme</>} s={offT} />}
-                  {unT.n > 0 && <Row id="t:un" label={<>{dot("rgba(255,255,255,0.25)")}Untagged</>} s={unT} accent="var(--muted)" />}
-                  {!inT.n && !offT.n && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
-                  {THEME_COVERAGE_START && <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
-                    Tracked from <b style={{ color: "var(--goldBright)" }}>{THEME_COVERAGE_START}</b>
-                    <span onClick={() => setEdgeNotes(n => ({ ...n, theme: !n.theme }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.theme ? "hide ▴" : "why? ▾"}</span>
+                  {unT.n > 0 && <Row id="t:un" label={<>{dot("var(--w22)")}Untagged</>} s={unT} accent="var(--muted)" />}
+                  {!inT.n && !offT.n && <div style={{ fontSize: "0.75rem", color: "var(--muted)", padding: "6px 2px" }}>No theme-taggable trades in this filter.</div>}
+                  {THEME_COVERAGE_START && <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
+                    Tracked from <b style={{ color: "var(--white)" }}>{THEME_COVERAGE_START}</b>
+                    <span onClick={() => setEdgeNotes(n => ({ ...n, theme: !n.theme }))} style={{ color: "var(--muted)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.theme ? "hide ▴" : "why? ▾"}</span>
                     {edgeNotes.theme && <div style={{ marginTop: 4 }}>The date of the first theme snapshot. Trades entered earlier aren't theme-tagged: themes rotate constantly, so a later snapshot can't honestly judge an older trade. Grade metrics cover all trades.</div>}
                   </div>}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>By market context (at entry)</div>
+                  <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--faint)", marginBottom: 6 }}>By market context (at entry)</div>
                   {mTrend.n > 0 && <Row id="m:trend" label={<span className="term" data-tip="Trending market: SPY closed ABOVE its 21-day EMA for 10 or more straight sessions, as of the last completed session before your entry. The tape had a persistent uptrend under your trade.">{dot(CTX_DOT.trend)}Trending</span>} s={mTrend} />}
                   {mChop.n > 0 && <Row id="m:chop" label={<span className="term" data-tip="Choppy market: within the last 10 sessions before your entry, SPY crossed back and forth around its 21-day EMA — neither side held 10 straight closes. Whipsaw conditions: breakouts get faded.">{dot(CTX_DOT.chop)}Choppy</span>} s={mChop} />}
                   {mDown.n > 0 && <Row id="m:down" label={<span className="term" data-tip="Downtrend market: SPY closed BELOW its 21-day EMA for 10 or more straight sessions before your entry. Persistent downside tape — fresh long breakout risk is swimming upstream.">{dot(CTX_DOT.down)}Downtrend</span>} s={mDown} />}
-                  {mUn.n > 0 && <Row id="m:un" label={<span className="term" data-tip="No verdict: the entry date predates the SPY history loaded, the date is missing, or the price feed didn't answer. Never guessed.">{dot("rgba(255,255,255,0.25)")}No data</span>} s={mUn} accent="var(--muted)" />}
-                  {!spyCtxDays && <div style={{ fontSize: "0.76rem", color: "var(--muted)", padding: "6px 2px" }}>Loading SPY history… (needs the deployed /api — shows “No data” in local dev.)</div>}
-                  <div style={{ fontSize: "0.66rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
+                  {mUn.n > 0 && <Row id="m:un" label={<span className="term" data-tip="No verdict: the entry date predates the SPY history loaded, the date is missing, or the price feed didn't answer. Never guessed.">{dot("var(--w22)")}No data</span>} s={mUn} accent="var(--muted)" />}
+                  {!spyCtxDays && <div style={{ padding: "6px 2px" }} aria-busy="true" aria-label="Loading SPY history"><SkLine w="100%" h={46} /><SkLine w="55%" h={9} /></div>}
+                  <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
                     SPY vs its 21-day EMA, past 10 sessions, judged at entry
-                    <span onClick={() => setEdgeNotes(n => ({ ...n, market: !n.market }))} style={{ color: "var(--goldBright)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.market ? "hide ▴" : "full definition ▾"}</span>
+                    <span onClick={() => setEdgeNotes(n => ({ ...n, market: !n.market }))} style={{ color: "var(--muted)", cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{edgeNotes.market ? "hide ▴" : "full definition ▾"}</span>
                     {edgeNotes.market && <div style={{ marginTop: 6, display: "grid", gap: 5 }}>
                       <div><b style={{ color: "var(--text)" }}>{dot(CTX_DOT.trend)}Trending</b> — SPY closed above its 21-day EMA for 10 or more straight sessions.</div>
                       <div><b style={{ color: "var(--text)" }}>{dot(CTX_DOT.chop)}Choppy</b> — price crossed back and forth through the EMA21 within the last 10 sessions.</div>
@@ -7634,7 +8341,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   style={{ position: "relative", display: "flex", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", cursor: "pointer", userSelect: "none", touchAction: "none" }}>
                   <div style={{ position: "absolute", top: 3, bottom: 3, left: 3, width: "calc((100% - 6px) / 3)", transform: `translateX(${eqIdx * 100}%)`, background: C.gold, borderRadius: 8, transition: "transform .18s cubic-bezier(.22,1,.36,1)", pointerEvents: "none" }} />
                   {EQ_UNITS.map(([k, lbl]) => (
-                    <span key={k} style={{ position: "relative", zIndex: 1, color: eqMode === k ? "#1a1206" : C.muted, padding: "7px 0", width: 36, textAlign: "center", fontFamily: font, fontWeight: 700, fontSize: "0.78rem", pointerEvents: "none" }}>{lbl}</span>
+                    <span key={k} style={{ position: "relative", zIndex: 1, color: eqMode === k ? "#1a1206" : C.muted, padding: "7px 0", width: 36, textAlign: "center", fontFamily: font, fontWeight: 700, fontSize: "0.75rem", pointerEvents: "none" }}>{lbl}</span>
                   ))}
                 </div>
                 <div className="seg" id="eqXSeg">
@@ -7643,13 +8350,13 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 </div>
                 <div className="viv-hide-screenshot" style={{ position: "relative" }}>
                   <button type="button" title="Save this chart as an image" onClick={() => setEqCamOpen(o => !o)}
-                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 8, color: eqCamStatus ? "var(--green)" : "var(--muted)", cursor: "pointer", fontSize: "0.9rem", lineHeight: 1, padding: "5px 9px" }}>
+                    style={{ background: "var(--w06)", border: "1px solid var(--border)", borderRadius: 8, color: eqCamStatus ? "var(--green)" : "var(--muted)", cursor: "pointer", fontSize: "0.875rem", lineHeight: 1, padding: "5px 9px" }}>
                     {eqCamStatus === "copied" ? "Copied ✓" : eqCamStatus === "downloaded" ? "Saved ✓" : "📷"}
                   </button>
                   {eqCamOpen && (
                     <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 20, background: "#11111b", border: "1px solid var(--border)", borderRadius: 10, padding: 5, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", whiteSpace: "nowrap" }}>
-                      <button type="button" onClick={() => doEqCapture("copy")} style={{ display: "block", width: "100%", textAlign: "left", background: "transparent", border: "none", color: "var(--text)", fontFamily: font, fontSize: "0.72rem", fontWeight: 600, padding: "6px 12px", borderRadius: 7, cursor: "pointer" }}>Copy image</button>
-                      <button type="button" onClick={() => doEqCapture("download")} style={{ display: "block", width: "100%", textAlign: "left", background: "transparent", border: "none", color: "var(--text)", fontFamily: font, fontSize: "0.72rem", fontWeight: 600, padding: "6px 12px", borderRadius: 7, cursor: "pointer" }}>Download PNG</button>
+                      <button type="button" onClick={() => doEqCapture("copy")} style={{ display: "block", width: "100%", textAlign: "left", background: "transparent", border: "none", color: "var(--text)", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "6px 12px", borderRadius: 7, cursor: "pointer" }}>Copy image</button>
+                      <button type="button" onClick={() => doEqCapture("download")} style={{ display: "block", width: "100%", textAlign: "left", background: "transparent", border: "none", color: "var(--text)", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "6px 12px", borderRadius: 7, cursor: "pointer" }}>Download PNG</button>
                     </div>
                   )}
                 </div>
@@ -7662,11 +8369,11 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   onPointerCancel={() => setEqHover(null)}>
                   <svg viewBox="0 0 600 210" preserveAspectRatio="none" className="eqsvg" role="img" aria-label="Equity curve">
                     <defs>
-                      <linearGradient id="jeqgPos" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(34,197,94,0.32)" /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient>
-                      <linearGradient id="jeqgNeg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(239,68,68,0.30)" /><stop offset="100%" stopColor="rgba(239,68,68,0)" /></linearGradient>
+                      <linearGradient id="jeqgPos" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(0,200,5,0.32)" /><stop offset="100%" stopColor="rgba(0,200,5,0)" /></linearGradient>
+                      <linearGradient id="jeqgNeg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(255,80,0,0.30)" /><stop offset="100%" stopColor="rgba(255,80,0,0)" /></linearGradient>
                     </defs>
                     <line x1="0" y1="52" x2="600" y2="52" className="grid" /><line x1="0" y1="105" x2="600" y2="105" className="grid" /><line x1="0" y1="158" x2="600" y2="158" className="grid" />
-                    <line x1="0" y1={eqSvg.yb.toFixed(1)} x2="600" y2={eqSvg.yb.toFixed(1)} stroke="rgba(255,255,255,0.22)" strokeWidth="1" strokeDasharray="4 4" />
+                    <line x1="0" y1={eqSvg.yb.toFixed(1)} x2="600" y2={eqSvg.yb.toFixed(1)} stroke="var(--w22)" strokeWidth="1" strokeDasharray="4 4" />
                     <g id="eqRise">
                       <path d={eqSvg.areaPos} fill="url(#jeqgPos)" />
                       <path d={eqSvg.areaNeg} fill="url(#jeqgNeg)" />
@@ -7681,14 +8388,14 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                       <path d={eqSvg.smaPaths.s20} fill="none" stroke={eqSvg.hits?.s20 ? "rgba(190,160,255,0.95)" : "rgba(168,130,255,0.65)"} strokeWidth="1.2" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
                     </>}
                     {eqSmaOn.s10 && eqSvg.smaPaths?.s10 && <>
-                      {eqSvg.hits?.s10 && <path d={eqSvg.smaPaths.s10} fill="none" stroke="rgba(239,68,68,0.28)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
-                      <path d={eqSvg.smaPaths.s10} fill="none" stroke={eqSvg.hits?.s10 ? "rgba(255,110,110,0.95)" : "rgba(239,68,68,0.75)"} strokeWidth="1.2" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+                      {eqSvg.hits?.s10 && <path d={eqSvg.smaPaths.s10} fill="none" stroke="rgba(255,80,0,0.28)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+                      <path d={eqSvg.smaPaths.s10} fill="none" stroke={eqSvg.hits?.s10 ? "rgba(255,110,110,0.95)" : "rgba(255,80,0,0.75)"} strokeWidth="1.2" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
                     </>}
                     {eqSmaOn.s5 && eqSvg.smaPaths?.s5 && <>
                       {eqSvg.hits?.s5 && <path d={eqSvg.smaPaths.s5} fill="none" stroke="rgba(240,192,80,0.30)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
                       <path d={eqSvg.smaPaths.s5} fill="none" stroke="var(--goldBright)" strokeWidth="1.4" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
                     </>}
-                    {eqHover != null && eqSvg.pts[eqHover] && <line x1={eqSvg.pts[eqHover].x.toFixed(1)} y1="0" x2={eqSvg.pts[eqHover].x.toFixed(1)} y2="210" stroke="rgba(255,255,255,0.4)" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
+                    {eqHover != null && eqSvg.pts[eqHover] && <line x1={eqSvg.pts[eqHover].x.toFixed(1)} y1="0" x2={eqSvg.pts[eqHover].x.toFixed(1)} y2="210" stroke="var(--w35)" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
                   </svg>
                   {eqHover != null && eqSvg.pts[eqHover] && (() => {
                     const p = eqSvg.pts[eqHover];
@@ -7708,11 +8415,11 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                       dStr = (p.delta >= 0 ? "+" : "−") + "$" + Math.abs(Math.round(p.delta)).toLocaleString();
                     }
                     return (<>
-                      <div style={{ position: "absolute", left: leftPct + "%", top: topPct + "%", width: 9, height: 9, borderRadius: "50%", background: "#fff", border: "2px solid var(--gold)", transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: 4 }} />
-                      <div style={{ position: "absolute", left: leftPct + "%", top: 4, transform: leftPct > 65 ? "translateX(calc(-100% - 10px))" : "translateX(10px)", pointerEvents: "none", zIndex: 5, background: "rgba(8,8,14,0.96)", border: "1px solid var(--borderGold)", borderRadius: 8, padding: "6px 9px", fontSize: "0.62rem", fontWeight: 700, whiteSpace: "nowrap", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,0.55)" }}>
-                        <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: "0.52rem", marginBottom: 2 }}>{p.key === "Start" ? (eqSvg.isR ? "Start · 0R" : "Starting capital") : (eqXAxis === "months" ? "Month " : "") + p.key}</div>
+                      <div style={{ position: "absolute", left: leftPct + "%", top: topPct + "%", width: 9, height: 9, borderRadius: "50%", background: "var(--white)", border: "2px solid var(--gold)", transform: "translate(-50%,-50%)", pointerEvents: "none", zIndex: 4 }} />
+                      <div style={{ position: "absolute", left: leftPct + "%", top: 4, transform: leftPct > 65 ? "translateX(calc(-100% - 10px))" : "translateX(10px)", pointerEvents: "none", zIndex: 5, background: "var(--sheet)", border: "1px solid var(--borderGold)", borderRadius: 8, padding: "6px 9px", fontSize: "0.6875rem", fontWeight: 700, whiteSpace: "nowrap", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,0.55)" }}>
+                        <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: "0.6875rem", marginBottom: 2 }}>{p.key === "Start" ? (eqSvg.isR ? "Start · 0R" : "Starting capital") : (eqXAxis === "months" ? "Month " : "") + p.key}</div>
                         <div>{valStr}</div>
-                        {p.key !== "Start" && <div style={{ color: p.delta >= 0 ? "var(--green)" : "var(--red)", marginTop: 1, fontSize: "0.55rem" }}>{dStr} that {eqXAxis === "months" ? "month" : "day"}</div>}
+                        {p.key !== "Start" && <div style={{ color: p.delta >= 0 ? "var(--green)" : "var(--red)", marginTop: 1, fontSize: "0.6875rem" }}>{dStr} that {eqXAxis === "months" ? "month" : "day"}</div>}
                       </div>
                     </>);
                   })()}
@@ -7721,18 +8428,18 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <div className="xaxis">{eqSvg.xs.length ? eqSvg.xs.map((s, i) => <span key={i}>{s}</span>) : <span>—</span>}</div>
               {/* SMA legend + the derisk/brake status — equity vs its own moving averages */}
               {eqSvg.riskStatus && (
-                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 14px", marginTop: 8, fontSize: "0.62rem", color: "var(--muted)" }}>
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 14px", marginTop: 8, fontSize: "0.6875rem", color: "var(--muted)" }}>
                   {[["s5", "5-SMA derisk", "var(--goldBright)", "Average of your last 5 equity points. Equity closing below it = the first warning: start derisking — smaller size, trim laggards. Click to show/hide the line."],
                     ["s10", "10-SMA brake", "var(--red)", "Average of your last 10 equity points. Equity below it = hard brake: no new risk until you've reviewed the open book and recent trades. Click to show/hide the line."],
                     ["s20", "20-SMA no edge", "rgba(168,130,255,0.9)", "Average of your last 20 equity points — the edge line. Equity below it means the system has NO EDGE right now: this is a real system drawdown, not one bad week. Stand down to smallest or sim-only size and run a full audit — which setups, which tape, which rule bled — before re-engaging at size. Click to show/hide the line."]].map(([k, lbl, col, tip]) => (
                     <span key={k} onClick={() => setEqSmaOn(o => ({ ...o, [k]: !o[k] }))} style={{ cursor: "pointer", opacity: eqSmaOn[k] ? 1 : 0.35, userSelect: "none" }}>
                       <span style={{ color: col }}>┄┄</span> <span className="term" data-tip={tip} style={eqSvg.hits?.[k] && eqSmaOn[k] ? { color: col, fontWeight: 800 } : undefined}>{lbl}</span>
-                      {eqSvg.hits?.[k] && eqSmaOn[k] && <span style={{ color: col, fontSize: "0.56rem", fontWeight: 800, marginLeft: 4 }}>● hit</span>}
+                      {eqSvg.hits?.[k] && eqSmaOn[k] && <span style={{ color: col, fontSize: "0.6875rem", fontWeight: 800, marginLeft: 4 }}>● hit</span>}
                     </span>
                   ))}
                   <span style={{ marginLeft: "auto", fontWeight: 800, padding: "3px 10px", borderRadius: 20,
-                    background: eqSvg.riskStatus === "brake" ? "rgba(239,68,68,0.14)" : eqSvg.riskStatus === "derisk" ? "rgba(240,192,80,0.14)" : "rgba(34,197,94,0.12)",
-                    color: eqSvg.riskStatus === "brake" ? "var(--red)" : eqSvg.riskStatus === "derisk" ? "var(--goldBright)" : "var(--green)" }}>
+                    background: eqSvg.riskStatus === "brake" ? "rgba(255,80,0,0.14)" : eqSvg.riskStatus === "derisk" ? "rgba(255,170,5,0.14)" : "rgba(0,200,5,0.12)",
+                    color: eqSvg.riskStatus === "brake" ? "var(--red)" : eqSvg.riskStatus === "derisk" ? "var(--orange)" : "var(--green)" }}>
                     {eqSvg.riskStatus === "brake" ? "🔴 BRAKE — equity below 10-SMA: no new risk, review trades"
                       : eqSvg.riskStatus === "derisk" ? "🟡 DERISK — equity below 5-SMA: cut size, trim laggards"
                       : "🟢 FULL RISK — equity above its 5-SMA"}
@@ -7757,8 +8464,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 const niceMax = Math.max(step, Math.ceil(maxC / step) * step);
                 const yFor = (v) => v / niceMax * halfH;
                 const ticks = []; for (let v = 0; v <= niceMax; v += step) ticks.push(v);
-                const yLab = { position: "absolute", right: 2, fontSize: "0.5rem", color: "var(--muted)" };
-                const gl = (v) => ({ position: "absolute", left: 0, right: 0, borderTop: v === 0 ? "1px solid rgba(255,255,255,0.18)" : "1px dashed rgba(255,255,255,0.06)" });
+                const yLab = { position: "absolute", right: 2, fontSize: "0.6875rem", color: "var(--muted)" };
+                const gl = (v) => ({ position: "absolute", left: 0, right: 0, borderTop: v === 0 ? "1px solid var(--w22)" : "1px dashed var(--w06)" });
                 return (
                 <div style={{ display: "flex", gap: 6, marginTop: 18 }}>
                   <div style={{ position: "relative", width: 24, height: CH, flexShrink: 0 }}>
@@ -7801,21 +8508,21 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 const rows = (distTrades[distSel] || []).slice().sort((x, y) => Math.abs(Number(y.plPct) || 0) - Math.abs(Number(x.plPct) || 0));
                 const edited = distEdits[distSel] !== undefined && distEdits[distSel] !== (distBase[distSel] || 0);
                 return (
-                  <div style={{ marginTop: 10, border: "1px solid var(--borderGold)", borderRadius: 10, padding: "10px 12px", background: "rgba(255,255,255,0.02)" }}>
+                  <div style={{ marginTop: 10, border: "1px solid var(--borderGold)", borderRadius: 10, padding: "10px 12px", background: "var(--w02)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontSize: "0.66rem", fontWeight: 800, color: b.side === "pos" ? "var(--green)" : "var(--red)" }}>{b.lab}</span>
-                      <span style={{ fontSize: "0.6rem", color: "var(--muted)" }}>{rows.length} trade{rows.length === 1 ? "" : "s"} in this bucket</span>
-                      {edited && <span style={{ fontSize: "0.56rem", color: "var(--gold)" }}>bar shows a what-if edit — this list is your REAL trades only</span>}
+                      <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: b.side === "pos" ? "var(--green)" : "var(--red)" }}>{b.lab}</span>
+                      <span style={{ fontSize: "0.6875rem", color: "var(--muted)" }}>{rows.length} trade{rows.length === 1 ? "" : "s"} in this bucket</span>
+                      {edited && <span style={{ fontSize: "0.6875rem", color: "var(--muted)" }}>bar shows a what-if edit — this list is your REAL trades only</span>}
                       <button className="distbtn" style={{ marginLeft: "auto" }} onClick={() => setDistSel(null)}>✕ Close</button>
                     </div>
-                    {rows.length === 0 ? <div style={{ fontSize: "0.62rem", color: "var(--muted)" }}>No real trades here.</div> : rows.map((t, k) => (
-                      <div key={t.id ?? k} onClick={() => openReview(t)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 6px", borderRadius: 7, cursor: "pointer", fontSize: "0.66rem", borderBottom: k < rows.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    {rows.length === 0 ? <div style={{ fontSize: "0.6875rem", color: "var(--muted)" }}>No real trades here.</div> : rows.map((t, k) => (
+                      <div key={t.id ?? k} onClick={() => openReview(t)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 6px", borderRadius: 7, cursor: "pointer", fontSize: "0.6875rem", borderBottom: k < rows.length - 1 ? "1px solid var(--w06)" : "none" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "var(--w04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                         <span style={{ fontWeight: 800, minWidth: 52 }}>{t.ticker}</span>
                         <span style={{ color: "var(--muted)", minWidth: 78 }}>{tradeDateISO(t.exit) || "—"}</span>
                         <span style={{ color: (Number(t.plPct) || 0) >= 0 ? "var(--green)" : "var(--red)", minWidth: 62, fontVariantNumeric: "tabular-nums" }}>{sgnPct(Number(t.plPct) || 0)}</span>
                         <span style={{ color: (Number(t.plDollar) || 0) >= 0 ? "var(--green)" : "var(--red)", fontVariantNumeric: "tabular-nums" }}>{sgnMoney(Number(t.plDollar) || 0)}</span>
-                        <span style={{ marginLeft: "auto", color: "var(--gold)" }}>View ›</span>
+                        <span style={{ marginLeft: "auto", color: "var(--muted)" }}>View ›</span>
                       </div>
                     ))}
                   </div>
@@ -7831,14 +8538,14 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
       style={{ position: "fixed", inset: 0, zIndex: 1250, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}>
       <div style={{ fontFamily: font, position: "relative", width: "min(94vw, 1100px)", maxHeight: "88vh", overflowY: "auto", background: "var(--glass)", border: "1px solid var(--border)", borderRadius: 18, padding: "22px 26px", backdropFilter: "blur(28px) saturate(160%)", WebkitBackdropFilter: "blur(28px) saturate(160%)", boxShadow: "0 30px 80px rgba(0,0,0,0.6)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          <span style={{ fontSize: "0.92rem", fontWeight: 800, color: "var(--goldBright)" }}>Return distribution — data sheet</span>
-          <button type="button" aria-label="Close" onClick={() => setDistPanelOpen(false)} style={{ marginLeft: "auto", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: "1.1rem", lineHeight: 1 }}>×</button>
+          <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--white)" }}>Return distribution — data sheet</span>
+          <button type="button" aria-label="Close" onClick={() => setDistPanelOpen(false)} style={{ marginLeft: "auto", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: "1.125rem", lineHeight: 1 }}>×</button>
         </div>
         <div style={{ zoom: 1.1 }}>
           <div className="disttoolbar">
             <button className={"distbtn" + (Object.keys(distEdits).length === 0 ? " on" : "")} onClick={() => setDistEdits({})} title="Restore the actual counts from your trades">↺ Refill from trades</button>
             <button className="distbtn" onClick={() => { const z = {}; DIST_BUCKETS.forEach((_, i) => z[i] = 0); setDistEdits(z); }} title="Zero every bucket to model from scratch">Clear all</button>
-            <span style={{ fontSize: "0.62rem", color: "var(--muted)" }}>Edit any count to model a different distribution — the chart and stats update live.</span>
+            <span style={{ fontSize: "0.6875rem", color: "var(--muted)" }}>Edit any count to model a different distribution — the chart and stats update live.</span>
           </div>
           <div className="distsum">
             <div className="ds"><div className="dsk">Total trades</div><div className="dsv">{distTotal}</div></div>
@@ -7874,7 +8581,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             <thead>
               <tr>
                 <th><span className="term" data-tip="Whether the trade finished a Win (green) or a Loss (red).">Result</span></th>
-                <th><span className="term" data-tip="The ticker. The dot shows the source: gold = IBKR-synced, grey = manual.">Symbol</span></th>
+                <th><span className="term" data-tip="The ticker. The dot shows the source: white = IBKR-synced, grey = manual.">Symbol</span></th>
                 <th className="pro-only"><span className="term" data-tip="Average price you entered the trade at.">Entry $</span></th>
                 <th className="pro-only"><span className="term" data-tip="Price you exited the trade at.">Exit $</span></th>
                 <th className="pro-only"><span className="term" data-tip="Number of shares traded.">Shares</span></th>
@@ -7910,8 +8617,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                         const sym = String(t.ticker || "").toUpperCase();
                         const isTrimOnly = (t._fills || [t]).every(f => (f.reason || "") === "Partial Trim");
                         const stillOpen = isTrimOnly && (positions || []).some(p => String(p.sym || "").toUpperCase() === sym);
-                        return stillOpen ? <span className="term" data-tip="Realized-so-far: partial trims of a position you still hold. This row moves your equity curve in real time and merges into one final row when the position closes — never double-counted." style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 800, color: "var(--goldBright)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>OPEN · partials</span> : null;
-                      })()}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}{isAdmin && t.extExit != null ? <span className="term" data-tip={`Extension at exit: ${Number(t.extExit).toFixed(1)}× ATR from the 50-day MA${t.extEntry != null ? ` (entry was ${Number(t.extEntry).toFixed(1)}×)` : ""}. ≥7× = sold into strength (rare, 3-sigma territory) · <2× = a stop/management exit near the mean.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--goldBright)" : t.extExit < 2 ? "var(--red)" : "var(--muted)", border: `1px solid ${t.extExit >= 7 ? "rgba(34,197,94,0.35)" : t.extExit >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(t.extExit).toFixed(1)}×</span> : null}</span></td>
+                        return stillOpen ? <span className="term" data-tip="Realized-so-far: partial trims of a position you still hold. This row moves your equity curve in real time and merges into one final row when the position closes — never double-counted." style={{ marginLeft: 6, fontSize: "0.6875rem", fontWeight: 800, color: "var(--text)", border: "1px solid var(--w14)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>OPEN · partials</span> : null;
+                      })()}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.6875rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}{isAdmin && t.extExit != null ? <span className="term" data-tip={`Extension at exit: ${Number(t.extExit).toFixed(1)}× ATR from the 50-day MA${t.extEntry != null ? ` (entry was ${Number(t.extEntry).toFixed(1)}×)` : ""}. ≥7× = sold into strength (rare, 3-sigma territory) · <2× = a stop/management exit near the mean.`} style={{ marginLeft: 6, fontSize: "0.6875rem", fontWeight: 700, color: t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--orange)" : t.extExit < 2 ? "var(--red)" : "var(--muted)", border: `1px solid ${t.extExit >= 7 ? "rgba(0,200,5,0.35)" : t.extExit >= 5 ? "rgba(255,170,5,0.35)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(t.extExit).toFixed(1)}×</span> : null}</span></td>
                       <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Exit $">${(Number(t.exitP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
@@ -7922,16 +8629,16 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                         const th = sectorFor(t.ticker);
                         if (!th) return <span className="term" data-tip="No DeepVue sector mapped for this ticker yet.">—</span>;
                         const fit = themeFit(th, t.entry), r = themeRanks(th, t.entry) || {}, rk = (x) => x ? "#" + x : "—";
-                        if (!fit) return <span className="term" data-tip={`⚪ Untagged — entry date is before the first DeepVue tracker snapshot${THEME_COVERAGE_START ? ` (${THEME_COVERAGE_START})` : ""} or unreadable. A later theme snapshot never judges an older trade.`} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: "0.62rem", fontWeight: 700, background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap", cursor: "help" }}>⚪ {th}</span>;
+                        if (!fit) return <span className="term" data-tip={`⚪ Untagged — entry date is before the first DeepVue tracker snapshot${THEME_COVERAGE_START ? ` (${THEME_COVERAGE_START})` : ""} or unreadable. A later theme snapshot never judges an older trade.`} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: "0.6875rem", fontWeight: 700, background: "var(--w06)", border: "1px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap", cursor: "help" }}>⚪ {th}</span>;
                         const tip = fit === "in"
                           ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend. Judged vs the ${r.date} tracker snapshot (nearest at/before entry).`
                           : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. Leaders that week: ${top5("week", t.entry).slice(0,3).join(", ")}. Judged vs the ${r.date} tracker snapshot (nearest at/before entry).`;
                         const g = fit === "in";
-                        return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: "0.62rem", fontWeight: 700, background: g ? "var(--greenDim)" : "var(--redDim)", border: `1px solid ${g ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)"}`, color: g ? "var(--green)" : "var(--red)", whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
+                        return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: "0.6875rem", fontWeight: 700, background: g ? "var(--greenDim)" : "var(--redDim)", border: `1px solid ${g ? "rgba(0,200,5,0.28)" : "rgba(255,80,0,0.26)"}`, color: g ? "var(--green)" : "var(--red)", whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
                       })()}</td>
                       <td className="pro-only" data-l="Stop">{
                         (isIbkrMode && t.source === "ibkr" && t.needsStop && !t.stop)
-                          ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "3px 9px", fontSize: "0.66rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Needs stop</button>
+                          ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "3px 9px", fontSize: "0.6875rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Needs stop</button>
                           : (t.stop ? "$" + Number(t.stop).toFixed(2) : "—")
                       }</td>
                       <td className="pro-only" data-l="Hold">{holdLabel(t)}</td>
@@ -7939,7 +8646,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                       <td data-l="P/L"><span className={plc}>{privacyMode ? sgnPct(Number(t.plPct)) : sgnMoney(Number(t.plDollar))}</span></td>
                       <td data-l="R">{
                         (isIbkrMode && t.source === "ibkr" && t.needsStop && !t.stop)
-                          ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "2px 8px", fontSize: "0.62rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Add stop</button>
+                          ? <button className="btn" onClick={(e) => { e.stopPropagation(); startEdit(t); }} title="Add your initial stop so R-multiple can be calculated" style={{ padding: "2px 8px", fontSize: "0.6875rem", color: "var(--goldBright)", borderColor: "var(--borderGold)", background: "var(--goldDim)", fontWeight: 700 }}>+ Add stop</button>
                           : <span className={(Number(t.rMult) || 0) >= 0 ? "pl up" : "pl dn"}>{t.rMult == null ? "—" : sgnR(Number(t.rMult))}</span>
                       }</td>
                       <td className="revcell" data-l=""><button className="revbtn" onClick={(e) => { e.stopPropagation(); setPreviewTrade(t); }}>View ›</button></td>
@@ -8030,7 +8737,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           const up = (Number(t.plPct) || 0) > 0, cls = up ? "st-win" : "st-loss";
           const th = sectorFor(t.ticker), fit = th ? themeFit(th, t.entry) : null;
           const gr = getSavedGrade(t.ticker);
-          const gcol = !gr ? "var(--muted)" : gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--goldBright)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
+          const gcol = !gr ? "var(--muted)" : gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--white)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
           const Row = ({ k, v, c }) => (<div className="tp-row"><span>{k}</span><b style={c ? { color: c } : undefined}>{v}</b></div>);
           return (
             <div className="vj tp-back" onClick={(e) => { if (e.target === e.currentTarget) setPreviewTrade(null); }}>
@@ -8061,7 +8768,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 {t.chartImage && (
                   <div className="tp-reason" style={{ padding: 11 }}>
                     <div className="tp-reason-h">Your chart</div>
-                    <img src={t.chartImage} alt={`${t.ticker} chart`} onClick={() => { setPreviewTrade(null); openReview(t); }} title="Open the full trade details" style={{ display: "block", width: "100%", height: "auto", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }} />
+                    <img src={t.chartImage} alt={`${t.ticker} chart`} onClick={() => { setPreviewTrade(null); openReview(t); }} title="Open the full trade details" style={{ display: "block", width: "100%", height: "auto", borderRadius: 10, border: "1px solid var(--w10)", cursor: "pointer" }} />
                   </div>
                 )}
                 <div className="tp-foot">
@@ -8094,7 +8801,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           if (!t) return null;
           const up = (Number(t.plPct) || 0) > 0, cls = up ? "st-win" : "st-loss";
           const gr = getSavedGrade(t.ticker);
-          const gcol = !gr ? "var(--muted)" : gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--goldBright)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
+          const gcol = !gr ? "var(--muted)" : gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--white)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
           return (
             <div className="vj td-back">
               <div className="td-page">
@@ -8162,14 +8869,14 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
 
                           <Rw k="Initial Target" v={target !== "" ? "$" + Number(target).toFixed(2) : "--"} />
                           <Rw k="Trade Risk" v={tradeRisk != null ? money(tradeRisk) : "--"} tip="(entry − planned stop) × shares" />
-                          <Rw k="Planned R-Multiple" v={plannedR != null ? plannedR.toFixed(2) + "R" : "--"} c={plannedR != null ? (plannedR >= 2 ? "var(--green)" : "var(--goldBright)") : undefined} />
+                          <Rw k="Planned R-Multiple" v={plannedR != null ? plannedR.toFixed(2) + "R" : "--"} c={plannedR != null ? (plannedR >= 2 ? "var(--green)" : "var(--white)") : undefined} />
                           <Rw k="Realized R-Multiple" v={realR != null ? sgnR(realR) : "--"} c={realR != null ? (realR >= 0 ? "var(--green)" : "var(--red)") : undefined} />
                           {isAdmin && (t.extEntry != null || t.extExit != null) && (
                             <div className="tz-row"><span className="term" data-tip="ATR% Multiple from the 50-day MA at your entry → at your exit (same metric your charts print). Under 4× = fresh entry zone; 5× = statistically stretched; 7.5–8× = rare (3-sigma); 10×+ = extreme — the trim-into-strength zone. Insight only — it never changes your stops or fills.">Ext (×ATR from 50MA)</span>
                               <b>
-                                <span style={{ color: t.extEntry == null ? "var(--faint)" : t.extEntry <= 4 ? "var(--green)" : t.extEntry < 7 ? "var(--goldBright)" : "var(--red)" }}>{t.extEntry != null ? Number(t.extEntry).toFixed(1) + "×" : "—"}</span>
+                                <span style={{ color: t.extEntry == null ? "var(--faint)" : t.extEntry <= 4 ? "var(--green)" : t.extEntry < 7 ? "var(--orange)" : "var(--red)" }}>{t.extEntry != null ? Number(t.extEntry).toFixed(1) + "×" : "—"}</span>
                                 <span style={{ color: "var(--muted)" }}> → </span>
-                                <span style={{ color: t.extExit == null ? "var(--faint)" : t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--goldBright)" : "var(--text)" }}>{t.extExit != null ? Number(t.extExit).toFixed(1) + "×" : "—"}</span>
+                                <span style={{ color: t.extExit == null ? "var(--faint)" : t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--orange)" : "var(--text)" }}>{t.extExit != null ? Number(t.extExit).toFixed(1) + "×" : "—"}</span>
                               </b>
                             </div>
                           )}
@@ -8210,17 +8917,17 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                                 {/* Your own chart for this trade — uploaded when you closed it, or added here later. */}
                                 <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: t.chartImage ? 10 : 0 }}>
-                                    <span style={{ fontFamily: font, fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted }}>Your chart</span>
+                                    <span style={{ fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: C.muted }}>Your chart</span>
                                     <div style={{ flex: 1 }}></div>
-                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 32, padding: "7px 12px", borderRadius: 8, cursor: reviewChartUploading ? "wait" : "pointer", background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, opacity: reviewChartUploading ? 0.6 : 1 }}>
+                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 32, padding: "7px 12px", borderRadius: 8, cursor: reviewChartUploading ? "wait" : "pointer", background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.75rem", fontWeight: 700, opacity: reviewChartUploading ? 0.6 : 1 }}>
                                       {reviewChartUploading ? "Uploading…" : t.chartImage ? "📷 Replace chart" : "📷 Add chart"}
                                       <input type="file" accept="image/*" disabled={reviewChartUploading} style={{ display: "none" }} onChange={e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) addTradeChartImage(t.id, f); }} />
                                     </label>
                                   </div>
                                   {t.chartImage
-                                    ? <img src={t.chartImage} alt={`${t.ticker} chart`} onClick={() => setReviewChartZoom(t.chartImage)} title="Click to view full size" style={{ display: "block", maxWidth: "100%", height: "auto", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", cursor: "zoom-in" }} />
-                                    : <div style={{ fontFamily: font, fontSize: "0.72rem", color: C.muted }}>No chart yet. Upload your marked-up screenshot so this review has the picture with it.</div>}
-                                  {t.chartUrl && <div style={{ marginTop: 8 }}><a href={t.chartUrl} target="_blank" rel="noreferrer" style={{ fontFamily: font, fontSize: "0.72rem", color: C.goldBright, textDecoration: "none" }}>Open chart link ↗</a></div>}
+                                    ? <img src={t.chartImage} alt={`${t.ticker} chart`} onClick={() => setReviewChartZoom(t.chartImage)} title="Click to view full size" style={{ display: "block", maxWidth: "100%", height: "auto", borderRadius: 10, border: "1px solid var(--w10)", cursor: "zoom-in" }} />
+                                    : <div style={{ fontFamily: font, fontSize: "0.75rem", color: C.muted }}>No chart yet. Upload your marked-up screenshot so this review has the picture with it.</div>}
+                                  {t.chartUrl && <div style={{ marginTop: 8 }}><a href={t.chartUrl} target="_blank" rel="noreferrer" style={{ fontFamily: font, fontSize: "0.75rem", color: C.muted, textDecoration: "none" }}>Open chart link ↗</a></div>}
                                 </div>
                               </div>
                             </>
@@ -8239,9 +8946,9 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               {/* Full-size chart viewer. Lives INSIDE the details layer (z 1300), so it sits at 1450
                   to clear the page under it while the edit modal (1400, separate body portal) still wins. */}
               {reviewChartZoom && (
-                <div onClick={() => setReviewChartZoom(null)} style={{ position: "fixed", inset: 0, zIndex: 1450, background: "rgba(4,4,8,0.92)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, cursor: "zoom-out" }}>
-                  <button aria-label="Close chart" onClick={e => { e.stopPropagation(); setReviewChartZoom(null); }} style={{ position: "absolute", top: 14, right: 14, width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, fontFamily: font, fontSize: "1.2rem", lineHeight: 1, cursor: "pointer" }}>&times;</button>
-                  <img src={reviewChartZoom} alt="Trade chart, full size" onClick={e => e.stopPropagation()} style={{ maxWidth: "100%", maxHeight: "92vh", objectFit: "contain", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)" }} />
+                <div onClick={() => setReviewChartZoom(null)} style={{ position: "fixed", inset: 0, zIndex: 1450, background: "var(--lightbox)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, cursor: "zoom-out" }}>
+                  <button aria-label="Close chart" onClick={e => { e.stopPropagation(); setReviewChartZoom(null); }} style={{ position: "absolute", top: 14, right: 14, width: 38, height: 38, borderRadius: 10, background: "var(--w08)", border: `1px solid ${C.border}`, color: C.white, fontFamily: font, fontSize: "1.25rem", lineHeight: 1, cursor: "pointer" }}>&times;</button>
+                  <img src={reviewChartZoom} alt="Trade chart, full size" onClick={e => e.stopPropagation()} style={{ maxWidth: "100%", maxHeight: "92vh", objectFit: "contain", borderRadius: 10, border: "1px solid var(--w10)" }} />
                 </div>
               )}
             </div>
@@ -8284,7 +8991,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   <select value={editRow.tradeType || "Long"} onChange={e => setEditRow(r => ({ ...r, tradeType: e.target.value }))} className="linksel" style={{ width: "100%", maxWidth: "none" }}><option value="Long">Long</option><option value="Short">Short</option></select>
                 </div>
               </div>
-              <div className="modalfoot"><button className="btn" onClick={() => deleteTrade(editingId)} style={{ color: "var(--red)", borderColor: "rgba(239,68,68,0.4)" }}>Delete trade</button><div className="spacer"></div><button className="btn" onClick={cancelEdit}>Cancel</button><button className="btn gold" onClick={saveEdit}>Save changes</button></div>
+              <div className="modalfoot"><button className="btn" onClick={() => deleteTrade(editingId)} style={{ color: "var(--red)", borderColor: "rgba(255,80,0,0.4)" }}>Delete trade</button><div className="spacer"></div><button className="btn" onClick={cancelEdit}>Cancel</button><button className="btn gold" onClick={saveEdit}>Save changes</button></div>
             </div>
           </div>
           </div>,
@@ -8338,7 +9045,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   </tbody>
                 </table>
               )}
-              {linkError && <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "var(--red)", fontSize: "0.72rem", lineHeight: 1.5, wordBreak: "break-word" }}><b>Database write failed</b><br />{linkError}</div>}
+              {linkError && <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 10, background: "rgba(255,80,0,0.08)", border: "1px solid rgba(255,80,0,0.25)", color: "var(--red)", fontSize: "0.75rem", lineHeight: 1.5, wordBreak: "break-word" }}><b>Database write failed</b><br />{linkError}</div>}
               <div className="modalfoot">
                 <button className="btn" onClick={() => { const all = {}; linkWizardData.forEach(r => { all[r.t.id] = r.suggestion; }); setLinkChoices(all); }}>Accept all suggestions</button>
                 <div className="spacer"></div>
@@ -8393,6 +9100,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
               {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
+            <ThemeToggle />
           </div>
 
           {/* COACH — admin-only standing read from Claude (kept in Pro too) */}
@@ -8418,8 +9126,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               {!isIbkrMode ? (
                 <label className="btn gold" title="Import trades from a CSV file" style={{ cursor: "pointer" }}>Import CSV<input type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} /></label>
               ) : (
-                <span className="btn ghost" title={ibkrSyncInfo?.last_synced_at ? "Last synced " + new Date(ibkrSyncInfo.last_synced_at).toLocaleString() : "Trades flow in automatically from IBKR"} style={{ borderColor: "rgba(34,197,94,0.4)", background: "rgba(34,197,94,0.10)", color: "#86efac", display: "inline-flex", alignItems: "center", gap: 7, cursor: "default" }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }}></span>Auto-syncing from IBKR{ibkrSyncInfo?.last_synced_at ? " · " + new Date(ibkrSyncInfo.last_synced_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                <span className="btn ghost" title={ibkrSyncInfo?.last_synced_at ? "Last synced " + new Date(ibkrSyncInfo.last_synced_at).toLocaleString() : "Trades flow in automatically from IBKR"} style={{ borderColor: "rgba(0,200,5,0.4)", background: "rgba(0,200,5,0.10)", color: "var(--greenFg)", display: "inline-flex", alignItems: "center", gap: 7, cursor: "default" }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)" }}></span>Auto-syncing from IBKR{ibkrSyncInfo?.last_synced_at ? " · " + new Date(ibkrSyncInfo.last_synced_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
                 </span>
               )}
             </div>
@@ -8427,8 +9135,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
 
           {/* Import result toast (shared feedback) */}
           {importResult && (
-            <div className="welcome" style={{ borderColor: importResult.success ? "var(--borderGold)" : "rgba(239,68,68,0.4)" }}>
-              <span className="wd" style={{ background: importResult.success ? "var(--goldBright)" : "var(--red)" }}></span>
+            <div className="welcome" style={{ borderColor: importResult.success ? "var(--borderGold)" : "rgba(255,80,0,0.4)" }}>
+              <span className="wd" style={{ background: importResult.success ? "var(--green)" : "var(--red)" }}></span>
               <div>{importResult.success
                 ? importResult.ibkr
                   ? `IBKR statement detected — imported ${importResult.count} closed trade${importResult.count !== 1 ? "s" : ""}.`
@@ -8451,7 +9159,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 </div>
                 <div className="kpiviz">
                   <svg viewBox="0 0 320 50" preserveAspectRatio="none" role="img" aria-label="Cumulative realized P/L">
-                    <defs><linearGradient id="jkpiSpark" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={heroSpark.up ? "rgba(34,197,94,0.34)" : "rgba(239,68,68,0.30)"} /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient></defs>
+                    <defs><linearGradient id="jkpiSpark" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={heroSpark.up ? "rgba(0,200,5,0.34)" : "rgba(255,80,0,0.30)"} /><stop offset="100%" stopColor="rgba(0,200,5,0)" /></linearGradient></defs>
                     <path d={heroSpark.area} fill="url(#jkpiSpark)" />
                     <path d={heroSpark.line} fill="none" stroke={heroSpark.up ? "var(--green)" : "var(--red)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                   </svg>
@@ -8468,7 +9176,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 </div>
                 <div className="kpiviz wrviz">
                   <svg viewBox="0 0 40 40" role="img" aria-label={`${dstats.n ? Math.round(dstats.winRate) : 0}% win rate`}>
-                    <circle className="wrzone loss" cx="20" cy="20" r="15" fill="none" stroke="rgba(239,68,68,0.30)" strokeWidth="6" />
+                    <circle className="wrzone loss" cx="20" cy="20" r="15" fill="none" stroke="rgba(255,80,0,0.30)" strokeWidth="6" />
                     <circle className="wrzone win" cx="20" cy="20" r="15" fill="none" stroke="var(--green)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${winArc.toFixed(1)} ${RING}`} transform="rotate(-90 20 20)" />
                   </svg>
                   <div className="wrtip win">{dstats.wins} win{dstats.wins === 1 ? "" : "s"}</div>
@@ -8652,25 +9360,25 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
 
           {/* FX MIS-PRICING ALERT (shared handlers) */}
           {fxFlagged.length > 0 && (
-            <div style={{ margin: "14px 0", padding: "13px 16px", borderRadius: 14, background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.35)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <span style={{ fontSize: "1.05rem" }}>⚠️</span>
-              <div style={{ flex: 1, minWidth: 260, fontSize: "0.8rem", lineHeight: 1.5 }}>
+            <div style={{ margin: "14px 0", padding: "13px 16px", borderRadius: 14, background: "rgba(255,170,5,0.08)", border: "1px solid rgba(255,170,5,0.35)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontSize: "1rem" }}>⚠️</span>
+              <div style={{ flex: 1, minWidth: 260, fontSize: "0.75rem", lineHeight: 1.5 }}>
                 <b style={{ color: "#fdba74" }}>{fxFlagged.length} synced trade{fxFlagged.length > 1 ? "s" : ""} look mis-priced.</b>{" "}
                 They match a known bug where non-USD trades were imported at raw local-currency prices. <b>Nothing is changed unless you confirm.</b>
               </div>
-              <button className="btn" onClick={() => setFxReviewOpen(true)} style={{ background: "rgba(251,146,60,0.15)", borderColor: "rgba(251,146,60,0.45)", color: "#fdba74", fontWeight: 700 }}>Review them</button>
+              <button className="btn" onClick={() => setFxReviewOpen(true)} style={{ background: "rgba(255,170,5,0.15)", borderColor: "rgba(255,170,5,0.45)", color: "#fdba74", fontWeight: 700 }}>Review them</button>
             </div>
           )}
           {fxReviewOpen && (
-            <div style={{ margin: "0 0 16px", padding: "16px", borderRadius: 14, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(251,146,60,0.35)" }}>
+            <div style={{ margin: "0 0 16px", padding: "16px", borderRadius: 14, background: "var(--w03)", border: "1px solid rgba(255,170,5,0.35)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-                <b style={{ fontSize: "0.86rem" }}>Review flagged trades</b>
-                <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>Untick any row that's actually correct. Deleting only removes the bad import — after that, run <b>Sync now</b> (Settings → IBKR).</span>
+                <b style={{ fontSize: "0.875rem" }}>Review flagged trades</b>
+                <span style={{ fontSize: "0.6875rem", color: "var(--muted)" }}>Untick any row that's actually correct. Deleting only removes the bad import — after that, run <b>Sync now</b> (Settings → IBKR).</span>
                 <button onClick={() => setFxReviewOpen(false)} style={{ marginLeft: "auto", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", borderRadius: 8, width: 26, height: 26, cursor: "pointer" }}>×</button>
               </div>
               <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 10 }}>
                 {fxFlagged.map((t, i) => (
-                  <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderTop: i ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.76rem", cursor: "pointer" }}>
+                  <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderTop: i ? "1px solid var(--w06)" : "none", fontSize: "0.75rem", cursor: "pointer" }}>
                     <input type="checkbox" checked={fxSel.has(t.id)} onChange={() => setFxSel(prev => { const n = new Set(prev); n.has(t.id) ? n.delete(t.id) : n.add(t.id); return n; })} />
                     <b style={{ minWidth: 76 }}>{t.ticker}</b>
                     <span style={{ color: "var(--muted)", minWidth: 130 }}>{tradeDateISO(t.entry) || t.entry} → {tradeDateISO(t.exit) || t.exit}</span>
@@ -8680,7 +9388,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                 ))}
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                <button className="btn" onClick={fxDeleteSelected} disabled={!fxSel.size || fxBusy} style={{ background: "rgba(239,68,68,0.14)", borderColor: "rgba(239,68,68,0.4)", color: "#fca5a5", fontWeight: 700 }}>{fxBusy ? "Removing…" : `Yes, these are wrong — remove ${fxSel.size} selected`}</button>
+                <button className="btn" onClick={fxDeleteSelected} disabled={!fxSel.size || fxBusy} style={{ background: "rgba(255,80,0,0.14)", borderColor: "rgba(255,80,0,0.4)", color: "var(--redFg)", fontWeight: 700 }}>{fxBusy ? "Removing…" : `Yes, these are wrong — remove ${fxSel.size} selected`}</button>
                 <button className="btn" onClick={fxDismiss} style={{ fontWeight: 700 }}>They're all correct — don't ask again</button>
               </div>
             </div>
@@ -8734,6 +9442,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
+          <ThemeToggle />
         </div>
 
         {/* HEADER */}
@@ -8776,8 +9485,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
 
         {/* Import result toast + guide (kept from the existing component) */}
         {importResult && (
-          <div className="welcome" style={{ borderColor: importResult.success ? "var(--borderGold)" : "rgba(239,68,68,0.4)" }}>
-            <span className="wd" style={{ background: importResult.success ? "var(--goldBright)" : "var(--red)" }}></span>
+          <div className="welcome" style={{ borderColor: importResult.success ? "var(--borderGold)" : "rgba(255,80,0,0.4)" }}>
+            <span className="wd" style={{ background: importResult.success ? "var(--green)" : "var(--red)" }}></span>
             <div>{importResult.success
               ? importResult.ibkr
                 ? `IBKR statement detected — imported ${importResult.count} closed trade${importResult.count !== 1 ? "s" : ""} (buys & sells paired automatically).${importResult.openLots ? ` ${importResult.openLots} still-open position${importResult.openLots !== 1 ? "s were" : " was"} skipped — add those on your Dashboard.` : ""}${importResult.skippedNonStock ? ` ${importResult.skippedNonStock} non-stock row${importResult.skippedNonStock !== 1 ? "s" : ""} (options/forex) skipped.` : ""}${importResult.skippedNonUsd ? ` ${importResult.skippedNonUsd} non-USD row${importResult.skippedNonUsd !== 1 ? "s" : ""} skipped.` : ""}`
@@ -8796,8 +9505,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
         {showImportGuide && (
           <div className="card" style={{ marginTop: 14, padding: "20px 24px" }}>
             <div className="sech" style={{ marginBottom: 10 }}>How to Import Your Trades</div>
-            <div style={{ fontSize: "0.78rem", color: "var(--text)", lineHeight: 1.7 }}>
-              <p style={{ marginBottom: 8 }}><b style={{ color: "var(--gold)" }}>Straight from IBKR (easiest):</b> log in to IBKR → <b style={{ color: "var(--white)" }}>Performance &amp; Reports → Statements → Activity</b> → set the date range that covers your trades → download as <b style={{ color: "var(--white)" }}>CSV</b> → drop that file here. We detect IBKR's format automatically, pair your buys and sells into round-trip trades (weighted-average cost, longs and shorts), and skip anything still open. A Flex Query CSV (with a Trades section) works too.</p>
+            <div style={{ fontSize: "0.75rem", color: "var(--text)", lineHeight: 1.7 }}>
+              <p style={{ marginBottom: 8 }}><b style={{ color: "var(--white)" }}>Straight from IBKR (easiest):</b> log in to IBKR → <b style={{ color: "var(--white)" }}>Performance &amp; Reports → Statements → Activity</b> → set the date range that covers your trades → download as <b style={{ color: "var(--white)" }}>CSV</b> → drop that file here. We detect IBKR's format automatically, pair your buys and sells into round-trip trades (weighted-average cost, longs and shorts), and skip anything still open. A Flex Query CSV (with a Trades section) works too.</p>
               <p style={{ marginBottom: 8 }}><b style={{ color: "var(--white)" }}>Or your own CSV</b> with a <b style={{ color: "var(--white)" }}>header row</b>. Recognized columns: Symbol/Ticker, Entry/Exit Date &amp; Time, Entry/Exit Price, Shares, Stop, Setup, Tags (semicolon-separated), P/L %, P/L $, R-Multiple, Exit Reason, Notes.</p>
               <p style={{ color: "var(--muted)" }}>P/L %, P/L $ and R-Multiple are auto-calculated from entry/exit/shares/stop if missing. Unrecognized columns are ignored. Importing the same file twice creates duplicates — delete the extras if that happens.</p>
             </div>
@@ -8854,8 +9563,8 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               <div className="meta">{!dstats.n ? "No trades match this filter." : <>{sgnPct(dstats.totalRet)} on starting capital · {dstats.n} closed trade{dstats.n === 1 ? "" : "s"} · <span style={{ color: "var(--green)" }}>{dstats.wins} W</span> / <span style={{ color: "var(--red)" }}>{dstats.losses} L</span></>}</div>
               <svg className="spark" viewBox="0 0 320 50" preserveAspectRatio="none" role="img" aria-label="Cumulative P/L">
                 <defs>
-                  <linearGradient id="jsp" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(34,197,94,0.34)" /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient>
-                  <linearGradient id="jspr" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(239,68,68,0.30)" /><stop offset="100%" stopColor="rgba(239,68,68,0)" /></linearGradient>
+                  <linearGradient id="jsp" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(0,200,5,0.34)" /><stop offset="100%" stopColor="rgba(0,200,5,0)" /></linearGradient>
+                  <linearGradient id="jspr" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(255,80,0,0.30)" /><stop offset="100%" stopColor="rgba(255,80,0,0)" /></linearGradient>
                 </defs>
                 <g id="heroRise">
                   <path d={heroSpark.area} fill={heroSpark.up ? "url(#jsp)" : "url(#jspr)"} />
@@ -8914,21 +9623,21 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
             </div>
             <div className="edgerow">
               <div className="edgestat"><div className={"edgeval " + (edgePos ? "green" : "red")}>{dstats.n ? sgnR(dstats.expectancy) : "—"}</div><div className="edgek">Expectancy / trade</div></div>
-              <div className="edgestat"><div className="edgeval gold">{dstats.n ? (isFinite(dstats.pf) ? dstats.pf.toFixed(2) : (dstats.wins ? "∞" : "—")) : "—"}</div><div className="edgek">Profit factor</div></div>
+              <div className="edgestat"><div className="edgeval">{dstats.n ? (isFinite(dstats.pf) ? dstats.pf.toFixed(2) : (dstats.wins ? "∞" : "—")) : "—"}</div><div className="edgek">Profit factor</div></div>
             </div>
             {isAdmin && dstats.extN > 0 && (
               <div className="edgerow">
                 <div className="edgestat"><div className="edgeval" style={{ color: dstats.avgExtExit >= 5 ? "var(--green)" : "var(--text)" }}>{dstats.avgExtExit.toFixed(1)}×</div><div className="edgek"><span className="term" data-tip="Average ATR% multiple from the 50-day MA at your exits. Higher = you're consistently selling while the stock is stretched, not after it comes in.">Avg exit extension</span></div></div>
-                <div className="edgestat"><div className="edgeval" style={{ color: dstats.strongExitPct >= 15 ? "var(--green)" : "var(--goldBright)" }}>{Math.round(dstats.strongExitPct)}%</div><div className="edgek"><span className="term" data-tip="Share of exits taken at ≥7× ATR from the 50-day MA — statistically rare (3-sigma) territory. These are your sell-into-strength exits; historically your highest win-rate bucket.">Exits into strength (≥7×)</span></div></div>
+                <div className="edgestat"><div className="edgeval" style={{ color: dstats.strongExitPct >= 15 ? "var(--green)" : "var(--orange)" }}>{Math.round(dstats.strongExitPct)}%</div><div className="edgek"><span className="term" data-tip="Share of exits taken at ≥7× ATR from the 50-day MA — statistically rare (3-sigma) territory. These are your sell-into-strength exits; historically your highest win-rate bucket.">Exits into strength (≥7×)</span></div></div>
               </div>
             )}
-            {dstats.n > 0 && <div style={{ marginTop: 14 }}><span className="streak" style={{ color: dstats.streakWin ? "#86efac" : "#fca5a5" }}>{(dstats.streakWin ? "▲ " : "▼ ") + dstats.streakN + "-trade " + (dstats.streakWin ? "win streak" : "losing streak")}</span></div>}
+            {dstats.n > 0 && <div style={{ marginTop: 14 }}><span className="streak" style={{ color: dstats.streakWin ? "var(--greenFg)" : "var(--redFg)" }}>{(dstats.streakWin ? "▲ " : "▼ ") + dstats.streakN + "-trade " + (dstats.streakWin ? "win streak" : "losing streak")}</span></div>}
             {dstats.n > 0 && (
               <div className="edgeproj">
                 {/* Uses <Abbr> (portal tooltip to document.body) instead of the .term CSS ::after tooltip:
                     the edge card has overflow:hidden (clips ::after) AND .vj.expert .term kills the tooltip
                     in Pro mode. The portal escapes both, so "How this is calculated" shows in Guided AND Pro. */}
-                <div className="projlabel">{edgePos ? <Abbr tip={<><strong style={{ color: C.goldBright }}>How this is calculated</strong><br />Your average result per trade × 100 — what 100 trades at your current average would return. A projection from your logged trades, not a repeat of your all-time total.</>}>{projProvisional ? <>If this <b>early</b> edge holds — your next <b>100 trades</b></> : <>If this holds for your next <b>100 trades</b></>}</Abbr> : <>Your next 100 trades — let's fix the edge first</>}</div>
+                <div className="projlabel">{edgePos ? <Abbr tip={<><strong style={{ color: C.white }}>How this is calculated</strong><br />Your average result per trade × 100 — what 100 trades at your current average would return. A projection from your logged trades, not a repeat of your all-time total.</>}>{projProvisional ? <>If this <b>early</b> edge holds — your next <b>100 trades</b></> : <>If this holds for your next <b>100 trades</b></>}</Abbr> : <>Your next 100 trades — let's fix the edge first</>}</div>
                 {edgePos ? (
                   <>
                     {projProvisional && (
@@ -9090,25 +9799,25 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
         </div>
 
         {fxFlagged.length > 0 && (
-          <div style={{ margin: "14px 0", padding: "13px 16px", borderRadius: 14, background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.35)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <span style={{ fontSize: "1.05rem" }}>⚠️</span>
-            <div style={{ flex: 1, minWidth: 260, fontSize: "0.8rem", lineHeight: 1.5 }}>
+          <div style={{ margin: "14px 0", padding: "13px 16px", borderRadius: 14, background: "rgba(255,170,5,0.08)", border: "1px solid rgba(255,170,5,0.35)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: "1rem" }}>⚠️</span>
+            <div style={{ flex: 1, minWidth: 260, fontSize: "0.75rem", lineHeight: 1.5 }}>
               <b style={{ color: "#fdba74" }}>{fxFlagged.length} synced trade{fxFlagged.length > 1 ? "s" : ""} look mis-priced.</b>{" "}
               They match a known bug where non-USD trades (e.g. Tokyo/Korea listings) were imported at raw local-currency prices — a ¥190,000 loss could show as −$190,000. <b>Nothing is changed unless you confirm.</b>
             </div>
-            <button className="btn" onClick={() => setFxReviewOpen(true)} style={{ background: "rgba(251,146,60,0.15)", borderColor: "rgba(251,146,60,0.45)", color: "#fdba74", fontWeight: 700 }}>Review them</button>
+            <button className="btn" onClick={() => setFxReviewOpen(true)} style={{ background: "rgba(255,170,5,0.15)", borderColor: "rgba(255,170,5,0.45)", color: "#fdba74", fontWeight: 700 }}>Review them</button>
           </div>
         )}
         {fxReviewOpen && (
-          <div style={{ margin: "0 0 16px", padding: "16px", borderRadius: 14, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(251,146,60,0.35)" }}>
+          <div style={{ margin: "0 0 16px", padding: "16px", borderRadius: 14, background: "var(--w03)", border: "1px solid rgba(255,170,5,0.35)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-              <b style={{ fontSize: "0.86rem" }}>Review flagged trades</b>
-              <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>Untick any row that's actually correct. Deleting only removes the bad import — after that, run <b>Sync now</b> (Settings → IBKR) and these trades re-import correctly converted to USD.</span>
+              <b style={{ fontSize: "0.875rem" }}>Review flagged trades</b>
+              <span style={{ fontSize: "0.6875rem", color: "var(--muted)" }}>Untick any row that's actually correct. Deleting only removes the bad import — after that, run <b>Sync now</b> (Settings → IBKR) and these trades re-import correctly converted to USD.</span>
               <button onClick={() => setFxReviewOpen(false)} style={{ marginLeft: "auto", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", borderRadius: 8, width: 26, height: 26, cursor: "pointer" }}>×</button>
             </div>
             <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 10 }}>
               {fxFlagged.map((t, i) => (
-                <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderTop: i ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.76rem", cursor: "pointer" }}>
+                <label key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderTop: i ? "1px solid var(--w06)" : "none", fontSize: "0.75rem", cursor: "pointer" }}>
                   <input type="checkbox" checked={fxSel.has(t.id)} onChange={() => setFxSel(prev => { const n = new Set(prev); n.has(t.id) ? n.delete(t.id) : n.add(t.id); return n; })} />
                   <b style={{ minWidth: 76 }}>{t.ticker}</b>
                   <span style={{ color: "var(--muted)", minWidth: 130 }}>{tradeDateISO(t.entry) || t.entry} → {tradeDateISO(t.exit) || t.exit}</span>
@@ -9118,7 +9827,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
               ))}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-              <button className="btn" onClick={fxDeleteSelected} disabled={!fxSel.size || fxBusy} style={{ background: "rgba(239,68,68,0.14)", borderColor: "rgba(239,68,68,0.4)", color: "#fca5a5", fontWeight: 700 }}>{fxBusy ? "Removing…" : `Yes, these are wrong — remove ${fxSel.size} selected`}</button>
+              <button className="btn" onClick={fxDeleteSelected} disabled={!fxSel.size || fxBusy} style={{ background: "rgba(255,80,0,0.14)", borderColor: "rgba(255,80,0,0.4)", color: "var(--redFg)", fontWeight: 700 }}>{fxBusy ? "Removing…" : `Yes, these are wrong — remove ${fxSel.size} selected`}</button>
               <button className="btn" onClick={fxDismiss} style={{ fontWeight: 700 }}>They're all correct — don't ask again</button>
             </div>
           </div>
@@ -9211,15 +9920,144 @@ const GLOSSARY = [
   ["Tier","Position Tier","Auto-assigned from $-at-risk vs your per-trade risk budget (Full / Half / Quarter / Pilot). 12% buffer for slippage."],
 ];
 
-const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
-    --text:rgba(255,255,255,0.92);
-    --muted:rgba(255,255,255,0.70);        
-    --faint:rgba(255,255,255,0.45);        
-    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
-    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
-    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
-    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
-    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;}
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── DASHBOARD — Robinhood home structure (2026-08-06) ───
+// hero (equity as THE number + change + wide minimal sparkline) → quiet stat rail →
+// open positions as tall hairline rows → daily market plan → everything else.
+// Appended AFTER RH_SYS('.vd') so it wins on source order at equal specificity.
+// ═══════════════════════════════════════════════════════════════════════════
+const DASH_RH = `
+/* ── HERO: the account number, Robinhood-large. Equity left the KPI rail to live here. ── */
+.vd .rhhero{padding:6px 2px 24px; margin:0 0 2px; border-bottom:1px solid var(--hair)}
+.vd .rhherotop{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px}
+.vd .rhherotop .herolabel{font-size:0.75rem; font-weight:500; letter-spacing:0; text-transform:none; color:var(--muted)}
+.vd .rhhero .heronum{margin-top:2px}
+.vd .rhhero .herochg{margin-top:10px; display:inline-flex; align-items:center; gap:8px}
+.vd .rhhero .herochg .chgnote{font-family:var(--font); font-size:0.75rem; font-weight:500; color:var(--faint); letter-spacing:0}
+.vd .herochg.up{color:var(--green)}
+.vd .herochg.dn{color:var(--red)}
+.vd .herobase{font-size:0.75rem; color:var(--faint); margin-top:9px; font-variant-numeric:tabular-nums;
+  min-height:1.3em}
+.vd .herosparkwrap{position:relative; margin-top:22px; cursor:crosshair; touch-action:pan-y}
+.vd .herospark{display:block; width:100%; height:110px; overflow:visible}
+/* Scrub crosshair — no transition: the dot must track the finger, not lag behind it. */
+.vd .scrubline{position:absolute; top:0; bottom:0; width:1px; background:var(--w35); pointer-events:none}
+.vd .scrubdot{position:absolute; width:11px; height:11px; border-radius:50%; border:2px solid var(--bg);
+  transform:translate(-50%,-50%); pointer-events:none; box-shadow:0 0 0 1px var(--w22)}
+.vd .herosparklbl{font-size:0.75rem; color:var(--faint); margin-top:8px; letter-spacing:0; text-transform:none; font-weight:500}
+@media(max-width:760px){.vd .herospark{height:74px}}
+
+/* ── GUIDED hero: the Open P/L card becomes the same flat hero band (no box, no tint).
+   Guided keeps its teaching composition — this is a register change, not a rearrangement. ── */
+.vd .hero{gap:14px; margin-top:18px}
+.vd .hero .north,.vd .hero .north.north-neg{background:transparent; border:none; border-radius:0;
+  padding:6px 2px 22px; border-bottom:1px solid var(--hair)}
+.vd .north .big{font-family:var(--font); font-size:clamp(2.4rem,5.2vw,3.1rem); font-weight:600;
+  letter-spacing:-0.03em; line-height:1.02; margin-top:6px; font-variant-numeric:tabular-nums}
+.vd .north .meta{font-size:0.875rem; margin-top:10px; color:var(--muted)}
+.vd .spark{height:96px; margin-top:20px}
+.vd .sparklabel{font-size:0.75rem; text-transform:none; letter-spacing:0; font-weight:500;
+  color:var(--faint); margin-top:8px}
+.vd .mini .hint{font-size:0.75rem; color:var(--muted); margin-top:8px}
+.vd .breakdown{font-size:0.75rem; line-height:1.7}
+.vd .outgrid{gap:20px 22px}
+.vd .outval{font-size:1.25rem}
+.vd .outsub{font-size:0.75rem; margin-top:6px}
+
+/* ── STAT RAIL: one quiet strip, hairline separators, no individual card boxes. ── */
+.vd .kpistrip,.vd.expert .kpistrip{display:grid; grid-template-columns:repeat(4,1fr); gap:0;
+  border-bottom:1px solid var(--hair); padding:0; margin:0 0 10px}
+.vd .kpistrip > *,.vd.expert .kpistrip > *{min-width:0}
+.vd .kpistrip .dragwrap{display:block; min-width:0}
+.vd .kpistrip .dragwrap .draghandle{top:2px; right:8px}
+.vd .kpistrip .card,.vd.expert .kpistrip .card.kpi{background:transparent; border:none; border-left:1px solid var(--hair);
+  border-radius:0; padding:18px 20px; min-height:0; display:block; box-shadow:none}
+.vd .kpistrip .dragwrap:first-child .card,.vd.expert .kpistrip .dragwrap:first-child .card.kpi{border-left:none; padding-left:2px}
+.vd.expert .kpistrip .card.kpi .cardhead{border-bottom:none; padding:0; margin:0 0 9px; gap:7px}
+.vd.expert .kpistrip .kpibody{display:flex; align-items:flex-end; justify-content:space-between; gap:10px; min-height:0}
+.vd.expert .kpistrip .kpiviz{width:54px; height:30px; flex:none}
+.vd.expert .kpistrip .kpisub{margin-top:6px; color:var(--faint)}
+.vd.expert .kpistrip .kpichip{margin-top:8px; background:var(--w06); color:var(--muted)}
+@media(max-width:1100px){.vd .kpistrip,.vd.expert .kpistrip{grid-template-columns:repeat(2,1fr)}
+  .vd .kpistrip .dragwrap:nth-child(odd) .card,.vd.expert .kpistrip .dragwrap:nth-child(odd) .card.kpi{border-left:none; padding-left:2px}}
+@media(max-width:760px){.vd .kpistrip,.vd.expert .kpistrip{grid-template-columns:repeat(2,1fr)}}
+
+/* ── OPEN POSITIONS: tall hairline rows, quiet header, no zebra. ── */
+.vd .card.poscard,.vd.expert .card.poscard{padding:0 0 8px}
+/* NOT overflow:hidden — Pro deliberately lets the .term/.infodot tooltips escape the card edge. */
+.vd .poscard .cardhead.poshead,.vd.expert .poscard .cardhead.poshead{padding:16px 22px 14px; margin:0;
+  border-bottom:1px solid var(--hair); flex-wrap:wrap}
+.vd .poscard .allocstrip{padding:13px 22px 14px; margin:0; border-bottom:1px solid var(--hair)}
+/* Row density is DESKTOP-ONLY — below 761px the positions table re-renders as stacked mobile
+   cards (.posrow) and these higher-specificity rules would otherwise un-hide <thead> and
+   fight the card padding. Guarded so the mobile layer is untouched. */
+@media(min-width:761px){
+.vd .poscard thead th,.vd.expert .poscard thead th{font-size:0.6875rem; font-weight:500; letter-spacing:0.06em;
+  color:var(--faint); padding:12px 14px; background:var(--card); border-bottom:1px solid var(--rule)}
+.vd .poscard thead th:first-child,.vd.expert .poscard thead th:first-child{padding-left:22px}
+.vd .poscard tbody td,.vd.expert .poscard tbody td{padding:15px 14px; font-size:0.875rem;
+  border-bottom:1px solid var(--rule)}
+.vd .poscard tbody td:first-child,.vd.expert .poscard tbody td:first-child{padding-left:22px}
+.vd .poscard tbody tr:hover{background:var(--w02)}
+/* mono only where the numbers live — the two left text columns (Status, Symbol) stay proportional */
+.vd .poscard tbody td:not(:first-child):not(:nth-child(2)):not(.mgcell){font-family:var(--mono); letter-spacing:-0.012em}
+.vd .poscard .mgcell,.vd .poscard thead th:last-child{background:var(--card)}
+}
+.vd .poscard .tick{font-size:1rem; font-weight:600; letter-spacing:-0.015em}
+.vd .poscard .addrow{margin:12px 22px 4px; width:calc(100% - 44px)}
+
+/* Status = a plain colored word with a dot, not a heavy pill (Robinhood's row grammar). */
+.vd .status{background:transparent; border:none; padding:0; font-size:0.75rem; font-weight:500;
+  letter-spacing:0; gap:7px}
+.vd .st-risk{background:transparent; border:none; color:var(--red)}
+.vd .st-free{background:transparent; border:none; color:var(--blue)}
+.vd .st-lock{background:transparent; border:none; color:var(--green)}
+.vd .status .d{width:6px; height:6px}
+/* status count chips stay pills but quiet down to the 12px register */
+.vd .countchip,.vd.expert .countchip{font-size:0.75rem; font-weight:500; padding:4px 12px; border-radius:999px;
+  background:var(--w06); color:var(--muted)}
+.vd .pl.up,.vd .pl.dn{font-weight:500}
+.vd .pl .pct{font-size:0.75rem; margin-top:3px}
+
+/* ── DAILY MARKET PLAN: flatten the chrome; keep every lens, stamp and control. ── */
+.vd.expert .lensmini{background:var(--card); border:1px solid var(--hair)}
+.vd.expert .lensmini:hover{border-color:var(--w14); transform:none}
+.vd .lensduo,.vd.expert .lensrowA,.vd.expert .lensrowB{gap:12px}
+.vd.expert .cardhead{border-bottom:1px solid var(--rule); padding-bottom:12px; margin-bottom:14px}
+.vd.expert .lensmini thead th{font-size:0.6875rem; padding:9px 10px}
+.vd.expert .lensmini tbody td{padding:9px 10px; font-size:0.75rem}
+
+/* ── Meters: flat semantic fills, no gradients, no gold. ── */
+.vd .allocbar{background:var(--w08); height:6px}
+.vd .allocfill{background:var(--red)}
+.vd .allocbar.over .allocfill{background:var(--red)}
+.vd .legdot{width:7px; height:7px}
+.vd .deploy{background:var(--w03); border:1px solid var(--hair); border-radius:12px; padding:13px 15px}
+.vd .deploy.over{background:var(--redDim); border-color:rgba(255,80,0,0.28)}
+.vd .deployhead{font-size:0.875rem; font-weight:500}
+
+/* ── Command header + hero controls ── */
+.vd.expert .cmdheader{margin-top:14px; margin-bottom:18px}
+.vd.expert .ghostchip{font-size:0.75rem; font-weight:500; padding:5px 12px; border-color:var(--w10)}
+.vd .infodot{border-color:var(--w14)}
+.vd .welcome{background:var(--w03); border:1px solid var(--hair); border-radius:14px}
+.vd .toolbar{margin:32px 0 14px}
+/* Last gold off the data controls: segmented view toggles, steppers and the capital field are
+   DATA chrome, not nav or CTA. Gold survives on focus only. */
+.vd .seg button.on{background:var(--w10); color:var(--white)}
+.vd .equity.off .tlseg button[data-tl=off]{background:var(--w10); color:var(--white)}
+.vd .stepper{border-color:var(--w14)}
+.vd .stepper button{color:var(--text)}
+.vd .stepper button:hover:not(:disabled){background:var(--w08)}
+.vd .capinput{border-color:var(--hair)}
+.vd .capinput:focus,.vd .numfield:focus{border-color:var(--goldBright)}
+.vd .numfield{border-color:var(--hair)}
+.vd .mgin.gold{border-color:var(--hair)}
+.vd .addrow{border:1px dashed var(--w14); color:var(--muted)}
+.vd .addrow:hover{background:var(--w06); border-color:var(--w22); color:var(--white)}
+`;
+
+const DASH_CSS = `${RH_TOKENS}
 .vd *{box-sizing:border-box;margin:0;padding:0}
 .vd{background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
     color:var(--text); font-family:var(--font); line-height:1.58; font-size:16px;
@@ -9233,11 +10071,11 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .shell{max-width:1680px}
 .vd.expert .shell{max-width:1680px} }
 .vd .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:wrap}
-.vd .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:0.95rem; flex:none; white-space:nowrap}
+.vd .brand{display:flex; align-items:center; gap:9px; font-weight:800; letter-spacing:-0.01em; color:var(--white); font-size:1rem; flex:none; white-space:nowrap}
 .vd .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
-.vd .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px}
-.vd .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 18px; border-radius:980px}
+    background:linear-gradient(135deg,var(--goldPillMid),var(--goldPill)); color:var(--goldOn); font-weight:800; font-size:0.75rem}
+.vd .tabs{display:inline-flex; gap:4px; background:var(--w03); border:1px solid var(--border); border-radius:980px; padding:4px}
+.vd .tabs a{text-decoration:none; color:var(--muted); font-size:0.75rem; font-weight:700; padding:7px 18px; border-radius:980px}
 .vd .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
 .vd .tabs a:hover:not(.on){color:var(--text)}
 .vd .card{position:relative; background:var(--glass);
@@ -9246,11 +10084,11 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
     -webkit-backdrop-filter:blur(28px) saturate(160%);
     padding:26px 28px; overflow:hidden;}
 .vd .card::before{content:''; position:absolute; inset:0; pointer-events:none;
-    background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%);}
-.vd .eyebrow{font-size:0.64rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--gold)}
+    background:linear-gradient(135deg, var(--w06), transparent 55%);}
+.vd .eyebrow{font-size:0.6875rem; font-weight:700; letter-spacing:0.17em; text-transform:uppercase; color:var(--faint)}
 .vd .h1{font-size:clamp(1.55rem,3vw,2.05rem); font-weight:800; letter-spacing:-0.04em; color:var(--white); opacity:0; transform:translateY(14px)}
-.vd .goldname{color:var(--goldBright)}
-.vd .sub{font-size:0.82rem; color:var(--muted); max-width:560px; margin-top:6px; opacity:0}
+.vd .goldname{color:var(--white)}
+.vd .sub{font-size:0.875rem; color:var(--muted); max-width:560px; margin-top:6px; opacity:0}
 .vd .riseup{opacity:0; transform:translateY(14px)}
 .vd .reveal.in-view .h1{animation:hRise 0.42s cubic-bezier(0.22,1,0.36,1) both}
 .vd .reveal.in-view .sub{animation:hFade 0.48s ease-out 0.2s both}
@@ -9266,12 +10104,12 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .alloc .allocfill{transition:none !important}
 .vd #sparkRise{animation:none !important; transform:none; opacity:1}
   }
-.vd .label{font-size:0.62rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
+.vd .label{font-size:0.6875rem; font-weight:700; letter-spacing:0.13em; text-transform:uppercase; color:var(--muted)}
 .vd .term{border-bottom:1px dotted var(--borderGold); cursor:help; position:relative}
 .vd .term .plain{color:var(--faint); font-weight:500}
 .vd .term:hover::after{content:attr(data-tip); position:absolute; left:0; top:130%;
     width:240px; background:#11111b; border:1px solid var(--borderGold);
-    border-radius:12px; padding:10px 12px; font-size:0.72rem; font-weight:400;
+    border-radius:12px; padding:10px 12px; font-size:0.75rem; font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--text); z-index:30;
     box-shadow:0 14px 40px rgba(0,0,0,0.55); line-height:1.45; white-space:pre-line;}
 .vd .term.tipright:hover::after{left:auto; right:0}
@@ -9280,47 +10118,47 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .hero{display:grid; grid-template-columns:1.4fr 1fr; gap:18px; margin-top:22px;}
 .vd .hero .equity{grid-column:1 / -1}
 .vd .hero .north{grid-row:span 1; display:flex; flex-direction:column; justify-content:center;
-    background:linear-gradient(140deg, rgba(34,197,94,0.10), transparent 70%);
-    border:1px solid rgba(34,197,94,0.22);}
-.vd .hero .north.north-neg{background:linear-gradient(140deg, rgba(239,68,68,0.10), transparent 70%);
-    border:1px solid rgba(239,68,68,0.22);}
+    background:linear-gradient(140deg, rgba(0,200,5,0.10), transparent 70%);
+    border:1px solid rgba(0,200,5,0.22);}
+.vd .hero .north.north-neg{background:linear-gradient(140deg, rgba(255,80,0,0.10), transparent 70%);
+    border:1px solid rgba(255,80,0,0.22);}
 .vd .north .big{font-size:clamp(2.4rem,6vw,3.6rem); font-weight:800; letter-spacing:-0.045em;
     color:var(--green); line-height:1; margin-top:8px;}
-.vd .north .meta{font-size:0.78rem; color:var(--muted); margin-top:10px}
+.vd .north .meta{font-size:0.75rem; color:var(--muted); margin-top:10px}
 .vd .spark{width:100%; height:52px; margin-top:16px; display:block}
-.vd .sparklabel{font-size:0.64rem; color:var(--faint); margin-top:5px; text-transform:uppercase; letter-spacing:0.1em; font-weight:600}
+.vd .sparklabel{font-size:0.6875rem; color:var(--faint); margin-top:5px; text-transform:uppercase; letter-spacing:0.1em; font-weight:600}
 .vd .mini{display:flex; flex-direction:column; justify-content:center}
-.vd .mini .val{font-size:1.7rem; font-weight:800; letter-spacing:-0.035em; margin-top:6px}
+.vd .mini .val{font-size:1.75rem; font-weight:800; letter-spacing:-0.035em; margin-top:6px}
 .vd .mini .val.green{color:var(--green)}
 .vd .mini .val.red{color:var(--red)}
-.vd .mini .val.gold{color:var(--goldBright)}
-.vd .mini .hint{font-size:0.72rem; color:var(--muted); margin-top:6px}
+.vd .mini .val.gold{color:var(--white)}
+.vd .mini .hint{font-size:0.75rem; color:var(--muted); margin-top:6px}
 .vd .equity .val{margin-top:8px}
-.vd .breakdown{font-size:0.8rem; color:var(--muted); margin-top:12px; line-height:1.75}
+.vd .breakdown{font-size:0.75rem; color:var(--muted); margin-top:12px; line-height:1.75}
 .vd .breakdown .op{margin-left:6px}
 .vd .editcap{display:inline-flex; align-items:center; gap:5px; cursor:pointer; border-bottom:1px dotted var(--borderGold); padding-bottom:1px}
 .vd .editcap .capval{color:var(--text); font-weight:700}
-.vd .editcap .pencil{font-size:0.74rem; color:var(--gold)}
-.vd .capinput{background:rgba(255,255,255,0.05); border:1px solid var(--gold); border-radius:7px; color:var(--white); font-family:var(--font); font-size:0.82rem; font-weight:700; padding:4px 9px; width:120px; outline:none}
+.vd .editcap .pencil{font-size:0.75rem; color:var(--muted)}
+.vd .capinput{background:var(--w06); border:1px solid var(--gold); border-radius:7px; color:var(--white); font-family:var(--font); font-size:0.875rem; font-weight:700; padding:4px 9px; width:120px; outline:none}
 .vd .tlrow{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid var(--border)}
 .vd .tllabel{display:flex; flex-direction:column; gap:3px}
-.vd .tllabel .gtip{font-size:0.7rem; color:var(--faint); font-weight:500}
+.vd .tllabel .gtip{font-size:0.6875rem; color:var(--faint); font-weight:500}
 .vd .tlseg button[data-tl]{padding:6px 16px}
 .vd .equity.off .tlseg button[data-tl=on]{color:var(--muted); background:transparent}
 .vd .equity.off .tlseg button[data-tl=off]{color:var(--goldBright); background:var(--goldDim)}
 .vd .card.equity{justify-content:flex-start}
 .vd .collapsehdr{display:flex; align-items:center; gap:14px; width:100%; background:transparent; border:none;
                cursor:pointer; font-family:var(--font); color:var(--text); padding:0 0 18px; text-align:left}
-.vd .collapsetitle{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
-.vd .collapsesummary{display:none; font-size:0.78rem; color:var(--muted); font-variant-numeric:tabular-nums}
-.vd .chev{margin-left:auto; color:var(--gold); font-size:1.35rem; line-height:1; transition:transform .2s}
+.vd .collapsetitle{font-size:1rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+.vd .collapsesummary{display:none; font-size:0.75rem; color:var(--muted); font-variant-numeric:tabular-nums}
+.vd .chev{margin-left:auto; color:var(--muted); font-size:1.25rem; line-height:1; transition:transform .2s}
 .vd .equity.collapsed .chev{transform:rotate(-90deg)}
 .vd .equity.collapsed .equity-grid{display:none}
 .vd .equity.collapsed .collapsesummary{display:inline}
 .vd .equity.collapsed .collapsehdr{padding-bottom:0}
 /* ── drag-to-rearrange cards — the ⋮⋮ handle peeks over the card's top-right on hover; hold it to drag ── */
 .vd .dragwrap{position:relative}
-.vd .dragwrap .draghandle{position:absolute; top:-9px; right:12px; z-index:6; display:none; align-items:center; justify-content:center; padding:1px 8px; border-radius:7px; background:#14141e; border:1px solid var(--border); color:var(--muted); cursor:grab; font-size:0.72rem; letter-spacing:1px; user-select:none; line-height:1.5}
+.vd .dragwrap .draghandle{position:absolute; top:-9px; right:12px; z-index:6; display:none; align-items:center; justify-content:center; padding:1px 8px; border-radius:7px; background:var(--cardHi); border:1px solid var(--border); color:var(--muted); cursor:grab; font-size:0.75rem; letter-spacing:1px; user-select:none; line-height:1.5}
 .vd .dragwrap:hover .draghandle{display:inline-flex}
 .vd .dragwrap .draghandle:hover{color:var(--goldBright); border-color:var(--borderGold)}
 .vd .dragwrap .draghandle:active{cursor:grabbing}
@@ -9346,42 +10184,42 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .eq-col .ctrl + .ctrl{margin-top:22px}
 .vd .ctrl .label{margin-bottom:9px}
 .vd .outgrid{display:grid; grid-template-columns:1fr 1fr; gap:18px 20px}
-.vd .outlabel{font-size:0.58rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:6px}
-.vd .outval{font-size:1.3rem; font-weight:800; letter-spacing:-0.03em; color:var(--white)}
+.vd .outlabel{font-size:0.6875rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:6px}
+.vd .outval{font-size:1.25rem; font-weight:800; letter-spacing:-0.03em; color:var(--white)}
 .vd .outval.green{color:var(--green)}
 .vd .outval.red{color:var(--red)}
-.vd .outval.gold{color:var(--goldBright)}
-.vd .outsub{font-size:0.68rem; color:var(--muted); margin-top:5px}
-.vd .outsub .g{color:var(--goldBright); font-weight:700}
+.vd .outval.gold{color:var(--white)}
+.vd .outsub{font-size:0.6875rem; color:var(--muted); margin-top:5px}
+.vd .outsub .g{color:var(--white); font-weight:700}
 .vd .richterm{position:relative; cursor:help; border-bottom:1px dotted var(--borderGold); padding-bottom:1px}
 .vd .richterm .pop{display:none; position:absolute; left:0; top:150%; width:230px;
     background:#11111b; border:1px solid var(--borderGold); border-radius:12px;
-    padding:10px 12px; font-size:0.72rem; font-weight:400; letter-spacing:0;
+    padding:10px 12px; font-size:0.75rem; font-weight:400; letter-spacing:0;
     text-transform:none; color:var(--text); z-index:30; line-height:1.5;
     box-shadow:0 14px 40px rgba(0,0,0,0.55);}
 .vd .richterm:hover .pop{display:block}
 .vd .richterm .pop.right{left:auto; right:0}
-.vd .richterm .pop .g{color:var(--goldBright); font-weight:700}
+.vd .richterm .pop .g{color:var(--white); font-weight:700}
 .vd .alloc{margin-top:18px}
-.vd .allocnote{font-size:0.76rem; color:var(--muted)}
+.vd .allocnote{font-size:0.75rem; color:var(--muted)}
 .vd .allocbar{position:relative; height:12px; border-radius:980px; overflow:hidden; margin:15px 0 13px;
-            background:rgba(34,197,94,0.18)}
+            background:rgba(0,200,5,0.18)}
 .vd .allocfill{position:absolute; left:0; top:0; height:100%; border-radius:980px; transition:width .25s ease;
              background:linear-gradient(90deg, #dc4646, var(--red))}
 .vd .allocbar.over .allocfill{background:linear-gradient(90deg, #991b1b, #dc2626)}
-.vd .alloclegend{display:flex; gap:24px; flex-wrap:wrap; font-size:0.78rem; color:var(--muted)}
+.vd .alloclegend{display:flex; gap:24px; flex-wrap:wrap; font-size:0.75rem; color:var(--muted)}
 .vd .alloclegend b{color:var(--text); font-weight:700}
 .vd .leg{display:inline-flex; align-items:center}
 .vd .legdot{width:9px; height:9px; border-radius:50%; margin-right:8px}
 .vd .legdot.risk{background:var(--red)}
 .vd .legdot.avail{background:var(--green)}
-.vd .legdot.free{background:var(--blue)}
-.vd .deploy{margin-top:16px; padding:14px 16px; border-radius:14px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25)}
-.vd .deploy.over{background:rgba(239,68,68,0.08); border-color:rgba(239,68,68,0.28)}
-.vd .deployhead{font-size:0.86rem; font-weight:700; color:var(--green)}
-.vd .deploy.over .deployhead{color:#fca5a5}
+.vd .legdot.free{background:#3b9eff}
+.vd .deploy{margin-top:16px; padding:14px 16px; border-radius:14px; background:rgba(0,200,5,0.08); border:1px solid rgba(0,200,5,0.25)}
+.vd .deploy.over{background:rgba(255,80,0,0.08); border-color:rgba(255,80,0,0.28)}
+.vd .deployhead{font-size:0.875rem; font-weight:700; color:var(--green)}
+.vd .deploy.over .deployhead{color:var(--redFg)}
 .vd .deployhead b{color:var(--white)}
-.vd .deploysub{font-size:0.74rem; color:var(--muted); margin-top:5px}
+.vd .deploysub{font-size:0.75rem; color:var(--muted); margin-top:5px}
 .vd .deploysub b{color:var(--text); font-weight:700}
 .vd .guidepanel{position:fixed; right:24px; bottom:88px; width:330px; max-width:calc(100vw - 40px); z-index:200;
     background:#11111b; border:1px solid var(--borderGold); border-radius:16px; padding:15px 17px;
@@ -9392,76 +10230,79 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .gp-dot{width:8px; height:8px; border-radius:50%; background:var(--goldBright); flex:none}
 .vd .guidepanel.speaking .gp-dot{animation:gppulse 1s ease-in-out infinite}
 @keyframes gppulse{0%,100%{opacity:1; transform:scale(1)}50%{opacity:0.35; transform:scale(1.6)}}
-.vd .gp-title{font-size:0.82rem; font-weight:800; color:var(--goldBright); flex:1}
+.vd .gp-title{font-size:0.875rem; font-weight:800; color:var(--white); flex:1}
 .vd .gp-mute{background:transparent; border:none; cursor:pointer; color:var(--muted); padding:3px; line-height:0; display:flex}
 .vd .gp-mute:hover{color:var(--text)}
 .vd .gp-mute svg{width:18px; height:18px}
-.vd .gp-body{font-size:0.78rem; color:var(--text); line-height:1.55}
-.vd .gp-body b{color:var(--goldBright)}
+.vd .gp-body{font-size:0.75rem; color:var(--text); line-height:1.55}
+.vd .gp-body b{color:var(--white)}
 .vd:not(.expert) .guide{transition:box-shadow .2s}
 .vd:not(.expert) .guide.guide-active{box-shadow:0 0 0 1px var(--borderGold), 0 0 50px rgba(201,152,42,0.13)}
 .vd .ctrlinput{display:inline-flex; align-items:center; gap:7px}
-.vd .numfield{background:rgba(255,255,255,0.05); border:1px solid var(--borderGold); border-radius:9px; color:var(--white); font-family:var(--font); font-size:1.2rem; font-weight:800; letter-spacing:-0.02em; padding:8px 13px; width:100px; outline:none}
+.vd .numfield{background:var(--w06); border:1px solid var(--borderGold); border-radius:9px; color:var(--white); font-family:var(--font); font-size:1.25rem; font-weight:800; letter-spacing:-0.02em; padding:8px 13px; width:100px; outline:none}
 .vd .numfield:focus{border-color:var(--gold)}
-.vd .ctrlinput .suffix{color:var(--muted); font-weight:700; font-size:1.05rem}
-.vd .ctrlhint{font-size:0.7rem; color:var(--faint); margin-top:8px}
-.vd .stepper{display:inline-flex; align-items:center; border:1px solid var(--borderGold); border-radius:980px; overflow:hidden; background:rgba(255,255,255,0.03)}
-.vd .stepper button{border:none; background:transparent; color:var(--goldBright); font-family:var(--font); font-size:1.3rem; font-weight:700; width:44px; height:42px; cursor:pointer; line-height:1; transition:background .15s}
+.vd .ctrlinput .suffix{color:var(--muted); font-weight:700; font-size:1rem}
+.vd .ctrlhint{font-size:0.6875rem; color:var(--faint); margin-top:8px}
+.vd .stepper{display:inline-flex; align-items:center; border:1px solid var(--borderGold); border-radius:980px; overflow:hidden; background:var(--w03)}
+.vd .stepper button{border:none; background:transparent; color:var(--goldBright); font-family:var(--font); font-size:1.25rem; font-weight:700; width:44px; height:42px; cursor:pointer; line-height:1; transition:background .15s}
 .vd .stepper button:hover:not(:disabled){background:var(--goldDim)}
 .vd .stepper button:disabled{color:var(--faint); cursor:not-allowed}
-.vd .stepper .stepval{min-width:54px; text-align:center; font-size:1.2rem; font-weight:800; color:var(--white)}
+.vd .stepper .stepval{min-width:54px; text-align:center; font-size:1.25rem; font-weight:800; color:var(--white)}
 .vd .welcome{display:flex; gap:14px; align-items:flex-start; margin-top:22px;
     background:var(--goldDim); border:1px solid var(--borderGold);
     border-radius:16px; padding:16px 18px;}
 .vd .welcome .dot{width:8px;height:8px;border-radius:50%;background:var(--goldBright);box-shadow:0 0 12px var(--goldBright);margin-top:6px;flex:none}
 .vd .welcome b{color:var(--white)}
-.vd .welcome .x{margin-left:auto; color:var(--faint); cursor:pointer; font-size:1.1rem; line-height:1}
+.vd .welcome .x{margin-left:auto; color:var(--faint); cursor:pointer; font-size:1.125rem; line-height:1}
 .vd .toolbar{display:flex; align-items:center; gap:10px; margin:30px 0 14px; flex-wrap:wrap}
-.vd .toolbar h2{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
-.vd .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
+.vd .toolbar h2{font-size:1rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+.vd .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:var(--w02)}
 .vd .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer;
-    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:7px 16px; border-radius:980px;
+    font-family:var(--font); font-size:0.75rem; font-weight:700; padding:7px 16px; border-radius:980px;
     letter-spacing:0.02em; transition:all .15s;}
 .vd .seg button.on{background:var(--goldDim); color:var(--goldBright)}
-.vd select{color-scheme:dark}
+.vd select{color-scheme:dark} body.theme-light .vd select{color-scheme:light}
 .vd .btn{transition:border-color .15s,color .15s,background .15s}
-.vd .btn:hover{border-color:var(--borderGold); color:var(--white); background:rgba(255,255,255,0.05)}
-.vd .btn{border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text);
-    font-family:var(--font); font-size:0.74rem; font-weight:700; padding:8px 16px;
+.vd .btn:hover{border-color:var(--borderGold); color:var(--white); background:var(--w06)}
+.vd .btn{border:1px solid var(--border); background:var(--w03); color:var(--text);
+    font-family:var(--font); font-size:0.75rem; font-weight:700; padding:8px 16px;
     border-radius:980px; cursor:pointer;}
-.vd .btn.gold{background:linear-gradient(120deg,var(--goldMid),var(--goldBright),var(--goldDeep)); color:#0a0a0a; border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
+.vd .btn.gold{background:linear-gradient(120deg,var(--goldPillMid),var(--goldPill),var(--goldPillDeep)); color:var(--goldOn); border:none; box-shadow:0 6px 18px rgba(201,152,42,0.25)}
 .vd .addrow{display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin:10px 0 2px;
     padding:12px; border:1px dashed var(--borderGold,rgba(201,152,42,0.45)); border-radius:12px;
-    background:transparent; color:var(--goldBright); font-family:var(--font); font-size:0.78rem; font-weight:700;
+    background:transparent; color:var(--goldBright); font-family:var(--font); font-size:0.75rem; font-weight:700;
     letter-spacing:0.02em; cursor:pointer; transition:background .15s ease, border-color .15s ease}
 .vd .addrow:hover{background:rgba(201,152,42,0.10); border-color:var(--goldBright)}
 .vd table{width:100%; border-collapse:collapse}
-.vd thead th{font-size:0.6rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase;
+.vd thead th{font-size:0.6875rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase;
     color:var(--muted); text-align:right; padding:12px 14px; border-bottom:1px solid var(--border);}
 .vd thead th:first-child,.vd thead th:nth-child(2){text-align:left}
-.vd tbody td{padding:10px 12px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.84rem}
+.vd tbody td{padding:10px 12px; text-align:right; border-bottom:1px solid var(--w06); font-size:0.875rem}
 .vd tbody td:first-child,.vd tbody td:nth-child(2){text-align:left}
-.vd tbody tr:hover{background:rgba(255,255,255,0.025)}
-.vd .tick{font-weight:800; letter-spacing:-0.01em; font-size:0.92rem; display:flex; align-items:center; gap:9px}
+.vd tbody tr:hover{background:var(--w03)}
+.vd .tick{font-weight:800; letter-spacing:-0.01em; font-size:0.875rem; display:flex; align-items:center; gap:9px}
 .vd .srcdot{width:7px;height:7px;border-radius:50%}
-.vd .srcdot.ibkr{background:var(--goldBright); box-shadow:0 0 8px var(--goldBright)}
-.vd .srcdot.man{background:rgba(255,255,255,0.28)}
-.vd .tag{display:inline-block; font-size:0.68rem; font-weight:600; color:var(--muted); background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:7px; padding:3px 9px}
+.vd .srcdot.ibkr{background:var(--white); box-shadow:0 0 8px var(--w55)}
+.vd .srcdot.man{background:var(--w35)}
+.vd .tag{display:inline-block; font-size:0.6875rem; font-weight:600; color:var(--muted); background:var(--w06); border:1px solid var(--border); border-radius:7px; padding:4px 8px}
 .vd .pl.up{color:var(--green); font-weight:700}
 .vd .pl.dn{color:var(--red); font-weight:700}
-.vd .pl .pct{display:block; font-size:0.7rem; color:var(--muted); font-weight:500; margin-top:2px}
-.vd .status{display:inline-flex; align-items:center; gap:7px; font-size:0.7rem; font-weight:700; padding:6px 12px; border-radius:980px; letter-spacing:0.02em}
+.vd .pl .pct{display:block; font-size:0.6875rem; color:var(--muted); font-weight:500; margin-top:2px}
+.vd .status{display:inline-flex; align-items:center; gap:7px; font-size:0.6875rem; font-weight:700; padding:6px 12px; border-radius:980px; letter-spacing:0.02em}
 .vd .status .d{width:7px;height:7px;border-radius:50%}
-.vd .st-risk{background:rgba(239,68,68,0.12); color:#fda4a4; border:1px solid rgba(239,68,68,0.3)}
+/* Status semantics (2026-08-06): At Risk = red · Risk-Free = blue · Profit Locked = green.
+   Same hexes as LT_STATUS in the Live Trades drawer, and the same blue the risk-budget
+   legend dot already used for Risk-Free. Gold is brand chrome only — never a status. */
+.vd .st-risk{background:rgba(255,80,0,0.12); color:var(--redFg); border:1px solid rgba(255,80,0,0.3)}
 .vd .st-risk .d{background:var(--red)}
-.vd .st-free{background:rgba(34,197,94,0.12); color:#86efac; border:1px solid rgba(34,197,94,0.3)}
-.vd .st-free .d{background:var(--green)}
-.vd .st-lock{background:rgba(59,130,246,0.12); color:#93c5fd; border:1px solid rgba(59,130,246,0.3)}
-.vd .st-lock .d{background:var(--blue)}
+.vd .st-free{background:rgba(59,158,255,0.10); color:var(--blueFg); border:1px solid rgba(59,158,255,0.35)}
+.vd .st-free .d{background:#3b9eff}
+.vd .st-lock{background:rgba(0,200,5,0.11); color:var(--greenFg); border:1px solid rgba(0,200,5,0.32)}
+.vd .st-lock .d{background:var(--green)}
 .vd .sizebar{display:inline-flex; flex-direction:column; align-items:flex-end; gap:4px}
-.vd .sizebar .track{width:70px;height:5px;border-radius:980px;background:rgba(255,255,255,0.1);overflow:hidden}
+.vd .sizebar .track{width:70px;height:5px;border-radius:980px;background:var(--w10);overflow:hidden}
 .vd .sizebar .fill{height:100%;border-radius:980px}
-.vd .sizebar small{font-size:0.66rem; color:var(--muted)}
+.vd .sizebar small{font-size:0.6875rem; color:var(--muted)}
 .vd .pro-only{display:none}
 .vd.pro .pro-only{display:table-cell}
 .vd.pro thead .pro-only{display:table-cell}
@@ -9471,84 +10312,84 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .outsub{display:none}
 .vd.expert .charthint{display:none}
 .vd.expert .deploysub{display:none}
-.vd .pro-note{font-size:0.72rem; color:var(--faint); margin-top:14px}
+.vd .pro-note{font-size:0.75rem; color:var(--faint); margin-top:14px}
 /* Freeze the Manage/Sell (action) column to the right edge so it's never cropped when the table is
    wider than the card — happens in Pro view and especially at Text Size = Large (zoom 1.15). */
-.vd .mgcell{text-align:right; white-space:nowrap; position:sticky; right:0; z-index:2; background:#0c0c14; box-shadow:-12px 0 14px -10px rgba(0,0,0,0.65)}
-.vd thead th:last-child{position:sticky; right:0; z-index:2; background:#0c0c14}
+.vd .mgcell{text-align:right; white-space:nowrap; position:sticky; right:0; z-index:2; background:var(--card); box-shadow:-12px 0 14px -10px rgba(0,0,0,0.65)}
+.vd thead th:last-child{position:sticky; right:0; z-index:2; background:var(--card)}
 .vd .mgcell .mgbtn + .mgbtn{margin-left:6px}
-.vd .mgbtn{background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
-         font-size:0.68rem; font-weight:700; padding:6px 13px; border-radius:980px; cursor:pointer; white-space:nowrap}
+.vd .mgbtn{background:var(--w04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+         font-size:0.6875rem; font-weight:700; padding:6px 13px; border-radius:980px; cursor:pointer; white-space:nowrap}
 .vd .mgbtn:hover{color:var(--text); border-color:var(--borderGold)}
-.vd .mgbtn.sell{background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.32); color:#fca5a5}
-.vd .mgbtn.sell:hover{background:rgba(239,68,68,0.16); color:#fecaca}
+.vd .mgbtn.sell{background:rgba(255,80,0,0.1); border-color:rgba(255,80,0,0.32); color:var(--redFg)}
+.vd .mgbtn.sell:hover{background:rgba(255,80,0,0.16); color:#fecaca}
 .vd .posrow.mg-open .mgbtn{background:var(--goldDim); color:var(--goldBright); border-color:var(--borderGold)}
-.vd .mgrow > td{padding:0 !important; border-bottom:1px solid rgba(255,255,255,0.06)}
+.vd .mgrow > td{padding:0 !important; border-bottom:1px solid var(--w06)}
 /* Wide Pro-view table scrolls horizontally inside the card instead of being clipped by overflow:hidden.
    container-type lets the expanded Manage panel size to the VISIBLE width (100cqw) so its Risk & P/L
    column is always fully readable, even when the data row above it is wider and scrolls. */
 .vd .pos-scroll{overflow-x:auto; container-type:inline-size}
 .vd .mgpanel{margin:2px 0 14px; width:100cqw; box-sizing:border-box; background:rgba(201,152,42,0.045); border:1px solid var(--borderGold); border-radius:16px; padding:18px 20px}
 .vd .mghead{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding-bottom:15px; margin-bottom:16px; border-bottom:1px solid var(--border)}
-.vd .mgtick{font-size:1.05rem; font-weight:800; color:var(--white); letter-spacing:-0.01em}
-.vd .mgls{font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--green); border:1px solid rgba(34,197,94,0.3); border-radius:6px; padding:2px 7px}
-.vd .mgmeta{font-size:0.74rem; color:var(--muted)}
+.vd .mgtick{font-size:1rem; font-weight:800; color:var(--white); letter-spacing:-0.01em}
+.vd .mgls{font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--green); border:1px solid rgba(0,200,5,0.3); border-radius:6px; padding:2px 7px}
+.vd .mgmeta{font-size:0.75rem; color:var(--muted)}
 .vd .mgmeta b{color:var(--text); font-weight:700; font-variant-numeric:tabular-nums}
-.vd .mgclose{margin-left:auto; background:transparent; border:none; color:var(--faint); font-size:1.4rem; line-height:1; cursor:pointer}
+.vd .mgclose{margin-left:auto; background:transparent; border:none; color:var(--faint); font-size:1.25rem; line-height:1; cursor:pointer}
 .vd .mgclose:hover{color:var(--text)}
 .vd .mggrid{display:grid; grid-template-columns:1fr 1fr; gap:0}
 .vd .mgcol{padding:0 22px; border-left:1px solid var(--border)}
 .vd .mgcol:first-child{padding-left:0; border-left:none}
 .vd .mgcol:last-child{padding-right:0}
-.vd .mgcoltitle{font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold); margin-bottom:14px}
+.vd .mgcoltitle{font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--faint); margin-bottom:14px}
 .vd .mgfield{display:flex; align-items:center; gap:8px; margin-bottom:10px}
-.vd .mgfield label{flex:1; font-size:0.76rem; color:var(--muted)}
-.vd .mgin{width:98px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--white);
-        font-family:var(--font); font-size:0.82rem; font-weight:700; padding:6px 9px; text-align:right; outline:none; font-variant-numeric:tabular-nums}
+.vd .mgfield label{flex:1; font-size:0.75rem; color:var(--muted)}
+.vd .mgin{width:98px; background:var(--w06); border:1px solid var(--border); border-radius:8px; color:var(--white);
+        font-family:var(--font); font-size:0.875rem; font-weight:700; padding:6px 9px; text-align:right; outline:none; font-variant-numeric:tabular-nums}
 .vd .mgin:focus{border-color:var(--gold)}
-.vd .mgin.gold{border-color:var(--borderGold); color:var(--goldBright)}
-.vd .mglock{background:transparent; border:none; color:var(--faint); cursor:pointer; font-size:0.78rem; padding:2px; line-height:0}
+.vd .mgin.gold{border-color:var(--borderGold); color:var(--white)}
+.vd .mglock{background:transparent; border:none; color:var(--faint); cursor:pointer; font-size:0.75rem; padding:2px; line-height:0}
 .vd .mglock:hover{color:var(--gold)}
 .vd .mgsave{margin-top:8px}
 .vd .mgacts{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px}
-.vd .mgact{font-size:0.7rem; padding:7px 13px}
-.vd .mgactlist{font-size:0.76rem; color:var(--faint); padding:8px 0; min-height:36px}
-.vd .mgnote{font-size:0.68rem; color:var(--faint); line-height:1.5; margin-top:6px}
+.vd .mgact{font-size:0.6875rem; padding:7px 13px}
+.vd .mgactlist{font-size:0.75rem; color:var(--faint); padding:8px 0; min-height:36px}
+.vd .mgnote{font-size:0.6875rem; color:var(--faint); line-height:1.5; margin-top:6px}
 .vd .mgreadout{display:flex; flex-direction:column}
-.vd .mgr{display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.78rem}
+.vd .mgr{display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid var(--w06); font-size:0.75rem}
 .vd .mgr span{color:var(--muted)}
 .vd .mgr b{color:var(--text); font-weight:700; font-variant-numeric:tabular-nums}
 .vd .mgr b.green{color:var(--green)}
 .vd .mgr b.red{color:var(--red)}
-.vd .mgr b.gold{color:var(--goldBright)}
+.vd .mgr b.gold{color:var(--white)}
 .vd .mgfoot{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:18px; padding-top:16px; border-top:1px solid var(--border)}
-.vd .mgfoot-hint{font-size:0.72rem; color:var(--faint)}
-.vd .mgsell{background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.32); color:#fca5a5; font-weight:700}
-.vd .mgsell:hover{background:rgba(239,68,68,0.16)}
-.vd .mgsell.open{background:rgba(239,68,68,0.18); color:#fecaca}
+.vd .mgfoot-hint{font-size:0.75rem; color:var(--faint)}
+.vd .mgsell{background:rgba(255,80,0,0.1); border:1px solid rgba(255,80,0,0.32); color:var(--redFg); font-weight:700}
+.vd .mgsell:hover{background:rgba(255,80,0,0.16)}
+.vd .mgsell.open{background:rgba(255,80,0,0.18); color:#fecaca}
 .vd .mgsellform{margin-top:16px; padding-top:16px; border-top:1px dashed var(--borderGold)}
 .vd .mgsellgrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0}
 .vd .mgsellcol{padding:0 22px; border-left:1px solid var(--border)}
 .vd .mgsellcol:first-child{padding-left:0; border-left:none}
 .vd .mgsellcol:last-child{padding-right:0}
 .vd .quickrow{display:flex; align-items:center; gap:6px; margin:0 0 12px}
-.vd .chipbtn{background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
-           font-size:0.66rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer}
+.vd .chipbtn{background:var(--w04); border:1px solid var(--border); color:var(--muted); font-family:var(--font);
+           font-size:0.6875rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer}
 .vd .chipbtn:hover{color:var(--text); border-color:var(--borderGold)}
-.vd .mgof{font-size:0.7rem; color:var(--faint); margin-left:4px}
-.vd .mgsel{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--white);
-         font-family:var(--font); font-size:0.78rem; font-weight:600; padding:6px 9px; outline:none; cursor:pointer}
+.vd .mgof{font-size:0.6875rem; color:var(--faint); margin-left:4px}
+.vd .mgsel{background:var(--w06); border:1px solid var(--border); border-radius:8px; color:var(--white);
+         font-family:var(--font); font-size:0.75rem; font-weight:600; padding:6px 9px; outline:none; cursor:pointer}
 .vd .mgsel:focus{border-color:var(--gold)}
-.vd .mgcheck{display:flex; align-items:center; gap:8px; font-size:0.76rem; color:var(--muted); margin-top:12px; cursor:pointer}
+.vd .mgcheck{display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--muted); margin-top:12px; cursor:pointer}
 .vd .mgcheck input{accent-color:var(--gold); width:15px; height:15px}
 .vd .mgoptional{color:var(--faint); font-weight:500; text-transform:none; letter-spacing:0}
 .vd .mgjournal{display:flex; flex-direction:column; gap:8px}
-.vd .mgta{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; color:var(--text);
-        font-family:var(--font); font-size:0.76rem; padding:8px 10px; outline:none; resize:vertical; min-height:38px}
+.vd .mgta{background:var(--w06); border:1px solid var(--border); border-radius:8px; color:var(--text);
+        font-family:var(--font); font-size:0.75rem; padding:8px 10px; outline:none; resize:vertical; min-height:38px}
 .vd .mgta:focus{border-color:var(--gold)}
 .vd .mgin.wide{width:100%; text-align:left; font-weight:500}
 .vd .mgsellactions{display:flex; gap:10px; margin-top:14px}
-.vd .mgsellmsg{font-size:0.74rem; color:var(--green); margin-top:10px; min-height:18px}
+.vd .mgsellmsg{font-size:0.75rem; color:var(--green); margin-top:10px; min-height:18px}
 @media(max-width:760px){
 .vd .hero{grid-template-columns:1fr 1fr;}
 .vd .hero .north{grid-column:1 / -1}
@@ -9565,7 +10406,7 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd table,.vd tbody,.vd tr,.vd td{display:block; width:100%}
 .vd tbody tr{border:1px solid var(--border); border-radius:16px; padding:8px 4px; margin-bottom:12px}
 .vd tbody td{display:flex; justify-content:space-between; align-items:center; text-align:right; border:none; padding:8px 14px}
-.vd tbody td::before{content:attr(data-l); color:var(--muted); font-size:0.66rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:700}
+.vd tbody td::before{content:attr(data-l); color:var(--muted); font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:700}
 .vd .tick{font-size:1rem}
 /* ── Lens minis + Theme strip render as REAL compact tables on mobile — exempt them from the
    card-izing above (built for the wide positions table). They're 3–5 narrow columns that fit
@@ -9581,17 +10422,17 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd .posrow{display:grid; grid-template-columns:1fr 1fr; column-gap:14px; row-gap:0; align-content:start; padding:14px 16px 10px; background:var(--glass)}
 /* secondary stats: quiet, left-aligned, value-over-label mini cells */
 .vd .posrow td{display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:3px; text-align:left; padding:9px 0; order:0}
-.vd .posrow td::before{font-size:0.56rem; opacity:0.5; font-weight:600; letter-spacing:0.07em; margin:0; order:2}
+.vd .posrow td::before{font-size:0.6875rem; opacity:0.5; font-weight:600; letter-spacing:0.07em; margin:0; order:2}
 .vd .posrow td.pro-only{display:none}
 .vd.pro .posrow td.pro-only{display:flex}
 /* header band: ticker (left) + P/L (right) on one line, status pill beneath, divider under */
 .vd .posrow td[data-l="Symbol"]{grid-column:1; order:-3; flex-direction:row; align-items:center; padding:0}
 .vd .posrow td[data-l="Symbol"]::before{display:none}
-.vd .posrow .tick{font-size:1.3rem; font-weight:800; letter-spacing:-0.02em}
+.vd .posrow .tick{font-size:1.25rem; font-weight:800; letter-spacing:-0.02em}
 .vd .posrow td[data-l="P/L"]{grid-column:2; order:-2; align-items:flex-end; justify-content:center; padding:0}
 .vd .posrow td[data-l="P/L"]::before{display:none}
-.vd .posrow td[data-l="P/L"] .pl{font-size:1.12rem; font-weight:800}
-.vd .posrow td[data-l="P/L"] .pct{font-size:0.74rem; text-align:right}
+.vd .posrow td[data-l="P/L"] .pl{font-size:1.125rem; font-weight:800}
+.vd .posrow td[data-l="P/L"] .pct{font-size:0.75rem; text-align:right}
 .vd .posrow td[data-l="Status"]{grid-column:1 / -1; order:-1; padding:8px 0 12px; margin-bottom:6px; border-bottom:1px solid var(--border)}
 .vd .posrow td[data-l="Status"]::before{display:none}
 /* bars sit left and fill the cell width */
@@ -9617,19 +10458,19 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 /* Every Pro card header: micro-label + info dot, divided from the body (Pro's replacement for the guided voice). */
 .vd.expert .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
 .vd.expert .cardhead .label{flex:1}
-.vd .infodot{position:relative; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none}
+.vd .infodot{position:relative; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.6875rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none}
 .vd .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
 .vd.expert .tipwrap{position:relative; cursor:help}
-.vd.expert .infodot:hover::after,.vd.expert .tipwrap:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+.vd.expert .infodot:hover::after,.vd.expert .tipwrap:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid var(--w14); border-radius:10px; padding:10px 12px; font-size:0.75rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
 /* P1. Command header */
 .vd.expert .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
-.vd.expert .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
-.vd.expert .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px; font-variant-numeric:tabular-nums}
+.vd.expert .cmdleft .ch1{font-size:1.25rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+.vd.expert .cmdmeta{font-size:0.75rem; color:var(--muted); margin-top:6px; font-variant-numeric:tabular-nums}
 .vd.expert .cmdactions{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
 .vd.expert .btn.ghost{background:transparent}
 .vd.expert .btn.goldoutline{background:transparent; border:1px solid var(--borderGold); color:var(--goldBright)}
 .vd.expert .btn.goldoutline:hover{background:var(--goldDim); color:var(--goldBright)}
-.vd.expert .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-size:0.62rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em}
+.vd.expert .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-size:0.6875rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em}
 .vd.expert .ghostchip:hover{color:var(--text); border-color:var(--borderGold)}
 /* P2. KPI strip — five short cards, collapsing 5→3→2 */
 .vd.expert .kpistrip{display:grid; grid-template-columns:repeat(auto-fit, minmax(215px,1fr)); gap:14px}
@@ -9638,16 +10479,16 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .kpi .cardhead{padding-bottom:8px; margin-bottom:10px}
 .vd.expert .kpibody{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-height:0}
 .vd.expert .kpimain{min-width:0}
-.vd.expert .kpinum{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; line-height:1.05; white-space:nowrap; font-variant-numeric:tabular-nums}
+.vd.expert .kpinum{font-size:1.25rem; font-weight:800; letter-spacing:-0.03em; line-height:1.05; white-space:nowrap; font-variant-numeric:tabular-nums}
 .vd.expert .kpinum.green{color:var(--green)}
 .vd.expert .kpinum.red{color:var(--red)}
-.vd.expert .kpinum.gold{color:var(--goldBright)}
-.vd.expert .kpisub{font-size:0.68rem; color:var(--muted); margin-top:4px; white-space:nowrap}
-.vd.expert .kpichip{display:inline-block; margin-top:7px; font-size:0.6rem; font-weight:700; padding:3px 9px; border-radius:980px; background:var(--goldDim); color:var(--goldBright); letter-spacing:0.03em}
+.vd.expert .kpinum.gold{color:var(--white)}
+.vd.expert .kpisub{font-size:0.6875rem; color:var(--muted); margin-top:4px; white-space:nowrap}
+.vd.expert .kpichip{display:inline-block; margin-top:7px; font-size:0.6875rem; font-weight:700; padding:4px 8px; border-radius:980px; background:var(--w06); color:var(--text); letter-spacing:0.03em}
 .vd.expert .kpiviz{flex:none; width:70px; height:40px}
 .vd.expert .kpiviz svg{width:100%; height:100%; display:block; overflow:visible}
 .vd.expert .kpiviz.hastip{position:relative}
-.vd.expert .kpitip{display:none; position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:8px 12px; box-shadow:0 10px 30px rgba(0,0,0,0.55); font-size:0.72rem; font-weight:700; line-height:1.55; text-align:right; white-space:nowrap}
+.vd.expert .kpitip{display:none; position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; background:#13131c; border:1px solid var(--w14); border-radius:10px; padding:8px 12px; box-shadow:0 10px 30px rgba(0,0,0,0.55); font-size:0.75rem; font-weight:700; line-height:1.55; text-align:right; white-space:nowrap}
 .vd.expert .kpiviz.hastip:hover .kpitip{display:block}
 @media(max-width:1200px){ .vd.expert .kpistrip{grid-template-columns:repeat(3,1fr)} }
 @media(max-width:760px){ .vd.expert .kpistrip{grid-template-columns:repeat(2,1fr)} }
@@ -9655,7 +10496,7 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .cfggrid{display:grid; grid-template-columns:repeat(4,1fr); gap:0}
 .vd.expert .cfgitem{padding:0 20px; border-left:1px solid var(--border)}
 .vd.expert .cfgitem:first-child{padding-left:0; border-left:none}
-.vd.expert .cfghint{font-size:0.68rem; color:var(--faint); margin-top:8px}
+.vd.expert .cfghint{font-size:0.6875rem; color:var(--faint); margin-top:8px}
 .vd.expert .cfgitem .stepper .stepval{min-width:64px}
 @media(max-width:900px){ .vd.expert .cfggrid{grid-template-columns:1fr 1fr; gap:18px 0} .vd.expert .cfgitem{border-left:none; padding:0} }
 /* P3. Context row */
@@ -9666,8 +10507,8 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vd.expert .ctxstack > .dragwrap > .card{flex:1}
 @media(max-width:1100px){ .vd.expert .ctxrow{grid-template-columns:1fr} }
 .vd.expert .ctxrow .allocbar{margin:4px 0 12px}
-.vd.expert .ctxrow .alloclegend{gap:16px; font-size:0.74rem}
-.vd.expert .ctxrow .allocnote{font-size:0.72rem; color:var(--faint); margin-top:12px; padding-top:12px; border-top:1px solid var(--border)}
+.vd.expert .ctxrow .alloclegend{gap:16px; font-size:0.75rem}
+.vd.expert .ctxrow .allocnote{font-size:0.75rem; color:var(--faint); margin-top:12px; padding-top:12px; border-top:1px solid var(--border)}
 /* P3b. LENS ROW — Row A = 3 lenses (auto-fit so it wraps to stacked cards on narrow), Row B = 2 cols */
 /* GUIDED market-lens duo — mobile-safe minmax (min(300px,100%) so a 390px phone can't overflow); static, no drag */
 .vd .lensduo{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap:14px; margin-top:14px}
@@ -9706,16 +10547,18 @@ const DASH_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 /* Risk-allocation strip riding on top of the positions table (2026-08-02 — replaces the old lens-row
    card). One slim ruled row: small donut + legend + budget note; wraps cleanly on narrow screens. */
 .vd .allocstrip{display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:9px 4px 12px; margin-bottom:6px; border-bottom:1px solid var(--border)}
-.vd .allocstrip .allocnote{font-size:0.7rem}
-.vd .allocstrip .leg{font-size:0.74rem; color:var(--muted)}
+.vd .allocstrip .allocnote{font-size:0.6875rem}
+.vd .allocstrip .leg{font-size:0.75rem; color:var(--muted)}
 .vd .allocstrip .leg b{color:var(--text); font-weight:700}
 @media(max-width:767px){.vd .allocstrip .allocnote{flex-basis:100%; margin-left:0 !important}}
-.vd.expert .poshead h2{font-size:0.95rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
-.vd.expert .countchip{background:var(--goldDim); color:var(--goldBright); font-size:0.66rem; font-weight:800; padding:3px 10px; border-radius:980px}
+.vd.expert .poshead h2{font-size:1rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
+.vd.expert .countchip{background:var(--w06); color:var(--text); font-size:0.6875rem; font-weight:800; padding:3px 10px; border-radius:980px}
 @media(min-width:761px){
-.vd.expert .poscard thead th{font-size:0.58rem; padding:9px 10px; position:sticky; top:0; z-index:2; background:rgba(9,9,15,0.94)}
-.vd.expert .poscard tbody td{padding:8px 10px; font-size:0.74rem}
-  }`;
+.vd.expert .poscard thead th{font-size:0.6875rem; padding:9px 10px; position:sticky; top:0; z-index:2; background:rgba(9,9,15,0.94)}
+.vd.expert .poscard tbody td{padding:8px 10px; font-size:0.75rem}
+  }
+${RH_SYS('.vd')}
+${DASH_RH}`;
 
 // ── Risk-allocation donut — deployed risk (red arc) vs available budget (green track).
 // Replaces the old thin full-width bar so the card's space carries the whole picture at a glance.
@@ -9726,12 +10569,12 @@ function AllocDonut({ pct, over, size = 104 }) {
   const arc = over ? circ : (p / 100) * circ;
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flex: "none", display: "block" }} aria-hidden>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke={over ? "rgba(239,68,68,0.18)" : "rgba(34,197,94,0.35)"} strokeWidth={sw} />
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#ef4444" strokeWidth={sw} strokeLinecap={over ? "butt" : "round"}
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke={over ? "rgba(255,80,0,0.18)" : "rgba(0,200,5,0.35)"} strokeWidth={sw} />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--red)" strokeWidth={sw} strokeLinecap={over ? "butt" : "round"}
         strokeDasharray={`${arc} ${Math.max(0, circ - arc)}`} transform={`rotate(-90 ${cx} ${cy})`}
-        style={over ? { filter: "drop-shadow(0 0 6px rgba(239,68,68,0.6))" } : undefined} />
-      <text x={cx} y={cy - 1} textAnchor="middle" dominantBaseline="auto" fill="#fff" fontSize={size * 0.21} fontWeight="800" fontFamily={font}>{Math.round(p)}%</text>
-      <text x={cx} y={cy + size * 0.14} textAnchor="middle" fill={over ? "#fca5a5" : "rgba(255,255,255,0.55)"} fontSize={size * 0.082} fontWeight="700" letterSpacing="0.08em" fontFamily={font}>{over ? "OVER BUDGET" : "DEPLOYED"}</text>
+        style={over ? { filter: "drop-shadow(0 0 6px rgba(255,80,0,0.6))" } : undefined} />
+      <text x={cx} y={cy - 1} textAnchor="middle" dominantBaseline="auto" fill="var(--white)" fontSize={size * 0.21} fontWeight="800" fontFamily={font}>{Math.round(p)}%</text>
+      <text x={cx} y={cy + size * 0.14} textAnchor="middle" fill={over ? "var(--redFg)" : "var(--w55)"} fontSize={size * 0.082} fontWeight="700" letterSpacing="0.08em" fontFamily={font}>{over ? "OVER BUDGET" : "DEPLOYED"}</text>
     </svg>
   );
 }
@@ -9802,7 +10645,7 @@ const WL_FLAG_COLORS = [
   { key: "blue",   hex: "#2962ff" },
   { key: "purple", hex: "#9c27b0" },
 ];
-const WL_FLAG_EMPTY = "rgba(255,255,255,0.30)";   // no colour set → subtle outline only
+const WL_FLAG_EMPTY = "var(--w35)";   // no colour set → subtle outline only
 
 // The flag glyph. Coloured → solid pennant. No colour → hairline outline, nothing else.
 function WlFlagGlyph({ color, size = 13 }) {
@@ -9828,16 +10671,16 @@ const WATCHLIST_STOCK_ROWS = (() => {
 // prints the section's VERBATIM TV label instead. Tints carry the funnel's meaning (gold = live
 // position, green = the hunting end, blue/grey = colder, purple = earnings-driven).
 const WL_STAGE_META = {
-  longs:    { name: "Longs (In-Position)",          fg: "#f0c050",                fg2: "rgba(240,192,80,0.70)",   bg: "rgba(201,152,42,0.14)",  bd: "rgba(201,152,42,0.40)" },
-  focus:    { name: "Focus List (Ideas)",           fg: "#7ef0a0",                fg2: "rgba(126,240,160,0.70)",  bg: "rgba(34,197,94,0.12)",   bd: "rgba(34,197,94,0.35)" },
-  strong:   { name: "Strong Stocks (Stalking)",     fg: "#5fbf83",                fg2: "rgba(95,191,131,0.70)",   bg: "rgba(34,197,94,0.06)",   bd: "rgba(34,197,94,0.20)" },
-  mediocre: { name: "Mediocre Stocks (Setting Up)", fg: "#93c5fd",                fg2: "rgba(147,197,253,0.70)",  bg: "rgba(59,130,246,0.12)",  bd: "rgba(59,130,246,0.35)" },
-  weak:     { name: "Weak Stocks (Watching)",       fg: "rgba(255,255,255,0.55)", fg2: "rgba(255,255,255,0.40)",  bg: "rgba(255,255,255,0.04)", bd: "rgba(255,255,255,0.13)" },
+  longs:    { name: "Longs (In-Position)",          fg: "var(--white)",                fg2: "var(--w82)",  bg: "var(--w10)", bd: "var(--w35)" },
+  focus:    { name: "Focus List (Ideas)",           fg: "var(--greenFg)",                fg2: "rgba(126,240,160,0.70)",  bg: "rgba(0,200,5,0.12)",   bd: "rgba(0,200,5,0.35)" },
+  strong:   { name: "Strong Stocks (Stalking)",     fg: "#5fbf83",                fg2: "rgba(95,191,131,0.70)",   bg: "rgba(0,200,5,0.06)",   bd: "rgba(0,200,5,0.20)" },
+  mediocre: { name: "Mediocre Stocks (Setting Up)", fg: "#93c5fd",                fg2: "rgba(147,197,253,0.70)",  bg: "rgba(59,158,255,0.12)",  bd: "rgba(59,158,255,0.35)" },
+  weak:     { name: "Weak Stocks (Watching)",       fg: "var(--w55)", fg2: "var(--w35)",  bg: "var(--w04)", bd: "var(--w10)" },
   peg:      { name: "Post Earnings Gap (PEG)",      fg: "#c4b5fd",                fg2: "rgba(196,181,253,0.70)",  bg: "rgba(167,139,250,0.12)", bd: "rgba(167,139,250,0.32)" },
   earnup:   { name: "Earnings Upcoming",            fg: "#a78bfa",                fg2: "rgba(167,139,250,0.70)",  bg: "rgba(167,139,250,0.06)", bd: "rgba(167,139,250,0.20)" },
 };
 // A section key the map doesn't know still renders — neutral tint, its own TV label. Never dropped.
-const WL_STAGE_FALLBACK = { fg: "rgba(255,255,255,0.55)", fg2: "rgba(255,255,255,0.40)", bg: "rgba(255,255,255,0.04)", bd: "rgba(255,255,255,0.13)" };
+const WL_STAGE_FALLBACK = { fg: "var(--w55)", fg2: "var(--w35)", bg: "var(--w04)", bd: "var(--w10)" };
 
 // The master table's columns, in order. `key` is also the multi-sort key; the flag column has none.
 // Tooltips spell the numbers out — GROUP columns say they are the group's, STOCK columns say they
@@ -9871,10 +10714,12 @@ const wlFmtDay = (iso) => {
   const mi = Number(p[1]) - 1;
   return (WL_MONTHS[mi] || "") + " " + Number(p[2]);
 };
-// Heat fill, identical to the rotation table's: rgba(34,197,94, 0.06 + 0.4·v/100).
-const wlHeat = (v) => (v == null ? "transparent" : `rgba(34,197,94,${(0.06 + 0.4 * Math.max(0, Math.min(1, v / 100))).toFixed(3)})`);
+// Heat fill, identical to the rotation table's: rgba(0,200,5, 0.06 + 0.4·v/100).
+const wlHeat = (v) => (v == null ? "transparent" : `rgba(0,200,5,${(0.06 + 0.4 * Math.max(0, Math.min(1, v / 100))).toFixed(3)})`);
 // Theme-rank colour: green top 3 · orange 4-5 · red the rest · grey when the tracker doesn't rank it.
-const wlRankColor = (rank) => (rank == null ? "rgba(255,255,255,0.35)" : rank <= 3 ? "#86efac" : rank <= 5 ? "#f0a03c" : "#fca5a5");
+// Theme-rank ladder — the three Robinhood semantics straight, no softened tints: top-3 green,
+// 4-5 the amber "sol", 6+ red. Tokens, so the ladder darkens for readability on the light theme.
+const wlRankColor = (rank) => (rank == null ? "var(--faint)" : rank <= 3 ? "var(--green)" : rank <= 5 ? "var(--orange)" : "var(--red)");
 
 // Stored multi-sort chain, per user. Anything malformed or referencing a column that no longer
 // exists is discarded rather than half-applied — a bad localStorage row can never break the table.
@@ -10133,7 +10978,7 @@ function WatchlistCard({ C, font, session }) {
           style={{
             width: 30, height: 30, padding: 0, borderRadius: 999, cursor: "pointer",
             background: c.hex, WebkitTapHighlightColor: "transparent",
-            border: flags[flagOpen.tk] === c.hex ? "2px solid rgba(255,255,255,0.92)" : "1px solid rgba(255,255,255,0.16)",
+            border: flags[flagOpen.tk] === c.hex ? "2px solid var(--white)" : "1px solid var(--w14)",
           }}
         />
       ))}
@@ -10144,26 +10989,26 @@ function WatchlistCard({ C, font, session }) {
         onClick={() => writeFlag(flagOpen.tk, null)}
         style={{
           width: 30, height: 30, padding: 0, borderRadius: 999, cursor: "pointer",
-          background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
-          color: "rgba(255,255,255,0.7)", fontSize: "0.72rem", fontWeight: 800, lineHeight: 1,
+          background: "var(--w06)", border: `1px solid ${C.border}`,
+          color: "var(--muted)", fontSize: "0.75rem", fontWeight: 800, lineHeight: 1,
           WebkitTapHighlightColor: "transparent",
         }}
       >✕</button>
     </div>, document.body) : null;
 
   // ── style primitives, borrowed from the rotation table so the two read as one system ──
-  const cardLabel = { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.gold };
-  const stampStyle = { fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
+  const cardLabel = { fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--faint)" };
+  const stampStyle = { fontSize: "0.6875rem", fontWeight: 700, color: C.muted, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
   const fchip = (on, meta) => ({
     display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", fontFamily: font,
-    fontSize: "0.66rem", fontWeight: 700, padding: "5px 11px", borderRadius: 99, cursor: "pointer", transition: "all .14s",
+    fontSize: "0.6875rem", fontWeight: 700, padding: "5px 11px", borderRadius: 99, cursor: "pointer", transition: "all .14s",
     border: `1px solid ${on ? (meta ? meta.bd : "rgba(201,152,42,0.55)") : C.border}`,
-    color: on ? (meta ? meta.fg : C.goldBright) : C.muted,
-    background: on ? (meta ? meta.bg : "rgba(201,152,42,0.10)") : "rgba(255,255,255,0.03)",
+    color: on ? (meta ? meta.fg : C.white) : C.muted,
+    background: on ? (meta ? meta.bg : "rgba(201,152,42,0.10)") : "var(--w03)",
   });
   const fnum = (on, meta) => ({
-    fontSize: "0.6rem", fontWeight: 800, fontVariantNumeric: "tabular-nums",
-    color: on ? (meta ? meta.fg2 : "rgba(240,192,80,0.7)") : "rgba(255,255,255,0.4)",
+    fontSize: "0.6875rem", fontWeight: 800, fontVariantNumeric: "tabular-nums",
+    color: on ? (meta ? meta.fg2 : "var(--w82)") : "var(--w35)",
   });
   const td = { padding: isMobileVP ? "6px 7px" : "7px 9px", borderBottom: `1px solid ${C.border}`, fontSize: isMobileVP ? "0.7rem" : "0.74rem", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: C.text };
   const jc = (align) => (align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start");
@@ -10178,15 +11023,15 @@ function WatchlistCard({ C, font, session }) {
         key={c.key}
         onClick={() => onSort(c.key)}
         style={{
-          padding: isMobileVP ? "7px 7px" : "8px 9px", fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.09em",
-          textTransform: "uppercase", color: on ? C.goldBright : C.muted, borderBottom: `1px solid ${C.border}`,
+          padding: isMobileVP ? "7px 7px" : "8px 9px", fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.09em",
+          color: on ? C.goldBright : C.muted, borderBottom: `1px solid ${C.border}`,
           textAlign: c.align, whiteSpace: "nowrap", cursor: "pointer", userSelect: "none",
         }}
       >
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, justifyContent: jc(c.align) }}>
           {c.label}
           {on ? (chain[ci].dir === "desc" ? " ▾" : " ▴") : ""}
-          {on && chain.length > 1 ? <span style={{ fontSize: "0.5rem", opacity: 0.75 }}>{WL_SUP[ci] || ci + 1}</span> : null}
+          {on && chain.length > 1 ? <span style={{ fontSize: "0.6875rem", opacity: 0.75 }}>{WL_SUP[ci] || ci + 1}</span> : null}
           <InfoDot tip={c.tip} />
         </span>
       </th>
@@ -10196,7 +11041,7 @@ function WatchlistCard({ C, font, session }) {
   // Heat cell — the same green ramp as the rotation table. "—" when there is no number to show.
   const heatCell = (v, key) => (
     <td key={key} style={{ ...td, textAlign: "center", background: wlHeat(v) }}>
-      {v == null ? <span style={{ color: "rgba(255,255,255,0.28)" }}>—</span> : <span style={{ fontWeight: 700 }}>{Math.round(v)}</span>}
+      {v == null ? <span style={{ color: "var(--faint)" }}>—</span> : <span style={{ fontWeight: 700 }}>{Math.round(v)}</span>}
     </td>
   );
 
@@ -10214,16 +11059,16 @@ function WatchlistCard({ C, font, session }) {
     }}>
       <style>{`
         .wlh table{border-collapse:collapse;width:100%}
-        .wlh thead th{position:sticky;top:0;background:#0c0c14;z-index:2}
+        .wlh thead th{position:sticky;top:0;background:var(--card);z-index:2}
         .wlh tbody tr{transition:background .12s}
-        .wlh tbody tr:hover{background:rgba(255,255,255,0.028)}
-        .wlh .wlh-tk{text-decoration:underline;text-decoration-color:rgba(201,152,42,0.4);text-underline-offset:3px;text-decoration-thickness:1px}
+        .wlh tbody tr:hover{background:var(--w03)}
+        .wlh .wlh-tk{text-decoration:underline;text-decoration-color:var(--w35);text-underline-offset:3px;text-decoration-thickness:1px}
       `}</style>
 
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingBottom: 9, borderBottom: `1px solid ${C.border}` }}>
-        <span style={{ fontSize: "0.8rem", fontWeight: 800, letterSpacing: "-0.01em", color: "rgba(255,255,255,0.95)" }}>The Hunt List</span>
-        <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{rows.length}</span>
+        <span style={{ fontSize: "0.75rem", fontWeight: 800, letterSpacing: "-0.01em", color: "var(--text)" }}>The Hunt List</span>
+        <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: C.text, background: "var(--w06)", borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{rows.length}</span>
         <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={stampStyle}>list {WATCHLIST?.asof || "—"} {wlWkd(WATCHLIST?.asof)}</span>
           <span style={stampStyle}>groups {GROUP_RS?.asof || "—"} {wlWkd(GROUP_RS?.asof)}</span>
@@ -10232,7 +11077,7 @@ function WatchlistCard({ C, font, session }) {
       </div>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", margin: "9px 0 11px" }}>
-        <span style={{ fontSize: "0.68rem", fontWeight: 500, color: C.muted, lineHeight: 1.55 }}>
+        <span style={{ fontSize: "0.6875rem", fontWeight: 500, color: C.muted, lineHeight: 1.55 }}>
           The watchlist, cross-checked against the leading themes and industry groups.
         </span>
         {/* The live TradingView list itself — members can follow it there (Valen 2026-08-05). */}
@@ -10240,8 +11085,8 @@ function WatchlistCard({ C, font, session }) {
           href="https://www.tradingview.com/watchlists/328880788/"
           target="_blank" rel="noopener noreferrer"
           style={{
-            marginLeft: "auto", fontSize: "0.66rem", fontWeight: 700, color: C.goldBright,
-            textDecoration: "underline", textDecorationColor: "rgba(201,152,42,0.4)",
+            marginLeft: "auto", fontSize: "0.6875rem", fontWeight: 700, color: C.muted,
+            textDecoration: "underline", textDecorationColor: "var(--w35)",
             textUnderlineOffset: 3, textDecorationThickness: 1, whiteSpace: "nowrap",
           }}
         >Open in TradingView ↗</a>
@@ -10252,19 +11097,19 @@ function WatchlistCard({ C, font, session }) {
         <div style={{
           display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 0, marginBottom: 11,
           padding: isMobileVP ? "8px 4px" : "9px 6px", borderRadius: 12,
-          background: "rgba(255,255,255,0.028)", border: `1px solid ${C.border}`,
+          background: "var(--w03)", border: `1px solid ${C.border}`,
         }}>
           {indexTickers.map((t, i) => {
             const pct = idxPct ? idxPct[String(t)] : null;
-            const pcol = pct == null ? null : pct > 0 ? "#86efac" : pct < 0 ? "#fca5a5" : "rgba(255,255,255,0.5)";
+            const pcol = pct == null ? null : pct > 0 ? "var(--greenFg)" : pct < 0 ? "var(--redFg)" : "var(--w55)";
             return (
               <span key={String(t)} style={{
                 display: "inline-flex", alignItems: "baseline", gap: 7, padding: "1px 12px",
                 borderRight: i === indexTickers.length - 1 ? "none" : `1px solid ${C.border}`,
               }}>
-                <span style={{ fontSize: "0.68rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{String(t)}</span>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{String(t)}</span>
                 {pct != null && (
-                  <span style={{ fontSize: "0.64rem", fontWeight: 700, color: pcol, fontVariantNumeric: "tabular-nums" }}>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: pcol, fontVariantNumeric: "tabular-nums" }}>
                     {pct > 0 ? "+" : ""}{pct.toFixed(2)}%
                   </span>
                 )}
@@ -10313,7 +11158,7 @@ function WatchlistCard({ C, font, session }) {
           </thead>
           <tbody>
             {sorted.length === 0 ? (
-              <tr><td colSpan={10} style={{ ...td, textAlign: "center", color: "rgba(255,255,255,0.5)", padding: "24px 9px" }}>No names match this filter.</td></tr>
+              <tr><td colSpan={10} style={{ ...td, textAlign: "center", color: "var(--faint)", padding: "24px 9px" }}>No names match this filter.</td></tr>
             ) : sorted.map(r => {
               const meta = stageMeta(r.sec);
               const soon = r.dte != null && r.dte <= 3;
@@ -10323,29 +11168,29 @@ function WatchlistCard({ C, font, session }) {
                   <td style={{ ...td, fontWeight: 800, color: C.white }}><span className="wlh-tk">{r.tk}</span></td>
                   <td style={{ ...td, textAlign: "center" }}>
                     <span style={{
-                      display: "inline-flex", alignItems: "center", fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.03em",
+                      display: "inline-flex", alignItems: "center", fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.03em",
                       padding: "2px 8px", borderRadius: 980, lineHeight: 1.45, whiteSpace: "nowrap",
                       color: meta.fg, background: meta.bg, border: `1px solid ${meta.bd}`,
                     }}>{r.secLabel}</span>
                   </td>
                   <td style={{ ...td, textAlign: "center" }}>
-                    {!r.theme ? <span style={{ color: "rgba(255,255,255,0.28)" }}>—</span> : (
+                    {!r.theme ? <span style={{ color: "var(--faint)" }}>—</span> : (
                       <>
-                        <span style={{ color: "rgba(255,255,255,0.66)" }}>{r.theme}</span>{" "}
+                        <span style={{ color: "var(--muted)" }}>{r.theme}</span>{" "}
                         <span style={{ fontWeight: 800, color: wlRankColor(r.rank) }}>{r.rank == null ? "untracked" : "#" + r.rank}</span>
                       </>
                     )}
                   </td>
                   <td style={{ ...td, textAlign: "center" }}>
                     {r.grp
-                      ? <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>{r.grp}</span>
-                      : <span style={{ color: "rgba(255,255,255,0.28)" }}>—</span>}
+                      ? <span style={{ fontWeight: 700, color: "var(--text)" }}>{r.grp}</span>
+                      : <span style={{ color: "var(--faint)" }}>—</span>}
                   </td>
                   {heatCell(r.thrust, "gt")}
                   {heatCell(r.rs1m, "gr")}
                   {heatCell(r.sthrust, "st")}
                   {heatCell(r.srs1m, "sr")}
-                  <td style={{ ...td, textAlign: "center", color: r.earn ? (soon ? "#fca5a5" : "rgba(255,255,255,0.48)") : "transparent", fontWeight: soon ? 700 : 500 }}>
+                  <td style={{ ...td, textAlign: "center", color: r.earn ? (soon ? "var(--redFg)" : "var(--w55)") : "transparent", fontWeight: soon ? 700 : 500 }}>
                     {r.earn ? wlFmtDay(r.earn) : ""}
                   </td>
                 </tr>
@@ -10355,9 +11200,9 @@ function WatchlistCard({ C, font, session }) {
         </table>
       </div>
 
-      <div style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.45)", lineHeight: 1.7, marginTop: 10 }}>
-        Theme rank — <b style={{ color: "#86efac" }}>green top 3</b> · <b style={{ color: "#f0a03c" }}>orange 4–5</b> ·{" "}
-        <b style={{ color: "#fca5a5" }}>red 6+</b> · <b style={{ color: "rgba(255,255,255,0.42)" }}>grey not tracked</b>, read off the latest theme snapshot{snapDate ? ` (${snapDate})` : ""}.
+      <div style={{ fontSize: "0.6875rem", color: "var(--faint)", lineHeight: 1.7, marginTop: 10 }}>
+        Theme rank — <b style={{ color: "var(--greenFg)" }}>green top 3</b> · <b style={{ color: "#f0a03c" }}>orange 4–5</b> ·{" "}
+        <b style={{ color: "var(--redFg)" }}>red 6+</b> · <b style={{ color: "var(--faint)" }}>grey not tracked</b>, read off the latest theme snapshot{snapDate ? ` (${snapDate})` : ""}.
         {" "}Group columns = the industry group's numbers; Stock columns = the name's own.
         {" "}Thrust % and RS rank in the two Group columns are the INDUSTRY GROUP's numbers (RSP benchmark, same formulas as the rotation table); a theme with no matching group shows “—”.
         {" "}Multi-sort: click one column, then another to stack a second sort (the small number shows the order); click again to flip direction; × reset clears. 
@@ -11177,9 +12022,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
   }, [posAnalysis, compEquity, targetRote]);
 
 
-  const compTh = (text, align = "right") => <th style={{padding:"10px 8px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap"}}>{text}</th>;
+  const compTh = (text, align = "right") => <th style={{padding:"10px 8px",textAlign:align,fontWeight:700,fontSize:"0.6875rem",letterSpacing:"0.10em",textTransform:"uppercase",color:C.muted,whiteSpace:"nowrap"}}>{text}</th>;
 
-  const th = (text, align = "right", sortKey = null) => <th onClick={sortKey ? () => togglePosSort(sortKey) : undefined} style={{ padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.56rem",letterSpacing:"0.10em",textTransform:"uppercase",color:posSort&&posSort.key===sortKey?C.gold:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"default",userSelect:"none" }}>{text}{sortKey && posSort && posSort.key === sortKey ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>;
+  const th = (text, align = "right", sortKey = null) => <th onClick={sortKey ? () => togglePosSort(sortKey) : undefined} style={{ padding:"10px 6px",textAlign:align,fontWeight:700,fontSize:"0.6875rem",letterSpacing:"0.10em",textTransform:"uppercase",color:posSort&&posSort.key===sortKey?C.white:C.muted,whiteSpace:"nowrap",cursor:sortKey?"pointer":"default",userSelect:"none" }}>{text}{sortKey && posSort && posSort.key === sortKey ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>;
 
   // ═══════════════════════════════════════════════════════════════════════
   // ─── MOCKUP-UI RENDER (dashboard-recommended.html) ───
@@ -11201,7 +12046,9 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
   const [cfgOpen, setCfgOpen] = useState(false); // Pro layout: reveal the relocated sizing controls (⚙ Configure)
   const dailyPlanRef = useRef(null); // wraps the whole Daily Market Plan section for the one-shot 📷 capture
   // drag-to-rearrange card layouts (hold a card's ⋮⋮ handle) — one saved order per group per browser
-  const kpiArr = useCardArrange(["openpl", "risk", "equity", "budget", "rote"], "viv-dash-kpi-order");   // Pro KPI strip
+  // Pro stat rail — Equity left the rail for the hero (2026-08-06), so the key list is 4 wide.
+  // Storage key bumped to -v2 so a persisted 5-key order doesn't need to be sanitized every load.
+  const kpiArr = useCardArrange(["openpl", "risk", "budget", "rote"], "viv-dash-kpi-order-v2");
   const ctxArr = useCardArrange(["market", "alloc", "themes"], "viv-dash-ctx-order");                     // Pro context row
   const stackArr = useCardArrange(["market", "themes", "alloc", "edge"], "viv-dash-stack-order"); // Guided card stack
   // Lens row — 4 slots (col1 · col2 · stack-top · stack-bottom); rearrangeable by ALL members.
@@ -11288,23 +12135,46 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
   const allocPct = budget.totalBudget > 0 ? Math.min(100, budget.deployedRisk / budget.totalBudget * 100) : 100;
 
   // realized-P/L sparkline (honest equity curve from closed trades; fall back to mockup curve)
-  const spark = useMemo(() => {
-    const tr = (journaledTrades || []).slice().reverse();
-    if (tr.length < 2) return null;
-    let cum = 0; const pts = tr.map(t => { cum += (t.plDollar || 0); return cum; });
-    const min = Math.min(0, ...pts), max = Math.max(0, ...pts), range = (max - min) || 1;
-    const W = 320, H = 56, step = W / (pts.length - 1);
-    const xy = pts.map((v, i) => [+(i * step).toFixed(1), +(H - ((v - min) / range) * (H - 6) - 3).toFixed(1)]);
-    const line = xy.map((p, i) => (i ? "L" : "M") + p[0] + "," + p[1]).join(" ");
-    const area = "M" + xy[0][0] + "," + H + " " + xy.map(p => "L" + p[0] + "," + p[1]).join(" ") + " L" + xy[xy.length - 1][0] + "," + H + " Z";
-    // MA5/10/20 of the same per-trade cumulative series — mirrors the Journal equity curve overlay
-    const smaOf = (p) => pts.map((_, i) => i + 1 >= p ? pts.slice(i + 1 - p, i + 1).reduce((s, v) => s + v, 0) / p : null);
-    const smaPath = (arr) => { let out = "", pen = false; arr.forEach((v, i) => { if (v == null) { pen = false; return; } out += (pen ? " L" : " M") + (i * step).toFixed(1) + "," + (H - ((v - min) / range) * (H - 6) - 3).toFixed(1); pen = true; }); return out.trim(); };
-    const smas = { s5: smaPath(smaOf(5)), s10: smaPath(smaOf(10)), s20: smaPath(smaOf(20)) };
-    return { line, area, smas, up: pts[pts.length - 1] >= 0 };
-  }, [journaledTrades]);
+  // The maths moved to buildEquityCurve() at module scope — same computation, now reusable by the
+  // hero's time-range chips so a filtered curve can never drift from the full one.
+  const spark = useMemo(() => buildEquityCurve(journaledTrades), [journaledTrades]);
   const sparkLine = spark ? spark.line : "M0,44 L32,46 L64,40 L96,42 L128,33 L160,36 L192,26 L224,30 L256,18 L288,22 L320,9";
   const sparkArea = spark ? spark.area : "M0,44 L32,46 L64,40 L96,42 L128,33 L160,36 L192,26 L224,30 L256,18 L288,22 L320,9 L320,56 L0,56 Z";
+
+  // ─── Hero time range (Phase 2) — 1W · 1M · 3M · YTD · ALL ───
+  // Client-side only: the SAME closed-trade array, windowed by exit date. Nothing is refetched
+  // and no figure is modelled — a range with fewer than 2 banked trades simply cannot draw a
+  // curve, so its chip is disabled rather than showing a misleading straight line.
+  const [heroRange, setHeroRange] = useState("ALL");
+  const heroRangeCurves = useMemo(() => {
+    const m = {};
+    for (const k of HERO_RANGES) m[k] = k === "ALL" ? spark : buildEquityCurve(tradesInHeroRange(journaledTrades, k));
+    return m;
+  }, [journaledTrades, spark]);
+  // Fall back to ALL if the member's saved range emptied out (e.g. no exits in the last week).
+  const heroSpark = heroRangeCurves[heroRange] || spark;
+  const heroLine = heroSpark ? heroSpark.line : sparkLine;
+  const heroArea = heroSpark ? heroSpark.area : sparkArea;
+
+  // ─── Scrubbable hero equity curve (Valen 2026-08-06) ───
+  // Robinhood's signature interaction: drag across the curve and the hero number reads the value
+  // at the cursor. Pure client-side SVG mouse math over spark.scrub — no library, no new fetch,
+  // no data change. Releasing (mouseleave / touchend) reverts to the live figures.
+  const [scrubI, setScrubI] = useState(null);
+  const heroSparkRef = useRef(null);
+  const onHeroScrub = (clientX) => {
+    const el = heroSparkRef.current;
+    if (!el || !heroSpark || !heroSpark.scrub.length) return;
+    const r = el.getBoundingClientRect();
+    if (!r.width) return;
+    const f = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    const i = Math.round(f * (heroSpark.scrub.length - 1));
+    setScrubI(prev => (prev === i ? prev : i));
+  };
+  const endHeroScrub = () => setScrubI(null);
+  // The point under the cursor, or null when not scrubbing (guards a stale index if the trade
+  // list shrinks, or the range narrows, while the pointer is down).
+  const heroPt = heroSpark && scrubI != null ? (heroSpark.scrub[scrubI] || null) : null;
 
   // Open Positions rows to render, with the member's chosen column sort applied. Keys map to enriched
   // fields: sym (ticker), rMult (R-multiple), plD (P/L $), plPct (P/L %), posValue (position size).
@@ -11346,19 +12216,19 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             <thead>
               <tr>
                 <th><span className="term" data-tip="Where this position sits on risk.&#10;At Risk = stop below entry.&#10;Risk-Free = stop at (or within a hair of) entry.&#10;Profit Locked = stop above entry.">Status</span></th>
-                <th onClick={() => togglePosSort("sym")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "sym" ? C.gold : undefined }} title="Sort by ticker"><span className="term" data-tip="The ticker symbol. The dot shows the source: gold = auto-synced from IBKR, grey = entered manually.">Symbol</span>{posSort && posSort.key === "sym" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
-                <th onClick={() => togglePosSort("holdDays")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "holdDays" ? C.gold : undefined }} title="Sort by days held"><span className="term" data-tip="How many calendar days you've held this position since your entry date.">Days</span>{posSort && posSort.key === "holdDays" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
+                <th onClick={() => togglePosSort("sym")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "sym" ? C.white : undefined }} title="Sort by ticker"><span className="term" data-tip="The ticker symbol. The dot shows the source: white = auto-synced from IBKR, grey = entered manually.">Symbol</span>{posSort && posSort.key === "sym" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
+                <th onClick={() => togglePosSort("holdDays")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "holdDays" ? C.white : undefined }} title="Sort by days held"><span className="term" data-tip="How many calendar days you've held this position since your entry date.">Days</span>{posSort && posSort.key === "holdDays" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th className="pro-only"><span className="term" data-tip="How many shares you currently hold.">Shares</span></th>
                 <th className="pro-only"><span className="term" data-tip="Your average entry price per share.">Avg Cost</span></th>
                 <th className="pro-only"><span className="term" data-tip="Total broker fees paid on this position so far.">Commission</span></th>
-                <th className="pro-only" onClick={() => togglePosSort("themeName")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "themeName" ? C.gold : undefined }} title="Sort by theme"><span className="term" data-tip="DeepVue-style sector, auto-recognized from the ticker — no AI needed. Unknown tickers show a dash. Click to sort by theme.">Theme</span>{posSort && posSort.key === "themeName" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
+                <th className="pro-only" onClick={() => togglePosSort("themeName")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "themeName" ? C.white : undefined }} title="Sort by theme"><span className="term" data-tip="DeepVue-style sector, auto-recognized from the ticker — no AI needed. Unknown tickers show a dash. Click to sort by theme.">Theme</span>{posSort && posSort.key === "themeName" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 {false && <th className="pro-only"><span className="term" data-tip="The Setup Grader score for this position (★ / letter / %). Grade a name in Premium Tools → Setup Grader, then Sync to Open Position.">Grade</span></th> /* GRADE COLUMN HIDDEN (Valen 2026-08-05) — grade still lives in Manage + trade views */}
-                <th onClick={() => togglePosSort("posValue")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "posValue" ? C.gold : undefined }} title="Sort by position size"><span className="term" data-tip="Total dollars in this position — shares × average cost.">Position size</span>{posSort && posSort.key === "posValue" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
+                <th onClick={() => togglePosSort("posValue")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "posValue" ? C.white : undefined }} title="Sort by position size"><span className="term" data-tip="Total dollars in this position — shares × average cost.">Position size</span>{posSort && posSort.key === "posValue" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th><span className="term" data-tip="Profit banked from partial sells of this position. The bar fills to the percentage of your original shares you've sold (trimmed).">Realized</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="Your current protective stop price.">Stop</span></th>
                 <th><span className="term tipright" data-tip="Dollars you'd lose if price falls to your stop from here.">Risk to stop</span></th>
-                <th className="pro-only" onClick={() => togglePosSort("rMult")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "rMult" ? C.gold : undefined }} title="Sort by R-multiple"><span className="term tipright" data-tip="R-multiple — profit/loss in units of your initial risk.">R</span>{posSort && posSort.key === "rMult" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
-                <th><span className="term tipright" data-tip="Open profit or loss on this position right now.">P/L</span>{" "}<span onClick={(e) => { e.stopPropagation(); togglePosSort("plD"); }} title="Sort by P/L ($)" style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "plD" ? C.gold : C.muted }}>${posSort && posSort.key === "plD" ? (posSort.dir === "asc" ? "▲" : "▼") : ""}</span>{" "}<span onClick={(e) => { e.stopPropagation(); togglePosSort("plPct"); }} title="Sort by P/L (%)" style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "plPct" ? C.gold : C.muted }}>%{posSort && posSort.key === "plPct" ? (posSort.dir === "asc" ? "▲" : "▼") : ""}</span></th>
+                <th className="pro-only" onClick={() => togglePosSort("rMult")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "rMult" ? C.white : undefined }} title="Sort by R-multiple"><span className="term tipright" data-tip="R-multiple — profit/loss in units of your initial risk.">R</span>{posSort && posSort.key === "rMult" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
+                <th><span className="term tipright" data-tip="Open profit or loss on this position right now.">P/L</span>{" "}<span onClick={(e) => { e.stopPropagation(); togglePosSort("plD"); }} title="Sort by P/L ($)" style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "plD" ? C.white : C.muted }}>${posSort && posSort.key === "plD" ? (posSort.dir === "asc" ? "▲" : "▼") : ""}</span>{" "}<span onClick={(e) => { e.stopPropagation(); togglePosSort("plPct"); }} title="Sort by P/L (%)" style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "plPct" ? C.white : C.muted }}>%{posSort && posSort.key === "plPct" ? (posSort.dir === "asc" ? "▲" : "▼") : ""}</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="The setup you traded — Breakout, Pullback Buy or Episodic Pivot.">Setup</span></th>
                 <th></th>
               </tr>
@@ -11379,14 +12249,14 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                   <React.Fragment key={p.id}>
                     <tr className={"posrow" + (isOpen ? " mg-open" : "")}>
                       <td data-l="Status"><span className={"status " + sc}><span className="d"></span>{p.riskStatus === "—" ? "Risk-Free" : p.riskStatus}</span></td>
-                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{p.sym}{isAdmin && p.extMult != null ? <span className="term" data-tip={`Extension: ${Number(p.extMult).toFixed(1)}× ATR from the 50-day MA (as of ${p.extAsof || "last sync"}). <4× = fresh · ~5× = stretched (2σ) · 7.5–8× = rare (3σ) · ≥10× = extreme, the trim-into-strength zone. Insight only — your stops and plan stay the plan.`} style={{ marginLeft: 6, fontSize: "0.55rem", fontWeight: 700, color: p.extMult >= 10 ? "var(--red)" : p.extMult >= 7.5 ? "#fb923c" : p.extMult >= 5 ? "var(--goldBright)" : "var(--muted)", border: `1px solid ${p.extMult >= 10 ? "rgba(239,68,68,0.4)" : p.extMult >= 7.5 ? "rgba(251,146,60,0.4)" : p.extMult >= 5 ? "var(--borderGold)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(p.extMult).toFixed(1)}×</span> : null}</span></td>
-                      <td data-l="Days" style={p.t3Due ? { background: "rgba(251,146,60,0.22)", boxShadow: "inset 3px 0 0 #fb923c" } : undefined}>{p.holdDays == null
+                      <td data-l="Symbol"><span className="tick"><span className={"srcdot " + (ibkr ? "ibkr" : "man")}></span>{p.sym}{isAdmin && p.extMult != null ? <span className="term" data-tip={`Extension: ${Number(p.extMult).toFixed(1)}× ATR from the 50-day MA (as of ${p.extAsof || "last sync"}). <4× = fresh · ~5× = stretched (2σ) · 7.5–8× = rare (3σ) · ≥10× = extreme, the trim-into-strength zone. Insight only — your stops and plan stay the plan.`} style={{ marginLeft: 6, fontSize: "0.6875rem", fontWeight: 700, color: p.extMult >= 10 ? "var(--red)" : p.extMult >= 7.5 ? "var(--orange)" : p.extMult >= 5 ? "var(--white)" : "var(--muted)", border: `1px solid ${p.extMult >= 10 ? "rgba(255,80,0,0.4)" : p.extMult >= 7.5 ? "rgba(255,170,5,0.4)" : p.extMult >= 5 ? "var(--w22)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(p.extMult).toFixed(1)}×</span> : null}</span></td>
+                      <td data-l="Days" style={p.t3Due ? { background: "rgba(255,170,5,0.22)", boxShadow: "inset 3px 0 0 var(--orange)" } : undefined}>{p.holdDays == null
                         ? <span className="term" data-tip="No entry date on this position — add one in Manage to track how long you've held it." style={{ color: "var(--faint)" }}>—</span>
                         : <span className="term" data-tip={p.t3Due
                             ? `T+${p.tradingDaysHeld}: ${p.tradingDaysHeld} trading days held and no partial trimmed yet. T+3 mandatory shave is due — trim 30–33% and move stops to breakeven (derisk regardless of R:R). Held ${p.holdDays} calendar days since entry (${p.entry}).`
                             : `Held ${p.holdDays} calendar day${p.holdDays === 1 ? "" : "s"} since entry (${p.entry}).`}
                             style={{ whiteSpace: "nowrap", cursor: "help", fontVariantNumeric: "tabular-nums", color: p.t3Due ? "#ffb84d" : "var(--text)", fontWeight: p.t3Due ? 800 : 400 }}>{p.holdDays}d{p.t3Due
-                            ? <span style={{ marginLeft: 7, fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.03em", color: "#1a1206", background: "#fb923c", borderRadius: 6, padding: "2px 7px", whiteSpace: "nowrap" }}>T+{p.tradingDaysHeld} · TRIM</span>
+                            ? <span style={{ marginLeft: 7, fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.03em", color: "#1a1206", background: "var(--orange)", borderRadius: 6, padding: "2px 7px", whiteSpace: "nowrap" }}>T+{p.tradingDaysHeld} · TRIM</span>
                             : null}</span>}</td>
                       <td className="pro-only" data-l="Shares">{p.sharesN}</td>
                       <td className="pro-only" data-l="Avg Cost">${(p.epN || 0).toFixed(2)}</td>
@@ -11396,25 +12266,25 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                         if (!th) return <span className="term" data-tip="No DeepVue sector mapped for this ticker yet — it'll tag automatically once added to the theme map.">—</span>;
                         const fit = themeFit(th, p.entry), r = themeRanks(th, p.entry) || {};
                         const rk = (x) => x ? "#" + x : "—";
-                        if (!fit) return <span className="term" data-tip={`⚪ Untagged — entry date is before the first DeepVue tracker snapshot${THEME_COVERAGE_START ? ` (${THEME_COVERAGE_START})` : ""} or unreadable. A later theme snapshot never judges an older trade.`} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.66rem", fontWeight: 700, background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap", cursor: "help" }}>⚪ {th}</span>;
+                        if (!fit) return <span className="term" data-tip={`⚪ Untagged — entry date is before the first DeepVue tracker snapshot${THEME_COVERAGE_START ? ` (${THEME_COVERAGE_START})` : ""} or unreadable. A later theme snapshot never judges an older trade.`} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.6875rem", fontWeight: 700, background: "var(--w06)", border: "1px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap", cursor: "help" }}>⚪ {th}</span>;
                         const tip = fit === "in"
                           ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend — where the money was rotating. Judged vs the ${r.date} tracker snapshot (nearest at/before your entry).`
                           : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. The leaders that week were ${top5("week", p.entry).slice(0,3).join(", ")}. Judged vs the ${r.date} tracker snapshot (nearest at/before your entry).`;
-                        const g = fit === "in", bg = g ? "var(--greenDim)" : "var(--redDim)", bd = g ? "rgba(34,197,94,0.28)" : "rgba(239,68,68,0.26)", cl = g ? "var(--green)" : "var(--red)";
-                        return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.66rem", fontWeight: 700, background: bg, border: `1px solid ${bd}`, color: cl, whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
+                        const g = fit === "in", bg = g ? "var(--greenDim)" : "var(--redDim)", bd = g ? "rgba(0,200,5,0.28)" : "rgba(255,80,0,0.26)", cl = g ? "var(--green)" : "var(--red)";
+                        return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.6875rem", fontWeight: 700, background: bg, border: `1px solid ${bd}`, color: cl, whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
                       })()}</td>
                       {false && <td className="pro-only" data-l="Grade">{(() => {
                         const gr = getSavedGrade(p.sym);
                         if (!gr) return <span className="term" data-tip="Not graded yet. Grade it in Premium Tools → Setup Grader, then Sync to Open Position." style={{ color: "var(--faint)" }}>—</span>;
-                        const col = gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--goldBright)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
+                        const col = gr.letter === "A+" ? "var(--green)" : gr.letter === "A" ? "var(--white)" : gr.letter === "B" ? "var(--muted)" : "var(--red)";
                         return <span className="term" data-tip={`Setup grade ${gr.letter} · ${gr.stars}/5★ · ${Math.round((gr.pct || 0) * 100)}% of criteria. Set in the Setup Grader.`} style={{ display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", cursor: "help" }}>
-                          <span style={{ letterSpacing: 0.5, fontSize: "0.7rem" }}>{[0, 1, 2, 3, 4].map(k => <span key={k} style={{ color: k < gr.stars ? "var(--goldBright)" : "rgba(255,255,255,0.16)" }}>★</span>)}</span>
-                          <b style={{ color: col, fontSize: "0.72rem" }}>{gr.letter}</b>
-                          <span style={{ color: "var(--muted)", fontSize: "0.68rem", fontVariantNumeric: "tabular-nums" }}>{Math.round((gr.pct || 0) * 100)}%</span>
+                          <span style={{ letterSpacing: 0.5, fontSize: "0.6875rem" }}>{[0, 1, 2, 3, 4].map(k => <span key={k} style={{ color: k < gr.stars ? "#fff" : "var(--w14)" }}>★</span>)}</span>
+                          <b style={{ color: col, fontSize: "0.75rem" }}>{gr.letter}</b>
+                          <span style={{ color: "var(--muted)", fontSize: "0.6875rem", fontVariantNumeric: "tabular-nums" }}>{Math.round((gr.pct || 0) * 100)}%</span>
                         </span>;
                       })()}</td> /* GRADE CELL HIDDEN with its header (Valen 2026-08-05) */}
                       <td data-l="Position size" style={{ whiteSpace: "nowrap" }}>
-                        {compEquity > 0 && <div className="term" data-tip="This position's size as a percentage of your account value — the honest gauge of how concentrated you are." style={{ fontSize: "0.63rem", fontWeight: 700, color: "var(--muted)", fontVariantNumeric: "tabular-nums", cursor: "help", borderBottom: "none" }}>{((p.posValue / compEquity) * 100).toFixed(1)}%</div>}
+                        {compEquity > 0 && <div className="term" data-tip="This position's size as a percentage of your account value — the honest gauge of how concentrated you are." style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--muted)", fontVariantNumeric: "tabular-nums", cursor: "help", borderBottom: "none" }}>{((p.posValue / compEquity) * 100).toFixed(1)}%</div>}
                         {usd0(p.posValue)}
                       </td>
                       <td data-l="Realized">
@@ -11429,7 +12299,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                       <td data-l="Risk to stop"><span className={"pl " + (p.rtsD > 0 ? "dn" : "up")}>{rtsTxt}</span></td>
                       <td className="pro-only" data-l="R"><span className={"pl " + (p.rMult >= 0 ? "up" : "dn")}>{(p.rMult >= 0 ? "+" : "") + p.rMult.toFixed(1)}R</span></td>
                       <td data-l="P/L"><span className={"pl " + (p.plD >= 0 ? "up" : "dn")}>{usdSigned(p.plD)}<span className="pct">{pctSigned(p.plPct)}</span></span></td>
-                      <td className="pro-only" data-l="Setup"><select value={p.setup || ""} onChange={e => updateField(p.id, "setup", e.target.value)} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border)", borderRadius: 7, color: p.setup ? "var(--text)" : "var(--faint)", fontFamily: font, fontSize: "0.68rem", fontWeight: 600, padding: "4px 8px", outline: "none", cursor: "pointer", maxWidth: 130 }}><option value="">— Setup —</option>{[...new Set([p.setup, ...(setupTypes || [])])].filter(Boolean).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                      <td className="pro-only" data-l="Setup"><select value={p.setup || ""} onChange={e => updateField(p.id, "setup", e.target.value)} style={{ background: "var(--w06)", border: "1px solid var(--border)", borderRadius: 7, color: p.setup ? "var(--text)" : "var(--faint)", fontFamily: font, fontSize: "0.6875rem", fontWeight: 600, padding: "4px 8px", outline: "none", cursor: "pointer", maxWidth: 130 }}><option value="">— Setup —</option>{[...new Set([p.setup, ...(setupTypes || [])])].filter(Boolean).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
                       <td className="mgcell" data-l="">
                         <button className="mgbtn" title={notesPreview(p.notes) || undefined} onClick={() => openManage(p)}>{notesPreview(p.notes) ? "Manage 📝" : "Manage"}</button>
                         <button className="mgbtn sell" title="Sell or close this position" onClick={() => openSell(p)}>Sell</button>
@@ -11459,7 +12329,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                               <div className="mgfield"><label><span className="term" data-tip="The latest market price. Drives your live P/L and how far you are from your stop.">Current price</span></label><input className="mgin gold" defaultValue={p.cp || ""} onBlur={e => updateField(p.id, "cp", e.target.value)} /></div>
                               <div className="mgfield"><label><span className="term" data-tip="Your original protective stop from entry. Locked — it drives your official R-multiple.">Original stop</span></label><input className="mgin" defaultValue={p.stop || ""} onBlur={e => updateField(p.id, "stop", e.target.value)} /></div>
                               <div className="mgfield"><label><span className="term" data-tip="DUAL stop: splits the position 50/50 — half your shares stay on the Original stop, half move to this level. To move the WHOLE position's stop (e.g. to breakeven), use Trailing stop instead.">2nd stop · dual 50/50</span></label><input className="mgin" defaultValue={p.stop2 || ""} onBlur={e => updateField(p.id, "stop2", e.target.value)} />
-                                {!p.hasTS && p.stop2 && p.stop2N >= p.epN && p.tradeType !== "Short" ? <div style={{ fontSize: 11, color: "#f0c050", marginTop: 4, lineHeight: 1.35 }}>Moving your whole stop to break-even? Use <b>Trailing stop</b> — with a 2nd stop, half your shares stay on the Original stop ({p.h1} sh @ {p.stop || "—"}).</div> : null}</div>
+                                {!p.hasTS && p.stop2 && p.stop2N >= p.epN && p.tradeType !== "Short" ? <div style={{ fontSize: 11, color: "var(--orange)", marginTop: 4, lineHeight: 1.35 }}>Moving your whole stop to break-even? Use <b>Trailing stop</b> — with a 2nd stop, half your shares stay on the Original stop ({p.h1} sh @ {p.stop || "—"}).</div> : null}</div>
                               <div className="mgfield"><label><span className="term" data-tip="Overrides both stops for the WHOLE position — use this for break-even moves and trailing. Risk reads Locked once it's at or above your cost.">Trailing stop / BE</span></label><div style={{ display: "flex", gap: 6 }}><input key={"ts-" + (p.trailStop || "")} className="mgin" style={{ flex: 1 }} defaultValue={p.trailStop || ""} onBlur={e => updateField(p.id, "trailStop", e.target.value)} /><button type="button" className="btn" style={{ padding: "0 10px", fontSize: 11, whiteSpace: "nowrap" }} title="Set trailing stop to your average cost (break-even)" onClick={() => updateField(p.id, "trailStop", String(p.epN))}>→ BE</button></div></div>
                               <div className="mgfield"><label><span className="term" data-tip="Total broker fees paid on this position. Subtracted from your net P/L.">Commission</span></label><input className="mgin" defaultValue={p.comm || ""} onBlur={e => updateField(p.id, "comm", e.target.value)} placeholder="0.00" /></div>
                               <button className="btn gold mgsave" onClick={() => onManualSave && onManualSave()}>Save stops</button>
@@ -11468,7 +12338,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                               <div className="mgcoltitle">Risk &amp; P/L</div>
                               <div className="mgreadout">
                                 <div className="mgr"><span className="term tipright" data-tip="Dollars you'd lose if price hits your stop from here. With a dual stop, half the shares are measured to each level.">Risk to stop</span><b className={p.rtsD > 0 ? "red" : "green"}>{p.rtsD <= 0 ? "Locked" : usd0(p.rtsD)}</b></div>
-                                {p.isDual && !p.hasTS ? <div style={{ fontSize: 10.5, color: "rgba(255,255,255,.45)", textAlign: "right", marginTop: -4, marginBottom: 4 }}>{p.h1} sh @ {p.stop || "—"} · {p.h2} sh @ {p.stop2 || "—"}</div> : null}
+                                {p.isDual && !p.hasTS ? <div style={{ fontSize: 10.5, color: "var(--faint)", textAlign: "right", marginTop: -4, marginBottom: 4 }}>{p.h1} sh @ {p.stop || "—"} · {p.h2} sh @ {p.stop2 || "—"}</div> : null}
                                 <div className="mgr"><span className="term tipright" data-tip="This position's risk as a % of your whole account.">Risk on equity</span><b>{pct2(p.currentRotePct)}</b></div>
                                 <div className="mgr"><span className="term tipright" data-tip="Whether this position's $-at-risk matches your per-trade risk budget. Under-risked is below budget, Over-risked is above.">Risk health</span><b style={{ color: sizeColor }}>{sizeLabel}</b></div>
                                 <div className="mgr"><span className="term tipright" data-tip="Profit or loss in units of your initial risk.">R-multiple</span><b className={p.rMult >= 0 ? "green" : "red"}>{(p.rMult >= 0 ? "+" : "") + p.rMult.toFixed(1)}R</b></div>
@@ -11485,7 +12355,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                             <div className="mgcoltitle"><span className="term" data-tip="Your management plan for this open trade — targets, trim rules, invalidation, what you're watching. Private to you; it travels into your journal when the position closes.">📝 Trade plan &amp; notes</span></div>
                             <textarea className="mgin" rows={4} defaultValue={notesToPlain(p.notes)}
                               placeholder="e.g. Trim 25% at 2R · stop to breakeven after 3 days · out on a close below the 10-MA…"
-                              style={{ width: "100%", resize: "vertical", minHeight: 74, lineHeight: 1.55, fontSize: "0.74rem", padding: "10px 12px", fontFamily: "inherit", height: "auto" }}
+                              style={{ width: "100%", resize: "vertical", minHeight: 74, lineHeight: 1.55, fontSize: "0.75rem", padding: "10px 12px", fontFamily: "inherit", height: "auto" }}
                               onBlur={e => { const v = e.target.value; if (v !== notesToPlain(p.notes)) { updateField(p.id, "notes", v); setTimeout(() => onManualSave && onManualSave(), 80); } }} />
                             <div style={{ fontSize: 10.5, color: "var(--faint)", marginTop: 4 }}>Saves when you click away · goes with the trade into your journal on close</div>
                           </div>
@@ -11508,7 +12378,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                             }} style={{ borderColor: "var(--borderGold)", color: "var(--goldBright)" }}>📖 Add to Model Book</button>
                             <span className="mgfoot-hint">Logs a closed trade to your journal and reduces (or closes) this position.</span>
                             <div className="spacer"></div>
-                            <button className="btn" style={{ color: "var(--red)", borderColor: "rgba(239,68,68,0.4)" }} title="Delete this position entirely (no journal entry). Use for entries keyed in by mistake." onClick={() => { if (removeRow(p.id)) { setManageId(null); setSellOpen(false); setTimeout(() => onManualSaveRef.current && onManualSaveRef.current(), 50); } }}>Delete position</button>
+                            <button className="btn" style={{ color: "var(--red)", borderColor: "rgba(255,80,0,0.4)" }} title="Delete this position entirely (no journal entry). Use for entries keyed in by mistake." onClick={() => { if (removeRow(p.id)) { setManageId(null); setSellOpen(false); setTimeout(() => onManualSaveRef.current && onManualSaveRef.current(), 50); } }}>Delete position</button>
                           </div>
                           {sellOpen && sellPos && sellPos.id === p.id && (
                             <div className="mgsellform">
@@ -11536,17 +12406,17 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                                     <input className="mgin wide" value={sellChartUrl} onChange={e => setSellChartUrl(e.target.value)} placeholder="tradingview.com/… (chart link)" />
                                     {/* Upload your own marked-up chart with the review — saved onto the closed trade. */}
                                     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-                                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 32, padding: "7px 12px", borderRadius: 8, cursor: sellUploadingImage ? "wait" : "pointer", background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, opacity: sellUploadingImage ? 0.6 : 1 }}>
+                                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 32, padding: "7px 12px", borderRadius: 8, cursor: sellUploadingImage ? "wait" : "pointer", background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.75rem", fontWeight: 700, opacity: sellUploadingImage ? 0.6 : 1 }}>
                                         {sellUploadingImage ? "Uploading…" : sellChartImage ? "📷 Replace chart" : "📷 Upload chart"}
                                         <input type="file" accept="image/*" disabled={sellUploadingImage} style={{ display: "none" }} onChange={e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) uploadSellChartImage(f); }} />
                                       </label>
                                       {sellChartImage && (
                                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                                           <img src={sellChartImage} alt="Chart for this close" style={{ height: 40, width: "auto", maxWidth: 120, objectFit: "cover", borderRadius: 6, border: `1px solid ${C.border}` }} />
-                                          <button type="button" aria-label="Remove chart" title="Remove this chart" onClick={() => setSellChartImage("")} style={{ minWidth: 32, minHeight: 32, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.95rem", lineHeight: 1, cursor: "pointer" }}>&times;</button>
+                                          <button type="button" aria-label="Remove chart" title="Remove this chart" onClick={() => setSellChartImage("")} style={{ minWidth: 32, minHeight: 32, borderRadius: 8, background: "var(--w04)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "1rem", lineHeight: 1, cursor: "pointer" }}>&times;</button>
                                         </span>
                                       )}
-                                      {!sellChartImage && !sellUploadingImage && <span style={{ color: C.muted, fontFamily: font, fontSize: "0.68rem" }}>Optional — your screenshot travels with this trade.</span>}
+                                      {!sellChartImage && !sellUploadingImage && <span style={{ color: C.muted, fontFamily: font, fontSize: "0.6875rem" }}>Optional — your screenshot travels with this trade.</span>}
                                     </div>
                                   </div>
                                 </div>
@@ -11614,6 +12484,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
               {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}              <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
             </div>
+            <ThemeToggle />
           </div>
 
           {/* P1. COMMAND HEADER */}
@@ -11630,7 +12501,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 onClick={() => onManualSave && onManualSave()}
                 disabled={saveStatus === "saving"}
                 title={saveStatus === "error" ? (saveErrorMsg || "Save failed — click to retry") : "Save all open positions"}
-                style={saveStatus === "saved" ? { background: "rgba(34,197,94,0.18)", borderColor: "rgba(34,197,94,0.4)", color: "#86efac" } : saveStatus === "error" ? { background: "rgba(239,68,68,0.16)", borderColor: "rgba(239,68,68,0.4)", color: "#fca5a5" } : undefined}
+                style={saveStatus === "saved" ? { background: "rgba(0,200,5,0.18)", borderColor: "rgba(0,200,5,0.4)", color: "var(--greenFg)" } : saveStatus === "error" ? { background: "rgba(255,80,0,0.16)", borderColor: "rgba(255,80,0,0.4)", color: "var(--redFg)" } : undefined}
               >{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Retry save" : "Save"}</button>
               <button className="btn goldoutline" onClick={addAndManage}>+ Add Position</button>
             </div>
@@ -11640,14 +12511,108 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               const hasVal = v => v != null && String(v).trim() !== "";
               const incomplete = (positions || []).filter(p => !(hasVal(p.sym) && hasVal(p.shares) && hasVal(p.ep))).length;
               return incomplete > 0 ? (
-                <div style={{ marginTop: 8, fontSize: "0.72rem", color: "var(--muted)" }}>
+                <div style={{ marginTop: 8, fontSize: "0.75rem", color: "var(--muted)" }}>
                   {incomplete} incomplete {incomplete === 1 ? "row needs" : "rows need"} a symbol, shares and entry price before {incomplete === 1 ? "it saves" : "they save"}.
                 </div>
               ) : null;
             })()}
           </div>
 
-          {/* P2. KPI STRIP — hold a card's ⋮⋮ handle to rearrange; the order is saved per browser */}
+          {/* P1b. HERO — Equity is THE number (Robinhood home grammar, 2026-08-06). It left the
+              KPI rail to live here: huge mono value, the open P/L change in semantic colour right
+              underneath, then the realized-equity sparkline. The privacy eye and ⚙ Configure ride
+              in the hero header — same state/handlers they had on the old Equity card, so nothing
+              became unreachable. The change line is labelled "open P/L" (NOT "today") because that
+              is what the number actually is — VIV terminology stays exact. */}
+          <div className="rhhero">
+            <div className="rhherotop">
+              <span className="herolabel">Equity</span>
+              <InfoDot tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number." />
+              <EyeToggle on={privacyOn} onClick={() => setPrivacyOn(p => !p)} title={privacyOn ? "Amounts hidden — tap to reveal" : "Hide dollar amounts (screenshot-safe)"} />
+              <button className="ghostchip" onClick={() => setCfgOpen(o => !o)} aria-expanded={cfgOpen} title="Edit your starting capital and sizing inputs">⚙ Configure</button>
+              <span className="kpichip">Trail-locked · {useSecuredProfit ? "ON" : "OFF"}</span>
+            </div>
+            {/* While scrubbing the hero reads the curve at the cursor: equity there = your starting
+                capital + realized P/L banked up to that trade. Both are existing figures — nothing
+                is modelled or invented. Release and it snaps back to live. */}
+            <LiveFigure
+              className="heronum"
+              text={privacyOn ? "•••••••" : usd0(heroPt ? (+portfolioSize || 0) + heroPt.cum : compEquity)}
+              value={privacyOn ? null : (heroPt ? (+portfolioSize || 0) + heroPt.cum : compEquity)}
+              roll={!privacyOn}
+            />
+            {heroPt ? (
+              <div className={"herochg " + (heroPt.cum >= 0 ? "up" : "dn")}>
+                {privacyOn ? "••••••" : usdSigned(heroPt.cum)}
+                <span className="chgnote">realized to this trade</span>
+              </div>
+            ) : (
+              <div className={"herochg " + (openPL >= 0 ? "up" : "dn")}>
+                {usdSigned(openPL)} ({pctSigned(openPLpct)})
+                <span className="chgnote">open P/L · {openCount} position{openCount === 1 ? "" : "s"}</span>
+              </div>
+            )}
+            <div className="herobase">
+              {heroPt
+                ? `${heroPt.date || "—"}${heroPt.sym ? ` · ${heroPt.sym}` : ""}`
+                : (privacyOn ? "Base •••• + •••• realized" : `Base ${usd0(+portfolioSize || 0)} + ${usd0(compRealizedPL)} realized`)}
+            </div>
+            {/* Realized equity curve — REAL closed-trade data only. Rendered only when there are
+                enough closed trades to draw one; no placeholder curve is ever shown. */}
+            {heroSpark && (
+              <>
+                <div
+                  className="herosparkwrap"
+                  ref={heroSparkRef}
+                  onMouseMove={e => onHeroScrub(e.clientX)}
+                  onMouseLeave={endHeroScrub}
+                  onTouchStart={e => e.touches[0] && onHeroScrub(e.touches[0].clientX)}
+                  onTouchMove={e => e.touches[0] && onHeroScrub(e.touches[0].clientX)}
+                  onTouchEnd={endHeroScrub}
+                  onTouchCancel={endHeroScrub}
+                >
+                  <svg className="herospark" viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Realized equity trend">
+                    <defs><linearGradient id="heroSparkG" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={heroSpark.up ? "rgba(0,200,5,0.22)" : "rgba(255,80,0,0.20)"} />
+                      <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+                    </linearGradient></defs>
+                    <path d={heroArea} fill="url(#heroSparkG)" />
+                    <path d={heroLine} fill="none" stroke={heroSpark.up ? "var(--green)" : "var(--red)"} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                  </svg>
+                  {/* Crosshair + dot are HTML, not SVG: preserveAspectRatio="none" stretches the
+                      viewBox non-uniformly, so an SVG <circle> would render as an ellipse. */}
+                  {heroPt && (<>
+                    <div className="scrubline" style={{ left: `${heroPt.xf * 100}%` }} />
+                    <div className="scrubdot" style={{ left: `${heroPt.xf * 100}%`, top: `${heroPt.yf * 100}%`, background: heroSpark.up ? "var(--green)" : "var(--red)" }} />
+                  </>)}
+                </div>
+                {/* Time range — the same closed trades, windowed by exit date. A range that can't
+                    make two points is disabled, never drawn flat. */}
+                <div className="rangebar" role="group" aria-label="Equity curve time range">
+                  {HERO_RANGES.map(k => {
+                    const ok = !!heroRangeCurves[k];
+                    return (
+                      <button
+                        key={k}
+                        className={"rangechip" + (heroRange === k ? " on" : "")}
+                        disabled={!ok}
+                        aria-pressed={heroRange === k}
+                        title={ok ? `Realized equity over ${k === "ALL" ? "all closed trades" : k}` : `Not enough closed trades in ${k}`}
+                        onClick={() => { setScrubI(null); setHeroRange(k); }}
+                      >{k}</button>
+                    );
+                  })}
+                </div>
+                <div className="herosparklbl">
+                  Realized equity · {heroRange === "ALL" ? (journaledTrades || []).length : tradesInHeroRange(journaledTrades, heroRange).length} closed trade{(heroRange === "ALL" ? (journaledTrades || []).length : tradesInHeroRange(journaledTrades, heroRange).length) === 1 ? "" : "s"}
+                  {heroRange !== "ALL" ? ` · ${heroRange}` : ""}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* P2. STAT RAIL — the four remaining KPIs as one quiet strip (Equity is now the hero).
+              Still drag-rearrangeable: hold a stat's ⋮⋮ handle; the order is saved per browser. */}
           {(() => {
             const KPI_CARDS = {
             openpl: (
@@ -11655,16 +12620,16 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <div className="cardhead"><span className="label">Open P/L</span><InfoDot tip="How much your open positions are up or down right now. Green means you're in profit; the line below is your realized equity trend." /></div>
               <div className="kpibody">
                 <div className="kpimain">
-                  <div className={"kpinum " + (openPL >= 0 ? "green" : "red")}><Cu>{usdSigned(openPL)}</Cu></div>
+                  <LiveFigure className={"kpinum " + (openPL >= 0 ? "green" : "red")} value={openPL} roll={false} text={<Cu>{usdSigned(openPL)}</Cu>} />
                   <div className="kpisub">{pctSigned(openPLpct)} across {openCount} position{openCount === 1 ? "" : "s"}</div>
                 </div>
                 <Tip as="div" className="kpiviz" tip={spark ? `Realized P/L trend · ${(journaledTrades || []).length} closed trades · dashed lines = MA5 (gold) / MA10 (red) / MA20 (violet) of the curve` : "Realized equity trend"}>
                   <svg viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Realized equity trend">
-                    <defs><linearGradient id="sparkgPro" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={spark && !spark.up ? "rgba(239,68,68,0.30)" : "rgba(34,197,94,0.34)"} /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient></defs>
+                    <defs><linearGradient id="sparkgPro" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={spark && !spark.up ? "rgba(255,80,0,0.30)" : "rgba(0,200,5,0.34)"} /><stop offset="100%" stopColor="rgba(0,200,5,0)" /></linearGradient></defs>
                     <path d={sparkArea} fill="url(#sparkgPro)" />
                     {/* MA5/10/20 overlays — same convention + colors as the Journal equity curve */}
                     {spark?.smas?.s20 && <path d={spark.smas.s20} fill="none" stroke="rgba(168,130,255,0.7)" strokeWidth="1.1" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
-                    {spark?.smas?.s10 && <path d={spark.smas.s10} fill="none" stroke="rgba(239,68,68,0.75)" strokeWidth="1.1" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
+                    {spark?.smas?.s10 && <path d={spark.smas.s10} fill="none" stroke="rgba(255,80,0,0.75)" strokeWidth="1.1" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
                     {spark?.smas?.s5 && <path d={spark.smas.s5} fill="none" stroke="rgba(240,192,80,0.85)" strokeWidth="1.1" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
                     <path d={sparkLine} fill="none" stroke={spark && !spark.up ? "var(--red)" : "var(--green)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                   </svg>
@@ -11683,27 +12648,16 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 </div>
                 <div className="kpiviz hastip">
                   <svg viewBox="0 0 70 40" role="img" aria-label="risk versus ROTE cap">
-                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="6" strokeLinecap="round" />
-                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="var(--goldBright)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(kRiskFrac * SEMI).toFixed(1)} 999`} />
+                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="var(--w10)" strokeWidth="6" strokeLinecap="round" />
+                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="var(--red)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(kRiskFrac * SEMI).toFixed(1)} 999`} />
                   </svg>
-                  <div className="kpitip"><div style={{ color: "var(--goldBright)" }}>At risk {usd0(rtsTotal)}</div><div style={{ color: "var(--green)" }}>Budget {usd0(budget.totalBudget)}</div></div>
+                  <div className="kpitip"><div style={{ color: "var(--red)" }}>At risk {usd0(rtsTotal)}</div><div style={{ color: "var(--green)" }}>Budget {usd0(budget.totalBudget)}</div></div>
                 </div>
               </div>
             </div>
             ),
-            /* K3: Equity */
-            equity: (
-            <div className="card kpi">
-              <div className="cardhead"><span className="label">Equity</span><InfoDot tip="Return On Total Equity base: the capital your position sizing is built on. Closed profits compound back into this number." /><EyeToggle on={privacyOn} onClick={() => setPrivacyOn(p => !p)} title={privacyOn ? "Amounts hidden — tap to reveal" : "Hide dollar amounts (screenshot-safe)"} /><button className="ghostchip" onClick={() => setCfgOpen(o => !o)} aria-expanded={cfgOpen} title="Edit your starting capital and sizing inputs">⚙ Configure</button></div>
-              <div className="kpibody">
-                <div className="kpimain">
-                  <div className="kpinum gold">{privacyOn ? "•••••••" : usd0(compEquity)}</div>
-                  <div className="kpisub">{privacyOn ? "Base •••• + •••• realized" : `Base ${usd0(+portfolioSize || 0)} + ${usd0(compRealizedPL)} realized`}</div>
-                  <span className="kpichip">Trail-locked · {useSecuredProfit ? "ON" : "OFF"}</span>
-                </div>
-              </div>
-            </div>
-            ),
+            /* K3 (Equity) was promoted to the page hero above — value, privacy eye, ⚙ Configure
+               and the Trail-locked chip all moved there verbatim. Nothing was dropped. */
             /* K4: Risk Budget */
             budget: (
             <div className="card kpi">
@@ -11714,15 +12668,15 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               </div>
               <div className="kpibody">
                 <div className="kpimain">
-                  <div className="kpinum gold">{usd0(budget.totalBudget)}</div>
+                  <div className="kpinum">{usd0(budget.totalBudget)}</div>
                   <div className="kpisub">Available {usd0(budget.available)}</div>
                 </div>
                 <div className="kpiviz hastip">
                   <svg viewBox="0 0 40 40" role="img" aria-label="risk budget deployed">
-                    <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(34,197,94,0.35)" strokeWidth="6" />
-                    <circle cx="20" cy="20" r="15" fill="none" stroke="var(--goldBright)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(kBudgetFrac * RING).toFixed(1)} ${RING}`} transform="rotate(-90 20 20)" />
+                    <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(0,200,5,0.35)" strokeWidth="6" />
+                    <circle cx="20" cy="20" r="15" fill="none" stroke="var(--w55)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(kBudgetFrac * RING).toFixed(1)} ${RING}`} transform="rotate(-90 20 20)" />
                   </svg>
-                  <div className="kpitip"><div style={{ color: "var(--goldBright)" }}>Deployed {usd0(budget.deployedRisk)}</div><div style={{ color: "var(--green)" }}>Available {usd0(budget.available)}</div></div>
+                  <div className="kpitip"><div style={{ color: "var(--white)" }}>Deployed {usd0(budget.deployedRisk)}</div><div style={{ color: "var(--green)" }}>Available {usd0(budget.available)}</div></div>
                 </div>
               </div>
             </div>
@@ -11739,8 +12693,8 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 </div>
                 <div className="kpiviz">
                   <svg viewBox="0 0 70 40" role="img" aria-label="current ROTE versus target">
-                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="6" strokeLinecap="round" />
-                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="var(--goldBright)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(kRoteFrac * SEMI).toFixed(1)} 999`} />
+                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="var(--w10)" strokeWidth="6" strokeLinecap="round" />
+                    <path d="M6,34 A29,29 0 0 1 64,34" fill="none" stroke="var(--w35)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${(kRoteFrac * SEMI).toFixed(1)} 999`} />
                   </svg>
                 </div>
               </div>
@@ -11802,7 +12756,100 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             </div>
           )}
 
-          {/* P3. THE DAILY PLAN — everything a member checks before the open, captured as ONE
+          {/* P3. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS.
+              Moved ABOVE the Daily Plan on 2026-08-06 (Robinhood home order: hero → stat rail →
+              positions → market plan). It is still a SIBLING of dailyPlanRef, never inside it, so
+              the 📷 "copy the whole plan" capture still contains zero account-size dollars.
+              RISK ALLOCATION lives HERE as a slim strip over the table (Valen 2026-08-02 — "overlay
+              it on top of the open position card"): same numbers as the old lens card (donut + At Risk /
+              Available / Risk-Free + deploy note), one row instead of a whole slot. */}
+          <div className="card poscard" style={{ marginTop: 14 }}>
+            {isMobileVP ? (
+              /* ── PHONE ONLY (2026-08-05): the header chrome + the whole risk-allocation strip fuse
+                 into one compact summary. ~230px of chrome before row one becomes ~72px. Tapping the
+                 summary reveals the identical At Risk / Available / Risk-Free / Exposure legend, so
+                 nothing is removed — just folded. Desktop renders the original markup below. */
+              <>
+                <div className="cardhead poshead mobposhead">
+                  <h2>Open Positions</h2>
+                  {openCount === 0 && <span className="countchip">0</span>}
+                  {nAtRisk > 0 && <span className="countchip term" data-tip={`${nAtRisk} of your ${openCount} open positions are At Risk — stop below entry, a stop-out costs money.`} style={{ background: "var(--redDim)", color: "var(--red)" }}>{nAtRisk} of {openCount} at risk</span>}
+                  {nRiskFree > 0 && <span className="countchip term" data-tip={`${nRiskFree} of your ${openCount} open positions are Risk-Free — stop at breakeven, worst case $0.`} style={{ background: "rgba(59,158,255,0.10)", color: "var(--blueFg)" }}>{nRiskFree} of {openCount} risk-free</span>}
+                  {nLocked > 0 && <span className="countchip term" data-tip={`${nLocked} of your ${openCount} open positions are Profit Locked — stop above entry, gains are protected.`} style={{ background: "var(--greenDim)", color: "var(--green)" }}>{nLocked} of {openCount} profit locked</span>}
+                  <span className="infodot" data-tip="Every trade you currently hold. The colored status shows which positions are at risk.">i</span>
+                  <div className="spacer"></div>
+                  <div className="seg" id="viewSeg">
+                    <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
+                    <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro</button>
+                  </div>
+                </div>
+                {/* Risk budget hides fully under the privacy eye (Valen 2026-08-06) — dollar-of-NLV surface. */}
+                {!privacyOn && <div className="allocstrip moballoc">
+                  <button type="button" className="allocsum" onClick={() => setAllocOpen(o => !o)} aria-expanded={allocOpen}>
+                    <span className="allocsumpct" style={{ color: over ? "var(--red)" : allocPct >= 70 ? "var(--orange)" : "var(--text)" }}>{Math.round(allocPct)}%</span>
+                    <span className="allocsumlbl">risk used</span>
+                    <span className="allocsumbar"><span style={{ width: `${Math.min(100, allocPct)}%`, background: over ? "var(--red)" : allocPct >= 70 ? "var(--orange)" : "linear-gradient(90deg, rgba(0,200,5,0.75), var(--green))" }}></span></span>
+                    <span className="allocsumexp">Exposure <b>{usd0(totalExposure)}</b></span>
+                    <span className="allocsumchev">{allocOpen ? "▲" : "▼"}</span>
+                  </button>
+                  {allocOpen && (
+                    <div className="allocdet">
+                      <Tip className="leg" tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></Tip>
+                      <Tip className="leg" tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></Tip>
+                      <Tip className="leg" tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></Tip>
+                      <Tip className="leg" tip="Total dollars across all open positions (the sum of the Position size column) — your gross exposure, with its % of account."><span className="legdot" style={{ background: "#fff" }}></span>Exposure&nbsp;<b>{usd0(totalExposure)}</b>{compEquity > 0 && <span style={{ color: "var(--muted)", fontWeight: 600 }}>&nbsp;· {((totalExposure / compEquity) * 100).toFixed(1)}%</span>}</Tip>
+                      <span className="allocnote">{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</span>
+                    </div>
+                  )}
+                </div>}
+              </>
+            ) : (
+              <>
+            <div className="cardhead poshead">
+              <h2>Open Positions</h2>
+              {/* Self-explanatory status counts (Valen 2026-08-05): "n/total at risk" — total trades
+                  visible in every chip, zero-count statuses not rendered. */}
+              {openCount === 0 && <span className="countchip">0</span>}
+              {nAtRisk > 0 && <span className="countchip term" data-tip={`${nAtRisk} of your ${openCount} open positions are At Risk — stop below entry, a stop-out costs money.`} style={{ background: "var(--redDim)", color: "var(--red)", cursor: "help" }}>{nAtRisk} of {openCount} at risk</span>}
+              {nRiskFree > 0 && <span className="countchip term" data-tip={`${nRiskFree} of your ${openCount} open positions are Risk-Free — stop at breakeven, worst case $0.`} style={{ cursor: "help", background: "rgba(59,158,255,0.10)", color: "var(--blueFg)" }}>{nRiskFree} of {openCount} risk-free</span>}
+              {nLocked > 0 && <span className="countchip term" data-tip={`${nLocked} of your ${openCount} open positions are Profit Locked — stop above entry, gains are protected.`} style={{ background: "var(--greenDim)", color: "var(--green)", cursor: "help" }}>{nLocked} of {openCount} profit locked</span>}
+              <span className="infodot" data-tip="Every trade you currently hold. The colored status shows which positions are at risk.">i</span>
+              <div className="spacer"></div>
+              <div className="seg" id="viewSeg">
+                <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
+                <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
+              </div>
+              <button className="btn ghost posRefreshBtn" onClick={fetchLivePrices} disabled={priceLoading} title="Pull the latest market prices for every open position">{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
+            </div>
+            {/* Risk budget hides fully under the privacy eye (Valen 2026-08-06) — dollar-of-NLV surface. */}
+            {!privacyOn && <div className="allocstrip">
+              {/* Energy-bar gauge (Valen 2026-08-05 — replaced the 54px donut, unreadable at strip size).
+                  Guided's full Risk Allocation card keeps its 112px donut. */}
+              <div className="term" data-tip={over ? "You're over your risk budget — the bar is maxed and red." : "How much of your total risk budget is deployed across your open stops right now. Fills up as you add risk; empties as stops move to breakeven."} style={{ display: "flex", flexDirection: "column", gap: 4, width: 150, flex: "none", cursor: "help", borderBottom: "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", color: over ? "var(--red)" : allocPct >= 70 ? "var(--orange)" : "var(--text)" }}>{Math.round(allocPct)}%</span>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>deployed</span>
+                </div>
+                <div style={{ height: 9, borderRadius: 99, background: "var(--w10)", border: "1px solid var(--w08)", overflow: "hidden" }}>
+                  <div style={{ width: `${Math.min(100, allocPct)}%`, height: "100%", borderRadius: 99, background: over ? "var(--red)" : allocPct >= 70 ? "var(--orange)" : "linear-gradient(90deg, rgba(0,200,5,0.75), var(--green))", transition: "width 0.5s ease" }}></div>
+                </div>
+              </div>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)", marginRight: 2 }}>Risk Allocation</span>
+              <Tip className="leg" tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></Tip>
+              <Tip className="leg" tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></Tip>
+              <Tip className="leg" tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></Tip>
+              <Tip className="leg" tip="Total dollars across all open positions (the sum of the Position size column) — your gross exposure, with its % of account."><span className="legdot" style={{ background: "#fff" }}></span>Exposure&nbsp;<b>{usd0(totalExposure)}</b>{compEquity > 0 && <span style={{ color: "var(--muted)", fontWeight: 600 }}>&nbsp;· {((totalExposure / compEquity) * 100).toFixed(1)}%</span>}</Tip>
+              <span className="allocnote" style={{ marginLeft: "auto" }}>{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</span>
+            </div>}
+              </>
+            )}
+            <div className="pos-scroll">
+              {positionsTable}
+            </div>
+            <button className="addrow" type="button" onClick={addAndManage}>+ Add Position</button>
+          </div>
+
+          {/* P4. THE DAILY PLAN — everything a member checks before the open, captured as ONE
               screenshot (Valen 2026-08-02, modelled on the daily-plan-sheet workflow):
                 row 1 (lens row, drag-to-rearrange): Theme Leaders · Rotation · stack(Breadth ·
                   Earnings — compact window, yesterday's reporters → the next sessions)
@@ -11833,14 +12880,14 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             };
             return (
               <div ref={dailyPlanRef}>
-                <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 16, marginBottom: 2, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--muted)" }}>Daily Market Plan</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 30, marginBottom: 6, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em", color: "var(--white)" }}>Daily Market Plan</span>
                   <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
-                    <span title={ps.detail} style={{ fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums", cursor: "help" }}>
+                    <span title={ps.detail} style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums", cursor: "help" }}>
                       {ps.updated ? `updated ${ps.updated} (${ps.day})` : ""}
                     </span>
                     <span data-html2canvas-ignore="true" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: "0.58rem", fontWeight: 700, color: "var(--muted)", opacity: 0.85 }}>Copy the whole plan</span>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", opacity: 0.85 }}>Copy the whole plan</span>
                       <LensCamera getEl={() => dailyPlanRef.current} name="daily-plan" C={C} />
                       <XShare getEl={() => dailyPlanRef.current} C={C} />
                     </span>
@@ -11870,12 +12917,12 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               {edgeShown ? (
                 <>
                   <button onClick={() => setEdgeShown(false)} title="Collapse the Edge Ledger"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 10, fontFamily: font, fontSize: "0.66rem", fontWeight: 700, color: "var(--muted)", background: "transparent", border: "1px solid var(--border)", borderRadius: 99, padding: "5px 12px", cursor: "pointer" }}>Edge Ledger ▾ hide</button>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 10, fontFamily: font, fontSize: "0.6875rem", fontWeight: 700, color: "var(--muted)", background: "transparent", border: "1px solid var(--border)", borderRadius: 99, padding: "5px 12px", cursor: "pointer" }}>Edge Ledger ▾ hide</button>
                   <EdgeLedger C={C} font={font} session={session} setPage={setPage} />
                 </>
               ) : (
                 <button onClick={() => setEdgeShown(true)} title="Show the Edge Ledger"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: font, fontSize: "0.66rem", fontWeight: 700, color: "var(--muted)", background: "transparent", border: "1px solid var(--border)", borderRadius: 99, padding: "6px 13px", cursor: "pointer" }}>Edge Ledger ▸ show</button>
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: font, fontSize: "0.6875rem", fontWeight: 700, color: "var(--muted)", background: "transparent", border: "1px solid var(--border)", borderRadius: 99, padding: "6px 13px", cursor: "pointer" }}>Edge Ledger ▸ show</button>
               )}
             </div>
           )}
@@ -11884,96 +12931,6 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               (Valen 2026-08-05: "it shouldn't be in dashboard, it should be under daily trade setup"). */}
           {false && <WatchlistCard C={C} font={font} session={session} />}
 
-          {/* P4. POSITIONS TABLE — shared markup (positionsTable); Pro only changes container/density via .vd.expert CSS.
-              RISK ALLOCATION now lives HERE as a slim strip over the table (Valen 2026-08-02 — "overlay
-              it on top of the open position card"): same numbers as the old lens card (donut + At Risk /
-              Available / Risk-Free + deploy note), one row instead of a whole slot. Dollar figures stay
-              out of the Daily Plan capture because this card sits below the capture wrapper. */}
-          <div className="card poscard" style={{ marginTop: 14 }}>
-            {isMobileVP ? (
-              /* ── PHONE ONLY (2026-08-05): the header chrome + the whole risk-allocation strip fuse
-                 into one compact summary. ~230px of chrome before row one becomes ~72px. Tapping the
-                 summary reveals the identical At Risk / Available / Risk-Free / Exposure legend, so
-                 nothing is removed — just folded. Desktop renders the original markup below. */
-              <>
-                <div className="cardhead poshead mobposhead">
-                  <h2>Open Positions</h2>
-                  {openCount === 0 && <span className="countchip">0</span>}
-                  {nAtRisk > 0 && <span className="countchip term" data-tip={`${nAtRisk} of your ${openCount} open positions are At Risk — stop below entry, a stop-out costs money.`} style={{ background: "var(--redDim)", color: "var(--red)" }}>{nAtRisk}/{openCount} at risk</span>}
-                  {nRiskFree > 0 && <span className="countchip term" data-tip={`${nRiskFree} of your ${openCount} open positions are Risk-Free — stop at breakeven, worst case $0.`}>{nRiskFree}/{openCount} risk-free</span>}
-                  {nLocked > 0 && <span className="countchip term" data-tip={`${nLocked} of your ${openCount} open positions are Profit Locked — stop above entry, gains are protected.`} style={{ background: "var(--greenDim)", color: "var(--green)" }}>{nLocked}/{openCount} profit locked</span>}
-                  <span className="infodot" data-tip="Every trade you currently hold. The colored status shows which positions are at risk.">i</span>
-                  <div className="spacer"></div>
-                  <div className="seg" id="viewSeg">
-                    <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
-                    <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro</button>
-                  </div>
-                </div>
-                {/* Risk budget hides fully under the privacy eye (Valen 2026-08-06) — dollar-of-NLV surface. */}
-                {!privacyOn && <div className="allocstrip moballoc">
-                  <button type="button" className="allocsum" onClick={() => setAllocOpen(o => !o)} aria-expanded={allocOpen}>
-                    <span className="allocsumpct" style={{ color: over ? "var(--red)" : allocPct >= 70 ? "var(--goldBright)" : "var(--text)" }}>{Math.round(allocPct)}%</span>
-                    <span className="allocsumlbl">risk used</span>
-                    <span className="allocsumbar"><span style={{ width: `${Math.min(100, allocPct)}%`, background: over ? "var(--red)" : allocPct >= 70 ? "linear-gradient(90deg, var(--gold), var(--goldBright))" : "linear-gradient(90deg, rgba(34,197,94,0.75), var(--green))" }}></span></span>
-                    <span className="allocsumexp">Exposure <b>{usd0(totalExposure)}</b></span>
-                    <span className="allocsumchev">{allocOpen ? "▲" : "▼"}</span>
-                  </button>
-                  {allocOpen && (
-                    <div className="allocdet">
-                      <Tip className="leg" tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></Tip>
-                      <Tip className="leg" tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></Tip>
-                      <Tip className="leg" tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></Tip>
-                      <Tip className="leg" tip="Total dollars across all open positions (the sum of the Position size column) — your gross exposure, with its % of account."><span className="legdot" style={{ background: "var(--goldBright)" }}></span>Exposure&nbsp;<b>{usd0(totalExposure)}</b>{compEquity > 0 && <span style={{ color: "var(--muted)", fontWeight: 600 }}>&nbsp;· {((totalExposure / compEquity) * 100).toFixed(1)}%</span>}</Tip>
-                      <span className="allocnote">{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</span>
-                    </div>
-                  )}
-                </div>}
-              </>
-            ) : (
-              <>
-            <div className="cardhead poshead">
-              <h2>Open Positions</h2>
-              {/* Self-explanatory status counts (Valen 2026-08-05): "n/total at risk" — total trades
-                  visible in every chip, zero-count statuses not rendered. */}
-              {openCount === 0 && <span className="countchip">0</span>}
-              {nAtRisk > 0 && <span className="countchip term" data-tip={`${nAtRisk} of your ${openCount} open positions are At Risk — stop below entry, a stop-out costs money.`} style={{ background: "var(--redDim)", color: "var(--red)", cursor: "help" }}>{nAtRisk}/{openCount} at risk</span>}
-              {nRiskFree > 0 && <span className="countchip term" data-tip={`${nRiskFree} of your ${openCount} open positions are Risk-Free — stop at breakeven, worst case $0.`} style={{ cursor: "help" }}>{nRiskFree}/{openCount} risk-free</span>}
-              {nLocked > 0 && <span className="countchip term" data-tip={`${nLocked} of your ${openCount} open positions are Profit Locked — stop above entry, gains are protected.`} style={{ background: "var(--greenDim)", color: "var(--green)", cursor: "help" }}>{nLocked}/{openCount} profit locked</span>}
-              <span className="infodot" data-tip="Every trade you currently hold. The colored status shows which positions are at risk.">i</span>
-              <div className="spacer"></div>
-              <div className="seg" id="viewSeg">
-                <button className={!showPro ? "on" : ""} onClick={() => setTableView("simple")}>Simple</button>
-                <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro &middot; all columns</button>
-              </div>
-              <button className="btn ghost posRefreshBtn" onClick={fetchLivePrices} disabled={priceLoading} title="Pull the latest market prices for every open position">{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
-            </div>
-            {/* Risk budget hides fully under the privacy eye (Valen 2026-08-06) — dollar-of-NLV surface. */}
-            {!privacyOn && <div className="allocstrip">
-              {/* Energy-bar gauge (Valen 2026-08-05 — replaced the 54px donut, unreadable at strip size).
-                  Guided's full Risk Allocation card keeps its 112px donut. */}
-              <div className="term" data-tip={over ? "You're over your risk budget — the bar is maxed and red." : "How much of your total risk budget is deployed across your open stops right now. Fills up as you add risk; empties as stops move to breakeven."} style={{ display: "flex", flexDirection: "column", gap: 4, width: 150, flex: "none", cursor: "help", borderBottom: "none" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <span style={{ fontSize: "0.66rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", color: over ? "var(--red)" : allocPct >= 70 ? "var(--goldBright)" : "var(--text)" }}>{Math.round(allocPct)}%</span>
-                  <span style={{ fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)" }}>deployed</span>
-                </div>
-                <div style={{ height: 9, borderRadius: 99, background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.07)", overflow: "hidden" }}>
-                  <div style={{ width: `${Math.min(100, allocPct)}%`, height: "100%", borderRadius: 99, background: over ? "var(--red)" : allocPct >= 70 ? "linear-gradient(90deg, var(--gold), var(--goldBright))" : "linear-gradient(90deg, rgba(34,197,94,0.75), var(--green))", transition: "width 0.5s ease" }}></div>
-                </div>
-              </div>
-              <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--muted)", marginRight: 2 }}>Risk Allocation</span>
-              <Tip className="leg" tip="Dollars currently exposed to loss across your open positions if every stop got hit."><span className="legdot risk"></span>At Risk&nbsp;<b>{usd0(budget.deployedRisk)}</b></Tip>
-              <Tip className="leg" tip="Room left in your risk budget for new trades before you hit your Target ROTE cap."><span className="legdot avail"></span>Available&nbsp;<b>{usd0(budget.available)}</b></Tip>
-              <Tip className="leg" tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></Tip>
-              <Tip className="leg" tip="Total dollars across all open positions (the sum of the Position size column) — your gross exposure, with its % of account."><span className="legdot" style={{ background: "var(--goldBright)" }}></span>Exposure&nbsp;<b>{usd0(totalExposure)}</b>{compEquity > 0 && <span style={{ color: "var(--muted)", fontWeight: 600 }}>&nbsp;· {((totalExposure / compEquity) * 100).toFixed(1)}%</span>}</Tip>
-              <span className="allocnote" style={{ marginLeft: "auto" }}>{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</span>
-            </div>}
-              </>
-            )}
-            <div className="pos-scroll">
-              {positionsTable}
-            </div>
-            <button className="addrow" type="button" onClick={addAndManage}>+ Add Position</button>
-          </div>
 
         </div>
       </div>
@@ -11999,6 +12956,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
+          <ThemeToggle />
         </div>
 
         {/* HEADER */}
@@ -12014,16 +12972,20 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
         <div className="hero">
           <div className={"card north guide reveal" + (openPL < 0 ? " north-neg" : "") + gactive("pl")} onMouseEnter={guideEnter("pl", "Open profit and loss", "How much your open positions are up or down right now. Green means you're in profit; the line below is your realized equity trend.", "/audio/open-pl.mp3")} onMouseLeave={guideLeave("pl")}>
             <div className="label">Open P/L · this month's live result</div>
-            <div className="big" style={{ color: openPL >= 0 ? "var(--green)" : "var(--red)" }}><Cu>{usdSigned(openPL)}</Cu></div>
+            <LiveFigure className="big" style={{ color: openPL >= 0 ? "var(--green)" : "var(--red)" }} value={openPL} roll={false} text={<Cu>{usdSigned(openPL)}</Cu>} />
             <div className="meta">{pctSigned(openPLpct)} across {openCount} open position{openCount === 1 ? "" : "s"} · you're {openPL >= 0 ? "green" : "red"} on open risk</div>
-            <svg className="spark" viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Realized equity trend">
-              <defs><linearGradient id="sparkg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={spark && !spark.up ? "rgba(239,68,68,0.30)" : "rgba(34,197,94,0.34)"} /><stop offset="100%" stopColor="rgba(34,197,94,0)" /></linearGradient></defs>
-              <g id="sparkRise">
-                <path d={sparkArea} fill="url(#sparkg)" />
-                <path d={sparkLine} fill="none" stroke={spark && !spark.up ? "var(--red)" : "var(--green)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-              </g>
-            </svg>
-            <div className="sparklabel">{spark ? `Realized P/L trend · ${(journaledTrades || []).length} closed trades` : "Realized equity trend"}</div>
+            {/* Real closed-trade curve only — the old placeholder path drew a fake rising line when
+                there were fewer than 2 closed trades. No sample data on a money surface. */}
+            {spark && (<>
+              <svg className="spark" viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Realized equity trend">
+                <defs><linearGradient id="sparkg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={!spark.up ? "rgba(255,80,0,0.20)" : "rgba(0,200,5,0.22)"} /><stop offset="100%" stopColor="transparent" /></linearGradient></defs>
+                <g id="sparkRise">
+                  <path d={sparkArea} fill="url(#sparkg)" />
+                  <path d={sparkLine} fill="none" stroke={!spark.up ? "var(--red)" : "var(--green)"} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                </g>
+              </svg>
+              <div className="sparklabel">Realized P/L trend · {(journaledTrades || []).length} closed trades</div>
+            </>)}
           </div>
 
           <div className={"card mini guide reveal" + gactive("rts")} onMouseEnter={guideEnter("rts", "Risk in the market", "The total you'd lose if every open position hit its stop at once. Keep it inside your risk rule.", "/audio/risk-market.mp3")} onMouseLeave={guideLeave("rts")}>
@@ -12135,7 +13097,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           alloc: privacyOn ? (
         <div className="card alloc">
           <div className="row"><div className="label">Risk allocation</div><div className="spacer"></div></div>
-          <div style={{ fontSize: "0.72rem", color: "var(--muted)", padding: "18px 0 10px" }}>Hidden while the privacy eye is on.</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--muted)", padding: "18px 0 10px" }}>Hidden while the privacy eye is on.</div>
         </div>
           ) : (
         <div className={"card alloc guide reveal" + gactive("alloc")} onMouseEnter={guideEnter("alloc", "Risk allocation", "A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.", "/audio/allocation.mp3")} onMouseLeave={guideLeave("alloc")}>
@@ -12208,7 +13170,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
             onClick={() => onManualSave && onManualSave()}
             disabled={saveStatus === "saving"}
             title={saveStatus === "error" ? (saveErrorMsg || "Save failed — click to retry") : "Save all open positions"}
-            style={saveStatus === "saved" ? { background: "rgba(34,197,94,0.18)", borderColor: "rgba(34,197,94,0.4)", color: "#86efac" } : saveStatus === "error" ? { background: "rgba(239,68,68,0.16)", borderColor: "rgba(239,68,68,0.4)", color: "#fca5a5" } : undefined}
+            style={saveStatus === "saved" ? { background: "rgba(0,200,5,0.18)", borderColor: "rgba(0,200,5,0.4)", color: "var(--greenFg)" } : saveStatus === "error" ? { background: "rgba(255,80,0,0.16)", borderColor: "rgba(255,80,0,0.4)", color: "var(--redFg)" } : undefined}
           >{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved ✓" : saveStatus === "error" ? "Retry save" : "Save"}</button>
           <button className="btn gold" onClick={addAndManage}>+ Add Position</button>
         </div>
@@ -12244,13 +13206,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
 // ═══════════════════════════════════════
 // ─── SETTINGS PAGE ───
 // ═══════════════════════════════════════
-const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
-    --text:rgba(255,255,255,0.92); --muted:rgba(255,255,255,0.70); --faint:rgba(255,255,255,0.45);
-    --gold:#c9982a; --goldBright:#f0c050; --goldMid:#b8820a; --goldDeep:#7a4f00;
-    --goldDim:rgba(201,152,42,0.15); --borderGold:rgba(201,152,42,0.22);
-    --glass:rgba(255,255,255,0.042); --border:rgba(255,255,255,0.09);
-    --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
-    --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;}
+const SET_CSS = `${RH_TOKENS}
 .vs *{box-sizing:border-box;margin:0;padding:0}
 .vs html{font-size:16px}
 .vs{background:radial-gradient(1200px 700px at 70% -10%, rgba(201,152,42,0.06), transparent 60%), var(--bg);
@@ -12264,14 +13220,14 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs.expert .shell{max-width:1680px} }
 .vs .card{position:relative; background:var(--glass); border:1px solid var(--border); border-radius:22px;
     backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%); padding:22px 24px; overflow:hidden; margin-top:18px}
-.vs .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)}
-.vs .cardtitle{font-size:1.02rem; font-weight:800; color:var(--white); letter-spacing:-0.02em}
-.vs .carddesc{font-size:0.8rem; color:var(--muted); margin-top:4px; line-height:1.5; max-width:640px}
+.vs .card::before{content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(135deg, var(--w06), transparent 55%)}
+.vs .cardtitle{font-size:1rem; font-weight:800; color:var(--white); letter-spacing:-0.02em}
+.vs .carddesc{font-size:0.75rem; color:var(--muted); margin-top:4px; line-height:1.5; max-width:640px}
 .vs.expert .carddesc{display:none}
-.vs .eyebrow{font-size:0.6rem; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); margin-bottom:5px}
+.vs .eyebrow{font-size:0.6875rem; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--faint); margin-bottom:5px}
 .vs .h1{font-size:clamp(1.55rem,3vw,2.05rem); font-weight:800; letter-spacing:-0.04em; color:var(--white)}
-.vs .goldname{color:var(--goldBright)}
-.vs .sub{font-size:0.82rem; color:var(--muted); max-width:640px; margin-top:6px}
+.vs .goldname{color:var(--white)}
+.vs .sub{font-size:0.875rem; color:var(--muted); max-width:640px; margin-top:6px}
 .vs .reveal .h1{opacity:0; transform:translateY(14px)}
 .vs .reveal .sub{opacity:0}
 .vs .reveal.in-view .h1{animation:hRise 0.42s cubic-bezier(0.22,1,0.36,1) both}
@@ -12281,77 +13237,77 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 @media (prefers-reduced-motion: reduce){
 .vs .reveal .h1,.vs .reveal .sub{animation:none !important; opacity:1; transform:none}
   }
-.vs .label{font-size:0.62rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted)}
+.vs .label{font-size:0.6875rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted)}
 .vs .row{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
 .vs .spacer{flex:1}
 .vs .navbar{display:flex; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:wrap}
-.vs .brand{display:flex; align-items:center; gap:9px; font-weight:800; color:var(--white); font-size:0.95rem; flex:none; white-space:nowrap}
+.vs .brand{display:flex; align-items:center; gap:9px; font-weight:800; color:var(--white); font-size:1rem; flex:none; white-space:nowrap}
 .vs .brand .vmark{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,var(--goldMid),var(--goldBright)); color:#0a0a0a; font-weight:800; font-size:0.8rem}
-.vs .tabs{display:inline-flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:980px; padding:4px; flex-wrap:wrap}
-.vs .tabs a{text-decoration:none; color:var(--muted); font-size:0.78rem; font-weight:700; padding:7px 16px; border-radius:980px}
+    background:linear-gradient(135deg,var(--goldPillMid),var(--goldPill)); color:var(--goldOn); font-weight:800; font-size:0.75rem}
+.vs .tabs{display:inline-flex; gap:4px; background:var(--w03); border:1px solid var(--border); border-radius:980px; padding:4px; flex-wrap:wrap}
+.vs .tabs a{text-decoration:none; color:var(--muted); font-size:0.75rem; font-weight:700; padding:7px 16px; border-radius:980px}
 .vs .tabs a.on{background:var(--goldDim); color:var(--goldBright)}
 .vs .tabs a:hover:not(.on){color:var(--text)}
 .vs .term{border-bottom:1px dotted var(--borderGold); cursor:help; position:relative}
 .vs .term:hover::after{content:attr(data-tip); position:absolute; left:0; top:150%; width:250px; background:#11111b;
-    border:1px solid var(--borderGold); border-radius:12px; padding:10px 12px; font-size:0.72rem; font-weight:400;
+    border:1px solid var(--borderGold); border-radius:12px; padding:10px 12px; font-size:0.75rem; font-weight:400;
     letter-spacing:0; text-transform:none; color:var(--text); z-index:60; box-shadow:0 14px 40px rgba(0,0,0,0.55); line-height:1.45; white-space:pre-line}
 .vs .term.tipright:hover::after{left:auto; right:0}
 .vs.expert .term{border-bottom:none; cursor:default}
 .vs.expert .term:hover::after{content:none}
-.vs .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:rgba(255,255,255,0.02)}
-.vs .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.74rem;
+.vs .seg{display:inline-flex; border:1px solid var(--border); border-radius:980px; padding:3px; gap:2px; background:var(--w02)}
+.vs .seg button{border:none; background:transparent; color:var(--muted); cursor:pointer; font-family:var(--font); font-size:0.75rem;
     font-weight:700; padding:7px 16px; border-radius:980px; transition:all .15s}
 .vs .seg button.on{background:var(--goldDim); color:var(--goldBright)}
-.vs select{color-scheme:dark}
+.vs select{color-scheme:dark} body.theme-light .vs select{color-scheme:light}
 .vs .btn{transition:border-color .15s,color .15s,background .15s}
-.vs .btn:hover{border-color:var(--borderGold); color:var(--white); background:rgba(255,255,255,0.05)}
-.vs .btn{border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text); font-family:var(--font);
-    font-size:0.76rem; font-weight:700; padding:9px 16px; border-radius:980px; cursor:pointer; transition:all .15s}
+.vs .btn:hover{border-color:var(--borderGold); color:var(--white); background:var(--w06)}
+.vs .btn{border:1px solid var(--border); background:var(--w03); color:var(--text); font-family:var(--font);
+    font-size:0.75rem; font-weight:700; padding:9px 16px; border-radius:980px; cursor:pointer; transition:all .15s}
 .vs .btn:hover{border-color:var(--borderGold)}
 .vs .btn.gold{background:var(--goldDim); color:var(--goldBright); border-color:var(--borderGold)}
-.vs .btn.green{background:rgba(34,197,94,0.12); color:#86efac; border-color:rgba(34,197,94,0.3)}
-.vs .btn.red{background:rgba(239,68,68,0.12); color:#fda4a4; border-color:rgba(239,68,68,0.3)}
-.vs .btn.ok{background:rgba(34,197,94,0.2)!important; color:#86efac!important; border-color:rgba(34,197,94,0.4)!important}
+.vs .btn.green{background:rgba(0,200,5,0.12); color:var(--greenFg); border-color:rgba(0,200,5,0.3)}
+.vs .btn.red{background:rgba(255,80,0,0.12); color:#fda4a4; border-color:rgba(255,80,0,0.3)}
+.vs .btn.ok{background:rgba(0,200,5,0.2)!important; color:var(--greenFg)!important; border-color:rgba(0,200,5,0.4)!important}
 .vs .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
 .vs .field{display:flex; flex-direction:column; gap:6px}
-.vs .field label{font-size:0.62rem; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--muted)}
-.vs .in{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; color:var(--text);
-    font-family:var(--font); font-size:0.92rem; font-weight:600; padding:10px 12px; outline:none; width:100%}
+.vs .field label{font-size:0.6875rem; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--muted)}
+.vs .in{background:var(--w06); border:1px solid var(--border); border-radius:10px; color:var(--text);
+    font-family:var(--font); font-size:0.875rem; font-weight:600; padding:10px 12px; outline:none; width:100%}
 .vs .in:focus{border-color:var(--gold)}
 .vs .in:disabled{color:var(--faint); cursor:not-allowed}
-.vs .field .hint{font-size:0.7rem; color:var(--faint); line-height:1.4}
+.vs .field .hint{font-size:0.6875rem; color:var(--faint); line-height:1.4}
 .vs.expert .field .hint{display:none}
-.vs .prefrow{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:14px 0; border-bottom:1px solid rgba(255,255,255,0.06); flex-wrap:wrap}
+.vs .prefrow{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:14px 0; border-bottom:1px solid var(--w06); flex-wrap:wrap}
 .vs .prefrow:last-child{border-bottom:none}
 .vs .prefrow .pl{max-width:430px}
-.vs .prefrow .pl .t{font-size:0.86rem; font-weight:700; color:var(--white)}
-.vs .prefrow .pl .d{font-size:0.76rem; color:var(--muted); margin-top:2px; line-height:1.45}
+.vs .prefrow .pl .t{font-size:0.875rem; font-weight:700; color:var(--white)}
+.vs .prefrow .pl .d{font-size:0.75rem; color:var(--muted); margin-top:2px; line-height:1.45}
 .vs.expert .prefrow .pl .d{display:none}
-.vs .alert{display:flex; gap:9px; align-items:flex-start; margin-top:14px; border-radius:12px; padding:11px 14px; font-size:0.78rem; line-height:1.45}
+.vs .alert{display:flex; gap:9px; align-items:flex-start; margin-top:14px; border-radius:12px; padding:11px 14px; font-size:0.75rem; line-height:1.45}
 .vs .alert svg{width:15px;height:15px;flex:none;margin-top:1px}
-.vs .alert.warn{background:rgba(239,68,68,0.10); border:1px solid rgba(239,68,68,0.3); color:#fda4a4}
-.vs .alert.caution{background:rgba(201,152,42,0.12); border:1px solid var(--borderGold); color:var(--goldBright)}
-.vs .alert.ok{background:rgba(34,197,94,0.10); border:1px solid rgba(34,197,94,0.3); color:#86efac}
-.vs .conn{display:inline-flex; align-items:center; gap:6px; font-size:0.68rem; font-weight:700; padding:4px 11px; border-radius:980px}
-.vs .conn.yes{background:rgba(34,197,94,0.12); color:#86efac}
-.vs .conn.no{background:rgba(255,255,255,0.06); color:var(--muted)}
+.vs .alert.warn{background:rgba(255,80,0,0.10); border:1px solid rgba(255,80,0,0.3); color:#fda4a4}
+.vs .alert.caution{background:rgba(255,170,5,0.10); border:1px solid rgba(255,170,5,0.28); color:var(--orange)}
+.vs .alert.ok{background:rgba(0,200,5,0.10); border:1px solid rgba(0,200,5,0.3); color:var(--greenFg)}
+.vs .conn{display:inline-flex; align-items:center; gap:6px; font-size:0.6875rem; font-weight:700; padding:4px 12px; border-radius:980px}
+.vs .conn.yes{background:rgba(0,200,5,0.12); color:var(--greenFg)}
+.vs .conn.no{background:var(--w06); color:var(--muted)}
 .vs .conn .d{width:6px;height:6px;border-radius:50%;background:currentColor}
 .vs .welcome{display:flex; gap:14px; align-items:flex-start; margin-top:18px; background:var(--goldDim);
     border:1px solid var(--borderGold); border-radius:16px; padding:14px 18px}
 .vs .welcome .wd{width:8px;height:8px;border-radius:50%;background:var(--goldBright);box-shadow:0 0 12px var(--goldBright);margin-top:6px;flex:none}
 .vs .welcome b{color:var(--white)}
-.vs .welcome .x{margin-left:auto; color:var(--faint); cursor:pointer; font-size:1.1rem; line-height:1}
+.vs .welcome .x{margin-left:auto; color:var(--faint); cursor:pointer; font-size:1.125rem; line-height:1}
 .vs.expert .welcome{display:none}
 .vs.expert .tourwrap{display:none}
 .vs .tour{position:relative; border:1px solid var(--borderGold); border-radius:16px; overflow:hidden; background:#0a0a12; aspect-ratio:16/6; min-height:200px; margin-top:14px}
 .vs .tourbg{position:absolute; inset:0; background:radial-gradient(560px 280px at 50% -10%, rgba(201,152,42,0.14), transparent 70%)}
 .vs .tourstage{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:26px 36px 52px; gap:10px}
-.vs .tourchip{font-size:0.58rem; font-weight:800; letter-spacing:0.13em; text-transform:uppercase; color:var(--gold)}
+.vs .tourchip{font-size:0.6875rem; font-weight:800; letter-spacing:0.13em; text-transform:uppercase; color:var(--faint)}
 .vs .tourtitle{font-size:clamp(1.1rem,2.6vw,1.5rem); font-weight:800; letter-spacing:-0.03em; color:var(--white)}
-.vs .tourcap{font-size:0.86rem; color:var(--muted); max-width:520px; line-height:1.5}
+.vs .tourcap{font-size:0.875rem; color:var(--muted); max-width:520px; line-height:1.5}
 .vs .tourdots{display:flex; gap:6px; margin-top:4px}
-.vs .tourdots i{width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,0.18); transition:all .25s}
+.vs .tourdots i{width:7px; height:7px; border-radius:50%; background:var(--w22); transition:all .25s}
 .vs .tourdots i.on{background:var(--goldBright); width:20px; border-radius:5px}
 .vs .tourposter{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
     background:rgba(8,8,14,0.55); backdrop-filter:blur(2px); cursor:pointer; z-index:3}
@@ -12359,45 +13315,45 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs .playbig{width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg,var(--goldBright),var(--goldMid));
     display:flex; align-items:center; justify-content:center; box-shadow:0 12px 40px rgba(201,152,42,0.4); transition:transform .15s}
 .vs .tourposter:hover .playbig{transform:scale(1.07)}
-.vs .playbig svg{width:26px; height:26px; color:#0a0a0a; margin-left:3px}
-.vs .postertitle{font-size:0.98rem; font-weight:800; color:var(--white)}
-.vs .postersub{font-size:0.76rem; color:var(--muted)}
+.vs .playbig svg{width:26px; height:26px; color:var(--goldOn); margin-left:3px}
+.vs .postertitle{font-size:1rem; font-weight:800; color:var(--white)}
+.vs .postersub{font-size:0.75rem; color:var(--muted)}
 .vs .tourbar{position:absolute; left:0; right:0; bottom:0; display:flex; align-items:center; gap:11px; padding:11px 15px;
     background:linear-gradient(0deg, rgba(8,8,14,0.92), transparent); z-index:4}
-.vs .tourbtn{background:rgba(255,255,255,0.1); border:none; width:32px; height:32px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--white); flex:none}
-.vs .tourbtn:hover{background:rgba(255,255,255,0.18)}
+.vs .tourbtn{background:var(--w10); border:none; width:32px; height:32px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--white); flex:none}
+.vs .tourbtn:hover{background:var(--w22)}
 .vs .tourbtn svg{width:14px; height:14px}
-.vs .tourprog{flex:1; height:5px; background:rgba(255,255,255,0.14); border-radius:980px; overflow:hidden}
+.vs .tourprog{flex:1; height:5px; background:var(--w14); border-radius:980px; overflow:hidden}
 .vs .tourprog .fill{height:100%; width:0%; background:linear-gradient(90deg,var(--goldMid),var(--goldBright)); transition:width .2s linear}
-.vs .tourtime{font-size:0.66rem; color:var(--muted); flex:none; min-width:32px; text-align:right}
+.vs .tourtime{font-size:0.6875rem; color:var(--muted); flex:none; min-width:32px; text-align:right}
 .vs .expander{margin-top:18px; border-top:1px solid var(--border); padding-top:15px}
-.vs .exhead{display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--goldBright); font-weight:700; font-size:0.85rem}
+.vs .exhead{display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--muted); font-weight:700; font-size:0.875rem}
 .vs .exhead .chev{margin-left:6px; transition:transform .2s}
 .vs .exhead.open .chev{transform:rotate(180deg)}
 .vs .exbody{display:none; margin-top:14px}
 .vs .exbody.open{display:block}
 .vs .steps{display:flex; flex-direction:column; gap:11px}
 .vs .step{border-left:2px solid var(--borderGold); padding:1px 0 1px 14px}
-.vs .step .sn{font-size:0.58rem; font-weight:800; color:var(--gold); text-transform:uppercase; letter-spacing:0.08em}
-.vs .step b{display:block; color:var(--white); font-size:0.84rem; margin-top:2px}
-.vs .step p{font-size:0.78rem; color:var(--muted); margin-top:3px; line-height:1.5}
-.vs .step code{background:rgba(255,255,255,0.07); padding:1px 6px; border-radius:5px; font-size:0.85em; color:var(--goldBright)}
+.vs .step .sn{font-size:0.6875rem; font-weight:800; color:var(--faint); text-transform:uppercase; letter-spacing:0.08em}
+.vs .step b{display:block; color:var(--white); font-size:0.875rem; margin-top:2px}
+.vs .step p{font-size:0.75rem; color:var(--muted); margin-top:3px; line-height:1.5}
+.vs .step code{background:var(--w08); padding:1px 6px; border-radius:5px; font-size:0.85em; color:var(--white)}
 .vs .chips{display:flex; flex-wrap:wrap; gap:7px; margin-top:12px}
-.vs .chip{display:inline-flex; align-items:center; gap:5px; font-size:0.72rem; font-weight:600; color:var(--muted);
-    background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; padding:4px 10px}
-.vs .ownerzone{border:1px solid rgba(239,68,68,0.3); border-radius:22px; padding:6px; margin-top:30px; background:rgba(239,68,68,0.035)}
+.vs .chip{display:inline-flex; align-items:center; gap:5px; font-size:0.75rem; font-weight:600; color:var(--muted);
+    background:var(--w06); border:1px solid var(--border); border-radius:8px; padding:4px 10px}
+.vs .ownerzone{border:1px solid rgba(255,80,0,0.3); border-radius:22px; padding:6px; margin-top:30px; background:rgba(255,80,0,0.035)}
 .vs .ownerhead{display:flex; align-items:center; gap:12px; padding:14px 18px 8px; flex-wrap:wrap}
-.vs .ownerbadge{font-size:0.58rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:#fda4a4; background:rgba(239,68,68,0.14); padding:4px 11px; border-radius:980px}
+.vs .ownerbadge{font-size:0.6875rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:#fda4a4; background:rgba(255,80,0,0.14); padding:4px 12px; border-radius:980px}
 .vs .ownerzone .card{margin:12px}
-.vs .codeshow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:1.35rem; color:var(--goldBright); letter-spacing:0.08em; font-weight:700}
-.vs .memrow{display:flex; align-items:center; gap:10px; padding:10px 2px; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.82rem}
+.vs .codeshow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:1.25rem; color:var(--white); letter-spacing:0.08em; font-weight:700}
+.vs .memrow{display:flex; align-items:center; gap:10px; padding:10px 2px; border-bottom:1px solid var(--w06); font-size:0.875rem}
 .vs .memrow:last-child{border-bottom:none}
 .vs .memrow .mn{font-weight:700; color:var(--white)}
-.vs .memrow .me{color:var(--muted); font-size:0.74rem}
-.vs .memrow .adm{font-size:0.58rem; font-weight:700; color:var(--goldBright); background:var(--goldDim); padding:2px 8px; border-radius:980px}
-.vs .memrow .jd{margin-left:auto; color:var(--faint); font-size:0.72rem}
+.vs .memrow .me{color:var(--muted); font-size:0.75rem}
+.vs .memrow .adm{font-size:0.6875rem; font-weight:700; color:var(--text); background:var(--w08); padding:2px 8px; border-radius:980px}
+.vs .memrow .jd{margin-left:auto; color:var(--faint); font-size:0.75rem}
 .vs.member .ownerzone .card{display:none}
-.vs .membernote{display:none; margin:12px; padding:16px 18px; border:1px dashed var(--border); border-radius:14px; color:var(--muted); font-size:0.82rem}
+.vs .membernote{display:none; margin:12px; padding:16px 18px; border:1px dashed var(--border); border-radius:14px; color:var(--muted); font-size:0.875rem}
 .vs.member .membernote{display:block}
 .vs .guidepanel{position:fixed; right:24px; bottom:96px; width:330px; max-width:calc(100vw - 40px); z-index:200;
     background:#11111b; border:1px solid var(--borderGold); border-radius:16px; padding:15px 17px; box-shadow:0 22px 60px rgba(0,0,0,0.6); display:none}
@@ -12407,16 +13363,16 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs .gp-dot{width:8px; height:8px; border-radius:50%; background:var(--goldBright); flex:none}
 .vs .guidepanel.speaking .gp-dot{animation:gppulse 1s ease-in-out infinite}
 @keyframes gppulse{0%,100%{opacity:1; transform:scale(1)}50%{opacity:0.35; transform:scale(1.6)}}
-.vs .gp-title{font-size:0.82rem; font-weight:800; color:var(--goldBright); flex:1}
+.vs .gp-title{font-size:0.875rem; font-weight:800; color:var(--white); flex:1}
 .vs .gp-mute{background:transparent; border:none; cursor:pointer; color:var(--muted); padding:3px; line-height:0; display:flex}
 .vs .gp-mute:hover{color:var(--text)}
 .vs .gp-mute svg{width:18px; height:18px}
-.vs .gp-body{font-size:0.78rem; color:var(--text); line-height:1.55}
-.vs .gp-body b{color:var(--goldBright)}
+.vs .gp-body{font-size:0.75rem; color:var(--text); line-height:1.55}
+.vs .gp-body b{color:var(--white)}
 .vs:not(.expert) .guide{transition:box-shadow .2s; border-radius:20px}
 .vs:not(.expert) .guide.guide-active{box-shadow:0 0 0 1px var(--borderGold), 0 0 50px rgba(201,152,42,0.13)}
 .vs .toast{position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px); z-index:400; background:#11111b;
-    border:1px solid var(--borderGold); border-radius:12px; padding:12px 18px; font-size:0.8rem; color:var(--text);
+    border:1px solid var(--borderGold); border-radius:12px; padding:12px 18px; font-size:0.75rem; color:var(--text);
     box-shadow:0 14px 40px rgba(0,0,0,0.6); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:90vw}
 .vs .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
 @media(max-width:680px){
@@ -12430,12 +13386,12 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs .tabs a{white-space:nowrap}
 .vs .tour{aspect-ratio:auto; height:280px; min-height:0}
 .vs .tourstage{padding:18px 16px 50px}
-.vs .tourtitle{font-size:1.05rem}
-.vs .tourcap{font-size:0.8rem}
+.vs .tourtitle{font-size:1rem}
+.vs .tourcap{font-size:0.75rem}
 .vs .card{padding:18px 16px}
 .vs .prefrow{flex-direction:column; align-items:flex-start; gap:10px}
 .vs .ownerhead{flex-direction:column; align-items:flex-start}
-.vs .codeshow{font-size:1.15rem}
+.vs .codeshow{font-size:1.125rem}
 .vs .memrow{flex-wrap:wrap}
 .vs .memrow .jd{margin-left:0; width:100%}
   }
@@ -12448,33 +13404,33 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs.expert .ownerzone .carddesc{display:block}
 /* P1. Command header — eyebrow + h1 + muted meta (Pro drops the welcome banner, guide panel + tour). */
 .vs.expert .cmdheader{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; margin-bottom:20px}
-.vs.expert .cmdleft .ch1{font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
-.vs.expert .cmdmeta{font-size:0.8rem; color:var(--muted); margin-top:6px}
+.vs.expert .cmdleft .ch1{font-size:1.25rem; font-weight:800; letter-spacing:-0.03em; color:var(--white); margin-top:5px}
+.vs.expert .cmdmeta{font-size:0.75rem; color:var(--muted); margin-top:6px}
 /* Uniform card header: label + info dot, divided from the body (mirrors .vj.expert). */
 .vs.expert .cardhead{display:flex; align-items:center; gap:8px; padding-bottom:11px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap}
 .vs.expert .cardhead .label{flex:1}
-.vs.expert .infodot{position:relative; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none}
+.vs.expert .infodot{position:relative; width:15px; height:15px; border-radius:50%; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; font-size:0.6875rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none}
 .vs.expert .infodot:hover{color:var(--gold); border-color:var(--borderGold)}
-.vs.expert .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 12px; font-size:0.72rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+.vs.expert .infodot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:300px; background:#13131c; border:1px solid var(--w14); border-radius:10px; padding:10px 12px; font-size:0.75rem; font-weight:500; line-height:1.55; color:var(--text); text-transform:none; letter-spacing:0.01em; white-space:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
 /* Pro keeps the compact field hints the mockup shows (autosaves note, connection hints). */
-.vs.expert .hint{font-size:0.68rem; color:var(--faint); line-height:1.4}
+.vs.expert .hint{font-size:0.6875rem; color:var(--faint); line-height:1.4}
 .vs.expert .field .hint{display:block}
 /* P2 / P4. Two-column page grid (stacks under 900px). */
 .vs.expert .pgrid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
 @media(max-width:900px){
 .vs.expert .pgrid{grid-template-columns:1fr} }
 /* Preferences — dense rows, label left / control right. */
-.vs.expert .prow{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:11px 0; border-bottom:1px solid rgba(255,255,255,0.06); flex-wrap:wrap}
+.vs.expert .prow{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:11px 0; border-bottom:1px solid var(--w06); flex-wrap:wrap}
 .vs.expert .prow:last-child{border-bottom:none}
-.vs.expert .prow .plabel{font-size:0.8rem; font-weight:700; color:var(--text)}
+.vs.expert .prow .plabel{font-size:0.75rem; font-weight:700; color:var(--text)}
 .vs.expert .prowctrl{display:flex; gap:6px; flex-wrap:wrap}
 /* Small pill chips (mirrors .vd.expert .ghostchip). */
-.vs.expert .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-size:0.62rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em; transition:all .15s}
+.vs.expert .ghostchip{background:transparent; border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-size:0.6875rem; font-weight:700; padding:4px 10px; border-radius:980px; cursor:pointer; letter-spacing:0.02em; transition:all .15s}
 .vs.expert .ghostchip:hover{color:var(--text); border-color:var(--borderGold)}
 .vs.expert .ghostchip.on{background:var(--goldDim); color:var(--goldBright); border-color:var(--borderGold)}
 .vs.expert .ghostchip:disabled{opacity:0.6; cursor:default}
 /* IBKR status meta. */
-.vs.expert .ibkrmeta{font-size:0.72rem; color:var(--faint)}
+.vs.expert .ibkrmeta{font-size:0.75rem; color:var(--faint)}
 /* P4. Lists & Labels — three compact columns in one card. */
 .vs.expert .llgrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:0}
 .vs.expert .llcol{padding:0 20px; border-left:1px solid var(--border)}
@@ -12482,17 +13438,19 @@ const SET_CSS = `:root{--bg:#08080e; --bg2:#0c0c14; --white:#ffffff;
 .vs.expert .llcol:last-child{padding-right:0}
 .vs.expert .llcol .label{margin-bottom:2px}
 .vs.expert .llgrid .chips{display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; min-height:24px}
-.vs.expert .llgrid .chip{display:inline-flex; align-items:center; gap:5px; font-size:0.7rem; font-weight:600; background:var(--goldDim); border:1px solid var(--borderGold); color:var(--gold); border-radius:8px; padding:4px 9px}
+.vs.expert .llgrid .chip{display:inline-flex; align-items:center; gap:5px; font-size:0.6875rem; font-weight:600; background:var(--w06); border:1px solid var(--w14); color:var(--text); border-radius:8px; padding:4px 9px}
 .vs.expert .llgrid .chip .cx{cursor:pointer; opacity:0.55; font-size:0.85em; line-height:1}
 .vs.expert .llgrid .chip .cx:hover{opacity:1}
 .vs.expert .llrow{display:flex; gap:6px; align-items:center}
-.vs.expert .llrow .in{padding:7px 10px; font-size:0.76rem}
+.vs.expert .llrow .in{padding:7px 10px; font-size:0.75rem}
 @media(max-width:760px){
 .vs.expert .llgrid{grid-template-columns:1fr}
 .vs.expert .llcol{padding:16px 0 0; border-left:none; border-top:1px solid var(--border)}
 .vs.expert .llcol:first-child{padding-top:0; border-top:none} }
 @media(max-width:600px){
-.vs.expert .prow{flex-direction:column; align-items:flex-start; gap:8px} }`;
+.vs.expert .prow{flex-direction:column; align-items:flex-start; gap:8px} }
+${RH_SYS('.vs')}
+${SET_RH}`;
 
 function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setTags, exitReasons, setExitReasons, fontSize, setFontSize, uiTheme = "classic", setUiTheme = () => {}, userEmail, displayName, onDisplayNameChange, session, onIbkrSync, onRunIntegrity, integrityReport, integrityRunning, intradayFeatureEnabled, onToggleIntradayFeature, intradayColumnAvailable, isMobile, isIbkrMode = false, ibkrSyncInfo = null, onSetSyncMode }) {
   const [syncModeBusy, setSyncModeBusy] = useState(false);
@@ -12626,20 +13584,20 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
 
   const renderListManager = (title, description, items, onAdd, onRemove, newVal, setNewVal, placeholder) => (
     <GlassCard style={{ padding: "24px 28px", marginBottom: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: "0.84rem", color: C.white, marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: "0.70rem", color: C.muted, marginBottom: 16 }}>{description}</div>
+      <div style={{ fontWeight: 700, fontSize: "0.875rem", color: C.white, marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 16 }}>{description}</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
         {items.map(item => (
-          <span key={item} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 980, background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.gold, fontSize: "0.72rem", fontWeight: 600 }}>
+          <span key={item} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 980, background: "var(--w06)", border: "1px solid var(--w14)", color: C.text, fontSize: "0.75rem", fontWeight: 600 }}>
             {item}
-            <span onClick={() => onRemove(item)} style={{ cursor: "pointer", opacity: 0.5, fontSize: "0.82rem", lineHeight: 1 }}>&times;</span>
+            <span onClick={() => onRemove(item)} style={{ cursor: "pointer", opacity: 0.5, fontSize: "0.875rem", lineHeight: 1 }}>&times;</span>
           </span>
         ))}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <input type="text" placeholder={placeholder} value={newVal} onChange={e => setNewVal(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") onAdd(); }}
-          style={{ flex: 1, maxWidth: 250, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", color: C.white, fontSize: "0.82rem", fontFamily: font, outline: "none" }}
+          style={{ flex: 1, maxWidth: 250, background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", color: C.white, fontSize: "0.875rem", fontFamily: font, outline: "none" }}
           onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
         <GoldBtn onClick={onAdd} small>Add</GoldBtn>
       </div>
@@ -12713,14 +13671,14 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <div className="ownerzone">
             <div className="ownerhead">
               <span className="ownerbadge">● Owner only</span>
-              <div style={{ flex: 1 }}><div className="cardtitle" style={{ fontSize: "0.98rem" }}>Access management &amp; data protection</div><div className="carddesc" style={{ marginTop: 2 }}>Members never see this section. Manage who can register and back up everyone's data.</div></div>
+              <div style={{ flex: 1 }}><div className="cardtitle" style={{ fontSize: "1rem" }}>Access management &amp; data protection</div><div className="carddesc" style={{ marginTop: 2 }}>Members never see this section. Manage who can register and back up everyone's data.</div></div>
               <div className="seg" id="viewAs" title="Preview what a normal member sees"><button className={!viewAsMember ? "on" : ""} onClick={() => setViewAsMember(false)}>View as owner</button><button className={viewAsMember ? "on" : ""} onClick={() => setViewAsMember(true)}>View as member</button></div>
             </div>
             <div className="membernote">A regular member sees <b>none</b> of this — the entire owner zone is hidden for non-admins. Switch back to <b>View as owner</b> to manage codes, members, and backups.</div>
 
             {/* access code */}
             <div className={"card guide" + gactive("code")} onMouseEnter={guideEnter("code", "Registration code", "The code new members need to create an account. Share it in your community. Set a new one and the old code stops working immediately, so you can rotate it whenever you want.", "/audio/settings-code.mp3")} onMouseLeave={guideLeave("code")}>
-              <div className="cardtitle" style={{ fontSize: "0.95rem" }}>Active registration code</div>
+              <div className="cardtitle" style={{ fontSize: "1rem" }}>Active registration code</div>
               <div className="carddesc">New members need this to sign up. Share it in your Skool community. Setting a new one deactivates the old one immediately.</div>
               <div className="row" style={{ marginTop: 14, gap: 14 }}><span className="codeshow">{activeCode ? activeCode.code : "— none —"}</span>
                 <button className={"btn" + (codeCopied ? " ok" : "")} onClick={() => { if (activeCode) { try { navigator.clipboard.writeText(activeCode.code); } catch {} setCodeCopied(true); setTimeout(() => setCodeCopied(false), 1500); } }} disabled={!activeCode}>{codeCopied ? "Copied ✓" : "Copy"}</button>
@@ -12733,7 +13691,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
 
             {/* members */}
             <div className="card">
-              <div className="cardtitle" style={{ fontSize: "0.95rem" }}>Registered members <span style={{ color: "var(--faint)", fontWeight: 600, fontSize: "0.8rem" }}>· {allMembers.length} total</span></div>
+              <div className="cardtitle" style={{ fontSize: "1rem" }}>Registered members <span style={{ color: "var(--faint)", fontWeight: 600, fontSize: "0.75rem" }}>· {allMembers.length} total</span></div>
               <div style={{ marginTop: 12, maxHeight: 340, overflowY: "auto" }}>
                 {allMembers.map(m => (
                   <div className="memrow" key={m.id}>
@@ -12747,7 +13705,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
 
             {/* backup & restore — handlers copied verbatim from the existing render (write to Supabase) */}
             <div className="card">
-              <div className="cardtitle" style={{ fontSize: "0.95rem" }}>Backup &amp; restore</div>
+              <div className="cardtitle" style={{ fontSize: "1rem" }}>Backup &amp; restore</div>
               <div className="carddesc">Export all member data (positions, trades, profiles, settings). <b>Run a backup before every deploy.</b> Restore is non-destructive — it only adds or updates, never deletes.</div>
               <div className="row" style={{ marginTop: 16, gap: 10 }}>
                 <button className="btn green" onClick={async () => {
@@ -12906,21 +13864,21 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
                   }} />
                 </label>
               </div>
-              <div id="backupStatus" style={{ marginTop: 12, fontSize: "0.76rem", color: backupStatus && (backupStatus.includes("fail") || backupStatus.includes("error") || backupStatus.includes("Invalid")) ? "#fda4a4" : "var(--faint)" }}>{backupStatus}</div>
+              <div id="backupStatus" style={{ marginTop: 12, fontSize: "0.75rem", color: backupStatus && (backupStatus.includes("fail") || backupStatus.includes("error") || backupStatus.includes("Invalid")) ? "#fda4a4" : "var(--faint)" }}>{backupStatus}</div>
             </div>
           </div>
         );
   const mobileSignOut = isMobile && (
           confirmSignOut ? (
             <div style={{ marginTop: 20, padding: "16px", border: "1px solid var(--border)", borderRadius: 16, background: "var(--glass)" }}>
-              <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text)", textAlign: "center", marginBottom: 12 }}>Are you sure you want to sign out?</div>
+              <div style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text)", textAlign: "center", marginBottom: 12 }}>Are you sure you want to sign out?</div>
               <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={() => onLogout && onLogout()} style={{ flex: 1, padding: "12px", background: "rgba(239,68,68,0.14)", border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5", fontFamily: "var(--font)", fontSize: "0.82rem", fontWeight: 700, borderRadius: 980, cursor: "pointer" }}>Yes</button>
-                <button onClick={() => setConfirmSignOut(false)} style={{ flex: 1, padding: "12px", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.82rem", fontWeight: 700, borderRadius: 980, cursor: "pointer" }}>No</button>
+                <button onClick={() => onLogout && onLogout()} style={{ flex: 1, padding: "12px", background: "rgba(255,80,0,0.14)", border: "1px solid rgba(255,80,0,0.4)", color: "var(--redFg)", fontFamily: "var(--font)", fontSize: "0.875rem", fontWeight: 700, borderRadius: 980, cursor: "pointer" }}>Yes</button>
+                <button onClick={() => setConfirmSignOut(false)} style={{ flex: 1, padding: "12px", background: "transparent", border: "1px solid var(--border)", color: "var(--muted)", fontFamily: "var(--font)", fontSize: "0.875rem", fontWeight: 700, borderRadius: 980, cursor: "pointer" }}>No</button>
               </div>
             </div>
           ) : (
-            <button onClick={() => setConfirmSignOut(true)} style={{ marginTop: 20, width: "100%", padding: "13px 16px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.5)", color: "#fca5a5", fontFamily: "var(--font)", fontSize: "0.82rem", fontWeight: 700, borderRadius: 980, cursor: "pointer", boxShadow: "0 0 18px rgba(239,68,68,0.35)" }}>Sign out</button>
+            <button onClick={() => setConfirmSignOut(true)} style={{ marginTop: 20, width: "100%", padding: "13px 16px", background: "rgba(255,80,0,0.12)", border: "1px solid rgba(255,80,0,0.5)", color: "var(--redFg)", fontFamily: "var(--font)", fontSize: "0.875rem", fontWeight: 700, borderRadius: 980, cursor: "pointer", boxShadow: "0 0 18px rgba(255,80,0,0.35)" }}>Sign out</button>
           )
         );
 
@@ -12943,6 +13901,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
             {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
+          <ThemeToggle />
         </div>
 
         {/* P1. COMMAND HEADER */}
@@ -12990,6 +13949,10 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
               <div className="prowctrl" id="prefFont">
                 {FONT_OPTS.map(o => (<button key={o.key} className={"ghostchip" + (fontSize === o.key ? " on" : "")} onClick={() => setFontSize(o.key)}>{o.label}</button>))}
               </div>
+            </div>
+            <div className="prow">
+              <span className="plabel">Appearance</span>
+              <ThemeChoice />
             </div>
             <div className="prow">
               <span className="plabel">Interface style</span>
@@ -13051,7 +14014,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
                 <div className="step"><span className="sn">Step 4 · Delivery settings</span><b>XML, last 365 days</b><p>Format = <code>XML</code>, Period = <b>Last 365 Calendar Days</b>. (Auto-sync only logs trades from your start date forward, so older history won't flood your journal.)</p></div>
                 <div className="step"><span className="sn">Step 5 · General settings</span><b>Leave the defaults</b><p>Date <code>yyyyMMdd</code>, Time <code>HHmmss</code>, Separator <code>;</code>, all Yes/No = No. Click <b>Continue → Create</b>.</p></div>
                 <div className="step"><span className="sn">Step 6 · Copy the Query ID</span><b>Write down the number</b><p>The query now shows a <b>Query ID</b> on the list. Copy it.</p></div>
-                <div className="step"><span className="sn">Step 7 · Get a token</span><b>Flex Web Service</b><p>Find <b>Flex Web Service Configuration</b>, switch <b>Status</b> to <b>on</b>, click <b>Generate New Token</b> (longest expiry), and copy it. <span style={{ color: "var(--goldBright)" }}>Treat it like a password.</span></p></div>
+                <div className="step"><span className="sn">Step 7 · Get a token</span><b>Flex Web Service</b><p>Find <b>Flex Web Service Configuration</b>, switch <b>Status</b> to <b>on</b>, click <b>Generate New Token</b> (longest expiry), and copy it. <span style={{ color: "var(--white)" }}>Treat it like a password.</span></p></div>
                 <div className="step"><span className="sn">Step 8 · Paste &amp; save</span><b>Link your account</b><p>Paste the <b>Query ID</b> and <b>token</b> into the fields above and click <b>Save connection</b>. Then click <b>Turn on auto-sync</b> just below. Done — privately linked to you.</p></div>
               </div>
               <div className="alert ok" style={{ marginTop: 14 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6 9 17l-5-5" /></svg><div><b>Good to know:</b> once auto-sync is on, each closed trade is logged <b>automatically</b> a few minutes after it closes — you never re-type it. The figures come straight from IBKR; you just add your <b>stop</b> (R-multiple stays blank until you do). It's <b>read-only</b> and only ever adds your own broker trades — it never edits or deletes anything else. The dot next to each ticker shows the source: <SourceDot source="manual" /> manual · <SourceDot source="ibkr" /> auto-synced.</div></div>
@@ -13066,7 +14029,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <div className="card">
             <div className="cardhead"><span className="label">Data Integrity</span><span className="infodot" data-tip="Scans your trades and positions for duplicates, orphaned trades, and sign errors. Read-only — it never changes anything.">i</span></div>
             <div className="row">
-              <span className={"conn " + (integ ? (integ.counts.critical > 0 ? "no" : "yes") : "yes")} style={integ && integ.counts.critical > 0 ? { background: "rgba(239,68,68,0.12)", color: "#fda4a4" } : undefined}><span className="d"></span>{integ ? (integ.counts.critical > 0 ? `${integ.counts.critical} critical${integ.counts.warn > 0 ? ` · ${integ.counts.warn} warn` : ""}` : "All clean ✓") : "Auto-checked on every sync"}</span>
+              <span className={"conn " + (integ ? (integ.counts.critical > 0 ? "no" : "yes") : "yes")} style={integ && integ.counts.critical > 0 ? { background: "rgba(255,80,0,0.12)", color: "#fda4a4" } : undefined}><span className="d"></span>{integ ? (integ.counts.critical > 0 ? `${integ.counts.critical} critical${integ.counts.warn > 0 ? ` · ${integ.counts.warn} warn` : ""}` : "All clean ✓") : "Auto-checked on every sync"}</span>
               <span className="ibkrmeta">Auto-runs on every sync</span>
               <div className="spacer"></div>
               {onRunIntegrity && <button className="ghostchip" onClick={onRunIntegrity} disabled={integrityRunning}>{integrityRunning ? "Scanning…" : (integ ? "↻ Re-run check" : "Run check")}</button>}
@@ -13124,6 +14087,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip `false` to relaunch (page + SQL stay ready) */}
           {false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase() && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a className="on" style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
+          <ThemeToggle />
         </div>
 
         {/* HEADER */}
@@ -13181,6 +14145,12 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           </div>
 
           <div className="prefrow">
+            <div className="pl"><div className="t"><span className="term" data-tip="Auto follows your device — the app turns dark when your system does. Pick Dark or Light to override it for this browser.">Appearance</span></div>
+              <div className="d">Auto follows your device's light/dark setting and keeps following it. Pick <b>Dark</b> or <b>Light</b> to lock the app to one. The switch in the top bar does the same thing in one tap.</div></div>
+            <ThemeChoice />
+          </div>
+
+          <div className="prefrow">
             <div className="pl"><div className="t"><span className="term" data-tip="Choose the overall look of the app. VIV Classic is the signature near-black + gold look. Zella Clean is a calmer, flatter alternative with Inter typography, softer whites and a toned-down gold accent — everything else works exactly the same. Switch back any time.">Interface style</span></div>
               <div className="d">VIV Classic is the signature near-black + gold look. <b>Book</b> keeps those exact colours but uses the Model Book's typeface — easier to read at small sizes, and numbers line up in columns. Zella Clean is a calmer, flatter alternative — Inter type, softer whites, muted accent. All switch instantly and you can revert any time.</div></div>
             <div className="seg" id="prefTheme"><button className={uiTheme === "classic" ? "on" : ""} onClick={() => setUiTheme("classic")}>VIV Classic</button><button className={uiTheme === "geist" ? "on" : ""} onClick={() => setUiTheme("geist")}>Book</button><button className={uiTheme === "zella" ? "on" : ""} onClick={() => setUiTheme("zella")}>Zella Clean</button></div>
@@ -13221,10 +14191,10 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
               ON  → trades flow in automatically from your cutover date forward (existing history untouched).
               OFF → manual entry. A user is on one mode or the other, never both. */}
           {onSetSyncMode && (
-            <div style={{ marginTop: 18, padding: "14px 16px", borderRadius: 12, border: "1px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+            <div style={{ marginTop: 18, padding: "14px 16px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--w02)" }}>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: "0.9rem", color: "var(--text)" }}>
+                  <div style={{ fontWeight: 800, fontSize: "0.875rem", color: "var(--text)" }}>
                     {isIbkrMode ? "Auto-sync is ON" : "Auto-sync is OFF"}
                     <span className={"conn " + (isIbkrMode ? "yes" : "no")} style={{ marginLeft: 10 }}><span className="d"></span>{isIbkrMode ? "Live" : "Manual entry"}</span>
                   </div>
@@ -13261,7 +14231,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
                 <div className="step"><span className="sn">Step 4 · Delivery settings</span><b>XML, last 365 days</b><p>Format = <code>XML</code>, Period = <b>Last 365 Calendar Days</b>. (Auto-sync only logs trades from your start date forward, so older history won't flood your journal.)</p></div>
                 <div className="step"><span className="sn">Step 5 · General settings</span><b>Leave the defaults</b><p>Date <code>yyyyMMdd</code>, Time <code>HHmmss</code>, Separator <code>;</code>, all Yes/No = No. Click <b>Continue → Create</b>.</p></div>
                 <div className="step"><span className="sn">Step 6 · Copy the Query ID</span><b>Write down the number</b><p>The query now shows a <b>Query ID</b> on the list. Copy it.</p></div>
-                <div className="step"><span className="sn">Step 7 · Get a token</span><b>Flex Web Service</b><p>Find <b>Flex Web Service Configuration</b>, switch <b>Status</b> to <b>on</b>, click <b>Generate New Token</b> (longest expiry), and copy it. <span style={{ color: "var(--goldBright)" }}>Treat it like a password.</span></p></div>
+                <div className="step"><span className="sn">Step 7 · Get a token</span><b>Flex Web Service</b><p>Find <b>Flex Web Service Configuration</b>, switch <b>Status</b> to <b>on</b>, click <b>Generate New Token</b> (longest expiry), and copy it. <span style={{ color: "var(--white)" }}>Treat it like a password.</span></p></div>
                 <div className="step"><span className="sn">Step 8 · Paste &amp; save</span><b>Link your account</b><p>Paste the <b>Query ID</b> and <b>token</b> into the fields above and click <b>Save connection</b>. Then click <b>Turn on auto-sync</b> just below. Done — privately linked to you.</p></div>
               </div>
               <div className="alert ok" style={{ marginTop: 14 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6 9 17l-5-5" /></svg><div><b>Good to know:</b> once auto-sync is on, each closed trade is logged <b>automatically</b> a few minutes after it closes — you never re-type it. The figures come straight from IBKR; you just add your <b>stop</b> (R-multiple stays blank until you do). It's <b>read-only</b> and only ever adds your own broker trades — it never edits or deletes anything else. The dot next to each ticker shows the source: <SourceDot source="manual" /> manual · <SourceDot source="ibkr" /> auto-synced.</div></div>
@@ -13277,7 +14247,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           <div className="row" style={{ marginTop: 16 }}>
             <span className="conn yes"><span className="d"></span>Auto-checked on every sync</span>
             {integ && (
-              <span className={"conn " + (integ.counts.critical > 0 ? "no" : "yes")} style={integ.counts.critical > 0 ? { background: "rgba(239,68,68,0.12)", color: "#fda4a4" } : undefined}><span className="d"></span>{integ.counts.critical > 0 ? `${integ.counts.critical} critical` : "All clean ✓"}{integ.counts.warn > 0 ? ` · ${integ.counts.warn} warn` : ""}</span>
+              <span className={"conn " + (integ.counts.critical > 0 ? "no" : "yes")} style={integ.counts.critical > 0 ? { background: "rgba(255,80,0,0.12)", color: "#fda4a4" } : undefined}><span className="d"></span>{integ.counts.critical > 0 ? `${integ.counts.critical} critical` : "All clean ✓"}{integ.counts.warn > 0 ? ` · ${integ.counts.warn} warn` : ""}</span>
             )}
             {onRunIntegrity && (
               <button className="btn" onClick={onRunIntegrity} disabled={integrityRunning}>{integrityRunning ? "Scanning…" : (integ ? "↻ Re-run check" : "✓ Run check")}</button>
@@ -13296,12 +14266,12 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             <div className="carddesc">Opt in to features that are still being validated. Toggles are per-browser — flipping them here doesn't affect other members or other devices.</div>
             <div className="prefrow" style={{ marginTop: 8 }}>
               <div className="pl">
-                <div className="t">Intraday Activity <span style={{ fontSize: "0.5rem", fontWeight: 800, padding: "2px 7px", borderRadius: 980, background: "var(--goldDim)", color: "var(--gold)", border: "1px solid var(--borderGold)", letterSpacing: "0.08em", textTransform: "uppercase", marginLeft: 6 }}>Beta</span></div>
+                <div className="t">Intraday Activity <span style={{ fontSize: "0.6875rem", fontWeight: 500, padding: "2px 7px", borderRadius: 980, background: "var(--w06)", color: "var(--text)", border: "1px solid var(--w14)", letterSpacing: 0, marginLeft: 6 }}>Beta</span></div>
                 <div className="d">Adds a “Today” column to Open Positions for logging intraday trims, adds, or notes. <b>Calculation only — does NOT change shares / stop / P/L.</b> IBKR sync overnight auto-matches logged trims to real fills.
-                  {!intradayColumnAvailable && (<><br /><span style={{ color: "var(--red)" }}>⚠ Schema migration not detected — run the <code style={{ color: "var(--goldBright)" }}>positions.intraday_log</code> migration in Supabase before enabling.</span></>)}
+                  {!intradayColumnAvailable && (<><br /><span style={{ color: "var(--red)" }}>⚠ Schema migration not detected — run the <code style={{ color: "var(--white)" }}>positions.intraday_log</code> migration in Supabase before enabling.</span></>)}
                 </div>
               </div>
-              <button onClick={() => onToggleIntradayFeature(!intradayFeatureEnabled)} role="switch" aria-checked={intradayFeatureEnabled} disabled={!intradayColumnAvailable} title={intradayColumnAvailable ? (intradayFeatureEnabled ? "Click to disable" : "Click to enable") : "Run the SQL migration first"} style={{ width: 56, height: 30, borderRadius: 980, border: `1px solid ${intradayFeatureEnabled ? "var(--borderGold)" : "var(--border)"}`, background: intradayFeatureEnabled ? "var(--goldDim)" : "rgba(255,255,255,0.04)", position: "relative", cursor: intradayColumnAvailable ? "pointer" : "not-allowed", opacity: intradayColumnAvailable ? 1 : 0.5, transition: "all 0.2s", fontFamily: "var(--font)", padding: 0, flex: "none" }}>
+              <button onClick={() => onToggleIntradayFeature(!intradayFeatureEnabled)} role="switch" aria-checked={intradayFeatureEnabled} disabled={!intradayColumnAvailable} title={intradayColumnAvailable ? (intradayFeatureEnabled ? "Click to disable" : "Click to enable") : "Run the SQL migration first"} style={{ width: 56, height: 30, borderRadius: 980, border: `1px solid ${intradayFeatureEnabled ? "var(--borderGold)" : "var(--border)"}`, background: intradayFeatureEnabled ? "var(--goldDim)" : "var(--w04)", position: "relative", cursor: intradayColumnAvailable ? "pointer" : "not-allowed", opacity: intradayColumnAvailable ? 1 : 0.5, transition: "all 0.2s", fontFamily: "var(--font)", padding: 0, flex: "none" }}>
                 <span style={{ position: "absolute", top: 3, left: intradayFeatureEnabled ? 28 : 3, width: 22, height: 22, borderRadius: 999, background: intradayFeatureEnabled ? "var(--goldBright)" : "var(--muted)", transition: "left 0.18s ease-out, background 0.18s", boxShadow: intradayFeatureEnabled ? "0 0 8px rgba(240,192,80,0.5)" : "none" }} />
               </button>
             </div>
@@ -13324,7 +14294,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
                 <div className="t">{lm.title}</div>
                 <div className="d">{lm.desc}</div>
                 <div className="chips">{lm.items.map(item => (
-                  <span key={item} className="chip" style={{ background: "var(--goldDim)", borderColor: "var(--borderGold)", color: "var(--gold)" }}>{item}<span onClick={() => lm.onRemove(item)} style={{ cursor: "pointer", opacity: 0.55, fontSize: "0.9rem", lineHeight: 1 }}>&times;</span></span>
+                  <span key={item} className="chip" style={{ background: "var(--w06)", borderColor: "var(--w14)", color: "var(--text)" }}>{item}<span onClick={() => lm.onRemove(item)} style={{ cursor: "pointer", opacity: 0.55, fontSize: "0.875rem", lineHeight: 1 }}>&times;</span></span>
                 ))}</div>
                 <div className="row" style={{ marginTop: 10, alignItems: "flex-end" }}>
                   <input className="in" style={{ maxWidth: 260 }} value={lm.val} onChange={e => lm.setVal(e.target.value)} onKeyDown={e => { if (e.key === "Enter") lm.onAdd(); }} placeholder={lm.ph} />
@@ -13405,6 +14375,7 @@ function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("mentor")}>Mentor</a> /* MENTOR MODE HIDDEN — flip to relaunch */}
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
+          <ThemeToggle />
         </div>
         <ModelBookPage C={C} font={font} session={session} isAdmin={isAdmin} journaledTrades={journaledTrades} />
       </div>
@@ -13427,13 +14398,14 @@ function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
 // identity on every parent render, so React unmounts and remounts it and the fetched data is lost.
 
 // Dot colours are FULL-SATURATION on purpose (Valen 2026-08-06: "striking colour, obvious
-// difference") — red at risk · gold risk-free · green profit locked, each with a matching glow.
+// difference") — red at risk · blue risk-free · green profit locked, each with a matching glow.
 const LT_STATUS = {
-  "At Risk":       { fg: "#fca5a5", bg: "rgba(239,68,68,0.10)",  bd: "rgba(239,68,68,0.30)",  rail: "#f23645", glow: "rgba(242,54,69,0.55)" },
-  "Risk-Free":     { fg: "#f0c050", bg: "rgba(201,152,42,0.13)", bd: "rgba(201,152,42,0.38)", rail: "#f5b514", glow: "rgba(245,181,20,0.55)" },
-  "Profit Locked": { fg: "#86efac", bg: "rgba(34,197,94,0.11)",  bd: "rgba(34,197,94,0.32)",  rail: "#17c964", glow: "rgba(23,201,100,0.55)" },
+  "At Risk":       { fg: "var(--redFg)", bg: "rgba(255,80,0,0.10)",  bd: "rgba(255,80,0,0.30)",  rail: "var(--red)", glow: "rgba(255,80,0,0.55)" },
+  // Gold means BRAND only, never status (Valen 2026-08-06) — Risk-Free moved to the blue family.
+  "Risk-Free":     { fg: "var(--blueFg)", bg: "rgba(59,158,255,0.10)", bd: "rgba(59,158,255,0.35)", rail: "var(--blue)", glow: "rgba(59,158,255,0.50)" },
+  "Profit Locked": { fg: "var(--greenFg)", bg: "rgba(0,200,5,0.11)",  bd: "rgba(0,200,5,0.32)",  rail: "var(--green)", glow: "rgba(0,200,5,0.55)" },
 };
-const LT_HAIR = "rgba(255,255,255,0.065)";
+const LT_HAIR = "var(--hair)";
 // Viewport width, local to this block so the overlay carries no outside dependency.
 function useLtNarrow() {
   const [w, setW] = useState(() => (typeof window === "undefined" ? 1200 : window.innerWidth));
@@ -13449,27 +14421,56 @@ function LiveTradesFab({ C, font, isMobile }) {
   const narrow = useLtNarrow();
   const phone = isMobile == null ? narrow : !!isMobile;
   const [open, setOpen] = useState(false);
-  const [data, setData] = useState(null);
-  const [state, setState] = useState("idle"); // idle | loading | ready | error
+  // ─── Stale-while-revalidate (Valen 2026-08-06) ───
+  // The drawer used to fetch only on first OPEN, so the member watched "Loading the live book…"
+  // through a serverless cold start every session. Now: (1) the last good payload is read from
+  // localStorage synchronously, so opening paints instantly; (2) the network pull starts on
+  // MOUNT, not on open, so it is usually already home by the time they tap. The API and its
+  // 2-min server cache are untouched.
+  const LT_CACHE_KEY = "viv-lt-cache";
+  const [data, setData] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LT_CACHE_KEY);
+      if (!raw) return null;
+      const j = JSON.parse(raw);
+      return j && Array.isArray(j.open) ? j : null;
+    } catch { return null; }
+  });
+  // Cached payload present ⇒ we already have something to render: never show a spinner over it.
+  const [state, setState] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LT_CACHE_KEY);
+      const j = raw ? JSON.parse(raw) : null;
+      return j && Array.isArray(j.open) ? "ready" : "idle";
+    } catch { return "idle"; }
+  });
   const pulled = useRef(false);
 
-  // Pulled the first time the overlay is opened, once. A member who never taps it costs the
-  // endpoint nothing, and re-opening reuses what was already fetched.
+  // Fires ONCE on mount (the single-fetch guard is unchanged). A revalidation that fails leaves
+  // the cached book on screen rather than replacing good data with an error.
   useEffect(() => {
-    if (!open || pulled.current) return;
+    if (pulled.current) return;
     pulled.current = true;
-    setState("loading");
+    let alive = true;
+    const hadCache = state === "ready";
+    if (!hadCache) setState("loading");
     (async () => {
       try {
         const r = await fetch("/api/live-trades");
         if (!r.ok) throw new Error("bad status");
         const j = await r.json();
-        if (!j || j.error) { setState("error"); return; }
-        setData(j);
+        if (!alive) return;
+        if (!j || j.error) { if (!hadCache) setState("error"); return; }
+        setData(j);              // silent swap when fresh data lands
         setState("ready");
-      } catch { setState("error"); }
+        try { localStorage.setItem(LT_CACHE_KEY, JSON.stringify(j)); } catch {}
+      } catch {
+        if (alive && !hadCache) setState("error");
+      }
     })();
-  }, [open]);
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const rows = data && Array.isArray(data.open) ? data.open : [];
 
@@ -13497,9 +14498,9 @@ function LiveTradesFab({ C, font, isMobile }) {
       hairlines only, exactly the book-page grammar. */}
   const LT_GEIST = "'Geist','Plus Jakarta Sans',-apple-system,sans-serif";
   const LT_MONO = "'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace";
-  const muted = { fontFamily: LT_GEIST, fontSize: "0.7rem", fontWeight: 500, letterSpacing: "0.01em", color: C.muted, whiteSpace: "nowrap" };
-  const val = { fontFamily: LT_MONO, fontSize: phone ? "0.84rem" : "0.87rem", fontWeight: 600, color: "#fff", fontVariantNumeric: "tabular-nums", letterSpacing: "0" };
-  const foot = { fontFamily: LT_GEIST, fontSize: "0.7rem", fontWeight: 500, color: "rgba(255,255,255,0.50)", lineHeight: 1.65 };
+  const muted = { fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.01em", color: C.muted, whiteSpace: "nowrap" };
+  const val = { fontFamily: LT_MONO, fontSize: phone ? "0.84rem" : "0.87rem", fontWeight: 600, color: "var(--white)", fontVariantNumeric: "tabular-nums", letterSpacing: "0" };
+  const foot = { fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 500, color: "var(--muted)", lineHeight: 1.65 };
   const chipRow = (label, value) => (
     <div key={label} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "8px 0" }}>
       <span style={muted}>{label}</span>
@@ -13521,28 +14522,33 @@ function LiveTradesFab({ C, font, isMobile }) {
           aria-expanded={isOpen}
           style={{
             display: "flex", alignItems: "center", gap: 10, width: "100%",
-            padding: "13px 2px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
+            padding: "9px 2px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
           }}
         >
-          <span style={{ fontFamily: LT_GEIST, fontSize: phone ? "1rem" : "1.06rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#fff", lineHeight: 1 }}>{o.tk}</span>
+          {/* Two-line left block (Valen 2026-08-06): ticker on top, the status WORD underneath in
+              its own status colour — the dot alone made members guess what the colour meant. */}
+          <span style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+            <span style={{ fontFamily: LT_GEIST, fontSize: phone ? "1rem" : "1.06rem", fontWeight: 600, letterSpacing: "-0.02em", color: "var(--white)", lineHeight: 1 }}>{o.tk}</span>
+            <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: s.fg, lineHeight: 1, whiteSpace: "nowrap" }}>{o.status}</span>
+          </span>
           <span style={{ width: 9, height: 9, borderRadius: 99, background: s.rail, boxShadow: `0 0 8px ${s.glow}`, flex: "0 0 auto" }} />
-          <span style={{ marginLeft: "auto", fontFamily: LT_MONO, fontSize: "0.76rem", fontWeight: 600, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>
+          <span style={{ marginLeft: "auto", fontFamily: LT_MONO, fontSize: "0.75rem", fontWeight: 600, color: "var(--white)", fontVariantNumeric: "tabular-nums" }}>
             {o.sizePct == null ? "—" : o.sizePct.toFixed(1) + "%"}
           </span>
-          <span style={{ fontFamily: LT_GEIST, fontSize: "0.62rem", fontWeight: 600, color: "rgba(255,255,255,0.4)", transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .18s" }}>▾</span>
+          <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 600, color: "var(--faint)", transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .18s" }}>▾</span>
         </button>
         {isOpen && <div style={{ padding: "0 2px 12px" }}>
         {/* Direction row removed — the Longs/Shorts section header already carries it. */}
         {chipRow("Status", (
           <span style={{
-            display: "inline-block", fontFamily: LT_GEIST, fontSize: "0.66rem", fontWeight: 700, letterSpacing: "0.04em",
-            textTransform: "uppercase", color: s.fg, whiteSpace: "nowrap",
+            display: "inline-block", fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.04em",
+            color: s.fg, whiteSpace: "nowrap",
           }}>{o.status}</span>
         ))}
         {chipRow("Position size", (
-          <span style={{ ...val, color: C.goldBright }}>
+          <span style={{ ...val, color: C.white }}>
             {o.sizePct == null ? "—" : o.sizePct.toFixed(1) + "%"}
-            <span style={{ fontFamily: LT_GEIST, fontSize: "0.66rem", fontWeight: 500, color: "rgba(255,255,255,0.42)" }}>&nbsp;of account</span>
+            <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 500, color: "var(--faint)" }}>&nbsp;of account</span>
           </span>
         ))}
         {/* Entry date/price + BOTH stops (Valen 2026-08-06: "always use Original Stoploss,
@@ -13557,8 +14563,8 @@ function LiveTradesFab({ C, font, isMobile }) {
           return (
             <span style={val}>
               {eff == null ? "—" : Number(eff).toFixed(2)}
-              {be && <span style={{ fontFamily: LT_GEIST, fontSize: "0.66rem", fontWeight: 500, color: "rgba(255,255,255,0.42)" }}>&nbsp;breakeven</span>}
-              {!be && o.trail != null && <span style={{ fontFamily: LT_GEIST, fontSize: "0.66rem", fontWeight: 500, color: "rgba(255,255,255,0.42)" }}>&nbsp;trailed</span>}
+              {be && <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 500, color: "var(--faint)" }}>&nbsp;breakeven</span>}
+              {!be && o.trail != null && <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 500, color: "var(--faint)" }}>&nbsp;trailed</span>}
             </span>
           );
         })())}
@@ -13576,8 +14582,8 @@ function LiveTradesFab({ C, font, isMobile }) {
   const shortRows = sortedRows.filter((o) => (o.side || "Long") === "Short");
   const secHead = (label) => (
     <div style={{
-      fontFamily: LT_GEIST, fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.12em",
-      textTransform: "uppercase", color: C.gold, padding: "12px 2px 4px",
+      fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.12em",
+      color: C.muted, padding: "12px 2px 4px",
     }}>{label}</div>
   );
 
@@ -13585,15 +14591,21 @@ function LiveTradesFab({ C, font, isMobile }) {
     <>
       <style>{`
         @keyframes vivltIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
-        .vivlt-drawer{animation:vivltIn .28s cubic-bezier(0.22,1,0.36,1)}
-        @keyframes vivltPulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,0.55)}70%{box-shadow:0 0 0 6px rgba(34,197,94,0)}}
+        .vivlt-drawer{animation:vivltIn var(--t-med) var(--ease)}
+        @keyframes vivltPulse{0%,100%{box-shadow:0 0 0 0 rgba(240,192,80,0.55)}70%{box-shadow:0 0 0 6px rgba(240,192,80,0)}}
         .vivlt-live{animation:vivltPulse 2s infinite}
-        @media (prefers-reduced-motion: reduce){.vivlt-drawer,.vivlt-live{animation:none}}
+        @keyframes vivltShimmer{0%,100%{opacity:0.32}50%{opacity:0.62}}
+        .vivlt-sk{background:var(--w08); border-radius:6px; animation:vivltShimmer 1.35s ease-in-out infinite}
+        .vivlt-skrow{display:flex; align-items:center; gap:12px; padding:15px 2px; border-bottom:1px solid var(--w06)}
+        .vivlt-skrow:nth-child(2) .vivlt-sk{animation-delay:.18s}
+        .vivlt-skrow:nth-child(3) .vivlt-sk{animation-delay:.36s}
+        @media (prefers-reduced-motion: reduce){.vivlt-drawer,.vivlt-live,.vivlt-sk{animation:none}}
       `}</style>
 
       {/* Floating launcher — the Feedback button's shape, stacked directly above it so the two
           never overlap, and gold-tinted GLASS rather than solid gold so they read as different.
-          The pulsing green dot is the "live" symbol (Valen 2026-08-06, replaced the chart icon). */}
+          The pulsing GOLD dot is the "live" symbol (Valen 2026-08-06 — gold = brand = this is VIV,
+          this is live; green now belongs to Profit Locked only). */}
       <button
         data-wllt
         onClick={() => setOpen(true)}
@@ -13602,13 +14614,13 @@ function LiveTradesFab({ C, font, isMobile }) {
           position: "fixed", right: phone ? 16 : 24, bottom: phone ? 134 : 80, zIndex: 1050,
           display: "inline-flex", alignItems: "center", gap: 9,
           background: "rgba(201,152,42,0.14)", color: C.goldBright,
-          border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 800, fontSize: "0.76rem",
+          border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 800, fontSize: "0.75rem",
           padding: "10px 16px", borderRadius: 99, cursor: "pointer", letterSpacing: "-0.01em",
           backdropFilter: "blur(20px) saturate(150%)", WebkitBackdropFilter: "blur(20px) saturate(150%)",
           boxShadow: "0 12px 30px rgba(0,0,0,0.45)",
         }}
       >
-        <span className="vivlt-live" style={{ width: 9, height: 9, borderRadius: 99, background: "#22c55e", display: "inline-block", flex: "0 0 auto" }} />
+        <span className="vivlt-live" style={{ width: 9, height: 9, borderRadius: 99, background: C.goldBright, display: "inline-block", flex: "0 0 auto" }} />
         Live Trades
       </button>
 
@@ -13622,8 +14634,10 @@ function LiveTradesFab({ C, font, isMobile }) {
           style={{
             position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 1340, fontFamily: font,
             width: "min(400px, 92vw)", display: "flex", flexDirection: "column",
-            background: "linear-gradient(180deg, rgba(18,18,26,0.97), rgba(8,8,14,0.99))",
-            borderLeft: `1px solid ${C.borderGold}`, boxShadow: "-24px 0 70px rgba(0,0,0,0.55)",
+            // Robinhood's glass recipe on dark; the .viv-glass rule swaps it for a plain white
+            // panel + one soft drop on light, where translucent grey reads as dirt.
+            background: "var(--glass)",
+            borderLeft: `1px solid ${C.borderGold}`, boxShadow: "var(--shadowOv)",
             backdropFilter: "blur(30px) saturate(160%)", WebkitBackdropFilter: "blur(30px) saturate(160%)",
           }}
         >
@@ -13636,26 +14650,60 @@ function LiveTradesFab({ C, font, isMobile }) {
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${C.gold}, ${C.goldBright}, ${C.gold}, transparent)`, opacity: 0.85 }} />
 
             <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", paddingBottom: 11, borderBottom: `1px solid ${C.border}`, marginBottom: 14 }}>
-              <span className="vivlt-live" style={{ width: 8, height: 8, borderRadius: 99, background: "#22c55e", display: "inline-block", flex: "0 0 auto" }} />
-              <span style={{ fontFamily: "'Geist','Plus Jakarta Sans',sans-serif", fontSize: "0.9rem", fontWeight: 700, letterSpacing: "-0.02em", color: "rgba(255,255,255,0.95)" }}>Live Trades</span>
-              {state === "ready" && <span style={{ fontSize: "0.6rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{rows.length} open</span>}
-              {state === "ready" && <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>as of {data.asof} {wlWkd(data.asof)}</span>}
+              <span className="vivlt-live" style={{ width: 8, height: 8, borderRadius: 99, background: C.goldBright, display: "inline-block", flex: "0 0 auto" }} />
+              <span style={{ fontFamily: "'Geist','Plus Jakarta Sans',sans-serif", fontSize: "0.875rem", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text)" }}>Live Trades</span>
+              {state === "ready" && <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: C.text, background: "var(--w06)", borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{rows.length} open</span>}
+              {state === "ready" && <span style={{ marginLeft: "auto", fontSize: "0.6875rem", fontWeight: 700, color: C.muted, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>as of {data.asof} {wlWkd(data.asof)}</span>}
               <button
                 onClick={() => setOpen(false)}
                 title="Close"
-                style={{ marginLeft: state === "ready" ? 0 : "auto", background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, color: C.muted, width: 32, height: 32, borderRadius: 10, fontSize: "1.2rem", cursor: "pointer", lineHeight: 1, flex: "0 0 auto", fontFamily: font }}
+                style={{ marginLeft: state === "ready" ? 0 : "auto", background: "var(--w04)", border: `1px solid ${C.border}`, color: C.muted, width: 32, height: 32, borderRadius: 10, fontSize: "1.25rem", cursor: "pointer", lineHeight: 1, flex: "0 0 auto", fontFamily: font }}
               >&times;</button>
             </div>
 
-            {state === "loading" && <div style={{ ...foot, textAlign: "center", padding: "18px 0" }}>Loading the live book…</div>}
+            {/* TRUE-COLD ONLY — with a cached book this branch never renders (state starts
+                "ready"). Three skeleton rows mirror the collapsed accordion: dot · ticker · size%. */}
+            {state === "loading" && (
+              <div aria-busy="true" aria-label="Loading the live book">
+                {[0, 1, 2].map(i => (
+                  <div className="vivlt-skrow" key={i}>
+                    <span className="vivlt-sk" style={{ width: 8, height: 8, borderRadius: 99, flex: "0 0 auto" }} />
+                    <span className="vivlt-sk" style={{ width: 54, height: 13 }} />
+                    <span className="vivlt-sk" style={{ width: 78, height: 11, marginLeft: "auto" }} />
+                  </div>
+                ))}
+              </div>
+            )}
             {state === "error" && <div style={{ ...foot, textAlign: "center", padding: "18px 0" }}>The live book is not available right now.</div>}
             {state === "ready" && (rows.length === 0
               ? <div style={{ ...foot, padding: "6px 2px 4px" }}>No open positions right now — flat is a position too.</div>
               : <>
+                  {/* Book summary line (Valen 2026-08-06): how many are open, and how protected the
+                      book is, in one hairline-separated line. Buckets with a zero count stay hidden. */}
+                  {(() => {
+                    const cnt = { "At Risk": 0, "Risk-Free": 0, "Profit Locked": 0 };
+                    sortedRows.forEach((o) => { if (cnt[o.status] != null) cnt[o.status] += 1; });
+                    const split = [["At Risk", "At risk"], ["Risk-Free", "Risk-free"], ["Profit Locked", "Profit locked"]].filter(([k]) => cnt[k] > 0);
+                    const cap = { fontFamily: LT_MONO, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: "var(--muted)" };
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "0 2px 10px", borderBottom: `1px solid ${C.border}` }}>
+                        <span className="vivlt-live" style={{ width: 7, height: 7, borderRadius: 99, background: C.goldBright, display: "inline-block", flex: "0 0 auto" }} />
+                        <span style={{ fontFamily: LT_MONO, fontSize: "0.875rem", fontWeight: 600, color: "var(--white)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{sortedRows.length}</span>
+                        <span style={cap}>open</span>
+                        {split.map(([k, label], i) => (
+                          <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: i === 0 ? "auto" : 0 }}>
+                            {i > 0 && <span style={{ color: "var(--faint)", fontSize: "0.6875rem", lineHeight: 1 }}>·</span>}
+                            <span style={{ fontFamily: LT_MONO, fontSize: "0.75rem", fontWeight: 600, color: (LT_STATUS[k] || {}).fg, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{cnt[k]}</span>
+                            <span style={cap}>{label}</span>
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   {/* Column labels (Valen 2026-08-06): the size % needs its name above it. */}
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "2px 2px 6px", borderBottom: `1px solid ${C.border}` }}>
-                    <span style={{ fontFamily: LT_GEIST, fontSize: "0.56rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.42)" }}>Ticker · status</span>
-                    <span style={{ marginLeft: "auto", fontFamily: LT_GEIST, fontSize: "0.56rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.42)" }}>Position size</span>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "10px 2px 6px", borderBottom: `1px solid ${C.border}` }}>
+                    <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: "var(--faint)" }}>Ticker · status</span>
+                    <span style={{ marginLeft: "auto", fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: "var(--faint)" }}>Position size</span>
                   </div>
                   {longRows.length > 0 && secHead("Longs")}
                   {longRows.map(card)}
@@ -13690,6 +14738,7 @@ function DailySetupsShell({ setPage, session, displayName }) {
           {false && practiceAllowed(session) && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("practice")}>Practice</a> /* PRACTICE HIDDEN (Valen 2026-07-30) */}
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
+          <ThemeToggle />
         </div>
         {/* 🎯 THE HUNT LIST lives HERE (Valen 2026-08-05: "it shouldn't be in dashboard, it should be
             under daily trade setup — have this new one instead"). The old setups feed is HIDDEN, not
@@ -13722,6 +14771,7 @@ function MentorShell({ setPage, session }) {
             <a className="on" style={{ cursor: "pointer" }}>Mentor</a>
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
+          <ThemeToggle />
         </div>
         <div className="reveal in-view" style={{ marginBottom: 10 }}>
           <div className="eyebrow">Mentorship</div>
@@ -13757,6 +14807,7 @@ function QuantShell({ setPage, session }) {
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
+          <ThemeToggle />
         </div>
         <QuantAnalysis C={C} font={font} session={session} />
       </div>
@@ -13785,6 +14836,7 @@ function BurstLogShell({ setPage, session }) {
             <a className="on" style={{ cursor: "pointer" }}>Bursts</a>
             <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
+          <ThemeToggle />
         </div>
         <BurstLog C={C} font={font} />
       </div>
@@ -13812,6 +14864,7 @@ function PracticeShell({ setPage, session }) {
             <a className="on" style={{ cursor: "pointer" }}>Practice</a>
             {false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("quant")}>Quant</a> /* QUANT HIDDEN (Valen 2026-07-30) */}{false && isAdmin && <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("burstlog")}>Bursts</a> /* BURSTS HIDDEN (Valen 2026-07-30) */}            <a style={{ cursor: "pointer" }} onClick={() => setPage && setPage("settings")}>Settings</a>
           </div>
+          <ThemeToggle />
         </div>
         <PracticeMode C={C} font={font} session={session} />
       </div>
@@ -13927,7 +14980,7 @@ function AuthPage() {
     setLoading(false);
   };
 
-  const inp = { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 16px", color: C.white, fontSize: "0.88rem", fontWeight: 500, fontFamily: font, outline: "none" };
+  const inp = { width: "100%", boxSizing: "border-box", background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 16px", color: C.white, fontSize: "0.875rem", fontWeight: 500, fontFamily: font, outline: "none" };
 
   return (
     <div style={{ fontFamily: font, background: C.bg, minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased", color: C.text, position: "relative", overflow: "hidden" }}>
@@ -13939,44 +14992,44 @@ function AuthPage() {
           {/* VIV Logo mark */}
           <img src="/logo-mark.png" alt="Valen Insiders Vault" style={{ width:88,height:"auto",display:"block",margin:"0 auto 16px",filter:"drop-shadow(0 0 22px rgba(201,152,42,0.4))" }} />
           <Wordmark size="1.6rem" style={{ marginBottom: 8 }} />
-          <div style={{ fontWeight: 400, fontSize: "0.82rem", color: C.muted, lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 400, fontSize: "0.875rem", color: C.muted, lineHeight: 1.6 }}>
             {mode === "login" ? "Members-only trading dashboard." : mode === "register" ? "Create your account to get started." : "Reset your password."}
           </div>
         </div>
         <GlassCard style={{ padding: "32px 28px" }}>
           <form onSubmit={mode === "login" ? handleLogin : mode === "register" ? handleRegister : handleForgot}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Email</label>
+              <label style={{ fontWeight: 500, fontSize: "0.6875rem", letterSpacing: 0, color: C.muted, marginBottom: 8, display: "block" }}>Email</label>
               <input type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} style={inp} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
             </div>
             {mode !== "forgot" && (
               <div style={{ marginBottom: 16 }}>
-                <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Password</label>
+                <label style={{ fontWeight: 500, fontSize: "0.6875rem", letterSpacing: 0, color: C.muted, marginBottom: 8, display: "block" }}>Password</label>
                 <input type="password" placeholder={mode === "register" ? "Min 6 characters" : "Your password"} value={password} onChange={e => setPassword(e.target.value)} style={inp} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
               </div>
             )}
             {mode === "register" && (
               <>
                 <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Confirm Password</label>
+                  <label style={{ fontWeight: 500, fontSize: "0.6875rem", letterSpacing: 0, color: C.muted, marginBottom: 8, display: "block" }}>Confirm Password</label>
                   <input type="password" placeholder="Repeat password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inp} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
                 </div>
                 <div style={{ marginBottom: 24 }}>
-                  <label style={{ fontWeight: 700, fontSize: "0.60rem", letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted, marginBottom: 8, display: "block" }}>Access Code</label>
+                  <label style={{ fontWeight: 500, fontSize: "0.6875rem", letterSpacing: 0, color: C.muted, marginBottom: 8, display: "block" }}>Access Code</label>
                   <input type="text" placeholder="Code from Skool community" value={accessCode} onChange={e => setAccessCode(e.target.value.toUpperCase())} style={{ ...inp, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace", fontWeight: 700 }} onFocus={e => e.target.style.borderColor = C.gold} onBlur={e => e.target.style.borderColor = C.border} />
                 </div>
               </>
             )}
-            {error && <div style={{ padding: "10px 14px", borderRadius: 10, background: C.redDim, border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: "0.74rem", fontWeight: 500, marginBottom: 16 }}>{error}</div>}
-            {success && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", color: C.green, fontSize: "0.74rem", fontWeight: 500, marginBottom: 16 }}>{success}</div>}
+            {error && <div style={{ padding: "10px 14px", borderRadius: 10, background: C.redDim, border: "1px solid rgba(255,80,0,0.2)", color: "var(--redFg)", fontSize: "0.75rem", fontWeight: 500, marginBottom: 16 }}>{error}</div>}
+            {success && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(0,200,5,0.08)", border: "1px solid rgba(0,200,5,0.25)", color: C.green, fontSize: "0.75rem", fontWeight: 500, marginBottom: 16 }}>{success}</div>}
             <button type="submit" disabled={loading} style={{
               width: "100%", padding: "14px", borderRadius: 980, border: "none", cursor: loading ? "wait" : "pointer",
               background: `linear-gradient(135deg, ${C.goldMid}, ${C.goldBright}, ${C.goldDeep})`, color: "#000",
-              fontWeight: 800, fontSize: "0.88rem", fontFamily: font, letterSpacing: "-0.01em",
+              fontWeight: 800, fontSize: "0.875rem", fontFamily: font, letterSpacing: "-0.01em",
               opacity: loading ? 0.7 : 1, transition: "opacity 0.2s",
             }}>{loading ? "Please wait..." : mode === "login" ? "Sign In" : mode === "register" ? "Create Account" : "Send Reset Email"}</button>
           </form>
-          <div style={{ marginTop: 16, textAlign: "center", fontSize: "0.70rem", color: C.muted }}>
+          <div style={{ marginTop: 16, textAlign: "center", fontSize: "0.6875rem", color: C.muted }}>
             {mode === "login" && (<>
               <span onClick={() => { setMode("forgot"); setError(""); setSuccess(""); }} style={{ color: C.gold, cursor: "pointer", fontWeight: 600 }}>Forgot password?</span>
               <span style={{ margin: "0 8px" }}>·</span>
@@ -13986,7 +15039,7 @@ function AuthPage() {
             {mode === "forgot" && <span>Remember your password? <span onClick={() => { setMode("login"); setError(""); setSuccess(""); }} style={{ color: C.gold, cursor: "pointer", fontWeight: 600 }}>Sign in</span></span>}
           </div>
         </GlassCard>
-        <div style={{ textAlign: "center", marginTop: 20, fontSize: "0.68rem", color: C.muted, lineHeight: 1.6 }}>
+        <div style={{ textAlign: "center", marginTop: 20, fontSize: "0.6875rem", color: C.muted, lineHeight: 1.6 }}>
           Need an access code?<br />
           <a href="https://www.skool.com/valensontrades/about" target="_blank" rel="noopener noreferrer" style={{ color: C.gold, fontWeight: 600, textDecoration: "none" }}>Join the Skool community</a> to get one.
         </div>
@@ -14045,7 +15098,7 @@ const mobileCSS = `
 @media (max-width: 767px) {
   /* Global font baseline — slightly smaller body text on phones */
   body, .viv-mobile-root { font-size: 14px; }
-  h1 { font-size: 1.35rem !important; line-height: 1.2 !important; letter-spacing: -0.03em !important; }
+  h1 { font-size: 1.25rem !important; line-height: 1.2 !important; letter-spacing: -0.03em !important; }
   h2 { font-size: 1rem !important; line-height: 1.25 !important; }
 
   /* Phone: hide the top page-nav tabs (Dashboard/Journal/Premium tools/Settings) for a cleaner mobile header */
@@ -14082,7 +15135,7 @@ const mobileCSS = `
   [style*='margin-bottom: 20px'] { margin-bottom: 14px !important; }
 
   /* Tables: compact rows + smaller font (most tables already scroll horizontally) */
-  table th, table td { padding: 5px 4px !important; font-size: 0.62rem !important; }
+  table th, table td { padding: 5px 4px !important; font-size: 0.6875rem !important; }
 
   /* iOS: sub-16px inputs trigger Safari zoom-on-focus */
   input, textarea, select { font-size: 16px !important; }
@@ -14102,8 +15155,8 @@ const mobileCSS = `
   }
 
   /* Big hero numbers (1.5rem+, 2rem) → scale down */
-  [style*='font-size: 2rem'] { font-size: 1.4rem !important; }
-  [style*='font-size: 1.5rem'] { font-size: 1.15rem !important; }
+  [style*='font-size: 2rem'] { font-size: 1.25rem !important; }
+  [style*='font-size: 1.25rem'] { font-size: 1.125rem !important; }
 }
 @media (max-width: 420px) {
   /* Tiniest phones — make stat tiles single-column so labels and big numbers stay readable */
@@ -14143,10 +15196,10 @@ const mobileCSS = `
   .vd.expert .cmdheader .eyebrow, .vs.expert .cmdheader .eyebrow { display: none !important; }
   .vp.expert .cmdleft .ch1, .vj.expert .cmdleft .ch1,
   .vd.expert .cmdleft .ch1, .vs.expert .cmdleft .ch1 {
-    font-size: 1.15rem !important; margin-top: 0 !important; line-height: 1.2 !important;
+    font-size: 1.125rem !important; margin-top: 0 !important; line-height: 1.2 !important;
   }
   .vp.expert .cmdmeta, .vj.expert .cmdmeta, .vd.expert .cmdmeta, .vs.expert .cmdmeta {
-    font-size: 0.66rem !important; margin-top: 3px !important; line-height: 1.4 !important;
+    font-size: 0.6875rem !important; margin-top: 3px !important; line-height: 1.4 !important;
   }
   .vp.expert .cmdactions, .vj.expert .cmdactions, .vd.expert .cmdactions, .vs.expert .cmdactions {
     width: 100% !important; gap: 6px !important;
@@ -14157,13 +15210,13 @@ const mobileCSS = `
   .vd.expert .cmdactions .btn, .vs.expert .cmdactions .btn {
     display: inline-flex !important; align-items: center !important; justify-content: center !important;
     width: 100% !important; box-sizing: border-box !important;
-    padding: 8px 8px !important; font-size: 0.64rem !important; min-height: 32px !important; white-space: nowrap !important;
+    padding: 8px 8px !important; font-size: 0.6875rem !important; min-height: 32px !important; white-space: nowrap !important;
   }
   .vj.expert .cmdactions .ddwrap { display: flex !important; }
 
   /* ── 3. GUIDED HEADERS — same idea, one size down ── */
-  .vp .h1, .vj .h1, .vd .h1, .vs .h1 { font-size: 1.28rem !important; letter-spacing: -0.03em !important; }
-  .vp .sub, .vj .sub, .vd .sub, .vs .sub { font-size: 0.72rem !important; line-height: 1.45 !important; margin-top: 4px !important; }
+  .vp .h1, .vj .h1, .vd .h1, .vs .h1 { font-size: 1.25rem !important; letter-spacing: -0.03em !important; }
+  .vp .sub, .vj .sub, .vd .sub, .vs .sub { font-size: 0.75rem !important; line-height: 1.45 !important; margin-top: 4px !important; }
   .vd .hero { gap: 10px !important; margin-top: 12px !important; }
 
   /* ── 4. CARD CHROME — tighter radius + padding reads as an app, not a web page ── */
@@ -14177,87 +15230,87 @@ const mobileCSS = `
   .vd.expert .cardhead, .vj.expert .cardhead { padding-bottom: 8px !important; margin-bottom: 10px !important; gap: 6px !important; }
   .vd .toolbar, .vj .toolbar, .vp .toolbar, .vs .toolbar { margin: 14px 0 8px !important; gap: 8px !important; }
   .vd .sech, .vj .sech, .vp .sech, .vs .sech,
-  .vd .toolbar h2, .vj .toolbar h2 { font-size: 0.86rem !important; }
+  .vd .toolbar h2, .vj .toolbar h2 { font-size: 0.875rem !important; }
 
   /* ── 5. SEGMENTED CONTROLS — "Pro · all columns" was ~222px wide and forced a wrap.
      The label itself is shortened to "Pro" in JSX on mobile; this shrinks the pill. ── */
   .vp .seg button, .vj .seg button, .vd .seg button, .vs .seg button {
-    padding: 6px 11px !important; font-size: 0.66rem !important;
+    padding: 6px 11px !important; font-size: 0.6875rem !important;
   }
   .vp .seg, .vj .seg, .vd .seg, .vs .seg { max-width: 100% !important; }
   .vp.expert .toolseg { margin: 10px 0 12px !important; }
-  .vp.expert .toolseg button { padding: 7px 12px !important; font-size: 0.68rem !important; }
+  .vp.expert .toolseg button { padding: 7px 12px !important; font-size: 0.6875rem !important; }
 
   /* ── 6. OPEN POSITIONS (Pro) — the fused mobile summary strip.
      ~230px of header + allocation chrome before row one becomes ~72px; tapping the
      summary reveals the identical legend (see .allocdet). ── */
   .vd.expert .poshead.mobposhead { padding-bottom: 8px !important; margin-bottom: 0 !important; gap: 6px !important; }
-  .vd.expert .poshead.mobposhead h2 { font-size: 0.82rem !important; }
+  .vd.expert .poshead.mobposhead h2 { font-size: 0.875rem !important; }
   .vd .allocstrip.moballoc { display: block !important; padding: 8px 0 6px !important; margin-bottom: 6px !important; }
   .vd .allocstrip.moballoc .allocsum {
     display: flex !important; align-items: center !important; gap: 8px !important; width: 100% !important;
     padding: 5px 0 !important; min-height: 32px !important; background: transparent !important; border: none !important;
     cursor: pointer !important; font-family: var(--font) !important; text-align: left !important;
   }
-  .vd .allocstrip.moballoc .allocsumpct { flex: none !important; font-size: 0.74rem !important; font-weight: 800 !important; font-variant-numeric: tabular-nums !important; }
-  .vd .allocstrip.moballoc .allocsumlbl { flex: none !important; font-size: 0.55rem !important; font-weight: 700 !important; letter-spacing: 0.1em !important; text-transform: uppercase !important; color: var(--muted) !important; }
+  .vd .allocstrip.moballoc .allocsumpct { flex: none !important; font-size: 0.75rem !important; font-weight: 800 !important; font-variant-numeric: tabular-nums !important; }
+  .vd .allocstrip.moballoc .allocsumlbl { flex: none !important; font-size: 0.6875rem !important; font-weight: 700 !important; letter-spacing: 0.1em !important; text-transform: uppercase !important; color: var(--muted) !important; }
   .vd .allocstrip.moballoc .allocsumbar {
     flex: 1 1 auto !important; min-width: 34px !important; height: 8px !important; display: block !important;
-    border-radius: 99px !important; background: rgba(255,255,255,0.09) !important;
-    border: 1px solid rgba(255,255,255,0.07) !important; overflow: hidden !important;
+    border-radius: 99px !important; background: var(--w10) !important;
+    border: 1px solid var(--w08) !important; overflow: hidden !important;
   }
   .vd .allocstrip.moballoc .allocsumbar > span { display: block !important; height: 100% !important; border-radius: 99px !important; transition: width 0.5s ease !important; }
-  .vd .allocstrip.moballoc .allocsumexp { flex: none !important; font-size: 0.62rem !important; color: var(--muted) !important; white-space: nowrap !important; }
+  .vd .allocstrip.moballoc .allocsumexp { flex: none !important; font-size: 0.6875rem !important; color: var(--muted) !important; white-space: nowrap !important; }
   .vd .allocstrip.moballoc .allocsumexp b { color: var(--text) !important; font-weight: 700 !important; }
-  .vd .allocstrip.moballoc .allocsumchev { flex: none !important; width: 14px !important; text-align: right !important; font-size: 0.55rem !important; color: var(--goldBright) !important; }
+  .vd .allocstrip.moballoc .allocsumchev { flex: none !important; width: 14px !important; text-align: right !important; font-size: 0.6875rem !important; color: var(--muted) !important; }
   .vd .allocstrip.moballoc .allocdet {
     display: flex !important; flex-wrap: wrap !important; gap: 7px 14px !important;
     padding: 9px 0 2px !important; margin-top: 6px !important; border-top: 1px solid var(--border) !important;
   }
-  .vd .allocstrip.moballoc .allocdet .leg { font-size: 0.68rem !important; }
-  .vd .allocstrip.moballoc .allocnote { flex-basis: 100% !important; font-size: 0.62rem !important; color: var(--faint) !important; margin-left: 0 !important; }
+  .vd .allocstrip.moballoc .allocdet .leg { font-size: 0.6875rem !important; }
+  .vd .allocstrip.moballoc .allocnote { flex-basis: 100% !important; font-size: 0.6875rem !important; color: var(--faint) !important; margin-left: 0 !important; }
 
   /* ── 7. JOURNAL FILTER BAR — 5 controls on one ruled row; only the chrome shrinks.
      Select/date font-size is left alone: sub-16px triggers iOS zoom-on-focus. ── */
   .vj .filterbar { gap: 8px !important; padding: 9px 10px !important; margin-bottom: 10px !important; border-radius: 12px !important; }
-  .vj .filterbar .flabel { font-size: 0.6rem !important; letter-spacing: 0.06em !important; }
-  .vj .fctl { font-size: 0.6rem !important; gap: 5px !important; }
-  .vj .filterbar .btn { padding: 6px 11px !important; font-size: 0.66rem !important; }
+  .vj .filterbar .flabel { font-size: 0.6875rem !important; letter-spacing: 0.06em !important; }
+  .vj .fctl { font-size: 0.6875rem !important; gap: 5px !important; }
+  .vj .filterbar .btn { padding: 6px 11px !important; font-size: 0.6875rem !important; }
   .vj .filterbar .filtsel { padding: 5px 9px !important; }
-  .vj .fcount { font-size: 0.68rem !important; }
+  .vj .fcount { font-size: 0.6875rem !important; }
   .vj.expert .metricsmini { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; grid-auto-rows: minmax(64px, auto) !important; }
   .vj.expert .mmtile { padding: 10px 11px !important; }
-  .vj.expert .mmv { font-size: 0.95rem !important; }
+  .vj.expert .mmv { font-size: 1rem !important; }
   /* VIV Analytics folds on phones — its heading is the tap target (.vahead, gated in the JSX). */
   .vj .vahead .sech { min-height: 30px !important; display: inline-flex !important; align-items: center !important; }
-  .vj .vahead .vachev { color: var(--goldBright) !important; font-size: 0.62rem !important; }
+  .vj .vahead .vachev { color: var(--muted) !important; font-size: 0.6875rem !important; }
 
   /* ── 8. PREMIUM TOOLS — the explainer box never collapses, and the desktop
      ≤600px rule STACKS it (icon above text), making it taller on the exact screens
      that can least afford it. Keep it a row, drop the icon, shrink the copy. ── */
   .vp .intro { flex-direction: row !important; padding: 10px 12px !important; margin-bottom: 10px !important; gap: 9px !important; border-radius: 12px !important; }
   .vp .intro .ico { display: none !important; }
-  .vp .intro h3 { font-size: 0.84rem !important; }
-  .vp .intro p { font-size: 0.72rem !important; line-height: 1.45 !important; }
+  .vp .intro h3 { font-size: 0.875rem !important; }
+  .vp .intro p { font-size: 0.75rem !important; line-height: 1.45 !important; }
   .vp .panelhead { margin-bottom: 9px !important; }
   .vp .io { grid-template-columns: 1fr !important; gap: 12px !important; }
   .vp .iogrid { gap: 10px !important; }
   .vp .tile { padding: 10px 12px !important; }
-  .vp .tile .v { font-size: 1.15rem !important; }
+  .vp .tile .v { font-size: 1.125rem !important; }
 
   /* ── 9. LENS / SUB-PAGE CARDS (Rotation, Breadth, Earnings) — these files carry
      their own scoped stylesheets with no mobile rules at all. ── */
   .grs .grs-card, .mm .mm-card, .earn .earn-card { padding: 11px 12px !important; margin-bottom: 10px !important; }
-  .grs .grs-card h1, .mm .mm-card h1, .earn .earn-card h1 { font-size: 1.15rem !important; margin: 0 0 4px !important; }
-  .grs .grs-card p, .mm .mm-card p, .earn .earn-card p { font-size: 0.72rem !important; line-height: 1.45 !important; }
+  .grs .grs-card h1, .mm .mm-card h1, .earn .earn-card h1 { font-size: 1.125rem !important; margin: 0 0 4px !important; }
+  .grs .grs-card p, .mm .mm-card p, .earn .earn-card p { font-size: 0.75rem !important; line-height: 1.45 !important; }
   .vd.expert .lensrowA, .vd.expert .lensrowB, .vd .lensduo, .vd.expert .lensstack, .vd.expert .ctxrow, .vd.expert .ctxstack { gap: 10px !important; margin-top: 10px !important; }
   .vd.expert .kpistrip { gap: 8px !important; }
 
   /* ── 10. DAILY SETUPS header ── */
   .dspagehead { margin-bottom: 10px !important; }
   .dspagehead .dseyebrow { display: none !important; }
-  .dspagehead h1 { font-size: 1.18rem !important; margin: 0 !important; }
-  .dspagehead .dsmeta { font-size: 0.68rem !important; margin-top: 4px !important; line-height: 1.4 !important; }
+  .dspagehead h1 { font-size: 1.125rem !important; margin: 0 !important; }
+  .dspagehead .dsmeta { font-size: 0.6875rem !important; margin-top: 4px !important; line-height: 1.4 !important; }
   .dstoolbar { gap: 7px !important; margin-bottom: 10px !important; }
 
   /* ── 11. PERFORMANCE CALENDAR — the 8th "Week" column stole ~130px of a 390px
@@ -14303,15 +15356,20 @@ const mobileCSS = `
   [style*='gap: 28'],
   [style*='gap: 26'] { gap: 12px !important; }
 
-  /* ── 13. TYPOGRAPHY FLOOR — nothing member-facing below 0.56rem on a phone.
-     (0.54rem is left alone; it is legible and lifting it re-wraps dense chips.) ── */
-  [style*='font-size: 0.46rem'],
-  [style*='font-size: 0.48rem'],
-  [style*='font-size: 0.5rem'],
-  [style*='font-size: 0.52rem'] { font-size: 0.56rem !important; }
-  [style*='font-size: 1.7rem'],
-  [style*='font-size: 2.1rem'],
-  [style*='font-size: 2.6rem'] { font-size: 1.4rem !important; }
+  /* ── 13. TYPOGRAPHY FLOOR — nothing member-facing below 0.6rem (10px) on a phone.
+     The app-wide floor was lifted to 0.6rem on 2026-08-06, so this is now a safety net for
+     any inline size that slips back under it (and for decorative glyphs kept smaller). ── */
+  [style*='font-size: 0.6875rem'],
+  [style*='font-size: 0.6875rem'],
+  [style*='font-size: 0.6875rem'],
+  [style*='font-size: 0.6875rem'],
+  [style*='font-size: 0.6875rem'],
+  [style*='font-size: 0.6875rem'],
+  [style*='font-size: 0.6875rem'],
+  [style*='font-size: 0.6875rem'] { font-size: 0.6875rem !important; }
+  [style*='font-size: 1.75rem'],
+  [style*='font-size: 2rem'],
+  [style*='font-size: 2.75rem'] { font-size: 1.25rem !important; }
 
   /* ── 14. TABLES — a wide table must scroll inside its own box, never the page ── */
   .vd .pos-scroll, .vj .hscroll, .earn .hscroll { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
@@ -14336,9 +15394,11 @@ const mobileCSS = `
 // ancestor. We ALSO scope each container explicitly (0,2,1) as belt-and-braces in case a container ever
 // declares a token on itself. Reverting to VIV Classic just removes the body class — pixel-identical.
 //
-// KNOWN GAP: inline styles that use JS literals from the `C = {…}` object (e.g. `color: C.gold`) are baked
-// hexes, not tokens, so this layer can't recolor them (shared helpers, wordmark, login, sidebar). That is
-// intentional per spec — we don't rewrite literal hexes.
+// (The old "inline styles are baked hexes" gap closed in Phase 2 — every `C` entry is now a
+// var() reference, so this layer recolours inline styles too.)
+// LIGHT THEME: these legacy interface styles are DARK-ONLY by design. When the light theme is
+// active the app forces the default "Book"/geist skin (see the uiTheme effect) — Zella's own
+// near-black ladder would otherwise fight the light tokens with equal specificity.
 const THEME_CSS = `
 body.theme-zella,
 body.theme-zella .vp, body.theme-zella .vj, body.theme-zella .vd, body.theme-zella .vs{
@@ -14346,8 +15406,10 @@ body.theme-zella .vp, body.theme-zella .vj, body.theme-zella .vd, body.theme-zel
   --text:#E7E9EE; --muted:#9AA0B0; --faint:#6B7180;
   --gold:#b8912f; --goldBright:#d9b04a; --goldMid:#a07f2a; --goldDeep:#6e5a1f;
   --goldDim:rgba(184,145,47,0.12); --borderGold:rgba(184,145,47,0.24);
-  --glass:rgba(255,255,255,0.028); --border:rgba(255,255,255,0.08);
-  --green:#22c55e; --red:#ef4444; --blue:#3b82f6;
+  --glass:#151721; --card:#151721; --cardHi:#1b1e2a;
+  --border:rgba(255,255,255,0.07); --hair:rgba(255,255,255,0.07); --rule:rgba(255,255,255,0.06);
+  /* Semantics stay on the shared Robinhood values — this skin only restyles surfaces + type. */
+  --green:#00c805; --red:#ff5000; --blue:#3b9eff; --orange:#ffaa05;
   --font:'Inter',-apple-system,BlinkMacSystemFont,'Plus Jakarta Sans',sans-serif;
 }
 /* Base page bg (covers overscroll) + Inter body font when Zella Clean is on. */
@@ -14378,9 +15440,15 @@ body.theme-geist .vp, body.theme-geist .vj, body.theme-geist .vd, body.theme-gei
 body.theme-geist .vd *, body.theme-geist .vj *, body.theme-geist .vp *, body.theme-geist .vs *{
   font-family:inherit;
 }
-/* …except the micro-label register, which gets the book's companion mono. */
+/* Labels keep the ONE proportional family (2026-08-06 Robinhood register): the old mono-caps
+   micro-kicker was the loudest thing on every card. Mono is now reserved for numeric columns. */
 body.theme-geist .vd .label, body.theme-geist .vj .label, body.theme-geist .vp .label, body.theme-geist .vs .label{
-  font-family:'Geist Mono',ui-monospace,monospace; font-weight:600; letter-spacing:0.12em;
+  font-family:var(--font); font-weight:500; letter-spacing:0; text-transform:none;
+}
+/* Hero + KPI values stay PROPORTIONAL here too — mono belongs to dense table columns only. */
+body.theme-geist .vd .heronum, body.theme-geist .vd .kpinum, body.theme-geist .vd .statval,
+body.theme-geist .vj .heronum, body.theme-geist .vp .heronum, body.theme-geist .vs .heronum{
+  font-family:var(--font); font-variant-numeric:tabular-nums;
 }
 /* Numbers line up in columns — the whole point of the swap. */
 body.theme-geist .vd table, body.theme-geist .vj table{ font-variant-numeric:tabular-nums; }
@@ -14410,11 +15478,11 @@ const appBgCSS = `
 .viv-tile-enter:nth-child(8){animation-delay:0.28s}
 /* Gold sheen sweep — runs once on hover over the primary CTA */
 .viv-sheen{position:relative;overflow:hidden;}
-.viv-sheen .viv-btn-sheen{position:absolute;top:0;left:0;height:100%;width:42%;background:linear-gradient(100deg,transparent,rgba(255,255,255,0.45),transparent);transform:translateX(-130%) skewX(-18deg);pointer-events:none;opacity:0;}
+.viv-sheen .viv-btn-sheen{position:absolute;top:0;left:0;height:100%;width:42%;background:linear-gradient(100deg,transparent,var(--w55),transparent);transform:translateX(-130%) skewX(-18deg);pointer-events:none;opacity:0;}
 .viv-sheen:hover .viv-btn-sheen{opacity:1;animation:vivSheen 0.6s cubic-bezier(0.22,1,0.36,1);}
 /* Hover lift for interactive cards (stat tiles) */
-.viv-lift{transition:transform 0.22s cubic-bezier(0.22,1,0.36,1), box-shadow 0.22s ease, border-color 0.22s ease;}
-.viv-lift:hover{transform:translateY(-3px);box-shadow:0 12px 30px rgba(0,0,0,0.38), 0 0 0 1px rgba(201,152,42,0.20);border-color:rgba(201,152,42,0.28);}
+.viv-lift{transition:background 0.18s ease, border-color 0.18s ease;}
+.viv-lift:hover{background:var(--cardHi);border-color:var(--w10);}
 /* a11y: visible keyboard focus ring (mouse/touch users unaffected — :focus-visible only fires for keyboard) */
 :focus-visible{outline:2px solid rgba(240,192,80,0.85) !important;outline-offset:2px;border-radius:4px;}
 /* Faster, cleaner taps: removes the 300ms mobile tap delay on interactive elements */
@@ -14457,7 +15525,7 @@ function AppBackground({ intensity = "calm" }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden" }}>
       <style>{appBgCSS}</style>
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(to right, rgba(255,255,255,0.022) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.022) 1px, transparent 1px)", backgroundSize: "44px 44px", maskImage: "radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 82%)", WebkitMaskImage: "radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 82%)" }} />
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(to right, var(--w02) 1px, transparent 1px), linear-gradient(to bottom, var(--w02) 1px, transparent 1px)", backgroundSize: "44px 44px", maskImage: "radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 82%)", WebkitMaskImage: "radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 82%)" }} />
       {pulses.map((pl, i) => <div key={`pl${i}`} className="viv-bg-pulse" style={{ left: pl.left, top: pl.top, width: pl.size, height: pl.size, animationDelay: pl.delay, background: "radial-gradient(circle, rgba(201,152,42,0.5), transparent 70%)" }} />)}
       {particles.map((p, i) => <div key={i} className="viv-bg-particle" style={{ left: p.left, top: p.top, width: p.size, height: p.size, animationDelay: p.delay, animationDuration: p.dur }} />)}
       <div ref={glowRef} className="viv-cursor-glow" style={{ position: "absolute", left: 0, top: 0, width: serene ? 620 : 520, height: serene ? 620 : 520, borderRadius: "50%", background: `radial-gradient(circle, rgba(201,152,42,${serene ? 0.055 : 0.04}), rgba(201,152,42,0.016) 38%, transparent 70%)`, transform: "translate(-800px,-800px) translate(-50%,-50%)", willChange: "transform" }} />
@@ -14483,7 +15551,7 @@ function AppInner() {
   useEffect(() => {
     if (typeof window === "undefined" || !(window.matchMedia && window.matchMedia("(pointer: coarse)").matches)) return;
     const tip = document.createElement("div");
-    tip.style.cssText = "position:fixed;z-index:4500;max-width:min(78vw,300px);background:rgba(10,10,18,0.97);border:1px solid rgba(255,255,255,0.18);border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.5;color:#e8e8f0;box-shadow:0 8px 28px rgba(0,0,0,0.5);display:none;pointer-events:none;font-family:" + font;
+    tip.style.cssText = "position:fixed;z-index:4500;max-width:min(78vw,300px);background:rgba(10,10,18,0.97);border:1px solid var(--w22);border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.5;color:#e8e8f0;box-shadow:0 8px 28px rgba(0,0,0,0.5);display:none;pointer-events:none;font-family:" + font;
     document.body.appendChild(tip);
     let hideT = null;
     const hide = () => { tip.style.display = "none"; if (hideT) clearTimeout(hideT); };
@@ -14515,6 +15583,18 @@ function AppInner() {
     tag.textContent = mobileCSS;
     document.head.appendChild(tag);
   }, []);
+  // Inject the GLOBAL theme sheet once — tokens, motion system, skeleton/roll/flash primitives.
+  // It has to live in <head> rather than inside a page's <style> because the Live Trades drawer,
+  // Feedback, What's New, Model Book, Study Book, the auth screen and the mobile layer all render
+  // OUTSIDE the four page sheets and still need the tokens.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (document.getElementById("viv-theme-tokens")) return;
+    const tag = document.createElement("style");
+    tag.id = "viv-theme-tokens";
+    tag.textContent = GLOBAL_THEME_CSS;
+    document.head.appendChild(tag);
+  }, []);
   // Inject the optional "Zella Clean" interface-style token layer once. It only takes effect while
   // <body> carries the `theme-zella` class (see uiTheme below) — otherwise it's inert, so VIV Classic
   // members render exactly as before.
@@ -14539,11 +15619,12 @@ function AppInner() {
     try { localStorage.setItem("viv-ui-theme", next); } catch { /* private mode — ignore */ }
     setUiThemeState(next);
   }, []);
-  // Reflect the choice onto <body> instantly (no reload). Removing the class restores VIV Classic exactly.
+  // Reflect the choice onto <body> instantly (no reload). Routed through the theme controller so
+  // the two systems can't contradict each other: Zella is dark-only, so under the light theme the
+  // controller substitutes the default Book/geist skin (see setVivSkin / applyTheme).
   useEffect(() => {
     if (typeof document === "undefined") return;
-    document.body.classList.toggle("theme-zella", uiTheme === "zella");
-    document.body.classList.toggle("theme-geist", uiTheme === "geist");
+    setVivSkin(uiTheme);
   }, [uiTheme]);
   const screenW = useScreenWidth();
   const isMobile = screenW < 768;
@@ -14551,6 +15632,10 @@ function AppInner() {
 
   // ─── Auth State ───
   const [session, setSession] = useState(null);
+  // Light theme stays admin-gated until its QA pass is done — members always render dark.
+  useEffect(() => {
+    setThemeUiAllowed((session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase());
+  }, [session]);
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   // Hash routing (Valen 2026-07-30): the URL mirrors the section (#modelbook, #journal, …) so a
@@ -15855,9 +16940,12 @@ function AppInner() {
   if (authLoading) {
     return (
       <div style={{ fontFamily: font, background: C.bg, minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", WebkitFontSmoothing: "antialiased" }}>
-        <div style={{ textAlign: "center" }}>
-          <Wordmark size="1.3rem" style={{ marginBottom: 12 }} />
-          <div style={{ fontSize: "0.78rem", color: C.muted }}>Loading...</div>
+        {/* Shape-matched, not the word "Loading": the wordmark stays put and three shimmer bars
+            stand in for the line of status text, so nothing jumps when the session resolves. */}
+        <div style={{ textAlign: "center", width: 240 }} aria-busy="true" aria-label="Loading your account">
+          <Wordmark size="1.3rem" style={{ marginBottom: 16 }} />
+          <SkLine w="100%" h={9} />
+          <SkLine w="72%" h={9} style={{ margin: "8px auto" }} />
         </div>
       </div>
     );
@@ -15878,9 +16966,9 @@ function AppInner() {
   const pageContent = (
     <>
       {isOffline && (
-        <div style={{ padding:"10px 16px",background:"rgba(239,68,68,0.12)",border:`1px solid rgba(239,68,68,0.25)`,borderRadius:10,marginBottom:12,display:"flex",alignItems:"center",gap:8 }}>
-          <span style={{ fontSize:"0.74rem",fontWeight:700,color:"#ef4444" }}>OFFLINE</span>
-          <span style={{ fontSize:"0.72rem",color:"rgba(255,255,255,0.6)" }}>Your changes are saved locally and will sync when your connection returns.</span>
+        <div style={{ padding:"10px 16px",background:"rgba(255,80,0,0.12)",border:`1px solid rgba(255,80,0,0.25)`,borderRadius:10,marginBottom:12,display:"flex",alignItems:"center",gap:8 }}>
+          <span style={{ fontSize:"0.75rem",fontWeight:700,color:"var(--red)" }}>OFFLINE</span>
+          <span style={{ fontSize:"0.75rem",color:"var(--muted)" }}>Your changes are saved locally and will sync when your connection returns.</span>
         </div>
       )}
       {demoMode && (
@@ -15888,11 +16976,11 @@ function AppInner() {
         // frame around the whole viewport + corner tag, visible over everything including modals
         // and while scrolled. pointer-events:none — it never blocks a click.
         <div style={{ position: "fixed", inset: 0, zIndex: 2000, pointerEvents: "none", border: "3px solid #7c5cff", boxShadow: "inset 0 0 42px rgba(124,92,255,0.16)" }}>
-          <div style={{ position: "absolute", bottom: 0, right: 18, background: "#7c5cff", color: "#fff", fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", padding: "4px 12px", borderRadius: "8px 8px 0 0" }}>🎮 Demo</div>
+          <div style={{ position: "absolute", bottom: 0, right: 18, background: "#7c5cff", color: "#fff", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, padding: "4px 12px", borderRadius: "8px 8px 0 0" }}>🎮 Demo</div>
         </div>
       )}
       {demoMode && page !== "settings" && (
-        <div style={{ background: "linear-gradient(90deg, #7c5cff, #5b3df0)", color: "#fff", textAlign: "center", fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", padding: "7px 12px" }}>
+        <div style={{ background: "linear-gradient(90deg, #7c5cff, #5b3df0)", color: "#fff", textAlign: "center", fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, padding: "7px 12px" }}>
           🎮 Demo mode — practice book. Your real positions and stats are untouched.
         </div>
       )}
@@ -15938,7 +17026,7 @@ function AppInner() {
                 color: active ? C.goldBright : C.muted, transition: "color 0.15s",
               }}>
                 <NavIcon name={item.id} size={19} />
-                <span style={{ fontSize: "0.56rem", fontWeight: active ? 700 : 500, letterSpacing: "0.04em" }}>{item.label}</span>
+                <span style={{ fontSize: "0.6875rem", fontWeight: active ? 600 : 500, letterSpacing: 0 }}>{item.label}</span>
                 {active && <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 26, height: 2, borderRadius: 1, background: C.goldBright }} />}
               </button>
             );

@@ -27,20 +27,20 @@ const num = (v, d = 0) => v == null || !isFinite(v) ? "—" : (+v).toFixed(d);
 const rat = (v) => v == null || !isFinite(v) ? "—" : (+v).toFixed(2);
 
 // ── systematic four-column read (shared by page + mini) ──────────────────────
-const GREEN = { fg: "#7ef0a0", bg: "rgba(34,197,94,0.12)", bd: "rgba(34,197,94,0.35)" };
-const AMBER = { fg: "#f0c050", bg: "rgba(201,152,42,0.14)", bd: "rgba(201,152,42,0.4)" };
-const RED = { fg: "#fca5a5", bg: "rgba(239,68,68,0.12)", bd: "rgba(239,68,68,0.35)" };
+const GREEN = { fg: "var(--greenFg)", bg: "rgba(0,200,5,0.12)", bd: "rgba(0,200,5,0.35)" };
+const AMBER = { fg: "var(--blueFg)", bg: "rgba(59,158,255,0.14)", bd: "rgba(59,158,255,0.4)" };
+const RED = { fg: "var(--redFg)", bg: "rgba(255,80,0,0.12)", bd: "rgba(255,80,0,0.35)" };
 
 // ── EXACT sheet-cell colouring — thresholds lifted verbatim from the source workbook's own
 //    conditional-formatting rules (extracted 2026-07-23); hues adapted for the dark theme.
 const CF = {
-  gStrong: { background: "rgba(51,153,102,0.55)", color: "#eafff3", fontWeight: 800 },
-  g:       { background: "rgba(34,197,94,0.26)",  color: "#b7f7c8" },
-  olive:   { background: "rgba(106,168,79,0.62)", color: "#f2ffe9", fontWeight: 800 },
-  rStrong: { background: "rgba(224,102,102,0.55)", color: "#ffecec", fontWeight: 800 },
+  gStrong: { background: "rgba(51,153,102,0.55)", color: "#eafff3", fontWeight: 600 },
+  g:       { background: "rgba(0,200,5,0.26)",  color: "#b7f7c8" },
+  olive:   { background: "rgba(106,168,79,0.62)", color: "#f2ffe9", fontWeight: 600 },
+  rStrong: { background: "rgba(224,102,102,0.55)", color: "#ffecec", fontWeight: 600 },
   r:       { background: "rgba(224,102,102,0.26)", color: "#ffd9d9" },
   pink:    { background: "rgba(244,204,204,0.14)", color: "#eec9c9" },
-  yellow:  { background: "rgba(255,255,0,0.18)",  color: "#fff3a8", fontWeight: 700 },
+  yellow:  { background: "rgba(255,255,0,0.18)",  color: "#fff3a8", fontWeight: 500 },
 };
 function sheetCF(row, key) {
   const v = row[key]; if (v == null) return null;
@@ -93,10 +93,10 @@ function TrafficCalendar({ C, rows }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-        <span style={{ fontSize: "0.85rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, color: green ? "#0a2413" : "#2a0c0c", background: green ? "#4ade80" : "#f87171" }}>
+        <span style={{ fontSize: "0.875rem", fontWeight: 600, padding: "6px 14px", borderRadius: 999, color: green ? "#0a2413" : "#2a0c0c", background: green ? "var(--green)" : "var(--red)" }}>
           {green ? "● GREEN" : "● RED"} · {streak} session{streak > 1 ? "s" : ""} and counting
         </span>
-        <span style={{ fontSize: "0.68rem", color: C.muted }}>
+        <span style={{ fontSize: "0.75rem", color: C.muted }}>
           {green ? "Environment is paying longs — setups are allowed to work." : "Environment is against longs — protect first, anticipate nothing."}
         </span>
       </div>
@@ -119,17 +119,17 @@ function TrafficCalendar({ C, rows }) {
                 style={{
                   gridRow: wd, gridColumn: col + 1, width: 27, height: 23, borderRadius: 4,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "0.62rem", fontWeight: 700, fontVariantNumeric: "tabular-nums",
-                  background: d ? (d.v === "g" ? "rgba(34,197,94,0.8)" : d.v === "r" ? "rgba(239,68,68,0.78)" : "rgba(255,255,255,0.16)") : "rgba(255,255,255,0.025)",
-                  color: d ? "#08080e" : "rgba(255,255,255,0.28)",
+                  fontSize: "0.6875rem", fontWeight: 500, fontVariantNumeric: "tabular-nums",
+                  background: d ? (d.v === "g" ? "rgba(0,200,5,0.8)" : d.v === "r" ? "rgba(255,80,0,0.78)" : "var(--w14)") : "var(--w02)",
+                  color: d ? "var(--goldOn)" : "var(--faint)",
                   border: d ? "none" : `1px solid ${C.border}`,
-                  outline: d && d.date === last.date ? `2px solid ${C.goldBright}` : "none", outlineOffset: 1,
+                  outline: d && d.date === last.date ? `2px solid var(--w55)` : "none", outlineOffset: 1,
                 }}>{dayN}</div>
             );
           }
           return (
             <div key={mk} style={{ flex: "none" }}>
-              <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", color: C.text, marginBottom: 6, textAlign: "center" }}>{MN[M - 1]}<span style={{ color: C.muted, fontWeight: 700 }}> ’{String(Y).slice(2)}</span></div>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.04em", color: C.text, marginBottom: 6, textAlign: "center" }}>{MN[M - 1]}<span style={{ color: C.muted, fontWeight: 500 }}> ’{String(Y).slice(2)}</span></div>
               <div style={{ display: "grid", gridTemplateRows: "repeat(5, 23px)", gridAutoColumns: "27px", gap: 3 }}>
                 {cells}
               </div>
@@ -138,16 +138,16 @@ function TrafficCalendar({ C, rows }) {
         })}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-        <span style={{ fontSize: "0.7rem", fontWeight: 700, color: C.text }}>
-          <span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "rgba(34,197,94,0.8)", marginRight: 6, verticalAlign: "-1px" }} />
+        <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.text }}>
+          <span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "rgba(0,200,5,0.8)", marginRight: 6, verticalAlign: "-1px" }} />
           Green = bullish — buyers in control, trade your setups
         </span>
-        <span style={{ fontSize: "0.7rem", fontWeight: 700, color: C.text }}>
-          <span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "rgba(239,68,68,0.78)", marginRight: 6, verticalAlign: "-1px" }} />
+        <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.text }}>
+          <span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "rgba(255,80,0,0.78)", marginRight: 6, verticalAlign: "-1px" }} />
           Red = bearish — sellers in control, protect capital
         </span>
-        <span style={{ fontSize: "0.7rem", color: C.muted }}>
-          Think of it as the market's weather report — <b style={{ color: C.goldBright }}>plan your trading accordingly</b>: press when it's been green, stay light when it's red.
+        <span style={{ fontSize: "0.6875rem", color: C.muted }}>
+          Think of it as the market's weather report — <b style={{ color: C.white }}>plan your trading accordingly</b>: press when it's been green, stay light when it's red.
         </span>
       </div>
     </>
@@ -185,15 +185,15 @@ function HorizonBlock({ C, title, up, dn, green }) {
   const tone = green ? GREEN : RED;
   return (
     <div style={{ padding: "12px 14px", borderRadius: 12, background: tone.bg, border: `1px solid ${tone.bd}` }}>
-      <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: tone.fg, marginBottom: 9 }}>{title} · {green ? "buyers lead" : "sellers lead"}</div>
+      <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: tone.fg, marginBottom: 9 }}>{title} · {green ? "buyers lead" : "sellers lead"}</div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
         <div style={{ textAlign: "left" }}>
-          <div style={{ fontSize: "0.55rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: C.muted, marginBottom: 3 }}>Up 25%+</div>
-          <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#86efac", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{num(up)}</div>
+          <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: C.muted, marginBottom: 3 }}>Up 25%+</div>
+          <div style={{ fontSize: "1.25rem", fontWeight: 500, letterSpacing: "-0.025em", fontFamily: "'Geist Mono', ui-monospace, monospace", color: "var(--greenFg)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{num(up)}</div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "0.55rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: C.muted, marginBottom: 3 }}>Down 25%+</div>
-          <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#fca5a5", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{num(dn)}</div>
+          <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: C.muted, marginBottom: 3 }}>Down 25%+</div>
+          <div style={{ fontSize: "1.25rem", fontWeight: 500, letterSpacing: "-0.025em", fontFamily: "'Geist Mono', ui-monospace, monospace", color: "var(--redFg)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{num(dn)}</div>
         </div>
       </div>
     </div>
@@ -231,8 +231,8 @@ export default function MarketMonitor({ C, font, session }) {
   const read = readBreadth(latest);
   const rootRef = useRef(null);
 
-  const cardLabel = { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.gold };
-  const asofStyle = { fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums", textAlign: "right" };
+  const cardLabel = { fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" };
+  const asofStyle = { fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums", textAlign: "right" };
 
   const SHORT = {
     date: "Date", up4: "Up 4%", down4: "Down 4%", r5: "5d ratio", r10: "10d ratio",
@@ -265,8 +265,8 @@ export default function MarketMonitor({ C, font, session }) {
     const dns = win.map(r => r.down4).filter(v => v != null);
     return { upMax: Math.max(1, ...ups), dnMax: Math.max(1, ...dns) };
   }, [win]);
-  const upHeat = (v) => v == null ? "transparent" : `rgba(34,197,94,${(0.05 + 0.42 * (v / heatBounds.upMax)).toFixed(3)})`;
-  const dnHeat = (v) => v == null ? "transparent" : `rgba(239,68,68,${(0.05 + 0.42 * (v / heatBounds.dnMax)).toFixed(3)})`;
+  const upHeat = (v) => v == null ? "transparent" : `rgba(0,200,5,${(0.05 + 0.42 * (v / heatBounds.upMax)).toFixed(3)})`;
+  const dnHeat = (v) => v == null ? "transparent" : `rgba(255,80,0,${(0.05 + 0.42 * (v / heatBounds.dnMax)).toFixed(3)})`;
 
   // admin-only corpus signals
   const signals = [
@@ -293,8 +293,8 @@ export default function MarketMonitor({ C, font, session }) {
   const kpis = [
     { k: "up4", label: "Stocks up 4%+ today", val: num(latest.up4), tip: "How many stocks jumped 4%+ today — raw buying pressure.", tone: C.green },
     { k: "down4", label: "Stocks down 4%+ today", val: num(latest.down4), tip: "How many stocks dropped 4%+ today — raw selling pressure.", tone: C.red },
-    { k: "r5", label: "5-day ratio", val: rat(latest.r5_calc ?? latest.r5), tip: "Buyers vs sellers over the last 5 days. Above 1 = buyers led the week.", tone: C.goldBright },
-    { k: "r10", label: "10-day ratio", val: rat(latest.r10_calc ?? latest.r10), tip: "Same balance over 10 days — a smoother read of who's winning.", tone: C.goldBright },
+    { k: "r5", label: "5-day ratio", val: rat(latest.r5_calc ?? latest.r5), tip: "Buyers vs sellers over the last 5 days. Above 1 = buyers led the week.", tone: C.white },
+    { k: "r10", label: "10-day ratio", val: rat(latest.r10_calc ?? latest.r10), tip: "Same balance over 10 days — a smoother read of who's winning.", tone: C.white },
     { k: "t2108", label: "T2108", val: rat(latest.t2108), tip: "T2108 — the % of all stocks above their 40-day average. Below 20 = washed out — the oversold opportunity zone where bottoms form. Above 80 = crowded and stretched. In between = no signal.", tone: C.blue, sub: t2108Zone },
   ];
 
@@ -323,18 +323,18 @@ export default function MarketMonitor({ C, font, session }) {
   const down4Series = win.map(r => r.down4);
   const t2108Series = win.map(r => r.t2108);
 
-  const chip = (fg, bg, bd) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.62rem", fontWeight: 800, padding: "3px 10px", borderRadius: 980, background: bg, border: `1px solid ${bd}`, color: fg, whiteSpace: "nowrap" });
-  const td = { padding: "6px 9px", borderBottom: `1px solid ${C.border}`, fontSize: "0.72rem", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: C.text, textAlign: "right" };
+  const chip = (fg, bg, bd) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.6875rem", fontWeight: 500, padding: "3px 10px", borderRadius: 999, background: bg, border: `1px solid ${bd}`, color: fg, whiteSpace: "nowrap" });
+  const td = { padding: "6px 9px", borderBottom: `1px solid ${C.border}`, fontSize: "0.75rem", fontWeight: 500, letterSpacing: "-0.025em", fontFamily: "'Geist Mono', ui-monospace, monospace", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: C.text, textAlign: "right" };
 
   return (
     <div ref={rootRef} className="mm" style={{ fontFamily: font, maxWidth: 1440, margin: "0 auto", color: C.text }}>
       <style>{`
-        .mm .mm-card{position:relative;background:rgba(255,255,255,0.042);border:1px solid rgba(255,255,255,0.09);border-radius:16px;backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);padding:18px 20px;margin-bottom:14px}
-        .mm .mm-card::before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,0.05),transparent 55%)}
+        .mm .mm-card{position:relative;background:var(--w04);border:1px solid var(--w08);border-radius:16px;backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);padding:18px 20px;margin-bottom:14px}
+        .mm .mm-card::before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:linear-gradient(135deg,var(--w06),transparent 55%)}
         .mm table{border-collapse:collapse;width:100%}
-        .mm tbody tr:hover{background:rgba(255,255,255,0.028)}
-        .mm thead th{position:sticky;top:0;background:#0c0c14;z-index:2}
-        .mm .mm-datecol{position:sticky;left:0;background:#0c0c14;z-index:1;text-align:left}
+        .mm tbody tr:hover{background:var(--w03)}
+        .mm thead th{position:sticky;top:0;background:var(--bg2);z-index:2}
+        .mm .mm-datecol{position:sticky;left:0;background:var(--bg2);z-index:1;text-align:left}
         .mm thead .mm-datecol{z-index:3}
       `}</style>
 
@@ -342,8 +342,8 @@ export default function MarketMonitor({ C, font, session }) {
       <section className="mm-card" style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start", justifyContent: "space-between" }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ ...cardLabel, marginBottom: 6 }}>Breadth</div>
-          <h1 style={{ margin: "0 0 6px", fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white }}>Market Breadth</h1>
-          <p style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.6, color: C.muted, maxWidth: "74ch" }}>
+          <h1 style={{ margin: "0 0 6px", fontSize: "1.25rem", fontWeight: 600, letterSpacing: "-0.02em", color: C.white }}>Market Breadth</h1>
+          <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.6, color: C.muted, maxWidth: "74ch" }}>
             How many stocks moved 4%+ up vs down today — the market's weather station. Sets the aggression dial, never picks the stock.
           </p>
         </div>
@@ -356,17 +356,17 @@ export default function MarketMonitor({ C, font, session }) {
       {/* 2 — THE ONE QUESTION (systematic read, member-facing) */}
       <section className="mm-card">
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <span style={{ ...cardLabel, color: C.white, fontSize: "0.72rem", letterSpacing: "0.08em" }}>The one question</span>
-          <span style={{ fontSize: "0.82rem", color: C.muted }}>— are breakouts likely to work right now?</span>
+          <span style={{ ...cardLabel, color: C.white, fontWeight: 600 }}>The one question</span>
+          <span style={{ fontSize: "0.875rem", color: C.muted }}>— are breakouts likely to work right now?</span>
           <InfoDot tip="Are big-money moves leaning up or down? Green on both timeframes = the tape supports breakouts." />
-          <span style={{ marginLeft: "auto", ...chip(read.verdict.fg, read.verdict.bg, read.verdict.bd), fontSize: "0.68rem", padding: "5px 13px" }}>{read.verdict.txt}</span>
+          <span style={{ marginLeft: "auto", ...chip(read.verdict.fg, read.verdict.bg, read.verdict.bd), fontSize: "0.75rem", padding: "5px 13px" }}>{read.verdict.txt}</span>
           <SectionCamera sel=".mm-card" name="breadth-verdict" C={C} style={{ position: "static", top: "auto", right: "auto" }} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))", gap: 12 }}>
           <HorizonBlock C={C} title="25%+ in a month" up={read.mUp} dn={read.mDn} green={read.mGreen} />
           <HorizonBlock C={C} title="25%+ in a quarter" up={read.qUp} dn={read.qDn} green={read.qGreen} />
         </div>
-        <div style={{ fontSize: "0.72rem", color: C.muted, lineHeight: 1.55, marginTop: 11 }}>{read.sentence}</div>
+        <div style={{ fontSize: "0.75rem", color: C.muted, lineHeight: 1.55, marginTop: 11 }}>{read.sentence}</div>
       </section>
 
       {/* 3 — TODAY TILES */}
@@ -375,13 +375,13 @@ export default function MarketMonitor({ C, font, session }) {
         <div style={{ ...cardLabel, marginBottom: 12 }}>Today · {asof}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
           {kpis.map(k => (
-            <div key={k.k} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "13px 15px" }}>
+            <div key={k.k} style={{ background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "13px 15px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted }}>{k.label}</span>
+                <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: C.muted }}>{k.label}</span>
                 <InfoDot tip={k.tip} />
               </div>
-              <div style={{ fontSize: "1.6rem", fontWeight: 800, color: k.tone, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{k.val}</div>
-              {k.sub && <div style={{ fontSize: "0.62rem", fontWeight: 700, color: k.sub.col, marginTop: 7, lineHeight: 1.35 }}>{k.sub.txt}</div>}
+              <div style={{ fontSize: "1.75rem", fontWeight: 500, letterSpacing: "-0.025em", fontFamily: "'Geist Mono', ui-monospace, monospace", color: k.tone, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{k.val}</div>
+              {k.sub && <div style={{ fontSize: "0.75rem", fontWeight: 500, color: k.sub.col, marginTop: 7, lineHeight: 1.35 }}>{k.sub.txt}</div>}
             </div>
           ))}
         </div>
@@ -392,31 +392,31 @@ export default function MarketMonitor({ C, font, session }) {
         <section className="mm-card">
           <div onClick={() => setSignalOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
             <span style={{ ...cardLabel, flex: 1 }}>Signal read — corpus-documented only (admin)</span>
-            <span style={{ fontSize: "0.7rem", color: C.muted }}>{signalOpen ? "▴" : "▾"}</span>
+            <span style={{ fontSize: "0.6875rem", color: C.muted }}>{signalOpen ? "▴" : "▾"}</span>
           </div>
           {signalOpen && (
             <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
               {signals.map(s => (
-                <div key={s.key} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "11px 13px", borderRadius: 11, background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}` }}>
+                <div key={s.key} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "11px 13px", borderRadius: 11, background: "var(--w02)", border: `1px solid ${C.border}` }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: "0.8rem", fontWeight: 800, color: C.white }}>{s.label}</span>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 600, color: C.white }}>{s.label}</span>
                       <InfoDot tip={"Source: " + s.cite} />
                     </div>
-                    <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
+                    <div style={{ fontSize: "0.75rem", color: C.muted, marginTop: 4, lineHeight: 1.5 }}>
                       Rule: <span style={{ color: C.text }}>{s.rule}</span>
                       {s.note ? <> · {s.note}</> : null}
                       {s.fired === true ? <> · {s.firedText}</> : s.fired === false ? <> · {s.okText}</> : null}
                     </div>
                   </div>
                   <div style={{ flex: "none" }}>
-                    {s.fired === true && <span style={chip("#fca5a5", "rgba(239,68,68,0.12)", "rgba(239,68,68,0.35)")}>⚠ FIRED · {num(s.value)}</span>}
-                    {s.fired === false && <span style={chip("#7ef0a0", "rgba(34,197,94,0.12)", "rgba(34,197,94,0.35)")}>✓ clear · {num(s.value)}</span>}
-                    {s.fired === null && <span style={chip(C.muted, "rgba(255,255,255,0.04)", C.border)}>context</span>}
+                    {s.fired === true && <span style={chip("var(--redFg)", "rgba(255,80,0,0.12)", "rgba(255,80,0,0.35)")}>⚠ FIRED · {num(s.value)}</span>}
+                    {s.fired === false && <span style={chip("var(--greenFg)", "rgba(0,200,5,0.12)", "rgba(0,200,5,0.35)")}>✓ clear · {num(s.value)}</span>}
+                    {s.fired === null && <span style={chip(C.muted, "var(--w04)", C.border)}>context</span>}
                   </div>
                 </div>
               ))}
-              <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.55 }}>
+              <div style={{ fontSize: "0.75rem", color: C.muted, lineHeight: 1.55 }}>
                 Sheet-table cell colouring now uses the EXACT thresholds extracted from the source workbook's own conditional-formatting rules (2026-07-23 · corpus stockbee-sources/22): pair comparisons on 4%/25%q/25%m/13%-34d, 5d ratio &gt;2 / &lt;0.5, 10d ≥2 / &lt;0.5, up4 ≥300 thrust, down4 ≥300 extreme, up25q ≤200 capitulation (olive), down25q ≤200 extended (yellow), up50m ≥20 froth / &lt;2 quiet, down50m &gt;19 capitulation, T2108 &lt;20 / &gt;80. Traffic-light calendar = the primary pair (up25q vs down25q) per session.
               </div>
             </div>
@@ -438,13 +438,13 @@ export default function MarketMonitor({ C, font, session }) {
       <section className="mm-card">
         <div onClick={() => setCheatOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
           <span style={{ ...cardLabel, flex: 1 }}>📌 Levels cheat sheet — what the numbers mean</span>
-          <span style={{ fontSize: "0.7rem", color: C.muted }}>{cheatOpen ? "▴" : "▾ open"}</span>
+          <span style={{ fontSize: "0.6875rem", color: C.muted }}>{cheatOpen ? "▴" : "▾ open"}</span>
         </div>
         {cheatOpen && (
           <div style={{ marginTop: 12, overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 720 }}>
               <thead><tr>
-                {["Indicator", "Level / range", "What it means"].map(h => <th key={h} style={{ textAlign: "left", padding: "7px 10px", fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, borderBottom: `1px solid ${C.border}` }}>{h}</th>)}
+                {["Indicator", "Level / range", "What it means"].map(h => <th key={h} style={{ textAlign: "left", padding: "7px 10px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", borderBottom: `1px solid ${C.border}` }}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {[
@@ -471,14 +471,14 @@ export default function MarketMonitor({ C, font, session }) {
                   ["⭐ THE COMBO", "Primary ≤200 + T2108 single digits", "The generational-bottom signal — bull markets are born here and last 3–5+ years", "gold", false],
                 ].map((r, i) => (
                   <tr key={i}>
-                    <td style={{ padding: "7px 10px", fontSize: "0.72rem", fontWeight: 800, color: C.white, whiteSpace: "nowrap", borderBottom: r[0] ? `1px solid ${C.border}` : "none", borderTop: r[0] && i > 0 ? `1px solid rgba(255,255,255,0.14)` : "none" }}>{r[0]}</td>
-                    <td style={{ padding: "7px 10px", fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap", borderBottom: `1px solid rgba(255,255,255,0.05)`, color: r[3] === "gold" ? C.goldBright : r[3] === "g" ? "#7ef0a0" : r[3] === "y" ? "#f0dc8a" : r[3] === "r" ? "#fca5a5" : C.text }}>{r[1]}</td>
-                    <td style={{ padding: "7px 10px", fontSize: "0.72rem", color: C.text, lineHeight: 1.45, borderBottom: `1px solid rgba(255,255,255,0.05)` }}>{r[2]}</td>
+                    <td style={{ padding: "7px 10px", fontSize: "0.75rem", fontWeight: 600, color: C.white, whiteSpace: "nowrap", borderBottom: r[0] ? `1px solid ${C.border}` : "none", borderTop: r[0] && i > 0 ? `1px solid var(--w14)` : "none" }}>{r[0]}</td>
+                    <td style={{ padding: "7px 10px", fontSize: "0.75rem", fontWeight: 500, whiteSpace: "nowrap", borderBottom: `1px solid var(--w06)`, color: r[3] === "gold" ? C.white : r[3] === "g" ? "var(--greenFg)" : r[3] === "y" ? "var(--orangeFg)" : r[3] === "r" ? "var(--redFg)" : C.text }}>{r[1]}</td>
+                    <td style={{ padding: "7px 10px", fontSize: "0.75rem", color: C.text, lineHeight: 1.45, borderBottom: `1px solid var(--w06)` }}>{r[2]}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
+            <div style={{ fontSize: "0.75rem", color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
               ⭐ rows are the rare, high-power signals — most fire at MAXIMUM pain, marking where risk/reward flips bullish while everything feels terrible. Golden rule: breadth calls <b style={{ color: C.text }}>bottoms</b>, never tops — markets top on <i>narrowing participation</i>, not on euphoric breadth, so never sell just because the sheet looks too green.
             </div>
           </div>
@@ -495,8 +495,8 @@ export default function MarketMonitor({ C, font, session }) {
           </div>
           <DualSpark a={up4Series} b={down4Series} ca={C.green} cb={C.red} />
           <div style={{ display: "flex", gap: 14, marginTop: 8 }}>
-            <span style={{ fontSize: "0.64rem", color: C.green, fontWeight: 700 }}>● up 4%+</span>
-            <span style={{ fontSize: "0.64rem", color: C.red, fontWeight: 700 }}>● down 4%+</span>
+            <span style={{ fontSize: "0.6875rem", color: C.green, fontWeight: 500 }}>● up 4%+</span>
+            <span style={{ fontSize: "0.6875rem", color: C.red, fontWeight: 500 }}>● down 4%+</span>
           </div>
         </div>
         <div className="mm-card" style={{ marginBottom: 0 }}>
@@ -507,9 +507,9 @@ export default function MarketMonitor({ C, font, session }) {
           </div>
           <SingleSpark a={t2108Series} col={C.blue} lo={0} hi={100} guides={[{ v: 20, col: C.green }, { v: 80, col: C.red }]} />
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
-            <span style={{ fontSize: "0.64rem", color: C.green, fontWeight: 700 }}>┈ below 20 = oversold · opportunity zone</span>
-            <span style={{ fontSize: "0.64rem", color: C.red, fontWeight: 700 }}>┈ above 80 = overheated</span>
-            <span style={{ fontSize: "0.64rem", color: C.muted }}>0–100 scale</span>
+            <span style={{ fontSize: "0.6875rem", color: C.green, fontWeight: 500 }}>┈ below 20 = oversold · opportunity zone</span>
+            <span style={{ fontSize: "0.6875rem", color: C.red, fontWeight: 500 }}>┈ above 80 = overheated</span>
+            <span style={{ fontSize: "0.6875rem", color: C.muted }}>0–100 scale</span>
           </div>
         </div>
       </section>
@@ -521,9 +521,9 @@ export default function MarketMonitor({ C, font, session }) {
           <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
             <SectionCamera sel=".mm-card" name="breadth-sheet" C={C} style={{ position: "static", top: "auto", right: "auto" }} />
             {!isDefaultChain && (
-              <button onClick={() => setChain(DEFAULT_CHAIN)} title="Restore the default sort (date, newest first)" style={{ fontFamily: font, fontSize: "0.66rem", fontWeight: 700, color: C.muted, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 11px", cursor: "pointer" }}>× reset sort</button>
+              <button onClick={() => setChain(DEFAULT_CHAIN)} title="Restore the default sort (date, newest first)" style={{ fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, color: C.muted, background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 999, padding: "5px 12px", cursor: "pointer" }}>× reset sort</button>
             )}
-            <button onClick={() => setShowAll(s => !s)} style={{ fontFamily: font, fontSize: "0.68rem", fontWeight: 700, color: C.text, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 11px", cursor: "pointer" }}>
+            <button onClick={() => setShowAll(s => !s)} style={{ fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, color: C.text, background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 999, padding: "5px 12px", cursor: "pointer" }}>
               {showAll ? "show latest 60" : "show all history"}
             </button>
           </div>
@@ -533,9 +533,9 @@ export default function MarketMonitor({ C, font, session }) {
             <thead>
               <tr>
                 <th className="mm-datecol" style={{ borderBottom: `1px solid ${C.border}` }} />
-                <th colSpan={6} style={{ padding: "7px 9px", fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", textAlign: "center", color: "#9ad8f0", background: "rgba(56,170,220,0.12)", borderBottom: `1px solid rgba(56,170,220,0.35)` }}>Primary breadth indicators</th>
-                <th colSpan={6} style={{ padding: "7px 9px", fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", textAlign: "center", color: "#f0dc8a", background: "rgba(240,200,80,0.10)", borderBottom: `1px solid rgba(240,200,80,0.35)` }}>Secondary breadth indicators</th>
-                <th colSpan={3} style={{ padding: "7px 9px", fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", textAlign: "center", color: C.muted, background: "rgba(255,255,255,0.03)", borderBottom: `1px solid ${C.border}` }}>Context</th>
+                <th colSpan={6} style={{ padding: "7px 9px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center", color: "var(--blueFg)", background: "rgba(59,158,255,0.12)", borderBottom: `1px solid rgba(59,158,255,0.35)` }}>Primary breadth indicators</th>
+                <th colSpan={6} style={{ padding: "7px 9px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center", color: "var(--muted)", background: "var(--w04)", borderBottom: `1px solid var(--w14)` }}>Secondary breadth indicators</th>
+                <th colSpan={3} style={{ padding: "7px 9px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center", color: C.muted, background: "var(--w03)", borderBottom: `1px solid ${C.border}` }}>Context</th>
               </tr>
               <tr>
                 {cols.map(col => {
@@ -544,7 +544,7 @@ export default function MarketMonitor({ C, font, session }) {
                   const left = col.key === "date";
                   return (
                     <th key={col.key} className={left ? "mm-datecol" : ""} onClick={() => clickSort(col.key)}
-                      style={{ padding: "8px 9px", fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: active ? C.goldBright : C.muted, borderBottom: `1px solid ${C.border}`, textAlign: left ? "left" : "right", whiteSpace: "nowrap", cursor: "pointer", userSelect: "none" }}>
+                      style={{ padding: "8px 9px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: active ? C.white : "var(--faint)", borderBottom: `1px solid ${C.border}`, textAlign: left ? "left" : "right", whiteSpace: "nowrap", cursor: "pointer", userSelect: "none" }}>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4, justifyContent: left ? "flex-start" : "flex-end" }}>
                         {SHORT[col.key] || col.hdr}{active ? (chain[ci].dir === "desc" ? " ▾" : " ▴") + SUP[ci] : ""}<InfoDot tip={col.hdr.trim()} />
                       </span>
@@ -559,7 +559,7 @@ export default function MarketMonitor({ C, font, session }) {
                   {cols.map(col => {
                     const v = row[col.key];
                     if (col.key === "date")
-                      return <td key={col.key} className="mm-datecol" style={{ ...td, textAlign: "left", fontWeight: 700, color: C.white }}>{v || "—"}</td>;
+                      return <td key={col.key} className="mm-datecol" style={{ ...td, textAlign: "left", fontWeight: 600, color: C.white }}>{v || "—"}</td>;
                     if (col.key === "sp")
                       return <td key={col.key} style={td}>{v == null ? "—" : (+v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>;
                     const cf = sheetCF(row, col.key);
@@ -569,7 +569,7 @@ export default function MarketMonitor({ C, font, session }) {
                     const ratio = isRatio(col.key) || col.key === "t2108";
                     const cs = ratio
                       ? { ...td, ...(col.key === "t2108" && !cf ? { color: C.blue } : {}), ...(cf || {}) }
-                      : { ...td, ...(cf || {}), ...(col.key === "up4" || col.key === "down4" ? { fontWeight: 700 } : {}) };
+                      : { ...td, ...(cf || {}), ...(col.key === "up4" || col.key === "down4" ? { fontWeight: 600 } : {}) };
                     const cv = ratio ? rat(v) : num(v);
                     if (tip) return <Tip as="td" key={col.key} tip={tip} style={cs}>{cv}</Tip>;
                     return <td key={col.key} style={cs}>{cv}</td>;
@@ -586,11 +586,11 @@ export default function MarketMonitor({ C, font, session }) {
         <section className="mm-card">
           <div onClick={() => setMethodOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
             <span style={{ ...cardLabel, flex: 1 }}>Method — provenance (admin)</span>
-            <span style={{ fontSize: "0.7rem", color: C.muted }}>{methodOpen ? "▴" : "▾"}</span>
+            <span style={{ fontSize: "0.6875rem", color: C.muted }}>{methodOpen ? "▴" : "▾"}</span>
           </div>
           {methodOpen && (
             <div style={{ marginTop: 12 }}>
-              <pre style={{ margin: 0, padding: "14px 16px", background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: "0.68rem", lineHeight: 1.7, color: C.text, overflowX: "auto", whiteSpace: "pre", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{
+              <pre style={{ margin: 0, padding: "14px 16px", background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: "0.75rem", lineHeight: 1.7, color: C.text, overflowX: "auto", whiteSpace: "pre", fontFamily: "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" }}>{
 `DATA        the source sheet itself — live public Google Sheet CSV, which the
             user's local "Stockbee Market Monitor 2026.xlsx" mirrors.
             source now = ${source === "sheet" ? "live sheet" : "local xlsx fallback"}   rows = ${allRows.length}   asof = ${asof}
@@ -646,7 +646,7 @@ export function BreadthMini({ C, font, session, noStamp }) {
           ] }} />
           <LensCamera getEl={() => cardRef.current} name="breadth" C={C} style={{ marginLeft: 6 }} />
           <XShare getEl={() => cardRef.current} C={C} />
-          {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
+          {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
         {/* the four-column master switch */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -654,17 +654,17 @@ export function BreadthMini({ C, font, session, noStamp }) {
           <HorizonBlock C={C} title="25%+ in a quarter" up={read.qUp} dn={read.qDn} green={read.qGreen} />
         </div>
         {/* one punchy verdict sentence */}
-        <div style={{ marginTop: 11, fontSize: "0.72rem", lineHeight: 1.5, color: C.text }}>{read.sentence}</div>
+        <div style={{ marginTop: 11, fontSize: "0.75rem", lineHeight: 1.5, color: C.text }}>{read.sentence}</div>
         {/* breakout-conditions line — plain binary; MORE/LESS carries the colour */}
-        <div style={{ marginTop: 7, fontSize: "0.72rem", fontWeight: 700, lineHeight: 1.45, color: C.text }}>
-          Breakouts are <span style={{ color: read.breakouts.more ? C.green : C.red, fontWeight: 800 }}>{read.breakouts.more ? "MORE" : "LESS"}</span> likely to work
+        <div style={{ marginTop: 7, fontSize: "0.75rem", fontWeight: 500, lineHeight: 1.45, color: C.text }}>
+          Breakouts are <span style={{ color: read.breakouts.more ? C.green : C.red, fontWeight: 600 }}>{read.breakouts.more ? "MORE" : "LESS"}</span> likely to work
         </div>
       </div>
       {open && createPortal(
-        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "32px 16px" }}>
+        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "var(--scrim)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "32px 16px" }}>
           <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1480, margin: "0 auto", position: "relative" }}>
             {/* explicit close (mobile audit A7 2026-08-04): on phones the inner div fills the popup and stops propagation, leaving only 16px backdrop strips to tap */}
-            <button onClick={() => setOpen(false)} aria-label="Close" style={{ position: "sticky", top: 0, float: "right", zIndex: 5, width: 38, height: 38, borderRadius: "50%", background: "rgba(8,8,14,0.9)", border: `1px solid ${C.border}`, color: C.muted, fontSize: "1.05rem", cursor: "pointer", lineHeight: 1 }}>✕</button>
+            <button onClick={() => setOpen(false)} aria-label="Close" style={{ position: "sticky", top: 0, float: "right", zIndex: 5, width: 38, height: 38, borderRadius: "50%", background: "var(--sheet)", border: `1px solid ${C.border}`, color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>✕</button>
             <MarketMonitor C={C} font={font} session={session} />
           </div>
         </div>, document.body)}

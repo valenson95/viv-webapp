@@ -164,10 +164,10 @@ export function ChartSeqEditor({ C, font, busy, list, onChange, onUpload, onZoom
   const items = list || [];
   const [lbox, setLbox] = useState(null); // internal lightbox fallback when the parent gives no onZoom
 
-  const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontFamily: font, fontSize: "0.78rem", padding: "7px 10px", outline: "none", width: "100%", maxWidth: "100%", boxSizing: "border-box", colorScheme: "dark" };
-  const lblStyle = { fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.muted, margin: "8px 0 4px", display: "block" };
-  const ctrlBtn = { flexShrink: 0, background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 800, fontSize: "0.68rem", borderRadius: 7, padding: "5px 9px", cursor: "pointer", lineHeight: 1 };
-  const imgStyle = { display: "block", width: "100%", maxWidth: "100%", maxHeight: compact ? 320 : 480, objectFit: "contain", borderRadius: 10, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)", cursor: "zoom-in" };
+  const inputS = { background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontFamily: font, fontSize: "0.75rem", padding: "7px 10px", outline: "none", width: "100%", maxWidth: "100%", boxSizing: "border-box" };
+  const lblStyle = { fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", margin: "8px 0 4px", display: "block" };
+  const ctrlBtn = { flexShrink: 0, background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 600, fontSize: "0.6875rem", borderRadius: 999, padding: "5px 9px", cursor: "pointer", lineHeight: 1 };
+  const imgStyle = { display: "block", width: "100%", maxWidth: "100%", maxHeight: compact ? 320 : 480, objectFit: "contain", borderRadius: 10, border: `1px solid ${C.border}`, background: "var(--w08)", cursor: "zoom-in" };
 
   const setItem = (i, patch) => onChange(items.map((c, j) => (j === i ? { ...c, ...patch } : c)));
   const move = (i, dir) => { const j = i + dir; if (j < 0 || j >= items.length) return; const arr = [...items]; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; onChange(arr); };
@@ -193,7 +193,7 @@ export function ChartSeqEditor({ C, font, busy, list, onChange, onUpload, onZoom
   return (
     <div onPaste={onPaste} style={{ fontFamily: font, minWidth: 0 }}>
       {items.length === 0 && (
-        <div style={{ fontSize: "0.76rem", color: C.muted, border: `1px dashed ${C.border}`, borderRadius: 12, padding: "22px 16px", textAlign: "center", marginBottom: 16, lineHeight: 1.55 }}>
+        <div style={{ fontSize: "0.75rem", color: C.muted, border: `1px dashed ${C.border}`, borderRadius: 12, padding: "22px 16px", textAlign: "center", marginBottom: 16, lineHeight: 1.55 }}>
           No charts yet — add or paste your first one below.<br />
           Order them oldest → newest; the first and last become the flash-card front and back automatically.
         </div>
@@ -203,15 +203,15 @@ export function ChartSeqEditor({ C, font, busy, list, onChange, onUpload, onZoom
         <div key={i} style={{ marginBottom: 20, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, minWidth: 0 }}>
           {/* label + reorder / remove controls */}
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
-            <span style={{ flexShrink: 0, fontSize: "0.6rem", fontWeight: 800, color: C.muted }}>{i + 1}</span>
+            <span style={{ flexShrink: 0, fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", color: C.muted }}>{i + 1}</span>
             <input value={c.label || ""} onChange={(e) => setItem(i, { label: e.target.value })}
               placeholder="Label this chart — e.g. 'Weekly context' or 'Trigger day'"
-              style={{ ...inputS, flex: "1 1 180px", width: "auto", minWidth: 0, textTransform: "uppercase", fontWeight: 800, letterSpacing: ".05em", color: C.goldBright, fontSize: "0.66rem" }} />
+              style={{ ...inputS, flex: "1 1 180px", width: "auto", minWidth: 0, textTransform: "uppercase", fontWeight: 600, letterSpacing: ".05em", color: C.white, fontSize: "0.6875rem" }} />
             <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
               <button type="button" onClick={() => move(i, -1)} disabled={i === 0} title="Move earlier" style={{ ...ctrlBtn, opacity: i === 0 ? 0.35 : 1, cursor: i === 0 ? "default" : "pointer" }}>↑</button>
               <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1} title="Move later" style={{ ...ctrlBtn, opacity: i === items.length - 1 ? 0.35 : 1, cursor: i === items.length - 1 ? "default" : "pointer" }}>↓</button>
               <button type="button" onClick={() => remove(i)} title="Remove this chart (the image stays in storage)" style={ctrlBtn}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "#e05555"; e.currentTarget.style.borderColor = "#e05555"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red)"; e.currentTarget.style.borderColor = "var(--red)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = C.border; }}>✕</button>
             </div>
           </div>
@@ -219,14 +219,14 @@ export function ChartSeqEditor({ C, font, busy, list, onChange, onUpload, onZoom
           {c.img && <img src={c.img} alt={c.label || "chart"} onClick={() => zoom(c.img, c.label || `Chart ${i + 1}`)} title="Click to zoom" style={imgStyle} />}
 
           <label style={lblStyle}>Caption</label>
-          <textarea value={c.caption || ""} onChange={(e) => setItem(i, { caption: e.target.value })} placeholder="What this chart shows…" style={{ ...inputS, minHeight: 42, resize: "vertical", fontSize: "0.8rem", color: C.text }} />
+          <textarea value={c.caption || ""} onChange={(e) => setItem(i, { caption: e.target.value })} placeholder="What this chart shows…" style={{ ...inputS, minHeight: 42, resize: "vertical", fontSize: "0.75rem", color: C.text }} />
 
           {/* role picker — optional; first/last are used automatically */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: "0.6rem", color: C.muted, flexShrink: 0 }} title="Which flash-card does this feed? (optional — first/last are used automatically)">Flash-card role</span>
+            <span style={{ fontSize: "0.6875rem", color: C.muted, flexShrink: 0 }} title="Which flash-card does this feed? (optional — first/last are used automatically)">Flash-card role</span>
             <select value={c.role || ""} onChange={(e) => setItem(i, { role: e.target.value || null })}
               title="Which flash-card does this feed? (optional — first/last are used automatically)"
-              style={{ ...inputS, width: "auto", flex: "0 1 200px", maxWidth: "100%", cursor: "pointer", fontSize: "0.72rem", padding: "5px 8px", color: c.role ? C.goldBright : C.muted }}>
+              style={{ ...inputS, width: "auto", flex: "0 1 200px", maxWidth: "100%", cursor: "pointer", fontSize: "0.75rem", padding: "5px 8px", color: c.role ? C.white : C.muted }}>
               {ROLE_OPTIONS.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
             </select>
           </div>
@@ -235,22 +235,22 @@ export function ChartSeqEditor({ C, font, busy, list, onChange, onUpload, onZoom
 
       {/* add-chart bar + paste hint */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "9px 18px", borderRadius: 99, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1 }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 600, fontSize: "0.75rem", padding: "9px 18px", borderRadius: 999, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1 }}>
           {busy ? "Uploading…" : "+ Add chart"}
           <input type="file" accept="image/*" disabled={busy} onChange={(e) => { doUpload(e.target.files && e.target.files[0]); e.target.value = ""; }} style={{ display: "none" }} />
         </label>
-        <span style={{ fontSize: "0.7rem", color: C.muted }}>…or copy a chart and press <b style={{ color: C.goldBright }}>⌘V / Ctrl+V</b> here.</span>
+        <span style={{ fontSize: "0.6875rem", color: C.muted }}>…or copy a chart and press <b style={{ color: C.white }}>⌘V / Ctrl+V</b> here.</span>
       </div>
 
       {/* internal lightbox (only when the parent didn't hand us an onZoom) */}
       {!onZoom && lbox && createPortal(
         <div onClick={(e) => { if (e.target === e.currentTarget) setLbox(null); }}
-          style={{ position: "fixed", inset: 0, zIndex: 1560, background: "rgba(4,4,8,0.9)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          style={{ position: "fixed", inset: 0, zIndex: 1560, background: "var(--lightbox)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10, color: C.white, fontFamily: font }}>
-            <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>{lbox.title}</span>
-            <button onClick={() => setLbox(null)} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.muted, width: 40, height: 40, borderRadius: 10, fontSize: "1.1rem", cursor: "pointer" }} aria-label="Close">✕</button>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>{lbox.title}</span>
+            <button onClick={() => setLbox(null)} style={{ background: "var(--w08)", border: `1px solid ${C.border}`, color: C.muted, width: 40, height: 40, borderRadius: 10, fontSize: "1.125rem", cursor: "pointer" }} aria-label="Close">✕</button>
           </div>
-          <img src={lbox.src} alt={lbox.title} onClick={() => setLbox(null)} style={{ maxWidth: "96vw", maxHeight: "82vh", objectFit: "contain", borderRadius: 10, border: `1px solid ${C.borderGold}`, cursor: "zoom-out", display: "block" }} />
+          <img src={lbox.src} alt={lbox.title} onClick={() => setLbox(null)} style={{ maxWidth: "96vw", maxHeight: "82vh", objectFit: "contain", borderRadius: 10, border: `1px solid ${C.border}`, cursor: "zoom-out", display: "block" }} />
         </div>, document.body)}
     </div>
   );

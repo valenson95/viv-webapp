@@ -26,19 +26,19 @@ const initials = (name) => (name || "M").trim().slice(0, 2).toUpperCase();
 const FB_CSS = `
 @keyframes vivfbFade{from{opacity:0}to{opacity:1}}
 @keyframes vivfbUp{from{opacity:0;transform:translateY(18px) scale(0.99)}to{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes vivfbPulse{0%,100%{box-shadow:0 0 0 0 rgba(240,192,80,0.55)}70%{box-shadow:0 0 0 6px rgba(240,192,80,0)}}
+@keyframes vivfbPulse{0%,100%{box-shadow:0 0 0 0 var(--w55)}70%{box-shadow:0 0 0 6px rgba(255,255,255,0)}}
 .vivfb-back{animation:vivfbFade .2s ease}
 .vivfb-modal{animation:vivfbUp .3s cubic-bezier(0.22,1,0.36,1)}
 .vivfb-dot{animation:vivfbPulse 2.2s infinite}
-.vivfb-in::placeholder{color:rgba(255,255,255,0.38)}
+.vivfb-in::placeholder{color:var(--faint)}
 .vivfb-in:focus{border-color:rgba(201,152,42,0.55) !important; box-shadow:0 0 0 3px rgba(201,152,42,0.12)}
 .vivfb-card{transition:border-color .16s, box-shadow .16s}
 .vivfb-card:hover{border-color:rgba(201,152,42,0.26)}
 .vivfb-fab{transition:transform .14s, box-shadow .2s}
 .vivfb-fab:hover{transform:translateY(-2px); box-shadow:0 16px 40px rgba(201,152,42,0.5)}
 .vivfb-feed::-webkit-scrollbar{width:8px}
-.vivfb-feed::-webkit-scrollbar-thumb{background:rgba(201,152,42,0.22); border-radius:99px}
-@keyframes vivfbBadge{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.6)}70%{box-shadow:0 0 0 7px rgba(239,68,68,0)}}
+.vivfb-feed::-webkit-scrollbar-thumb{background:var(--w22); border-radius:999px}
+@keyframes vivfbBadge{0%,100%{box-shadow:0 0 0 0 rgba(255,80,0,0.6)}70%{box-shadow:0 0 0 7px rgba(255,80,0,0)}}
 .vivfb-badge{animation:vivfbBadge 2s infinite}
 .vivfb-toast{animation:vivfbUp .32s cubic-bezier(0.22,1,0.36,1)}
 @keyframes vivfbDrawerIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
@@ -205,15 +205,15 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
   const openCount = items.filter(f => f.status !== "resolved").length;
   const detailItem = detail ? items.find(f => f.id === detail) : null;
 
-  const catColor = (c) => c === "Bug" ? C.red : c === "Feature request" ? C.blue : c === "Question" ? C.purple : C.gold;
+  const catColor = (c) => c === "Bug" ? C.red : c === "Feature request" ? C.blue : c === "Question" ? C.purple : C.muted;
   const gold = `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`;
-  const glass = { background: "rgba(255,255,255,0.04)", backdropFilter: "blur(20px) saturate(150%)", WebkitBackdropFilter: "blur(20px) saturate(150%)" };
+  const glass = { background: "var(--w04)", backdropFilter: "blur(20px) saturate(150%)", WebkitBackdropFilter: "blur(20px) saturate(150%)" };
 
-  // pill chip helper
-  const chip = (active, accent) => ({
-    fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", borderRadius: 99, cursor: "pointer", fontFamily: font,
-    border: `1px solid ${active ? accent : C.border}`, color: active ? "#08080e" : C.muted,
-    background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
+  // pill chip helper — neutral active state (filters act on data, not brand chrome)
+  const chip = (active) => ({
+    fontSize: "0.75rem", fontWeight: 500, padding: "7px 14px", borderRadius: 999, cursor: "pointer", fontFamily: font,
+    border: `1px solid ${active ? "var(--w14)" : C.border}`, color: active ? "var(--white)" : C.muted,
+    background: active ? "var(--w10)" : "var(--w03)",
     transition: "all .14s",
   });
 
@@ -224,16 +224,16 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
       {/* Floating launcher */}
       <button className="vivfb-fab" onClick={() => setOpen(true)} title="Community feedback" style={{
         position: "fixed", right: isMobile ? 16 : 24, bottom: isMobile ? 78 : 24, zIndex: 1050, display: "inline-flex", alignItems: "center", gap: 9,
-        background: gold, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.82rem", padding: "13px 20px", borderRadius: 99, cursor: "pointer",
+        background: gold, color: "var(--goldOn)", border: "none", fontFamily: font, fontWeight: 600, fontSize: "0.875rem", padding: "13px 20px", borderRadius: 999, cursor: "pointer",
         boxShadow: "0 12px 34px rgba(201,152,42,0.42)", letterSpacing: "-0.01em",
       }}>
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#08080e" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="var(--goldOn)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
         Feedback
         {badgeCount > 0 && (
           <span className="vivfb-badge" title={isAdmin ? `${badgeCount} new feedback` : `${badgeCount} of your items resolved`} style={{
-            position: "absolute", top: -7, right: -7, minWidth: 21, height: 21, padding: "0 5px", borderRadius: 99,
-            background: "#ef4444", color: "#fff", fontSize: "0.66rem", fontWeight: 800, display: "grid", placeItems: "center",
-            border: "2px solid #08080e", lineHeight: 1, boxSizing: "border-box",
+            position: "absolute", top: -7, right: -7, minWidth: 21, height: 21, padding: "0 5px", borderRadius: 999,
+            background: "var(--red)", color: "#fff", fontSize: "0.6875rem", fontWeight: 600, display: "grid", placeItems: "center",
+            border: "2px solid var(--bg)", lineHeight: 1, boxSizing: "border-box",
           }}>{badgeCount > 9 ? "9+" : badgeCount}</span>
         )}
       </button>
@@ -245,8 +245,8 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
         <div className="vivfb-drawer" style={{
           position: "fixed", top: 0, right: 0, zIndex: 1350,
           width: "min(440px, 92vw)", display: "flex", flexDirection: "column",
-          background: "linear-gradient(180deg, rgba(18,18,26,0.97), rgba(8,8,14,0.99))",
-          borderLeft: `1px solid ${C.borderGold}`, boxShadow: "-24px 0 70px rgba(0,0,0,0.55)",
+          background: "var(--sheet)",
+          borderLeft: `1px solid ${C.borderGold}`, boxShadow: "var(--shadowOv)",
           backdropFilter: "blur(30px) saturate(160%)", WebkitBackdropFilter: "blur(30px) saturate(160%)",
           fontFamily: font,
         }}>
@@ -255,13 +255,13 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
 
           {/* header */}
           <div style={{ position: "relative", flex: "0 0 auto", padding: "22px 22px 18px", borderBottom: `1px solid ${C.border}`, overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: -60, right: -20, width: 220, height: 160, background: "radial-gradient(circle, rgba(201,152,42,0.16), transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", top: -60, right: -20, width: 220, height: 160, background: "radial-gradient(circle, var(--w06), transparent 70%)", pointerEvents: "none" }} />
             <div style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: 12 }}>
               <div>
-                <div style={{ fontSize: "1.2rem", fontWeight: 800, color: C.white, letterSpacing: "-0.02em", lineHeight: 1.1 }}>Community <span style={{ color: C.gold }}>Feedback</span></div>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 9, padding: "4px 11px 4px 9px", borderRadius: 99, border: `1px solid ${C.borderGold}`, background: C.goldDim }}>
-                  <span className="vivfb-dot" style={{ width: 7, height: 7, borderRadius: "50%", background: C.goldBright }} />
-                  <span style={{ fontSize: "0.68rem", fontWeight: 700, color: C.goldBright, letterSpacing: "0.02em" }}>{openCount} open · shape what we build</span>
+                <div style={{ fontSize: "1.25rem", fontWeight: 600, color: C.white, letterSpacing: "-0.02em", lineHeight: 1.1 }}>Community <span style={{ color: C.white }}>Feedback</span></div>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 9, padding: "4px 11px 4px 9px", borderRadius: 999, border: `1px solid ${C.border}`, background: "var(--w06)" }}>
+                  <span className="vivfb-dot" style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--w55)" }} />
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 500, color: C.muted, letterSpacing: "0.02em" }}>{openCount} open · shape what we build</span>
                 </div>
               </div>
               <button onClick={() => setOpen(false)} title="Close (Esc)" style={{ marginLeft: "auto", ...glass, border: `1px solid ${C.border}`, color: C.muted, width: 36, height: 36, borderRadius: 11, fontSize: "1.25rem", cursor: "pointer", lineHeight: 1, flex: "0 0 auto" }}>&times;</button>
@@ -273,81 +273,94 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
             <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
               {CATEGORIES.map(c => {
                 const active = cat === c, ac = catColor(c);
-                return <button key={c} onClick={() => setCat(c)} style={{ fontSize: "0.72rem", fontWeight: 700, padding: "6px 13px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
-                  border: `1px solid ${active ? ac : C.border}`, background: active ? `${ac}1f` : "rgba(255,255,255,0.03)", color: active ? ac : C.muted }}>{c}</button>;
+                return <button key={c} onClick={() => setCat(c)} style={{ fontSize: "0.75rem", fontWeight: 500, padding: "6px 13px", borderRadius: 999, cursor: "pointer", fontFamily: font, transition: "all .14s",
+                  border: `1px solid ${active ? ac : C.border}`, background: active ? `${ac}1f` : "var(--w03)", color: active ? ac : C.muted }}>{c}</button>;
               })}
             </div>
             <textarea className="vivfb-in" value={draft} onChange={e => setDraft(e.target.value)} placeholder="Share a suggestion, report a bug, or request a feature…" rows={3}
-              style={{ width: "100%", resize: "vertical", background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 14, color: C.white, fontFamily: font, fontSize: "0.9rem", padding: "13px 15px", outline: "none", lineHeight: 1.55, transition: "border-color .14s, box-shadow .14s" }} />
+              style={{ width: "100%", resize: "vertical", background: "var(--w08)", border: `1px solid ${C.border}`, borderRadius: 14, color: C.white, fontFamily: font, fontSize: "0.875rem", padding: "13px 15px", outline: "none", lineHeight: 1.55, transition: "border-color .14s, box-shadow .14s" }} />
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 11 }}>
-              <button onClick={post} disabled={!draft.trim() || busy} style={{ background: draft.trim() ? gold : "rgba(255,255,255,0.06)", color: draft.trim() ? "#08080e" : C.muted, border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.82rem", padding: "11px 24px", borderRadius: 99, cursor: draft.trim() ? "pointer" : "default", boxShadow: draft.trim() ? "0 8px 22px rgba(201,152,42,0.32)" : "none", transition: "all .14s" }}>{busy ? "Posting…" : "Post"}</button>
+              <button onClick={post} disabled={!draft.trim() || busy} style={{ background: draft.trim() ? gold : "var(--w06)", color: draft.trim() ? "var(--goldOn)" : C.muted, border: "none", fontFamily: font, fontWeight: 600, fontSize: "0.875rem", padding: "11px 24px", borderRadius: 999, cursor: draft.trim() ? "pointer" : "default", boxShadow: draft.trim() ? "0 8px 22px rgba(201,152,42,0.32)" : "none", transition: "all .14s" }}>{busy ? "Posting…" : "Post"}</button>
             </div>
           </div>
 
           {/* filters */}
           <div style={{ flex: "0 0 auto", display: "flex", gap: 8, padding: "14px 22px 2px" }}>
             {[["all", "All"], ["open", "Open"], ["resolved", "Resolved"]].map(([k, l]) => (
-              <button key={k} onClick={() => setFilter(k)} style={chip(filter === k, C.goldBright)}>{l}</button>
+              <button key={k} onClick={() => setFilter(k)} style={chip(filter === k)}>{l}</button>
             ))}
           </div>
 
           {/* feed — the drawer's own scroll region; header/composer/filters stay put */}
           <div className="vivfb-feed" style={{ flex: "1 1 auto", minHeight: 0, padding: "14px 22px 26px", overflowY: "auto" }}>
-            {loading && <div style={{ color: C.muted, fontSize: "0.84rem", padding: "24px 0", textAlign: "center" }}>Loading…</div>}
-              {error === "setup" && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "24px 4px", textAlign: "center", lineHeight: 1.6 }}>💬 Feedback is being set up — check back shortly.</div>}
-              {error && error !== "setup" && <div style={{ color: C.red, fontSize: "0.8rem", padding: "16px 0" }}>{error}</div>}
-              {!loading && !error && sorted.length === 0 && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "26px 4px", textAlign: "center" }}>No feedback yet — be the first to post.</div>}
+            {loading && (
+              <div style={{ padding: "2px 0 6px" }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="sk-row" style={{ borderRadius: 16, marginBottom: 13, border: `1px solid ${C.border}`, padding: "15px 17px" }}>
+                    <div style={{ width: 34, height: 34, borderRadius: "50%", flex: "0 0 auto" }} className="sk" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="sk sk-line" style={{ width: "40%" }} />
+                      <div className="sk sk-line" style={{ width: "85%" }} />
+                      <div className="sk sk-line" style={{ width: "60%" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+              {error === "setup" && <div style={{ color: C.muted, fontSize: "0.875rem", padding: "24px 4px", textAlign: "center", lineHeight: 1.6 }}>💬 Feedback is being set up — check back shortly.</div>}
+              {error && error !== "setup" && <div style={{ color: C.red, fontSize: "0.75rem", padding: "16px 0" }}>{error}</div>}
+              {!loading && !error && sorted.length === 0 && <div style={{ color: C.muted, fontSize: "0.875rem", padding: "26px 4px", textAlign: "center" }}>No feedback yet — be the first to post.</div>}
 
               {sorted.map(f => {
                 const resolved = f.status === "resolved";
                 const showComments = expanded[f.id];
                 return (
                   <div key={f.id} className="vivfb-card" onClick={() => setDetail(f.id)} title="Open full view" style={{
-                    border: `1px solid ${resolved ? "rgba(34,197,94,0.32)" : C.border}`, borderRadius: 16, padding: "15px 17px", marginBottom: 13, cursor: "pointer",
-                    background: resolved ? "rgba(34,197,94,0.05)" : "rgba(255,255,255,0.025)", boxShadow: "0 8px 26px rgba(0,0,0,0.28)",
+                    border: `1px solid ${resolved ? "rgba(0,200,5,0.32)" : C.border}`, borderRadius: 16, padding: "15px 17px", marginBottom: 13, cursor: "pointer",
+                    background: resolved ? "rgba(0,200,5,0.05)" : "var(--w03)", boxShadow: "var(--shadowOv)",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 10 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: gold, color: "#08080e", display: "grid", placeItems: "center", fontWeight: 800, fontSize: "0.72rem", flex: "0 0 auto", boxShadow: "0 4px 12px rgba(201,152,42,0.35)" }}>{initials(f.author_name)}</div>
+                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--w10)", color: C.white, display: "grid", placeItems: "center", fontWeight: 600, fontSize: "0.75rem", flex: "0 0 auto", boxShadow: "var(--shadow)" }}>{initials(f.author_name)}</div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: "0.84rem", fontWeight: 700, color: C.white }}>{f.author_name || "Member"}</div>
-                        <div style={{ fontSize: "0.68rem", color: C.muted }}>{timeAgo(f.created_at)}</div>
+                        <div style={{ fontSize: "0.875rem", fontWeight: 500, color: C.white }}>{f.author_name || "Member"}</div>
+                        <div style={{ fontSize: "0.6875rem", color: C.muted }}>{timeAgo(f.created_at)}</div>
                       </div>
-                      <span style={{ fontSize: "0.62rem", fontWeight: 800, color: catColor(f.category), background: `${catColor(f.category)}1a`, border: `1px solid ${catColor(f.category)}44`, padding: "3px 10px", borderRadius: 99, marginLeft: "auto" }}>{f.category || "Suggestion"}</span>
-                      {resolved && <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.green, background: "rgba(34,197,94,0.14)", border: "1px solid rgba(34,197,94,0.4)", padding: "3px 10px", borderRadius: 99 }}>✓ Resolved</span>}
+                      <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: catColor(f.category), background: `${catColor(f.category)}1a`, border: `1px solid ${catColor(f.category)}44`, padding: "3px 10px", borderRadius: 999, marginLeft: "auto" }}>{f.category || "Suggestion"}</span>
+                      {resolved && <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.green, background: "rgba(0,200,5,0.14)", border: "1px solid rgba(0,200,5,0.4)", padding: "3px 10px", borderRadius: 999 }}>✓ Resolved</span>}
                     </div>
-                    <div style={{ fontSize: "0.9rem", color: C.text, lineHeight: 1.58, whiteSpace: "pre-wrap", marginBottom: 13 }}>{f.body}</div>
+                    <div style={{ fontSize: "0.875rem", color: C.text, lineHeight: 1.58, whiteSpace: "pre-wrap", marginBottom: 13 }}>{f.body}</div>
 
                     <div onClick={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <button onClick={() => toggleVote(f)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.74rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
-                        border: `1px solid ${f.myVote ? C.borderGold : C.border}`, background: f.myVote ? C.goldDim : "rgba(255,255,255,0.03)", color: f.myVote ? C.goldBright : C.muted }}>
+                      <button onClick={() => toggleVote(f)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.75rem", fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", fontFamily: font, transition: "all .14s",
+                        border: `1px solid ${f.myVote ? "var(--w22)" : C.border}`, background: f.myVote ? "var(--w08)" : "var(--w03)", color: f.myVote ? C.white : C.muted }}>
                         ▲ {f.votes}
                       </button>
-                      <button onClick={() => setExpanded(e => ({ ...e, [f.id]: !e[f.id] }))} style={{ fontSize: "0.74rem", fontWeight: 700, padding: "6px 13px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", color: C.muted }}>
+                      <button onClick={() => setExpanded(e => ({ ...e, [f.id]: !e[f.id] }))} style={{ fontSize: "0.75rem", fontWeight: 500, padding: "6px 13px", borderRadius: 999, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, background: "var(--w03)", color: C.muted }}>
                         💬 {f.comments.length}
                       </button>
-                      {isAdmin && <button onClick={() => toggleResolved(f)} style={{ fontSize: "0.72rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${resolved ? C.border : "rgba(34,197,94,0.42)"}`, background: resolved ? "rgba(255,255,255,0.03)" : "rgba(34,197,94,0.12)", color: resolved ? C.muted : C.green }}>{resolved ? "Reopen" : "Mark resolved"}</button>}
-                      {(isAdmin || f.user_id === uid) && <button onClick={() => remove(f)} title="Delete" style={{ marginLeft: "auto", fontSize: "0.72rem", fontWeight: 700, padding: "6px 11px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, background: "transparent", color: C.muted }}>Delete</button>}
+                      {isAdmin && <button onClick={() => toggleResolved(f)} style={{ fontSize: "0.75rem", fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", fontFamily: font, border: `1px solid ${resolved ? C.border : "rgba(0,200,5,0.42)"}`, background: resolved ? "var(--w03)" : "rgba(0,200,5,0.12)", color: resolved ? C.muted : C.green }}>{resolved ? "Reopen" : "Mark resolved"}</button>}
+                      {(isAdmin || f.user_id === uid) && <button onClick={() => remove(f)} title="Delete" style={{ marginLeft: "auto", fontSize: "0.75rem", fontWeight: 500, padding: "6px 11px", borderRadius: 999, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, background: "transparent", color: C.muted }}>Delete</button>}
                     </div>
 
                     {showComments && (
                       <div onClick={e => e.stopPropagation()} style={{ marginTop: 13, paddingTop: 13, borderTop: `1px solid ${C.border}` }}>
                         {f.comments.map(c => (
                           <div key={c.id} style={{ display: "flex", gap: 9, marginBottom: 10 }}>
-                            <div style={{ width: 27, height: 27, borderRadius: "50%", flex: "0 0 auto", display: "grid", placeItems: "center", fontWeight: 800, fontSize: "0.62rem", background: c.is_admin ? gold : "rgba(255,255,255,0.07)", color: c.is_admin ? "#08080e" : C.muted }}>{initials(c.author_name)}</div>
-                            <div style={{ background: c.is_admin ? "rgba(201,152,42,0.07)" : "rgba(255,255,255,0.03)", border: `1px solid ${c.is_admin ? C.borderGold : C.border}`, borderRadius: 12, padding: "9px 13px", flex: 1 }}>
+                            <div style={{ width: 27, height: 27, borderRadius: "50%", flex: "0 0 auto", display: "grid", placeItems: "center", fontWeight: 600, fontSize: "0.6875rem", background: c.is_admin ? "var(--w14)" : "var(--w08)", color: c.is_admin ? C.white : C.muted }}>{initials(c.author_name)}</div>
+                            <div style={{ background: c.is_admin ? "var(--w06)" : "var(--w03)", border: `1px solid ${c.is_admin ? "var(--w22)" : C.border}`, borderRadius: 12, padding: "9px 13px", flex: 1 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
-                                <span style={{ fontSize: "0.74rem", fontWeight: 700, color: c.is_admin ? C.gold : C.text }}>{c.author_name || "Member"}</span>
-                                {c.is_admin && <span style={{ fontSize: "0.54rem", fontWeight: 800, color: "#08080e", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, padding: "1px 7px", borderRadius: 99, letterSpacing: "0.04em" }}>TEAM</span>}
-                                <span style={{ fontSize: "0.64rem", color: C.muted, marginLeft: "auto" }}>{timeAgo(c.created_at)}</span>
+                                <span style={{ fontSize: "0.75rem", fontWeight: 500, color: c.is_admin ? C.white : C.text }}>{c.author_name || "Member"}</span>
+                                {c.is_admin && <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.white, background: "var(--w14)", padding: "1px 7px", borderRadius: 999, letterSpacing: "0.04em" }}>TEAM</span>}
+                                <span style={{ fontSize: "0.6875rem", color: C.muted, marginLeft: "auto" }}>{timeAgo(c.created_at)}</span>
                               </div>
-                              <div style={{ fontSize: "0.82rem", color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{c.body}</div>
+                              <div style={{ fontSize: "0.875rem", color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{c.body}</div>
                             </div>
                           </div>
                         ))}
                         <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                           <input className="vivfb-in" value={commentDraft[f.id] || ""} onChange={e => setCommentDraft(d => ({ ...d, [f.id]: e.target.value }))} onKeyDown={e => { if (e.key === "Enter") addComment(f); }}
-                            placeholder={isAdmin ? "Reply as team…" : "Add a comment…"} style={{ flex: 1, background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.82rem", padding: "10px 13px", outline: "none", transition: "border-color .14s, box-shadow .14s" }} />
-                          <button onClick={() => addComment(f)} style={{ background: gold, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.76rem", padding: "10px 17px", borderRadius: 10, cursor: "pointer" }}>Send</button>
+                            placeholder={isAdmin ? "Reply as team…" : "Add a comment…"} style={{ flex: 1, background: "var(--w08)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.875rem", padding: "10px 13px", outline: "none", transition: "border-color .14s, box-shadow .14s" }} />
+                          <button onClick={() => addComment(f)} style={{ background: gold, color: "var(--goldOn)", border: "none", fontFamily: font, fontWeight: 600, fontSize: "0.75rem", padding: "10px 17px", borderRadius: 10, cursor: "pointer" }}>Send</button>
                         </div>
                       </div>
                     )}
@@ -368,26 +381,26 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
         const cc = catColor(f.category);
         return (
           <div className="vivfb-back" onClick={(e) => { if (e.target === e.currentTarget) setDetail(null); }} style={{
-            position: "fixed", inset: 0, zIndex: 1360, background: "radial-gradient(1000px 600px at 70% -10%, rgba(201,152,42,0.09), transparent 60%), rgba(3,3,6,0.82)",
+            position: "fixed", inset: 0, zIndex: 1360, background: "radial-gradient(1000px 600px at 70% -10%, var(--w04), transparent 60%), var(--scrim)",
             backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: isMobile ? "20px 12px 40px" : "48px 16px", overflowY: "auto", fontFamily: font,
           }}>
             <div className="vivfb-modal" style={{
               width: "min(760px, 100%)", position: "relative", borderRadius: 22, overflow: "hidden",
-              background: "linear-gradient(180deg, rgba(18,18,26,0.94), rgba(8,8,14,0.98))",
-              border: `1px solid ${C.borderGold}`, boxShadow: "0 44px 110px rgba(0,0,0,0.78)",
+              background: "var(--sheet)",
+              border: `1px solid ${C.border}`, boxShadow: "var(--shadowOv)",
               backdropFilter: "blur(30px) saturate(160%)", WebkitBackdropFilter: "blur(30px) saturate(160%)",
             }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${C.gold}, ${C.goldBright}, ${C.gold}, transparent)`, opacity: 0.85 }} />
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, var(--w22), var(--w55), var(--w22), transparent)", opacity: 0.85 }} />
 
               {/* header */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "20px 22px 16px", borderBottom: `1px solid ${C.border}` }}>
-                <div style={{ width: 40, height: 40, borderRadius: "50%", background: gold, color: "#08080e", display: "grid", placeItems: "center", fontWeight: 800, fontSize: "0.8rem", flex: "0 0 auto", boxShadow: "0 4px 12px rgba(201,152,42,0.35)" }}>{initials(f.author_name)}</div>
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--w10)", color: C.white, display: "grid", placeItems: "center", fontWeight: 600, fontSize: "0.75rem", flex: "0 0 auto", boxShadow: "var(--shadow)" }}>{initials(f.author_name)}</div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: C.white }}>{f.author_name || "Member"}</div>
-                  <div style={{ fontSize: "0.7rem", color: C.muted }}>{timeAgo(f.created_at)}</div>
+                  <div style={{ fontSize: "1rem", fontWeight: 500, color: C.white }}>{f.author_name || "Member"}</div>
+                  <div style={{ fontSize: "0.6875rem", color: C.muted }}>{timeAgo(f.created_at)}</div>
                 </div>
-                <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 800, color: cc, background: `${cc}1a`, border: `1px solid ${cc}44`, padding: "4px 11px", borderRadius: 99 }}>{f.category || "Suggestion"}</span>
-                {resolved && <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.green, background: "rgba(34,197,94,0.14)", border: "1px solid rgba(34,197,94,0.4)", padding: "4px 11px", borderRadius: 99 }}>✓ Resolved</span>}
+                <span style={{ marginLeft: "auto", fontSize: "0.6875rem", fontWeight: 600, color: cc, background: `${cc}1a`, border: `1px solid ${cc}44`, padding: "4px 11px", borderRadius: 999 }}>{f.category || "Suggestion"}</span>
+                {resolved && <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.green, background: "rgba(0,200,5,0.14)", border: "1px solid rgba(0,200,5,0.4)", padding: "4px 11px", borderRadius: 999 }}>✓ Resolved</span>}
                 <button onClick={() => setDetail(null)} style={{ ...glass, border: `1px solid ${C.border}`, color: C.muted, width: 36, height: 36, borderRadius: 11, fontSize: "1.25rem", cursor: "pointer", lineHeight: 1, flex: "0 0 auto" }}>&times;</button>
               </div>
 
@@ -398,33 +411,33 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
 
               {/* actions — reuse the list handlers */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "0 22px 16px" }}>
-                <button onClick={() => toggleVote(f)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.76rem", fontWeight: 800, padding: "7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
-                  border: `1px solid ${f.myVote ? C.borderGold : C.border}`, background: f.myVote ? C.goldDim : "rgba(255,255,255,0.03)", color: f.myVote ? C.goldBright : C.muted }}>▲ {f.votes}</button>
-                <span style={{ fontSize: "0.74rem", fontWeight: 700, color: C.muted }}>💬 {f.comments.length} {f.comments.length === 1 ? "comment" : "comments"}</span>
-                {isAdmin && <button onClick={() => toggleResolved(f)} style={{ fontSize: "0.74rem", fontWeight: 800, padding: "7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${resolved ? C.border : "rgba(34,197,94,0.42)"}`, background: resolved ? "rgba(255,255,255,0.03)" : "rgba(34,197,94,0.12)", color: resolved ? C.muted : C.green }}>{resolved ? "Reopen" : "Mark resolved"}</button>}
-                {(isAdmin || f.user_id === uid) && <button onClick={() => { remove(f); setDetail(null); }} title="Delete" style={{ marginLeft: "auto", fontSize: "0.74rem", fontWeight: 700, padding: "7px 13px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, background: "transparent", color: C.muted }}>Delete</button>}
+                <button onClick={() => toggleVote(f)} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.75rem", fontWeight: 600, padding: "7px 15px", borderRadius: 999, cursor: "pointer", fontFamily: font, transition: "all .14s",
+                  border: `1px solid ${f.myVote ? "var(--w22)" : C.border}`, background: f.myVote ? "var(--w08)" : "var(--w03)", color: f.myVote ? C.white : C.muted }}>▲ {f.votes}</button>
+                <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted }}>💬 {f.comments.length} {f.comments.length === 1 ? "comment" : "comments"}</span>
+                {isAdmin && <button onClick={() => toggleResolved(f)} style={{ fontSize: "0.75rem", fontWeight: 600, padding: "7px 15px", borderRadius: 999, cursor: "pointer", fontFamily: font, border: `1px solid ${resolved ? C.border : "rgba(0,200,5,0.42)"}`, background: resolved ? "var(--w03)" : "rgba(0,200,5,0.12)", color: resolved ? C.muted : C.green }}>{resolved ? "Reopen" : "Mark resolved"}</button>}
+                {(isAdmin || f.user_id === uid) && <button onClick={() => { remove(f); setDetail(null); }} title="Delete" style={{ marginLeft: "auto", fontSize: "0.75rem", fontWeight: 500, padding: "7px 13px", borderRadius: 999, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, background: "transparent", color: C.muted }}>Delete</button>}
               </div>
 
               {/* comments — always open in the full view */}
               <div style={{ padding: "16px 22px 22px", borderTop: `1px solid ${C.border}` }}>
-                {f.comments.length === 0 && <div style={{ fontSize: "0.8rem", color: C.muted, marginBottom: 12 }}>No comments yet.</div>}
+                {f.comments.length === 0 && <div style={{ fontSize: "0.75rem", color: C.muted, marginBottom: 12 }}>No comments yet.</div>}
                 {f.comments.map(c => (
                   <div key={c.id} style={{ display: "flex", gap: 9, marginBottom: 10 }}>
-                    <div style={{ width: 27, height: 27, borderRadius: "50%", flex: "0 0 auto", display: "grid", placeItems: "center", fontWeight: 800, fontSize: "0.62rem", background: c.is_admin ? gold : "rgba(255,255,255,0.07)", color: c.is_admin ? "#08080e" : C.muted }}>{initials(c.author_name)}</div>
-                    <div style={{ background: c.is_admin ? "rgba(201,152,42,0.07)" : "rgba(255,255,255,0.03)", border: `1px solid ${c.is_admin ? C.borderGold : C.border}`, borderRadius: 12, padding: "9px 13px", flex: 1 }}>
+                    <div style={{ width: 27, height: 27, borderRadius: "50%", flex: "0 0 auto", display: "grid", placeItems: "center", fontWeight: 600, fontSize: "0.6875rem", background: c.is_admin ? "var(--w14)" : "var(--w08)", color: c.is_admin ? C.white : C.muted }}>{initials(c.author_name)}</div>
+                    <div style={{ background: c.is_admin ? "var(--w06)" : "var(--w03)", border: `1px solid ${c.is_admin ? "var(--w22)" : C.border}`, borderRadius: 12, padding: "9px 13px", flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
-                        <span style={{ fontSize: "0.74rem", fontWeight: 700, color: c.is_admin ? C.gold : C.text }}>{c.author_name || "Member"}</span>
-                        {c.is_admin && <span style={{ fontSize: "0.54rem", fontWeight: 800, color: "#08080e", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, padding: "1px 7px", borderRadius: 99, letterSpacing: "0.04em" }}>TEAM</span>}
-                        <span style={{ fontSize: "0.64rem", color: C.muted, marginLeft: "auto" }}>{timeAgo(c.created_at)}</span>
+                        <span style={{ fontSize: "0.75rem", fontWeight: 500, color: c.is_admin ? C.white : C.text }}>{c.author_name || "Member"}</span>
+                        {c.is_admin && <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.white, background: "var(--w14)", padding: "1px 7px", borderRadius: 999, letterSpacing: "0.04em" }}>TEAM</span>}
+                        <span style={{ fontSize: "0.6875rem", color: C.muted, marginLeft: "auto" }}>{timeAgo(c.created_at)}</span>
                       </div>
-                      <div style={{ fontSize: "0.84rem", color: C.text, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{c.body}</div>
+                      <div style={{ fontSize: "0.875rem", color: C.text, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{c.body}</div>
                     </div>
                   </div>
                 ))}
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   <input className="vivfb-in" value={commentDraft[f.id] || ""} onChange={e => setCommentDraft(d => ({ ...d, [f.id]: e.target.value }))} onKeyDown={e => { if (e.key === "Enter") addComment(f); }}
-                    placeholder={isAdmin ? "Reply as team…" : "Add a comment…"} style={{ flex: 1, background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.84rem", padding: "11px 14px", outline: "none", transition: "border-color .14s, box-shadow .14s" }} />
-                  <button onClick={() => addComment(f)} style={{ background: gold, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "11px 18px", borderRadius: 10, cursor: "pointer" }}>Send</button>
+                    placeholder={isAdmin ? "Reply as team…" : "Add a comment…"} style={{ flex: 1, background: "var(--w08)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.875rem", padding: "11px 14px", outline: "none", transition: "border-color .14s, box-shadow .14s" }} />
+                  <button onClick={() => addComment(f)} style={{ background: "var(--w10)", color: "var(--white)", border: "1px solid var(--w14)", fontFamily: font, fontWeight: 500, fontSize: "0.75rem", padding: "11px 18px", borderRadius: 999, cursor: "pointer" }}>Send</button>
                 </div>
               </div>
             </div>
@@ -437,8 +450,8 @@ export default function FeedbackWidget({ session, isAdmin, displayName, C, font,
       {toasts.length > 0 && (
         <div style={{ position: "fixed", left: "50%", bottom: isMobile ? 100 : 92, transform: "translateX(-50%)", zIndex: 1600, display: "flex", flexDirection: "column", gap: 8, alignItems: "center", pointerEvents: "none", fontFamily: font, width: "min(430px, calc(100vw - 32px))" }}>
           {toasts.map(t => (
-            <div key={t.id} className="vivfb-toast" style={{ pointerEvents: "auto", width: "100%", boxSizing: "border-box", background: "linear-gradient(180deg, rgba(20,20,30,0.98), rgba(10,10,16,0.98))", border: `1px solid ${C.borderGold}`, borderRadius: 14, padding: "12px 15px", color: C.text, fontSize: "0.82rem", fontWeight: 600, lineHeight: 1.5, boxShadow: "0 18px 50px rgba(0,0,0,0.6)", display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <span style={{ color: C.green, fontWeight: 800, flex: "0 0 auto" }}>✓</span>
+            <div key={t.id} className="vivfb-toast" style={{ pointerEvents: "auto", width: "100%", boxSizing: "border-box", background: "var(--sheet)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 15px", color: C.text, fontSize: "0.875rem", fontWeight: 500, lineHeight: 1.5, boxShadow: "var(--shadowOv)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <span style={{ color: C.green, fontWeight: 600, flex: "0 0 auto" }}>✓</span>
               <span style={{ minWidth: 0 }}>{t.msg.replace(/^✓\s*/, "")}</span>
             </div>
           ))}

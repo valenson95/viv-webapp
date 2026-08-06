@@ -119,9 +119,9 @@ export function computeTrend(trades) {
 }
 
 const REGIME = {
-  UPTREND: { fg: "#7ef0a0", bg: "rgba(34,197,94,0.13)", bd: "rgba(34,197,94,0.38)" },
-  CHOP: { fg: "#f0c050", bg: "rgba(201,152,42,0.14)", bd: "rgba(201,152,42,0.4)" },
-  DOWNTREND: { fg: "#fca5a5", bg: "rgba(239,68,68,0.13)", bd: "rgba(239,68,68,0.38)" },
+  UPTREND: { fg: "var(--greenFg)", bg: "rgba(0,200,5,0.13)", bd: "rgba(0,200,5,0.38)" },
+  CHOP: { fg: "var(--orange)", bg: "rgba(255,170,5,0.14)", bd: "rgba(255,170,5,0.4)" },
+  DOWNTREND: { fg: "var(--redFg)", bg: "rgba(255,80,0,0.13)", bd: "rgba(255,80,0,0.38)" },
 };
 
 export default function MarketTrend({ C, font, trades }) {
@@ -148,28 +148,28 @@ export default function MarketTrend({ C, font, trades }) {
           when the Situational card beside it runs taller */}
       <div style={{ display: "flex", flexDirection: "column", gap: 7, flex: 1 }}>
         {t.signals.map(s => (
-          <div key={s.k} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: 10, background: "rgba(255,255,255,0.025)", border: `1px solid ${C.border}` }}>
+          <div key={s.k} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: 10, background: "var(--w02)", border: `1px solid ${C.border}` }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: C.text, lineHeight: 1.35 }}>
-                {s.drives && <span style={{ color: C.goldBright || C.gold, marginRight: 5, fontSize: "0.7em" }}>▸</span>}{s.label}
+              <div style={{ fontSize: "0.75rem", fontWeight: 500, color: C.text, lineHeight: 1.35 }}>
+                {s.drives && <span style={{ color: C.white, marginRight: 5, fontSize: "0.7em" }}>▸</span>}{s.label}
               </div>
-              <div style={{ fontSize: "0.6rem", color: C.muted, lineHeight: 1.4 }}>{s.sub}</div>
+              <div style={{ fontSize: "0.75rem", color: C.muted, lineHeight: 1.4 }}>{s.sub}</div>
             </div>
-            <span style={{ flex: "none", minWidth: 40, textAlign: "center", fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.04em", padding: "3px 9px", borderRadius: 7, color: s.v == null ? C.muted : s.v ? "#7ef0a0" : "#fca5a5", background: s.v == null ? "rgba(255,255,255,0.04)" : s.v ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)", border: `1px solid ${s.v == null ? C.border : s.v ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.35)"}` }}>
+            <span style={{ flex: "none", minWidth: 40, textAlign: "center", fontSize: "0.6875rem", fontWeight: 600, letterSpacing: "0.02em", padding: "3px 9px", borderRadius: 999, color: s.v == null ? C.muted : s.v ? "var(--greenFg)" : "var(--redFg)", background: s.v == null ? "var(--w04)" : s.v ? "rgba(0,200,5,0.12)" : "rgba(255,80,0,0.12)", border: `1px solid ${s.v == null ? C.border : s.v ? "rgba(0,200,5,0.35)" : "rgba(255,80,0,0.35)"}` }}>
               {s.v == null ? "—" : s.v ? "YES" : "NO"}
             </span>
           </div>
         ))}
       </div>
       <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, background: rg.bg, border: `1px solid ${rg.bd}` }}>
-        <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.13em", textTransform: "uppercase", color: C.muted }}>Market regime</span>
+        <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>Market regime</span>
         <InfoDot tip={{ lead: "Set by the three price rows marked ▸.", points: [
           "All three YES → UPTREND",
           "All three NO → DOWNTREND",
           "Anything mixed → CHOP",
           "Breadth and your own trades are context — they do not set the regime.",
         ] }} />
-        <span style={{ marginLeft: "auto", fontSize: "0.82rem", fontWeight: 800, letterSpacing: "0.06em", color: rg.fg }}>{t.regime}</span>
+        <span style={{ marginLeft: "auto", fontSize: "0.875rem", fontWeight: 600, letterSpacing: "0.02em", color: rg.fg }}>{t.regime}</span>
       </div>
     </div>
   );

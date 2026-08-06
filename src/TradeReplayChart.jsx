@@ -14,7 +14,12 @@ const TFS = [{ k: "1min", lbl: "1m" }, { k: "5min", lbl: "5m" }, { k: "15min", l
 // MODULE scope (never nested in a component — past bug): a component defined inside a render body
 // is a new type every render, forcing a full remount of everything using it. C is a prop here (not
 // module-scope in this file), so it's passed through explicitly.
-const Pill = ({ C, label, children }) => <span style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 9, padding: "7px 12px", fontSize: "0.76rem", color: C.muted, fontWeight: 600 }}>{label} {children}</span>;
+const Pill = ({ C, label, children }) => <span style={{ background: "var(--w04)", border: `1px solid ${C.border}`, borderRadius: 9, padding: "7px 12px", fontSize: "0.75rem", color: C.muted, fontWeight: 600 }}>{label} {children}</span>;
+// Resolve a CSS custom property to its current painted value — for <canvas> 2D context and the
+// Lightweight-Charts library, neither of which accepts var(...) strings (canvas silently drops an
+// invalid fillStyle/strokeStyle; LWC's own colour options need a real CSS colour). Called fresh
+// inside the draw/init paths below so a light/dark toggle is picked up on the next repaint.
+const cssVar = (n, fb) => { try { const v = getComputedStyle(document.documentElement).getPropertyValue(n); return (v || "").trim() || fb; } catch { return fb; } };
 // Normalize any trade date to ISO YYYY-MM-DD before it hits `new Date()`. A naive slice(0,10)
 // left legacy manual/dashboard "M/D/YY" rows (e.g. "7/16/26") as non-ISO strings: Safari/JSC
 // refuses to parse those (Invalid Date → the details chart silently blanked), and where they DID
@@ -70,7 +75,12 @@ export default function TradeReplayChart({ trade, C, font }) {
   const [savedTick, setSavedTick] = useState(0); // bumps when annotations persist → "saved ✓" flash
   useEffect(() => { toolRef.current = tool; }, [tool]);
 
-  const GOLD = C.goldBright, GRN = "#22c55e", RED = "#ef4444", BLUE = "#6aa8ff";
+  // JSX-facing tokens — safe as var() strings in inline React styles (pills/legend below); these
+  // re-theme live with no re-render needed. The canvas + Lightweight-Charts paths CANNOT use these
+  // (var() is not a valid canvas fillStyle/strokeStyle or LWC colour option) — they resolve their
+  // own real colour strings via cssVar() at draw/init time instead, see redraw() and the chart-init
+  // effect below.
+  const GOLD = C.goldBright, GRN = "var(--green)", RED = "var(--red)", BLUE = "var(--blue)";
 
   // ── annotation persistence: load per trade, save on every change, never lost ──
   const drawKey = `viv-chart-draw-${trade.id ?? (trade.ticker + "|" + iso(trade.entry))}-v1`;
@@ -111,6 +121,9 @@ export default function TradeReplayChart({ trade, C, font }) {
 
   const redraw = useCallback(() => {
     const cv = canvasRef.current, chart = chartRef.current, s = seriesRef.current; if (!cv || !chart || !s) return;
+    // Real colours, re-read on every repaint (resize, range change, theme toggle) — var(...)
+    // strings are not valid canvas fillStyle/strokeStyle values.
+    const goldC = cssVar("--goldBright", "#f0c050"), blueC = cssVar("--blue", "#3b9eff");
     const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
     cv.width = w * dpr; cv.height = h * dpr; // crisp lines on retina
     const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, w, h);
@@ -118,9 +131,9 @@ export default function TradeReplayChart({ trade, C, font }) {
     const line = (x1, y1, x2, y2, color) => { ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
     for (const d of drawingsRef.current) {
       const y = Y(d.p1.price); if (y == null) continue;
-      if (d.type === "hline") { line(0, y, w, y, GOLD); ctx.fillStyle = GOLD; ctx.font = "10px " + font; ctx.fillText(d.p1.price.toFixed(2), 4, y - 4); }
-      else if (d.type === "hray") { const x = timeToX(d.p1.t); if (x != null) { line(x, y, w, y, GOLD); ctx.fillStyle = GOLD; ctx.font = "10px " + font; ctx.fillText(d.p1.price.toFixed(2), x + 4, y - 4); } }
-      else if (d.type === "trend" && d.p2) { const x1 = timeToX(d.p1.t), y1 = Y(d.p1.price), x2 = timeToX(d.p2.t), y2 = Y(d.p2.price); if (x1 != null && x2 != null && y1 != null && y2 != null) line(x1, y1, x2, y2, BLUE); }
+      if (d.type === "hline") { line(0, y, w, y, goldC); ctx.fillStyle = goldC; ctx.font = "10px " + font; ctx.fillText(d.p1.price.toFixed(2), 4, y - 4); }
+      else if (d.type === "hray") { const x = timeToX(d.p1.t); if (x != null) { line(x, y, w, y, goldC); ctx.fillStyle = goldC; ctx.font = "10px " + font; ctx.fillText(d.p1.price.toFixed(2), x + 4, y - 4); } }
+      else if (d.type === "trend" && d.p2) { const x1 = timeToX(d.p1.t), y1 = Y(d.p1.price), x2 = timeToX(d.p2.t), y2 = Y(d.p2.price); if (x1 != null && x2 != null && y1 != null && y2 != null) line(x1, y1, x2, y2, blueC); }
     }
     // pending trend draft: anchor dot + dashed preview to the cursor (first click used to be
     // invisible, which read as "the tool doesn't work")
@@ -128,13 +141,13 @@ export default function TradeReplayChart({ trade, C, font }) {
     if (draft) {
       const x = timeToX(draft.t), y = Y(draft.price);
       if (x != null && y != null) {
-        ctx.fillStyle = BLUE; ctx.beginPath(); ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = blueC; ctx.beginPath(); ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.fill();
         const mp = mouseRef.current;
-        if (mp) { ctx.setLineDash([4, 4]); line(x, y, mp.x, mp.y, BLUE); ctx.setLineDash([]); }
+        if (mp) { ctx.setLineDash([4, 4]); line(x, y, mp.x, mp.y, blueC); ctx.setLineDash([]); }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [font, GOLD, BLUE]);
+  }, [font]);
 
   useEffect(() => {
     let dead = false; setStatus("loading");
@@ -155,20 +168,27 @@ export default function TradeReplayChart({ trade, C, font }) {
   useEffect(() => {
     if (status !== "ok") return; const LWC = window.LightweightCharts; if (!LWC || !wrapRef.current) { setStatus("nolib"); return; }
     wrapRef.current.innerHTML = "";
-    const chart = LWC.createChart(wrapRef.current, { layout: { background: { color: "#0e0e16" }, textColor: "rgba(255,255,255,0.62)", fontFamily: font }, grid: { vertLines: { color: "rgba(255,255,255,0.05)" }, horzLines: { color: "rgba(255,255,255,0.05)" } }, rightPriceScale: { borderColor: "rgba(255,255,255,0.12)" }, timeScale: { borderColor: "rgba(255,255,255,0.12)", timeVisible: tf !== "1day", secondsVisible: false }, crosshair: { mode: 0 }, height: wrapRef.current.clientHeight || 440 });
+    // Real colours resolved off the current theme at chart-creation time — Lightweight-Charts'
+    // colour options (like canvas fillStyle) do not accept var(...) strings. Recomputed each time
+    // this effect (re)runs, so a tf/trade change while the app is on light theme still paints light.
+    const bgC = cssVar("--card", "#0e0e16"), textC = cssVar("--muted", "rgba(255,255,255,0.62)");
+    const gridC = cssVar("--gridline", "rgba(255,255,255,0.05)"), axisC = cssVar("--axis", "rgba(255,255,255,0.45)");
+    const goldC = cssVar("--goldBright", "#f0c050"), grnC = cssVar("--green", "#00c805");
+    const redC = cssVar("--red", "#ff5000"), blueC = cssVar("--blue", "#3b9eff");
+    const chart = LWC.createChart(wrapRef.current, { layout: { background: { color: bgC }, textColor: textC, fontFamily: font }, grid: { vertLines: { color: gridC }, horzLines: { color: gridC } }, rightPriceScale: { borderColor: axisC }, timeScale: { borderColor: axisC, timeVisible: tf !== "1day", secondsVisible: false }, crosshair: { mode: 0 }, height: wrapRef.current.clientHeight || 440 });
     chartRef.current = chart;
-    const s = chart.addCandlestickSeries({ upColor: GRN, downColor: RED, wickUpColor: GRN, wickDownColor: RED, borderVisible: false }); seriesRef.current = s;
+    const s = chart.addCandlestickSeries({ upColor: grnC, downColor: redC, wickUpColor: grnC, wickDownColor: redC, borderVisible: false }); seriesRef.current = s;
     const bars = barsRef.current; s.setData(bars);
     const closes = bars.map(b => b.close), e9 = ema(closes, 9), e21 = ema(closes, 21);
-    const l9 = chart.addLineSeries({ color: GOLD, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-    const l21 = chart.addLineSeries({ color: BLUE, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+    const l9 = chart.addLineSeries({ color: goldC, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+    const l21 = chart.addLineSeries({ color: blueC, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
     l9.setData(bars.map((b, i) => ({ time: b.time, value: e9[i] })));
     l21.setData(bars.map((b, i) => ({ time: b.time, value: e21[i] })));
     const isLong = (trade.tradeType || "Long") !== "Short";
     const entryP = Number(trade.entryP) || 0, exitP = Number(trade.exitP) || 0, stopP = Number(trade.stop) || 0, up = (Number(trade.plDollar) || 0) >= 0;
     // Events vs levels: entry/exit = arrow markers at the exact fill bars ONLY; the locked
     // stop is a standing LEVEL, so only the stop draws a horizontal line.
-    if (stopP) s.createPriceLine({ price: stopP, color: RED, lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: "stop " + stopP });
+    if (stopP) s.createPriceLine({ price: stopP, color: redC, lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: "stop " + stopP });
     // Fills at their EXACT time bars (entry_time/exit_time stored as ET; date-only rows fall
     // back to 09:30 ET open). TradeZella-style arrows: BUY side = green ▲ below the bar,
     // SELL side = red ▼ above the bar — colored by SIDE, not by P&L.
@@ -178,8 +198,8 @@ export default function TradeReplayChart({ trade, C, font }) {
     for (const f of fills) {
       const eT = fillEpoch(f.entry, f.entryTime), xT = fillEpoch(f.exit, f.exitTime, "15:59:00");
       const eP = Number(f.entryP) || entryP, xP = Number(f.exitP) || exitP;
-      if (eT != null) marks.push({ time: nearestT(eT).time, position: isLong ? "belowBar" : "aboveBar", color: isLong ? GRN : RED, shape: isLong ? "arrowUp" : "arrowDown", text: (fills.length > 1 ? "" : "ENTRY ") + eP.toFixed(2) });
-      if (xT != null && f.exit) marks.push({ time: nearestT(xT).time, position: isLong ? "aboveBar" : "belowBar", color: isLong ? RED : GRN, shape: isLong ? "arrowDown" : "arrowUp", text: (fills.length > 1 ? "" : "EXIT ") + xP.toFixed(2) });
+      if (eT != null) marks.push({ time: nearestT(eT).time, position: isLong ? "belowBar" : "aboveBar", color: isLong ? grnC : redC, shape: isLong ? "arrowUp" : "arrowDown", text: (fills.length > 1 ? "" : "ENTRY ") + eP.toFixed(2) });
+      if (xT != null && f.exit) marks.push({ time: nearestT(xT).time, position: isLong ? "aboveBar" : "belowBar", color: isLong ? redC : grnC, shape: isLong ? "arrowDown" : "arrowUp", text: (fills.length > 1 ? "" : "EXIT ") + xP.toFixed(2) });
     }
     marks.sort((a, b) => a.time - b.time);
     s.setMarkers(marks);
@@ -187,7 +207,7 @@ export default function TradeReplayChart({ trade, C, font }) {
     const onRange = () => redraw(); chart.timeScale().subscribeVisibleTimeRangeChange(onRange);
     const ro = new ResizeObserver(() => { chart.applyOptions({ height: wrapRef.current.clientHeight }); redraw(); }); ro.observe(wrapRef.current); redraw();
     return () => { try { ro.disconnect(); chart.remove(); } catch (e) {} chartRef.current = null; seriesRef.current = null; };
-  }, [status, tf, font, redraw, trade, GOLD, BLUE]);
+  }, [status, tf, font, redraw, trade]);
 
   const onCanvasClick = (e) => {
     const chart = chartRef.current, s = seriesRef.current; if (!chart || !s) return; const T = toolRef.current; if (T === "cursor") return;
@@ -212,8 +232,8 @@ export default function TradeReplayChart({ trade, C, font }) {
 
   // ── pills from trade data ──
   const entryP = Number(trade.entryP) || 0, exitP = Number(trade.exitP) || 0, stopP = Number(trade.stop) || 0, pl = Number(trade.plDollar) || 0, r = trade.rMult, sh = Number(trade.shares) || 0, up = pl >= 0;
-  const b = (t, c) => <b style={{ color: c || "#fff", fontWeight: 800 }}>{t}</b>;
-  const tBtn = (k, label, title) => <button title={title} onClick={() => { setTool(k); if (k !== "trend") { draftRef.current = null; mouseRef.current = null; redraw(); } }} style={{ background: tool === k ? C.goldDim : "transparent", color: tool === k ? C.goldBright : C.muted, border: `1px solid ${tool === k ? C.borderGold : "transparent"}`, borderRadius: 7, padding: "5px 9px", fontFamily: font, fontSize: "0.7rem", fontWeight: 700, cursor: "pointer" }}>{label}</button>;
+  const b = (t, c) => <b style={{ color: c || "var(--white)", fontWeight: 800 }}>{t}</b>;
+  const tBtn = (k, label, title) => <button title={title} onClick={() => { setTool(k); if (k !== "trend") { draftRef.current = null; mouseRef.current = null; redraw(); } }} style={{ background: tool === k ? C.goldDim : "transparent", color: tool === k ? C.goldBright : C.muted, border: `1px solid ${tool === k ? C.borderGold : "transparent"}`, borderRadius: 7, padding: "5px 9px", fontFamily: font, fontSize: "0.6875rem", fontWeight: 700, cursor: "pointer" }}>{label}</button>;
 
   return (
     <div style={{ fontFamily: font }}>
@@ -228,24 +248,24 @@ export default function TradeReplayChart({ trade, C, font }) {
       </div>
       {/* timeframe + drawing tools strip */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 8, padding: 2 }}>
-          {TFS.map(x => <button key={x.k} onClick={() => setTf(x.k)} style={{ background: tf === x.k ? C.gold : "transparent", color: tf === x.k ? "#1a1206" : C.muted, border: "none", borderRadius: 6, padding: "5px 10px", fontFamily: font, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>{x.lbl}</button>)}
+        <div style={{ display: "flex", gap: 2, background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 8, padding: 2 }}>
+          {TFS.map(x => <button key={x.k} onClick={() => setTf(x.k)} style={{ background: tf === x.k ? C.gold : "transparent", color: tf === x.k ? "var(--goldOn)" : C.muted, border: "none", borderRadius: 6, padding: "5px 10px", fontFamily: font, fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>{x.lbl}</button>)}
         </div>
         <div style={{ display: "flex", gap: 2, marginLeft: 4 }}>
           {tBtn("cursor", "✛", "Cursor")}{tBtn("hline", "─ Line", "Horizontal line")}{tBtn("hray", "→ Ray", "Horizontal ray")}{tBtn("trend", "╱ Trend", "Trend line")}
-          <button onClick={() => { drawingsRef.current = []; draftRef.current = null; persistDrawings(); redraw(); }} title="Clear drawings (also clears the saved annotations for this trade)" style={{ background: "transparent", color: C.muted, border: "none", borderRadius: 7, padding: "5px 8px", fontFamily: font, fontSize: "0.7rem", fontWeight: 700, cursor: "pointer" }}>✕ Clear</button>
+          <button onClick={() => { drawingsRef.current = []; draftRef.current = null; persistDrawings(); redraw(); }} title="Clear drawings (also clears the saved annotations for this trade)" style={{ background: "transparent", color: C.muted, border: "none", borderRadius: 7, padding: "5px 8px", fontFamily: font, fontSize: "0.6875rem", fontWeight: 700, cursor: "pointer" }}>✕ Clear</button>
         </div>
-        {savedTick > 0 && <span style={{ fontSize: "0.62rem", color: GRN, fontWeight: 700 }}>annotations saved ✓</span>}
+        {savedTick > 0 && <span style={{ fontSize: "0.6875rem", color: GRN, fontWeight: 700 }}>annotations saved ✓</span>}
       </div>
       {/* chart */}
-      <div style={{ position: "relative", height: 500, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.border}`, background: "#0e0e16" }}>
+      <div style={{ position: "relative", height: 500, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.border}`, background: "var(--card)" }}>
         <div ref={wrapRef} style={{ position: "absolute", inset: 0 }} />
         <canvas ref={canvasRef} onClick={onCanvasClick} onMouseMove={onCanvasMove} onMouseLeave={() => { mouseRef.current = null; redraw(); }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: tool === "cursor" ? "none" : "auto", cursor: tool === "cursor" ? "default" : "crosshair" }} />
-        {status !== "ok" && <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.82rem" }}>{status === "loading" ? "Loading candles…" : status === "empty" ? `No candle data for ${trade.ticker}` : status === "nolib" ? "Chart engine not loaded" : "Couldn't load candles (check POLYGON_API_KEY)"}</div>}
-        {status === "ok" && sample && <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(201,152,42,0.18)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.05em", padding: "3px 8px", borderRadius: 6, pointerEvents: "none" }}>SAMPLE · live candles on deploy</div>}
+        {status !== "ok" && <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.875rem" }}>{status === "loading" ? "Loading candles…" : status === "empty" ? `No candle data for ${trade.ticker}` : status === "nolib" ? "Chart engine not loaded" : "Couldn't load candles (check POLYGON_API_KEY)"}</div>}
+        {status === "ok" && sample && <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(201,152,42,0.18)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.05em", padding: "3px 8px", borderRadius: 6, pointerEvents: "none" }}>SAMPLE · live candles on deploy</div>}
       </div>
       {/* legend */}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 10, color: C.muted, fontSize: "0.72rem" }}>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 10, color: C.muted, fontSize: "0.75rem" }}>
         <span><i style={{ display: "inline-block", width: 10, height: 2, background: C.goldBright, verticalAlign: "middle", marginRight: 5 }} />EMA9</span>
         <span><i style={{ display: "inline-block", width: 10, height: 2, background: BLUE, verticalAlign: "middle", marginRight: 5 }} />EMA21</span>
         <span style={{ color: GRN, fontWeight: 700 }}>▲ buy fill</span>

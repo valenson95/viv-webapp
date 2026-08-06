@@ -255,7 +255,7 @@ export function scoreTicked(ticked, { makerGate = true } = {}) {
 
 const CHECK = (
   <svg viewBox="0 0 24 24" fill="none" style={{ width: 13, height: 13 }}>
-    <path d="M20 6L9 17l-5-5" stroke="#08080e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M20 6L9 17l-5-5" stroke="var(--bg)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -274,13 +274,13 @@ const GRADES = {
   0: ["—", "Tick what's true to grade the setup."],
 };
 
-const letterColor = (C, l) => l === "A+" ? C.green : l === "A" ? C.goldBright : l === "B" ? C.muted : (l === "—" ? C.muted : C.red);
+const letterColor = (C, l) => l === "A+" ? C.green : l === "A" ? C.white : l === "B" ? C.muted : (l === "—" ? C.muted : C.red);
 // Device-LOCAL calendar date (Valen = MYT). toISOString() alone is UTC and stamps
 // yesterday before 8am MYT — wrong feed grouping + wrong theme snapshot.
 const localISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const MiniStars = ({ C, n, size = 0.72 }) => (
   <span style={{ letterSpacing: 1, fontSize: `${size}rem`, whiteSpace: "nowrap" }}>
-    {[0, 1, 2, 3, 4].map(k => <span key={k} style={{ color: k < n ? C.goldBright : "rgba(255,255,255,0.16)" }}>★</span>)}
+    {[0, 1, 2, 3, 4].map(k => <span key={k} style={{ color: k < n ? C.white : "var(--faint)" }}>★</span>)}
   </span>
 );
 
@@ -288,7 +288,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
   useGrades(); // re-render when a grade is saved/removed
   const uid = session?.user?.id || null;
   const [on, setOn] = useState(() => new Set());
-  const [auto, setAuto] = useState(() => new Set()); // gold-dot: ticks auto-read by VIV, pending a human eye
+  const [auto, setAuto] = useState(() => new Set()); // auto-dot: ticks auto-read by VIV, pending a human eye
   const [ticker, setTicker] = useState("");
   const [showSync, setShowSync] = useState(false);
   const [flash, setFlash] = useState("");
@@ -594,39 +594,39 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
         <div className="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg></div>
         <div>
           <h3>What is the Setup Grader?</h3>
-          <p>Use it while <b>scanning and screening</b> for the best stocks — <b>not during live trading</b>. Tick every characteristic that's true and it scores the chart out of <b>5 stars</b> across three areas: the <b>prior move</b>, the <b>base</b>, and the <b>trigger day</b> ({TOTAL} scored ticks). <b style={{ color: C.gold }}>Leadership</b> sits above as a <b>context check</b> (not scored), and two <b style={{ color: C.goldBright }}>Bonus</b> ticks are tracked but left out of the score. A <b style={{ color: C.gold }}>★ maker</b> is a <b>confluence factor</b> — a high-signal criterion that independently raises the odds the breakout works. You can tick most boxes and still cap at 4★; the <b>fifth star (A+) only unlocks when the ★-makers stack</b> — because {STARMAKERS} unrelated signals agreeing is an edge, one alone is luck. When you're ready to enter, the <b style={{ color: C.blue }}>Trigger &amp; Stop</b> live-checklist at the bottom covers execution.</p>
+          <p>Use it while <b>scanning and screening</b> for the best stocks — <b>not during live trading</b>. Tick every characteristic that's true and it scores the chart out of <b>5 stars</b> across three areas: the <b>prior move</b>, the <b>base</b>, and the <b>trigger day</b> ({TOTAL} scored ticks). <b style={{ color: C.white }}>Leadership</b> sits above as a <b>context check</b> (not scored), and two <b style={{ color: C.white }}>Bonus</b> ticks are tracked but left out of the score. A <b style={{ color: C.white }}>★ maker</b> is a <b>confluence factor</b> — a high-signal criterion that independently raises the odds the breakout works. You can tick most boxes and still cap at 4★; the <b>fifth star (A+) only unlocks when the ★-makers stack</b> — because {STARMAKERS} unrelated signals agreeing is an edge, one alone is luck. When you're ready to enter, the <b style={{ color: C.blue }}>Trigger &amp; Stop</b> live-checklist at the bottom covers execution.</p>
         </div>
       </div>
 
       {/* SCREENING WATCHLIST — key in tickers, save grades */}
       <div style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "14px 16px 8px", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
-          <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Screening watchlist</span>
-          <span style={{ fontSize: "0.72rem", color: C.muted }}>grade names as you scan — each saves with its ★ score</span>
+          <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>Screening watchlist</span>
+          <span style={{ fontSize: "0.75rem", color: C.muted }}>grade names as you scan — each saves with its ★ score</span>
           {isAdmin && savedRows.length > 0 && (
             <button onClick={clearWatchlist} disabled={busy}
               title="Clear these names from the watchlist. Their saved grades are kept everywhere else (positions, Model Book, Daily Setups)."
-              style={{ background: "rgba(239,68,68,0.08)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.38)", fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 12px", borderRadius: 99, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>
+              style={{ background: "rgba(255,80,0,0.08)", color: "var(--redFg)", border: "1px solid rgba(255,80,0,0.38)", fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "6px 12px", borderRadius: 999, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>
               🗑 {sel.size > 0 ? `Clear selected (${sel.size})` : `Clear all (${savedRows.length})`}
             </button>
           )}
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
             <input value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} onKeyDown={e => { if (e.key === "Enter") startTicker(); }}
               placeholder="Ticker e.g. NVDA" maxLength={8}
-              style={{ width: 130, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontWeight: 700, fontSize: "0.82rem", letterSpacing: "0.04em", padding: "8px 12px", outline: "none" }} />
-            <button onClick={startTicker} style={{ background: C.goldDim, color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 800, fontSize: "0.74rem", padding: "8px 14px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap" }}>Grade this ↓</button>
+              style={{ width: 130, background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontWeight: 600, fontSize: "0.875rem", letterSpacing: "0.02em", padding: "8px 12px", outline: "none" }} />
+            <button onClick={startTicker} style={{ background: C.goldDim, color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 600, fontSize: "0.75rem", padding: "8px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Grade this ↓</button>
           </div>
         </div>
         {isAdmin && sel.size > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "4px 2px 12px" }}>
-            <span style={{ fontSize: "0.72rem", fontWeight: 800, color: C.gold }}>{sel.size} selected</span>
-            <button disabled={busy} onClick={copySummary} style={{ background: "rgba(255,255,255,0.06)", color: C.text, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>📋 Copy summary</button>
-            <button disabled={busy} onClick={downloadCards} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>🖼 Download {sel.size} card{sel.size > 1 ? "s" : ""}</button>
-            <button onClick={() => setSel(new Set())} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer" }}>Clear</button>
+            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: C.white }}>{sel.size} selected</span>
+            <button disabled={busy} onClick={copySummary} style={{ background: "var(--w06)", color: C.text, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "6px 13px", borderRadius: 999, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>📋 Copy summary</button>
+            <button disabled={busy} onClick={downloadCards} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>🖼 Download {sel.size} card{sel.size > 1 ? "s" : ""}</button>
+            <button onClick={() => setSel(new Set())} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "6px 12px", borderRadius: 999, cursor: "pointer" }}>Clear</button>
           </div>
         )}
         {savedRows.length === 0 ? (
-          <div style={{ fontSize: "0.8rem", color: C.muted, padding: "6px 2px 12px" }}>No graded names yet — type a ticker, tick the criteria below, then <b style={{ color: C.gold }}>Save grade</b>. It'll appear here.</div>
+          <div style={{ fontSize: "0.75rem", color: C.muted, padding: "6px 2px 12px" }}>No graded names yet — type a ticker, tick the criteria below, then <b style={{ color: C.white }}>Save grade</b>. It'll appear here.</div>
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460 }}>
@@ -636,10 +636,10 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                     <input type="checkbox" title="Select all"
                       checked={savedRows.length > 0 && savedRows.every(g => sel.has(g.sym))}
                       onChange={e => setSel(e.target.checked ? new Set(savedRows.map(g => g.sym)) : new Set())}
-                      style={{ accentColor: "#c9982a", cursor: "pointer" }} />
+                      style={{ accentColor: "var(--text)", cursor: "pointer" }} />
                   </th>}
                   {["Ticker", "Grade", "Stars", "%", "", ""].map((h, i) => (
-                    <th key={i} style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, padding: "6px 8px", borderBottom: `1px solid ${C.border}`, textAlign: i >= 3 ? "right" : "left" }}>{h}</th>
+                    <th key={i} style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", padding: "6px 8px", borderBottom: `1px solid ${C.border}`, textAlign: i >= 3 ? "right" : "left" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -649,24 +649,24 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                   const opened = openSym === g.sym;
                   return (
                     <React.Fragment key={g.sym}>
-                    <tr onClick={() => loadTicker(g.sym)} style={{ cursor: "pointer", background: active ? "rgba(201,152,42,0.07)" : "transparent" }}
-                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = active ? "rgba(201,152,42,0.07)" : "transparent"; }}>
-                      {isAdmin && <td onClick={e => e.stopPropagation()} style={{ padding: "9px 4px 9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)`, width: 30 }}>
-                        <input type="checkbox" checked={sel.has(g.sym)} onChange={() => toggleSel(g.sym)} style={{ accentColor: "#c9982a", cursor: "pointer" }} />
+                    <tr onClick={() => loadTicker(g.sym)} style={{ cursor: "pointer", background: active ? "var(--w06)" : "transparent" }}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--w03)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = active ? "var(--w06)" : "transparent"; }}>
+                      {isAdmin && <td onClick={e => e.stopPropagation()} style={{ padding: "9px 4px 9px 8px", borderBottom: `1px solid var(--w04)`, width: 30 }}>
+                        <input type="checkbox" checked={sel.has(g.sym)} onChange={() => toggleSel(g.sym)} style={{ accentColor: "var(--text)", cursor: "pointer" }} />
                       </td>}
-                      <td style={{ padding: "9px 8px", fontWeight: 800, fontSize: "0.86rem", color: C.white, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                      <td style={{ padding: "14px 8px", fontWeight: 600, fontSize: "0.875rem", color: C.white, borderBottom: `1px solid var(--w06)` }}>
                         {g.sym}
-                        {posSet.has(g.sym) && <span title="Open position" style={{ marginLeft: 7, fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.06em", color: C.green, background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)", padding: "2px 6px", borderRadius: 99, verticalAlign: "middle" }}>OPEN</span>}
+                        {posSet.has(g.sym) && <span title="Open position" style={{ marginLeft: 7, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: C.green, background: "rgba(0,200,5,0.12)", border: "1px solid rgba(0,200,5,0.3)", padding: "2px 7px", borderRadius: 999, verticalAlign: "middle" }}>Open</span>}
                       </td>
-                      <td style={{ padding: "9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><span style={{ fontWeight: 800, fontSize: "0.86rem", color: letterColor(C, g.letter) }}>{g.letter}</span></td>
-                      <td style={{ padding: "9px 8px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><MiniStars C={C} n={g.stars} /></td>
-                      <td style={{ padding: "9px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: "0.82rem", color: C.text, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>{Math.round((g.pct || 0) * 100)}%</td>
-                      <td onClick={e => e.stopPropagation()} style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)`, whiteSpace: "nowrap", position: "relative" }}>
-                        <button onClick={(e) => { e.stopPropagation(); opened ? setOpenSym("") : openRow(g); }} style={{ background: opened ? C.goldDim : "transparent", border: `1px solid ${opened ? C.borderGold : C.border}`, color: opened ? C.goldBright : C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 11px", borderRadius: 8, cursor: "pointer" }}>{opened ? "Close" : "Open"}</button>
-                        <button title={`Attach ${g.sym}'s saved grade to an open position of your choice`} onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setRowSync(p => p?.sym === g.sym ? null : { sym: g.sym, x: r.right, y: r.bottom }); }} style={{ marginLeft: 6, background: rowSync?.sym === g.sym ? "rgba(59,130,246,0.18)" : "rgba(59,130,246,0.10)", border: "1px solid rgba(59,130,246,0.3)", color: C.blue, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "5px 9px", borderRadius: 8, cursor: "pointer" }}>⇄</button>
+                      <td style={{ padding: "14px 8px", borderBottom: `1px solid var(--w06)` }}><span style={{ fontWeight: 600, fontSize: "0.875rem", color: letterColor(C, g.letter) }}>{g.letter}</span></td>
+                      <td style={{ padding: "14px 8px", borderBottom: `1px solid var(--w06)` }}><MiniStars C={C} n={g.stars} /></td>
+                      <td style={{ padding: "14px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, fontSize: "0.875rem", letterSpacing: "-0.025em", color: C.text, borderBottom: `1px solid var(--w06)` }}>{Math.round((g.pct || 0) * 100)}%</td>
+                      <td onClick={e => e.stopPropagation()} style={{ padding: "14px 8px", textAlign: "right", borderBottom: `1px solid var(--w06)`, whiteSpace: "nowrap", position: "relative" }}>
+                        <button onClick={(e) => { e.stopPropagation(); opened ? setOpenSym("") : openRow(g); }} style={{ background: opened ? "var(--w10)" : "transparent", border: `1px solid ${opened ? "var(--w14)" : C.border}`, color: opened ? C.white : C.muted, fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, padding: "5px 11px", borderRadius: 999, cursor: "pointer" }}>{opened ? "Close" : "Open"}</button>
+                        <button title={`Attach ${g.sym}'s saved grade to an open position of your choice`} onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setRowSync(p => p?.sym === g.sym ? null : { sym: g.sym, x: r.right, y: r.bottom }); }} style={{ marginLeft: 6, background: rowSync?.sym === g.sym ? "rgba(59,158,255,0.18)" : "var(--blueDim)", border: "1px solid rgba(59,158,255,0.3)", color: C.blue, fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, padding: "5px 9px", borderRadius: 999, cursor: "pointer" }}>⇄</button>
                       </td>
-                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.04)` }}><button title="Remove from this list (grade is kept)" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Remove ${g.sym} from the screening watchlist?\n\nThe saved grade is KEPT everywhere it's used — Open Positions' Grade column, the Model Book, and any published Daily Setups. This only clears ${g.sym} from this list; grade it again anytime to bring it back.`)) archiveGrade(g.sym); }} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1, width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", verticalAlign: "middle", padding: 0 }}>×</button></td>
+                      <td style={{ padding: "9px 8px", textAlign: "right", borderBottom: `1px solid var(--w04)` }}><button title="Remove from this list (grade is kept)" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Remove ${g.sym} from the screening watchlist?\n\nThe saved grade is KEPT everywhere it's used — Open Positions' Grade column, the Model Book, and any published Daily Setups. This only clears ${g.sym} from this list; grade it again anytime to bring it back.`)) archiveGrade(g.sym); }} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1, width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", verticalAlign: "middle", padding: 0 }}>×</button></td>
                     </tr>
                     {opened && (() => {
                       // Inline editor — VERSION-AWARE: a legacy row keeps its own list, denominator
@@ -695,24 +695,24 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                       };
                       return (
                       <tr>
-                        <td colSpan={isAdmin ? 7 : 6} style={{ padding: "2px 8px 14px", borderBottom: `1px solid rgba(255,255,255,0.04)`, background: "rgba(201,152,42,0.03)" }}>
+                        <td colSpan={isAdmin ? 7 : 6} style={{ padding: "2px 8px 14px", borderBottom: `1px solid var(--w04)`, background: "var(--w03)" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", padding: "10px 6px 4px" }}>
                             <MiniStars C={C} n={eStars} size={0.9} />
-                            <span style={{ fontWeight: 800, fontSize: "0.9rem", color: letterColor(C, eLetter) }}>{eLetter}</span>
-                            <span style={{ fontSize: "0.8rem", fontWeight: 700, color: C.white }}>{(GRADES[eStars] || GRADES[0])[0]}</span>
-                            <span style={{ fontSize: "0.72rem", color: C.muted }}>{ePassed}/{eTotal} criteria · {eStarHit}/{eSM} ★-makers{eV === 1 ? " · previous checklist" : ""}{dirty ? " · unsaved edits" : ""}</span>
+                            <span style={{ fontWeight: 600, fontSize: "0.875rem", color: letterColor(C, eLetter) }}>{eLetter}</span>
+                            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: C.white }}>{(GRADES[eStars] || GRADES[0])[0]}</span>
+                            <span style={{ fontSize: "0.75rem", color: C.muted }}>{ePassed}/{eTotal} criteria · {eStarHit}/{eSM} ★-makers{eV === 1 ? " · previous checklist" : ""}{dirty ? " · unsaved edits" : ""}</span>
                             <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                              {rowMsg && <span style={{ fontSize: "0.72rem", fontWeight: 700, color: rowMsg.includes("✓") ? C.green : C.goldBright }}>{rowMsg}</span>}
-                              <button onClick={saveRow} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Save grade</button>
-                              <button onClick={deleteRow} style={{ background: "rgba(239,68,68,0.10)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.4)", fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "6px 14px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Delete</button>
-                              <button onClick={() => loadTicker(g.sym)} title="Load into the full grader below for the chart, annotation and publishing" style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.68rem", fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Full kit ↓</button>
+                              {rowMsg && <span style={{ fontSize: "0.75rem", fontWeight: 600, color: rowMsg.includes("✓") ? C.green : C.white }}>{rowMsg}</span>}
+                              <button onClick={saveRow} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.6875rem", fontWeight: 600, padding: "6px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Save grade</button>
+                              <button onClick={deleteRow} style={{ background: "rgba(255,80,0,0.10)", color: "var(--redFg)", border: "1px solid rgba(255,80,0,0.4)", fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, padding: "6px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Delete</button>
+                              <button onClick={() => loadTicker(g.sym)} title="Load into the full grader below for the chart, annotation and publishing" style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, padding: "6px 12px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Full kit ↓</button>
                             </div>
                           </div>
-                          <div style={{ fontSize: "0.68rem", color: C.muted, padding: "0 6px 4px" }}>Click any criterion to tick / untick it, then Save — the grade updates right here, no scrolling.</div>
+                          <div style={{ fontSize: "0.6875rem", color: C.muted, padding: "0 6px 4px" }}>Click any criterion to tick / untick it, then Save — the grade updates right here, no scrolling.</div>
                           {(g.note || g.chart_img) && (
                             <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap", padding: "6px 6px 2px" }}>
-                              {g.chart_img && <img src={g.chart_img} alt={`${g.sym} chart`} style={{ width: 180, maxWidth: "100%", borderRadius: 10, border: `1px solid ${C.border}`, display: "block" }} />}
-                              {g.note && <div style={{ flex: "1 1 220px", fontSize: "0.78rem", color: C.text, lineHeight: 1.5 }}>{g.note}</div>}
+                              {g.chart_img && <img src={g.chart_img} alt={`${g.sym} chart`} style={{ width: 180, maxWidth: "100%", borderRadius: 12, border: `1px solid ${C.border}`, display: "block" }} />}
+                              {g.note && <div style={{ flex: "1 1 220px", fontSize: "0.75rem", color: C.text, lineHeight: 1.5 }}>{g.note}</div>}
                             </div>
                           )}
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "8px 18px", padding: "8px 6px 0" }}>
@@ -720,15 +720,15 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                               if (sec.reminder) return null;
                               return (
                                 <div key={si}>
-                                  <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, margin: "4px 0 6px" }}>{sec.title}</div>
+                                  <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)", margin: "4px 0 6px" }}>{sec.title}</div>
                                   {sec.items.map((it, ii) => {
                                     const key = si + "-" + ii, isOn = editOn.has(key);
                                     return (
                                       <div key={ii} onClick={() => editToggle(key)} title={it.s} data-tip={it.s}
-                                        style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.74rem", lineHeight: 1.6, color: isOn ? C.text : "rgba(255,255,255,0.35)", cursor: "pointer", userSelect: "none", borderRadius: 6, padding: "1px 4px" }}
-                                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                                        <span style={{ color: isOn ? C.goldBright : "rgba(255,255,255,0.22)", fontWeight: 800 }}>{isOn ? "✓" : "·"}</span>
-                                        <span>{it.c}{it.star && <span style={{ color: C.goldMid, marginLeft: 5, fontSize: "0.62rem" }}>★</span>}{it.bonus && <span style={{ marginLeft: 5, fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "0 5px", borderRadius: 99 }}>Bonus</span>}{isOn && editAuto.has(key) && <span title="Auto-read from the chart by VIV" style={{ marginLeft: 5, fontSize: "0.6rem", color: C.goldBright }}>●</span>}</span>
+                                        style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.75rem", lineHeight: 1.6, color: isOn ? C.text : "var(--faint)", cursor: "pointer", userSelect: "none", borderRadius: 6, padding: "1px 4px" }}
+                                        onMouseEnter={e => e.currentTarget.style.background = "var(--w04)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                                        <span style={{ color: isOn ? C.white : "var(--faint)", fontWeight: 600 }}>{isOn ? "✓" : "·"}</span>
+                                        <span>{it.c}{it.star && <span style={{ color: "var(--faint)", marginLeft: 5, fontSize: "0.6875rem" }}>★</span>}{it.bonus && <span style={{ marginLeft: 5, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: "var(--faint)", border: "1px solid var(--w35)", padding: "0 5px", borderRadius: 999 }}>Bonus</span>}{isOn && editAuto.has(key) && <span title="Auto-read from the chart by VIV" style={{ marginLeft: 5, fontSize: "0.6875rem", color: C.blue }}>●</span>}</span>
                                       </div>
                                     );
                                   })}
@@ -756,17 +756,17 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
           return (
             <>
               <div onClick={() => setRowSync(null)} style={{ position: "fixed", inset: 0, zIndex: 1240 }} />
-              <div style={{ position: "fixed", top: Math.min(rowSync.y + 6, window.innerHeight - 260), left: Math.max(10, rowSync.x - 230), zIndex: 1250, width: 230, maxHeight: 240, overflowY: "auto", background: "#0c0c14", border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, boxShadow: "0 18px 44px rgba(0,0,0,0.6)", textAlign: "left", fontFamily: font }}>
-                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, padding: "7px 10px 6px" }}>Attach {rowSync.sym}&#39;s grade to…</div>
+              <div style={{ position: "fixed", top: Math.min(rowSync.y + 6, window.innerHeight - 260), left: Math.max(10, rowSync.x - 230), zIndex: 1250, width: 230, maxHeight: 240, overflowY: "auto", background: "var(--bg2)", border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, boxShadow: "var(--shadowOv)", textAlign: "left", fontFamily: font }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)", padding: "7px 10px 6px" }}>Attach {rowSync.sym}&#39;s grade to…</div>
                 {targets.length === 0 ? (
-                  <div style={{ fontSize: "0.74rem", color: C.muted, padding: "8px 10px 12px" }}>{posSet.has(rowSync.sym) ? `${rowSync.sym} already shows on its own open position.` : "No open positions found. Grades show on a position automatically once you hold its ticker."}</div>
+                  <div style={{ fontSize: "0.75rem", color: C.muted, padding: "8px 10px 12px" }}>{posSet.has(rowSync.sym) ? `${rowSync.sym} already shows on its own open position.` : "No open positions found. Grades show on a position automatically once you hold its ticker."}</div>
                 ) : targets.map(s => {
                   const eg = getGrade(s);
                   return (
                     <div key={s} onClick={() => { if (eg && !window.confirm(`${s} already has a saved ${eg.letter} grade — overwrite it with ${rowSync.sym}'s ${g.letter}?`)) return; saveGrade(s, g); setRowSync(null); flashMsg(`${rowSync.sym} grade attached to ${s} — shows on its Open Positions row`); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 10px", borderRadius: 8, cursor: "pointer" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <span style={{ fontWeight: 800, fontSize: "0.82rem", color: C.white }}>{s}</span>
-                      {eg ? <span style={{ fontSize: "0.66rem", fontWeight: 700, color: letterColor(C, eg.letter) }}>has {eg.letter}</span> : <span style={{ fontSize: "0.64rem", color: C.muted }}>ungraded</span>}
+                      onMouseEnter={e => e.currentTarget.style.background = "var(--w06)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <span style={{ fontWeight: 600, fontSize: "0.875rem", color: C.white }}>{s}</span>
+                      {eg ? <span style={{ fontSize: "0.6875rem", fontWeight: 500, color: letterColor(C, eg.letter) }}>has {eg.letter}</span> : <span style={{ fontSize: "0.6875rem", color: C.muted }}>ungraded</span>}
                     </div>
                   );
                 })}
@@ -779,48 +779,48 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
       {/* SCORE PANEL */}
       <div style={{
         position: "sticky", top: 12, zIndex: 5, fontFamily: font, marginBottom: 20,
-        background: `linear-gradient(135deg, rgba(201,152,42,0.10), rgba(255,255,255,0.02))`,
-        border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "16px 20px",
+        background: `linear-gradient(135deg, var(--w06), transparent 55%), ${C.glass}`,
+        border: `1px solid ${C.border}`, borderRadius: 18, padding: "16px 20px",
         backdropFilter: "blur(24px) saturate(160%)", WebkitBackdropFilter: "blur(24px) saturate(160%)",
         display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap",
-        boxShadow: "0 16px 44px rgba(0,0,0,0.5)",
+        boxShadow: "var(--shadowOv)",
       }}>
         <div>
-          <div style={{ fontSize: "1.7rem", letterSpacing: 3, lineHeight: 1 }}>
+          <div style={{ fontSize: "1.75rem", letterSpacing: 3, lineHeight: 1 }}>
             {[0, 1, 2, 3, 4].map(k => (
-              <span key={k} style={{ color: k < stars ? C.goldBright : "rgba(255,255,255,0.14)", textShadow: k < stars ? "0 0 12px rgba(240,192,80,0.5)" : "none" }}>★</span>
+              <span key={k} style={{ color: k < stars ? C.white : "var(--faint)", textShadow: k < stars ? "0 0 12px var(--w35)" : "none" }}>★</span>
             ))}
           </div>
-          <div style={{ fontSize: "0.72rem", color: C.muted, marginTop: 6 }}>
+          <div style={{ fontSize: "0.75rem", color: C.muted, marginTop: 6 }}>
             {passed ? `${starHit}/${STARMAKERS} ★-makers · ${Math.round(pct * 100)}% of criteria` : "Tick what's true to grade the setup"}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: "1.12rem", fontWeight: 800, color: C.white }}>{gLabel}</div>
-          <div style={{ fontSize: "0.72rem", color: C.muted, marginTop: 3, maxWidth: 320 }}>{gDesc}</div>
+          <div style={{ fontSize: "1.125rem", fontWeight: 600, color: C.white }}>{gLabel}</div>
+          <div style={{ fontSize: "0.75rem", color: C.muted, marginTop: 3, maxWidth: 320 }}>{gDesc}</div>
         </div>
         <div style={{ marginLeft: "auto", textAlign: "right" }}>
-          <div style={{ fontSize: "1.7rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", color: C.white }}>
-            {passed}<span style={{ color: C.muted, fontWeight: 600, fontSize: "1rem" }}>/{TOTAL}</span>
+          <div style={{ fontSize: "1.75rem", fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", color: C.white }}>
+            {passed}<span style={{ color: C.muted, fontWeight: 500, fontSize: "1rem" }}>/{TOTAL}</span>
           </div>
-          <div style={{ fontSize: "0.62rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.12em" }}>criteria passed</div>
+          <div style={{ fontSize: "0.6875rem", color: C.muted, letterSpacing: 0 }}>criteria passed</div>
         </div>
         <div style={{ position: "relative", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <button onClick={() => doSave()} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontSize: "0.74rem", fontWeight: 800, padding: "9px 16px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Save grade{ticker ? ` · ${ticker.toUpperCase().trim()}` : ""}</button>
-          <button onClick={() => setShowSync(s => !s)} style={{ background: "rgba(59,130,246,0.12)", color: C.blue, border: "1px solid rgba(59,130,246,0.3)", fontFamily: font, fontSize: "0.74rem", fontWeight: 800, padding: "9px 14px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Sync to Open Position ▾</button>
-          <button onClick={reset} style={{ background: "rgba(255,255,255,0.06)", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "9px 16px", borderRadius: 99, cursor: "pointer" }}>Reset</button>
+          <button onClick={() => doSave()} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "9px 16px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Save grade{ticker ? ` · ${ticker.toUpperCase().trim()}` : ""}</button>
+          <button onClick={() => setShowSync(s => !s)} style={{ background: "rgba(59,158,255,0.12)", color: C.blue, border: "1px solid rgba(59,158,255,0.3)", fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "9px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Sync to Open Position ▾</button>
+          <button onClick={reset} style={{ background: "var(--w06)", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "9px 16px", borderRadius: 999, cursor: "pointer" }}>Reset</button>
           {showSync && (
-            <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 30, minWidth: 220, maxHeight: 260, overflowY: "auto", background: "#0c0c14", border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, boxShadow: "0 18px 44px rgba(0,0,0,0.6)" }}>
-              <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, padding: "7px 10px 6px" }}>Attach this grade to…</div>
+            <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 30, minWidth: 220, maxHeight: 260, overflowY: "auto", background: "var(--bg2)", border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, boxShadow: "var(--shadowOv)" }}>
+              <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)", padding: "7px 10px 6px" }}>Attach this grade to…</div>
               {posSyms.length === 0 ? (
-                <div style={{ fontSize: "0.76rem", color: C.muted, padding: "8px 10px 12px" }}>No open positions found. Grade shows on a position once you hold it.</div>
+                <div style={{ fontSize: "0.75rem", color: C.muted, padding: "8px 10px 12px" }}>No open positions found. Grade shows on a position once you hold it.</div>
               ) : posSyms.map(s => {
                 const g = getGrade(s);
                 return (
                   <div key={s} onClick={() => syncTo(s)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 10px", borderRadius: 8, cursor: "pointer" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.05)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    <span style={{ fontWeight: 800, fontSize: "0.84rem", color: C.white }}>{s}</span>
-                    {g ? <span style={{ fontSize: "0.68rem", fontWeight: 700, color: letterColor(C, g.letter) }}>{g.letter} · {g.stars}★</span> : <span style={{ fontSize: "0.66rem", color: C.muted }}>ungraded</span>}
+                    onMouseEnter={e => e.currentTarget.style.background = "var(--w06)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <span style={{ fontWeight: 600, fontSize: "0.875rem", color: C.white }}>{s}</span>
+                    {g ? <span style={{ fontSize: "0.6875rem", fontWeight: 500, color: letterColor(C, g.letter) }}>{g.letter} · {g.stars}★</span> : <span style={{ fontSize: "0.6875rem", color: C.muted }}>ungraded</span>}
                   </div>
                 );
               })}
@@ -829,22 +829,22 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
         </div>
         {autoLive.length > 0 && (
           <button onClick={() => { setAuto(new Set()); flashMsg("Auto-ticks confirmed — hit Save grade to keep it"); }}
-            title="These ticks were auto-read off the chart by VIV (gold dot ●). Cross-check them, then confirm."
-            style={{ background: "rgba(201,152,42,0.12)", color: C.goldBright, border: `1px solid ${C.borderGold}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 800, padding: "9px 14px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>
+            title="These ticks were auto-read off the chart by VIV (● dot). Cross-check them, then confirm."
+            style={{ background: "rgba(59,158,255,0.12)", color: C.blue, border: "1px solid rgba(59,158,255,0.3)", fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "9px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>
             ● Confirm {autoLive.length} auto-tick{autoLive.length > 1 ? "s" : ""}
           </button>
         )}
-        {flash && <div style={{ flexBasis: "100%", fontSize: "0.74rem", color: C.green, fontWeight: 700, marginTop: 2 }}>✓ {flash}</div>}
+        {flash && <div style={{ flexBasis: "100%", fontSize: "0.75rem", color: C.green, fontWeight: 500, marginTop: 2 }}>✓ {flash}</div>}
       </div>
 
       {/* LEGACY-GRADE NOTICE — a saved grade made on the PREVIOUS checklist can't be mapped onto the
           new items (meanings differ). Show its frozen score, start the v2 checklist unticked. */}
       {legacyLoaded && (
-        <div style={{ fontFamily: font, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.28)", borderRadius: 12, padding: "10px 14px", marginBottom: 16 }}>
-          <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.blue, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", padding: "3px 9px", borderRadius: 99 }}>Previous checklist</span>
-          <span style={{ fontSize: "0.8rem", color: C.text }}>
+        <div style={{ fontFamily: font, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", background: "rgba(59,158,255,0.06)", border: "1px solid rgba(59,158,255,0.28)", borderRadius: 12, padding: "10px 14px", marginBottom: 16 }}>
+          <span style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: C.blue, background: "rgba(59,158,255,0.12)", border: "1px solid rgba(59,158,255,0.3)", padding: "3px 9px", borderRadius: 999 }}>Previous checklist</span>
+          <span style={{ fontSize: "0.75rem", color: C.text }}>
             {ticker ? `${ticker.toUpperCase().trim()} was ` : "This name was "}
-            graded <b style={{ color: letterColor(C, legacyLoaded.letter) }}>{legacyLoaded.letter} · {legacyLoaded.stars}★</b> ({legacyLoaded.passed}/{legacyLoaded.total}) on the previous checklist — <b style={{ color: C.goldBright }}>your ticks were carried over</b> where the item still exists (gold dot ● = carried, click to confirm/change); items new to this checklist start blank. The saved grade stays untouched until you Save.
+            graded <b style={{ color: letterColor(C, legacyLoaded.letter) }}>{legacyLoaded.letter} · {legacyLoaded.stars}★</b> ({legacyLoaded.passed}/{legacyLoaded.total}) on the previous checklist — <b style={{ color: C.white }}>your ticks were carried over</b> where the item still exists (● dot = carried, click to confirm/change); items new to this checklist start blank. The saved grade stays untouched until you Save.
           </span>
         </div>
       )}
@@ -852,54 +852,54 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
       {/* DAILY POST KIT — attach the chart, annotate, publish to members / copy the Skool card */}
       <div style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "14px 16px", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Daily post kit</span>
-          <span style={{ fontSize: "0.72rem", color: C.muted }}>paste a chart screenshot (⌘V) anywhere on this tab — it attaches here</span>
+          <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>Daily post kit</span>
+          <span style={{ fontSize: "0.75rem", color: C.muted }}>paste a chart screenshot (⌘V) anywhere on this tab — it attaches here</span>
         </div>
         <div style={{ display: "flex", gap: 14, alignItems: "stretch", flexWrap: "wrap" }}>
           {/* chart slot */}
-          <label style={{ flex: "0 0 200px", minHeight: 96, borderRadius: 12, border: `1px dashed ${chartImg ? C.borderGold : C.border}`, background: "rgba(255,255,255,0.02)", display: "grid", placeItems: "center", cursor: "pointer", overflow: "hidden", position: "relative" }}>
+          <label style={{ flex: "0 0 200px", minHeight: 96, borderRadius: 12, border: `1px dashed ${chartImg ? "var(--w22)" : C.border}`, background: "var(--w02)", display: "grid", placeItems: "center", cursor: "pointer", overflow: "hidden", position: "relative" }}>
             <input type="file" accept="image/*" disabled={busy} onChange={e => uploadChart(e.target.files?.[0])} style={{ display: "none" }} />
             {chartImg
               ? <img src={chartImg} alt="chart" style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }} />
-              : <span style={{ fontSize: "0.7rem", color: C.muted, textAlign: "center", padding: "0 12px" }}>{busy ? "Uploading…" : "📈 Paste or click to attach the chart"}</span>}
+              : <span style={{ fontSize: "0.75rem", color: C.muted, textAlign: "center", padding: "0 12px" }}>{busy ? "Uploading…" : "📈 Paste or click to attach the chart"}</span>}
           </label>
           {chartImg && (
-            <button onClick={() => setChartImg("")} title="Remove chart" style={{ alignSelf: "flex-start", background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.66rem", fontWeight: 700, padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>×</button>
+            <button onClick={() => setChartImg("")} title="Remove chart" style={{ alignSelf: "flex-start", background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, padding: "5px 10px", borderRadius: 999, cursor: "pointer" }}>×</button>
           )}
           {/* annotation */}
           <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} maxLength={400}
             placeholder="Annotation for the post — the read, the level that matters, what you're waiting for…"
-            style={{ flex: "1 1 260px", minWidth: 0, resize: "vertical", background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, fontFamily: font, fontSize: "0.82rem", lineHeight: 1.5, padding: "10px 12px", outline: "none" }} />
+            style={{ flex: "1 1 260px", minWidth: 0, resize: "vertical", background: "var(--w04)", border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, fontFamily: font, fontSize: "0.875rem", lineHeight: 1.5, padding: "10px 12px", outline: "none" }} />
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
           {isAdmin && (
             <button disabled={busy} onClick={doPublish}
-              style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontSize: "0.74rem", fontWeight: 800, padding: "9px 16px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
+              style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "9px 16px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
               📣 Publish to members{ticker ? ` · ${ticker.toUpperCase().trim()}` : ""}
             </button>
           )}
           <button disabled={busy} onClick={doCard}
-            style={{ background: "rgba(255,255,255,0.06)", color: C.text, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.74rem", fontWeight: 800, padding: "9px 16px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
+            style={{ background: "var(--w06)", color: C.text, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "9px 16px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
             🖼 Copy share card
           </button>
-          <span style={{ fontSize: "0.7rem", color: C.muted }}>{isAdmin ? "Publish → members' Daily Setups feed · card → clipboard for Skool" : "The card is a branded image of this grade — share your setup in the community"}</span>
+          <span style={{ fontSize: "0.75rem", color: C.muted }}>{isAdmin ? "Publish → members' Daily Setups feed · card → clipboard for Skool" : "The card is a branded image of this grade — share your setup in the community"}</span>
         </div>
       </div>
 
       {/* ═══ ONE-PAGE CHECKLIST — leadership context strip · 3 scored bucket cards · trigger strip ═══ */}
 
       {/* Leadership / Stock Selection — NON-SCORED context (dashed, not tickable, not in pct/stars) */}
-      <div style={{ fontFamily: font, background: "rgba(201,152,42,0.04)", border: `1px dashed ${C.borderGold}`, borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
+      <div style={{ fontFamily: font, background: "var(--w02)", border: `1px dashed ${C.border}`, borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-          <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold }}>{LEADERSHIP_CONTEXT.title}</span>
-          <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.gold, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "3px 9px", borderRadius: 99 }}>Not scored</span>
-          <span style={{ fontSize: "0.72rem", color: C.muted, flex: "1 1 240px", lineHeight: 1.4 }}>{LEADERSHIP_CONTEXT.note}</span>
+          <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>{LEADERSHIP_CONTEXT.title}</span>
+          <span style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: "var(--muted)", background: "var(--w06)", border: "1px solid var(--w22)", padding: "3px 9px", borderRadius: 999 }}>Not scored</span>
+          <span style={{ fontSize: "0.75rem", color: C.muted, flex: "1 1 240px", lineHeight: 1.4 }}>{LEADERSHIP_CONTEXT.note}</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "4px 18px" }}>
           {LEADERSHIP_CONTEXT.items.map((it, i) => (
-            <div key={i} style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.76rem", lineHeight: 1.4 }}>
-              <span style={{ color: C.gold, flex: "0 0 auto" }}>▹</span>
-              <span style={{ color: C.text }}><b style={{ fontWeight: 700 }}>{it.c}</b> <span style={{ color: C.muted }}>— {it.s}</span></span>
+            <div key={i} style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.75rem", lineHeight: 1.4 }}>
+              <span style={{ color: "var(--faint)", flex: "0 0 auto" }}>▹</span>
+              <span style={{ color: C.text }}><b style={{ fontWeight: 600 }}>{it.c}</b> <span style={{ color: C.muted }}>— {it.s}</span></span>
             </div>
           ))}
         </div>
@@ -913,38 +913,38 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
           const scoredNum = SECTIONS.slice(0, si).filter(s => !s.reminder).length + 1;
           return (
             <div key={si} style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "12px 14px" }}>
-              {/* header: number chip + uppercase micro-label + count, hairline divider */}
+              {/* header: number chip + quiet sentence-case label + count, hairline divider */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 9, marginBottom: 8, borderBottom: `1px solid ${C.border}` }}>
-                <span style={{ width: 20, height: 20, borderRadius: 6, display: "grid", placeItems: "center", background: C.goldDim, color: C.gold, fontWeight: 800, fontSize: "0.68rem", border: `1px solid ${C.borderGold}`, flex: "none" }}>{scoredNum}</span>
-                <span style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: C.gold, flex: 1 }}>{sec.title}</span>
-                <span style={{ fontSize: "0.68rem", fontWeight: 800, fontVariantNumeric: "tabular-nums", padding: "3px 9px", borderRadius: 99, border: `1px solid ${full ? "rgba(34,197,94,0.4)" : C.border}`, background: full ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.05)", color: full ? C.green : C.muted }}>{secCounts[si]}/{sec.items.length}</span>
+                <span style={{ width: 20, height: 20, borderRadius: 6, display: "grid", placeItems: "center", background: "var(--w08)", color: C.white, fontWeight: 600, fontSize: "0.6875rem", border: "1px solid var(--w22)", flex: "none" }}>{scoredNum}</span>
+                <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)", flex: 1 }}>{sec.title}</span>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", padding: "3px 9px", borderRadius: 999, border: `1px solid ${full ? "rgba(0,200,5,0.4)" : C.border}`, background: full ? "rgba(0,200,5,0.14)" : "var(--w06)", color: full ? C.green : C.muted }}>{secCounts[si]}/{sec.items.length}</span>
               </div>
               {si === 2 && (
-                <div style={{ fontSize: "0.68rem", color: C.muted, fontStyle: "italic", lineHeight: 1.4, margin: "0 0 8px" }}>Grading pre-market? Leave these unticked — come back after the open to finish the grade.</div>
+                <div style={{ fontSize: "0.75rem", color: C.muted, fontStyle: "italic", lineHeight: 1.4, margin: "0 0 8px" }}>Grading pre-market? Leave these unticked — come back after the open to finish the grade.</div>
               )}
               {sec.items.map((it, ii) => {
                 const key = si + "-" + ii, isOn = on.has(key);
                 return (
                   <div key={ii} onClick={() => toggle(key)} style={{
                     display: "flex", gap: 9, alignItems: "flex-start", padding: "5px 4px", borderRadius: 8,
-                    cursor: "pointer", userSelect: "none", background: isOn ? "rgba(201,152,42,0.06)" : "transparent",
+                    cursor: "pointer", userSelect: "none", background: isOn ? "var(--w06)" : "transparent",
                   }}
-                    onMouseEnter={e => { if (!isOn) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = isOn ? "rgba(201,152,42,0.06)" : "transparent"; }}>
+                    onMouseEnter={e => { if (!isOn) e.currentTarget.style.background = "var(--w03)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = isOn ? "var(--w06)" : "transparent"; }}>
                     <div style={{
                       flex: "0 0 18px", width: 18, height: 18, borderRadius: 5, marginTop: 1,
-                      border: isOn ? `1.5px solid ${C.goldBright}` : "1.5px solid rgba(255,255,255,0.22)",
-                      background: isOn ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
+                      border: isOn ? "1.5px solid var(--w82)" : "1.5px solid var(--w22)",
+                      background: isOn ? "var(--w82)" : "var(--w03)",
                       display: "grid", placeItems: "center",
                     }}>{isOn && CHECK}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "0.8rem", fontWeight: 600, lineHeight: 1.25, color: isOn ? C.goldBright : C.text }}>
+                      <div style={{ fontSize: "0.875rem", fontWeight: 500, lineHeight: 1.25, color: isOn ? C.white : C.text }}>
                         {it.c}
-                        {it.star && <span style={{ marginLeft: 6, fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldMid, background: "rgba(201,152,42,0.12)", border: `1px solid ${C.borderGold}`, padding: "1px 6px", borderRadius: 99, whiteSpace: "nowrap" }}>★ maker</span>}
-                        {it.bonus && <span title="Bonus factor — tracked but excluded from the star score" style={{ marginLeft: 6, fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "1px 6px", borderRadius: 99, whiteSpace: "nowrap" }}>Bonus</span>}
-                        {isOn && auto.has(key) && <span title="Auto-read from the chart by VIV — cross-check it; any click clears the dot" style={{ marginLeft: 6, fontSize: "0.58rem", color: C.goldBright, textShadow: "0 0 8px rgba(240,192,80,0.7)" }}>●</span>}
+                        {it.star && <span style={{ marginLeft: 6, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: isOn ? "var(--muted)" : "var(--faint)", border: `1px solid ${isOn ? "var(--w35)" : "var(--w22)"}`, background: "var(--w06)", padding: "1px 6px", borderRadius: 999, whiteSpace: "nowrap" }}>★ maker</span>}
+                        {it.bonus && <span title="Bonus factor — tracked but excluded from the star score" style={{ marginLeft: 6, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: isOn ? "var(--muted)" : "var(--faint)", border: `1px solid ${isOn ? "var(--w35)" : "var(--w22)"}`, padding: "1px 6px", borderRadius: 999, whiteSpace: "nowrap" }}>Bonus</span>}
+                        {isOn && auto.has(key) && <span title="Auto-read from the chart by VIV — cross-check it; any click clears the dot" style={{ marginLeft: 6, fontSize: "0.6875rem", color: C.blue, textShadow: "0 0 8px rgba(59,158,255,0.7)" }}>●</span>}
                       </div>
-                      <div style={{ fontSize: "0.7rem", color: C.muted, marginTop: 1, lineHeight: 1.35 }}>{it.s}</div>
+                      <div style={{ fontSize: "0.75rem", color: C.muted, marginTop: 1, lineHeight: 1.35 }}>{it.s}</div>
                     </div>
                   </div>
                 );
@@ -958,20 +958,20 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
       {SECTIONS.map((sec, si) => {
         if (!sec.reminder) return null;
         return (
-          <div key={si} style={{ fontFamily: font, background: "rgba(59,130,246,0.04)", border: "1px dashed rgba(59,130,246,0.28)", borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
+          <div key={si} style={{ fontFamily: font, background: "rgba(59,158,255,0.04)", border: "1px dashed rgba(59,158,255,0.28)", borderRadius: 16, padding: "12px 16px", marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-              <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.blue }}>{sec.title}</span>
-              <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.blue, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)", padding: "3px 9px", borderRadius: 99 }}>Not scored</span>
-              <span style={{ fontSize: "0.72rem", color: C.muted, flex: "1 1 240px", lineHeight: 1.4 }}>{sec.note}</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: C.blue }}>{sec.title}</span>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: C.blue, background: "rgba(59,158,255,0.12)", border: "1px solid rgba(59,158,255,0.3)", padding: "3px 9px", borderRadius: 999 }}>Not scored</span>
+              <span style={{ fontSize: "0.75rem", color: C.muted, flex: "1 1 240px", lineHeight: 1.4 }}>{sec.note}</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "2px 16px" }}>
               {sec.items.map((it, ii) => {
                 const key = si + "-" + ii, isOn = on.has(key);
                 return (
-                  <div key={ii} onClick={() => toggle(key)} title={it.s} data-tip={it.s} style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.74rem", lineHeight: 1.45, padding: "3px 2px", borderRadius: 6, cursor: "pointer", userSelect: "none", color: isOn ? C.text : "rgba(255,255,255,0.55)" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    <span style={{ color: isOn ? C.blue : "rgba(255,255,255,0.3)", fontWeight: 800, flex: "0 0 auto" }}>{isOn ? "✓" : "○"}</span>
-                    <span>{it.c}{it.key && <span style={{ marginLeft: 5, fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.blue }}>· R:R</span>}</span>
+                  <div key={ii} onClick={() => toggle(key)} title={it.s} data-tip={it.s} style={{ display: "flex", gap: 7, alignItems: "baseline", fontSize: "0.75rem", lineHeight: 1.45, padding: "3px 2px", borderRadius: 6, cursor: "pointer", userSelect: "none", color: isOn ? C.text : "var(--muted)" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "var(--w03)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <span style={{ color: isOn ? C.blue : "var(--faint)", fontWeight: 600, flex: "0 0 auto" }}>{isOn ? "✓" : "○"}</span>
+                    <span>{it.c}{it.key && <span style={{ marginLeft: 5, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: C.blue }}>· R:R</span>}</span>
                   </div>
                 );
               })}
@@ -981,8 +981,8 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
       })}
 
       {/* footnote */}
-      <div style={{ fontFamily: font, fontSize: "0.76rem", color: C.muted, lineHeight: 1.6, padding: "4px 6px" }}>
-        <b style={{ color: "rgba(255,255,255,0.75)" }}>One more thing to check (not scored):</b> the market regime — is the overall market trending up with leaders working? If it's in a downtrend, even a perfect chart usually fails, so grade the market before you grade the stock.
+      <div style={{ fontFamily: font, fontSize: "0.75rem", color: C.muted, lineHeight: 1.6, padding: "4px 6px" }}>
+        <b style={{ color: "var(--muted)" }}>One more thing to check (not scored):</b> the market regime — is the overall market trending up with leaders working? If it's in a downtrend, even a perfect chart usually fails, so grade the market before you grade the stock.
       </div>
     </div>
   );

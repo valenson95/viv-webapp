@@ -22,11 +22,11 @@ const ADMIN_EMAIL = "vc-lv@live.com";
 // Palette aligned to the VIV brand `C` tokens (dashboard-pro) so the research bench reads as
 // the same design system: glass surfaces, pure-white alpha neutrals, brand blue.
 const T = {
-  card: "rgba(255,255,255,0.042)", border: "rgba(255,255,255,0.09)", borderSoft: "rgba(255,255,255,0.06)",
-  text: "rgba(255,255,255,0.92)", muted: "rgba(255,255,255,0.70)", faint: "rgba(255,255,255,0.45)",
-  gold: "#c9982a", goldBright: "#f0c050", goldSoft: "rgba(201,152,42,0.55)",
-  green: "#22c55e", red: "#ef4444", blue: "#3b82f6", grey: "#7C8496",
-  grid: "rgba(255,255,255,0.045)",
+  card: "var(--w04)", border: "var(--w08)", borderSoft: "var(--w06)",
+  text: "var(--text)", muted: "var(--muted)", faint: "var(--faint)",
+  gold: "var(--gold)", goldBright: "var(--goldBright)", goldSoft: "var(--goldDim)",
+  green: "var(--green)", red: "var(--red)", blue: "var(--blue)", grey: "var(--muted)",
+  grid: "var(--gridline)",
 };
 const fmt$ = (v) => v == null ? "—" : (v < 0 ? "−$" : "$") + Math.abs(Math.round(v)).toLocaleString();
 const num = (v, d = 2) => v == null || !isFinite(v) ? "—" : (+v).toFixed(d);
@@ -37,9 +37,9 @@ const median = (a) => { if (!a.length) return null; const s = [...a].sort((x, y)
 /* ─── primitives (webapp visual language) ────────────────────────────────── */
 // Card micro-label — muted uppercase, the uniform section header across every card (brand chrome).
 const SecHead = ({ children }) => (
-  <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: T.muted }}>{children}</span>
+  <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.muted }}>{children}</span>
 );
-const cardLabel = { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: T.muted };
+const cardLabel = { fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.muted };
 // Uniform card: glass surface (via .qcard), header = micro-label + meta + info-dot + collapse
 // chevron, hairline divider below. The "how to read" pointers live in the info-dot tooltip
 // (same pattern as the mockup) so the card body stays clean; nothing is removed, just relocated.
@@ -50,12 +50,12 @@ const Panel = ({ title, meta, children, footnote, howto, tip, collapsed = false,
     <section className="qcard" style={style}>
       <div onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none", paddingBottom: open ? 11 : 0, marginBottom: open ? 14 : 0, borderBottom: open ? `1px solid ${T.border}` : "none" }}>
         <span style={{ ...cardLabel, flex: 1 }}>{title}</span>
-        {meta && <span style={{ fontSize: "0.66rem", color: T.faint, fontVariantNumeric: "tabular-nums" }}>{meta}</span>}
+        {meta && <span style={{ fontSize: "0.6875rem", color: T.faint, fontVariantNumeric: "tabular-nums" }}>{meta}</span>}
         {dotTip && <span className="idot" data-tip={dotTip} onClick={e => e.stopPropagation()}>i</span>}
-        <span style={{ fontSize: "0.7rem", color: T.faint }}>{open ? "▴" : "▾"}</span>
+        <span style={{ fontSize: "0.6875rem", color: T.faint }}>{open ? "▴" : "▾"}</span>
       </div>
       {open && <div>{children}</div>}
-      {open && footnote && <p style={{ margin: "12px 0 0", fontSize: "0.68rem", lineHeight: 1.6, color: T.muted, maxWidth: "92ch" }}>{footnote}</p>}
+      {open && footnote && <p style={{ margin: "12px 0 0", fontSize: "0.6875rem", lineHeight: 1.6, color: T.muted, maxWidth: "92ch" }}>{footnote}</p>}
     </section>
   );
 };
@@ -67,8 +67,8 @@ const Kpi = ({ label, value, tone, sub, tip }) => (
     </div>
     <div className="kpibody">
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: "1.4rem", fontWeight: 800, color: tone || T.text, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em", lineHeight: 1.05, whiteSpace: "nowrap" }}>{value}</div>
-        {sub && <div style={{ fontSize: "0.66rem", color: T.muted, marginTop: 4, lineHeight: 1.4 }}>{sub}</div>}
+        <div style={{ fontSize: "1.25rem", fontWeight: 800, color: tone || T.text, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.03em", lineHeight: 1.05, whiteSpace: "nowrap" }}>{value}</div>
+        {sub && <div style={{ fontSize: "0.6875rem", color: T.muted, marginTop: 4, lineHeight: 1.4 }}>{sub}</div>}
       </div>
     </div>
   </div>
@@ -77,13 +77,13 @@ const dot = (c) => <i style={{ display: "inline-block", width: 7, height: 7, bor
 // "WHAT IT SAYS NOW" — one plain-English sentence per panel, computed from the live data.
 // The chart is evidence; this line is the finding. (TradeZella-style narrative insight.)
 const Say = ({ children, points }) => (
-  <div style={{ margin: "0 0 12px", padding: "10px 14px", borderLeft: `3px solid ${T.gold}`, background: "rgba(201,152,42,0.05)", borderRadius: "0 10px 10px 0", fontSize: "0.76rem", lineHeight: 1.65, color: T.text, width: "100%" }}>
-    <span style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, display: "block", marginBottom: 4 }}>What it says now</span>
+  <div style={{ margin: "0 0 12px", padding: "10px 14px", borderLeft: `3px solid ${T.gold}`, background: "var(--goldDim)", borderRadius: "0 10px 10px 0", fontSize: "0.75rem", lineHeight: 1.65, color: T.text, width: "100%" }}>
+    <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.faint, display: "block", marginBottom: 4 }}>What it says now</span>
     {/* key-pointer ROWS, never a paragraph chunk (Valen) */}
     {points
       ? points.filter(Boolean).map((p, i) => (
         <div key={i} style={{ display: "flex", gap: 9, padding: "2px 0", alignItems: "baseline" }}>
-          <span style={{ color: T.gold, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
+          <span style={{ color: T.faint, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
         </div>
       ))
       : children}
@@ -92,18 +92,18 @@ const Say = ({ children, points }) => (
 // Verdict pill — brand pass/miss chip (green / red / neutral), same shape everywhere.
 const Chip = ({ ok, children }) => {
   const c = ok == null
-    ? { bg: "rgba(255,255,255,0.05)", bd: "rgba(255,255,255,0.14)", fg: T.muted }
+    ? { bg: "var(--w06)", bd: "var(--w14)", fg: T.muted }
     : ok
-      ? { bg: "rgba(34,197,94,0.10)", bd: "rgba(34,197,94,0.32)", fg: "#86efac" }
-      : { bg: "rgba(239,68,68,0.10)", bd: "rgba(239,68,68,0.32)", fg: "#fca5a5" };
+      ? { bg: "rgba(0,200,5,0.10)", bd: "rgba(0,200,5,0.32)", fg: "var(--greenFg)" }
+      : { bg: "rgba(255,80,0,0.10)", bd: "rgba(255,80,0,0.32)", fg: "var(--redFg)" };
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.02em", padding: "3px 10px", borderRadius: 980, whiteSpace: "nowrap", background: c.bg, border: `1px solid ${c.bd}`, color: c.fg }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.02em", padding: "3px 10px", borderRadius: 980, whiteSpace: "nowrap", background: c.bg, border: `1px solid ${c.bd}`, color: c.fg }}>
       {children}
     </span>
   );
 };
 // Donut gauge (Rocketsheets-style ring, doctrine colours) — pct 0..100, number in the centre
-const Donut = ({ pct, center, label, sub, color = T.gold, tip }) => {
+const Donut = ({ pct, center, label, sub, color = "var(--w35)", tip }) => {
   const r = 25, cir = 2 * Math.PI * r, f = Math.min(1, Math.max(0, (pct || 0) / 100));
   return (
     <div className="qcard kpicard">
@@ -114,35 +114,35 @@ const Donut = ({ pct, center, label, sub, color = T.gold, tip }) => {
       <div className="kpibody">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <svg width="56" height="56" viewBox="0 0 64 64" style={{ flex: "none" }}>
-            <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
+            <circle cx="32" cy="32" r={r} fill="none" stroke="var(--w08)" strokeWidth="6" />
             <circle cx="32" cy="32" r={r} fill="none" stroke={color} strokeWidth="6" strokeDasharray={`${(cir * f).toFixed(1)} ${cir.toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 32 32)" />
             <text x="32" y="37" textAnchor="middle" fill={T.text} fontSize="13" fontWeight="800" style={{ fontVariantNumeric: "tabular-nums" }}>{center}</text>
           </svg>
-          {sub && <div style={{ minWidth: 0, fontSize: "0.66rem", color: T.muted, lineHeight: 1.45 }}>{sub}</div>}
+          {sub && <div style={{ minWidth: 0, fontSize: "0.6875rem", color: T.muted, lineHeight: 1.45 }}>{sub}</div>}
         </div>
       </div>
     </div>
   );
 };
 // Sample-size honesty tag — every verdict states the n it used AND the n it needs.
-// Colour: green = enough · gold = half-way (direction) · red = outlier-driven territory.
+// Colour: green = enough · white = half-way (direction) · red = outlier-driven territory.
 const SampleTag = ({ n, rec, label = "trades" }) => (
   <span className="term" data-tip={`· R results are noisy (spread ≈ 1–1.5R)\n· trusting a ~0.3R difference needs roughly ${rec}+ ${label}\n· below half that, 2–3 outliers can flip the verdict\n· until then: DIRECTION, not proof`}
-    style={{ fontSize: "0.62rem", fontWeight: 700, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: n >= rec ? T.green : n >= rec / 2 ? T.goldBright : T.red }}>
+    style={{ fontSize: "0.6875rem", fontWeight: 700, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: n >= rec ? T.green : n >= rec / 2 ? T.text : T.red }}>
     n={n} · need ≥{rec} {label} for a stable read
   </span>
 );
 const TT = ({ active, payload, render }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: "#13141B", border: `1px solid ${T.border}`, borderRadius: 10, padding: "9px 12px", boxShadow: "0 8px 28px rgba(0,0,0,0.55)", fontSize: "0.7rem", color: T.text, lineHeight: 1.7, fontVariantNumeric: "tabular-nums" }}>
+    <div style={{ background: "var(--tipbg)", border: "1px solid var(--tipbd)", borderRadius: 10, padding: "9px 12px", boxShadow: "var(--shadowLg)", fontSize: "0.6875rem", color: T.text, lineHeight: 1.7, fontVariantNumeric: "tabular-nums" }}>
       {render(payload)}
     </div>
   );
 };
 const axis = { tick: { fill: T.faint, fontSize: 10 }, axisLine: false, tickLine: false };
-const thBase = { padding: "7px 10px", fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted, borderBottom: `1px solid ${T.border}`, textAlign: "left", whiteSpace: "nowrap" };
-const tdBase = { padding: "8px 10px", borderBottom: `1px solid ${T.borderSoft}`, fontSize: "0.74rem", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
+const thBase = { padding: "7px 10px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.muted, borderBottom: `1px solid ${T.border}`, textAlign: "left", whiteSpace: "nowrap" };
+const tdBase = { padding: "8px 10px", borderBottom: `1px solid ${T.borderSoft}`, fontSize: "0.75rem", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
 
 /* ─── cohort aggregation (same math as edge-ledger.mjs, client-side) ─────── */
 function aggOf(list) {
@@ -173,7 +173,7 @@ class QABoundary extends React.Component {
   static getDerivedStateFromError(e) { return { err: e }; }
   render() {
     if (this.state.err) return (
-      <div style={{ padding: 40, color: T.text, fontSize: "0.8rem", lineHeight: 1.7 }}>
+      <div style={{ padding: 40, color: T.text, fontSize: "0.75rem", lineHeight: 1.7 }}>
         <b style={{ color: T.red }}>The Quant page hit a rendering error.</b>
         <div style={{ color: T.muted, marginTop: 6 }}>{String(this.state.err?.message || this.state.err)}</div>
         <div style={{ color: T.faint, marginTop: 6 }}>Usually a stale payload — rerun <code>node --env-file=.env.local scripts/edge-ledger.mjs</code> and refresh.</div>
@@ -446,10 +446,10 @@ function QuantAnalysisInner({ C, font, session }) {
     return { rows: rowsB, fails, level };
   }, [A, lab, dk, eqState, eqMaP]);
   const bd = board.level === "on"
-    ? { word: "ON TRACK", col: T.green, bd: "rgba(34,197,94,0.35)", bg: "rgba(34,197,94,0.07)" }
+    ? { word: "ON TRACK", col: T.green, bd: "rgba(0,200,5,0.35)", bg: "rgba(0,200,5,0.07)" }
     : board.level === "drift"
-      ? { word: "DRIFTING", col: T.goldBright, bd: "rgba(240,192,80,0.35)", bg: "rgba(201,152,42,0.07)" }
-      : { word: "OFF TRACK", col: T.red, bd: "rgba(239,68,68,0.35)", bg: "rgba(239,68,68,0.07)" };
+      ? { word: "DRIFTING", col: T.text, bd: "var(--w35)", bg: "var(--w06)" }
+      : { word: "OFF TRACK", col: T.red, bd: "rgba(255,80,0,0.35)", bg: "rgba(255,80,0,0.07)" };
 
   const scat = useMemo(() => {
     // x = SYSTEM-MAX R (the fair, attainable ceiling); raw MFE kept for the tooltip
@@ -482,11 +482,22 @@ function QuantAnalysisInner({ C, font, session }) {
   }, [rows]);
 
   if (!isAdmin) return null;
-  if (!data) return <div style={{ fontFamily: font, color: T.muted, padding: 48, fontSize: "0.8rem" }}>Loading… (if empty, run <code>node --env-file=.env.local scripts/edge-ledger.mjs</code>)</div>;
+  if (!data) return (
+    <div style={{ fontFamily: font, maxWidth: 1440, margin: "0 auto", padding: 48 }}>
+      <div className="sk sk-line" style={{ width: 180, height: 20, margin: "0 0 20px" }} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(158px,1fr))", gap: 14, marginBottom: 14 }}>
+        {[0, 1, 2, 3, 4, 5].map(i => <div key={i} className="sk" style={{ height: 96, borderRadius: 16 }} />)}
+      </div>
+      <div className="sk" style={{ width: "100%", height: 240, borderRadius: 16 }} />
+      <div style={{ fontSize: "0.6875rem", color: T.faint, marginTop: 16 }}>if this doesn't load, run <code>node --env-file=.env.local scripts/edge-ledger.mjs</code></div>
+    </div>
+  );
 
   const rec = data.reconcile || {};
   const mc = (mode === "sys" ? data.monte?.system : data.monte?.all) || data.monte?.system || {};
-  const stTone = verdict === "on-track" || verdict === "early-positive" ? T.green : String(verdict).includes("off") || String(verdict).includes("negative") ? T.red : T.goldBright;
+  const stTone = verdict === "on-track" || verdict === "early-positive" ? T.green : String(verdict).includes("off") || String(verdict).includes("negative") ? T.red : T.text;
+  // Dim companion for the badge fill — was `${stTone}1a` string-concat onto a var() reference (invalid CSS, silently dropped); same ternary, proper tokens.
+  const stToneDim = verdict === "on-track" || verdict === "early-positive" ? "var(--greenDim)" : String(verdict).includes("off") || String(verdict).includes("negative") ? "var(--redDim)" : "var(--w08)";
   const th = (label, key, right) => (
     <th key={label} onClick={() => key && (sortKey === key ? setSortDir(d => -d) : (setSortKey(key), setSortDir(-1)))}
       style={{ ...thBase, textAlign: right ? "right" : "left", cursor: key ? "pointer" : "default" }}>
@@ -498,10 +509,10 @@ function QuantAnalysisInner({ C, font, session }) {
   const sliceRow = (label, s, tip) => (
     <div key={label} style={{ padding: "8px 4px", borderTop: `1px solid ${T.borderSoft}`, minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-        <span className="term" data-tip={tip} style={{ fontWeight: 700, fontSize: "0.76rem" }}>{label}</span>
-        <b style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums", fontSize: "0.8rem", color: s.expR == null ? T.muted : s.expR >= 0 ? T.green : T.red }}>{sgnR(s.expR)}</b>
+        <span className="term" data-tip={tip} style={{ fontWeight: 700, fontSize: "0.75rem" }}>{label}</span>
+        <b style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums", fontSize: "0.75rem", color: s.expR == null ? T.muted : s.expR >= 0 ? T.green : T.red }}>{sgnR(s.expR)}</b>
       </div>
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: "0.66rem", color: T.muted, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: "0.6875rem", color: T.muted, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
         <span>{s.n} trade{s.n === 1 ? "" : "s"}</span>
         <span>{s.wr == null ? "—" : Math.round(s.wr) + "% win"}</span>
         <span>PF {s.pf == null ? "—" : s.pf === Infinity ? "∞" : num(s.pf)}</span>
@@ -514,27 +525,27 @@ function QuantAnalysisInner({ C, font, session }) {
       {/* .term tooltips are scoped to .vj/.vp in App.jsx — this page needs its own scope or every
           data-tip is silently dead (Valen found the definitions never showed, 2026-07-11). */}
       <style>{`
-        .qa .term{border-bottom:1px dotted rgba(201,152,42,0.5); cursor:help; position:relative}
+        .qa .term{border-bottom:1px dotted var(--gold); cursor:help; position:relative}
         /* a .term inside an ellipsis cell (overflow:hidden) CLIPS its own tooltip — hover must
            un-clip and float above the rows below (the "SQN shows ? but no tip" bug, 2026-07-12) */
         .qa .term:hover{overflow:visible !important; z-index:60}
         .qa .term:hover::after{content:attr(data-tip); position:absolute; left:0; top:150%; width:320px;
-          background:#11111b; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 13px;
-          font-size:0.68rem; line-height:1.65; color:#E7E9EE; z-index:60; white-space:pre-line; font-weight:500;
+          background:var(--tipbg); border:1px solid var(--w14); border-radius:10px; padding:10px 13px;
+          font-size:0.6875rem; line-height:1.65; color:var(--text); z-index:60; white-space:pre-line; font-weight:500;
           text-transform:none; letter-spacing:0; text-align:left; font-variant-numeric:normal;
-          box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+          box-shadow:var(--shadowLg)}
         .qa .term.tipright:hover::after{left:auto; right:0}
         /* ── uniform card chrome (brand glass surface) ── */
-        .qa .qcard{position:relative; background:rgba(255,255,255,0.042); border:1px solid rgba(255,255,255,0.09); border-radius:16px; backdrop-filter:blur(24px) saturate(150%); -webkit-backdrop-filter:blur(24px) saturate(150%); padding:18px 20px; overflow:visible; margin-bottom:14px}
-        .qa .qcard::before{content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit; background:linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)}
+        .qa .qcard{position:relative; background:var(--w04); border:1px solid var(--w08); border-radius:16px; backdrop-filter:blur(24px) saturate(150%); -webkit-backdrop-filter:blur(24px) saturate(150%); padding:18px 20px; overflow:visible; margin-bottom:14px}
+        .qa .qcard::before{content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit; background:linear-gradient(135deg, var(--w06), transparent 55%)}
         /* ── info dot (how-to-read lives in its tooltip) ── */
-        .qa .idot{width:15px; height:15px; border-radius:50%; border:1px solid rgba(255,255,255,0.14); display:inline-flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; font-style:italic; color:rgba(255,255,255,0.45); cursor:help; flex:none; position:relative}
-        .qa .idot:hover{color:#c9982a; border-color:rgba(201,152,42,0.4)}
-        .qa .idot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:320px; background:#13131c; border:1px solid rgba(255,255,255,0.14); border-radius:10px; padding:10px 13px; font-size:0.68rem; font-weight:500; line-height:1.6; color:#E7E9EE; text-transform:none; letter-spacing:0; white-space:pre-line; text-align:left; font-variant-numeric:normal; box-shadow:0 10px 30px rgba(0,0,0,0.55); pointer-events:none}
+        .qa .idot{width:15px; height:15px; border-radius:50%; border:1px solid var(--w14); display:inline-flex; align-items:center; justify-content:center; font-size:0.6875rem; font-weight:700; font-style:italic; color:var(--faint); cursor:help; flex:none; position:relative}
+        .qa .idot:hover{color:var(--gold); border-color:var(--gold)}
+        .qa .idot:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 8px); right:-6px; z-index:60; width:max-content; max-width:320px; background:var(--tipbg); border:1px solid var(--w14); border-radius:10px; padding:10px 13px; font-size:0.6875rem; font-weight:500; line-height:1.6; color:var(--text); text-transform:none; letter-spacing:0; white-space:pre-line; text-align:left; font-variant-numeric:normal; box-shadow:var(--shadowLg); pointer-events:none}
         /* ── KPI strip ── */
         .qa .kpistrip{display:grid; grid-template-columns:repeat(auto-fit, minmax(158px,1fr)); gap:14px; margin-bottom:14px}
         .qa .kpicard{min-height:112px; padding:14px 18px; display:flex; flex-direction:column; margin-bottom:0}
-        .qa .kpihead{display:flex; align-items:center; gap:8px; padding-bottom:8px; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.09)}
+        .qa .kpihead{display:flex; align-items:center; gap:8px; padding-bottom:8px; margin-bottom:10px; border-bottom:1px solid var(--w08)}
         .qa .kpibody{display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-height:0}
         @media(max-width:760px){ .qa .kpistrip{grid-template-columns:repeat(2,1fr)} }
         /* ── paired card rows ── */
@@ -547,31 +558,31 @@ function QuantAnalysisInner({ C, font, session }) {
       {/* command header — the page nav is the shared navbar in App.jsx's QuantShell */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap", marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: T.gold }}>Quant</div>
+          <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.faint }}>Quant</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 5, flexWrap: "wrap" }}>
-            <h1 style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", margin: 0 }}>Quant Analysis</h1>
-            <span style={{ display: "inline-flex", border: `1px solid ${T.border}`, borderRadius: 980, padding: 3, gap: 2, background: "rgba(255,255,255,0.02)" }}
+            <h1 style={{ fontSize: "1.25rem", fontWeight: 800, letterSpacing: "-0.03em", color: "var(--white)", margin: 0 }}>Quant Analysis</h1>
+            <span style={{ display: "inline-flex", border: `1px solid ${T.border}`, borderRadius: 980, padding: 3, gap: 2, background: "var(--w02)" }}
               title="Same population as the journal, two cuts — the toggle IS the reconciliation">
               {[["sys", "System cohort"], ["all", "Stress-test (full)"]].map(([k, lab2]) => (
                 <button key={k} onClick={() => switchMode(k)} title={k === "sys" ? `Campaigns entered on/after ${data.systemEntry} — the 3-stop / derisk-trim book, tracked in real time. Small n by design: it grows with every new trade.` : `Your FULL history since ${data.since || "May"} (incl. the recovered pre-system book) replayed through the new entry criteria — a stress test of the rules, NOT the system's live record`}
-                  style={{ border: "none", background: mode === k ? "rgba(201,152,42,0.15)" : "transparent", color: mode === k ? T.goldBright : T.muted, cursor: "pointer", fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "6px 14px", borderRadius: 980, letterSpacing: "0.02em" }}>{lab2}</button>
+                  style={{ border: "none", background: mode === k ? "var(--goldDim)" : "transparent", color: mode === k ? T.goldBright : T.muted, cursor: "pointer", fontFamily: font, fontSize: "0.6875rem", fontWeight: 700, padding: "6px 14px", borderRadius: 980, letterSpacing: "0.02em" }}>{lab2}</button>
               ))}
             </span>
-            <span style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.08em", padding: "3px 10px", borderRadius: 980, background: "rgba(201,152,42,0.15)", color: T.goldBright, border: `1px solid rgba(201,152,42,0.22)` }}
+            <span style={{ fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.08em", padding: "3px 10px", borderRadius: 980, background: "var(--w08)", color: T.text, border: "1px solid var(--w22)" }}
               title="Admin-only research bench — never shown to members">ADMIN</span>
           </div>
-          <div style={{ fontSize: "0.8rem", color: T.muted, marginTop: 6 }}>{mode === "sys" ? `System cohort · entered ≥ ${data.systemEntry}` : `Stress-test (full) · full history since ${data.since || "2026-05-01"}, incl. recovered pre-system book`} · N={A.n} closed campaigns · the journal records your trades, this page judges the system behind them</div>
+          <div style={{ fontSize: "0.75rem", color: T.muted, marginTop: 6 }}>{mode === "sys" ? `System cohort · entered ≥ ${data.systemEntry}` : `Stress-test (full) · full history since ${data.since || "2026-05-01"}, incl. recovered pre-system book`} · N={A.n} closed campaigns · the journal records your trades, this page judges the system behind them</div>
         </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.08em", padding: "6px 14px", borderRadius: 980, whiteSpace: "nowrap", background: `${stTone}1a`, color: stTone, border: `1px solid ${stTone}59` }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.08em", padding: "6px 14px", borderRadius: 980, whiteSpace: "nowrap", background: stToneDim, color: stTone, border: `1px solid ${stTone}` }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: stTone }} />{String(verdict).toUpperCase().replace(/-/g, " ")}
           </span>
-          <span style={{ fontSize: "0.66rem", color: T.faint }}>{String(data.asof).slice(0, 16).replace("T", " ")} UTC</span>
+          <span style={{ fontSize: "0.6875rem", color: T.faint }}>{String(data.asof).slice(0, 16).replace("T", " ")} UTC</span>
         </div>
       </div>
 
       {/* how to read this page — the 30-second orientation */}
-      <section style={{ background: "rgba(201,152,42,0.04)", border: `1px solid var(--borderGold, rgba(201,152,42,0.3))`, borderRadius: 14, padding: "14px 20px", marginBottom: 16 }}>
+      <section style={{ background: "var(--goldDim)", border: "1px solid var(--borderGold)", borderRadius: 14, padding: "14px 20px", marginBottom: 16 }}>
         <SecHead>How to read this page</SecHead>
         <div style={{ marginTop: 8 }}>
           {[
@@ -581,8 +592,8 @@ function QuantAnalysisInner({ C, font, session }) {
             <>Read the gold "WHAT IT SAYS NOW" rows first — the chart under them is just the evidence.</>,
             <>Hover any dotted term for its plain-English definition.</>,
           ].map((p, i) => (
-            <div key={i} style={{ display: "flex", gap: 9, padding: "3px 0", fontSize: "0.74rem", lineHeight: 1.6, color: T.muted }}>
-              <span style={{ color: T.gold, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
+            <div key={i} style={{ display: "flex", gap: 9, padding: "3px 0", fontSize: "0.75rem", lineHeight: 1.6, color: T.muted }}>
+              <span style={{ color: T.faint, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
             </div>
           ))}
         </div>
@@ -611,8 +622,8 @@ function QuantAnalysisInner({ C, font, session }) {
         {/* R-vs-$ reconciliation — shown whenever the two disagree in sign or the risk unit is
             wildly uneven. Partials ARE counted; the gap is SIZING, and it names names. */}
         {sizing.uw != null && sizing.ul != null && (((A.net ?? 0) < 0) !== ((A.expR ?? 0) < 0) || sizing.ul > sizing.uw * 1.5 || sizing.uw > sizing.ul * 1.5) && (
-          <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 12, background: "rgba(201,152,42,0.05)", border: "1px solid rgba(201,152,42,0.3)" }}>
-            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Why R and $ disagree — your risk unit wasn't constant</div>
+          <div style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 12, background: "var(--goldDim)", border: "1px solid var(--borderGold)" }}>
+            <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.faint, marginBottom: 6 }}>Why R and $ disagree — your risk unit wasn't constant</div>
             {[
               <>Not a math error, and partials ARE counted — every campaign is all its legs summed; R is blended against the initial risk.</>,
               <>This cohort made <b>{sgnR(sizing.sumR)}</b> across {sizing.nR} R-scored campaigns, yet {fmt$(A.net)} in dollars — because <b>$ risked per 1R was not the same trade to trade</b>.</>,
@@ -622,8 +633,8 @@ function QuantAnalysisInner({ C, font, session }) {
               sizing.noRn > 0 && <>{sizing.noRn} campaign{sizing.noRn === 1 ? "" : "s"} without a recorded R ({fmt$(sizing.noRpl)}) count in $ but are invisible to expectancy.</>,
               <>Fix: R-based sizing only works when 1R = the SAME dollars everywhere — pick the unit, size every entry to it.</>,
             ].filter(Boolean).map((p, i) => (
-              <div key={i} style={{ display: "flex", gap: 9, padding: "2px 0", fontSize: "0.72rem", lineHeight: 1.6, color: T.muted }}>
-                <span style={{ color: T.gold, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
+              <div key={i} style={{ display: "flex", gap: 9, padding: "2px 0", fontSize: "0.75rem", lineHeight: 1.6, color: T.muted }}>
+                <span style={{ color: T.faint, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
               </div>
             ))}
           </div>
@@ -636,32 +647,32 @@ function QuantAnalysisInner({ C, font, session }) {
           <span className="idot" data-tip={"Ten numbers, each with a FIXED target the system was designed to. This is the whole page in one table — everything below only explains the misses."}>i</span>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "4px 12px", padding: "12px 16px", borderRadius: 12, background: bd.bg, border: `1px solid ${bd.bd}`, marginBottom: 12 }}>
-          <b style={{ color: bd.col, fontSize: "0.95rem", fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{bd.word}</b>
-          <span style={{ fontSize: "0.7rem", color: T.muted, lineHeight: 1.5, flex: "1 1 220px", minWidth: 0 }}>
+          <b style={{ color: bd.col, fontSize: "1rem", fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{bd.word}</b>
+          <span style={{ fontSize: "0.6875rem", color: T.muted, lineHeight: 1.5, flex: "1 1 220px", minWidth: 0 }}>
             {board.fails.length === 0 ? `all ${board.rows.filter(r => r.ok != null).length} benchmarks passing` : `${board.fails.length} of ${board.rows.filter(r => r.ok != null).length} benchmarks failing — ${board.fails.map(f => f.label.toLowerCase()).join(" · ")}`}
           </span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
             {(() => { const tot = board.rows.filter(r => r.ok != null).length, pass = tot - board.fails.length, r = 15, cir = 2 * Math.PI * r; return (
               <svg width="40" height="40" viewBox="0 0 40 40" role="img" aria-label={`${pass} of ${tot} benchmarks passing`}>
-                <circle cx="20" cy="20" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
+                <circle cx="20" cy="20" r={r} fill="none" stroke="var(--w08)" strokeWidth="4" />
                 <circle cx="20" cy="20" r={r} fill="none" stroke={bd.col} strokeWidth="4" strokeDasharray={`${(cir * (tot ? pass / tot : 0)).toFixed(1)} ${cir.toFixed(1)}`} strokeLinecap="round" transform="rotate(-90 20 20)" />
                 <text x="20" y="24" textAnchor="middle" fill={T.text} fontSize="10" fontWeight="800">{pass}/{tot}</text>
               </svg>); })()}
-            <span style={{ fontSize: "0.64rem", color: T.faint }}>{A.n} campaigns · {span.first || "—"} → {span.last || "—"}</span>
+            <span style={{ fontSize: "0.6875rem", color: T.faint }}>{A.n} campaigns · {span.first || "—"} → {span.last || "—"}</span>
           </span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(170px,1.5fr) minmax(120px,1fr) 90px 90px", gap: "0 10px", alignItems: "center", padding: "2px 6px 6px", fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(170px,1.5fr) minmax(120px,1fr) 90px 90px", gap: "0 10px", alignItems: "center", padding: "2px 6px 6px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.muted }}>
           <span>Benchmark metric</span><span>Live</span><span>Target</span><span style={{ textAlign: "right" }}>Verdict</span>
         </div>
         {board.rows.map(r => (
-          <div key={r.label} style={{ display: "grid", gridTemplateColumns: "minmax(170px,1.5fr) minmax(120px,1fr) 90px 90px", gap: "2px 10px", alignItems: "center", padding: "8px 6px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.76rem", minWidth: 0 }}>
+          <div key={r.label} style={{ display: "grid", gridTemplateColumns: "minmax(170px,1.5fr) minmax(120px,1fr) 90px 90px", gap: "2px 10px", alignItems: "center", padding: "8px 6px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.75rem", minWidth: 0 }}>
             <span className="term" data-tip={r.tip} style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.label}</span>
             <b style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{r.live}</b>
             <span style={{ color: T.muted, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{r.bench}</span>
             <span style={{ textAlign: "right" }}><Chip ok={r.ok}>{r.ok == null ? "no data" : r.ok ? "PASS" : "MISS"}</Chip></span>
           </div>
         ))}
-        <div style={{ fontSize: "0.62rem", color: T.muted, marginTop: 8, lineHeight: 1.5 }}>Benchmarks are fixed system targets, not aspirations — a MISS names the exact lab section below that explains it. Judge adherence (not outcome) until n ≥ 30; outcome readable at 30; Monte Carlo calibrated at 50.</div>
+        <div style={{ fontSize: "0.6875rem", color: T.muted, marginTop: 8, lineHeight: 1.5 }}>Benchmarks are fixed system targets, not aspirations — a MISS names the exact lab section below that explains it. Judge adherence (not outcome) until n ≥ 30; outcome readable at 30; Monte Carlo calibrated at 50.</div>
       </section>
 
       {/* WHERE THE MONEY CAME FROM + RESULT SHAPE — two half-width cards, stack < 1000px */}
@@ -678,15 +689,15 @@ function QuantAnalysisInner({ C, font, session }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 18 }}>
           {[{ list: byTicker.top, label: "TOP EARNERS", col: T.green }, { list: byTicker.bottom, label: "BIGGEST COSTS", col: T.red }].map((side, si) => (
             <div key={si}>
-              <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 6 }}>{side.label}</div>
-              {side.list.length === 0 && <div style={{ fontSize: "0.7rem", color: T.muted }}>none</div>}
+              <div style={{ fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 6 }}>{side.label}</div>
+              {side.list.length === 0 && <div style={{ fontSize: "0.6875rem", color: T.muted }}>none</div>}
               {side.list.map((x, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
-                  <b style={{ minWidth: 52, fontSize: "0.74rem" }}>{x.t}</b>
-                  <div style={{ flex: 1, height: 12, borderRadius: 6, background: "rgba(255,255,255,0.04)", overflow: "hidden" }}>
+                  <b style={{ minWidth: 52, fontSize: "0.75rem" }}>{x.t}</b>
+                  <div style={{ flex: 1, height: 12, borderRadius: 6, background: "var(--w04)", overflow: "hidden" }}>
                     <div style={{ width: (100 * Math.abs(x.pl) / byTicker.max).toFixed(1) + "%", height: "100%", background: side.col, opacity: 0.6 }} />
                   </div>
-                  <span style={{ minWidth: 76, textAlign: "right", fontSize: "0.72rem", fontVariantNumeric: "tabular-nums", color: side.col }}>{fmt$(x.pl)}</span>
+                  <span style={{ minWidth: 76, textAlign: "right", fontSize: "0.75rem", fontVariantNumeric: "tabular-nums", color: side.col }}>{fmt$(x.pl)}</span>
                 </div>
               ))}
             </div>
@@ -716,7 +727,7 @@ function QuantAnalysisInner({ C, font, session }) {
               {/* horizontal labels, upright — the slanted version was unreadable (Valen 2026-07-11) */}
               <XAxis dataKey="bucket" {...axis} interval={0} angle={0} textAnchor="middle" height={28} tick={{ fill: T.muted, fontSize: 10, fontWeight: 600 }} />
               <YAxis {...axis} width={26} allowDecimals={false} />
-              <Tooltip cursor={{ fill: "rgba(255,255,255,0.03)" }} content={<TT render={(p) => <>{p[0]?.payload?.bucket}: <b>{p[0]?.payload?.n}</b> campaigns</>} />} />
+              <Tooltip cursor={{ fill: "var(--w03)" }} content={<TT render={(p) => <>{p[0]?.payload?.bucket}: <b>{p[0]?.payload?.n}</b> campaigns</>} />} />
               <Bar dataKey="n" radius={[3, 3, 0, 0]} maxBarSize={34}>
                 {hist.map((d, i) => <Cell key={i} fill={d.tone} fillOpacity={0.7} />)}
                 <LabelList dataKey="n" position="top" style={{ fill: T.muted, fontSize: 10 }} formatter={(x) => x || ""} />
@@ -742,7 +753,7 @@ function QuantAnalysisInner({ C, font, session }) {
           const defensiveOk = lab.nLossR > 0 && lab.breaches.length / lab.nLossR <= 0.1;
           const extDiff = lab.extOK.n >= 3 && lab.extHot.n >= 3 ? lab.extOK.expR - lab.extHot.expR : null;
           return (
-            <div style={{ padding: "10px 14px", borderRadius: 12, marginBottom: 10, background: defensiveOk ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.07)", border: `1px solid ${defensiveOk ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}` }}>
+            <div style={{ padding: "10px 14px", borderRadius: 12, marginBottom: 10, background: defensiveOk ? "rgba(0,200,5,0.06)" : "rgba(255,80,0,0.07)", border: `1px solid ${defensiveOk ? "rgba(0,200,5,0.3)" : "rgba(255,80,0,0.3)"}` }}>
               <div style={{ marginBottom: 6 }}>
                 <Chip ok={defensiveOk}>{defensiveOk ? "ENTRY RULES: DEFENSIVE JOB DONE · OFFENSIVE PROOF PENDING" : "ENTRY RULES: LOSSES LEAKING PAST THE CAP"}</Chip>
                 <span style={{ marginLeft: 10 }}><SampleTag n={lab.nLossR} rec={30} label="losers judged" /></span>
@@ -753,8 +764,8 @@ function QuantAnalysisInner({ C, font, session }) {
                 <>OFFENCE — <b>not proven yet at this sample</b>: {extDiff == null ? "extension gate lacks trades on both sides" : Math.abs(extDiff) < 0.15 ? `the ≤4× freshness gate reads a wash so far (${sgnR(lab.extOK.expR)} fresh vs ${sgnR(lab.extHot.expR)} chased)` : extDiff > 0 ? `the ≤4× freshness gate is earning its keep (+${extDiff.toFixed(2)}R separation)` : `chased entries did BETTER so far (${sgnR(lab.extHot.expR)} vs ${sgnR(lab.extOK.expR)}) — small n, don't conclude`}; the 30-min wait gate is at n={wg.simmed ?? 0} of 15 needed; LoD/RVOL slices wait on live entry-gate capture.</>,
                 <>Plain English: <b>your entry rules are not losing you money — but they haven't yet proven they MAKE you money.</b> Keep logging; the offence verdicts firm up as the sample builds to 30.</>,
               ].map((p, i) => (
-                <div key={i} style={{ display: "flex", gap: 9, padding: "2px 0", fontSize: "0.72rem", lineHeight: 1.6, color: T.muted }}>
-                  <span style={{ color: T.gold, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
+                <div key={i} style={{ display: "flex", gap: 9, padding: "2px 0", fontSize: "0.75rem", lineHeight: 1.6, color: T.muted }}>
+                  <span style={{ color: T.faint, flex: "none" }}>·</span><span style={{ minWidth: 0 }}>{p}</span>
                 </div>
               ))}
             </div>
@@ -763,7 +774,7 @@ function QuantAnalysisInner({ C, font, session }) {
         {/* SECTION HEADLINE — one pointer per rule card below; each states ITS OWN sub-sample
             (they differ by design: loss-side reads use losers, gate reads use both sides). */}
         <Say points={[
-          <span style={{ color: T.faint, fontSize: "0.68rem" }}>One line per rule card below — each computed from its own stated sample, full detail in its card:</span>,
+          <span style={{ color: T.faint, fontSize: "0.6875rem" }}>One line per rule card below — each computed from its own stated sample, full detail in its card:</span>,
           lab.avgLossR != null && <>Average loser: <b>{sgnR(lab.avgLossR)}</b> — all {lab.nLossR} losers with an R in this cohort → 3-stop card.</>,
           lab.n3sLosers >= 1
             ? <>3-stop era (from 2026-07-10): losers average <b>{sgnR(lab.avgLoss3s)}</b> (n={lab.n3sLosers} — far below the ≥3 needed; not yet a verdict) vs the −0.67R cap. Earlier trades judged vs their own −1R stop.</>
@@ -776,39 +787,39 @@ function QuantAnalysisInner({ C, font, session }) {
         {/* one rule per ROW — full-width cards, never a cramped mosaic (Valen 2026-07-11) */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
           {/* ── RULE CARD: 3-stop structure ── */}
-          <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
-            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Rule · 3-stop structure — how deep do winners dip?</div>
+          <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "var(--w02)" }}>
+            <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.faint, marginBottom: 6 }}>Rule · 3-stop structure — how deep do winners dip?</div>
             {/* VERDICT — the money answer: every campaign replayed with the 3 rungs vs one full stop */}
             {lab.simN >= 5 && lab.simDelta != null && (
-              <div style={{ padding: "8px 12px", borderRadius: 10, marginBottom: 8, background: lab.simDelta >= 0 ? "rgba(34,197,94,0.07)" : "rgba(239,68,68,0.07)", border: `1px solid ${lab.simDelta >= 0 ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`, fontSize: "0.72rem", lineHeight: 1.6 }}>
+              <div style={{ padding: "8px 12px", borderRadius: 10, marginBottom: 8, background: lab.simDelta >= 0 ? "rgba(0,200,5,0.07)" : "rgba(255,80,0,0.07)", border: `1px solid ${lab.simDelta >= 0 ? "rgba(0,200,5,0.3)" : "rgba(255,80,0,0.3)"}`, fontSize: "0.75rem", lineHeight: 1.6 }}>
                 <Chip ok={lab.simDelta >= 0}>{lab.simDelta >= 0 ? "3-STOP WOULD HAVE HELPED" : "3-STOP WOULD HAVE COST YOU"}</Chip>
                 <span style={{ marginLeft: 10 }}><SampleTag n={lab.simN} rec={50} label="campaigns" /></span>
                 <div style={{ marginTop: 3, color: T.muted }}>Replaying your {lab.simN} campaigns: 3-stop <b style={{ color: T.text, fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.sim3)}</b>/trade vs one full stop <b style={{ color: T.text, fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.sim1)}</b>/trade → difference <b style={{ color: lab.simDelta >= 0 ? T.green : T.red, fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.simDelta)}</b> per trade. EOD replay from the day after entry; both arms share the same assumptions, so the DIFFERENCE is the honest read.</div>
               </div>
             )}
-            <div style={{ fontSize: "0.62rem", color: T.faint, lineHeight: 1.5, marginBottom: 4 }}>Dips measured from your ENTRY TIME onward: entry-day heat comes from 5-minute bars where your entry time is recorded ({(data.coverage?.intraday0 ?? 0)} campaigns covered); trades without a time skip day 0 (that low usually prints before an ORB entry). Later days use daily lows. <SampleTag n={lab.wMAEn} rec={30} label="winners" /></div>
+            <div style={{ fontSize: "0.6875rem", color: T.faint, lineHeight: 1.5, marginBottom: 4 }}>Dips measured from your ENTRY TIME onward: entry-day heat comes from 5-minute bars where your entry time is recorded ({(data.coverage?.intraday0 ?? 0)} campaigns covered); trades without a time skip day 0 (that low usually prints before an ORB entry). Later days use daily lows. <SampleTag n={lab.wMAEn} rec={30} label="winners" /></div>
             {[
               { lvl: "through rung 1 (−0.33R)", v: lab.rung33, note: "expected to be common — that's why only ⅓ of size sits there", warnAt: null },
               { lvl: "through rung 2 (−0.67R)", v: lab.rung67, note: "should be rare — high = loose entries vs LoD or early triggers", warnAt: 25 },
               { lvl: "through full stop (−1.00R)", v: lab.rung100, note: "a winner surviving a REAL post-entry sweep is near-impossible — residual % here is gap noise in the daily bars", warnAt: 10 },
             ].map(r => (
-              <div key={r.lvl} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "7px 2px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.74rem" }}>
+              <div key={r.lvl} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "7px 2px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.75rem" }}>
                 <span style={{ flex: "0 0 190px", fontWeight: 700 }}>{r.lvl}</span>
                 <b style={{ fontVariantNumeric: "tabular-nums", color: r.warnAt != null && r.v != null && r.v > r.warnAt ? T.red : T.text }}>{r.v == null ? "—" : r.v + "% of winners"}</b>
-                <span style={{ fontSize: "0.62rem", color: T.faint, lineHeight: 1.4 }}>{r.note}</span>
+                <span style={{ fontSize: "0.6875rem", color: T.faint, lineHeight: 1.4 }}>{r.note}</span>
               </div>
             ))}
-            <div style={{ marginTop: 10, fontSize: "0.74rem", display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
-              <span>avg loss <b style={{ fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.avgLossR)}</b> <span style={{ color: T.faint, fontSize: "0.62rem" }}>cohort · cap −1R before 07-10, −0.67R after</span></span>
+            <div style={{ marginTop: 10, fontSize: "0.75rem", display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
+              <span>avg loss <b style={{ fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.avgLossR)}</b> <span style={{ color: T.faint, fontSize: "0.6875rem" }}>cohort · cap −1R before 07-10, −0.67R after</span></span>
               <span>worst <b style={{ fontVariantNumeric: "tabular-nums" }}>{sgnR(lab.worstR)}</b></span>
             </div>
             {lab.breaches.length > 0 && (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted, marginBottom: 4 }}>Losses beyond their own era's design cap — every one has a name</div>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.muted, marginBottom: 4 }}>Losses beyond their own era's design cap — every one has a name</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {lab.breaches.map((c, i) => (
                     <span key={i} title={`${c.ticker} · ${c.lastExit || ""} · ${sgnR(c.blendedR ?? c.rSum)} · ${c.reasons || ""}`}
-                      style={{ fontSize: "0.66rem", fontWeight: 700, border: `1px solid rgba(239,68,68,0.35)`, color: T.red, borderRadius: 99, padding: "2px 9px", fontVariantNumeric: "tabular-nums" }}>
+                      style={{ fontSize: "0.6875rem", fontWeight: 700, border: `1px solid rgba(255,80,0,0.35)`, color: T.red, borderRadius: 99, padding: "2px 9px", fontVariantNumeric: "tabular-nums" }}>
                       {c.ticker} {sgnR(c.blendedR ?? c.rSum, 2)}
                     </span>
                   ))}
@@ -817,46 +828,46 @@ function QuantAnalysisInner({ C, font, session }) {
             )}
           </div>
           {/* ── RULE CARD: extension gate ── */}
-          <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
-            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Rule · Extension ≤ 4× from the 50MA</div>
+          <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "var(--w02)" }}>
+            <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.faint, marginBottom: 6 }}>Rule · Extension ≤ 4× from the 50MA</div>
             <div style={{ marginBottom: 4 }}>{lab.extOK.n >= 5 && lab.extHot.n >= 4
               ? <Chip ok={(lab.extOK.expR ?? -9) > (lab.extHot.expR ?? -9)}>{(lab.extOK.expR ?? -9) > (lab.extHot.expR ?? -9) ? "GATE EARNS ITS KEEP — fresh entries make more" : "NOT SEPARATING — chased entries did as well; keep watching"}</Chip>
               : <Chip ok={null}>BUILDING SAMPLE</Chip>} <span style={{ marginLeft: 8 }}><SampleTag n={Math.min(lab.extOK.n, lab.extHot.n)} rec={30} label="per side" /></span></div>
-            <div style={{ fontSize: "0.64rem", color: T.muted, lineHeight: 1.6, marginBottom: 4 }}>
+            <div style={{ fontSize: "0.6875rem", color: T.muted, lineHeight: 1.6, marginBottom: 4 }}>
               <div>· PURPOSE: loss-side — a fresh entry sits near support, so failures cost less; chases snap back through wide stops.</div>
               {lab.extMech && <div>· MEASURED: works mostly through <b style={{ color: T.text }}>{lab.extMech.top}</b> ({sgnR(lab.extMech.topV)}/trade of the gap) — wins {sgnR(lab.extMech.a.avgWinR)} vs {sgnR(lab.extMech.b.avgWinR)} · losses {sgnR(lab.extMech.a.avgLossR)} vs {sgnR(lab.extMech.b.avgLossR)} · win rate {Math.round(lab.extMech.a.wr)}% vs {Math.round(lab.extMech.b.wr)}%.</div>}
             </div>
             {sliceRow("Extension ≤ 4× at entry", lab.extOK, "Campaigns entered with ATR%-multiple from the 50MA at or under 4× — the freshness gate. Uses your recorded value when present, else computed from daily bars (SMA50 + ATR14 as of entry). Expectancy here vs the hot side IS the gate's proof.")}
             {sliceRow("Extension > 4× at entry", lab.extHot, "Chased entries — extension above 4× when the trigger fired. If this side's expectancy is negative, every violation has a known price.")}
-            {lab.extUnknown > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, padding: "5px 4px" }}>{lab.extUnknown} campaigns lack bar history for the calc — excluded, not guessed.</div>}
+            {lab.extUnknown > 0 && <div style={{ fontSize: "0.6875rem", color: T.faint, padding: "5px 4px" }}>{lab.extUnknown} campaigns lack bar history for the calc — excluded, not guessed.</div>}
           </div>
           {/* ── RULE CARD: LoD-distance gate ── */}
-          <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
-            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Rule · LoD-distance ≤ 60% of ATR</div>
+          <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "var(--w02)" }}>
+            <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.faint, marginBottom: 6 }}>Rule · LoD-distance ≤ 60% of ATR</div>
             <div style={{ marginBottom: 4 }}>{lab.lodOK.n >= 5 && lab.lodHot.n >= 5
               ? <Chip ok={(lab.lodOK.expR ?? -9) > (lab.lodHot.expR ?? -9)}>{(lab.lodOK.expR ?? -9) > (lab.lodHot.expR ?? -9) ? "GATE EARNS ITS KEEP — tight entries make more" : "NOT SEPARATING — loose entries did as well; keep watching"}</Chip>
               : <Chip ok={null}>BUILDING SAMPLE</Chip>} <span style={{ marginLeft: 8 }}><SampleTag n={Math.min(lab.lodOK.n, lab.lodHot.n)} rec={30} label="per side" /></span></div>
-            <div style={{ fontSize: "0.64rem", color: T.muted, lineHeight: 1.6, marginBottom: 4 }}>
+            <div style={{ fontSize: "0.6875rem", color: T.muted, lineHeight: 1.6, marginBottom: 4 }}>
               <div>· PURPOSE: win-side — a tight D means the same move pays MORE R per trade (losses are capped at −1R either way).</div>
               {lab.lodMech && <div>· MEASURED: works mostly through <b style={{ color: T.text }}>{lab.lodMech.top}</b> ({sgnR(lab.lodMech.topV)}/trade of the gap) — wins {sgnR(lab.lodMech.a.avgWinR)} vs {sgnR(lab.lodMech.b.avgWinR)} · losses {sgnR(lab.lodMech.a.avgLossR)} vs {sgnR(lab.lodMech.b.avgLossR)} · win rate {Math.round(lab.lodMech.a.wr)}% vs {Math.round(lab.lodMech.b.wr)}%.</div>}
             </div>
             {sliceRow("LoD-dist ≤ 0.6 ATR", lab.lodOK, "Entries where the low-of-day sat within 60% of one ATR of the entry price — the tight-stop gate. Until the trade-log's live capture builds up, this uses the ENTRY DAY's final low from EOD bars — an upper bound of the true at-entry distance (the low can print after you entered).")}
             {sliceRow("LoD-dist > 0.6 ATR", lab.lodHot, "Gate violations — the stop anchor sat too far below the entry, making D wide and the R math expensive.")}
-            {lab.lodUnknown > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, padding: "5px 4px" }}>{lab.lodUnknown} campaigns lack an entry-day bar match — excluded, not guessed.</div>}
+            {lab.lodUnknown > 0 && <div style={{ fontSize: "0.6875rem", color: T.faint, padding: "5px 4px" }}>{lab.lodUnknown} campaigns lack an entry-day bar match — excluded, not guessed.</div>}
           </div>
           {/* ── RULE CARD: 30-min wait gate (simulated with real 5-min bars) ── */}
-          <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
-            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Rule · 30-min wait gate — enter after 10:00 ET</div>
+          <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "var(--w02)" }}>
+            <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.faint, marginBottom: 6 }}>Rule · 30-min wait gate — enter after 10:00 ET</div>
             {(() => {
               const wg = data.waitGate;
-              if (!wg || !wg.simmed) return <div style={{ fontSize: "0.68rem", color: T.muted, lineHeight: 1.6 }}>No eligible campaigns simulated yet — needs a recorded pre-10:00 entry time and 5-minute bar history (≈60 days). Grows automatically as entries are logged with times.</div>;
+              if (!wg || !wg.simmed) return <div style={{ fontSize: "0.6875rem", color: T.muted, lineHeight: 1.6 }}>No eligible campaigns simulated yet — needs a recorded pre-10:00 entry time and 5-minute bar history (≈60 days). Grows automatically as entries are logged with times.</div>;
               return (
-                <div style={{ fontSize: "0.74rem", lineHeight: 1.8 }}>
+                <div style={{ fontSize: "0.75rem", lineHeight: 1.8 }}>
                   {/* VERDICT — key pointers, from HIS data only */}
-                  <div style={{ padding: "8px 12px", borderRadius: 10, marginBottom: 8, background: (wg.actMeanR ?? 0) >= (wg.waitMeanR ?? 0) ? "rgba(239,68,68,0.07)" : "rgba(34,197,94,0.07)", border: `1px solid ${(wg.actMeanR ?? 0) >= (wg.waitMeanR ?? 0) ? "rgba(239,68,68,0.3)" : "rgba(34,197,94,0.3)"}` }}>
+                  <div style={{ padding: "8px 12px", borderRadius: 10, marginBottom: 8, background: (wg.actMeanR ?? 0) >= (wg.waitMeanR ?? 0) ? "rgba(255,80,0,0.07)" : "rgba(0,200,5,0.07)", border: `1px solid ${(wg.actMeanR ?? 0) >= (wg.waitMeanR ?? 0) ? "rgba(255,80,0,0.3)" : "rgba(0,200,5,0.3)"}` }}>
                     <Chip ok={(wg.waitMeanR ?? 0) > (wg.actMeanR ?? 0)}>{(wg.waitMeanR ?? 0) > (wg.actMeanR ?? 0) ? "WAITING WOULD HAVE HELPED" : "WAITING WOULD HAVE COST YOU"}</Chip>
                     <span style={{ marginLeft: 10 }}><SampleTag n={wg.simmed} rec={15} label="pre-10:00 entries" /></span>
-                    <div style={{ marginTop: 3, color: T.muted, fontSize: "0.7rem", lineHeight: 1.6 }}>
+                    <div style={{ marginTop: 3, color: T.muted, fontSize: "0.6875rem", lineHeight: 1.6 }}>
                       <div>· {wg.avoided ? <><b style={{ color: T.green }}>{wg.avoided} loss{wg.avoided === 1 ? "" : "es"} avoided entirely</b> — price was at/below the stop by 10:00, so the waited trade is never taken (counted as 0R for the wait).</> : <>No trade was invalidated by 10:00 — every eligible entry still triggers, just re-timed.</>}</div>
                       <div>· The gate's trade-off in your data: it skips some losers, but dilutes the runners it delays into.</div>
                       <div>· n={wg.simmed} — direction only until n ≥ 15.</div>
@@ -871,27 +882,27 @@ function QuantAnalysisInner({ C, font, session }) {
                   <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {(wg.pairs || []).map((p, i) => (
                       <span key={i} title={`${p.t} ${p.d}: as traded ${sgnR(p.act)} · ${p.avoided ? "wait would have SKIPPED this trade — loss avoided" : "waited " + sgnR(p.wait)}`}
-                        style={{ fontSize: "0.64rem", border: `1px solid ${p.avoided ? "rgba(34,197,94,0.4)" : T.borderSoft}`, borderRadius: 99, padding: "2px 9px", color: p.avoided ? T.green : p.wait >= p.act ? T.green : T.muted, fontVariantNumeric: "tabular-nums" }}>
+                        style={{ fontSize: "0.6875rem", border: `1px solid ${p.avoided ? "rgba(0,200,5,0.4)" : T.borderSoft}`, borderRadius: 99, padding: "2px 9px", color: p.avoided ? T.green : p.wait >= p.act ? T.green : T.muted, fontVariantNumeric: "tabular-nums" }}>
                         {p.t} {sgnR(p.act, 1)} → {p.avoided ? "avoided" : sgnR(p.wait, 1)}
                       </span>
                     ))}
                     {/* avoided losers render inside pairs with the "avoided" tag */}
                   </div>
                   {(wg.skips || []).length > 0 && (
-                    <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 6, lineHeight: 1.5 }}>Eligible but not simulated (named, never guessed): {wg.skips.map((s) => `${s.t} ${s.d} — ${s.why}`).join(" · ")}. Rerun the ledger to retry price-feed gaps.</div>
+                    <div style={{ fontSize: "0.6875rem", color: T.faint, marginTop: 6, lineHeight: 1.5 }}>Eligible but not simulated (named, never guessed): {wg.skips.map((s) => `${s.t} ${s.d} — ${s.why}`).join(" · ")}. Rerun the ledger to retry price-feed gaps.</div>
                   )}
-                  <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 6, lineHeight: 1.5 }}>{wg.noTime} campaigns have no recorded entry time — excluded, not guessed. Verdict from YOUR data only; treat as direction until n ≥ 15.</div>
+                  <div style={{ fontSize: "0.6875rem", color: T.faint, marginTop: 6, lineHeight: 1.5 }}>{wg.noTime} campaigns have no recorded entry time — excluded, not guessed. Verdict from YOUR data only; treat as direction until n ≥ 15.</div>
                 </div>
               );
             })()}
           </div>
           {/* ── RULE CARD: setup grade ── */}
-          <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.015)" }}>
-            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Context · setup grade at entry</div>
+          <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: "12px 14px", background: "var(--w02)" }}>
+            <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.faint, marginBottom: 6 }}>Context · setup grade at entry</div>
             <div style={{ marginBottom: 4 }}>{lab.gA.n >= 5
               ? <Chip ok={(lab.gA.expR ?? -9) > (lab.gU.expR ?? -9)}>{(lab.gA.expR ?? -9) > (lab.gU.expR ?? -9) ? "A-GRADES OUTPERFORM — the grader is predictive" : "A-GRADES UNDERPERFORMING — grading and outcomes disagree; review what the grader rewards"}</Chip>
               : <Chip ok={null}>BUILDING SAMPLE</Chip>} <span style={{ marginLeft: 8 }}><SampleTag n={lab.gA.n} rec={30} label="A-grades" /></span></div>
-            <div style={{ fontSize: "0.64rem", color: T.muted, lineHeight: 1.6, marginBottom: 4 }}>
+            <div style={{ fontSize: "0.6875rem", color: T.muted, lineHeight: 1.6, marginBottom: 4 }}>
               <div>· PURPOSE: both sides — a better base should win more often AND run further when it works.</div>
               {lab.gradeMech && <div>· MEASURED: the A-vs-ungraded gap runs mostly through <b style={{ color: T.text }}>{lab.gradeMech.top}</b> ({sgnR(lab.gradeMech.topV)}/trade) — wins {sgnR(lab.gradeMech.a.avgWinR)} vs {sgnR(lab.gradeMech.b.avgWinR)} · losses {sgnR(lab.gradeMech.a.avgLossR)} vs {sgnR(lab.gradeMech.b.avgLossR)}.</div>}
             </div>
@@ -900,11 +911,11 @@ function QuantAnalysisInner({ C, font, session }) {
             {sliceRow("Ungraded", lab.gU, "No grade recorded at entry — the pre-grader era or skipped grading.")}
           </div>
           {/* ── RULE CARD: playbook gates awaiting live capture ── */}
-          <div style={{ border: `1px solid ${T.borderSoft}`, borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.012)" }}>
-              <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted, marginBottom: 4 }}>Playbook gates — LoD-dist ≤ 60% ATR · time-matched RVOL · ORB wait · sized-same-D</div>
+          <div style={{ border: `1px solid ${T.borderSoft}`, borderRadius: 12, padding: "12px 14px", background: "var(--w02)" }}>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.muted, marginBottom: 4 }}>Playbook gates — LoD-dist ≤ 60% ATR · time-matched RVOL · ORB wait · sized-same-D</div>
               {lab.gatedN === 0 ? (
-                <div style={{ fontSize: "0.68rem", color: T.muted, lineHeight: 1.6 }}>
-                  <b style={{ color: T.text }}>0 of {A.n}</b> campaigns carry gate data — capture starts with the next logged entry (the trade-log now records <code style={{ fontSize: "0.62rem" }}>entry_gates</code> at entry time: LoD-distance %ATR, RVOL, ORB wait-gate, DCR, sized-same-D). These rows will populate automatically; nothing is backfilled by guessing.
+                <div style={{ fontSize: "0.6875rem", color: T.muted, lineHeight: 1.6 }}>
+                  <b style={{ color: T.text }}>0 of {A.n}</b> campaigns carry gate data — capture starts with the next logged entry (the trade-log now records <code style={{ fontSize: "0.6875rem" }}>entry_gates</code> at entry time: LoD-distance %ATR, RVOL, ORB wait-gate, DCR, sized-same-D). These rows will populate automatically; nothing is backfilled by guessing.
                 </div>
               ) : (<>
                 {sliceRow("LoD-dist ≤ 60% ATR (pass)", lab.gates.lod.pass, "Entries taken with the low-of-day within 60% of ATR — the tight-stop gate.")}
@@ -977,18 +988,18 @@ function QuantAnalysisInner({ C, font, session }) {
         )}
         {eqState && (
           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "10px 16px", marginBottom: 14 }}>
-            <span style={{ display: "inline-flex", alignItems: "center", fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.1em", color: eqState.above ? T.green : T.red, border: `1px solid ${(eqState.above ? T.green : T.red)}44`, borderRadius: 99, padding: "4px 13px" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.1em", color: eqState.above ? T.green : T.red, border: `1px solid ${eqState.above ? T.green : T.red}`, borderRadius: 99, padding: "4px 13px" }}>
               {dot(eqState.above ? T.green : T.red)}{eqState.above ? "IN GEAR · FULL RISK" : "BELOW EQUITY-MA · HALF RISK"}
             </span>
-            <span style={{ fontSize: "0.7rem", color: T.muted }}>
+            <span style={{ fontSize: "0.6875rem", color: T.muted }}>
               Equity <b style={{ color: T.text }}>{eqState.cum}R</b> is <b style={{ color: eqState.above ? T.green : T.red }}>{eqState.gap > 0 ? "+" : ""}{eqState.gap}R</b> {eqState.above ? "above" : "below"} its {eqMaP}-MA (<b style={{ color: T.text }}>{eqState.ma}R</b>) · {eqState.streak} trades this side
               <span style={{ color: T.faint }}> · max drawdown <b style={{ color: T.text, fontVariantNumeric: "tabular-nums" }}>{extra.mdd}R</b> · longest streaks <b style={{ color: T.text }}>{extra.maxW}W</b>/<b style={{ color: T.text }}>{extra.maxL}L</b> · now {extra.curW ? `${extra.curW} win${extra.curW > 1 ? "s" : ""} running` : extra.curL ? `${extra.curL} loss${extra.curL > 1 ? "es" : ""} running` : "flat"}</span>
             </span>
             <span style={{ marginLeft: "auto", display: "inline-flex", gap: 4 }}>
               <button onClick={() => setOvl(o => !o)} title="Overlay the same trades' cumulative $ P&L (right axis). Where the two lines diverge, position sizing — not the edge — did the work."
-                style={{ background: ovl ? "rgba(122,162,247,0.12)" : "transparent", border: `1px solid ${ovl ? T.blue : T.border}`, color: ovl ? T.blue : T.faint, borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontSize: "0.64rem", fontFamily: font }}>$ overlay</button>
+                style={{ background: ovl ? "var(--blueDim)" : "transparent", border: `1px solid ${ovl ? T.blue : T.border}`, color: ovl ? T.blue : T.faint, borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontSize: "0.6875rem", fontFamily: font }}>$ overlay</button>
               {[5, 10, 20].map(p => (
-                <button key={p} onClick={() => setEqMaP(p)} style={{ background: p === eqMaP ? "rgba(201,152,42,0.12)" : "transparent", border: `1px solid ${p === eqMaP ? T.gold : T.border}`, color: p === eqMaP ? T.goldBright : T.faint, borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontSize: "0.64rem", fontFamily: font }}>{p}-MA</button>
+                <button key={p} onClick={() => setEqMaP(p)} style={{ background: p === eqMaP ? "var(--goldDim)" : "transparent", border: `1px solid ${p === eqMaP ? T.gold : T.border}`, color: p === eqMaP ? T.goldBright : T.faint, borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontSize: "0.6875rem", fontFamily: font }}>{p}-MA</button>
               ))}
             </span>
           </div>
@@ -1013,17 +1024,17 @@ function QuantAnalysisInner({ C, font, session }) {
             <Area yAxisId="r" type="monotone" dataKey="cum" stroke={T.gold} strokeWidth={1.6} fill="url(#eqFill)"
               dot={(pr) => <circle key={pr.index} cx={pr.cx} cy={pr.cy} r={2.2} fill={pr.payload?.below ? T.red : T.gold} />}
               activeDot={{ r: 4, fill: T.gold }} />
-            <Line yAxisId="r" type="monotone" dataKey="ma" stroke="rgba(255,255,255,0.55)" strokeWidth={1.3} strokeDasharray="5 4" dot={false} activeDot={{ r: 3, fill: "#fff" }} />
+            <Line yAxisId="r" type="monotone" dataKey="ma" stroke="var(--muted)" strokeWidth={1.3} strokeDasharray="5 4" dot={false} activeDot={{ r: 3, fill: "var(--white)" }} />
             {ovl && <Line yAxisId="usd" type="monotone" dataKey="cumUsd" stroke={T.blue} strokeWidth={1.4} dot={false} activeDot={{ r: 3, fill: T.blue }} />}
           </ComposedChart>
         </ResponsiveContainer>
-        {ovl && <div style={{ fontSize: "0.64rem", color: T.muted, margin: "2px 0 6px" }}><i style={{ display: "inline-block", width: 12, height: 2, background: T.blue, verticalAlign: "middle", marginRight: 5 }} />same trades in DOLLARS (right axis) — where blue and gold diverge, position sizing did the work, not the edge.</div>}
+        {ovl && <div style={{ fontSize: "0.6875rem", color: T.muted, margin: "2px 0 6px" }}><i style={{ display: "inline-block", width: 12, height: 2, background: T.blue, verticalAlign: "middle", marginRight: 5 }} />same trades in DOLLARS (right axis) — where blue and gold diverge, position sizing did the work, not the edge.</div>}
         <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "2px 12px", margin: "10px 0 2px" }}>
-          <span className="term" data-tip="A moving window: after every trade, take just the LAST 10 trades and average their R. Trade #24's value = the average of trades 15–24. The all-time average moves slowly; this line shows what you're doing LATELY — it turns down many trades before the overall numbers do." style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.faint }}>The pulse — average R of your last 10 trades</span>
+          <span className="term" data-tip="A moving window: after every trade, take just the LAST 10 trades and average their R. Trade #24's value = the average of trades 15–24. The all-time average moves slowly; this line shows what you're doing LATELY — it turns down many trades before the overall numbers do." style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.faint }}>The pulse — average R of your last 10 trades</span>
           {roll.length > 0 && (
-            <span style={{ fontSize: "0.7rem", fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ fontSize: "0.6875rem", fontVariantNumeric: "tabular-nums" }}>
               now <b style={{ color: roll[roll.length - 1].exp >= 0.25 ? T.green : T.red }}>{(roll[roll.length - 1].exp >= 0 ? "+" : "") + roll[roll.length - 1].exp}R</b>
-              <span style={{ color: T.faint, fontSize: "0.62rem" }}> per trade · target ≥ +0.25R {roll[roll.length - 1].exp >= 0.25 ? "✓" : "✕"}</span>
+              <span style={{ color: T.faint, fontSize: "0.6875rem" }}> per trade · target ≥ +0.25R {roll[roll.length - 1].exp >= 0.25 ? "✓" : "✕"}</span>
             </span>
           )}
         </div>
@@ -1032,9 +1043,9 @@ function QuantAnalysisInner({ C, font, session }) {
             <XAxis dataKey="i" {...axis} hide />
             <YAxis {...axis} width={38} domain={["auto", "auto"]} tickFormatter={(t) => t + "R"} />
             <Tooltip content={<TT render={(p) => <>rolling-10 expectancy after #{p[0]?.payload?.i}: <b>{p[0]?.payload?.exp > 0 ? "+" : ""}{p[0]?.payload?.exp}R</b></>} />} />
-            <ReferenceLine y={0} stroke={`${T.red}55`} strokeDasharray="4 4" />
-            <ReferenceLine y={0.25} stroke={`${T.green}45`} strokeDasharray="4 4" label={{ value: "+0.25R", position: "right", fill: T.faint, fontSize: 9 }} />
-            <Line type="monotone" dataKey="exp" stroke="rgba(255,255,255,0.65)" strokeWidth={1.5} dot={false} activeDot={{ r: 3.5, fill: "#fff" }} />
+            <ReferenceLine y={0} stroke={T.red} strokeOpacity={0.33} strokeDasharray="4 4" />
+            <ReferenceLine y={0.25} stroke={T.green} strokeOpacity={0.27} strokeDasharray="4 4" label={{ value: "+0.25R", position: "right", fill: T.faint, fontSize: 9 }} />
+            <Line type="monotone" dataKey="exp" stroke="var(--muted)" strokeWidth={1.5} dot={false} activeDot={{ r: 3.5, fill: "var(--white)" }} />
           </LineChart>
         </ResponsiveContainer>
       </Panel>
@@ -1056,7 +1067,7 @@ function QuantAnalysisInner({ C, font, session }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18 }}>
           {[{ d: mfeDots, t: "DAY OF MAX PROFIT" }, { d: trimDots, t: "DAY OF FIRST TRIM" }].map((cfg, k) => (
             <div key={k}>
-              <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 2 }}>{cfg.t}</div>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 2 }}>{cfg.t}</div>
               <div style={{ marginBottom: 4 }}>
                 {k === 0
                   ? (dk.medDayMFE != null ? <Chip ok={dk.medDayMFE >= 3 && dk.medDayMFE <= 5}>{dk.medDayMFE >= 3 && dk.medDayMFE <= 5 ? `MEDIAN DAY ${dk.medDayMFE} — RULE AIMED RIGHT` : `MEDIAN DAY ${dk.medDayMFE} — OUTSIDE THE WINDOW, RE-AIM`}</Chip> : <Chip ok={null}>NO DATA</Chip>)
@@ -1086,7 +1097,7 @@ function QuantAnalysisInner({ C, font, session }) {
               const helped = tv.filter(x => x.v >= 0).length;
               const excluded = rows.filter(c => c.deriskCostR == null);
               return (<>
-                <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 2 }}>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 2 }}>
                   TRIM VALUE ADDED VS NEVER-TRIM (R) <span style={{ color: T.muted, letterSpacing: 0, textTransform: "none", fontWeight: 600 }}>· one bar per trade, sorted</span>
                 </div>
                 <div style={{ marginBottom: 4 }}><Chip ok={(-dk.deriskCostR ?? 0) >= 0}>{`HELPED ON ${helped} OF ${tv.length} · NET ${sgnR(-dk.deriskCostR, 1)}`}</Chip></div>
@@ -1096,7 +1107,7 @@ function QuantAnalysisInner({ C, font, session }) {
                     <XAxis dataKey="t" {...axis} interval={0} angle={-38} textAnchor="end" height={42} tick={{ ...axis.tick, fontSize: 8.5 }} />
                     <YAxis {...axis} width={30} tickFormatter={(t) => t + "R"} />
                     <ReferenceLine y={0} stroke={T.border} />
-                    <Tooltip cursor={{ fill: "rgba(255,255,255,0.03)" }} content={<TT render={(p) => {
+                    <Tooltip cursor={{ fill: "var(--w03)" }} content={<TT render={(p) => {
                       const d = p[0]?.payload; if (!d) return null;
                       return <><b>{d.t}</b><div>never-trim: {num(d.shadowR)}R · actual: {num(d.actual)}R</div><div>trim {d.v >= 0 ? "added" : "cost"} <b>{num(Math.abs(d.v))}R</b></div></>;
                     }} />} />
@@ -1105,7 +1116,7 @@ function QuantAnalysisInner({ C, font, session }) {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                {excluded.length > 0 && <div style={{ fontSize: "0.62rem", color: T.faint, marginTop: 4, lineHeight: 1.5 }}>Not shown ({excluded.length}, no original stop → no R math): {excluded.map(c => c.ticker).join(" · ")}.</div>}
+                {excluded.length > 0 && <div style={{ fontSize: "0.6875rem", color: T.faint, marginTop: 4, lineHeight: 1.5 }}>Not shown ({excluded.length}, no original stop → no R math): {excluded.map(c => c.ticker).join(" · ")}.</div>}
               </>);
             })()}
           </div>
@@ -1127,11 +1138,11 @@ function QuantAnalysisInner({ C, font, session }) {
             {(() => {
               const best = lab.tourney.slice().sort((a, b) => (b.meanR ?? -99) - (a.meanR ?? -99))[0];
               const never = lab.tourney.find(v => v.key === "shadowR");
-              return <>Across these {lab.tourneyN} campaigns, <b style={{ color: T.goldBright }}>{best.label}</b> comes out best at <b>{sgnR(best.meanR)}</b> per trade{never && best.key !== "shadowR" ? <> vs <b>{sgnR(never.meanR)}</b> for never trimming — the trim earns its keep</> : never && best.key === "shadowR" ? <> — right now HOLDING beats every trim variant; sample is small, treat as direction</> : null}. <SampleTag n={lab.tourneyN} rec={50} label="campaigns" />{lab.fillDays && lab.fillDays.n5 < 10 ? <span style={{ color: T.faint, fontSize: "0.66rem" }}> — and the EFFECTIVE sample is thinner: only {lab.fillDays.n5} trades ever printed +5R, so those few carry the ranking.</span> : null}</>;
+              return <>Across these {lab.tourneyN} campaigns, <b style={{ color: T.text }}>{best.label}</b> comes out best at <b>{sgnR(best.meanR)}</b> per trade{never && best.key !== "shadowR" ? <> vs <b>{sgnR(never.meanR)}</b> for never trimming — the trim earns its keep</> : never && best.key === "shadowR" ? <> — right now HOLDING beats every trim variant; sample is small, treat as direction</> : null}. <SampleTag n={lab.tourneyN} rec={50} label="campaigns" />{lab.fillDays && lab.fillDays.n5 < 10 ? <span style={{ color: T.faint, fontSize: "0.6875rem" }}> — and the EFFECTIVE sample is thinner: only {lab.fillDays.n5} trades ever printed +5R, so those few carry the ranking.</span> : null}</>;
             })()}
           </Say>
           {lab.fillDays && (
-            <div style={{ fontSize: "0.7rem", color: T.muted, margin: "0 0 10px", lineHeight: 1.6 }}>
+            <div style={{ fontSize: "0.6875rem", color: T.muted, margin: "0 0 10px", lineHeight: 1.6 }}>
               When the level trims actually fill: <b style={{ color: T.text }}>+3R printed on {lab.fillDays.n3} of {lab.fillDays.all}</b> trades (median day {num(lab.fillDays.med3, 0)}) · <b style={{ color: T.text }}>+5R on {lab.fillDays.n5} of {lab.fillDays.all}</b> (median day {num(lab.fillDays.med5, 0)}) · the rest time-stop at the window or ended early.
             </div>
           )}
@@ -1139,7 +1150,7 @@ function QuantAnalysisInner({ C, font, session }) {
             <div style={{ minWidth: 640 }}>
               {/* every column carries its PURPOSE on hover (Valen: a column without a stated
                   purpose is noise) */}
-              <div style={{ display: "grid", gridTemplateColumns: "minmax(150px,1.4fr) 50px 85px 85px 85px 130px", gap: "0 10px", alignItems: "center", padding: "2px 4px 6px", fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted }}>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(150px,1.4fr) 50px 85px 85px 85px 130px", gap: "0 10px", alignItems: "center", padding: "2px 4px 6px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.muted }}>
                 <span className="term" data-tip={"· the trim recipe being replayed\n· same trades every row, only the rule changes\n· the ranking IS the decision"}>Strategy</span>
                 <span className="term" data-tip={"· campaigns replayed under this rule\n· identical across rows by design\n· same trades = fair fight"}>n</span>
                 <span style={{ textAlign: "right" }}><span className="term tipright" data-tip={"· average R per trade under this rule\n· highest mean = most money per trade\n· this is the ranking column"}>Mean R</span></span>
@@ -1151,8 +1162,8 @@ function QuantAnalysisInner({ C, font, session }) {
                 const best = lab.tourney.slice().sort((a, b) => (b.meanR ?? -99) - (a.meanR ?? -99))[0];
                 const isBest = v.key === best.key;
                 return (
-                  <div key={v.key} style={{ display: "grid", gridTemplateColumns: "minmax(150px,1.4fr) 60px 90px 90px 90px 130px", gap: "0 10px", alignItems: "center", padding: "8px 4px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.76rem", background: isBest ? "rgba(201,152,42,0.05)" : "transparent" }}>
-                    <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{v.label}{isBest && <span style={{ color: T.goldBright, fontSize: "0.6rem", fontWeight: 800, marginLeft: 8 }}>◂ BEST</span>}</span>
+                  <div key={v.key} style={{ display: "grid", gridTemplateColumns: "minmax(150px,1.4fr) 60px 90px 90px 90px 130px", gap: "0 10px", alignItems: "center", padding: "8px 4px", borderTop: `1px solid ${T.borderSoft}`, fontSize: "0.75rem", background: isBest ? "var(--w06)" : "transparent" }}>
+                    <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{v.label}{isBest && <span style={{ color: T.text, fontSize: "0.6875rem", fontWeight: 800, marginLeft: 8 }}>◂ BEST</span>}</span>
                     <span style={{ color: T.muted, fontVariantNumeric: "tabular-nums" }}>{v.n}</span>
                     <b style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: (v.meanR ?? 0) >= 0 ? T.green : T.red }}>{sgnR(v.meanR)}</b>
                     <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{sgnR(v.medR)}</span>
@@ -1185,7 +1196,7 @@ function QuantAnalysisInner({ C, font, session }) {
                   <td style={{ ...tdBase, textAlign: "right", color: (o.realizedUsd || 0) >= 0 ? T.green : T.red }}>{fmt$(o.realizedUsd)}</td>
                   <td style={{ ...tdBase, textAlign: "right", color: (o.unrealUsd || 0) >= 0 ? T.green : T.red }}>{fmt$(o.unrealUsd)}{o.unrealR != null ? <span style={{ color: T.faint }}>{`  ${o.unrealR > 0 ? "+" : ""}${num(o.unrealR, 1)}R`}</span> : null}</td>
                   <td style={{ ...tdBase, textAlign: "right", fontWeight: 700, color: (o.worstCaseUsd ?? 0) >= 0 ? T.green : T.red }}>{o.worstCaseUsd != null ? fmt$(o.worstCaseUsd) : "—"}</td>
-                  <td style={tdBase}>{o.riskFree ? <span>{dot(T.green)}Risk-free</span> : <span>{dot(T.gold)}At risk</span>}</td>
+                  <td style={tdBase}>{o.riskFree ? <span>{dot(T.green)}Risk-free</span> : <span>{dot(T.red)}At risk</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -1227,7 +1238,7 @@ function QuantAnalysisInner({ C, font, session }) {
           const dataH = counts.map((n2, i) => ({ x: +(lo + w * (i + 0.5)).toFixed(1), n: n2 }));
           return (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 4 }}>DISTRIBUTION OF THE 10,000 ENDINGS (% RETURN AFTER 100 TRADES)</div>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.1em", color: T.faint, marginBottom: 4 }}>DISTRIBUTION OF THE 10,000 ENDINGS (% RETURN AFTER 100 TRADES)</div>
               <ResponsiveContainer width="100%" height={150}>
                 <ComposedChart data={dataH} margin={{ left: 0, right: 8, top: 6 }}>
                   <defs>
@@ -1277,16 +1288,16 @@ function QuantAnalysisInner({ C, font, session }) {
             ["Open runners (not counted)", rec.openRunners],
           ].map(([k, val]) => (
             <div key={k}>
-              <div style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.faint }}>{k}</div>
-              <div style={{ fontSize: "0.9rem", fontWeight: 700, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{val ?? "—"}</div>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.faint }}>{k}</div>
+              <div style={{ fontSize: "0.875rem", fontWeight: 700, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{val ?? "—"}</div>
             </div>
           ))}
         </div>
         {rec.rCrossCheck?.mismatched > 0 && (
-          <div style={{ fontSize: "0.68rem", color: T.red, marginTop: 10 }}>R mismatches (recorded vs recomputed — treat these rows' R as unverified): {(rec.rCrossCheck.rows || []).join(" · ")}</div>
+          <div style={{ fontSize: "0.6875rem", color: T.red, marginTop: 10 }}>R mismatches (recorded vs recomputed — treat these rows' R as unverified): {(rec.rCrossCheck.rows || []).join(" · ")}</div>
         )}
         {(rec.unparseableRows || []).length > 0 && (
-          <div style={{ fontSize: "0.68rem", color: T.red, marginTop: 6 }}>Unrecoverable rows (by name): {rec.unparseableRows.join(" · ")}</div>
+          <div style={{ fontSize: "0.6875rem", color: T.red, marginTop: 6 }}>Unrecoverable rows (by name): {rec.unparseableRows.join(" · ")}</div>
         )}
       </Panel>
 
@@ -1296,20 +1307,20 @@ function QuantAnalysisInner({ C, font, session }) {
         <Panel title="Data coverage — every exclusion has a name" meta={`${data.coverage.scored} of ${allCamps.length} campaigns fully scored · ${data.coverage.intraday0} with intraday day-0`} collapsed
           footnote="Scored = has bar-derived metrics (MFE/MAE, sims). A campaign can still count in win rate and $ P&L while excluded here — exclusion reasons are about the R/bar math only. If a name you traded is missing from BOTH the scored set and this list, that IS a bug: flag it immediately.">
           {(data.coverage.excluded || []).length === 0
-            ? <div style={{ fontSize: "0.72rem", color: T.muted }}>Nothing excluded — every campaign carries full metrics.</div>
+            ? <div style={{ fontSize: "0.75rem", color: T.muted }}>Nothing excluded — every campaign carries full metrics.</div>
             : (data.coverage.excluded || []).map((x, i) => (
-              <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "6px 4px", borderTop: i ? `1px solid ${T.borderSoft}` : "none", fontSize: "0.72rem" }}>
+              <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "6px 4px", borderTop: i ? `1px solid ${T.borderSoft}` : "none", fontSize: "0.75rem" }}>
                 <b style={{ minWidth: 56 }}>{x.t}</b>
                 <span style={{ color: T.muted, minWidth: 84, fontVariantNumeric: "tabular-nums" }}>{x.d || "no date"}</span>
-                <span style={{ color: T.faint, fontSize: "0.66rem" }}>{x.sys ? "system cohort" : "full journal"}</span>
+                <span style={{ color: T.faint, fontSize: "0.6875rem" }}>{x.sys ? "system cohort" : "full journal"}</span>
                 <span style={{ color: T.muted, flex: "1 1 240px" }}>{x.why}</span>
               </div>
             ))}
-          {(data.coverage.barsMissing || []).length > 0 && <div style={{ fontSize: "0.66rem", color: T.red, marginTop: 8 }}>Price-feed gaps (rerun the ledger; if persistent, the ticker may be delisted/renamed): {data.coverage.barsMissing.join(" · ")}</div>}
+          {(data.coverage.barsMissing || []).length > 0 && <div style={{ fontSize: "0.6875rem", color: T.red, marginTop: 8 }}>Price-feed gaps (rerun the ledger; if persistent, the ticker may be delisted/renamed): {data.coverage.barsMissing.join(" · ")}</div>}
           {/* WHY SECTION SAMPLE SIZES DIFFER — each metric needs different inputs; every n is
               traceable to a rule here, not a bug (Valen asked, 2026-07-11) */}
           <div style={{ marginTop: 14, borderTop: `1px solid ${T.borderSoft}`, paddingTop: 10 }}>
-            <div style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: T.gold, marginBottom: 6 }}>Why sections show different sample sizes</div>
+            <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: 0, color: T.faint, marginBottom: 6 }}>Why sections show different sample sizes</div>
             {[
               [`${A.n}`, "All closed campaigns in this cohort", "scoreboard $ rows, win rate, per-ticker P&L"],
               [`${A.nR}`, "…that also have an R (needs an original stop)", "R distribution, equity curve, Monte Carlo"],
@@ -1319,13 +1330,13 @@ function QuantAnalysisInner({ C, font, session }) {
               [`${dk.trimDays?.length ?? 0}`, "…campaigns you actually trimmed", "trim adherence"],
               [`${data.waitGate?.simmed ?? 0} of ${data.waitGate?.eligible ?? 0}`, "…entered before 10:00 ET with a recorded entry time", "30-min wait gate"],
             ].map(([n2, why, used], i) => (
-              <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "4px 0", fontSize: "0.7rem", alignItems: "baseline" }}>
+              <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", padding: "4px 0", fontSize: "0.6875rem", alignItems: "baseline" }}>
                 <b style={{ minWidth: 64, fontVariantNumeric: "tabular-nums" }}>{n2}</b>
                 <span style={{ color: T.muted, flex: "1 1 260px", minWidth: 0 }}>{why}</span>
-                <span style={{ color: T.faint, fontSize: "0.64rem" }}>{used}</span>
+                <span style={{ color: T.faint, fontSize: "0.6875rem" }}>{used}</span>
               </div>
             ))}
-            <div style={{ fontSize: "0.64rem", color: T.faint, marginTop: 4 }}>Each row is a subset of the one above it. A metric never silently drops a trade the rule doesn't exclude.</div>
+            <div style={{ fontSize: "0.6875rem", color: T.faint, marginTop: 4 }}>Each row is a subset of the one above it. A metric never silently drops a trade the rule doesn't exclude.</div>
           </div>
         </Panel>
       )}
@@ -1364,7 +1375,7 @@ function QuantAnalysisInner({ C, font, session }) {
       {/* methodology */}
       <Panel title="Methodology & definitions" collapsed
         tip={"How every number on this page is computed — populations, campaign definition, R formula, and the truth hierarchy (this page is an IBKR-rebuild estimate; the trades journal is realized-P&L source of truth). Read this before disputing a number."}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem" }}>
           <tbody>
             {[
               ["Populations", `Stress-test (full) = every verified campaign since ${data.since || "2026-05-01"}, incl. the recovered pre-system book (M/D/YY dates normalized after a census proved the format; every recovered R recomputed from its own entry/stop/exit; zero overlap with pipeline rows). Purpose: replay old trades through the new entry criteria. System cohort = campaigns entered ≥ ${data.systemEntry} — the LIVE record of the 3-stop / derisk-trim book; recovered history is asserted out of it at build time. The toggle recomputes every panel client-side from the same list.`],
@@ -1374,7 +1385,7 @@ function QuantAnalysisInner({ C, font, session }) {
               ["Entry gates", "entry_gates JSON captured at entry by the trade-log (LoD-dist %ATR ≤0.60 · time-matched RVOL ≥1.3 · ORB 30-min wait · ext ≤4× · sized-same-D). Old rows without capture are excluded from gate slices, never guessed."],
               ["Expectancy / SQN", "(avg win × WR) − (avg loss × (1−WR)), in R. SQN = mean(R)/σ(R)·√n — Van Tharp scale: 1.6 tradeable · 2–3 good · 3–5 excellent."],
               ["Truth hierarchy", "Equities-focused IBKR fill rebuild — an estimate. TradeZella remains realized-P&L source of truth. Refresh: node --env-file=.env.local scripts/edge-ledger.mjs"],
-            ].map(([k, d]) => <tr key={k}><td style={{ ...tdBase, fontSize: "0.62rem", fontWeight: 800, color: T.gold, whiteSpace: "nowrap", verticalAlign: "top", textTransform: "uppercase", letterSpacing: "0.06em" }}>{k}</td><td style={{ ...tdBase, whiteSpace: "normal", lineHeight: 1.6, color: T.muted }}>{d}</td></tr>)}
+            ].map(([k, d]) => <tr key={k}><td style={{ ...tdBase, fontSize: "0.6875rem", fontWeight: 500, color: T.faint, whiteSpace: "nowrap", verticalAlign: "top", letterSpacing: 0 }}>{k}</td><td style={{ ...tdBase, whiteSpace: "normal", lineHeight: 1.6, color: T.muted }}>{d}</td></tr>)}
           </tbody>
         </table>
       </Panel>

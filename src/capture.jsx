@@ -5,22 +5,26 @@ import React, { useState, useRef } from "react";
 // ClipboardItem built SYNCHRONOUSLY inside the gesture with a Promise value), falling
 // back to a PNG download when the async Clipboard API is unavailable. The button itself
 // is excluded from the capture via data-html2canvas-ignore. html2canvas can't read
-// backdrop-filter glass, so we pass an explicit near-black background. html2canvas is
-// loaded lazily (matches captureElement.js) so it stays out of the first-paint bundle.
-const H2C_OPTS = {
-  backgroundColor: "#08080e",
+// backdrop-filter glass, so we pass an explicit background — html2canvas ALSO can't resolve
+// var(...) (it reads inline/computed colours itself and chokes on the raw custom-property
+// string), so that background is resolved to a real colour off the CURRENT theme at capture
+// time, not baked in at module load. html2canvas is loaded lazily (matches captureElement.js)
+// so it stays out of the first-paint bundle.
+const cssVar = (n, fb) => { try { const v = getComputedStyle(document.documentElement).getPropertyValue(n); return (v || "").trim() || fb; } catch { return fb; } };
+const h2cOpts = () => ({
+  backgroundColor: cssVar("--bg", "#08080e"),
   scale: 2,
   ignoreElements: (n) => n && n.getAttribute && n.getAttribute("data-html2canvas-ignore") === "true",
-};
+});
 let _h2c = null;
 const loadH2C = () => (_h2c = _h2c || import("html2canvas").then((m) => m.default || m));
-const render = (el) => loadH2C().then((h2c) => h2c(el, H2C_OPTS));
+const render = (el) => loadH2C().then((h2c) => h2c(el, h2cOpts()));
 
 export function LensCamera({ getEl, name, C, style }) {
   const [done, setDone] = useState(false);
-  const muted = (C && C.muted) || "rgba(255,255,255,0.5)";
-  const gold = (C && C.goldBright) || "#f0c050";
-  const green = (C && C.green) || "#22c55e";
+  const muted = (C && C.muted) || "var(--faint)";
+  const gold = (C && C.goldBright) || "var(--goldBright)";
+  const green = (C && C.green) || "var(--green)";
   const flash = () => { setDone(true); setTimeout(() => setDone(false), 2000); };
   const fileName = `viv-${name}-${new Date().toISOString().slice(0, 10)}.png`;
   const download = (el) => render(el).then((canvas) => {
@@ -55,7 +59,7 @@ export function LensCamera({ getEl, name, C, style }) {
       onMouseEnter={(e) => { if (!done) e.currentTarget.style.color = gold; }}
       onMouseLeave={(e) => { if (!done) e.currentTarget.style.color = muted; }}>
       {done ? (
-        <span style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.02em", whiteSpace: "nowrap" }}>Copied ✓</span>
+        <span style={{ fontSize: "0.6875rem", fontWeight: 800, letterSpacing: "0.02em", whiteSpace: "nowrap" }}>Copied ✓</span>
       ) : (
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -77,8 +81,9 @@ export function LensCamera({ getEl, name, C, style }) {
 // the PNG instead and say so.
 export function XShare({ getEl, text, C, style, label }) {
   const [state, setState] = useState("");   // "" | "copied" | "saved"
-  const muted = (C && C.muted) || "rgba(255,255,255,0.5)";
-  const gold = (C && C.goldBright) || "#f0c050";
+  const muted = (C && C.muted) || "var(--faint)";
+  const gold = (C && C.goldBright) || "var(--goldBright)";
+  const green = (C && C.green) || "var(--green)";
   // Blank composer by default (Valen 2026-08-02: "i just have to do my own write up").
   // The IMAGE is the payload; pass `text` only if a caller genuinely wants a seed caption.
   const openX = () => {
@@ -118,7 +123,7 @@ export function XShare({ getEl, text, C, style, label }) {
     : (label || "Post to X — copies this card as an image, then opens a blank post for you to paste into");
   return (
     <button type="button" data-html2canvas-ignore="true" onClick={onClick} title={msg} aria-label="Post to X"
-      style={{ display: "inline-flex", alignItems: "center", gap: 5, height: 30, padding: state ? "0 8px" : "0 5px", borderRadius: 7, cursor: "pointer", flex: "none", background: state ? "rgba(201,152,42,0.14)" : "transparent", border: "none", color: state ? gold : muted, transition: "color .15s", fontSize: "0.56rem", fontWeight: 800, whiteSpace: "nowrap", ...style }}
+      style={{ display: "inline-flex", alignItems: "center", gap: 5, height: 30, padding: state ? "0 8px" : "0 5px", borderRadius: 7, cursor: "pointer", flex: "none", background: state ? "rgba(0,200,5,0.14)" : "transparent", border: "none", color: state ? green : muted, transition: "color .15s", fontSize: "0.6875rem", fontWeight: 800, whiteSpace: "nowrap", ...style }}
       onMouseEnter={(e) => { if (!state) e.currentTarget.style.color = gold; }}
       onMouseLeave={(e) => { if (!state) e.currentTarget.style.color = muted; }}>
       <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">

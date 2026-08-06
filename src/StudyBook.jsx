@@ -579,19 +579,19 @@ export function StudyScoreboard({ C, rows }) {
   const bySetup = {};
   rows.forEach(r => { const s = r.metrics.study.setup; bySetup[s] = (bySetup[s] || 0) + 1; });
   // Uniform card chrome — 16px radius, glass, top-left sheen, uppercase micro-label + divider head.
-  const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" };
-  const box = { background: "rgba(0,0,0,0.25)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 16px", flex: 1, minWidth: 140 };
-  const boxNum = { display: "block", fontSize: "1.3rem", fontWeight: 800, color: C.white, lineHeight: 1.1 };
-  const boxLbl = { fontSize: "0.6rem", color: C.muted, textTransform: "uppercase", letterSpacing: ".08em" };
-  const subhead = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "16px 0 10px" };
-  const gloss = { border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 12px", fontSize: "0.72rem", color: C.muted, lineHeight: 1.5 };
-  const glossTerm = { display: "block", marginBottom: 3, fontSize: "0.76rem", color: C.goldBright };
+  const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, var(--w06), transparent 55%)" };
+  const box = { background: "var(--w22)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 16px", flex: 1, minWidth: 140 };
+  const boxNum = { display: "block", fontSize: "1.25rem", fontWeight: 600, color: C.white, lineHeight: 1.1 };
+  const boxLbl = { fontSize: "0.75rem", color: C.muted, };
+  const subhead = { fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", margin: "16px 0 10px" };
+  const gloss = { border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 12px", fontSize: "0.75rem", color: C.muted, lineHeight: 1.5 };
+  const glossTerm = { display: "block", marginBottom: 3, fontSize: "0.75rem", color: C.white };
   return (
     <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", marginBottom: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
       <div style={sheen} />
       <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}` }}>
-        <span style={{ flex: 1, fontSize: "0.62rem", fontWeight: 700, letterSpacing: ".13em", textTransform: "uppercase", color: C.muted }}>Study Scoreboard</span>
-        <span title="Historical EXERCISE mode: fixed factor + metric cards on past winners so commonality emerges from the counts, never from memory." style={{ flex: "none", width: 15, height: 15, borderRadius: "50%", border: `1px solid ${C.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 700, fontStyle: "italic", color: C.muted, cursor: "help" }}>i</span>
+        <span style={{ flex: 1, fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em", color: C.white }}>Study Scoreboard</span>
+        <span title="Historical EXERCISE mode: fixed factor + metric cards on past winners so commonality emerges from the counts, never from memory." style={{ flex: "none", width: 15, height: 15, borderRadius: "50%", border: `1px solid ${C.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6875rem", fontWeight: 700, fontStyle: "italic", color: C.muted, cursor: "help" }}>i</span>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
         <div style={box}><b style={boxNum}>{rows.length}</b><span style={boxLbl}>Studies</span></div>
@@ -623,28 +623,28 @@ export function StudyScoreboard({ C, rows }) {
               we replace it with a loud banner + raw fractions (both denominators, no %, no ∞), rows
               desaturated. At ≥5 failures the ratio returns, but ALWAYS with both denominators shown. */}
           {guard ? (
-            <div style={{ fontSize: "0.72rem", color: C.goldBright, fontWeight: 600, margin: "0 0 10px", padding: "10px 13px", background: "rgba(201,152,42,0.06)", border: "1px solid rgba(201,152,42,0.35)", borderRadius: 8, lineHeight: 1.55 }}>
+            <div style={{ fontSize: "0.75rem", color: C.text, fontWeight: 600, margin: "0 0 10px", padding: "10px 13px", background: "var(--w06)", border: "1px solid var(--w22)", borderRadius: 8, lineHeight: 1.55 }}>
               🔒 Lift locked — {nWin} winners / {nFail} failures graded so far. Lift compares winners AGAINST failures, so it needs a graded failure control group (~1 failure per 2–3 winners). Raw tick counts are shown below in the meantime.
             </div>
           ) : (
             <div style={small
-              ? { fontSize: "0.72rem", color: "#e0a955", margin: "0 0 10px", padding: "9px 12px", background: "rgba(224,169,85,0.08)", border: "1px solid rgba(224,169,85,0.25)", borderRadius: 8, lineHeight: 1.5 }
-              : { fontSize: "0.72rem", color: C.muted, margin: "0 0 10px", lineHeight: 1.5 }}>
+              ? { fontSize: "0.75rem", color: "var(--orangeFg)", margin: "0 0 10px", padding: "9px 12px", background: "var(--orangeDim)", border: "1px solid var(--orange)", borderRadius: 8, lineHeight: 1.5 }
+              : { fontSize: "0.75rem", color: C.muted, margin: "0 0 10px", lineHeight: 1.5 }}>
               {small ? `⚠ n=${n} resolved · ${campN} campaigns — early read, believe nothing before n≥30 per class (promote at n≥50). Add FAILURES too — without them lift can't be computed (winners-only = survivor bias).`
                      : `n=${n} resolved · ${campN} campaigns — lift = % of winners with the factor ÷ % of failures with it (both denominators shown). ≥2 = edge candidate · ~1 = noise.`}
             </div>
           )}
           <div style={{ maxHeight: 280, overflowY: "auto", paddingTop: 2 }}>
             {lifts.slice(0, 16).map((l, i, arr) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", borderBottom: i === arr.length - 1 ? "none" : "1px solid rgba(255,255,255,0.05)", fontSize: "0.74rem", opacity: guard ? 0.55 : 1 }}>
-                <span style={{ width: 170, flex: "none", color: C.muted, fontSize: "0.66rem" }}>{l.setup}</span>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", borderBottom: i === arr.length - 1 ? "none" : "1px solid var(--w06)", fontSize: "0.75rem", opacity: guard ? 0.55 : 1 }}>
+                <span style={{ width: 170, flex: "none", color: C.muted, fontSize: "0.6875rem" }}>{l.setup}</span>
                 <span style={{ flex: 1, color: C.text }}>{l.label}</span>
                 {guard ? (
-                  <span style={{ flex: "none", textAlign: "right", whiteSpace: "nowrap", color: C.muted, fontSize: "0.66rem" }}>winners {l.wc}/{l.denW} · failures {l.fc}/{l.denF}</span>
+                  <span style={{ flex: "none", textAlign: "right", whiteSpace: "nowrap", color: C.muted, fontSize: "0.6875rem" }}>winners {l.wc}/{l.denW} · failures {l.fc}/{l.denF}</span>
                 ) : (
                   <>
-                    <span style={{ width: 150, flex: "none", textAlign: "right", whiteSpace: "nowrap", color: C.muted, fontSize: "0.66rem" }}>{Math.round(l.pW * 100)}%W ({l.wc}/{l.denW}) · {Math.round(l.pF * 100)}%F ({l.fc}/{l.denF})</span>
-                    <b style={{ width: 56, flex: "none", textAlign: "right", fontWeight: 800, color: l.lift >= 2 ? "#7ef0a0" : l.lift < 0.7 ? "#e05555" : C.muted }}>{l.lift === Infinity ? "∞" : l.lift.toFixed(2)}×</b>
+                    <span style={{ width: 150, flex: "none", textAlign: "right", whiteSpace: "nowrap", color: C.muted, fontSize: "0.6875rem" }}>{Math.round(l.pW * 100)}%W ({l.wc}/{l.denW}) · {Math.round(l.pF * 100)}%F ({l.fc}/{l.denF})</span>
+                    <b style={{ width: 56, flex: "none", textAlign: "right", fontWeight: 600, color: l.lift >= 2 ? "var(--greenFg)" : l.lift < 0.7 ? "var(--redFg)" : C.muted }}>{l.lift === Infinity ? "∞" : l.lift.toFixed(2)}×</b>
                   </>
                 )}
               </div>
@@ -982,25 +982,25 @@ export function HypothesisRead({ C, study, ticker, date }) {
   const ctx = { ticker, date }; // enables the H12 rotation lens (per-entry) where date matches a snapshot
   const lines = HYPOTHESES.map(h => { const v = entryVerdict(h, study, ctx); return v ? { h, ...v } : null; }).filter(Boolean);
   if (!lines.length) return null;
-  const toneColor = (t) => t === "supports" ? "#7ef0a0" : t === "challenges" ? "#e05555" : C.muted;
-  const chip = (source) => { const gold = source === "DOCTRINE"; return { border: `1px solid ${gold ? C.goldBright : C.blue}`, color: gold ? C.goldBright : C.blue, background: gold ? C.goldDim : C.blueDim, borderRadius: 99, fontSize: "0.5rem", fontWeight: 800, letterSpacing: ".06em", padding: "1px 6px", whiteSpace: "nowrap" }; };
+  const toneColor = (t) => t === "supports" ? "var(--greenFg)" : t === "challenges" ? "var(--redFg)" : C.muted;
+  const chip = (source) => { const gold = source === "DOCTRINE"; return { border: `1px solid ${gold ? "var(--w35)" : C.blue}`, color: gold ? C.white : C.blue, background: gold ? "var(--w06)" : C.blueDim, borderRadius: 99, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: ".06em", padding: "1px 6px", whiteSpace: "nowrap" }; };
   return (
-    <div style={{ border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "11px 13px", background: "rgba(0,0,0,0.22)", marginBottom: 12 }}>
-      <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 9 }}>🧪 What this study says about the hypotheses</div>
+    <div style={{ border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "11px 13px", background: "var(--w22)", marginBottom: 12 }}>
+      <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 9 }}>🧪 What this study says about the hypotheses</div>
       {/* Strict 3-column grid (Valen 2026-07-26 — the old flex-wrap layout scattered chips/verdicts
           onto their own lines in narrow containers): [verdict dot] [name — answer, wraps] [chips, nowrap,
           right-aligned]. Verdict = a colored pill, always in the same place; verb nuance lives in the title. */}
       <div style={{ display: "grid", gap: 7 }}>
         {lines.map(({ h, answer, chip: ch, tone, verb }) => (
-          <div key={h.id} style={{ display: "grid", gridTemplateColumns: "16px minmax(0,1fr) auto", alignItems: "start", columnGap: 8, fontSize: "0.73rem", lineHeight: 1.45 }}>
-            <span style={{ fontSize: "0.8rem", lineHeight: 1.3 }}>{ch}</span>
+          <div key={h.id} style={{ display: "grid", gridTemplateColumns: "16px minmax(0,1fr) auto", alignItems: "start", columnGap: 8, fontSize: "0.75rem", lineHeight: 1.45 }}>
+            <span style={{ fontSize: "0.75rem", lineHeight: 1.3 }}>{ch}</span>
             <span style={{ minWidth: 0 }}>
               <b style={{ color: C.white }}>{h.short}</b>
               <span style={{ color: C.text }}> · {answer}</span>
             </span>
             <span style={{ display: "flex", gap: 6, alignItems: "center", whiteSpace: "nowrap", justifySelf: "end", paddingTop: 1 }} title={verb}>
               <span style={chip(h.source)}>{h.source}</span>
-              <span style={{ fontWeight: 800, fontSize: "0.56rem", letterSpacing: ".05em", textTransform: "uppercase", color: toneColor(tone), border: `1px solid ${toneColor(tone)}`, borderRadius: 99, padding: "1px 8px" }}>
+              <span style={{ fontWeight: 600, fontSize: "0.6875rem", color: toneColor(tone), border: `1px solid ${toneColor(tone)}`, borderRadius: 99, padding: "1px 8px" }}>
                 {tone === "supports" ? "Supports" : tone === "challenges" ? "Challenges" : "＋ Data"}
               </span>
             </span>
@@ -1048,11 +1048,11 @@ function hypHeat(supports, challenges, C) {
   const usable = supports + challenges;
   if (usable < 8) return { bg: "transparent", fg: C.muted, verdict: `collecting — ${usable}/30`, weak: true };
   const r = supports / usable, d = Math.abs(r - 0.5) * 2, op = (0.12 + d * 0.30).toFixed(2), pct = Math.round(r * 100);
-  if (r >= 0.70) return { bg: `rgba(34,197,94,${op})`, fg: "#7ef0a0", verdict: `supports · ${pct}%` };
-  if (r >= 0.55) return { bg: `rgba(34,197,94,${op})`, fg: "#7ef0a0", verdict: `leans support · ${pct}%` };
-  if (r > 0.45) return { bg: "rgba(224,169,85,0.12)", fg: "#e0a955", verdict: `contested · ${pct}%` };
-  if (r > 0.30) return { bg: `rgba(239,68,68,${op})`, fg: "#e05555", verdict: `leans against · ${pct}%` };
-  return { bg: `rgba(239,68,68,${op})`, fg: "#e05555", verdict: `against · ${pct}%` };
+  if (r >= 0.70) return { bg: `rgba(0,200,5,${op})`, fg: "var(--greenFg)", verdict: `supports · ${pct}%` };
+  if (r >= 0.55) return { bg: `rgba(0,200,5,${op})`, fg: "var(--greenFg)", verdict: `leans support · ${pct}%` };
+  if (r > 0.45) return { bg: "var(--orangeDim)", fg: "var(--orangeFg)", verdict: `contested · ${pct}%` };
+  if (r > 0.30) return { bg: `rgba(255,80,0,${op})`, fg: "var(--redFg)", verdict: `leans against · ${pct}%` };
+  return { bg: `rgba(255,80,0,${op})`, fg: "var(--redFg)", verdict: `against · ${pct}%` };
 }
 
 // Evidence-QUALITY chip (Valen 2026-07-26) — PRESENTATION over the EXISTING vote counts (never re-counts).
@@ -1063,14 +1063,14 @@ function evidenceChip(supports, challenges, dataCount, dist, C) {
   if (dist) {
     const nn = dataCount || 0;
     const filled = nn >= 30 ? 4 : nn >= 15 ? 3 : nn >= 8 ? 2 : 1;
-    return { filled, label: nn >= 30 ? "HIGH" : nn >= 8 ? "BUILDING" : "THIN", color: "#94a3b8",
+    return { filled, label: nn >= 30 ? "HIGH" : nn >= 8 ? "BUILDING" : "THIN", color: "var(--muted)",
       reason: `${nn} data point${nn === 1 ? "" : "s"} — descriptive distribution, no supports/challenges verdict` };
   }
   const nn = supports + challenges, oneClass = supports === 0 || challenges === 0;
-  if (nn >= 30) return { filled: 4, label: "HIGH", color: "#7ef0a0", reason: `${nn} resolved votes — past the believe-nothing-under-30 floor` };
+  if (nn >= 30) return { filled: 4, label: "HIGH", color: "var(--greenFg)", reason: `${nn} resolved votes — past the believe-nothing-under-30 floor` };
   if ((nn >= 8 && supports >= 3 && challenges >= 3) || (nn >= 15 && oneClass))
-    return { filled: 3, label: "MODERATE", color: "#e0a955", reason: (nn >= 15 && oneClass) ? `${nn} votes but all one-sided` : `${nn} votes with ${supports}–${challenges} both sides represented` };
-  if (nn >= 8) return { filled: 2, label: "LOW", color: "#c99a5a", reason: oneClass ? `all ${nn} votes one-sided` : `only an ${supports}–${challenges} split` };
+    return { filled: 3, label: "MODERATE", color: "var(--orangeFg)", reason: (nn >= 15 && oneClass) ? `${nn} votes but all one-sided` : `${nn} votes with ${supports}–${challenges} both sides represented` };
+  if (nn >= 8) return { filled: 2, label: "LOW", color: "var(--gold)", reason: oneClass ? `all ${nn} votes one-sided` : `only an ${supports}–${challenges} split` };
   return { filled: 1, label: "INSUFFICIENT", color: C.muted, reason: `only ${nn} resolved vote${nn === 1 ? "" : "s"}` };
 }
 
@@ -1079,18 +1079,18 @@ function evidenceChip(supports, challenges, dataCount, dist, C) {
 // readout only. Module scope + own expand state (never a component nested in a component). ──
 export function HypReadout({ C, hyp, winners, fails, allStudies }) {
   const [open, setOpen] = useState(null);
-  const liftColor = (l) => l >= 2 ? "#7ef0a0" : l < 0.7 ? "#e05555" : C.muted;
+  const liftColor = (l) => l >= 2 ? "var(--greenFg)" : l < 0.7 ? "var(--redFg)" : C.muted;
   const outLabel = (s) => MB_OUTCOME[outcomeClass(s)] || outcomeClass(s);
-  const outColor = (s) => outcomeClass(s) === "failure" ? "#e05555" : "#7ef0a0";
+  const outColor = (s) => outcomeClass(s) === "failure" ? "var(--redFg)" : "var(--greenFg)";
   const expandList = (list, valFn) => (
     <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8, maxHeight: 240, overflowY: "auto" }}>
-      {list.length === 0 ? <div style={{ fontSize: "0.66rem", color: C.muted }}>No studies counted yet.</div> :
+      {list.length === 0 ? <div style={{ fontSize: "0.6875rem", color: C.muted }}>No studies counted yet.</div> :
         [...list].sort((a, b) => (["big winner", "monster"].includes(outcomeClass(b.s)) ? 1 : 0) - (["big winner", "monster"].includes(outcomeClass(a.s)) ? 1 : 0)).map((x, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: "0.68rem", borderBottom: i === list.length - 1 ? "none" : "1px solid rgba(255,255,255,0.04)" }}>
-            <span style={{ width: 56, flex: "none", fontWeight: 800, color: C.white }}>{x.ticker}</span>
-            <span style={{ width: 88, flex: "none", color: C.muted, fontSize: "0.62rem" }}>{x.date}</span>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: "0.6875rem", borderBottom: i === list.length - 1 ? "none" : "1px solid var(--w04)" }}>
+            <span style={{ width: 56, flex: "none", fontWeight: 600, color: C.white }}>{x.ticker}</span>
+            <span style={{ width: 88, flex: "none", color: C.muted, fontSize: "0.6875rem" }}>{x.date}</span>
             <span style={{ flex: 1, color: C.text }}>{valFn(x.s, x)}</span>
-            <span style={{ flex: "none", fontWeight: 700, color: outColor(x.s), fontSize: "0.62rem" }}>{outLabel(x.s)}</span>
+            <span style={{ flex: "none", fontWeight: 700, color: outColor(x.s), fontSize: "0.6875rem" }}>{outLabel(x.s)}</span>
           </div>
         ))}
     </div>
@@ -1109,44 +1109,44 @@ export function HypReadout({ C, hyp, winners, fails, allStudies }) {
     const dists = hyp.stores.map(([store, maLabel]) => ({ store, maLabel, ...legDist(store, dynBands, base) }));
     const med10 = medianCompanion(base, "d_below_ma10", "ma10_censored");
     const med20 = medianCompanion(base, "d_below_ma20", "ma20_censored");
-    const distBox = { flex: "1 1 240px", minWidth: 220, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "rgba(0,0,0,0.25)" };
+    const distBox = { flex: "1 1 240px", minWidth: 220, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "var(--w22)" };
     return (
       <div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {dists.map(d => (
             <div key={d.store} style={distBox}>
-              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Legs to first close below {d.maLabel} · n={d.n}</div>
+              <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 7 }}>Legs to first close below {d.maLabel} · n={d.n}</div>
               {dynBands.map(b => {
                 const c = d.counts[b] || 0, pct = d.n ? Math.round(c / d.n * 100) : 0, prior = hyp.priorDist[b];
                 return (
-                  <div key={b} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "2px 0" }}>
+                  <div key={b} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.6875rem", padding: "2px 0" }}>
                     <span style={{ width: 26, flex: "none", color: C.text, fontWeight: 700 }}>{b}</span>
-                    <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: C.goldBright }} /></div>
-                    <span style={{ width: 66, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{c} · {pct}%</span>
-                    <span style={{ width: 58, flex: "none", textAlign: "right", color: "rgba(255,255,255,0.32)", fontSize: "0.6rem" }} title="Doctrine prior — the reference distribution (only the doctrine legs 2–5 carry one); blank = no prior for this bucket">{prior == null ? "" : `prior ${prior}%`}</span>
+                    <div style={{ flex: 1, height: 8, background: "var(--w08)", borderRadius: 99, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: "var(--w35)" }} /></div>
+                    <span style={{ width: 66, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.6875rem" }}>{c} · {pct}%</span>
+                    <span style={{ width: 58, flex: "none", textAlign: "right", color: "var(--faint)", fontSize: "0.6875rem" }} title="Doctrine prior — the reference distribution (only the doctrine legs 2–5 carry one); blank = no prior for this bucket">{prior == null ? "" : `prior ${prior}%`}</span>
                   </div>
                 );
               })}
             </div>
           ))}
         </div>
-        <div style={{ fontSize: "0.66rem", color: C.text, marginTop: 9 }}>
-          Median sessions to first close below MA — <b style={{ color: C.goldBright }}>10MA {med10.med == null ? "—" : med10.med}</b> (n={med10.n}, {med10.cens} censored) · <b style={{ color: C.goldBright }}>20MA {med20.med == null ? "—" : med20.med}</b> (n={med20.n}, {med20.cens} censored)
+        <div style={{ fontSize: "0.6875rem", color: C.text, marginTop: 9 }}>
+          Median sessions to first close below MA — <b style={{ color: C.white }}>10MA {med10.med == null ? "—" : med10.med}</b> (n={med10.n}, {med10.cens} censored) · <b style={{ color: C.white }}>20MA {med20.med == null ? "—" : med20.med}</b> (n={med20.n}, {med20.cens} censored)
         </div>
-        <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
+        <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
           n={hypCampCount(base)} campaigns (leg-lifespan is whole-trend — counted once per campaign, root leg) · {dists[0].n}/{dists[1].n} measured (10MA/20MA) · {dists[0].blank}/{dists[1].blank} blank · censored shown separately — believe nothing &lt;30, promote at 50
         </div>
-        <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{open === hyp.id ? "▴ hide the studies counted" : "▾ show the studies counted"}</div>
+        <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", fontSize: "0.6875rem", color: C.goldBright, marginTop: 6 }}>{open === hyp.id ? "▴ hide the studies counted" : "▾ show the studies counted"}</div>
         {open === hyp.id && (() => {
           const withLegs = base.filter(x => (x.s.checks?.legs_ma10 ?? "") !== "" || (x.s.checks?.legs_ma20 ?? "") !== "");
           return (
             <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8, maxHeight: 240, overflowY: "auto" }}>
-              {withLegs.length === 0 ? <div style={{ fontSize: "0.66rem", color: C.muted }}>No leg counts recorded yet.</div> :
+              {withLegs.length === 0 ? <div style={{ fontSize: "0.6875rem", color: C.muted }}>No leg counts recorded yet.</div> :
                 withLegs.map((x, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: "0.68rem", borderBottom: i === withLegs.length - 1 ? "none" : "1px solid rgba(255,255,255,0.04)" }}>
-                    <span style={{ width: 56, flex: "none", fontWeight: 800, color: C.white }}>{x.ticker}</span>
-                    <span style={{ width: 88, flex: "none", color: C.muted, fontSize: "0.62rem" }}>{x.date}</span>
-                    <span style={{ flex: 1, color: C.text }}>10MA: <b style={{ color: C.goldBright }}>{x.s.checks?.legs_ma10 || "—"}</b> legs · 20MA: <b style={{ color: C.goldBright }}>{x.s.checks?.legs_ma20 || "—"}</b> legs</span>
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: "0.6875rem", borderBottom: i === withLegs.length - 1 ? "none" : "1px solid var(--w04)" }}>
+                    <span style={{ width: 56, flex: "none", fontWeight: 600, color: C.white }}>{x.ticker}</span>
+                    <span style={{ width: 88, flex: "none", color: C.muted, fontSize: "0.6875rem" }}>{x.date}</span>
+                    <span style={{ flex: 1, color: C.text }}>10MA: <b style={{ color: C.white }}>{x.s.checks?.legs_ma10 || "—"}</b> legs · 20MA: <b style={{ color: C.white }}>{x.s.checks?.legs_ma20 || "—"}</b> legs</span>
                   </div>
                 ))}
             </div>
@@ -1159,42 +1159,42 @@ export function HypReadout({ C, hyp, winners, fails, allStudies }) {
   if (hyp.kind === "extension") {
     const en = extEntry(hyp.bands, hyp.entryKey, hypForLevel(winners, hyp), hypForLevel(fails, hyp));
     const px = extPeakDist(hyp.bands, hyp.peakKey, hypForLevel(winners, hyp));
-    const half = { flex: "1 1 260px", minWidth: 240, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "rgba(0,0,0,0.25)" };
+    const half = { flex: "1 1 260px", minWidth: 240, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", background: "var(--w22)" };
     const exitOpen = open === `${hyp.id}-x`;
     return (
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <div style={half}>
-          <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Entry ext (×ATR% from 50MA) — winners vs losers</div>
+          <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 7 }}>Entry ext (×ATR% from 50MA) — winners vs losers</div>
           {en.rows.map(row => {
             const rowOpen = open === `${hyp.id}-e-${row.band}`;
             return (
               <div key={row.band}>
-                <div onClick={() => setOpen(rowOpen ? null : `${hyp.id}-e-${row.band}`)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0" }}>
+                <div onClick={() => setOpen(rowOpen ? null : `${hyp.id}-e-${row.band}`)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 8, fontSize: "0.6875rem", padding: "3px 0" }}>
                   <span style={{ width: 44, flex: "none", color: C.text, fontWeight: 700 }}>{row.band}</span>
-                  <span style={{ flex: 1, color: C.muted, fontSize: "0.66rem" }}>{row.wc}W · {row.fc}F</span>
-                  <b style={{ width: 52, flex: "none", textAlign: "right", fontWeight: 800, color: en.enough ? liftColor(row.lift) : C.muted }}>{en.enough ? (row.lift === Infinity ? "∞" : row.lift.toFixed(2) + "×") : "·"}</b>
-                  <span style={{ flex: "none", color: C.muted, fontSize: "0.62rem" }}>{rowOpen ? "▴" : "▾"}</span>
+                  <span style={{ flex: 1, color: C.muted, fontSize: "0.6875rem" }}>{row.wc}W · {row.fc}F</span>
+                  <b style={{ width: 52, flex: "none", textAlign: "right", fontWeight: 600, color: en.enough ? liftColor(row.lift) : C.muted }}>{en.enough ? (row.lift === Infinity ? "∞" : row.lift.toFixed(2) + "×") : "·"}</b>
+                  <span style={{ flex: "none", color: C.muted, fontSize: "0.6875rem" }}>{rowOpen ? "▴" : "▾"}</span>
                 </div>
                 {rowOpen && expandList(row.list, s => { const v = s.m?.[hyp.entryKey]; return v == null || v === "" ? "—" : `${(+v).toFixed(2)}× at entry`; })}
               </div>
             );
           })}
-          {!en.enough && <div style={{ fontSize: "0.66rem", color: "#e0a955", marginTop: 6 }}>collecting — n={en.W + en.F} of 30</div>}
-          <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6 }}>n={en.W} winners / {en.F} losers / {en.E} excluded blank across {hypCampCount(en.rows.flatMap(r => r.list))} campaigns — believe nothing &lt;30, promote at 50</div>
+          {!en.enough && <div style={{ fontSize: "0.6875rem", color: "var(--orangeFg)", marginTop: 6 }}>collecting — n={en.W + en.F} of 30</div>}
+          <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 6 }}>n={en.W} winners / {en.F} losers / {en.E} excluded blank across {hypCampCount(en.rows.flatMap(r => r.list))} campaigns — believe nothing &lt;30, promote at 50</div>
         </div>
         <div style={half}>
-          <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 7 }}>Where winners topped — the trim band · n={px.n}</div>
+          <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 7 }}>Where winners topped — the trim band · n={px.n}</div>
           {hyp.bands.map(band => { const c = px.counts[band], pct = px.n ? Math.round(c / px.n * 100) : 0;
             return (
-              <div key={band} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "2px 0" }}>
+              <div key={band} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.6875rem", padding: "2px 0" }}>
                 <span style={{ width: 44, flex: "none", color: C.text, fontWeight: 700 }}>{band}</span>
-                <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: band === "≥7×" ? "#7ef0a0" : C.goldBright }} /></div>
-                <span style={{ width: 66, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{c} · {pct}%</span>
+                <div style={{ flex: 1, height: 8, background: "var(--w08)", borderRadius: 99, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: band === "≥7×" ? "var(--greenFg)" : "var(--w35)" }} /></div>
+                <span style={{ width: 66, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.6875rem" }}>{c} · {pct}%</span>
               </div>
             ); })}
-          <div style={{ fontSize: "0.66rem", color: C.text, marginTop: 7 }}>Median winner peak ext — <b style={{ color: C.goldBright }}>{px.med == null ? "—" : px.med.toFixed(2) + "×"}</b></div>
-          <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 4 }}>n={px.n} winners with peak ext / {px.blank} excluded blank across {hypCampCount(px.set)} campaigns — believe nothing &lt;30, promote at 50</div>
-          <div onClick={() => setOpen(exitOpen ? null : `${hyp.id}-x`)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{exitOpen ? "▴ hide the winners counted" : "▾ show the winners counted"}</div>
+          <div style={{ fontSize: "0.6875rem", color: C.text, marginTop: 7 }}>Median winner peak ext — <b style={{ color: C.white }}>{px.med == null ? "—" : px.med.toFixed(2) + "×"}</b></div>
+          <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 4 }}>n={px.n} winners with peak ext / {px.blank} excluded blank across {hypCampCount(px.set)} campaigns — believe nothing &lt;30, promote at 50</div>
+          <div onClick={() => setOpen(exitOpen ? null : `${hyp.id}-x`)} style={{ cursor: "pointer", fontSize: "0.6875rem", color: C.goldBright, marginTop: 6 }}>{exitOpen ? "▴ hide the winners counted" : "▾ show the winners counted"}</div>
           {exitOpen && expandList(px.set, s => { const v = s.outcome?.[hyp.peakKey]; return v == null || v === "" ? "—" : `${(+v).toFixed(2)}× at peak`; })}
         </div>
       </div>
@@ -1207,7 +1207,7 @@ export function HypReadout({ C, hyp, winners, fails, allStudies }) {
     const fmts = hyp.fmts || hyp.cols.map(() => _pct);
     return (
       <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted, padding: "2px 0 5px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", padding: "2px 0 5px" }}>
           <span style={{ width: 78, flex: "none" }}>Band</span>
           <span style={{ width: 30, flex: "none", textAlign: "right" }}>n</span>
           <div style={{ flex: 1 }} />
@@ -1218,18 +1218,18 @@ export function HypReadout({ C, hyp, winners, fails, allStudies }) {
           const barVal = pb.meds[bs.barCol], pct = Math.round(Math.abs(barVal ?? 0) / bs.maxBar * 100), bandOpen = open === `${hyp.id}-b-${pb.band}`;
           return (
             <div key={pb.band}>
-              <div onClick={() => pb.n && setOpen(bandOpen ? null : `${hyp.id}-b-${pb.band}`)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0", cursor: pb.n ? "pointer" : "default" }}>
+              <div onClick={() => pb.n && setOpen(bandOpen ? null : `${hyp.id}-b-${pb.band}`)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.6875rem", padding: "3px 0", cursor: pb.n ? "pointer" : "default" }}>
                 <span style={{ width: 78, flex: "none", color: C.text, fontWeight: 700 }}>{pb.band}</span>
-                <span style={{ width: 30, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{pb.n}</span>
-                <div style={{ flex: 1, height: 8, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: (barVal ?? 0) < 0 ? "#e05555" : C.goldBright }} /></div>
-                {pb.meds.map((m, ci) => <span key={ci} style={{ width: 92, flex: "none", textAlign: "right", color: ci === bs.barCol ? C.white : C.muted, fontWeight: ci === bs.barCol ? 700 : 400, fontSize: "0.66rem" }}>{fmts[ci](m)}</span>)}
-                <span style={{ width: 14, flex: "none", color: C.muted, fontSize: "0.6rem" }}>{pb.n ? (bandOpen ? "▴" : "▾") : ""}</span>
+                <span style={{ width: 30, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.6875rem" }}>{pb.n}</span>
+                <div style={{ flex: 1, height: 8, background: "var(--w08)", borderRadius: 99, overflow: "hidden" }}><div style={{ width: `${pct}%`, height: "100%", background: (barVal ?? 0) < 0 ? "var(--redFg)" : "var(--w35)" }} /></div>
+                {pb.meds.map((m, ci) => <span key={ci} style={{ width: 92, flex: "none", textAlign: "right", color: ci === bs.barCol ? C.white : C.muted, fontWeight: ci === bs.barCol ? 700 : 400, fontSize: "0.6875rem" }}>{fmts[ci](m)}</span>)}
+                <span style={{ width: 14, flex: "none", color: C.muted, fontSize: "0.6875rem" }}>{pb.n ? (bandOpen ? "▴" : "▾") : ""}</span>
               </div>
               {bandOpen && expandList(pb.items, hyp.expand)}
             </div>
           );
         })}
-        <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 7, letterSpacing: ".01em" }}>
+        <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 7, letterSpacing: ".01em" }}>
           n={bs.set.length} measured across {hypCampCount(bs.set)} campaigns · {bs.excluded} excluded ({hyp.excludedLabel || "blank"}) — believe nothing &lt;30, promote at 50
         </div>
       </div>
@@ -1244,7 +1244,7 @@ export function HypReadout({ C, hyp, winners, fails, allStudies }) {
     const niceRM = { "10ma": "held 10MA", "20ma": "cut to 20MA", "50ma": "cut to 50MA", deeper: "cut deeper", none: "no touch" };
     return (
       <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted, padding: "2px 0 5px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", padding: "2px 0 5px" }}>
           <span style={{ width: 112, flex: "none" }}>Leg 1</span>
           <span style={{ width: 30, flex: "none", textAlign: "right" }}>n</span>
           {cols.map(([lab]) => <span key={lab} style={{ flex: 1, textAlign: "right" }}>{lab}</span>)}
@@ -1253,17 +1253,17 @@ export function HypReadout({ C, hyp, winners, fails, allStudies }) {
           const rowKey = `${hyp.id}-${row.pole}`, rowOpen = open === rowKey;
           return (
             <div key={rowKey}>
-              <div onClick={() => row.n && setOpen(rowOpen ? null : rowKey)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0", cursor: row.n ? "pointer" : "default" }}>
+              <div onClick={() => row.n && setOpen(rowOpen ? null : rowKey)} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.6875rem", padding: "3px 0", cursor: row.n ? "pointer" : "default" }}>
                 <span style={{ width: 112, flex: "none", color: C.text, fontWeight: 700 }}>{row.pole ? "leg1 ≥30%" : "leg1 <30% (control)"}</span>
-                <span style={{ width: 30, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.64rem" }}>{row.n}</span>
+                <span style={{ width: 30, flex: "none", textAlign: "right", color: C.muted, fontSize: "0.6875rem" }}>{row.n}</span>
                 {cols.map(([, key]) => { const c = row.counts[key], pct = row.n ? Math.round(c / row.n * 100) : 0;
-                  return <span key={key} style={{ flex: 1, textAlign: "right", color: (key === "held10" && row.pole) ? "#7ef0a0" : C.muted, fontWeight: (key === "held10" && row.pole) ? 700 : 400, fontSize: "0.66rem" }}>{c} · {pct}%</span>; })}
+                  return <span key={key} style={{ flex: 1, textAlign: "right", color: (key === "held10" && row.pole) ? "var(--greenFg)" : C.muted, fontWeight: (key === "held10" && row.pole) ? 700 : 400, fontSize: "0.6875rem" }}>{c} · {pct}%</span>; })}
               </div>
               {rowOpen && expandList(row.list, s => niceRM[s.checks?.retrace_ma] || s.checks?.retrace_ma || "—")}
             </div>
           );
         })}
-        <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 7, letterSpacing: ".01em" }}>
+        <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 7, letterSpacing: ".01em" }}>
           n={cr.n} 2nd-leg pullbacks with both pole + retrace depth recorded, across {hypCampCount(cr.eligible)} campaigns — "no touch" counts with 10MA-held · believe nothing &lt;30, promote at 50
         </div>
       </div>
@@ -1280,31 +1280,31 @@ export function HypReadout({ C, hyp, winners, fails, allStudies }) {
         <div>
           <div style={{ display: "grid", gap: 2 }}>
             {r.rows.map(row => (
-              <div key={row.val} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.7rem", padding: "3px 0" }}>
+              <div key={row.val} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.6875rem", padding: "3px 0" }}>
                 <span style={{ width: 92, flex: "none", color: C.text }}>{row.label}</span>
-                <span style={{ flex: 1, color: C.muted, fontSize: "0.66rem" }}>{row.wc}W · {row.fc}F</span>
-                <b style={{ width: 52, flex: "none", textAlign: "right", fontWeight: 800, color: r.enough ? liftColor(row.lift) : C.muted }}>{r.enough ? (row.lift === Infinity ? "∞" : row.lift.toFixed(2) + "×") : "·"}</b>
+                <span style={{ flex: 1, color: C.muted, fontSize: "0.6875rem" }}>{row.wc}W · {row.fc}F</span>
+                <b style={{ width: 52, flex: "none", textAlign: "right", fontWeight: 600, color: r.enough ? liftColor(row.lift) : C.muted }}>{r.enough ? (row.lift === Infinity ? "∞" : row.lift.toFixed(2) + "×") : "·"}</b>
               </div>
             ))}
           </div>
-          {!r.enough && <div style={{ fontSize: "0.66rem", color: "#e0a955", marginTop: 6 }}>collecting — n={measured} of 30</div>}
+          {!r.enough && <div style={{ fontSize: "0.6875rem", color: "var(--orangeFg)", marginTop: 6 }}>collecting — n={measured} of 30</div>}
         </div>
       ) : (
-        <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: "0.72rem", padding: "4px 0" }}>
+        <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: "0.75rem", padding: "4px 0" }}>
           <span style={{ flex: 1, color: C.text }}>Winners <b style={{ color: C.white }}>{r.wT}/{r.W}</b> have it · Losers <b style={{ color: C.white }}>{r.fT}/{r.F}</b> have it</span>
           {r.enough
-            ? <b style={{ flex: "none", fontWeight: 800, color: liftColor(r.lift) }}>{r.lift === Infinity ? "∞" : r.lift.toFixed(2)}× lift</b>
-            : <span style={{ flex: "none", color: "#e0a955", fontSize: "0.68rem" }}>collecting — n={measured} of 30</span>}
-          <span style={{ flex: "none", color: C.muted, fontSize: "0.7rem" }}>{open === hyp.id ? "▴" : "▾"}</span>
+            ? <b style={{ flex: "none", fontWeight: 600, color: liftColor(r.lift) }}>{r.lift === Infinity ? "∞" : r.lift.toFixed(2)}× lift</b>
+            : <span style={{ flex: "none", color: "var(--orangeFg)", fontSize: "0.6875rem" }}>collecting — n={measured} of 30</span>}
+          <span style={{ flex: "none", color: C.muted, fontSize: "0.6875rem" }}>{open === hyp.id ? "▴" : "▾"}</span>
         </div>
       )}
-      <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
+      <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 6, letterSpacing: ".01em" }}>
         {hyp.level === "campaign"
           ? `n=${cardCamps} campaigns (deduped to root leg) · ${r.W}W / ${r.F}F / ${r.E} blank — believe nothing <30, promote at 50`
           : `n=${r.W} winners / ${r.F} losers / ${r.E} excluded blank across ${cardCamps} campaigns — believe nothing <30, promote at 50`}
       </div>
       {isSub
-        ? <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", fontSize: "0.64rem", color: C.goldBright, marginTop: 6 }}>{open === hyp.id ? "▴ hide the studies counted" : "▾ show the studies counted"}</div>
+        ? <div onClick={() => setOpen(open === hyp.id ? null : hyp.id)} style={{ cursor: "pointer", fontSize: "0.6875rem", color: C.goldBright, marginTop: 6 }}>{open === hyp.id ? "▴ hide the studies counted" : "▾ show the studies counted"}</div>
         : null}
       {open === hyp.id && expandList(r.list, isSub ? (s => (SUBCATS[hyp.parent].options.find(([v]) => String(s.checks?.[SUBCATS[hyp.parent].store]) === v)?.[1]) || "—") : hyp.value)}
     </div>
@@ -1326,9 +1326,9 @@ export function StudyHypotheses({ C, rows }) {
   const allStudies = eraRows.filter(r => r.metrics?.study).map(mapPt);
   const totalCamps = hypCampCount(allStudies);
   const srcChip = (source) => { const gold = source === "DOCTRINE";
-    return { border: `1px solid ${gold ? C.goldBright : C.blue}`, color: gold ? C.goldBright : C.blue,
-      background: gold ? C.goldDim : C.blueDim, borderRadius: 99, fontSize: "0.52rem", fontWeight: 800, letterSpacing: ".08em", padding: "1px 7px", whiteSpace: "nowrap", flex: "none" }; };
-  const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" };
+    return { border: `1px solid ${gold ? "var(--w35)" : C.blue}`, color: gold ? C.white : C.blue,
+      background: gold ? "var(--w06)" : C.blueDim, borderRadius: 99, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: ".08em", padding: "1px 7px", whiteSpace: "nowrap", flex: "none" }; };
+  const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, var(--w06), transparent 55%)" };
   // Per-hypothesis verdict counts — the SAME shared entryVerdict + campaign dedup used everywhere.
   const rowsData = HYPOTHESES.map(h => {
     let supports = 0, challenges = 0, data = 0; const camps = new Set();
@@ -1341,20 +1341,20 @@ export function StudyHypotheses({ C, rows }) {
     <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", marginBottom: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
       <div style={sheen} />
       <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 12, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
-        <span style={{ flex: 1, fontSize: "0.62rem", fontWeight: 700, letterSpacing: ".13em", textTransform: "uppercase", color: C.muted }}>🧪 Hypotheses</span>
-        <span style={{ fontSize: "0.6rem", color: C.muted }}>{resolved.length} resolved · {winners.length}W / {fails.length}F · {totalCamps} campaign{totalCamps === 1 ? "" : "s"}</span>
+        <span style={{ flex: 1, fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em", color: C.white }}>🧪 Hypotheses</span>
+        <span style={{ fontSize: "0.6875rem", color: C.muted }}>{resolved.length} resolved · {winners.length}W / {fails.length}F · {totalCamps} campaign{totalCamps === 1 ? "" : "s"}</span>
         <div style={{ display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 99, overflow: "hidden" }}>
           {[["all", "All studies"], ["new", `From ${H_ERA_START}`]].map(([val, label]) => (
             <button key={val} type="button" onClick={() => setEra(val)}
-              style={{ background: era === val ? `linear-gradient(135deg,${C.goldBright},${C.goldMid})` : "transparent", color: era === val ? "#08080e" : C.muted, border: "none", fontFamily: "inherit", fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".04em", padding: "4px 11px", cursor: "pointer" }}>{label}</button>
+              style={{ background: era === val ? "var(--w10)" : "transparent", color: era === val ? "var(--white)" : C.muted, border: "none", fontFamily: "inherit", fontSize: "0.6875rem", fontWeight: 600, letterSpacing: ".04em", padding: "4px 11px", cursor: "pointer" }}>{label}</button>
           ))}
         </div>
       </div>
-      <div style={{ fontSize: "0.6rem", color: C.muted, marginBottom: 12 }}>Blank fields never vote — old studies only count where the data is real. Click any row for the deep dive.</div>
+      <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 12 }}>Blank fields never vote — old studies only count where the data is real. Click any row for the deep dive.</div>
       {/* ── Clean heat table — one row per hypothesis, colored by support-vs-against ratio (gated on sample
           size so a thin sample never reads green). Click a row → the full deep-dive modal. ── */}
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", background: "rgba(255,255,255,0.03)", fontSize: "0.52rem", fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", background: "var(--w03)", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)" }}>
           <span style={{ flex: 1, minWidth: 0 }}>Hypothesis</span>
           <span style={{ width: 34, flex: "none", textAlign: "center" }}>🟢</span>
           <span style={{ width: 34, flex: "none", textAlign: "center" }}>🔴</span>
@@ -1369,72 +1369,72 @@ export function StudyHypotheses({ C, rows }) {
           const ev = evidenceChip(t.supports, t.challenges, t.data, dist, C); // presentation over existing counts
           // Tri-state (four-state) headline mapped from the SAME counts + mute logic — replaces the status word.
           let headline, headCol;
-          if (dist) { headline = "distribution — open to view"; headCol = "#94a3b8"; }
+          if (dist) { headline = "distribution — open to view"; headCol = "var(--muted)"; }
           else if (insufficient) { headline = "INSUFFICIENT DATA"; headCol = C.muted; }
           else { const r = t.supports / (t.supports + t.challenges), pct = Math.round(r * 100);
-            if (r >= 0.55) { headline = `SUPPORTED (leaning) · ${pct}%`; headCol = "#7ef0a0"; }
-            else if (r > 0.45) { headline = `TESTED — UNDECIDED · ${pct}%`; headCol = "#e0a955"; }
-            else { headline = `CHALLENGED (leaning) · ${pct}%`; headCol = "#e05555"; } }
+            if (r >= 0.55) { headline = `SUPPORTED (leaning) · ${pct}%`; headCol = "var(--greenFg)"; }
+            else if (r > 0.45) { headline = `TESTED — UNDECIDED · ${pct}%`; headCol = "var(--orangeFg)"; }
+            else { headline = `CHALLENGED (leaning) · ${pct}%`; headCol = "var(--redFg)"; } }
           // Keep the existing HEAT background; only desaturate the genuinely-insufficient rows.
-          const rowBg = dist ? "rgba(148,163,184,0.06)" : (heat.weak ? "transparent" : heat.bg);
+          const rowBg = dist ? "var(--w06)" : (heat.weak ? "transparent" : heat.bg);
           return (
             <div key={t.h.id} onClick={() => setModalId(t.h.id)}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderTop: `1px solid ${C.border}`, background: rowBg, fontSize: "0.72rem", cursor: "pointer", transition: "filter .12s", opacity: insufficient ? 0.62 : 1 }}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 16px", borderTop: `1px solid ${C.border}`, background: rowBg, fontSize: "0.75rem", cursor: "pointer", transition: "filter .12s", opacity: insufficient ? 0.62 : 1 }}
               onMouseEnter={e => e.currentTarget.style.filter = "brightness(1.28)"} onMouseLeave={e => e.currentTarget.style.filter = "none"}>
               <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap", color: C.text, lineHeight: 1.35 }}>
-                <span style={{ fontSize: "0.5rem", fontWeight: 800, color: C.muted, letterSpacing: ".04em" }}>{t.h.id}</span>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.muted, letterSpacing: ".04em" }}>{t.h.id}</span>
                 <span style={{ fontWeight: 600, color: C.white }}>{t.h.title || t.h.claim}</span>
                 <span style={srcChip(t.h.source)}>{t.h.source}</span>
                 <span title={ev.reason} style={{ display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", cursor: "help" }}>
-                  <span style={{ letterSpacing: "1px", fontSize: "0.5rem", lineHeight: 1 }}>{[0, 1, 2, 3].map(k => <span key={k} style={{ color: k < ev.filled ? ev.color : "rgba(255,255,255,0.18)" }}>●</span>)}</span>
-                  <span style={{ fontSize: "0.48rem", fontWeight: 800, letterSpacing: ".06em", color: ev.color }}>{ev.label}</span>
+                  <span style={{ letterSpacing: "1px", fontSize: "0.6875rem", lineHeight: 1 }}>{[0, 1, 2, 3].map(k => <span key={k} style={{ color: k < ev.filled ? ev.color : "var(--faint)" }}>●</span>)}</span>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: ".06em", color: ev.color }}>{ev.label}</span>
                 </span>
               </span>
-              <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 800, color: dist ? C.muted : (t.supports ? "#7ef0a0" : "rgba(255,255,255,0.25)") }}>{dist ? "—" : t.supports}</span>
-              <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 800, color: dist ? C.muted : (t.challenges ? "#e05555" : "rgba(255,255,255,0.25)") }}>{dist ? "—" : t.challenges}</span>
-              <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 800, color: t.data ? C.muted : "rgba(255,255,255,0.25)" }}>{t.data}</span>
-              <span title={`${t.h.level === "campaign" ? "campaign-level — deduped to root leg · " : ""}${t.camps} campaign${t.camps === 1 ? "" : "s"} in the sample`} style={{ width: 28, flex: "none", textAlign: "center", color: C.muted, fontSize: "0.66rem", cursor: "help" }}>{dist ? t.data : t.n}</span>
-              <span style={{ width: 124, flex: "none", textAlign: "right", fontWeight: 700, color: headCol, fontSize: "0.62rem", lineHeight: 1.3 }}>{headline}</span>
+              <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 600, color: dist ? C.muted : (t.supports ? "var(--greenFg)" : "var(--faint)") }}>{dist ? "—" : t.supports}</span>
+              <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 600, color: dist ? C.muted : (t.challenges ? "var(--redFg)" : "var(--faint)") }}>{dist ? "—" : t.challenges}</span>
+              <span style={{ width: 34, flex: "none", textAlign: "center", fontWeight: 600, color: t.data ? C.muted : "var(--faint)" }}>{t.data}</span>
+              <span title={`${t.h.level === "campaign" ? "campaign-level — deduped to root leg · " : ""}${t.camps} campaign${t.camps === 1 ? "" : "s"} in the sample`} style={{ width: 28, flex: "none", textAlign: "center", color: C.muted, fontSize: "0.6875rem", cursor: "help" }}>{dist ? t.data : t.n}</span>
+              <span style={{ width: 124, flex: "none", textAlign: "right", fontWeight: 700, color: headCol, fontSize: "0.6875rem", lineHeight: 1.3 }}>{headline}</span>
             </div>
           );
         })}
       </div>
-      <div style={{ fontSize: "0.58rem", color: C.muted, marginTop: 8 }}><b style={{ color: C.goldBright }}>DOCTRINE</b> = an observed prior · <b style={{ color: C.blue }}>MINE</b> = Valen's own read · green = supports, red = challenges (colored only past 8 resolved votes), slate = descriptive distribution.</div>
+      <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 8 }}><b style={{ color: C.white }}>DOCTRINE</b> = an observed prior · <b style={{ color: C.blue }}>MINE</b> = Valen's own read · green = supports, red = challenges (colored only past 8 resolved votes), slate = descriptive distribution.</div>
 
       {/* ── Deep-dive modal (blurred backdrop; closes on backdrop click only; inside clicks don't). Portaled
           to body to escape the panel's backdrop-filter stacking context. z 1300 (above editor 1250, below
           the chart lightbox 1550). Esc is left to the lightbox — not bound here. ── */}
       {modalHyp && createPortal(
         <div onClick={e => { if (e.target === e.currentTarget) setModalId(null); }}
-          style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(4,4,8,0.6)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "5vh 4vw", display: "flex", justifyContent: "center", alignItems: "flex-start" }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: "min(840px,100%)", background: "linear-gradient(180deg, rgba(18,18,26,0.96), rgba(8,8,14,0.98))", border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "20px 22px", boxShadow: "0 40px 100px rgba(0,0,0,0.72)" }}>
+          style={{ position: "fixed", inset: 0, zIndex: 1300, background: "var(--scrim)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "5vh 4vw", display: "flex", justifyContent: "center", alignItems: "flex-start" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "min(840px,100%)", background: "var(--sheet)", border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "20px 22px", boxShadow: "var(--shadowLg)" }}>
             {(() => {
               const h = modalHyp, mine = h.source === "MINE";
               return (<>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 4 }}>
-                  <span style={{ fontSize: "0.56rem", fontWeight: 800, color: C.muted, letterSpacing: ".06em", marginTop: 6 }}>{h.id}</span>
-                  <span style={{ flex: 1, fontSize: "1.02rem", fontWeight: 800, color: C.white, lineHeight: 1.35 }}>{h.title || h.claim}</span>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.muted, letterSpacing: ".06em", marginTop: 6 }}>{h.id}</span>
+                  <span style={{ flex: 1, fontSize: "1rem", fontWeight: 600, color: C.white, lineHeight: 1.35 }}>{h.title || h.claim}</span>
                   <span style={srcChip(h.source)}>{h.source}</span>
-                  <button onClick={() => setModalId(null)} style={{ flex: "none", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, width: 30, height: 30, borderRadius: 9, fontSize: "1.05rem", cursor: "pointer", lineHeight: 1 }} aria-label="Close">×</button>
+                  <button onClick={() => setModalId(null)} style={{ flex: "none", background: "var(--w06)", border: `1px solid ${C.border}`, color: C.muted, width: 30, height: 30, borderRadius: 99, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }} aria-label="Close">×</button>
                 </div>
-                <div style={{ fontSize: "0.62rem", color: mine ? C.blue : C.goldBright, fontWeight: 700, marginBottom: 14 }}>{mine ? "MINE — Valen's own observed prior" : "DOCTRINE — an observed prior from the corpus"}</div>
+                <div style={{ fontSize: "0.6875rem", color: mine ? C.blue : C.white, fontWeight: 700, marginBottom: 14 }}>{mine ? "MINE — Valen's own observed prior" : "DOCTRINE — an observed prior from the corpus"}</div>
 
-                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 6 }}>The thesis</div>
-                <div style={{ fontSize: "0.82rem", color: C.text, lineHeight: 1.55, marginBottom: h.caption ? 6 : 16 }}>{h.prior}</div>
-                {h.caption && <div style={{ fontSize: "0.66rem", color: "rgba(255,255,255,0.5)", fontStyle: "italic", marginBottom: 16 }}>{h.caption}</div>}
+                <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 6 }}>The thesis</div>
+                <div style={{ fontSize: "0.875rem", color: C.text, lineHeight: 1.55, marginBottom: h.caption ? 6 : 16 }}>{h.prior}</div>
+                {h.caption && <div style={{ fontSize: "0.6875rem", color: "var(--faint)", fontStyle: "italic", marginBottom: 16 }}>{h.caption}</div>}
 
-                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 6 }}>How it's tracked</div>
+                <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 6 }}>How it's tracked</div>
                 <div style={{ display: "grid", gap: 3, marginBottom: 6 }}>
                   {h.points.map(([lab, meaning], i) => (
-                    <div key={i} style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.4 }}><b style={{ color: C.goldBright }}>{lab}</b> <span style={{ color: C.muted }}>— {meaning}</span></div>
+                    <div key={i} style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.4 }}><b style={{ color: C.white }}>{lab}</b> <span style={{ color: C.muted }}>— {meaning}</span></div>
                   ))}
                 </div>
-                {h.howTracked && <div style={{ fontSize: "0.68rem", color: C.muted, lineHeight: 1.5, marginBottom: 16 }}>{h.howTracked}</div>}
+                {h.howTracked && <div style={{ fontSize: "0.6875rem", color: C.muted, lineHeight: 1.5, marginBottom: 16 }}>{h.howTracked}</div>}
 
-                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 6 }}>Verdict logic</div>
-                <div style={{ fontSize: "0.72rem", color: C.text, lineHeight: 1.5, marginBottom: 16 }}>{h.verdictLine || "Supports when the predicted-good state coincides with a winner; challenges when it doesn't."}</div>
+                <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 6 }}>Verdict logic</div>
+                <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.5, marginBottom: 16 }}>{h.verdictLine || "Supports when the predicted-good state coincides with a winner; challenges when it doesn't."}</div>
 
-                <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 8 }}>The live readout</div>
+                <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 8 }}>The live readout</div>
                 <HypReadout C={C} hyp={h} winners={winners} fails={fails} allStudies={allStudies} />
               </>);
             })()}
@@ -1708,21 +1708,21 @@ export function ChecklistTally({ C, rows, project }) {
   // Evidence engine (Valen 2026-07-29): the Market-Bottom book graduates from static text to a descriptive
   // read of its own rows. Gate on the project key — every other project keeps the static rendering below.
   const mbEvidence = project === "Finding the Market's Bottom" ? mbHypothesisEvidence(rows) : null;
-  const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" };
+  const sheen = { position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, var(--w06), transparent 55%)" };
   // Tiny gold-outline id chip.
-  const idChip = { flex: "none", fontSize: "0.5rem", fontWeight: 800, letterSpacing: ".06em", color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 99, padding: "2px 7px", whiteSpace: "nowrap" };
+  const idChip = { flex: "none", fontSize: "0.6875rem", fontWeight: 600, letterSpacing: ".06em", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 99, padding: "2px 7px", whiteSpace: "nowrap" };
   // Verdict → {color, background}, following the pre-registered ladder (SUPPORTS green → AGAINST red).
   const VERDICT = {
-    "SUPPORTS": ["#7ef0a0", "rgba(126,240,160,0.12)"],
-    "LEANS FOR": ["#b6e8bf", "rgba(126,240,160,0.08)"],
-    "MIXED": [C.gold, "rgba(201,152,42,0.12)"],
-    "LEANS AGAINST": ["#e05555", "rgba(224,90,85,0.12)"],
-    "AGAINST": ["#e05555", "rgba(224,90,85,0.12)"],
-    "INSUFFICIENT": ["rgba(255,255,255,0.55)", "rgba(255,255,255,0.06)"],
-    "REFINED": [C.goldBright, "rgba(240,192,80,0.12)"],
+    "SUPPORTS": ["var(--greenFg)", "var(--greenDim)"],
+    "LEANS FOR": ["var(--greenFg)", "var(--greenDim)"],
+    "MIXED": ["var(--muted)", "var(--w08)"],
+    "LEANS AGAINST": ["var(--redFg)", "var(--redDim)"],
+    "AGAINST": ["var(--redFg)", "var(--redDim)"],
+    "INSUFFICIENT": ["var(--muted)", "var(--w06)"],
+    "REFINED": ["var(--white)", "var(--w10)"],
   };
-  const verdictChip = (v) => { const [col, bg] = VERDICT[v] || VERDICT["INSUFFICIENT"]; return { flex: "none", fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".04em", textTransform: "uppercase", color: col, background: bg, borderRadius: 99, padding: "2px 9px", whiteSpace: "nowrap" }; };
-  const segColor = (vote) => vote === "for" ? "#7ef0a0" : vote === "against" ? "rgba(224,90,85,0.85)" : "rgba(255,255,255,0.10)";
+  const verdictChip = (v) => { const [col, bg] = VERDICT[v] || VERDICT["INSUFFICIENT"]; return { flex: "none", fontSize: "0.6875rem", fontWeight: 600, color: col, background: bg, borderRadius: 99, padding: "2px 9px", whiteSpace: "nowrap" }; };
+  const segColor = (vote) => vote === "for" ? "var(--greenFg)" : vote === "against" ? "var(--redFg)" : "var(--w10)";
   // Row-2 evidence line — ONE line per hypothesis, chosen by shape (fraction chips · compare pills · unit bar · muted).
   const evidenceRow = (h, ev) => {
     // H3 — four year fraction chips
@@ -1730,9 +1730,9 @@ export function ChecklistTally({ C, rows, project }) {
       return (
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           {ev.fractions.map((f, i) => (
-            <span key={i} style={{ fontSize: "0.74rem" }}>
+            <span key={i} style={{ fontSize: "0.75rem" }}>
               <span style={{ color: C.muted }}>{f.year} </span>
-              <span style={{ color: "#fff", fontWeight: 700 }}>{f.k}/{f.n}</span>
+              <span style={{ color: "var(--white)", fontWeight: 700 }}>{f.k}/{f.n}</span>
             </span>
           ))}
         </div>
@@ -1742,10 +1742,10 @@ export function ChecklistTally({ C, rows, project }) {
     if ((h.id === "MB-H1" || h.id === "MB-H5") && ev.compare) {
       const pill = (s, gold) => (
         <span style={{ display: "inline-flex", alignItems: "baseline", gap: 5, paddingBottom: 3, borderBottom: `1px solid ${C.border}` }}>
-          <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: ".02em", color: gold ? C.gold : C.muted }}>
-            <span style={{ textTransform: "uppercase", letterSpacing: ".05em" }}>{s.label}</span> {s.value}
+          <span style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: ".02em", color: gold ? C.white : C.muted }}>
+            <span>{s.label}</span> {s.value}
           </span>
-          <span style={{ fontSize: "0.5rem", fontWeight: 700, color: C.muted }}>n={s.n}</span>
+          <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: C.muted }}>n={s.n}</span>
         </span>
       );
       return (
@@ -1760,7 +1760,7 @@ export function ChecklistTally({ C, rows, project }) {
     if (ev.verdict === "INSUFFICIENT") {
       const forC = ev.units ? ev.units.filter((u) => u.vote === "for").length : 0;
       const tot = ev.units ? ev.units.length : ev.n;
-      return <div style={{ fontSize: "0.72rem", color: C.muted }}>{forC}/{tot} ticked so far · below the n ≥ 5 read threshold</div>;
+      return <div style={{ fontSize: "0.75rem", color: C.muted }}>{forC}/{tot} ticked so far · below the n ≥ 5 read threshold</div>;
     }
     // unit bar (H2, H4, and H6 once sufficient)
     if (ev.units && ev.units.length) {
@@ -1772,9 +1772,9 @@ export function ChecklistTally({ C, rows, project }) {
             {ev.units.map((u, i) => (
               <div key={i} title={u.tip} style={{ flex: 1, height: 10, borderRadius: 3, background: segColor(u.vote) }} />
             ))}
-            <div style={{ position: "absolute", left: "70%", top: -1, bottom: -1, width: 1, background: "rgba(255,255,255,0.25)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", left: "70%", top: -1, bottom: -1, width: 1, background: "var(--w22)", pointerEvents: "none" }} />
           </div>
-          <span style={{ flex: "none", fontSize: "0.95rem", fontWeight: 800, color: C.goldBright }}>{forC}/{denom}</span>
+          <span style={{ flex: "none", fontSize: "1rem", fontWeight: 600, color: C.white }}>{forC}/{denom}</span>
         </div>
       );
     }
@@ -1784,8 +1784,8 @@ export function ChecklistTally({ C, rows, project }) {
     <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: "18px 20px", marginBottom: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
       <div style={sheen} />
       <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 12, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
-        <span style={{ flex: 1, fontSize: "0.62rem", fontWeight: 700, letterSpacing: ".13em", textTransform: "uppercase", color: C.muted }}>🧪 Working Hypotheses</span>
-        <span style={{ fontSize: "0.6rem", color: C.muted }}>what this research says so far</span>
+        <span style={{ flex: 1, fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em", color: C.white }}>🧪 Working Hypotheses</span>
+        <span style={{ fontSize: "0.6875rem", color: C.muted }}>what this research says so far</span>
       </div>
       {/* Evidence CARD system (Market-Bottom book) — one card per hypothesis: id + punchy claim + verdict chip,
           then a single evidence line (unit bar · compare pills · fraction chips), then a one-line headline.
@@ -1795,22 +1795,22 @@ export function ChecklistTally({ C, rows, project }) {
           {hyps.map((h, idx) => {
             const ev = mbEvidence[h.id];
             return (
-              <div key={h.id} style={{ padding: "12px 0", borderTop: idx > 0 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+              <div key={h.id} style={{ padding: "12px 0", borderTop: idx > 0 ? "1px solid var(--w06)" : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={idChip}>{h.id}</span>
-                  <span title={`${h.text}\nmeasure: ${h.measure}`} style={{ flex: 1, minWidth: 0, fontSize: "0.88rem", fontWeight: 700, color: "#fff", lineHeight: 1.35, cursor: "help" }}>{h.short || h.text}</span>
+                  <span title={`${h.text}\nmeasure: ${h.measure}`} style={{ flex: 1, minWidth: 0, fontSize: "0.875rem", fontWeight: 700, color: "var(--white)", lineHeight: 1.35, cursor: "help" }}>{h.short || h.text}</span>
                   {ev && <span style={verdictChip(ev.verdict)}>{ev.chip}</span>}
                 </div>
                 {ev && (
                   <>
                     <div style={{ marginTop: 10 }}>{evidenceRow(h, ev)}</div>
-                    <div title={ev.headline} style={{ marginTop: 7, fontSize: "0.7rem", color: C.muted, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.headline}</div>
+                    <div title={ev.headline} style={{ marginTop: 7, fontSize: "0.6875rem", color: C.muted, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.headline}</div>
                   </>
                 )}
               </div>
             );
           })}
-          <div style={{ fontSize: "0.58rem", color: C.muted, lineHeight: 1.5, marginTop: 12 }}>
+          <div style={{ fontSize: "0.6875rem", color: C.muted, lineHeight: 1.5, marginTop: 12 }}>
             n={rows.length} · descriptive only — pre-registered ladder, threshold notch at 70%.
           </div>
         </div>
@@ -1822,7 +1822,7 @@ export function ChecklistTally({ C, rows, project }) {
               <span style={idChip}>{h.id}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.45 }}>{h.short || h.text}</div>
-                <div style={{ fontSize: "0.6rem", color: C.muted, lineHeight: 1.4, marginTop: 3 }}>measure: {h.measure}</div>
+                <div style={{ fontSize: "0.6875rem", color: C.muted, lineHeight: 1.4, marginTop: 3 }}>measure: {h.measure}</div>
               </div>
             </div>
           ))}
@@ -1830,7 +1830,7 @@ export function ChecklistTally({ C, rows, project }) {
       )}
       {groups.map((g) => (
         <div key={g.setup} style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.goldBright, marginBottom: 8 }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 8 }}>
             Checklist tally — {g.n} stud{g.n === 1 ? "y" : "ies"}{groups.length > 1 ? ` · ${g.setup}` : ""}
           </div>
           <div style={{ display: "grid", gap: 6 }}>
@@ -1838,21 +1838,21 @@ export function ChecklistTally({ C, rows, project }) {
               const p = g.n ? Math.round((it.count / g.n) * 100) : 0;
               return (
                 <div key={it.key} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: "0.72rem", color: C.text, lineHeight: 1.35 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: "0.75rem", color: C.text, lineHeight: 1.35 }}>
                     {it.label}
-                    {it.bonus && <span style={{ fontSize: "0.5rem", fontWeight: 800, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 99, padding: "0 5px", marginLeft: 5, verticalAlign: "1px" }}>BONUS</span>}
+                    {it.bonus && <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 99, padding: "0 5px", marginLeft: 5, verticalAlign: "1px" }}>BONUS</span>}
                   </span>
-                  <div style={{ width: 96, flex: "none", height: 10, borderRadius: 3, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
-                    <div style={{ width: `${p}%`, height: "100%", background: `linear-gradient(90deg,${C.goldMid},${C.goldBright})`, borderRadius: 3 }} />
+                  <div style={{ width: 96, flex: "none", height: 10, borderRadius: 3, background: "var(--w08)", overflow: "hidden" }}>
+                    <div style={{ width: `${p}%`, height: "100%", background: "var(--w35)", borderRadius: 3 }} />
                   </div>
-                  <span style={{ width: 44, flex: "none", textAlign: "right", fontSize: "0.66rem", fontWeight: 700, color: C.goldBright }}>{it.count}/{g.n}</span>
+                  <span style={{ width: 44, flex: "none", textAlign: "right", fontSize: "0.6875rem", fontWeight: 700, color: C.white }}>{it.count}/{g.n}</span>
                 </div>
               );
             })}
           </div>
         </div>
       ))}
-      <div style={{ fontSize: "0.58rem", color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Counts are cards ticked so far — an untick may just mean "not studied yet", never "failed".</div>
+      <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Counts are cards ticked so far — an untick may just mean "not studied yet", never "failed".</div>
     </div>
   );
 }
@@ -1868,7 +1868,7 @@ const DV_CSS = `
 .sbdv-grid{ display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:22px; align-items:start; }
 .sbdv-rail{ position:sticky; top:0; max-height:100vh; overflow-y:auto; }
 .sbdv-scroll::-webkit-scrollbar,.sbdv-rail::-webkit-scrollbar{ width:8px }
-.sbdv-scroll::-webkit-scrollbar-thumb,.sbdv-rail::-webkit-scrollbar-thumb{ background:rgba(201,152,42,0.22); border-radius:99px }
+.sbdv-scroll::-webkit-scrollbar-thumb,.sbdv-rail::-webkit-scrollbar-thumb{ background:var(--goldDim); border-radius:99px }
 @media (max-width:760px){
   .sbdv-grid{ grid-template-columns:1fr; }
   .sbdv-rail{ position:static; max-height:none; overflow:visible; order:-1; }
@@ -1899,7 +1899,7 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
     return () => window.removeEventListener("keydown", onKey);
   }, [lbox]);
 
-  const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontFamily: font, fontSize: "0.78rem", padding: "7px 10px", outline: "none", width: "100%", colorScheme: "dark" };
+  const inputS = { background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontFamily: font, fontSize: "0.75rem", padding: "7px 10px", outline: "none", width: "100%", colorScheme: "dark" };
   // Same study-merge updater as the quick editor — the rail checklist EDITS, it doesn't just display
   // (Valen 2026-07-26: two viewing formats of ONE editor; detailed is the default).
   const setS = (patch) => setRow(r => ({ ...r, metrics: { ...r.metrics, study: { ...r.metrics.study, ...patch } } }));
@@ -1908,16 +1908,16 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
   const capText = cap > 0 ? (cap >= 1e9 ? "$" + (cap / 1e9).toFixed(1) + "B" : "$" + Math.round(cap / 1e6) + "M") : null;
   const adr = s.m?.adr20;
 
-  const btn = { fontFamily: font, borderRadius: 99, cursor: "pointer", fontWeight: 800 };
+  const btn = { fontFamily: font, borderRadius: 99, cursor: "pointer", fontWeight: 600 };
   return createPortal(
-    <div style={{ position: "fixed", inset: 0, zIndex: 1340, background: "#0a0a10", fontFamily: font, display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 1340, background: "var(--bg)", fontFamily: font, display: "flex", flexDirection: "column" }}>
       <style dangerouslySetInnerHTML={{ __html: DV_CSS }} />
       {/* Header — Back + Save top-right. Sits OUTSIDE the one scroll container (below), so the rail's sticky
           top:0 pins right under it and Save stays reachable without scrolling. No Esc-close on the overlay. */}
-      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "12px 20px", borderBottom: `1px solid ${C.border}`, background: "rgba(8,8,14,0.9)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
-        <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>📖 Detailed study{row.ticker ? ` · ${row.ticker}` : ""}</span>
-        <button disabled={busy} onClick={onSave} style={{ ...btn, marginLeft: "auto", background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, color: "#08080e", border: "none", fontSize: "0.76rem", padding: "8px 18px" }}>{busy ? "Saving…" : "💾 Save"}</button>
-        <button onClick={onClose} title="Drop to the quick editor — ticks, computed fields, the standard chart slots" style={{ ...btn, background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontWeight: 700, fontSize: "0.74rem", padding: "8px 14px" }}>✎ Ticks &amp; fields</button>
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "12px 20px", borderBottom: `1px solid ${C.border}`, background: "var(--glass)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
+        <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)" }}>📖 Detailed study{row.ticker ? ` · ${row.ticker}` : ""}</span>
+        <button disabled={busy} onClick={onSave} style={{ ...btn, marginLeft: "auto", background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, color: "var(--goldOn)", border: "none", fontSize: "0.75rem", padding: "8px 18px" }}>{busy ? "Saving…" : "💾 Save"}</button>
+        <button onClick={onClose} title="Drop to the quick editor — ticks, computed fields, the standard chart slots" style={{ ...btn, background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontWeight: 700, fontSize: "0.75rem", padding: "8px 14px" }}>✎ Ticks &amp; fields</button>
       </div>
 
       {/* THE one scroll container. Charts column scrolls; the rail (inside) is sticky top:0. */}
@@ -1932,9 +1932,9 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
               const secs = sectionizeCharts(row.charts || []);
               return secs.length > 1 ? (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                  <span style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, alignSelf: "center" }}>Case-study order:</span>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, alignSelf: "center" }}>Case-study order:</span>
                   {secs.map((sec, i) => (
-                    <span key={i} style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase", color: sec.num ? C.goldBright : C.muted, border: `1px solid ${sec.num ? C.borderGold : C.border}`, borderRadius: 99, padding: "3px 9px" }}>{sec.title}{sec.charts.length > 1 ? ` · ${sec.charts.length}` : ""}</span>
+                    <span key={i} style={{ fontSize: "0.6875rem", fontWeight: 600, color: sec.num ? C.white : C.muted, border: `1px solid ${C.border}`, borderRadius: 99, padding: "3px 9px" }}>{sec.title}{sec.charts.length > 1 ? ` · ${sec.charts.length}` : ""}</span>
                   ))}
                 </div>
               ) : null;
@@ -1952,13 +1952,13 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
                   onZoom={({ src, title }) => setLbox({ src, title })} />
               );
               return (<>
-                <div style={{ fontSize: "0.66rem", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", marginBottom: 14, background: "rgba(255,255,255,0.03)" }}>↩ Chart set shared from Leg 1 (root) — edit charts there.</div>
+                <div style={{ fontSize: "0.6875rem", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", marginBottom: 14, background: "var(--w03)" }}>↩ Chart set shared from Leg 1 (root) — edit charts there.</div>
                 <div style={{ display: "grid", gap: 14 }}>
                   {inheritedCharts.map((c, j) => (
-                    <figure key={j} style={{ margin: 0, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", background: "rgba(0,0,0,0.3)" }}>
-                      <figcaption style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.goldBright, padding: "8px 12px 0" }}>{c.label || DV_ROLE_LABEL[c.role] || `Chart ${j + 1}`}</figcaption>
+                    <figure key={j} style={{ margin: 0, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", background: "var(--w35)" }}>
+                      <figcaption style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", padding: "8px 12px 0" }}>{c.label || DV_ROLE_LABEL[c.role] || `Chart ${j + 1}`}</figcaption>
                       <img src={c.img} alt={c.label || ""} onClick={() => setLbox({ src: c.img, title: c.label || DV_ROLE_LABEL[c.role] || "Shared chart" })} style={{ display: "block", width: "100%", maxHeight: 460, objectFit: "contain", cursor: "zoom-in", marginTop: 8 }} />
-                      {c.caption && <div style={{ fontSize: "0.72rem", color: C.muted, padding: "0 12px 10px" }}>{c.caption}</div>}
+                      {c.caption && <div style={{ fontSize: "0.75rem", color: C.muted, padding: "0 12px 10px" }}>{c.caption}</div>}
                     </figure>
                   ))}
                 </div>
@@ -1969,28 +1969,28 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
           {/* ── sticky stats + hypothesis rail ── */}
           <div className="sbdv-rail">
             <div style={{ border: `1px solid ${C.borderGold}`, borderRadius: 14, padding: 16, background: C.glass }}>
-              <div style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white }}>{row.ticker || "—"}</div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 600, letterSpacing: "-0.02em", color: C.white }}>{row.ticker || "—"}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", margin: "6px 0 4px" }}>
-                <span style={{ fontSize: "0.74rem", fontWeight: 700, color: C.goldBright }}>{s.setup}{(s.setup === "Parabolic" || s.setup === "Momentum Breakdown") && s.direction === "short" ? " · Short" : ""}</span>
-                {row.entry_date && <span style={{ fontSize: "0.7rem", color: C.muted }}>· {row.entry_date}</span>}
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: C.white }}>{s.setup}{(s.setup === "Parabolic" || s.setup === "Momentum Breakdown") && s.direction === "short" ? " · Short" : ""}</span>
+                {row.entry_date && <span style={{ fontSize: "0.6875rem", color: C.muted }}>· {row.entry_date}</span>}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 6 }}>
-                {cls && <span style={{ fontSize: "0.68rem", fontWeight: 800, color: cls === "failure" ? "#e05555" : "#7ef0a0", border: `1px solid ${cls === "failure" ? "#e05555" : "#7ef0a0"}`, borderRadius: 99, padding: "2px 10px" }}>{cls === "failure" ? "▼ " : "▲ "}{MB_OUTCOME[cls] || cls}</span>}
-                {q.letter !== "—" && <span style={{ fontSize: "0.68rem", fontWeight: 800, color: q.letter === "A+" ? "#7ef0a0" : C.goldBright, border: `1px solid ${C.borderGold}`, borderRadius: 99, padding: "2px 10px" }} title={`Auto-grade from ${q.on}/${q.total} ticks`}>Grade {q.letter}</span>}
+                {cls && <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: cls === "failure" ? "var(--redFg)" : "var(--greenFg)", border: `1px solid ${cls === "failure" ? "var(--redFg)" : "var(--greenFg)"}`, borderRadius: 99, padding: "2px 10px" }}>{cls === "failure" ? "▼ " : "▲ "}{MB_OUTCOME[cls] || cls}</span>}
+                {q.letter !== "—" && <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: q.letter === "A+" ? "var(--greenFg)" : C.white, border: `1px solid ${C.border}`, borderRadius: 99, padding: "2px 10px" }} title={`Auto-grade from ${q.on}/${q.total} ticks`}>Grade {q.letter}</span>}
               </div>
             </div>
 
             {/* HERO — Captured % (Valen 2026-07-26), the single loudest stat; the rest demote to quiet rows. */}
             <div style={{ marginTop: 12, border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "14px 16px", background: C.glass }}>
-              <div style={{ fontSize: "1.7rem", fontWeight: 800, color: C.goldBright, lineHeight: 1.05 }}>{(row.run_pct == null || row.run_pct === "") ? "—" : `${+row.run_pct > 0 ? "+" : ""}${row.run_pct}%`}</div>
-              <div style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: C.muted, marginTop: 3 }}>Captured</div>
+              <div style={{ fontSize: "1.75rem", fontWeight: 600, color: C.white, lineHeight: 1.05 }}>{(row.run_pct == null || row.run_pct === "") ? "—" : `${+row.run_pct > 0 ? "+" : ""}${row.run_pct}%`}</div>
+              <div style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginTop: 3 }}>Captured</div>
             </div>
             <div style={{ display: "grid", gap: 2, marginTop: 10 }}>
               {[["Run-up %", row.run_up_pct], ["Days held", row.days_held], ["R multiple", row.r_mult], ["Theme", row.theme || s.m?.theme],
                 ["Cap / ADR", (capText || (adr != null && adr !== "")) ? `${capText || "—"}${adr != null && adr !== "" && !Number.isNaN(+adr) ? ` · ADR ${(+adr).toFixed(1)}%` : ""}` : null]].map(([k, v]) => (
                 <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: `1px solid ${C.border}` }}>
-                  <span style={{ fontSize: "0.72rem", color: C.muted, whiteSpace: "nowrap" }}>{k}</span>
-                  <span style={{ fontSize: "0.78rem", fontWeight: 700, color: (v == null || v === "") ? C.muted : "#e8e8ec", textAlign: "right", overflow: "hidden", textOverflow: "ellipsis" }}>{(v == null || v === "") ? "—" : String(v)}</span>
+                  <span style={{ fontSize: "0.75rem", color: C.muted, whiteSpace: "nowrap" }}>{k}</span>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color: (v == null || v === "") ? C.muted : "var(--text)", textAlign: "right", overflow: "hidden", textOverflow: "ellipsis" }}>{(v == null || v === "") ? "—" : String(v)}</span>
                 </div>
               ))}
             </div>
@@ -1998,10 +1998,10 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
             {/* Bucket-grouped EDITABLE checklist (Valen 2026-07-26): same three buckets + handlers as the
                 quick editor, ALL items shown in one column — tick/untick + subcat pills right here.
                 Unticked stay visible but muted. Two viewing formats, one editing surface. */}
-            <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "16px 0 4px" }}>👁 My ticks — {q.on}/{q.total}</div>
+            <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", margin: "16px 0 4px" }}>👁 My ticks — {q.on}/{q.total}</div>
             {def.buckets.map((b) => (
               <div key={b.title} style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: "0.55rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, margin: "8px 0 4px" }}>{b.title}</div>
+                <div style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, margin: "8px 0 4px" }}>{b.title}</div>
                 {b.items.map(([k, t, bonus]) => {
                   const on = !!s.checks?.[k];
                   const sub = SUBCATS[k];
@@ -2010,9 +2010,9 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
                       <label style={{ display: "flex", alignItems: "flex-start", gap: 7, cursor: "pointer", opacity: on ? 1 : 0.5 }}>
                         <input type="checkbox" style={{ accentColor: C.goldBright, marginTop: 2, flexShrink: 0 }} checked={on}
                           onChange={e => setS({ checks: { ...s.checks, [k]: e.target.checked, ...(sub && !e.target.checked ? { [sub.store]: "" } : {}) } })} />
-                        <span style={{ fontSize: "0.7rem", color: on ? C.text : C.muted, lineHeight: 1.45 }}>
+                        <span style={{ fontSize: "0.6875rem", color: on ? C.text : C.muted, lineHeight: 1.45 }}>
                           {t}
-                          {bonus ? <span style={{ fontSize: "0.5rem", fontWeight: 800, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 99, padding: "0 5px", marginLeft: 5, verticalAlign: "1px" }}>BONUS</span> : null}
+                          {bonus ? <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 99, padding: "0 5px", marginLeft: 5, verticalAlign: "1px" }}>BONUS</span> : null}
                         </span>
                       </label>
                       {sub && on && (
@@ -2020,7 +2020,7 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
                           {sub.options.map(([val, optLabel]) => { const onOpt = String(s.checks?.[sub.store] || "") === val;
                             return <button key={val} type="button"
                               onClick={() => setS({ checks: { ...s.checks, [sub.store]: onOpt ? "" : val } })}
-                              style={{ background: onOpt ? "rgba(212,175,55,0.18)" : "transparent", border: `1px solid ${onOpt ? C.goldBright : C.border}`, color: onOpt ? C.goldBright : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.6rem", fontWeight: 700, padding: "2px 8px", cursor: "pointer" }}>
+                              style={{ background: onOpt ? "var(--w10)" : "transparent", border: `1px solid ${onOpt ? "var(--w14)" : C.border}`, color: onOpt ? "var(--white)" : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.6875rem", fontWeight: 700, padding: "2px 8px", cursor: "pointer" }}>
                               {optLabel}</button>; })}
                         </div>
                       )}
@@ -2031,12 +2031,12 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
             ))}
 
             {row.thesis && (<>
-              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "16px 0 6px" }}>Thesis</div>
-              <div style={{ fontSize: "0.78rem", color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{row.thesis}</div>
+              <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", margin: "16px 0 6px" }}>Thesis</div>
+              <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{row.thesis}</div>
             </>)}
             {(row.lesson || s.refusal) && (<>
-              <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "16px 0 6px" }}>Lesson</div>
-              <div style={{ fontSize: "0.78rem", color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{[s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n")}</div>
+              <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", margin: "16px 0 6px" }}>Lesson</div>
+              <div style={{ fontSize: "0.75rem", color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{[s.refusal && `REFUSE-IF: ${s.refusal}`, row.lesson].filter(Boolean).join("\n")}</div>
             </>)}
 
             {/* 🧪 Hypothesis verdicts — the exact same component mounted in the quick editor (admin-gated surface). */}
@@ -2050,13 +2050,13 @@ export function StudyDetailView({ C, font, busy, row, setRow, onUpload, onSave, 
       {/* click-to-zoom lightbox (z 1550 — above this overlay, matching the editor's lightbox). Esc / backdrop / ✕ close. */}
       {lbox && (
         <div onClick={e => { if (e.target === e.currentTarget) setLbox(null); }}
-          style={{ position: "fixed", inset: 0, zIndex: 1550, background: "rgba(4,4,8,0.9)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          style={{ position: "fixed", inset: 0, zIndex: 1550, background: "var(--lightbox)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10, color: C.white }}>
-            <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>{lbox.title}</span>
-            <button onClick={() => setLbox(null)} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.muted, width: 40, height: 40, borderRadius: 10, fontSize: "1.1rem", cursor: "pointer" }} aria-label="Close">✕</button>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)" }}>{lbox.title}</span>
+            <button onClick={() => setLbox(null)} style={{ background: "var(--w08)", border: `1px solid ${C.border}`, color: C.muted, width: 40, height: 40, borderRadius: 99, fontSize: "1.125rem", cursor: "pointer" }} aria-label="Close">✕</button>
           </div>
           <div style={{ position: "relative" }}>
-            {capBadge && <span title={capBadge.tip} style={{ ...badgeStyle, top: 10, right: 10, fontSize: "0.72rem", padding: "5px 11px" }}>{capBadge.text}</span>}
+            {capBadge && <span title={capBadge.tip} style={{ ...badgeStyle, top: 10, right: 10, fontSize: "0.75rem", padding: "5px 11px" }}>{capBadge.text}</span>}
             <img src={lbox.src} alt={lbox.title} style={{ maxWidth: "96vw", maxHeight: "82vh", objectFit: "contain", borderRadius: 10, border: `1px solid ${C.borderGold}`, cursor: "zoom-out", display: "block" }} onClick={() => setLbox(null)} />
           </div>
         </div>
@@ -2116,9 +2116,9 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   const sharedRootHTF = (cid && sibs.length && sibs[0].id !== row.id)
     ? ((buildChartList(sibs[0], true).find(c => c && c.role === "context" && c.img) || {}).img || sibs[0].before_img || null)
     : null;
-  const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontFamily: font, fontSize: "0.78rem", padding: "7px 10px", outline: "none", width: "100%", colorScheme: "dark" };
-  const lbl = { fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.muted, marginBottom: 4, display: "block" };
-  const sect = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright, margin: "14px 0 8px" };
+  const inputS = { background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 8, color: C.white, fontFamily: font, fontSize: "0.75rem", padding: "7px 10px", outline: "none", width: "100%", colorScheme: "dark" };
+  const lbl = { fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginBottom: 4, display: "block" };
+  const sect = { fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", margin: "14px 0 8px" };
   const cls = outcomeClass(s);
   // ── click-to-zoom lightbox: click any chart to enlarge, ←/→ cycles Context→BEFORE→AFTER, Esc closes ──
   const [zoom, setZoom] = useState(null); // null | "before_img" | "after_img" | "outcome_img"
@@ -2187,7 +2187,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     if (adr != null && adr !== "" && !Number.isNaN(+adr)) parts.push("ADR " + (+adr).toFixed(1) + "%");
     return parts.length ? { text: parts.join(" · "), tip: `At the trigger date — cap from SEC shares outstanding (${s.m?.mcap_asof || "n/a"}), ADR20 from the 20 sessions before the trigger.` } : null;
   })();
-  const badgeStyle = { position: "absolute", top: 6, right: 6, zIndex: 2, background: "rgba(8,8,14,0.82)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.04em", padding: "3px 8px", borderRadius: 7, whiteSpace: "nowrap", cursor: "help", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" };
+  const badgeStyle = { position: "absolute", top: 6, right: 6, zIndex: 2, background: "rgba(8,8,14,0.82)", border: "1px solid var(--w22)", color: C.white, fontFamily: font, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: "0.04em", padding: "3px 8px", borderRadius: 7, whiteSpace: "nowrap", cursor: "help", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" };
   // ── Canonical slot ↔ list sync (Valen 2026-07-26). The quick-editor 3-slot row still fills the standard
   // slots, but the ONE list (row.charts) is the source of truth on save — so every quick-row upload/remove
   // is mirrored into the list by ROLE (and the slot field kept in sync for the zoom lightbox). This is how
@@ -2217,14 +2217,14 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
     return (
     <div style={{ flex: 1, minWidth: 240 }}>
       <label style={lbl}>{title}</label>
-      <div style={{ fontSize: "0.62rem", color: C.muted, marginBottom: 6 }}>{hint}</div>
-      <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; onUpload(f, slot, (updater) => { const url = updater({})[slot]; if (url) upsertCanonical(SLOT_ROLE[slot], url); }); }} style={{ fontSize: "0.7rem", color: C.muted }} />
+      <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 6 }}>{hint}</div>
+      <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; onUpload(f, slot, (updater) => { const url = updater({})[slot]; if (url) upsertCanonical(SLOT_ROLE[slot], url); }); }} style={{ fontSize: "0.6875rem", color: C.muted }} />
       {showSharedHTF && (
         <div style={{ position: "relative", marginTop: 8 }}>
           <span title="This weekly is shared from leg 1 — the HTF lives on the root leg. Upload here only to override it for this leg."
-            style={{ position: "absolute", top: 6, left: 6, zIndex: 2, background: "rgba(8,8,14,0.9)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.03em", padding: "3px 8px", borderRadius: 7, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>↩ shared HTF — from leg 1</span>
-          <img src={sharedRootHTF} alt="shared HTF" style={{ display: "block", width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px dashed ${C.borderGold}`, background: "rgba(0,0,0,0.3)", opacity: 0.55 }} />
-          <div style={{ fontSize: "0.62rem", color: C.muted, marginTop: 6, fontStyle: "italic" }}>upload here only to override for this leg</div>
+            style={{ position: "absolute", top: 6, left: 6, zIndex: 2, background: "rgba(8,8,14,0.9)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: "0.03em", padding: "3px 8px", borderRadius: 7, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>↩ shared HTF — from leg 1</span>
+          <img src={sharedRootHTF} alt="shared HTF" style={{ display: "block", width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px dashed ${C.borderGold}`, background: "var(--w35)", opacity: 0.55 }} />
+          <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 6, fontStyle: "italic" }}>upload here only to override for this leg</div>
         </div>
       )}
       {row[slot] && (
@@ -2234,10 +2234,10 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
               (the image stays in storage). */}
           <button type="button" onClick={(e) => { e.stopPropagation(); removeCanonical(SLOT_ROLE[slot]); }}
             title="Remove this chart — the slot reopens for the correct one (the image stays in storage)"
-            style={{ position: "absolute", top: 6, left: 6, zIndex: 2, background: "rgba(8,8,14,0.82)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.04em", padding: "3px 8px", borderRadius: 7, cursor: "pointer", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#e05555"; e.currentTarget.style.borderColor = "#e05555"; }}
+            style={{ position: "absolute", top: 6, left: 6, zIndex: 2, background: "rgba(8,8,14,0.82)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: "0.04em", padding: "3px 8px", borderRadius: 7, cursor: "pointer", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--redFg)"; e.currentTarget.style.borderColor = "var(--redFg)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = C.border; }}>✕ Remove</button>
-          <img src={row[slot]} alt="" onClick={() => setZoom(slot)} title="Click to zoom (← → cycles BEFORE/AFTER/TRIGGER · Esc closes)" style={{ display: "block", width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)", cursor: "zoom-in" }} />
+          <img src={row[slot]} alt="" onClick={() => setZoom(slot)} title="Click to zoom (← → cycles BEFORE/AFTER/TRIGGER · Esc closes)" style={{ display: "block", width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "var(--w35)", cursor: "zoom-in" }} />
         </div>
       )}
     </div>
@@ -2302,21 +2302,21 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
   };
   return (
     <div style={{ position: "relative", background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 16, padding: 18, marginBottom: 18, fontFamily: font, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)" }}>
-      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%)" }} />
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, background: "linear-gradient(135deg, var(--w06), transparent 55%)" }} />
       <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
-        <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>📚 Study {row.ticker ? `· ${row.ticker}` : "· new"}</span>
+        <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)" }}>📚 Study {row.ticker ? `· ${row.ticker}` : "· new"}</span>
         {/* Leg / campaign navigation (Valen 2026-07-24): ‹ › = prev/next leg in this campaign · ⌃ ⌄ = prev/next
             campaign (first leg). Arrow keys do the same when the lightbox is closed and you're not typing. Each
             hop runs the unsaved-changes guard first. Only shown once the study is saved (has a position). */}
         {navPos && (() => {
           const navBtn = (label, target, title) => (
             <button type="button" title={title} disabled={!target} onClick={() => go(target)}
-              style={{ background: "transparent", border: `1px solid ${target ? C.border : "transparent"}`, color: target ? C.muted : "rgba(255,255,255,0.18)", borderRadius: 7, fontFamily: font, fontSize: "0.8rem", fontWeight: 800, padding: "2px 9px", cursor: target ? "pointer" : "default", lineHeight: 1 }}>{label}</button>
+              style={{ background: "transparent", border: `1px solid ${target ? C.border : "transparent"}`, color: target ? C.muted : "var(--faint)", borderRadius: 7, fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "2px 9px", cursor: target ? "pointer" : "default", lineHeight: 1 }}>{label}</button>
           );
           return <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
             {navBtn("‹", legTarget(-1), "Previous leg (←)")}
             {navBtn("›", legTarget(1), "Next leg (→)")}
-            <span style={{ fontSize: "0.6rem", color: C.muted, whiteSpace: "nowrap", margin: "0 4px" }}>Leg {navPos.li + 1} of {navCampaigns[navPos.ci].legs.length} · campaign {navPos.ci + 1} of {navCampaigns.length}</span>
+            <span style={{ fontSize: "0.6875rem", color: C.muted, whiteSpace: "nowrap", margin: "0 4px" }}>Leg {navPos.li + 1} of {navCampaigns[navPos.ci].legs.length} · campaign {navPos.ci + 1} of {navCampaigns.length}</span>
             {navBtn("⌃", campTarget(-1), "Previous campaign (↑)")}
             {navBtn("⌄", campTarget(1), "Next campaign (↓)")}
           </span>;
@@ -2325,13 +2325,13 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
             in 📚 for the lift stats; when starred it ALSO appears as a Model Book card. Saved with the study. */}
         <button title={s.in_model_book ? "In the Model Book — click to remove" : "Add to the Model Book (the winners' textbook). Saved when you save the study."}
           onClick={() => setS({ in_model_book: !s.in_model_book })}
-          style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${s.in_model_book ? C.borderGold : C.border}`, color: s.in_model_book ? C.goldBright : C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.78rem", fontWeight: 700, padding: "4px 12px", cursor: "pointer" }}>
+          style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${s.in_model_book ? C.borderGold : C.border}`, color: s.in_model_book ? C.white : C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.75rem", fontWeight: 700, padding: "4px 12px", cursor: "pointer" }}>
           {s.in_model_book ? "★" : "☆"} Model Book</button>
         {/* 📖 Detailed view (Valen 2026-07-25): long-form scrollable study page — big charts + unlimited extras +
             a sticky stats/hypothesis rail. The quick editor stays the default; this opens over it, state intact. */}
         <button title="Open the long-form detailed view — big charts, extra charts, captions, sticky stats rail" onClick={() => setDetailOpen(true)}
-          style={{ background: "transparent", border: `1px solid ${C.borderGold}`, color: C.goldBright, borderRadius: 8, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "4px 12px", cursor: "pointer" }}>📖 Detailed view</button>
-        <button title="Collapse (asks first if you have unsaved changes)" onClick={guardedCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, fontFamily: font, fontSize: "0.72rem", padding: "4px 12px", cursor: "pointer" }}>✕ collapse</button>
+          style={{ background: "transparent", border: `1px solid ${C.borderGold}`, color: C.goldBright, borderRadius: 8, fontFamily: font, fontSize: "0.75rem", fontWeight: 700, padding: "4px 12px", cursor: "pointer" }}>📖 Detailed view</button>
+        <button title="Collapse (asks first if you have unsaved changes)" onClick={guardedCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.75rem", padding: "4px 12px", cursor: "pointer" }}>✕ collapse</button>
       </div>
 
       {/* LEG STRIP (Valen 2026-07-28): one chip per leg of this campaign (structural order from buildCampaigns —
@@ -2340,19 +2340,19 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           Only shown once the study is persisted (navPos). Solo studies show their single chip + the add button. */}
       {navPos && (() => {
         const legs = navCampaigns[navPos.ci].legs;
-        const chipBase = { display: "inline-flex", alignItems: "center", gap: 6, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "5px 12px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" };
+        const chipBase = { display: "inline-flex", alignItems: "center", gap: 6, fontFamily: font, fontSize: "0.6875rem", fontWeight: 700, padding: "5px 12px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" };
         return (
           <div style={{ margin: "0 0 6px" }}>
             <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, marginRight: 2 }}>Legs</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginRight: 2 }}>Legs</span>
               {legs.map((leg, i) => { const active = leg.id === row.id;
                 return <button key={leg.id} type="button" disabled={busy} title={active ? "This leg" : "Switch to this leg (saves the current leg first)"} onClick={() => stripSwitch(leg)}
-                  style={{ ...chipBase, border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? C.goldBright : C.muted, background: active ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.03)", cursor: busy ? "default" : "pointer" }}>
+                  style={{ ...chipBase, border: `1px solid ${active ? "var(--w14)" : C.border}`, color: active ? "var(--white)" : C.muted, background: active ? "var(--w10)" : "var(--w03)", cursor: busy ? "default" : "pointer" }}>
                   Leg {i + 1}{leg.entry_date ? ` · ${leg.entry_date}` : ""}</button>; })}
               {addingLeg ? (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                   <input type="date" autoFocus value={newLegDate} onChange={e => setNewLegDate(e.target.value)} style={{ ...inputS, width: 150, padding: "4px 8px" }} />
-                  <button type="button" disabled={busy || !newLegDate} onClick={confirmAddLeg} style={{ ...chipBase, border: `1px solid ${C.goldBright}`, color: "#08080e", background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, opacity: (busy || !newLegDate) ? 0.5 : 1, cursor: (busy || !newLegDate) ? "default" : "pointer" }}>✓ Add</button>
+                  <button type="button" disabled={busy || !newLegDate} onClick={confirmAddLeg} style={{ ...chipBase, border: `1px solid ${C.goldBright}`, color: "var(--goldOn)", background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, opacity: (busy || !newLegDate) ? 0.5 : 1, cursor: (busy || !newLegDate) ? "default" : "pointer" }}>✓ Add</button>
                   <button type="button" onClick={() => { setAddingLeg(false); setNewLegDate(""); }} style={{ ...chipBase, border: `1px solid ${C.border}`, color: C.muted, background: "transparent" }}>✕</button>
                 </span>
               ) : (
@@ -2360,7 +2360,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
                   style={{ ...chipBase, border: `1px dashed ${C.border}`, color: C.muted, background: "transparent" }}>＋ Add leg</button>
               )}
             </div>
-            <div style={{ fontSize: "0.62rem", color: C.muted, marginTop: 5 }}>One chart set serves every leg (charts live on the root leg). Computed metrics fill on the next study-fill run.</div>
+            <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 5 }}>One chart set serves every leg (charts live on the root leg). Computed metrics fill on the next study-fill run.</div>
           </div>
         );
       })()}
@@ -2389,8 +2389,8 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
         {(() => { const q = studyQuality(s); // quality = tick count, computed live — never typed
           return <div style={{ width: 130 }}><label style={lbl}>Quality (auto)</label>
             <div style={{ ...inputS, display: "flex", justifyContent: "space-between", alignItems: "center" }} title="Auto-graded from your ticks — tick-% → letter, same scale as the Setup Grader">
-              <b style={{ color: q.letter === "A+" ? "#7ef0a0" : q.letter === "A" ? C.goldBright : C.muted }}>{q.letter}</b>
-              <span style={{ fontSize: "0.62rem", color: C.muted }}>{q.on}/{q.total}</span>
+              <b style={{ color: q.letter === "A+" ? "var(--greenFg)" : q.letter === "A" ? C.white : C.muted }}>{q.letter}</b>
+              <span style={{ fontSize: "0.6875rem", color: C.muted }}>{q.on}/{q.total}</span>
             </div></div>; })()}
       </div>
 
@@ -2403,7 +2403,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
         {chartSlot("before_img", "HTF — weekly context", "The weekly — where this leg sits in the bigger trend (pole, prior base, era).")}
         {chartSlot("after_img", "LTF — daily setup", "The daily into the trigger — right edge = the trigger day. Grade the ticks off this chart.")}
       </div>
-      <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 6 }}>5-min entry detail + extra charts live in the <b style={{ color: C.goldBright }}>📖 Detailed view</b> — this quick row fills the two standard slots.</div>
+      <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 6 }}>5-min entry detail + extra charts live in the <b style={{ color: C.white }}>📖 Detailed view</b> — this quick row fills the two standard slots.</div>
 
       {/* 👁 HIS ticks — only chart-readable factors, grader-style 3 buckets per setup.
           Data-context items (theme/liquidity/ADR/rank) are NOT here: backtested charts
@@ -2411,24 +2411,24 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       <div style={sect}>👁 My ticks — what the chart shows ({s.setup})</div>
       {(() => { const scored = def.buckets.flatMap(b => b.items).filter(it => !it[2]);
         const on = scored.filter(([k]) => s.checks[k]).length;
-        return <div style={{ fontSize: "0.66rem", color: C.muted, marginBottom: 8 }}>{on}/{scored.length} ticked — eyeball reps; tick only what the chart actually shows (bonus ticks tracked, not graded)</div>; })()}
+        return <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 8 }}>{on}/{scored.length} ticked — eyeball reps; tick only what the chart actually shows (bonus ticks tracked, not graded)</div>; })()}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         {def.buckets.map((b, bi) => (
           <div key={bi} style={{ flex: 1, minWidth: 250, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px" }}>
-            <div style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>{b.title}</div>
+            <div style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginBottom: 6 }}>{b.title}</div>
             {b.items.map(([k, t, bonus]) => { const sub = SUBCATS[k];
               return <div key={k} style={{ padding: "3px 0" }}>
-                <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: "0.74rem", cursor: "pointer" }}>
+                <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: "0.75rem", cursor: "pointer" }}>
                   <input type="checkbox" style={{ accentColor: C.goldBright, marginTop: 3 }} checked={!!s.checks[k]}
                     onChange={e => setS({ checks: { ...s.checks, [k]: e.target.checked, ...(sub && !e.target.checked ? { [sub.store]: "" } : {}) } })} />
-                  <span>{t}{bonus && <span style={{ marginLeft: 6, border: `1px solid ${C.goldBright}`, color: C.goldBright, borderRadius: 99, fontSize: "0.56rem", fontWeight: 800, letterSpacing: ".06em", padding: "1px 7px", verticalAlign: "1px" }}>BONUS</span>}</span>
+                  <span>{t}{bonus && <span style={{ marginLeft: 6, border: "1px solid var(--w22)", color: "var(--faint)", borderRadius: 99, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: ".06em", padding: "1px 7px", verticalAlign: "1px" }}>BONUS</span>}</span>
                 </label>
                 {sub && s.checks[k] && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "5px 0 2px 24px" }}>
                     {sub.options.map(([val, optLabel]) => { const onOpt = String(s.checks[sub.store] || "") === val;
                       return <button key={val} type="button"
                         onClick={() => setS({ checks: { ...s.checks, [sub.store]: onOpt ? "" : val } })}
-                        style={{ background: onOpt ? "rgba(212,175,55,0.18)" : "transparent", border: `1px solid ${onOpt ? C.goldBright : C.border}`, color: onOpt ? C.goldBright : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.64rem", fontWeight: 700, padding: "3px 10px", cursor: "pointer" }}>
+                        style={{ background: onOpt ? "var(--w10)" : "transparent", border: `1px solid ${onOpt ? "var(--w14)" : C.border}`, color: onOpt ? "var(--white)" : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.6875rem", fontWeight: 700, padding: "3px 10px", cursor: "pointer" }}>
                         {optLabel}</button>; })}
                   </div>
                 )}
@@ -2441,14 +2441,14 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           DEFAULT view; the key strip + full computed grids fold behind "Show all computed". Admin-side
           (📚 Studies is admin-only). The cap/ADR badge stays on the chart. */}
       <HypothesisRead C={C} study={s} ticker={row.ticker} date={row.entry_date} />
-      {cls && <div style={{ marginTop: 6, marginBottom: 6, fontSize: "0.74rem" }}>Auto-class: <b style={{ color: cls === "failure" ? "#e05555" : "#7ef0a0" }}>{cls === "failure" ? "▼ " : "▲ "}{cls}</b></div>}
+      {cls && <div style={{ marginTop: 6, marginBottom: 6, fontSize: "0.75rem" }}>Auto-class: <b style={{ color: cls === "failure" ? "var(--redFg)" : "var(--greenFg)" }}>{cls === "failure" ? "▼ " : "▲ "}{cls}</b></div>}
 
       {/* Campaign — whole trend (Valen 2026-07-24): H10 leg-lifespan + the shared AFTER-outcome chart are
           recorded ONCE, on the ROOT leg (counted off the shared AFTER chart). Non-root legs show them
           read-only with an "edit on leg 1" hint. Solo studies (no campaign_id) = root ⇒ editable inline
           as before. legs_ma10/20 live in checks but are NOT setup ticks — they never grade. */}
       <div style={sect}>{cid ? `Campaign — whole trend · leg ${legIdx} of ${sibs.length || 1}` : "Whole-trend outcome & lifespan"}</div>
-      {cid && <div style={{ fontSize: "0.62rem", color: C.muted, marginBottom: 8 }}>Campaign <b style={{ color: C.goldBright }}>{cid}</b>{multiLeg ? ` · ${sibs[0]?.entry_date || "?"} → ${sibs[sibs.length - 1]?.entry_date || "?"}` : ""}{!isRoot ? " · shared fields edit on leg 1" : ""}</div>}
+      {cid && <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 8 }}>Campaign <b style={{ color: C.white }}>{cid}</b>{multiLeg ? ` · ${sibs[0]?.entry_date || "?"} → ${sibs[sibs.length - 1]?.entry_date || "?"}` : ""}{!isRoot ? " · shared fields edit on leg 1" : ""}</div>}
       <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div style={{ minWidth: 230 }}>
           <label style={lbl}>Legs before first close below the MA (whole trend, off the AFTER chart)</label>
@@ -2462,35 +2462,35 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
                 const cur = String(s.checks[store] || ""), isPreset = presets.includes(cur), customOn = !!cur && !isPreset;
                 return (
                   <div key={store} style={{ minWidth: 200 }}>
-                    <div style={{ fontSize: "0.58rem", color: C.muted, marginBottom: 3 }}>{label}</div>
+                    <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 3 }}>{label}</div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                       {presets.map(opt => { const on = cur === opt;
                         return <button key={opt} type="button" onClick={() => setS({ checks: { ...s.checks, [store]: on ? "" : opt } })}
-                          style={{ background: on ? "rgba(212,175,55,0.18)" : "transparent", border: `1px solid ${on ? C.goldBright : C.border}`, color: on ? C.goldBright : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "5px 11px", cursor: "pointer", minWidth: 30 }}>
+                          style={{ background: on ? "var(--w10)" : "transparent", border: `1px solid ${on ? "var(--w14)" : C.border}`, color: on ? "var(--white)" : C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.6875rem", fontWeight: 700, padding: "5px 11px", cursor: "pointer", minWidth: 30 }}>
                           {opt}</button>; })}
                       <input type="text" inputMode="numeric" placeholder="or N" value={isPreset ? "" : cur}
                         onChange={e => { const raw = e.target.value.replace(/[^\d]/g, ""); const n = parseInt(raw, 10);
                           setS({ checks: { ...s.checks, [store]: raw && n >= 1 ? String(n) : "" } }); }}
                         title="Type any larger leg count (e.g. 12) — selecting a preset chip clears this, and vice-versa"
-                        style={{ width: 58, background: customOn ? "rgba(212,175,55,0.18)" : "rgba(255,255,255,0.05)", border: `1px solid ${customOn ? C.goldBright : C.border}`, color: customOn ? C.goldBright : C.white, borderRadius: 99, fontFamily: font, fontSize: "0.7rem", fontWeight: 700, padding: "5px 10px", outline: "none", colorScheme: "dark" }} />
-                      {customOn && <span style={{ fontSize: "0.62rem", color: C.goldBright, fontWeight: 700 }}>= {cur} legs</span>}
+                        style={{ width: 58, background: customOn ? "var(--w10)" : "var(--w06)", border: `1px solid ${customOn ? "var(--w14)" : C.border}`, color: customOn ? "var(--white)" : C.white, borderRadius: 99, fontFamily: font, fontSize: "0.6875rem", fontWeight: 700, padding: "5px 10px", outline: "none", colorScheme: "dark" }} />
+                      {customOn && <span style={{ fontSize: "0.6875rem", color: C.white, fontWeight: 700 }}>= {cur} legs</span>}
                     </div>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div style={{ fontSize: "0.74rem", color: C.text, marginTop: 6 }}>10MA: <b style={{ color: C.goldBright }}>{rootStudy.checks?.legs_ma10 || "—"}</b> legs · 20MA: <b style={{ color: C.goldBright }}>{rootStudy.checks?.legs_ma20 || "—"}</b> legs <span style={{ color: C.muted, fontSize: "0.62rem" }}>· edit on leg 1</span></div>
+            <div style={{ fontSize: "0.75rem", color: C.text, marginTop: 6 }}>10MA: <b style={{ color: C.white }}>{rootStudy.checks?.legs_ma10 || "—"}</b> legs · 20MA: <b style={{ color: C.white }}>{rootStudy.checks?.legs_ma20 || "—"}</b> legs <span style={{ color: C.muted, fontSize: "0.6875rem" }}>· edit on leg 1</span></div>
           )}
         </div>
         <div style={{ flex: "1 1 240px", minWidth: 240 }}>
           {isRoot ? chartSlot("outcome_img", "AFTER — the shared outcome", "Same chart weeks later — the whole trend's outcome. Shared across every leg of the campaign.")
             : (<div>
                 <label style={lbl}>AFTER — the shared outcome</label>
-                <div style={{ fontSize: "0.62rem", color: C.muted, marginBottom: 6 }}>Shared across the campaign — edit on leg 1</div>
+                <div style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: 6 }}>Shared across the campaign — edit on leg 1</div>
                 {rootStudy.outcome_img
-                  ? <img src={rootStudy.outcome_img} alt="shared after" style={{ display: "block", width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(0,0,0,0.3)" }} />
-                  : <div style={{ fontSize: "0.7rem", color: C.muted, border: `1px dashed ${C.border}`, borderRadius: 8, padding: "18px 12px", textAlign: "center" }}>No AFTER chart yet — add it on leg 1</div>}
+                  ? <img src={rootStudy.outcome_img} alt="shared after" style={{ display: "block", width: "100%", maxHeight: 220, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.border}`, background: "var(--w35)" }} />
+                  : <div style={{ fontSize: "0.6875rem", color: C.muted, border: `1px dashed ${C.border}`, borderRadius: 8, padding: "18px 12px", textAlign: "center" }}>No AFTER chart yet — add it on leg 1</div>}
               </div>)}
         </div>
       </div>
@@ -2499,7 +2499,7 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           the hypothesis read above is the default summary (Valen 2026-07-24). */}
       <div style={{ ...sect, display: "flex", alignItems: "center", gap: 10 }}>
         <span>📊 Computed metrics</span>
-        <button type="button" onClick={() => setShowAll(v => !v)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".06em", padding: "3px 11px", cursor: "pointer", textTransform: "uppercase" }}>
+        <button type="button" onClick={() => setShowAll(v => !v)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 99, fontFamily: font, fontSize: "0.6875rem", fontWeight: 600, padding: "3px 11px", cursor: "pointer", }}>
           {showAll ? "Hide computed ▴" : "Show all computed ▾"}</button>
       </div>
       {showAll && (<>
@@ -2512,14 +2512,14 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           const cap = +(s.m?.mcap_t || 0);
           return <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
             {strip.map(([lab, v]) => (
-              <div key={lab} style={{ flex: "1 1 130px", minWidth: 120, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 10px", background: "rgba(0,0,0,0.25)" }}>
-                <div style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".07em", textTransform: "uppercase", color: C.muted, marginBottom: 3 }}>{lab}</div>
-                <div style={{ fontSize: "0.8rem", fontWeight: 700, color: (v == null || v === "") ? C.muted : C.white }}>{(v == null || v === "") ? "—" : String(v)}</div>
+              <div key={lab} style={{ flex: "1 1 130px", minWidth: 120, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 10px", background: "var(--w22)" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginBottom: 3 }}>{lab}</div>
+                <div style={{ fontSize: "0.75rem", fontWeight: 700, color: (v == null || v === "") ? C.muted : C.white }}>{(v == null || v === "") ? "—" : String(v)}</div>
               </div>
             ))}
-            <div style={{ flex: "1 1 130px", minWidth: 120, border: `1px solid ${C.borderGold}`, borderRadius: 8, padding: "7px 10px", background: C.goldDim }}>
-              <div style={{ fontSize: "0.54rem", fontWeight: 800, letterSpacing: ".07em", textTransform: "uppercase", color: C.muted, marginBottom: 3 }}>Cap / ADR</div>
-              <div style={{ fontSize: "0.8rem", fontWeight: 700, color: C.goldBright }}>{cap > 0 ? (cap >= 1e9 ? "$" + (cap / 1e9).toFixed(1) + "B" : "$" + Math.round(cap / 1e6) + "M") : "—"}{s.m?.adr20 != null && s.m?.adr20 !== "" ? ` · ADR ${(+s.m.adr20).toFixed(1)}%` : ""}</div>
+            <div style={{ flex: "1 1 130px", minWidth: 120, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 10px", background: "var(--w04)" }}>
+              <div style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginBottom: 3 }}>Cap / ADR</div>
+              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: C.white }}>{cap > 0 ? (cap >= 1e9 ? "$" + (cap / 1e9).toFixed(1) + "B" : "$" + Math.round(cap / 1e6) + "M") : "—"}{s.m?.adr20 != null && s.m?.adr20 !== "" ? ` · ADR ${(+s.m.adr20).toFixed(1)}%` : ""}</div>
             </div>
           </div>;
         })()}
@@ -2556,8 +2556,8 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-        <button disabled={busy} onClick={doSave} style={{ background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 22px", borderRadius: 99, cursor: "pointer" }}>{busy ? "Saving…" : "Save study"}</button>
-        <button onClick={guardedCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
+        <button disabled={busy} onClick={doSave} style={{ background: `linear-gradient(135deg,${C.goldBright},${C.goldMid})`, color: "var(--goldOn)", border: "none", fontFamily: font, fontWeight: 600, fontSize: "0.75rem", padding: "10px 22px", borderRadius: 99, cursor: "pointer" }}>{busy ? "Saving…" : "Save study"}</button>
+        <button onClick={guardedCancel} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.75rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
       </div>
 
       {/* click-to-zoom lightbox — ← → toggles HTF↔LTF, click backdrop or Esc to close. z 1550: the
@@ -2565,15 +2565,15 @@ export function StudyEditor({ C, font, busy, initial, onSave, onCancel, onUpload
           paint above the editor — matches the app-wide "lightboxes above modals" convention (1500+). */}
       {zoom && row[zoom] && (
         <div onClick={e => { if (e.target === e.currentTarget) setZoom(null); }}
-          style={{ position: "fixed", inset: 0, zIndex: 1550, background: "rgba(4,4,8,0.9)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          style={{ position: "fixed", inset: 0, zIndex: 1550, background: "var(--lightbox)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10, color: C.white, fontFamily: font }}>
-            {zoomSlots.length > 1 && <button onClick={() => setZoom(zoomSlots[(zoomSlots.indexOf(zoom) - 1 + zoomSlots.length) % zoomSlots.length])} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 10, fontSize: "1.3rem", cursor: "pointer" }} aria-label="Previous">‹</button>}
-            <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: C.goldBright }}>{SLOT_TITLES[zoom] || zoom}{zoomSlots.length > 1 ? " · ← → to cycle" : ""}</span>
-            {zoomSlots.length > 1 && <button onClick={() => setZoom(zoomSlots[(zoomSlots.indexOf(zoom) + 1) % zoomSlots.length])} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 10, fontSize: "1.3rem", cursor: "pointer" }} aria-label="Next">›</button>}
-            <button onClick={() => setZoom(null)} style={{ background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.muted, width: 40, height: 40, borderRadius: 10, fontSize: "1.1rem", cursor: "pointer", marginLeft: 8 }} aria-label="Close">✕</button>
+            {zoomSlots.length > 1 && <button onClick={() => setZoom(zoomSlots[(zoomSlots.indexOf(zoom) - 1 + zoomSlots.length) % zoomSlots.length])} style={{ background: "var(--w08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 99, fontSize: "1.25rem", cursor: "pointer" }} aria-label="Previous">‹</button>}
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)" }}>{SLOT_TITLES[zoom] || zoom}{zoomSlots.length > 1 ? " · ← → to cycle" : ""}</span>
+            {zoomSlots.length > 1 && <button onClick={() => setZoom(zoomSlots[(zoomSlots.indexOf(zoom) + 1) % zoomSlots.length])} style={{ background: "var(--w08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 99, fontSize: "1.25rem", cursor: "pointer" }} aria-label="Next">›</button>}
+            <button onClick={() => setZoom(null)} style={{ background: "var(--w08)", border: `1px solid ${C.border}`, color: C.muted, width: 40, height: 40, borderRadius: 99, fontSize: "1.125rem", cursor: "pointer", marginLeft: 8 }} aria-label="Close">✕</button>
           </div>
           <div style={{ position: "relative" }}>
-            {capBadge && <span title={capBadge.tip} style={{ ...badgeStyle, top: 10, right: 10, fontSize: "0.72rem", padding: "5px 11px" }}>{capBadge.text}</span>}
+            {capBadge && <span title={capBadge.tip} style={{ ...badgeStyle, top: 10, right: 10, fontSize: "0.75rem", padding: "5px 11px" }}>{capBadge.text}</span>}
             <img src={row[zoom]} alt={zoom} style={{ maxWidth: "96vw", maxHeight: "82vh", objectFit: "contain", borderRadius: 10, border: `1px solid ${C.borderGold}`, cursor: "zoom-out", display: "block" }} onClick={() => setZoom(null)} />
           </div>
         </div>

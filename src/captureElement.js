@@ -1,13 +1,16 @@
 // Shared screenshot helper — lazy html2canvas, copy-to-clipboard or download PNG.
 // Used by the calendar camera (Calendar.jsx) and the equity-curve camera (App.jsx).
 // Returns "copied" | "downloaded" so callers can flash a status, or null on failure.
+// html2canvas cannot resolve var(...) custom properties, so the capture background is read off
+// the live --bg value at call time (not a module-load constant) — correct on both themes.
+const cssVar = (n, fb) => { try { const v = getComputedStyle(document.documentElement).getPropertyValue(n); return (v || "").trim() || fb; } catch { return fb; } };
 export async function captureElement(el, mode, filename = "VIV") {
   if (!el) return null;
   const hidden = el.querySelectorAll(".viv-hide-screenshot"); // e.g. the camera control itself
   hidden.forEach(e => { e.dataset.prevDisplay = e.style.display; e.style.display = "none"; });
   try {
     const { default: html2canvas } = await import("html2canvas"); // lazy — keeps html2canvas out of the initial bundle
-    const canvas = await html2canvas(el, { backgroundColor: "#08080e", scale: 2, useCORS: true, logging: false });
+    const canvas = await html2canvas(el, { backgroundColor: cssVar("--bg", "#08080e"), scale: 2, useCORS: true, logging: false });
     const fname = `${filename}-${new Date().toISOString().slice(0, 10)}.png`;
     if (mode === "copy" && navigator.clipboard && window.ClipboardItem && navigator.clipboard.write) {
       const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));

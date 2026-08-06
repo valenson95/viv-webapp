@@ -27,10 +27,10 @@ const cardStars = (r) => isStudyRow(r) ? (STUDY_LETTER_N[studyQuality(r.metrics.
 // Outcome-class chip (Valen 2026-07-26) — presentation of the PRE-REGISTERED outcomeClass(): emoji + word,
 // colored by tier (green tiers / red / muted), never color alone. Keys mirror StudyBook.outcomeClass.
 const OC_CHIP = {
-  monster:       { emoji: "🦖", label: "Monster",      color: "#7ef0a0" },
-  "big winner":  { emoji: "🏆", label: "Big winner",   color: "#6fd090" },
-  "works small": { emoji: "🌱", label: "Works small",  color: "#b7d69a" },
-  failure:       { emoji: "💀", label: "Failure",      color: "#e05555" },
+  monster:       { emoji: "🦖", label: "Monster",      color: "var(--greenFg)" },
+  "big winner":  { emoji: "🏆", label: "Big winner",   color: "var(--green)" },
+  "works small": { emoji: "🌱", label: "Works small",  color: "var(--muted)" },
+  failure:       { emoji: "💀", label: "Failure",      color: "var(--red)" },
 };
 // tolerant date → ISO (journal trades carry ISO or M/D/YY)
 const mbISO = (d) => {
@@ -313,13 +313,13 @@ export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = fa
   const seedHyps = () => setHyps((PROJECT_HYPOTHESES["Finding the Market's Bottom"] || []).map((h) => h.short || h.text));
   const tickAll = (on) => setSel(on ? new Set(entries.map((e) => String(e.id))) : new Set());
   const years = [...new Set(entries.filter((e) => sel.has(String(e.id))).map((e) => String(e.date || "").slice(0, 4)).filter((y) => /^\d{4}$/.test(y)))].sort();
-  const inp = { width: "100%", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.86rem", padding: "10px 12px", outline: "none", boxSizing: "border-box" };
-  const lab = { fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.muted, margin: "16px 0 6px" };
+  const inp = { width: "100%", background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.875rem", padding: "10px 12px", outline: "none", boxSizing: "border-box" };
+  const lab = { fontSize: "0.75rem", fontWeight: 500, color: C.muted, margin: "16px 0 6px" };
   return createPortal(
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1500, background: "rgba(5,5,10,0.72)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 100%)", maxHeight: "88vh", overflowY: "auto", background: "#0d0d14", border: `1px solid ${C.border}`, borderRadius: 18, padding: "26px 28px", fontFamily: font }}>
-        <div style={{ fontSize: "1.15rem", fontWeight: 800, color: C.white, letterSpacing: "-0.02em" }}>{dive ? "Your Deep Dive" : "Make it a Deep Dive"}</div>
-        <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 8, lineHeight: 1.6 }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1500, background: "var(--scrim)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 100%)", maxHeight: "88vh", overflowY: "auto", background: "var(--sheet)", border: `1px solid ${C.border}`, borderRadius: 18, padding: "26px 28px", fontFamily: font }}>
+        <div style={{ fontSize: "1.125rem", fontWeight: 600, color: C.white, letterSpacing: "-0.02em" }}>{dive ? "Your Deep Dive" : "Make it a Deep Dive"}</div>
+        <div style={{ fontSize: "0.75rem", color: C.muted, marginTop: 8, lineHeight: 1.6 }}>
           Your studies, typeset as a proper research report — the same template the VIV dives use.
           Keep it to yourself as a draft, or flip it live so other members can read it.
         </div>
@@ -341,11 +341,11 @@ export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = fa
           <div style={{ maxHeight: 220, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 12, padding: "6px 4px" }}>
             {entries.map((e) => { const on = sel.has(String(e.id)); return (
               <div key={e.id} onClick={() => setSel((prev) => { const nx = new Set(prev); on ? nx.delete(String(e.id)) : nx.add(String(e.id)); return nx; })}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer", background: on ? "rgba(201,152,42,0.07)" : "none" }}>
-                <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", border: `1px solid ${on ? C.gold : C.border}`, background: on ? C.gold : "none", color: "#08080e", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{on ? "✓" : ""}</span>
-                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: C.white, width: 62, flex: "none" }}>{e.ticker}</span>
-                <span style={{ fontSize: "0.74rem", color: C.muted, width: 88, flex: "none" }}>{e.date || "—"}</span>
-                <span style={{ fontSize: "0.74rem", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.setup || ""}</span>
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer", background: on ? "var(--goldDim)" : "none" }}>
+                <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", border: `1px solid ${on ? C.gold : C.border}`, background: on ? C.gold : "none", color: "var(--goldOn)", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{on ? "✓" : ""}</span>
+                <span style={{ fontSize: "0.875rem", fontWeight: 700, color: C.white, width: 62, flex: "none" }}>{e.ticker}</span>
+                <span style={{ fontSize: "0.75rem", color: C.muted, width: 88, flex: "none" }}>{e.date || "—"}</span>
+                <span style={{ fontSize: "0.75rem", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.setup || ""}</span>
               </div>); })}
           </div>
         ) : (
@@ -358,7 +358,7 @@ export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = fa
           <div style={lab}>Chapters <span style={{ opacity: 0.6, textTransform: "none", letterSpacing: 0 }}>(optional — name each year of your journey)</span></div>
           {years.map((y) => (
             <div key={y} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
-              <span style={{ fontSize: "0.78rem", fontWeight: 800, color: C.muted, width: 44, flex: "none" }}>{y}</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 600, color: C.muted, width: 44, flex: "none" }}>{y}</span>
               <input style={{ ...inp, marginTop: 0 }} value={chapters[y] || ""} maxLength={60}
                 onChange={(e) => setChapters((c) => ({ ...c, [y]: e.target.value }))}
                 placeholder={`e.g. "My first month" · "After I fixed my stops"`} />
@@ -371,17 +371,17 @@ export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = fa
           </div>
           {hyps.map((h, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: C.muted, width: 28, flex: "none" }}>H{i + 1}</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 600, color: C.muted, width: 28, flex: "none" }}>H{i + 1}</span>
               <input style={{ ...inp, marginTop: 0 }} value={h} maxLength={200}
                 onChange={(e) => setHyps((prev) => prev.map((x, k) => k === i ? e.target.value : x))}
                 placeholder='e.g. "My best trades come from tight ranges after a correction"' />
               <span onClick={() => setHyps((prev) => prev.filter((_, k) => k !== i))}
-                style={{ color: C.muted, cursor: "pointer", fontSize: "0.9rem", padding: "0 4px" }} title="Remove">✕</span>
+                style={{ color: C.muted, cursor: "pointer", fontSize: "0.875rem", padding: "0 4px" }} title="Remove">✕</span>
             </div>
           ))}
           <div style={{ display: "flex", gap: 14, marginTop: 8 }}>
-            {hyps.length < 10 && <span onClick={() => setHyps((prev) => [...prev, ""])} style={{ color: C.gold, cursor: "pointer", fontSize: "0.76rem", fontWeight: 700 }}>＋ Add a hypothesis</span>}
-            {hyps.length === 0 && <span onClick={seedHyps} style={{ color: C.muted, cursor: "pointer", fontSize: "0.76rem", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>Start from the VIV correction checklist</span>}
+            {hyps.length < 10 && <span onClick={() => setHyps((prev) => [...prev, ""])} style={{ color: C.gold, cursor: "pointer", fontSize: "0.75rem", fontWeight: 700 }}>＋ Add a hypothesis</span>}
+            {hyps.length === 0 && <span onClick={seedHyps} style={{ color: C.muted, cursor: "pointer", fontSize: "0.75rem", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>Start from the VIV correction checklist</span>}
           </div>
         </>)}
         {v2 && (<>
@@ -390,17 +390,17 @@ export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = fa
             onChange={(e) => setIntro(e.target.value)}
             placeholder="In your own words. This becomes page one of your dive." />
           <div onClick={() => setHideNotes(!hideNotes)} style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0 0", padding: "8px 0", cursor: "pointer" }}>
-            <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", border: `1px solid ${hideNotes ? C.gold : C.border}`, background: hideNotes ? C.gold : "none", color: "#08080e", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{hideNotes ? "✓" : ""}</span>
-            <span style={{ fontSize: "0.8rem", color: C.text }}>Hide my notes — charts and numbers show, personal notes stay private</span>
+            <span style={{ width: 16, height: 16, borderRadius: 4, flex: "none", border: `1px solid ${hideNotes ? C.gold : C.border}`, background: hideNotes ? C.gold : "none", color: "var(--goldOn)", fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{hideNotes ? "✓" : ""}</span>
+            <span style={{ fontSize: "0.75rem", color: C.text }}>Hide my notes — charts and numbers show, personal notes stay private</span>
           </div>
         </>)}
-        <div onClick={() => setLive(!live)} style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 0", cursor: "pointer", padding: "12px 14px", borderRadius: 12, border: `1px solid ${live ? "rgba(34,197,94,0.4)" : C.border}`, background: live ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)" }}>
-          <span style={{ width: 34, height: 20, borderRadius: 99, background: live ? "#22c55e" : "rgba(255,255,255,0.14)", position: "relative", flex: "none", transition: "background .15s" }}>
-            <span style={{ position: "absolute", top: 2, left: live ? 16 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+        <div onClick={() => setLive(!live)} style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 0", cursor: "pointer", padding: "12px 14px", borderRadius: 12, border: `1px solid ${live ? "rgba(0,200,5,0.4)" : C.border}`, background: live ? "rgba(0,200,5,0.08)" : "var(--w03)" }}>
+          <span style={{ width: 34, height: 20, borderRadius: 99, background: live ? "var(--green)" : "var(--w14)", position: "relative", flex: "none", transition: "background .15s" }}>
+            <span style={{ position: "absolute", top: 2, left: live ? 16 : 2, width: 16, height: 16, borderRadius: "50%", background: "var(--white)", transition: "left .15s" }} />
           </span>
-          <span style={{ fontSize: "0.82rem", color: C.text }}>
+          <span style={{ fontSize: "0.875rem", color: C.text }}>
             <b style={{ color: C.white }}>{live ? "Live — other members can read it" : "Draft — only you can see it"}</b>
-            <span style={{ display: "block", fontSize: "0.72rem", color: C.muted, marginTop: 2 }}>You can flip this on and off any time. Off hides it instantly.</span>
+            <span style={{ display: "block", fontSize: "0.75rem", color: C.muted, marginTop: 2 }}>You can flip this on and off any time. Off hides it instantly.</span>
           </span>
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 24, alignItems: "center" }}>
@@ -411,11 +411,11 @@ export function MemberDiveModal({ C, font, dive, projects, entries = [], v2 = fa
                 intro: intro.trim() || null, hide_notes: hideNotes } : {}),
               ...(v3 ? { hypotheses: (() => { const c = hyps.map((h) => h.trim()).filter(Boolean); return c.length ? c : null; })() } : {}),
             }); setBusy(false); }}
-            style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.8rem", padding: "11px 22px", borderRadius: 99, cursor: title.trim() ? "pointer" : "not-allowed", opacity: title.trim() ? 1 : 0.5 }}>
+            style={{ background: "linear-gradient(135deg, var(--goldPill), var(--goldPillMid))", color: "var(--goldOn)", border: "none", fontFamily: font, fontWeight: 600, fontSize: "0.75rem", padding: "11px 22px", borderRadius: 99, cursor: title.trim() ? "pointer" : "not-allowed", opacity: title.trim() ? 1 : 0.5 }}>
             {busy ? "Saving…" : "Save"}</button>
-          <button onClick={onClose} style={{ background: "none", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontWeight: 700, fontSize: "0.8rem", padding: "11px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onClose} style={{ background: "none", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontWeight: 700, fontSize: "0.75rem", padding: "11px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
           {dive && onDelete && <span onClick={() => window.confirm("Remove this dive? Your studies are untouched — only the dive listing goes away.") && onDelete()}
-            style={{ marginLeft: "auto", fontSize: "0.74rem", color: "#f87171", cursor: "pointer" }}>Remove dive</span>}
+            style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--red)", cursor: "pointer" }}>Remove dive</span>}
         </div>
       </div>
     </div>, document.body);
@@ -427,11 +427,11 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, 
   // Static dives (no rows) carry their own switch: draft:true = admin-only, draft:false = LIVE.
   const liveOf = (d) => d.static ? !d.draft : (d.rows || []).some(r => r.is_published);
   const badge = (d) => isAdmin ? (
-    <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: liveOf(d) ? C.green : C.muted, border: `1px solid ${liveOf(d) ? "rgba(34,197,94,0.35)" : C.border}`, padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>{liveOf(d) ? "LIVE" : "DRAFT"}</span>
+    <span style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: "0.1em", color: liveOf(d) ? C.green : C.muted, border: `1px solid ${liveOf(d) ? "rgba(0,200,5,0.35)" : C.border}`, padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>{liveOf(d) ? "LIVE" : "DRAFT"}</span>
   ) : null;
   // No publish link for static dives — there are no rows to flip; publishing one is a code change.
   const pubLink = (d) => (isAdmin && onTogglePublish && !d.static) ? (
-    <span onClick={(e) => { e.stopPropagation(); onTogglePublish(d); }} style={{ fontSize: "0.72rem", color: C.muted, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 4, whiteSpace: "nowrap" }}>{liveOf(d) ? "Unpublish" : "Publish to members"}</span>
+    <span onClick={(e) => { e.stopPropagation(); onTogglePublish(d); }} style={{ fontSize: "0.75rem", color: C.muted, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 4, whiteSpace: "nowrap" }}>{liveOf(d) ? "Unpublish" : "Publish to members"}</span>
   ) : null;
   const [layout, setLayout] = useState(() => { try { return localStorage.getItem("viv-dives-layout") || "list"; } catch { return "list"; } });
   const setL = (v) => { setLayout(v); try { localStorage.setItem("viv-dives-layout", v); } catch {} };
@@ -441,13 +441,13 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, 
   // Falsy cover on a static dive → no thumb at all (never a broken <img>).
   const thumbOf = (d) => d.cover || (d.rows || []).find(r => r.before_img)?.before_img || null;
   const pair = (p, i) => (
-    <span key={i} title="3-month return off this study's own low — the study is inside the dive" style={{ fontSize: "0.78rem", whiteSpace: "nowrap", marginRight: 44 }}>
+    <span key={i} title="3-month return off this study's own low — the study is inside the dive" style={{ fontSize: "0.75rem", whiteSpace: "nowrap", marginRight: 44 }}>
       <span style={{ fontWeight: 700, color: C.white }}>{p.t}</span>
       <span style={{ fontWeight: 600, color: C.green, marginLeft: 8 }}>+{p.v}%</span>
     </span>
   );
   const toggleBtn = (v, glyph, label) => (
-    <button onClick={() => setL(v)} title={label} style={{ background: layout === v ? "rgba(255,255,255,0.08)" : "none", border: `1px solid ${layout === v ? C.border : "transparent"}`, borderRadius: 10, color: layout === v ? C.white : C.muted, fontSize: "0.9rem", padding: "7px 12px", cursor: "pointer", lineHeight: 1 }}>{glyph}</button>
+    <button onClick={() => setL(v)} title={label} style={{ background: layout === v ? "var(--w08)" : "none", border: `1px solid ${layout === v ? C.border : "transparent"}`, borderRadius: 99, color: layout === v ? C.white : C.muted, fontSize: "0.875rem", padding: "7px 12px", cursor: "pointer", lineHeight: 1 }}>{glyph}</button>
   );
   return (
     <div>
@@ -455,21 +455,21 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, 
         .divesmarq{display:inline-flex;animation:divesmarq 36s linear infinite}
         .divesmarqwrap:hover .divesmarq{animation-play-state:paused}`}</style>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-        <h2 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, margin: 0 }}>Deep Dives</h2>
+        <h2 style={{ fontSize: "2rem", fontWeight: 600, letterSpacing: "-0.02em", color: C.white, margin: 0 }}>Deep Dives</h2>
         {onMyBook && (
           // Backdropped pill (Valen 2026-08-03: "make it slightly more obvious") — this is the
           // doorway to their personal book AND the Make-it-a-Deep-Dive flow behind it.
-          <span onClick={onMyBook} style={{ fontSize: "0.8rem", fontWeight: 700, color: C.gold, cursor: "pointer", whiteSpace: "nowrap", background: "rgba(201,152,42,0.10)", border: `1px solid ${C.borderGold || "rgba(201,152,42,0.35)"}`, borderRadius: 99, padding: "9px 18px", transition: "background .15s" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "rgba(201,152,42,0.2)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "rgba(201,152,42,0.10)"; }}>
+          <span onClick={onMyBook} style={{ fontSize: "0.75rem", fontWeight: 700, color: C.gold, cursor: "pointer", whiteSpace: "nowrap", background: "var(--goldDim)", border: `1px solid ${C.borderGold || "var(--borderGold)"}`, borderRadius: 99, padding: "9px 18px", transition: "background .15s" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "var(--borderGold)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "var(--goldDim)"; }}>
             📖 {myCount ? `Your book (${myCount})` : "Start your own book"} <span style={{ opacity: 0.6 }}>→</span>
           </span>
         )}
       </div>
-      {!latest && <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 16 }}>The first dive is being prepared — check back soon.</div>}
+      {!latest && <div style={{ fontSize: "0.75rem", color: C.muted, marginTop: 16 }}>The first dive is being prepared — check back soon.</div>}
       {proof.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, padding: "14px 0", margin: "24px 0 0" }}>
-          <span style={{ fontSize: "0.72rem", color: C.muted, whiteSpace: "nowrap", paddingRight: 28, borderRight: `1px solid ${C.border}`, marginRight: 28, flex: "none" }}>From the studies</span>
+          <span style={{ fontSize: "0.75rem", color: C.muted, whiteSpace: "nowrap", paddingRight: 28, borderRight: `1px solid ${C.border}`, marginRight: 28, flex: "none" }}>From the studies</span>
           <div className="divesmarqwrap" style={{ overflow: "hidden", flex: 1, minWidth: 0, maskImage: "linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent)" }}>
             <div className="divesmarq">{proof.map(pair)}{proof.map((p, i) => pair(p, i + 100))}</div>
           </div>
@@ -478,10 +478,10 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, 
       {latest && (
         <div style={{ display: "flex", gap: 36, alignItems: "flex-start", justifyContent: "space-between", margin: "40px 0 0", flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 420px", minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: C.muted }}>Latest dive <span style={{ opacity: 0.45 }}>——</span> {latest.updated}</span>{badge(latest)}</div>
-            <div onClick={() => onOpen(latest)} style={{ fontSize: "2.1rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, lineHeight: 1.14, margin: "16px 0 0", maxWidth: "20ch", cursor: "pointer" }}>{latest.title}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted }}>Latest dive <span style={{ opacity: 0.45 }}>——</span> {latest.updated}</span>{badge(latest)}</div>
+            <div onClick={() => onOpen(latest)} style={{ fontSize: "2rem", fontWeight: 600, letterSpacing: "-0.02em", color: C.white, lineHeight: 1.14, margin: "16px 0 0", maxWidth: "20ch", cursor: "pointer" }}>{latest.title}</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 22, marginTop: 28 }}>
-              <div onClick={() => onOpen(latest)} style={{ display: "inline-block", paddingBottom: 10, borderBottom: `1px solid ${C.border}`, fontSize: "0.92rem", color: C.text, cursor: "pointer" }}>Open the dive <span style={{ color: C.muted }}>↗</span></div>
+              <div onClick={() => onOpen(latest)} style={{ display: "inline-block", paddingBottom: 10, borderBottom: `1px solid ${C.border}`, fontSize: "0.875rem", color: C.text, cursor: "pointer" }}>Open the dive <span style={{ color: C.muted }}>↗</span></div>
               {pubLink(latest)}
             </div>
           </div>
@@ -498,9 +498,9 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, 
             <div style={{ margin: "16px 0 0" }}>
               {rest.map(d => (
                 <div key={d.slug} onClick={() => onOpen(d)} style={{ display: "flex", alignItems: "baseline", gap: 14, padding: "17px 0", cursor: "pointer" }}>
-                  <span style={{ fontSize: "0.92rem", fontWeight: 600, color: C.text, whiteSpace: "nowrap" }}>{d.title}</span>
-                  <span style={{ flex: 1, borderBottom: "1px dotted rgba(255,255,255,0.18)", transform: "translateY(-4px)" }} />
-                  <span style={{ fontSize: "0.78rem", color: C.muted, whiteSpace: "nowrap" }}>{d.updated}</span>
+                  <span style={{ fontSize: "0.875rem", fontWeight: 600, color: C.text, whiteSpace: "nowrap" }}>{d.title}</span>
+                  <span style={{ flex: 1, borderBottom: "1px dotted var(--w22)", transform: "translateY(-4px)" }} />
+                  <span style={{ fontSize: "0.75rem", color: C.muted, whiteSpace: "nowrap" }}>{d.updated}</span>
                   {badge(d)}{pubLink(d)}
                 </div>
               ))}
@@ -510,8 +510,8 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, 
               {rest.map(d => (
                 <div key={d.slug} onClick={() => onOpen(d)} style={{ cursor: "pointer" }}>
                   {thumbOf(d) && <img src={thumbOf(d)} alt="" style={{ width: "100%", borderRadius: 16, border: `1px solid ${C.border}`, display: "block" }} />}
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0 0" }}><span style={{ fontSize: "0.72rem", color: C.muted }}>{d.updated}</span>{badge(d)}</div>
-                  <div style={{ fontSize: "1.05rem", fontWeight: 700, color: C.white, lineHeight: 1.3, margin: "6px 0 0" }}>{d.title}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0 0" }}><span style={{ fontSize: "0.75rem", color: C.muted }}>{d.updated}</span>{badge(d)}</div>
+                  <div style={{ fontSize: "1rem", fontWeight: 700, color: C.white, lineHeight: 1.3, margin: "6px 0 0" }}>{d.title}</div>
                 </div>
               ))}
             </div>
@@ -521,17 +521,17 @@ export function DiveIndex({ C, font, dives, onOpen, onMyBook, myCount, isAdmin, 
       {community.length > 0 && (
         <>
           <div style={{ display: "flex", alignItems: "baseline", gap: 14, margin: "52px 0 0", paddingTop: 26, borderTop: `1px solid ${C.border}` }}>
-            <span style={{ fontSize: "0.66rem", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: C.muted }}>From the community</span>
-            <span style={{ fontSize: "0.7rem", color: C.muted, opacity: 0.7 }}>member research, self-published</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted }}>From the community</span>
+            <span style={{ fontSize: "0.6875rem", color: C.muted, opacity: 0.7 }}>member research, self-published</span>
           </div>
           <div style={{ margin: "6px 0 0" }}>
             {community.map((d) => (
               <div key={d.id} onClick={() => onOpenCommunity && onOpenCommunity(d)} style={{ display: "flex", alignItems: "baseline", gap: 14, padding: "15px 0", cursor: "pointer" }}>
-                <span style={{ fontSize: "0.92rem", fontWeight: 600, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "24ch" }}>{d.title}</span>
-                <span style={{ flex: 1, borderBottom: "1px dotted rgba(255,255,255,0.18)", transform: "translateY(-4px)" }} />
-                <span style={{ fontSize: "0.76rem", color: C.muted, whiteSpace: "nowrap" }}>{d.author_name || "a member"}</span>
+                <span style={{ fontSize: "0.875rem", fontWeight: 600, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "24ch" }}>{d.title}</span>
+                <span style={{ flex: 1, borderBottom: "1px dotted var(--w22)", transform: "translateY(-4px)" }} />
+                <span style={{ fontSize: "0.75rem", color: C.muted, whiteSpace: "nowrap" }}>{d.author_name || "a member"}</span>
                 {d.created_by === uid && (
-                  <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: d.is_live ? "#22c55e" : C.muted, border: `1px solid ${d.is_live ? "rgba(34,197,94,0.35)" : C.border}`, padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>{d.is_live ? "LIVE" : "DRAFT"}</span>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: "0.1em", color: d.is_live ? "var(--green)" : C.muted, border: `1px solid ${d.is_live ? "rgba(0,200,5,0.35)" : C.border}`, padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>{d.is_live ? "LIVE" : "DRAFT"}</span>
                 )}
               </div>
             ))}
@@ -3124,12 +3124,12 @@ function YourPatterns({ C, font, myRows }) {
   return (
     <div style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 16, padding: "16px 18px", marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: hasSignal ? 12 : 4 }}>
-        <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>Your patterns</div>
-        <div style={{ fontSize: "0.78rem", fontWeight: 700, color: C.white }}>The factors that recur in {scopeLabel}</div>
-        <div style={{ marginLeft: "auto", fontSize: "0.68rem", fontWeight: 700, color: C.muted }}>n = {useBest ? `${bestN} best · ${n} total` : `${n}`} {n === 1 ? "study" : "studies"}</div>
+        <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)" }}>Your patterns</div>
+        <div style={{ fontSize: "0.75rem", fontWeight: 700, color: C.white }}>The factors that recur in {scopeLabel}</div>
+        <div style={{ marginLeft: "auto", fontSize: "0.6875rem", fontWeight: 700, color: C.muted }}>n = {useBest ? `${bestN} best · ${n} total` : `${n}`} {n === 1 ? "study" : "studies"}</div>
       </div>
       {!hasSignal ? (
-        <div style={{ fontSize: "0.78rem", color: C.muted, lineHeight: 1.55 }}>
+        <div style={{ fontSize: "0.75rem", color: C.muted, lineHeight: 1.55 }}>
           Add a few graded setups to your book{n > 0 ? ` (you have ${n} so far)` : ""} — once you have three or more with ticked factors, this card tallies which characteristics show up most in your best setups, so you can collate your own rules.
         </div>
       ) : (
@@ -3141,18 +3141,18 @@ function YourPatterns({ C, font, myRows }) {
                 <div key={f.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
-                      <span style={{ fontSize: "0.78rem", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.label}</span>
-                      <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.goldBright, whiteSpace: "nowrap" }}>{num}/{denom}{useBest && f.all > f.best ? <span style={{ color: C.muted, fontWeight: 600 }}> · {f.all}/{n} all</span> : null}</span>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.label}</span>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 600, color: C.white, whiteSpace: "nowrap" }}>{num}/{denom}{useBest && f.all > f.best ? <span style={{ color: C.muted, fontWeight: 600 }}> · {f.all}/{n} all</span> : null}</span>
                     </div>
-                    <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-                      <div style={{ width: `${bar(num)}%`, height: "100%", borderRadius: 99, background: `linear-gradient(90deg, ${C.goldMid}, ${C.goldBright})` }} />
+                    <div style={{ height: 6, borderRadius: 99, background: "var(--w08)", overflow: "hidden" }}>
+                      <div style={{ width: `${bar(num)}%`, height: "100%", borderRadius: 99, background: "var(--w35)" }} />
                     </div>
                   </div>
                 </div>
               );
             })}
           </div>
-          <div style={{ fontSize: "0.68rem", color: C.muted, marginTop: 11, lineHeight: 1.5 }}>
+          <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 11, lineHeight: 1.5 }}>
             Honest counts — how often each ticked factor appears in {scopeLabel} (each factor counted once per setup). No lift statistics; just your own recurring commonalities. Export the CSV above to slice them any way you like.
           </div>
         </>
@@ -3184,7 +3184,7 @@ const Stars = ({ C, n, max, size = "0.95rem" }) => {
   return (
     <span style={{ letterSpacing: 1.5, fontSize: size, whiteSpace: "nowrap" }}>
       {Array.from({ length: slots }, (_, k) => (
-        <span key={k} style={{ color: k < n ? (k >= 5 ? "#7ef0a0" : C.goldBright) : "rgba(255,255,255,0.13)", textShadow: k < n ? "0 0 10px rgba(240,192,80,0.4)" : "none" }}>★</span>
+        <span key={k} style={{ color: k < n ? (k >= 5 ? "var(--greenFg)" : C.white) : "var(--w14)", textShadow: k < n ? "0 0 10px var(--w35)" : "none" }}>★</span>
       ))}
     </span>
   );
@@ -3194,9 +3194,9 @@ const Stars = ({ C, n, max, size = "0.95rem" }) => {
 // parent render (new component type → React unmounts/remounts → typed form wiped, prefill
 // lost, uploads resolving against a dead instance). Do not move it back inside the page.
 function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload, journaledTrades }) {
-  const chipBtn = { fontSize: "0.72rem", fontWeight: 700, padding: "6px 14px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "rgba(255,255,255,0.03)" };
-  const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.84rem", padding: "9px 12px", outline: "none", width: "100%", colorScheme: "dark" };
-  const lbl = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" };
+  const chipBtn = { fontSize: "0.75rem", fontWeight: 700, padding: "6px 14px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "var(--w03)" };
+  const inputS = { background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.875rem", padding: "9px 12px", outline: "none", width: "100%", colorScheme: "light dark" };
+  const lbl = { fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginBottom: 6, display: "block" };
     const [row, setRow] = useState(() => {
       let prefill = {};
       try { prefill = JSON.parse(sessionStorage.getItem("viv-mb-prefill") || "{}"); sessionStorage.removeItem("viv-mb-prefill"); } catch {}
@@ -3227,7 +3227,7 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
     const auto = new Set((row.metrics && row.metrics._auto) || []);
     const clearAuto = (r, key) => { const m = r.metrics || {}; return { ...m, _auto: (m._auto || []).filter(x => x !== key) }; };
     const setField = (key, val) => setRow(r => ({ ...r, [key]: val, metrics: clearAuto(r, key) }));
-    const AutoDot = ({ k }) => auto.has(k) ? <span title="Auto-filled from your chart by VIV — edit to correct (the dot clears)" style={{ display: "inline-block", width: 7, height: 7, borderRadius: 99, background: C.goldBright, boxShadow: "0 0 7px rgba(240,192,80,0.85)", marginLeft: 6, verticalAlign: "middle", flexShrink: 0 }} /> : null;
+    const AutoDot = ({ k }) => auto.has(k) ? <span title="Auto-filled from your chart by VIV — edit to correct (the dot clears)" style={{ display: "inline-block", width: 7, height: 7, borderRadius: 99, background: C.white, boxShadow: "0 0 7px var(--w55)", marginLeft: 6, verticalAlign: "middle", flexShrink: 0 }} /> : null;
     const toggleElite = (k) => setRow(r => ({ ...r, elite: r.elite.includes(k) ? r.elite.filter(x => x !== k) : [...r.elite, k], metrics: clearAuto(r, "elite:" + k) }));
     const toggleTick = (key) => setRow(r => {
       const m2 = clearAuto(r, "tick:" + key);
@@ -3281,20 +3281,20 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
     return (
       <div onPaste={onPaste} style={{ fontFamily: font, background: C.glass, border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "20px 22px", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-          <div style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white }}>{row.id ? `Edit ${row.ticker}` : "Add to the Model Book"}</div>
+          <div style={{ fontSize: "1rem", fontWeight: 600, color: C.white }}>{row.id ? `Edit ${row.ticker}` : "Add to the Model Book"}</div>
           <div style={{ marginLeft: "auto" }}><Stars C={C} n={eff.n} /></div>
-          <span style={{ fontSize: "0.78rem", fontWeight: 800, color: eff.n >= 6 ? "#7ef0a0" : C.goldBright }}>{eff.label}</span>
+          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: eff.n >= 6 ? "var(--greenFg)" : C.white }}>{eff.label}</span>
         </div>
         {auto.size > 0 && (
-          <div style={{ fontSize: "0.72rem", fontWeight: 600, color: C.goldBright, marginBottom: 12 }}>
-            <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 99, background: C.goldBright, boxShadow: "0 0 7px rgba(240,192,80,0.85)", marginRight: 7, verticalAlign: "middle" }} />
-            gold dot = auto-filled from your chart — cross-check and edit anything that's off (editing clears the dot)
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: C.muted, marginBottom: 12 }}>
+            <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 99, background: C.white, boxShadow: "0 0 7px var(--w55)", marginRight: 7, verticalAlign: "middle" }} />
+            the dot = auto-filled from your chart — cross-check and edit anything that's off (editing clears the dot)
           </div>
         )}
         {shadow && (
-          <div onClick={applyShadow} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.78rem", fontWeight: 700, color: C.goldBright, background: C.goldDim, border: `1px dashed ${C.borderGold}`, borderRadius: 12, padding: "10px 14px", marginBottom: 12, cursor: "pointer" }}>
+          <div onClick={applyShadow} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.75rem", fontWeight: 700, color: C.goldBright, background: C.goldDim, border: `1px dashed ${C.borderGold}`, borderRadius: 12, padding: "10px 14px", marginBottom: 12, cursor: "pointer" }}>
             ⚡ Found your {row.ticker} trade ({mbISO(shadow.exit)}) in the journal — click to shadow-fill dates, %, R, days, theme &amp; outcome.
-            <span style={{ marginLeft: "auto", fontSize: "0.68rem", color: C.muted, fontWeight: 600 }}>fills only what's empty</span>
+            <span style={{ marginLeft: "auto", fontSize: "0.6875rem", color: C.muted, fontWeight: 600 }}>fills only what's empty</span>
           </div>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
@@ -3315,26 +3315,26 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
 
         {/* SETUP GRADER CHECKLIST — the stars are COMPUTED from these ticks (objective, no bias) */}
         {(row.metrics?.needs_eye || []).length > 0 && (
-          <div style={{ fontSize: "0.74rem", fontWeight: 600, color: "#f0b04f", background: "rgba(240,176,79,0.07)", border: "1px solid rgba(240,176,79,0.3)", borderRadius: 10, padding: "8px 13px", marginBottom: 10, lineHeight: 1.5 }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--goldBright)", background: "var(--goldDim)", border: "1px solid var(--borderGold)", borderRadius: 10, padding: "8px 13px", marginBottom: 10, lineHeight: 1.5 }}>
             👁 <b>Needs your eye</b> — not provable from the chart alone, tick below if true:{" "}
             {(row.metrics.needs_eye).map(k => { const [si, ii] = k.split("-").map(Number); return SECTIONS[si]?.items?.[ii]?.c; }).filter(Boolean).join(" · ")}
           </div>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <span style={{ ...lbl, marginBottom: 0 }}>{memberMode ? "Setup checklist — tick what the chart shows; stars come from how many boxes it ticks" : "Setup Grader checklist — stars compute from these ticks"}</span>
-          <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.goldBright }}>{graded.stars}★ · {graded.passed}/{graded.total}{memberMode ? "" : ` · ${graded.starHit}/${graded.starmakers} ★-makers`}</span>
+          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: C.white }}>{graded.stars}★ · {graded.passed}/{graded.total}{memberMode ? "" : ` · ${graded.starHit}/${graded.starmakers} ★-makers`}</span>
           <button onClick={pullGrade} title="Import this ticker's saved Setup Grader ticks" style={{ ...chipBtn, whiteSpace: "nowrap", marginLeft: "auto" }}>Pull from grader</button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 10, marginBottom: 14 }}>
           {sectionsFor(row.ticked).filter(s => !s.reminder).map((sec, si) => (
-            <div key={si} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", background: "rgba(255,255,255,0.015)" }}>
-              <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>{sec.title}</div>
+            <div key={si} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", background: "var(--w02)" }}>
+              <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 7 }}>{sec.title}</div>
               {sec.items.map((it, ii) => {
                 const key = si + "-" + ii, on = row.ticked.includes(key);
                 return (
                   <div key={ii} onClick={() => toggleTick(key)} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 2px", cursor: "pointer" }}>
-                    <span style={{ color: on ? C.goldBright : "rgba(255,255,255,0.22)", fontWeight: 800, lineHeight: 1.3 }}>{on ? "✓" : "○"}</span>
-                    <span style={{ fontSize: "0.76rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 }}>{it.c}{it.star && !memberMode && <span style={{ fontSize: "0.56rem", color: C.goldMid, marginLeft: 5 }}>★ maker</span>}{it.bonus && <span style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "0 5px", borderRadius: 99, marginLeft: 5 }}>Bonus</span>}<AutoDot k={"tick:" + key} /></span>
+                    <span style={{ color: on ? C.goldBright : "var(--w22)", fontWeight: 600, lineHeight: 1.3 }}>{on ? "✓" : "○"}</span>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 600, color: on ? C.white : C.text, lineHeight: 1.35 }}>{it.c}{it.star && !memberMode && <span style={{ fontSize: "0.6875rem", color: C.muted, marginLeft: 5 }}>★ maker</span>}{it.bonus && <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--faint)", border: "1px solid var(--w22)", padding: "0 5px", borderRadius: 99, marginLeft: 5 }}>Bonus</span>}<AutoDot k={"tick:" + key} /></span>
                   </div>
                 );
               })}
@@ -3353,9 +3353,9 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
             {ELITE.map(f => {
               const on = row.elite.includes(f.k);
               return (
-                <div key={f.k} onClick={() => toggleElite(f.k)} style={{ display: "flex", gap: 10, padding: "8px 11px", borderRadius: 10, cursor: "pointer", background: on ? "rgba(126,240,160,0.07)" : "rgba(255,255,255,0.02)", border: `1px solid ${on ? "rgba(126,240,160,0.35)" : C.border}` }}>
-                  <span style={{ color: on ? "#7ef0a0" : "rgba(255,255,255,0.25)", fontWeight: 800 }}>{on ? "✓" : "○"}</span>
-                  <div><div style={{ fontSize: "0.8rem", fontWeight: 700, color: on ? "#7ef0a0" : C.text }}>{f.c}<AutoDot k={"elite:" + f.k} /></div><div style={{ fontSize: "0.7rem", color: C.muted }}>{f.s}</div></div>
+                <div key={f.k} onClick={() => toggleElite(f.k)} style={{ display: "flex", gap: 10, padding: "8px 11px", borderRadius: 10, cursor: "pointer", background: on ? "var(--greenDim)" : "var(--w02)", border: `1px solid ${on ? "var(--green)" : C.border}` }}>
+                  <span style={{ color: on ? "var(--greenFg)" : "var(--w22)", fontWeight: 600 }}>{on ? "✓" : "○"}</span>
+                  <div><div style={{ fontSize: "0.75rem", fontWeight: 700, color: on ? "var(--greenFg)" : C.text }}>{f.c}<AutoDot k={"elite:" + f.k} /></div><div style={{ fontSize: "0.6875rem", color: C.muted }}>{f.s}</div></div>
                 </div>
               );
             })}
@@ -3366,7 +3366,7 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
             save (first = Before, last = After) so the card grid and study strip keep working. */}
         <div style={{ marginBottom: 14 }}>
           <span style={lbl}>Charts — oldest to newest</span>
-          <div style={{ fontSize: "0.7rem", color: C.muted, margin: "0 0 10px" }}>Add as many as you like. The <b style={{ color: C.goldBright }}>first</b> chart becomes the Before face and the <b style={{ color: C.goldBright }}>last</b> the After face automatically — or tag any chart's role yourself.</div>
+          <div style={{ fontSize: "0.6875rem", color: C.muted, margin: "0 0 10px" }}>Add as many as you like. The <b style={{ color: C.white }}>first</b> chart becomes the Before face and the <b style={{ color: C.white }}>last</b> the After face automatically — or tag any chart's role yourself.</div>
           <ChartSeqEditor C={C} font={font} busy={busy} list={(row.metrics && row.metrics.charts) || []} compact
             onChange={(nl) => setRow(r => ({ ...r, metrics: { ...(r.metrics || {}), charts: nl } }))}
             onUpload={onUpload} />
@@ -3376,15 +3376,15 @@ function MBEditor({ C, font, busy, isAdmin, initial, onSave, onCancel, onUpload,
           <div><span style={lbl}>The lesson (what to internalize)<AutoDot k="lesson" /></span><textarea rows={3} style={{ ...inputS, resize: "vertical" }} value={row.lesson || ""} onChange={e => setField("lesson", e.target.value)} /></div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button disabled={busy || !row.ticker} onClick={() => onSave(row)} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.82rem", padding: "11px 24px", borderRadius: 99, cursor: "pointer", opacity: busy || !row.ticker ? 0.6 : 1 }}>{busy ? "Saving…" : row.id ? "Save changes" : "Add entry"}</button>
+          <button disabled={busy || !row.ticker} onClick={() => onSave(row)} style={{ background: "linear-gradient(135deg, var(--goldPill), var(--goldPillMid))", color: "var(--goldOn)", border: "none", fontFamily: font, fontWeight: 600, fontSize: "0.875rem", padding: "11px 24px", borderRadius: 99, cursor: "pointer", opacity: busy || !row.ticker ? 0.6 : 1 }}>{busy ? "Saving…" : row.id ? "Save changes" : "Add entry"}</button>
           {isAdmin ? (
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.78rem", color: row.is_published ? C.green : C.muted, cursor: "pointer", fontFamily: font, fontWeight: 700 }}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.75rem", color: row.is_published ? C.green : C.muted, cursor: "pointer", fontFamily: font, fontWeight: 700 }}>
               <input type="checkbox" checked={!!row.is_published} onChange={e => setRow(r => ({ ...r, is_published: e.target.checked }))} /> Published to members
             </label>
           ) : (
-            <span style={{ fontSize: "0.72rem", color: C.muted, fontFamily: font }}>🔒 Saves to your personal model book — only you can see it.</span>
+            <span style={{ fontSize: "0.75rem", color: C.muted, fontFamily: font }}>🔒 Saves to your personal model book — only you can see it.</span>
           )}
-          <button onClick={onCancel} style={{ marginLeft: "auto", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 700, fontSize: "0.76rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onCancel} style={{ marginLeft: "auto", background: "var(--w06)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 700, fontSize: "0.75rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>Cancel</button>
         </div>
       </div>
     );
@@ -3427,14 +3427,14 @@ function ExportDialog({ C, font, isAdmin, pop, gradeBadge, onClose, coverTitle }
   const toggle = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const chipS = (active) => ({
-    display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", fontSize: "0.7rem", fontWeight: 700,
+    display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", fontSize: "0.6875rem", fontWeight: 700,
     padding: "6px 13px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
-    border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? "#08080e" : C.muted,
-    background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
+    border: `1px solid ${active ? "var(--w14)" : C.border}`, color: active ? "var(--white)" : C.muted,
+    background: active ? "var(--w10)" : "var(--w03)",
   });
-  const inputS = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.8rem", padding: "8px 11px", outline: "none", colorScheme: "dark" };
-  const smallBtn = { background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 700, fontSize: "0.7rem", padding: "6px 13px", borderRadius: 99, cursor: "pointer" };
-  const footBtn = (disabled) => ({ background: disabled ? "rgba(255,255,255,0.05)" : `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: disabled ? C.muted : "#08080e", border: disabled ? `1px solid ${C.border}` : "none", fontFamily: font, fontWeight: 800, fontSize: "0.8rem", padding: "11px 22px", borderRadius: 99, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.65 : 1 });
+  const inputS = { background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 10, color: C.white, fontFamily: font, fontSize: "0.75rem", padding: "8px 11px", outline: "none", colorScheme: "light dark" };
+  const smallBtn = { background: "var(--w06)", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 700, fontSize: "0.6875rem", padding: "6px 13px", borderRadius: 99, cursor: "pointer" };
+  const footBtn = (disabled) => ({ background: disabled ? "var(--w06)" : "linear-gradient(135deg, var(--goldPill), var(--goldPillMid))", color: disabled ? C.muted : "var(--goldOn)", border: disabled ? `1px solid ${C.border}` : "none", fontFamily: font, fontWeight: 600, fontSize: "0.75rem", padding: "11px 22px", borderRadius: 99, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.65 : 1 });
 
   // outcome chip (label + color) — study rows use the pre-registered class; plain rows the outcome column/derivation.
   const outcomeChip = (r) => {
@@ -3445,30 +3445,30 @@ function ExportDialog({ C, font, isAdmin, pop, gradeBadge, onClose, coverTitle }
     const eo = r.outcome || outcomeFromR(r.r_mult, r.run_pct);
     if (!eo) return { label: "— pending", color: C.muted };
     const win = /winner/i.test(eo), loss = /(loser|subpar)/i.test(eo);
-    return { label: `${win ? "▲ " : loss ? "▼ " : ""}${eo}`, color: win ? C.goldBright : loss ? "#e05555" : C.muted };
+    return { label: `${win ? "▲ " : loss ? "▼ " : ""}${eo}`, color: win ? C.white : loss ? "var(--red)" : C.muted };
   };
   const gradeLetter = (r) => isStudyRow(r) ? studyQuality(r.metrics.study).letter
     : gradeBadge(effectiveStars(cardStars(r), (r.elite || []).length).n).l;
 
   return createPortal(
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(4,4,8,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "min(760px, 96%)", background: "linear-gradient(180deg, rgba(18,18,26,0.97), rgba(8,8,14,0.99))", border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "22px 24px", boxShadow: "0 40px 100px rgba(0,0,0,0.72)", fontFamily: font }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1100, background: "var(--scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "min(760px, 96%)", background: "var(--sheet)", border: `1px solid ${C.borderGold}`, borderRadius: 18, padding: "22px 24px", boxShadow: "var(--shadowLg)", fontFamily: font }}>
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
           <div>
-            <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold }}>Export</div>
-            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white, marginTop: 3 }}>Export your book</div>
+            <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)" }}>Export</div>
+            <div style={{ fontSize: "1rem", fontWeight: 600, color: C.white, marginTop: 3 }}>Export your book</div>
           </div>
-          <button onClick={onClose} aria-label="Close" style={{ marginLeft: "auto", flex: "none", background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, width: 34, height: 34, display: "grid", placeItems: "center", padding: 0, borderRadius: 10, fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }}>&times;</button>
+          <button onClick={onClose} aria-label="Close" style={{ marginLeft: "auto", flex: "none", background: "var(--w06)", border: `1px solid ${C.border}`, color: C.muted, width: 34, height: 34, display: "grid", placeItems: "center", padding: 0, borderRadius: 99, fontSize: "1.25rem", cursor: "pointer", lineHeight: 1 }}>&times;</button>
         </div>
-        <div style={{ fontSize: "0.74rem", color: C.muted, marginBottom: 16, lineHeight: 1.5 }}>Pick what to export — filter, then tick the entries. PDF = a branded study book; CSV = a flat sheet for any analysis tool.</div>
+        <div style={{ fontSize: "0.75rem", color: C.muted, marginBottom: 16, lineHeight: 1.5 }}>Pick what to export — filter, then tick the entries. PDF = a branded study book; CSV = a flat sheet for any analysis tool.</div>
 
         {/* (a) FILTERS */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 14 }}>
           <input value={tickerRaw} onChange={(e) => setTickerRaw(e.target.value)} placeholder="Ticker — MXL, PLTR or a substring"
             style={{ ...inputS, flex: "1 1 220px", minWidth: 0, fontWeight: 700, borderColor: tickerRaw ? C.goldBright : C.border }} />
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.68rem", fontWeight: 700, color: C.muted }}>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...inputS, cursor: "pointer" }} /></label>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.68rem", fontWeight: 700, color: C.muted }}>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ ...inputS, cursor: "pointer" }} /></label>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.6875rem", fontWeight: 700, color: C.muted }}>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...inputS, cursor: "pointer" }} /></label>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.6875rem", fontWeight: 700, color: C.muted }}>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ ...inputS, cursor: "pointer" }} /></label>
         </div>
         {hasStudies && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -3482,28 +3482,28 @@ function ExportDialog({ C, font, isAdmin, pop, gradeBadge, onClose, coverTitle }
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
           <button onClick={() => setSelected(new Set(filtered.map((r) => r.id)))} style={smallBtn}>Select all</button>
           <button onClick={() => setSelected(new Set())} style={smallBtn}>Clear</button>
-          <span style={{ marginLeft: "auto", fontSize: "0.72rem", fontWeight: 700, color: C.goldBright }}>{N} of {M} selected</span>
+          <span style={{ marginLeft: "auto", fontSize: "0.75rem", fontWeight: 700, color: C.white }}>{N} of {M} selected</span>
         </div>
 
         {/* (b) FILTERED LIST — scrolls internally */}
         <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, maxHeight: "min(46vh, 380px)", overflowY: "auto", marginBottom: 16 }}>
           {filtered.length === 0 ? (
-            <div style={{ padding: "34px 16px", textAlign: "center", color: C.muted, fontSize: "0.8rem" }}>No entries match these filters.</div>
+            <div style={{ padding: "34px 16px", textAlign: "center", color: C.muted, fontSize: "0.75rem" }}>No entries match these filters.</div>
           ) : filtered.map((r) => {
             const on = selected.has(r.id);
             const gl = gradeLetter(r);
             const pat = isStudyRow(r) ? (r.metrics.study.setup || r.pattern) : r.pattern;
             const ocp = outcomeChip(r);
             return (
-              <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderBottom: `1px solid ${C.border}`, cursor: "pointer", fontSize: "0.76rem" }}>
+              <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: `1px solid ${C.border}`, cursor: "pointer", fontSize: "0.75rem" }}>
                 <input type="checkbox" checked={on} onChange={() => toggle(r.id)} style={{ cursor: "pointer", accentColor: C.goldBright, flexShrink: 0 }} />
                 <b style={{ width: 62, color: C.white, flexShrink: 0 }}>{r.ticker}</b>
                 <span style={{ width: 82, color: C.muted, flexShrink: 0 }}>{r.entry_date || "—"}</span>
                 <span style={{ flex: 1, minWidth: 0, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pat || "—"}</span>
                 {gl === "—"
-                  ? <span style={{ flexShrink: 0, minWidth: 24, textAlign: "center", padding: "1px 7px", borderRadius: 6, fontWeight: 800, fontSize: "0.66rem", color: C.muted, border: `1px solid ${C.border}` }}>—</span>
-                  : <span style={{ flexShrink: 0, minWidth: 24, textAlign: "center", padding: "2px 7px", borderRadius: 6, fontWeight: 800, fontSize: "0.66rem", color: "#08080e", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` }}>{gl}</span>}
-                <span style={{ width: 108, flexShrink: 0, textAlign: "right", fontWeight: 800, fontSize: "0.66rem", color: ocp.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ocp.label}</span>
+                  ? <span style={{ flexShrink: 0, minWidth: 24, textAlign: "center", padding: "1px 7px", borderRadius: 6, fontWeight: 600, fontSize: "0.6875rem", color: C.muted, border: `1px solid ${C.border}` }}>—</span>
+                  : <span style={{ flexShrink: 0, minWidth: 24, textAlign: "center", padding: "2px 7px", borderRadius: 6, fontWeight: 600, fontSize: "0.6875rem", color: C.white, background: "var(--w10)" }}>{gl}</span>}
+                <span style={{ width: 108, flexShrink: 0, textAlign: "right", fontWeight: 600, fontSize: "0.6875rem", color: ocp.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ocp.label}</span>
               </label>
             );
           })}
@@ -3605,10 +3605,10 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
   // Grade badge derived from the objective star tier (same source as the stars — no new data, no re-scoring).
   // Defined BEFORE `visible` because the grade sub-filter reads it during the filter pass (avoid a TDZ crash).
-  const gradeBadge = (n) => n >= 5 ? { l: "A+", fg: "#86efac", bg: "rgba(34,197,94,0.15)", bd: "rgba(34,197,94,0.3)" }
-    : n === 4 ? { l: "A", fg: "#86efac", bg: "rgba(34,197,94,0.15)", bd: "rgba(34,197,94,0.3)" }
-    : n === 3 ? { l: "B", fg: C.goldBright, bg: C.goldDim, bd: C.borderGold }
-    : { l: "C", fg: "#fca5a5", bg: "rgba(239,68,68,0.12)", bd: "rgba(239,68,68,0.3)" };
+  const gradeBadge = (n) => n >= 5 ? { l: "A+", fg: "var(--greenFg)", bg: "rgba(0,200,5,0.15)", bd: "rgba(0,200,5,0.3)" }
+    : n === 4 ? { l: "A", fg: "var(--greenFg)", bg: "rgba(0,200,5,0.15)", bd: "rgba(0,200,5,0.3)" }
+    : n === 3 ? { l: "B", fg: C.white, bg: "var(--w10)", bd: "var(--w22)" }
+    : { l: "C", fg: "var(--redFg)", bg: "rgba(255,80,0,0.12)", bd: "rgba(255,80,0,0.3)" };
 
   // Admin's 🎴 Gallery view over My Research shows the WHOLE personal dataset as cards — study rows +
   // plain rows together (the "same fills, VIV-Official format" view). Everywhere else, studies stay out
@@ -3887,9 +3887,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
   const chip = (active) => ({
     display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
-    fontSize: "0.72rem", fontWeight: 700, padding: "7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
-    border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? "#08080e" : C.muted,
-    background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
+    fontSize: "0.75rem", fontWeight: 700, padding: "7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
+    border: `1px solid ${active ? "var(--w14)" : C.border}`, color: active ? "var(--white)" : C.muted,
+    background: active ? "var(--w10)" : "var(--w03)",
   });
 
   // MEMBER VIEW (Valen 2026-07-30): members land on the Deep Dives report page — no Pattern
@@ -3897,7 +3897,21 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
   // (memberView "mine" falls through to the page below with member-minimal chrome).
   if (!isAdmin && memberView === "dives") return (
     <div style={{ fontFamily: font }}>
-      {loading ? <div style={{ color: C.muted, fontSize: "0.8rem", padding: "30px 0" }}>Loading…</div>
+      {loading ? (
+        // Shape-matched skeleton of the DiveIndex below: page title → latest-dive hero → list rows.
+        // `.sk` is the app-wide shimmer (theme-aware, reduced-motion guarded) — never re-implemented here.
+        <div aria-busy="true" aria-label="Loading Deep Dives" style={{ padding: "8px 0 30px" }}>
+          <div className="sk sk-line" style={{ width: "34%", height: 28, margin: "0 0 34px" }} />
+          <div className="sk sk-line" style={{ width: "22%", height: 12 }} />
+          <div className="sk sk-line" style={{ width: "62%", height: 40, margin: "16px 0 0" }} />
+          <div className="sk sk-line" style={{ width: "26%", height: 12, margin: "26px 0 0" }} />
+          <div style={{ margin: "34px 0 0" }}>
+            {[0, 1, 2, 3].map((k) => (
+              <div key={k} className="sk-row"><div className="sk sk-line" style={{ flex: 1 }} /></div>
+            ))}
+          </div>
+        </div>
+      )
         : <DiveIndex C={C} font={font} dives={diveList}
             onOpen={(d) => d.static === "playbook" ? openPlaybookBook() : openMyBookPdf(d.rows, { coverTitle: d.project })}
             onMyBook={() => { setFScope("mine"); setMemberView("mine"); }} myCount={mineCount}
@@ -3915,23 +3929,23 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {/* command header */}
       <div className="toolbar" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap", marginBottom: 20 }}>
         <div>
-          {!isAdmin && <div onClick={() => setMemberView("dives")} style={{ fontSize: "0.72rem", color: C.muted, cursor: "pointer", marginBottom: 10 }}>← Deep Dives</div>}
-          {isAdmin && <div style={{ fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold }}>Model Book</div>}
+          {!isAdmin && <div onClick={() => setMemberView("dives")} style={{ fontSize: "0.75rem", color: C.muted, cursor: "pointer", marginBottom: 10 }}>← Deep Dives</div>}
+          {isAdmin && <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)" }}>Model Book</div>}
           {isAdmin ? (<h2 className={"sech guide" + (gactive ? gactive("modelbook") : "")}
             onMouseEnter={guideEnter ? guideEnter("modelbook", "Model Book", "Two books in one: the ⭐ VIV Official library — curated elite setups, read-only — and 🔒 My Book, your private collection only you can see. Study the before chart, the exact factors that made it elite, then the outcome. Stars are computed from the Setup Grader ticks (objective, no bias). Fields marked with a gold dot were auto-read off the chart by VIV — edit any that look off. Pattern recognition is built by reps: same patterns, hundreds of examples.", undefined) : undefined}
             onMouseLeave={guideLeave ? guideLeave("modelbook") : undefined}
-            style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, marginTop: 5 }}>The Pattern Library</h2>) : (
+            style={{ fontSize: "1.75rem", fontWeight: 600, letterSpacing: "-0.02em", color: C.white, marginTop: 5 }}>The Pattern Library</h2>) : (
             <>
-              <h2 className="sech" style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, marginTop: 5 }}>Your Book</h2>
-              <div onClick={() => setDiveModal(true)} style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: "0.76rem", color: C.gold, cursor: "pointer" }}>
+              <h2 className="sech" style={{ fontSize: "1.75rem", fontWeight: 600, letterSpacing: "-0.02em", color: C.white, marginTop: 5 }}>Your Book</h2>
+              <div onClick={() => setDiveModal(true)} style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: "0.75rem", color: C.gold, cursor: "pointer" }}>
                 {myDive ? <>📖 {myDive.title}
-                  <span style={{ fontSize: "0.56rem", fontWeight: 800, letterSpacing: "0.1em", color: myDive.is_live ? "#22c55e" : C.muted, border: `1px solid ${myDive.is_live ? "rgba(34,197,94,0.35)" : C.border}`, padding: "2px 8px", borderRadius: 99 }}>{myDive.is_live ? "LIVE" : "DRAFT"}</span>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: "0.1em", color: myDive.is_live ? "var(--green)" : C.muted, border: `1px solid ${myDive.is_live ? "rgba(0,200,5,0.35)" : C.border}`, padding: "2px 8px", borderRadius: 99 }}>{myDive.is_live ? "LIVE" : "DRAFT"}</span>
                   <span style={{ color: C.muted }}>edit</span></>
                   : <>📖 Make it a Deep Dive <span style={{ color: C.muted }}>— publish your book like the VIV dives</span></>}
               </div>
             </>
           )}
-          {isAdmin && <div style={{ fontSize: "0.8rem", color: C.muted, marginTop: 6 }}>{visible.length} {visible.length === 1 ? "entry" : "entries"} · the best setups, kept for study — before → factors → after</div>}
+          {isAdmin && <div style={{ fontSize: "0.75rem", color: C.muted, marginTop: 6 }}>{visible.length} {visible.length === 1 ? "entry" : "entries"} · the best setups, kept for study — before → factors → after</div>}
         </div>
         {!editing && !studyEditing && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -3941,17 +3955,17 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                     The actual PDF/CSV run on the SELECTED rows from inside the dialog. */}
                 <button onClick={() => setExporting(true)}
                   title="Open the export picker — multi-select entries, filter by ticker and date range, then export as a branded PDF study book."
-                  style={{ background: "rgba(255,255,255,0.04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ Export PDF</button>
+                  style={{ background: "var(--w04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.75rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ Export PDF</button>
                 <button onClick={() => setExporting(true)}
                   title="Open the export picker — multi-select entries, filter by ticker and date range, then export as a CSV for any analysis tool."
-                  style={{ background: "rgba(255,255,255,0.04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ CSV</button>
+                  style={{ background: "var(--w04)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 700, fontSize: "0.75rem", padding: "10px 18px", borderRadius: 99, cursor: "pointer" }}>⬇ CSV</button>
               </>
             )}
             {/* ONE INTAKE: for ADMIN in 🔒 My Research (fScope==="mine") "＋ New study" opens the STUDY editor
                 (studyMode on → Lab view, its portal mounts). Members (never admin) keep their untouched draft
                 flow → MBEditor. Admin in All/Official opens MBEditor for a curated card. Editing an EXISTING
                 legacy row still uses MBEditor (via the detail overlay's Edit button). */}
-            <button onClick={() => { if (isAdmin && fScope === "mine") { setStudyMode(true); setStudyEditing({}); } else setEditing({}); }} style={{ background: `linear-gradient(120deg, ${C.goldMid}, ${C.goldBright}, ${C.goldDeep})`, color: "#0a0a0a", border: "none", fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", boxShadow: "0 6px 18px rgba(201,152,42,0.25)" }}>{(isAdmin && fScope === "mine") ? "＋ New study" : isAdmin ? "+ Add entry" : "+ Add to my book"}</button>
+            <button onClick={() => { if (isAdmin && fScope === "mine") { setStudyMode(true); setStudyEditing({}); } else setEditing({}); }} style={{ background: "linear-gradient(120deg, var(--goldPillMid), var(--goldPill), var(--goldPillDeep))", color: "var(--goldOn)", border: "none", fontFamily: font, fontWeight: 700, fontSize: "0.75rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", boxShadow: "0 6px 18px rgba(201,152,42,0.25)" }}>{(isAdmin && fScope === "mine") ? "＋ New study" : isAdmin ? "+ Add entry" : "+ Add to my book"}</button>
           </div>
         )}
       </div>
@@ -3991,7 +4005,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           named project. Shown only once at least one project book exists (else the row is noise). */}
       {isAdmin && fScope === "mine" && projectBooks.length > 0 && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "0 0 16px" }}>
-          <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, marginRight: 2 }}>Books</span>
+          <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginRight: 2 }}>Books</span>
           <button onClick={() => setBook("__all__")} style={chip(book === "__all__")}>All books</button>
           <button onClick={() => setBook("__none__")} style={chip(book === "__none__")}>📕 Winner DNA{dnaCount ? ` (${dnaCount})` : ""}</button>
           {projectBooks.map(p => {
@@ -4018,7 +4032,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           ))}
           <span style={{ width: 1, alignSelf: "stretch", background: C.border, margin: "0 4px" }} />
           <input value={fTicker} onChange={e => setFTicker(e.target.value.toUpperCase())} placeholder="Search ticker…"
-            style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${fTicker ? C.goldBright : C.border}`, borderRadius: 99, color: C.white, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "7px 14px", outline: "none", width: 140, maxWidth: "100%", colorScheme: "dark" }} />
+            style={{ background: "var(--w06)", border: `1px solid ${fTicker ? C.goldBright : C.border}`, borderRadius: 99, color: C.white, fontFamily: font, fontSize: "0.75rem", fontWeight: 700, padding: "7px 14px", outline: "none", width: 140, maxWidth: "100%", colorScheme: "light dark" }} />
           {subFiltersActive && (
             <button onClick={clearSubFilters} title="Reset pattern / grade / outcome / ticker filters"
               style={{ ...chip(false), color: C.goldBright, borderColor: C.borderGold }}>✕ Clear</button>
@@ -4026,34 +4040,31 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         </div>
       )}
       {fScope === "mine" && !isAdmin && (
-        <div style={{ fontSize: "0.72rem", color: C.muted, margin: "-8px 0 16px" }}>🔒 Your personal model book — entries here are visible only to you. The ⭐ VIV Official book is curated by the team and is read-only.</div>
+        <div style={{ fontSize: "0.75rem", color: C.muted, margin: "-8px 0 16px" }}>🔒 Your personal model book — entries here are visible only to you. The ⭐ VIV Official book is curated by the team and is read-only.</div>
       )}
 
-      {loading && (() => {
-        const sk = { background: "linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(240,192,80,0.08) 50%, rgba(255,255,255,0.03) 75%)", backgroundSize: "800px 100%", animation: "mbshimmer 1.4s linear infinite" };
-        return (
-          <>
-            <style>{"@keyframes mbshimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}"}</style>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }} aria-label="Loading the Model Book">
-              {Array.from({ length: 6 }, (_, k) => (
-                <div key={k} style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
-                  <div style={{ height: 160, borderBottom: `1px solid ${C.border}`, ...sk }} />
-                  <div style={{ padding: "13px 15px" }}>
-                    <div style={{ height: 14, width: "55%", borderRadius: 6, marginBottom: 10, ...sk }} />
-                    <div style={{ height: 10, width: "82%", borderRadius: 6, ...sk }} />
-                  </div>
-                </div>
-              ))}
+      {loading && (
+        // Card-grid skeleton — same shape as a real entry card (chart pane → title → meta line).
+        // Uses the app-wide `.sk` shimmer (theme-aware + reduced-motion guarded); the old local
+        // @keyframes mbshimmer and its hardcoded white washes are gone with it.
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }} aria-busy="true" aria-label="Loading the Model Book">
+          {Array.from({ length: 6 }, (_, k) => (
+            <div key={k} style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
+              <div className="sk" style={{ height: 160, borderRadius: 0, borderBottom: `1px solid ${C.border}` }} />
+              <div style={{ padding: "13px 15px" }}>
+                <div className="sk sk-line" style={{ height: 14, width: "55%", margin: "0 0 10px" }} />
+                <div className="sk sk-line" style={{ height: 10, width: "82%", margin: 0 }} />
+              </div>
             </div>
-          </>
-        );
-      })()}
-      {error === "setup" && <div style={{ color: C.muted, fontSize: "0.86rem", padding: "30px 0", textAlign: "center" }}>📖 The Model Book is being set up — check back shortly.</div>}
-      {error && error !== "setup" && <div style={{ color: C.red, fontSize: "0.8rem", padding: "12px 0" }}>{error}</div>}
+          ))}
+        </div>
+      )}
+      {error === "setup" && <div style={{ color: C.muted, fontSize: "0.875rem", padding: "30px 0", textAlign: "center" }}>📖 The Model Book is being set up — check back shortly.</div>}
+      {error && error !== "setup" && <div style={{ color: C.red, fontSize: "0.75rem", padding: "12px 0" }}>{error}</div>}
       {!studyMode && !loading && !error && visible.length === 0 && (
-        <div style={{ color: C.muted, fontSize: "0.86rem", padding: "34px 16px", textAlign: "center", lineHeight: 1.6 }}>
+        <div style={{ color: C.muted, fontSize: "0.875rem", padding: "34px 16px", textAlign: "center", lineHeight: 1.6 }}>
           {subFiltersActive
-            ? <>No entries match these filters. <button onClick={clearSubFilters} style={{ background: "none", border: "none", color: C.goldBright, fontFamily: font, fontWeight: 800, fontSize: "0.86rem", cursor: "pointer", textDecoration: "underline", padding: 0 }}>Clear filters</button> to see the full book.</>
+            ? <>No entries match these filters. <button onClick={clearSubFilters} style={{ background: "none", border: "none", color: C.goldBright, fontFamily: font, fontWeight: 600, fontSize: "0.875rem", cursor: "pointer", textDecoration: "underline", padding: 0 }}>Clear filters</button> to see the full book.</>
             : fScope === "mine" ? "Your book is empty — save a setup to start building your own pattern library."
             : fScope === "official" ? "No published setups yet — the VIV team is curating the library. Check back soon."
             : "No entries yet — curated VIV setups and your own saved studies will appear here as cards."}
@@ -4075,11 +4086,11 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               inside never close (members are editing). Portaled to body so no card backdrop-filter
               becomes its containing block. No Esc-close here: the editor's chart lightbox owns Esc. */}
           {studyEditing !== null && createPortal(
-            <div onClick={() => { if (studyCloseGuard.current()) setStudyEditing(null); }} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "4vh 3vw" }}>
-              <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1180, margin: "0 auto", background: "rgba(10,10,16,0.92)", borderRadius: 16 }}>
+            <div onClick={() => { if (studyCloseGuard.current()) setStudyEditing(null); }} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "var(--scrim)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "4vh 3vw" }}>
+              <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1180, margin: "0 auto", background: "var(--sheet)", borderRadius: 16 }}>
                 {/* Save errors must be visible INSIDE the popup — the page-level banner sits behind this
                     backdrop, which made failed saves look like "nothing happened" (Valen 2026-07-29). */}
-                {error && error !== "setup" && <div style={{ color: "#fca5a5", background: "rgba(224,90,85,0.12)", border: "1px solid rgba(224,90,85,0.4)", borderRadius: 10, fontSize: "0.78rem", fontWeight: 600, padding: "10px 14px", margin: "0 0 2px" }}>⚠ Save failed: {error} — your edits are still here; hit Save again.</div>}
+                {error && error !== "setup" && <div style={{ color: "var(--redFg)", background: "var(--redDim)", border: "1px solid var(--red)", borderRadius: 10, fontSize: "0.75rem", fontWeight: 600, padding: "10px 14px", margin: "0 0 2px" }}>⚠ Save failed: {error} — your edits are still here; hit Save again.</div>}
                 <StudyEditor key={studyEditing.id || (studyEditing.metrics ? "child" : "new")} C={C} font={font} busy={busy} campaignRows={studyRows}
                   initial={studyEditing && (studyEditing.id || studyEditing.metrics) ? studyEditing : null}
                   closeGuard={studyCloseGuard} onNavigate={(t) => setStudyEditing(t)}
@@ -4088,9 +4099,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                   onCancel={() => setStudyEditing(null)} onUpload={uploadImg} />
               </div>
             </div>, document.body)}
-          <button onClick={() => setStudyEditing({})} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "#08080e", border: "none", fontFamily: font, fontWeight: 800, fontSize: "0.78rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", marginBottom: 14 }}>＋ New study</button>
+          <button onClick={() => setStudyEditing({})} style={{ background: "linear-gradient(135deg, var(--goldPill), var(--goldPillMid))", color: "var(--goldOn)", border: "none", fontFamily: font, fontWeight: 600, fontSize: "0.75rem", padding: "10px 20px", borderRadius: 99, cursor: "pointer", marginBottom: 14 }}>＋ New study</button>
           {bookStudyRows.length === 0 && studyEditing === null && (
-            <div style={{ color: C.muted, fontSize: "0.82rem", padding: "18px 0" }}>{isProjectBook ? "No studies in this book yet — hit ＋ New study and set its Project to this book." : "No studies yet — hit ＋ New study. Grade blind (grade + prediction locked before the outcome opens), then record what happened. The scoreboard finds your winner DNA as the sample grows."}</div>
+            <div style={{ color: C.muted, fontSize: "0.875rem", padding: "18px 0" }}>{isProjectBook ? "No studies in this book yet — hit ＋ New study and set its Project to this book." : "No studies yet — hit ＋ New study. Grade blind (grade + prediction locked before the outcome opens), then record what happened. The scoreboard finds your winner DNA as the sample grows."}</div>
           )}
           {/* Grouped by CAMPAIGN (Valen 2026-07-24): legs of one trend nest under a header (ticker · span ·
               N legs · shared BEFORE→AFTER). Solo studies (no campaign_id) render as a single row exactly as
@@ -4110,14 +4121,14 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               });
               return (
                 <button onClick={cyc} title="Click to sort — asc → desc → off. The other date column stays as a secondary sort."
-                  style={{ width, textAlign: "left", background: "transparent", border: "none", cursor: "pointer", padding: 0, fontFamily: font, fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: st ? C.goldBright : C.muted, whiteSpace: "nowrap" }}>
+                  style={{ width, textAlign: "left", background: "transparent", border: "none", cursor: "pointer", padding: 0, fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: st ? C.white : C.muted, whiteSpace: "nowrap" }}>
                   {label}{st ? (st.dir === 1 ? " ↑" : " ↓") : " ⇅"}{listSort.length > 1 && idx >= 0 ? <sup>{idx + 1}</sup> : null}
                 </button>
               );
             };
             return (
               <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "2px 12px 6px" }}>
-                <span style={{ width: 64, fontSize: "0.6rem", fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: C.muted }}>Ticker</span>
+                <span style={{ width: 64, fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)" }}>Ticker</span>
                 {th("entry", "Entry date", 92)}
                 {th("trigger", "Trigger date", 92)}
               </div>
@@ -4165,49 +4176,49 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                   backImg = r.after_img || null;
                 }
                 return (
-                  <div key={r.id} style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 4, marginLeft: indent ? 22 : 0, fontSize: "0.78rem", cursor: "pointer" }}
+                  <div key={r.id} style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", padding: "14px 16px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 4, marginLeft: indent ? 22 : 0, fontSize: "0.75rem", cursor: "pointer" }}
                     onClick={() => setStudyEditing(r)}
                     onMouseEnter={e => e.currentTarget.style.borderColor = C.borderGold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
                     {indent
-                      ? <span style={{ width: 64, color: C.muted, fontSize: "0.66rem", fontWeight: 700 }}>leg {legIndex}</span>
+                      ? <span style={{ width: 64, color: C.muted, fontSize: "0.6875rem", fontWeight: 700 }}>leg {legIndex}</span>
                       : <b style={{ width: 64 }}>{r.ticker}</b>}
                     <span style={{ color: C.muted, width: 92 }}>{r.entry_date || "—"}</span>
                     {/* Trigger date (Valen 2026-07-28) — his picked trigger (metrics.study.m.trigger_date), distinct
                         from the entry/anchor date (e.g. Market Bottom rows anchor on the LOW; the trigger comes later). */}
-                    <span title="Trigger date — fill it in the editor's metrics grid" style={{ color: s.m?.trigger_date ? C.goldBright : C.muted, width: 92, fontSize: "0.74rem" }}>{s.m?.trigger_date || "—"}</span>
+                    <span title="Trigger date — fill it in the editor's metrics grid" style={{ color: s.m?.trigger_date ? C.white : C.muted, width: 92, fontSize: "0.75rem" }}>{s.m?.trigger_date || "—"}</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
                       {frontImg
                         ? <span style={{ position: "relative", display: "inline-block", width: 64, height: 40, flexShrink: 0 }}>
                             <img src={frontImg} alt="htf" title={frontInherited ? "Shared HTF (weekly) from Leg 1 — the weekly lives on the root leg" : "HTF — this leg's weekly"} style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}`, display: "block" }} />
-                            {frontInherited && <span title="Shared HTF (weekly) from Leg 1 — the weekly lives on the root leg" style={{ position: "absolute", top: -5, left: -5, background: "rgba(8,8,14,0.92)", border: `1px solid ${C.borderGold}`, color: C.goldBright, fontSize: "0.48rem", fontWeight: 800, letterSpacing: ".02em", borderRadius: 99, padding: "0 4px", lineHeight: 1.6, whiteSpace: "nowrap" }}>↩ shared</span>}
+                            {frontInherited && <span title="Shared HTF (weekly) from Leg 1 — the weekly lives on the root leg" style={{ position: "absolute", top: -5, left: -5, background: "var(--sheet)", border: `1px solid ${C.border}`, color: C.muted, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: ".02em", borderRadius: 99, padding: "0 4px", lineHeight: 1.6, whiteSpace: "nowrap" }}>↩ shared</span>}
                           </span>
                         : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
-                      <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
+                      <span style={{ color: C.muted, fontSize: "0.6875rem" }}>→</span>
                       {backImg
                         ? <img src={backImg} alt={inheritWholeSet ? "outcome" : "ltf"} title={inheritWholeSet ? "The shared trend outcome" : (indent ? "LTF — this leg's daily setup" : "The outcome")} style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} />
                         : secondCount > 1
-                          ? <span title={`${secondCount} charts in this study`} style={{ width: 64, height: 40, borderRadius: 5, border: `1px solid ${C.borderGold}`, display: "grid", placeItems: "center", color: C.goldBright, fontSize: "0.62rem", fontWeight: 800 }}>+{secondCount - 1}</span>
+                          ? <span title={`${secondCount} charts in this study`} style={{ width: 64, height: 40, borderRadius: 5, border: `1px solid ${C.borderGold}`, display: "grid", placeItems: "center", color: C.white, fontSize: "0.6875rem", fontWeight: 600 }}>+{secondCount - 1}</span>
                           : inheritWholeSet
                             ? <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />
-                            : <span title={indent ? "No LTF yet — drop this leg's own daily setup chart" : "No outcome chart yet — drop `TICKER DATE AFTER.png` in the study inbox"} style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>{indent ? "ltf?" : "after?"}</span>}
+                            : <span title={indent ? "No LTF yet — drop this leg's own daily setup chart" : "No outcome chart yet — drop `TICKER DATE AFTER.png` in the study inbox"} style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.6875rem" }}>{indent ? "ltf?" : "after?"}</span>}
                     </span>
                     {/* setup comes from the STUDY payload (the pattern column is the legacy Model-Book field —
                         rows seeded by script showed the DB-default "Trendline Breakout", Valen bug report 2026-07-28) */}
                     <span style={{ width: 150 }}>{(s.setup || r.pattern || "") + (s.direction === "short" ? " · Short" : "")}</span>
-                    {(() => { const q = studyQuality(s); return <span style={{ width: 70, color: q.letter === "—" ? C.muted : q.letter === "A+" ? "#7ef0a0" : C.goldBright, fontWeight: 700 }} title={`${q.on}/${q.total} criteria ticked`}>{q.letter}</span>; })()}
+                    {(() => { const q = studyQuality(s); return <span style={{ width: 70, color: q.letter === "—" ? C.muted : q.letter === "A+" ? "var(--greenFg)" : C.white, fontWeight: 700 }} title={`${q.on}/${q.total} criteria ticked`}>{q.letter}</span>; })()}
                     {/* (a) OUTCOME-CLASS chip — emoji + word, colored by tier (never color alone) */}
-                    <span title={oc ? `Outcome class: ${oc.label}` : "Outcome pending — grade the result to classify"} style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 108, flexShrink: 0, whiteSpace: "nowrap", fontSize: "0.66rem", fontWeight: 800, color: oc ? oc.color : C.muted }}>{oc ? `${oc.emoji} ${oc.label}` : "— pending"}</span>
-                    <span style={{ flex: 1, minWidth: 0, color: C.muted, fontSize: "0.7rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.regime_tag || ""}</span>
+                    <span title={oc ? `Outcome class: ${oc.label}` : "Outcome pending — grade the result to classify"} style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 108, flexShrink: 0, whiteSpace: "nowrap", fontSize: "0.6875rem", fontWeight: 600, color: oc ? oc.color : C.muted }}>{oc ? `${oc.emoji} ${oc.label}` : "— pending"}</span>
+                    <span style={{ flex: 1, minWidth: 0, color: C.muted, fontSize: "0.6875rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.regime_tag || ""}</span>
                     {/* (b) H-VOTE DOT STRIP — 14 hypotheses in order; read-only reuse of entryVerdict. green=supports ·
                         red=challenges · grey=adds-data · hollow=no vote. Wraps gracefully on narrow screens. */}
                     <span style={{ display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center", flex: "none", maxWidth: 130, justifyContent: "flex-end" }}>
                       {HYPOTHESES.map(h => { const v = entryVerdict(h, s, hctx); const b = v ? v.bucket : null;
-                        const col = b === "supports" ? "#7ef0a0" : b === "challenges" ? "#e05555" : b === "data" ? "rgba(255,255,255,0.4)" : "transparent";
+                        const col = b === "supports" ? "var(--greenFg)" : b === "challenges" ? "var(--red)" : b === "data" ? "var(--faint)" : "transparent";
                         return <span key={h.id} title={`${h.id} · ${b === "data" ? "adds data" : b || "no vote"}`} style={{ width: 7, height: 7, borderRadius: "50%", background: col, border: b ? "none" : `1px solid ${C.border}`, boxSizing: "border-box", flex: "none" }} />; })}
                     </span>
-                    {showAddLeg && <button title="Add a linked leg to this trend" onClick={(e) => { e.stopPropagation(); addLeg(camp.root, camp.legs); }} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, cursor: "pointer", fontSize: "0.6rem", fontWeight: 800, borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" }}>+ leg</button>}
-                    <button title={inModelBook(r) ? "In the Model Book — click to remove" : "Add to the Model Book"} onClick={(e) => { e.stopPropagation(); toggleModelBook(r); }} style={{ background: "transparent", border: "none", color: inModelBook(r) ? C.goldBright : C.muted, cursor: "pointer", fontSize: "1rem" }}>{inModelBook(r) ? "★" : "☆"}</button>
-                    <button title="Delete study" onClick={(e) => { e.stopPropagation(); remove(r); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: "0.95rem" }}>×</button>
+                    {showAddLeg && <button title="Add a linked leg to this trend" onClick={(e) => { e.stopPropagation(); addLeg(camp.root, camp.legs); }} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, cursor: "pointer", fontSize: "0.6875rem", fontWeight: 600, borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" }}>+ leg</button>}
+                    <button title={inModelBook(r) ? "In the Model Book — click to remove" : "Add to the Model Book"} onClick={(e) => { e.stopPropagation(); toggleModelBook(r); }} style={{ background: "transparent", border: "none", color: inModelBook(r) ? C.white : C.muted, cursor: "pointer", fontSize: "1rem" }}>{inModelBook(r) ? "★" : "☆"}</button>
+                    <button title="Delete study" onClick={(e) => { e.stopPropagation(); remove(r); }} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: "1rem" }}>×</button>
                   </div>
                 );
               };
@@ -4216,24 +4227,24 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               const rootFront = rootFaces.front && rootFaces.front.img;
               const rootBack = rootFaces.back && rootFaces.back.img;
               return (
-                <div key={camp.cid} style={{ marginTop: 14, marginBottom: 4, border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "8px 10px", background: "rgba(201,152,42,0.04)" }}>
+                <div key={camp.cid} style={{ marginTop: 14, marginBottom: 4, border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "8px 10px", background: "var(--w03)" }}>
                   {/* Campaign header — ticker · trend span · N legs · shared BEFORE→AFTER · + Add leg */}
-                  <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "4px 4px 8px", fontSize: "0.78rem", cursor: "pointer" }} onClick={() => setStudyEditing(camp.root)}
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "4px 4px 8px", fontSize: "0.75rem", cursor: "pointer" }} onClick={() => setStudyEditing(camp.root)}
                     onMouseEnter={e => e.currentTarget.style.opacity = 0.85} onMouseLeave={e => e.currentTarget.style.opacity = 1}>
-                    <b style={{ width: 64, color: C.goldBright }}>{camp.root.ticker}</b>
-                    <span style={{ color: C.muted, width: 150, fontSize: "0.7rem" }}>{camp.span[0] || "?"} → {camp.span[1] || "?"}</span>
-                    <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, borderRadius: 99, padding: "2px 9px" }}>{camp.count} legs</span>
+                    <b style={{ width: 64, color: C.white }}>{camp.root.ticker}</b>
+                    <span style={{ color: C.muted, width: 150, fontSize: "0.6875rem" }}>{camp.span[0] || "?"} → {camp.span[1] || "?"}</span>
+                    <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.white, border: `1px solid ${C.border}`, borderRadius: 99, padding: "2px 9px" }}>{camp.count} legs</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
                       {rootFront ? <img src={rootFront} alt="setup" title="The setup — root leg" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
-                      <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
+                      <span style={{ color: C.muted, fontSize: "0.6875rem" }}>→</span>
                       {rootBack
                         ? <img src={rootBack} alt="outcome" title="The shared trend outcome" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} />
                         : rootFaces.count > 1
-                          ? <span title={`${rootFaces.count} charts in the root leg`} style={{ width: 64, height: 40, borderRadius: 5, border: `1px solid ${C.borderGold}`, display: "grid", placeItems: "center", color: C.goldBright, fontSize: "0.62rem", fontWeight: 800 }}>+{rootFaces.count - 1}</span>
-                          : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
+                          ? <span title={`${rootFaces.count} charts in the root leg`} style={{ width: 64, height: 40, borderRadius: 5, border: `1px solid ${C.borderGold}`, display: "grid", placeItems: "center", color: C.white, fontSize: "0.6875rem", fontWeight: 600 }}>+{rootFaces.count - 1}</span>
+                          : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.6875rem" }}>after?</span>}
                     </span>
                     <span style={{ flex: 1 }} />
-                    <button title="Add a linked leg to this trend" onClick={(e) => { e.stopPropagation(); addLeg(camp.root, camp.legs); }} style={{ background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, cursor: "pointer", fontSize: "0.66rem", fontWeight: 800, borderRadius: 99, padding: "4px 12px", whiteSpace: "nowrap" }}>+ Add leg</button>
+                    <button title="Add a linked leg to this trend" onClick={(e) => { e.stopPropagation(); addLeg(camp.root, camp.legs); }} style={{ background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, cursor: "pointer", fontSize: "0.6875rem", fontWeight: 600, borderRadius: 99, padding: "4px 12px", whiteSpace: "nowrap" }}>+ Add leg</button>
                   </div>
                   {camp.legs.map((r, i) => legRow(r, i + 1, true, false))}
                 </div>
@@ -4247,8 +4258,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               study editor. Admin-only block → plain "Legacy" copy is fine. */}
           {myRows.length > 0 && !isProjectBook && (
             <div style={{ marginTop: 18 }}>
-              <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, borderTop: `1px solid ${C.border}`, paddingTop: 14, marginBottom: 10 }}>
-                📖 Legacy entries — pre-studies era <span style={{ color: C.gold }}>({myRows.length})</span>
+              <div style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, borderTop: `1px solid ${C.border}`, paddingTop: 14, marginBottom: 10 }}>
+                📖 Legacy entries — pre-studies era <span style={{ color: C.white }}>({myRows.length})</span>
               </div>
               {myRows.map((r) => {
                 const faces = chartFaces(r, false); // plain rows: derives from before_img/after_img
@@ -4258,9 +4269,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 const eo = r.outcome || outcomeFromR(r.r_mult, r.run_pct);
                 const win = eo ? /winner/i.test(eo) : null;
                 const loss = eo ? /(loser|subpar)/i.test(eo) : null;
-                const oc = win ? "#7ef0a0" : loss ? "#e05555" : C.muted;
+                const oc = win ? "var(--greenFg)" : loss ? "var(--red)" : C.muted;
                 return (
-                  <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 4, fontSize: "0.78rem", cursor: "pointer" }}
+                  <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "14px 16px", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 4, fontSize: "0.75rem", cursor: "pointer" }}
                     onClick={() => setDetail(r)}
                     onMouseEnter={e => e.currentTarget.style.borderColor = C.borderGold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
                     <b style={{ width: 64 }}>{r.ticker}</b>
@@ -4268,14 +4279,14 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                     <span style={{ color: C.muted, width: 92 }}>—</span>{/* trigger-column spacer — legacy rows have no study payload */}
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 148, flexShrink: 0 }}>
                       {frontImg ? <img src={frontImg} alt="setup" title="The setup" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.border}` }} /> : <span style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "inline-block" }} />}
-                      <span style={{ color: C.muted, fontSize: "0.7rem" }}>→</span>
+                      <span style={{ color: C.muted, fontSize: "0.6875rem" }}>→</span>
                       {backImg
                         ? <img src={backImg} alt="outcome" title="The outcome" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.borderGold}` }} />
-                        : <span title="No after chart" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.56rem" }}>after?</span>}
+                        : <span title="No after chart" style={{ width: 64, height: 40, borderRadius: 5, border: `1px dashed ${C.border}`, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.6875rem" }}>after?</span>}
                     </span>
                     <span style={{ width: 150 }}>{r.pattern}</span>
-                    <span style={{ width: 70, color: gl === "A+" ? "#7ef0a0" : gl === "C" ? "#e05555" : C.goldBright, fontWeight: 700 }} title="Grade from the Setup Grader stars">{gl}</span>
-                    <span title={eo ? `Outcome: ${eo}` : "Outcome pending"} style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 108, flexShrink: 0, whiteSpace: "nowrap", fontSize: "0.66rem", fontWeight: 800, color: oc }}>{eo ? `${win ? "▲" : loss ? "▼" : ""} ${eo}` : "— pending"}</span>
+                    <span style={{ width: 70, color: gl === "A+" ? "var(--greenFg)" : gl === "C" ? "var(--red)" : C.white, fontWeight: 700 }} title="Grade from the Setup Grader stars">{gl}</span>
+                    <span title={eo ? `Outcome: ${eo}` : "Outcome pending"} style={{ display: "inline-flex", alignItems: "center", gap: 4, width: 108, flexShrink: 0, whiteSpace: "nowrap", fontSize: "0.6875rem", fontWeight: 600, color: oc }}>{eo ? `${win ? "▲" : loss ? "▼" : ""} ${eo}` : "— pending"}</span>
                     <span style={{ flex: 1, minWidth: 0 }} />
                     {/* 14-dot alignment slot: hollow only — legacy rows are not part of the hypothesis dataset */}
                     <span title="legacy entry — not part of the hypothesis dataset" style={{ display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center", flex: "none", maxWidth: 130, justifyContent: "flex-end" }}>
@@ -4299,14 +4310,14 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {/* #playbook landing card — what the Skool onboarding link opens onto. One click, because a
           blob tab needs a user gesture. Hidden the moment it is used or if the hash is anything else. */}
       {deepPlaybook && (
-        <div style={{ border: `1px solid ${C.gold}55`, background: "rgba(201,152,42,0.07)", borderRadius: 14, padding: "22px 24px", marginBottom: 26, display: "flex", flexWrap: "wrap", gap: 18, alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ border: "1px solid var(--borderGold)", background: "var(--goldDim)", borderRadius: 14, padding: "22px 24px", marginBottom: 26, display: "flex", flexWrap: "wrap", gap: 18, alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, marginBottom: 7 }}>Start here</div>
-            <div style={{ fontSize: "1.18rem", fontWeight: 800, color: "#fff", marginBottom: 5 }}>21 Building Blocks to Profitability</div>
-            <div style={{ fontSize: "0.85rem", color: C.muted, maxWidth: "52ch" }}>The whole system in twenty-one pieces — how I read the market, pick the stock, take the trade, and look after it afterwards.</div>
+            <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 7 }}>Start here</div>
+            <div style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--white)", marginBottom: 5 }}>21 Building Blocks to Profitability</div>
+            <div style={{ fontSize: "0.875rem", color: C.muted, maxWidth: "52ch" }}>The whole system in twenty-one pieces — how I read the market, pick the stock, take the trade, and look after it afterwards.</div>
           </div>
           <button type="button" onClick={consumePlaybookLink}
-            style={{ flex: "none", background: C.gold, color: "#08080e", border: "none", borderRadius: 10, padding: "12px 22px", fontSize: "0.86rem", fontWeight: 800, cursor: "pointer", fontFamily: font }}>
+            style={{ flex: "none", background: "var(--goldPill)", color: "var(--goldOn)", border: "none", borderRadius: 10, padding: "12px 22px", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", fontFamily: font }}>
             Open the handbook ↗
           </button>
         </div>
@@ -4326,7 +4337,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {(() => {
         if (studyMode || fScope === "dives") return null;
         const gridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 16, marginTop: 4 };
-        const legsChip = { fontSize: "0.56rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, background: C.goldDim, borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" };
+        const legsChip = { fontSize: "0.6875rem", fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, background: "var(--w06)", borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap" };
         const renderCard = ({ r, legs }) => {
           const eff = effectiveStars(cardStars(r), (r.elite || []).length);
           const elite = eff.n >= 6;
@@ -4339,7 +4350,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           const oc = r.outcome || outcomeFromR(r.r_mult, r.run_pct);
           const win = oc ? /winner/i.test(oc) : (heroPct != null ? heroPct >= 0 : null);
           const loss = oc ? /(loser|subpar)/i.test(oc) : (heroPct != null ? heroPct < 0 : null);
-          const heroColor = win ? C.goldBright : loss ? C.red : C.muted;
+          const heroColor = win ? C.white : loss ? C.red : C.muted;
           const heroText = heroPct != null
             ? `${heroPct > 0 ? "+" : ""}${heroPct}%${win ? " ▲" : loss ? " ▼" : ""}${r.days_held != null ? ` · ${r.days_held}d` : ""}`
             : "—";
@@ -4347,20 +4358,20 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           const hookSrc = (r.lesson || r.thesis || "").trim();
           const hook = hookSrc ? ((hookSrc.match(/^[^.!?]*[.!?]?/) || [hookSrc])[0]).trim() : "";
           return (
-            <div key={r.id} onClick={() => setDetail(r)} style={{ position: "relative", background: C.glass, border: `1px solid ${elite ? "rgba(126,240,160,0.32)" : C.border}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "transform .15s ease, border-color .15s ease" }}
-              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = elite ? "rgba(126,240,160,0.55)" : C.borderGold; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.borderColor = elite ? "rgba(126,240,160,0.32)" : C.border; }}>
+            <div key={r.id} onClick={() => setDetail(r)} style={{ position: "relative", background: C.glass, border: `1px solid ${elite ? "var(--green)" : C.border}`, borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "transform .15s ease, border-color .15s ease" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = elite ? "var(--green)" : C.borderGold; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.borderColor = elite ? "var(--green)" : C.border; }}>
               {/* cover — front image fills; when a back exists it takes the right half (the before → after pair) */}
               <div style={{ position: "relative", height: 160, overflow: "hidden", borderBottom: `1px solid ${C.border}`, display: "flex" }}>
-                {elite && <span style={{ position: "absolute", top: 12, right: 12, zIndex: 2, fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", padding: "5px 12px", borderRadius: 99, background: "rgba(126,240,160,0.16)", border: "1px solid rgba(126,240,160,0.45)", color: "#7ef0a0", boxShadow: "0 0 16px rgba(126,240,160,0.25)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}>⭐ Elite</span>}
+                {elite && <span style={{ position: "absolute", top: 12, right: 12, zIndex: 2, fontSize: "0.6875rem", fontWeight: 600, padding: "5px 12px", borderRadius: 99, background: "var(--greenDim)", border: "1px solid var(--green)", color: "var(--greenFg)", boxShadow: "0 0 16px rgba(0,200,5,0.25)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}>⭐ Elite</span>}
                 {faces.front ? (
                   <>
                     <img src={faces.front.img} alt={r.ticker} style={{ width: faces.back ? "50%" : "100%", height: 160, objectFit: "cover", display: "block" }} />
                     {faces.back && <img src={faces.back.img} alt={`${r.ticker} outcome`} style={{ width: "50%", height: 160, objectFit: "cover", display: "block", borderLeft: `1px solid ${C.border}` }} />}
                   </>
                 ) : (
-                  <div style={{ position: "relative", flex: 1, height: 160, background: "linear-gradient(180deg, rgba(201,152,42,0.10), rgba(201,152,42,0) 55%), repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 28px), #0d0d16" }}>
-                    <span style={{ position: "absolute", left: 12, bottom: 4, fontSize: "2.6rem", fontWeight: 800, letterSpacing: "-0.02em", color: "rgba(255,255,255,0.05)", lineHeight: 1, userSelect: "none", pointerEvents: "none" }}>{r.ticker}</span>
+                  <div style={{ position: "relative", flex: 1, height: 160, background: "linear-gradient(180deg, var(--w06), transparent 55%), repeating-linear-gradient(0deg, var(--w04) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, var(--w04) 0 1px, transparent 1px 28px), var(--bg2)" }}>
+                    <span style={{ position: "absolute", left: 12, bottom: 4, fontSize: "2.75rem", fontWeight: 600, letterSpacing: "-0.02em", color: "var(--w06)", lineHeight: 1, userSelect: "none", pointerEvents: "none" }}>{r.ticker}</span>
                   </div>
                 )}
               </div>
@@ -4368,22 +4379,22 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               <div style={{ padding: "14px 16px 16px" }}>
                 {/* row 1 — ticker + pattern, grade badge (near-black on gold) top-right */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{r.ticker}</span>
-                  <span style={{ fontSize: "0.62rem", fontWeight: 800, color: C.gold, whiteSpace: "nowrap" }}>{r.pattern}</span>
+                  <span style={{ fontSize: "1rem", fontWeight: 600, color: C.white, letterSpacing: "-0.01em" }}>{r.ticker}</span>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.muted, whiteSpace: "nowrap" }}>{r.pattern}</span>
                   {legs > 1 && <span title={`${legs} legs in this campaign`} style={legsChip}>{legs} legs</span>}
-                  <span title={eff.label} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 26, height: 22, padding: "0 8px", borderRadius: 7, fontWeight: 800, fontSize: "0.72rem", color: "#08080e", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, flexShrink: 0 }}>{gb.l}</span>
+                  <span title={eff.label} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 26, height: 22, padding: "0 8px", borderRadius: 7, fontWeight: 600, fontSize: "0.75rem", color: C.white, background: "var(--w10)", flexShrink: 0 }}>{gb.l}</span>
                 </div>
                 {/* status badges + date */}
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-                  {inModelBook(r) && <span title="Starred from a 📚 Study" style={{ fontSize: "0.56rem", fontWeight: 800, color: C.goldBright, border: `1px solid ${C.borderGold}`, padding: "2px 8px", borderRadius: 99 }}>📚 study</span>}
-                  {!r.is_published && !isStudyRow(r) && <span style={{ fontSize: "0.56rem", fontWeight: 800, color: isAdmin ? C.muted : "#8ab4f8", border: `1px solid ${isAdmin ? C.border : "rgba(138,180,248,0.35)"}`, padding: "2px 8px", borderRadius: 99 }}>{isAdmin ? "DRAFT" : "🔒 PERSONAL"}</span>}
-                  {r.is_published && <span title="Curated by the VIV team" style={{ fontSize: "0.56rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "2px 8px", borderRadius: 99 }}>⭐ VIV</span>}
-                  {dr && <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.muted, whiteSpace: "nowrap" }}>{dr}</span>}
+                  {inModelBook(r) && <span title="Starred from a 📚 Study" style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, padding: "2px 8px", borderRadius: 99 }}>📚 study</span>}
+                  {!r.is_published && !isStudyRow(r) && <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: isAdmin ? C.muted : "var(--blueFg)", border: `1px solid ${isAdmin ? C.border : "var(--blue)"}`, padding: "2px 8px", borderRadius: 99 }}>{isAdmin ? "DRAFT" : "🔒 PERSONAL"}</span>}
+                  {r.is_published && <span title="Curated by the VIV team" style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.muted, background: "var(--w06)", border: `1px solid ${C.border}`, padding: "2px 8px", borderRadius: 99 }}>⭐ VIV</span>}
+                  {dr && <span style={{ marginLeft: "auto", fontSize: "0.6875rem", color: C.muted, whiteSpace: "nowrap" }}>{dr}</span>}
                 </div>
                 {/* row 2 — the loud hero outcome line */}
-                <div style={{ fontSize: "1.05rem", fontWeight: 800, color: heroColor, marginTop: 11, letterSpacing: "-0.01em" }}>{heroText}</div>
+                <div style={{ fontSize: "1rem", fontWeight: 600, color: heroColor, marginTop: 11, letterSpacing: "-0.01em" }}>{heroText}</div>
                 {/* row 3 — his own one-line hook */}
-                {hook && <div style={{ fontSize: "0.7rem", color: C.muted, lineHeight: 1.45, marginTop: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hook}</div>}
+                {hook && <div style={{ fontSize: "0.6875rem", color: C.muted, lineHeight: 1.45, marginTop: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hook}</div>}
               </div>
             </div>
           );
@@ -4397,11 +4408,11 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           if (m.ret_3m != null && m.ret_3m !== "") chips.push(`${+m.ret_3m > 0 ? "+" : ""}${m.ret_3m}% 3M`);
           if (m.theme) chips.push(String(m.theme));
           const pane = (img, label, divider) => (
-            <div style={{ position: "relative", flex: 1, minWidth: 0, height: 120, background: "#0d0d16", borderRight: divider ? `1px solid ${C.border}` : "none" }}>
+            <div style={{ position: "relative", flex: 1, minWidth: 0, height: 120, background: "var(--bg2)", borderRight: divider ? `1px solid ${C.border}` : "none" }}>
               {img
                 ? <img src={img} alt={label} style={{ width: "100%", height: 120, objectFit: "cover", display: "block" }} />
-                : <div style={{ width: "100%", height: 120, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.6rem" }}>—</div>}
-              <span style={{ position: "absolute", left: 6, bottom: 5, fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, background: "rgba(8,8,14,0.72)", borderRadius: 5, padding: "1px 6px" }}>{label}</span>
+                : <div style={{ width: "100%", height: 120, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.6875rem" }}>—</div>}
+              <span style={{ position: "absolute", left: 6, bottom: 5, fontSize: "0.6875rem", fontWeight: 600, color: C.muted, background: "var(--glass)", borderRadius: 5, padding: "1px 6px" }}>{label}</span>
             </div>
           );
           return (
@@ -4416,13 +4427,13 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
               </div>
               <div style={{ padding: "12px 14px 14px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: "1rem", fontWeight: 800, color: C.white }}>{r.ticker}</span>
+                  <span style={{ fontSize: "1rem", fontWeight: 600, color: C.white }}>{r.ticker}</span>
                   {legs > 1 && <span title={`${legs} legs in this campaign`} style={legsChip}>{legs} legs</span>}
-                  <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.muted, whiteSpace: "nowrap" }}>{r.entry_date || "—"}</span>
+                  <span style={{ marginLeft: "auto", fontSize: "0.6875rem", color: C.muted, whiteSpace: "nowrap" }}>{r.entry_date || "—"}</span>
                 </div>
                 {chips.length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 9 }}>
-                    {chips.map((c, i) => <span key={i} style={{ fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, border: `1px solid ${C.borderGold}`, background: C.goldDim, borderRadius: 99, padding: "2px 9px", whiteSpace: "nowrap" }}>{c}</span>)}
+                    {chips.map((c, i) => <span key={i} style={{ fontSize: "0.6875rem", fontWeight: 700, color: C.white, border: `1px solid ${C.border}`, background: "var(--w06)", borderRadius: 99, padding: "2px 9px", whiteSpace: "nowrap" }}>{c}</span>)}
                   </div>
                 )}
               </div>
@@ -4433,7 +4444,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
           <div style={{ marginTop: 4 }}>
             {bookYearGroups.map(([year, items]) => (
               <div key={year} style={{ marginBottom: 26 }}>
-                <div style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.goldBright, margin: "0 0 12px", paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>{year} · {items.length} {items.length === 1 ? "ticker" : "tickers"}</div>
+                <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", margin: "0 0 12px", paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>{year} · {items.length} {items.length === 1 ? "ticker" : "tickers"}</div>
                 <div style={gridStyle}>{items.map(renderProjectCard)}</div>
               </div>
             ))}
@@ -4446,21 +4457,21 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
       {detail && (() => {
         const r = detail, eff = effectiveStars(cardStars(r), (r.elite || []).length);
         return (
-          <div onClick={e => { if (e.target === e.currentTarget) setDetail(null); }} style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(4,4,8,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
-            <div style={{ width: "min(1280px,96%)", background: "linear-gradient(180deg, rgba(18,18,26,0.95), rgba(8,8,14,0.98))", border: `1px solid ${C.borderGold}`, borderRadius: 20, padding: "22px 26px", boxShadow: "0 40px 100px rgba(0,0,0,0.72)" }}>
+          <div onClick={e => { if (e.target === e.currentTarget) setDetail(null); }} style={{ position: "fixed", inset: 0, zIndex: 1200, background: "var(--scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
+            <div style={{ width: "min(1280px,96%)", background: "var(--sheet)", border: `1px solid ${C.borderGold}`, borderRadius: 20, padding: "22px 26px", boxShadow: "var(--shadowLg)" }}>
               {/* Rail scrollbar: thin, gold-tinted, with an 8px gutter so the thumb never sits ON the
                   card content (Valen 2026-07-27: "the scroll shouldn't overlap the card"). */}
-              <style dangerouslySetInnerHTML={{ __html: ".mbdt-grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:24px;align-items:start}.mbdt-rail{position:sticky;top:0;max-height:calc(100vh - 96px);overflow-y:auto;padding-right:8px;scrollbar-width:thin;scrollbar-color:rgba(201,152,42,0.35) transparent}.mbdt-rail::-webkit-scrollbar{width:6px}.mbdt-rail::-webkit-scrollbar-thumb{background:rgba(201,152,42,0.3);border-radius:3px}.mbdt-rail::-webkit-scrollbar-track{background:transparent}@media (max-width:760px){.mbdt-grid{grid-template-columns:1fr}.mbdt-rail{position:static;max-height:none;overflow:visible;order:-1;padding-right:0}}" }} />
+              <style dangerouslySetInnerHTML={{ __html: ".mbdt-grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:24px;align-items:start}.mbdt-rail{position:sticky;top:0;max-height:calc(100vh - 96px);overflow-y:auto;padding-right:8px;scrollbar-width:thin;scrollbar-color:var(--borderGold) transparent}.mbdt-rail::-webkit-scrollbar{width:6px}.mbdt-rail::-webkit-scrollbar-thumb{background:var(--borderGold);border-radius:3px}.mbdt-rail::-webkit-scrollbar-track{background:transparent}@media (max-width:760px){.mbdt-grid{grid-template-columns:1fr}.mbdt-rail{position:static;max-height:none;overflow:visible;order:-1;padding-right:0}}" }} />
               {/* header — full width above the two columns */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4, flexWrap: "wrap" }}>
-                <span style={{ fontSize: "1.4rem", fontWeight: 800, color: C.white }}>{r.ticker}</span>
-                <span style={{ fontSize: "0.66rem", fontWeight: 800, color: C.gold, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "3px 11px", borderRadius: 99 }}>{r.pattern}</span>
-                {r.theme && <span style={{ fontSize: "0.7rem", color: C.muted }}>{r.theme}</span>}
+                <span style={{ fontSize: "1.25rem", fontWeight: 600, color: C.white }}>{r.ticker}</span>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.muted, background: "var(--w06)", border: `1px solid ${C.border}`, padding: "3px 11px", borderRadius: 99 }}>{r.pattern}</span>
+                {r.theme && <span style={{ fontSize: "0.6875rem", color: C.muted }}>{r.theme}</span>}
                 <span style={{ marginLeft: "auto" }}><Stars C={C} n={eff.n} /></span>
-                <span style={{ fontSize: "0.82rem", fontWeight: 800, color: eff.n >= 6 ? "#7ef0a0" : C.goldBright }}>{eff.label}</span>
-                <button onClick={() => setDetail(null)} style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.muted, width: 34, height: 34, borderRadius: 10, fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }} aria-label="Close">&times;</button>
+                <span style={{ fontSize: "0.875rem", fontWeight: 600, color: eff.n >= 6 ? "var(--greenFg)" : C.white }}>{eff.label}</span>
+                <button onClick={() => setDetail(null)} style={{ background: "var(--w06)", border: `1px solid ${C.border}`, color: C.muted, width: 34, height: 34, borderRadius: 99, fontSize: "1.25rem", cursor: "pointer", lineHeight: 1 }} aria-label="Close">&times;</button>
               </div>
-              <div style={{ fontSize: "0.74rem", color: C.muted, marginBottom: 16 }}>
+              <div style={{ fontSize: "0.75rem", color: C.muted, marginBottom: 16 }}>
                 {r.entry_date || "—"} → {r.exit_date || "—"}{r.days_held != null ? ` · ${r.days_held}d` : ""}
               </div>
 
@@ -4472,7 +4483,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                 const oc = r.outcome || outcomeFromR(r.r_mult, r.run_pct);
                 const win = oc ? /winner/i.test(oc) : null;
                 const loss = oc ? /(loser|subpar)/i.test(oc) : null;
-                const oColor = win ? "#7ef0a0" : loss ? C.red : C.muted;
+                const oColor = win ? "var(--greenFg)" : loss ? C.red : C.muted;
                 const oGlyph = win ? "▲" : loss ? "▼" : "—";
                 // cap / ADR quiet stat (study-promoted rows only; plain rows show —)
                 const sm = r.metrics?.study?.m;
@@ -4493,18 +4504,18 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
                 // checklist block (unchanged logic — every factor, ticked & unticked, read-only)
                 const checklistBlock = (() => {
-                  const bucketStyle = { border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", background: "rgba(255,255,255,0.015)", minWidth: 0, marginBottom: 8 };
-                  const bucketTitle = { fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 7 };
+                  const bucketStyle = { border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", background: "var(--w02)", minWidth: 0, marginBottom: 8 };
+                  const bucketTitle = { fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginBottom: 7 };
                   const rowStyle = { display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 2px" };
-                  const mark = (on) => ({ color: on ? C.goldBright : "rgba(255,255,255,0.35)", opacity: on ? 1 : 0.5, fontWeight: 800, lineHeight: 1.3, flexShrink: 0 });
-                  const labelStyle = (on) => ({ fontSize: "0.74rem", fontWeight: 600, color: on ? C.goldBright : C.text, lineHeight: 1.35 });
-                  const bonusTag = <span style={{ fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: C.goldBright, border: `1px solid ${C.goldBright}`, padding: "0 5px", borderRadius: 99, marginLeft: 5 }}>Bonus</span>;
+                  const mark = (on) => ({ color: on ? C.white : "var(--faint)", opacity: on ? 1 : 0.5, fontWeight: 600, lineHeight: 1.3, flexShrink: 0 });
+                  const labelStyle = (on) => ({ fontSize: "0.75rem", fontWeight: 600, color: on ? C.white : C.text, lineHeight: 1.35 });
+                  const bonusTag = <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--faint)", border: "1px solid var(--w22)", padding: "0 5px", borderRadius: 99, marginLeft: 5 }}>Bonus</span>;
                   if (isStudyRow(r)) {
                     const study = r.metrics.study;
                     const def = STUDY_SETUPS[study.setup] || STUDY_SETUPS["Momentum Breakout"];
                     const q = studyQuality(study);
                     return (<>
-                      <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>👁 Checklist — {q.on}/{q.total}</div>
+                      <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 8 }}>👁 Checklist — {q.on}/{q.total}</div>
                       {def.buckets.map((b, bi) => (
                         <div key={bi} style={bucketStyle}>
                           <div style={bucketTitle}>{b.title}</div>
@@ -4516,7 +4527,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                             return (
                               <div key={k} style={rowStyle}>
                                 <span style={mark(on)}>{on ? "✓" : "○"}</span>
-                                <span style={labelStyle(on)}>{itemLabel}{subVal && <b style={{ color: C.goldBright, marginLeft: 5 }}>{subVal}</b>}{bonus && bonusTag}</span>
+                                <span style={labelStyle(on)}>{itemLabel}{subVal && <b style={{ color: C.white, marginLeft: 5 }}>{subVal}</b>}{bonus && bonusTag}</span>
                               </div>
                             );
                           })}
@@ -4528,7 +4539,7 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                   const tset = new Set(r.ticked || []);
                   const secs = sectionsFor(r.ticked).filter(sec => !sec.reminder);
                   return (<>
-                    <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Setup checklist — {graded.passed}/{graded.total}</div>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 8 }}>Setup checklist — {graded.passed}/{graded.total}</div>
                     {secs.map((sec, si) => (
                       <div key={si} style={bucketStyle}>
                         <div style={bucketTitle}>{sec.title}</div>
@@ -4551,19 +4562,19 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                     {/* ── LEFT: the story — sectionized charts → ⑤ the lesson → elite factors ── */}
                     <div style={{ minWidth: 0, position: "relative" }}>
                       {sections.length === 0 ? (
-                        <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.76rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>Charts pending — they'll appear here as this setup is documented.</div>
+                        <div style={{ height: 180, display: "grid", placeItems: "center", color: C.muted, fontSize: "0.75rem", border: `1px dashed ${C.border}`, borderRadius: 12 }}>Charts pending — they'll appear here as this setup is documented.</div>
                       ) : (
                         <div style={{ display: "grid", gap: 20 }}>
                           {sections.map((sec, si) => (
                             <div key={si} style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 9 }}>{sec.title}</div>
+                              <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 9 }}>{sec.title}</div>
                               <div style={{ display: "grid", gap: 16 }}>
                                 {sec.charts.map((c, ci) => {
                                   const label = c.label || sec.title;
                                   return (
                                     <div key={ci} style={{ minWidth: 0 }}>
                                       <img src={c.img} alt={label} onClick={() => setZoom({ imgs: { before: c.img, after: "" }, slot: "before", title: label })} style={{ display: "block", width: "100%", maxWidth: "100%", borderRadius: 12, border: `1px solid ${C.borderGold}`, cursor: "zoom-in" }} />
-                                      {c.caption && <div style={{ fontSize: "0.78rem", color: C.muted, lineHeight: 1.55, marginTop: 7, maxWidth: "66ch" }}>{c.caption}</div>}
+                                      {c.caption && <div style={{ fontSize: "0.75rem", color: C.muted, lineHeight: 1.55, marginTop: 7, maxWidth: "66ch" }}>{c.caption}</div>}
                                     </div>
                                   );
                                 })}
@@ -4574,18 +4585,18 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                       )}
                       {r.lesson && (
                         <div style={{ marginTop: 22 }}>
-                          <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 9 }}>⑤ The lesson</div>
-                          <div style={{ fontSize: "0.82rem", color: "#e8e8ec", lineHeight: 1.6, maxWidth: "66ch", whiteSpace: "pre-wrap" }}>{r.lesson}</div>
+                          <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 9 }}>⑤ The lesson</div>
+                          <div style={{ fontSize: "0.875rem", color: "var(--text)", lineHeight: 1.6, maxWidth: "66ch", whiteSpace: "pre-wrap" }}>{r.lesson}</div>
                         </div>
                       )}
                       {(r.elite || []).length > 0 && (
                         <div style={{ marginTop: 22 }}>
-                          <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: "#7ef0a0", marginBottom: 9 }}>Elite factors present ({(r.elite || []).length}/{ELITE.length})</div>
+                          <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--greenFg)", marginBottom: 9 }}>Elite factors present ({(r.elite || []).length}/{ELITE.length})</div>
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px,100%), 1fr))", gap: 6 }}>
                             {ELITE.filter(f => (r.elite || []).includes(f.k)).map(f => (
-                              <div key={f.k} style={{ display: "flex", gap: 9, padding: "8px 11px", borderRadius: 10, background: "rgba(126,240,160,0.06)", border: "1px solid rgba(126,240,160,0.25)" }}>
-                                <span style={{ color: "#7ef0a0", fontWeight: 800 }}>✓</span>
-                                <div><div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#c9f5d7" }}>{f.c}</div><div style={{ fontSize: "0.7rem", color: C.muted }}>{f.s}</div></div>
+                              <div key={f.k} style={{ display: "flex", gap: 9, padding: "8px 11px", borderRadius: 10, background: "var(--greenDim)", border: "1px solid var(--green)" }}>
+                                <span style={{ color: "var(--greenFg)", fontWeight: 600 }}>✓</span>
+                                <div><div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--greenFg)" }}>{f.c}</div><div style={{ fontSize: "0.6875rem", color: C.muted }}>{f.s}</div></div>
                               </div>
                             ))}
                           </div>
@@ -4599,19 +4610,19 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                       <div style={{ border: `1px solid ${C.borderGold}`, borderRadius: 14, padding: "16px 18px", background: C.glass, marginBottom: 12 }}>
                         {heroVal ? (
                           <>
-                            <div title={capTip || undefined} style={{ fontSize: "1.7rem", fontWeight: 800, color: "#f0c050", letterSpacing: "-0.02em", lineHeight: 1.05 }}>{heroVal}</div>
-                            <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, marginTop: 3 }}>{heroLabel}</div>
+                            <div title={capTip || undefined} style={{ fontSize: "1.75rem", fontWeight: 600, color: "var(--white)", letterSpacing: "-0.02em", lineHeight: 1.05 }}>{heroVal}</div>
+                            <div style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginTop: 3 }}>{heroLabel}</div>
                           </>
                         ) : (
                           <>
-                            <div style={{ fontSize: "1.7rem", fontWeight: 800, color: "#f0c050", lineHeight: 1.05 }}>{gb.l}</div>
-                            <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, marginTop: 3 }}>Grade · no outcome yet</div>
+                            <div style={{ fontSize: "1.75rem", fontWeight: 600, color: "var(--white)", lineHeight: 1.05 }}>{gb.l}</div>
+                            <div style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginTop: 3 }}>Grade · no outcome yet</div>
                           </>
                         )}
                         {/* (2) verdict row — outcome chip WITH glyph + grade chip (near-black on gold) */}
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.68rem", fontWeight: 800, color: oColor, border: `1px solid ${oColor}`, borderRadius: 99, padding: "3px 11px", whiteSpace: "nowrap" }}>{oGlyph} {oc || "Pending"}</span>
-                          <span title={eff.label} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 26, height: 22, padding: "0 9px", borderRadius: 7, fontWeight: 800, fontSize: "0.72rem", color: "#08080e", background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` }}>{gb.l}</span>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.6875rem", fontWeight: 600, color: oColor, border: `1px solid ${oColor}`, borderRadius: 99, padding: "3px 11px", whiteSpace: "nowrap" }}>{oGlyph} {oc || "Pending"}</span>
+                          <span title={eff.label} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 26, height: 22, padding: "0 9px", borderRadius: 7, fontWeight: 600, fontSize: "0.75rem", color: C.white, background: "var(--w10)" }}>{gb.l}</span>
                         </div>
                       </div>
 
@@ -4619,8 +4630,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                       <div style={{ display: "grid", gap: 2, marginBottom: 14 }}>
                         {quiet.map(([k, v, tip]) => (
                           <div key={k} title={tip || undefined} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, padding: "5px 0", borderBottom: `1px solid ${C.border}` }}>
-                            <span style={{ fontSize: "0.72rem", color: C.muted, whiteSpace: "nowrap" }}>{k}</span>
-                            <span style={{ fontSize: "0.78rem", fontWeight: 700, color: (v == null || v === "—") ? C.muted : "#e8e8ec", textAlign: "right", overflow: "hidden", textOverflow: "ellipsis" }}>{v}</span>
+                            <span style={{ fontSize: "0.75rem", color: C.muted, whiteSpace: "nowrap" }}>{k}</span>
+                            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: (v == null || v === "—") ? C.muted : "var(--text)", textAlign: "right", overflow: "hidden", textOverflow: "ellipsis" }}>{v}</span>
                           </div>
                         ))}
                       </div>
@@ -4631,9 +4642,9 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                       {/* measured traits */}
                       {(r.characteristics || []).length > 0 && (
                         <div style={{ marginBottom: 14 }}>
-                          <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginBottom: 7 }}>Measured traits</div>
+                          <div style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, marginBottom: 7 }}>Measured traits</div>
                           <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-                            {(r.characteristics || []).map((c, i) => <span key={i} style={{ fontSize: "0.7rem", fontWeight: 700, color: C.text, background: C.goldDim, border: `1px solid ${C.borderGold}`, padding: "4px 10px", borderRadius: 99 }}>{c}</span>)}
+                            {(r.characteristics || []).map((c, i) => <span key={i} style={{ fontSize: "0.6875rem", fontWeight: 700, color: C.text, background: "var(--w06)", border: `1px solid ${C.border}`, padding: "4px 10px", borderRadius: 99 }}>{c}</span>)}
                           </div>
                         </div>
                       )}
@@ -4641,8 +4652,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
                       {/* (5) thesis block */}
                       {r.thesis && (
                         <div style={{ marginBottom: 14 }}>
-                          <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold, marginBottom: 6 }}>The thesis</div>
-                          <div style={{ fontSize: "0.82rem", color: C.text, lineHeight: 1.6, maxWidth: "66ch", whiteSpace: "pre-wrap" }}>{r.thesis}</div>
+                          <div style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)", marginBottom: 6 }}>The thesis</div>
+                          <div style={{ fontSize: "0.875rem", color: C.text, lineHeight: 1.6, maxWidth: "66ch", whiteSpace: "pre-wrap" }}>{r.thesis}</div>
                         </div>
                       )}
 
@@ -4655,8 +4666,8 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
 
               {(isAdmin || (r.created_by === uid && !r.is_published)) && (
                 <div style={{ display: "flex", gap: 10, borderTop: `1px solid ${C.border}`, paddingTop: 14, marginTop: 18 }}>
-                  <button onClick={() => { if (isStudyRow(r)) { setStudyMode(true); setStudyEditing(r); } else setEditing(r); setDetail(null); }} style={{ background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>{isStudyRow(r) ? "Edit study" : "Edit"}</button>
-                  <button onClick={() => remove(r)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.red, fontFamily: font, fontWeight: 700, fontSize: "0.74rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>Delete</button>
+                  <button onClick={() => { if (isStudyRow(r)) { setStudyMode(true); setStudyEditing(r); } else setEditing(r); setDetail(null); }} style={{ background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.75rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>{isStudyRow(r) ? "Edit study" : "Edit"}</button>
+                  <button onClick={() => remove(r)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.red, fontFamily: font, fontWeight: 700, fontSize: "0.75rem", padding: "8px 16px", borderRadius: 99, cursor: "pointer" }}>Delete</button>
                 </div>
               )}
             </div>
@@ -4670,22 +4681,22 @@ export default function ModelBookPage({ C, font, session, isAdmin, guideEnter, g
         const hasBoth = !!(zoom.imgs.before && zoom.imgs.after);
         const navBtn = (side, slot, enabled) => enabled && (
           <button onClick={e => { e.stopPropagation(); setZoom(z => ({ ...z, slot })); }} aria-label={`Show ${slot} chart`}
-            style={{ position: "fixed", [side]: 20, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.07)", backdropFilter: "blur(4px)", border: `1px solid ${C.border}`, color: C.white, width: 46, height: 64, borderRadius: 14, fontSize: "1.5rem", cursor: "pointer", lineHeight: 1 }}>{side === "left" ? "‹" : "›"}</button>
+            style={{ position: "fixed", [side]: 20, top: "50%", transform: "translateY(-50%)", background: "var(--w08)", backdropFilter: "blur(4px)", border: `1px solid ${C.border}`, color: C.white, width: 46, height: 64, borderRadius: 14, fontSize: "1.25rem", cursor: "pointer", lineHeight: 1 }}>{side === "left" ? "‹" : "›"}</button>
         );
         return (
-          <div onClick={() => setZoom(null)} style={{ position: "fixed", inset: 0, zIndex: 1500, background: "rgba(2,2,6,0.93)", display: "grid", placeItems: "center", cursor: "zoom-out", padding: 18 }}>
-            <img key={zoom.slot} src={url} alt={`${zoom.slot} chart zoom`} style={{ maxWidth: "96vw", maxHeight: "90vh", borderRadius: 12, border: `1px solid ${isBefore ? C.borderGold : "rgba(34,197,94,0.45)"}`, boxShadow: "0 30px 90px rgba(0,0,0,0.8)" }} />
-            <span style={{ position: "fixed", top: 20, left: 20, fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: isBefore ? C.goldBright : "#7ef0a0", background: "rgba(8,8,14,0.8)", border: `1px solid ${isBefore ? C.borderGold : "rgba(34,197,94,0.4)"}`, padding: "7px 15px", borderRadius: 99 }}>
+          <div onClick={() => setZoom(null)} style={{ position: "fixed", inset: 0, zIndex: 1500, background: "var(--lightbox)", display: "grid", placeItems: "center", cursor: "zoom-out", padding: 18 }}>
+            <img key={zoom.slot} src={url} alt={`${zoom.slot} chart zoom`} style={{ maxWidth: "96vw", maxHeight: "90vh", borderRadius: 12, border: `1px solid ${isBefore ? C.borderGold : "var(--green)"}`, boxShadow: "var(--shadowLg)" }} />
+            <span style={{ position: "fixed", top: 20, left: 20, fontSize: "0.6875rem", fontWeight: 600, color: isBefore ? C.white : "var(--greenFg)", background: "var(--glass)", border: `1px solid ${isBefore ? C.borderGold : "var(--green)"}`, padding: "7px 15px", borderRadius: 99 }}>
               {zoom.title ? zoom.title : (isBefore ? "◀ Before — the setup" : "After — the outcome ▶")}
             </span>
             {navBtn("left", "before", hasBoth && !isBefore)}
             {navBtn("right", "after", hasBoth && isBefore)}
             {hasBoth && (
-              <span style={{ position: "fixed", bottom: 18, left: "50%", transform: "translateX(-50%)", fontSize: "0.68rem", fontWeight: 600, color: C.muted, background: "rgba(8,8,14,0.8)", border: `1px solid ${C.border}`, padding: "6px 14px", borderRadius: 99, whiteSpace: "nowrap" }}>
+              <span style={{ position: "fixed", bottom: 18, left: "50%", transform: "translateX(-50%)", fontSize: "0.6875rem", fontWeight: 600, color: C.muted, background: "var(--glass)", border: `1px solid ${C.border}`, padding: "6px 14px", borderRadius: 99, whiteSpace: "nowrap" }}>
                 ← → flip before / after &nbsp;·&nbsp; Esc to close
               </span>
             )}
-            <button onClick={() => setZoom(null)} aria-label="Close zoom" style={{ position: "fixed", top: 18, right: 20, background: "rgba(255,255,255,0.08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 12, fontSize: "1.3rem", cursor: "pointer", lineHeight: 1 }}>&times;</button>
+            <button onClick={() => setZoom(null)} aria-label="Close zoom" style={{ position: "fixed", top: 18, right: 20, background: "var(--w08)", border: `1px solid ${C.border}`, color: C.white, width: 40, height: 40, borderRadius: 99, fontSize: "1.25rem", cursor: "pointer", lineHeight: 1 }}>&times;</button>
           </div>
         );
       })()}

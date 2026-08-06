@@ -8,14 +8,14 @@ import { themeFit, themeRanks } from "./themes.js";
 // ══════════════════════════════════════════════════════════════════
 // DAILY SETUPS — the members' daily-idea feed. Valen grades a chart in the
 // Setup Grader and publishes; it lands here: chart + annotation + the exact
-// grader scorecard (auditable — every star traces to its ticks; gold dot ● =
+// grader scorecard (auditable — every star traces to its ticks; ● dot =
 // auto-read from the chart). Read-only for members; admin can remove posts.
 // ══════════════════════════════════════════════════════════════════
 
 const Stars = ({ C, n, size = "1.05rem" }) => (
   <span style={{ letterSpacing: 2, fontSize: size, whiteSpace: "nowrap" }}>
     {[0, 1, 2, 3, 4].map(k => (
-      <span key={k} style={{ color: k < n ? C.goldBright : "rgba(255,255,255,0.16)", textShadow: k < n ? "0 0 10px rgba(240,192,80,0.45)" : "none" }}>★</span>
+      <span key={k} style={{ color: k < n ? C.white : "var(--w14)", textShadow: k < n ? "0 0 10px var(--w35)" : "none" }}>★</span>
     ))}
   </span>
 );
@@ -147,11 +147,11 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
     return "fresh";
   };
   const STATUS_META = {
-    pivot:     { label: "At the pivot", col: C.goldBright, bg: "rgba(240,192,80,0.1)",  bd: C.borderGold,             tip: "Tight and coiled right at the buy point — the watch-closely list" },
-    coiling:   { label: "Coiling",      col: "#3b82f6",    bg: "rgba(59,130,246,0.1)",  bd: "rgba(59,130,246,0.35)",  tip: "Base is developing — contraction started but not pivot-tight yet" },
-    fresh:     { label: "Fresh",        col: C.text,       bg: "rgba(255,255,255,0.05)", bd: C.border,                 tip: "First look — on the radar, base not built yet" },
-    triggered: { label: "✔ Triggered",  col: "#22c55e",    bg: "rgba(34,197,94,0.1)",   bd: "rgba(34,197,94,0.35)",   tip: "The gameplan became a live trade" },
-    faded:     { label: "Faded",        col: C.muted,      bg: "rgba(255,255,255,0.04)", bd: C.border,                 tip: "Idea aged out — over 5 days without triggering" },
+    pivot:     { label: "At the pivot", col: C.white, bg: "var(--w08)",  bd: "var(--w22)",             tip: "Tight and coiled right at the buy point — the watch-closely list" },
+    coiling:   { label: "Coiling",      col: C.blue,    bg: "var(--blueDim)",  bd: "rgba(59,158,255,0.35)", /* residual: no border-blue token */  tip: "Base is developing — contraction started but not pivot-tight yet" },
+    fresh:     { label: "Fresh",        col: C.text,       bg: "var(--w06)", bd: C.border,                 tip: "First look — on the radar, base not built yet" },
+    triggered: { label: "✔ Triggered",  col: "var(--green)",    bg: "rgba(0,200,5,0.1)",   bd: "rgba(0,200,5,0.35)",   tip: "The gameplan became a live trade" },
+    faded:     { label: "Faded",        col: C.muted,      bg: "var(--w04)", bd: C.border,                 tip: "Idea aged out — over 5 days without triggering" },
   };
   // Board = the LATEST post per ticker (index/market-context posts excluded).
   // A ticker whose ANY post is ✔ taken counts as TRIGGERED on the board — the taken mark may live on an
@@ -195,7 +195,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
     });
   const filtersActive = (q.trim() ? 1 : 0) + (themeF ? 1 : 0) + (gradeF ? 1 : 0) + (minStars > 0 ? 1 : 0);
   const clearAllFilters = () => { setQ(""); setThemeF(""); setGradeF(""); setMinStars(0); };
-  const chip = (active) => ({ background: active ? C.goldDim : "rgba(255,255,255,0.03)", color: active ? C.goldBright : C.muted, border: `1px solid ${active ? C.borderGold : C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 12px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" });
+  const chip = (active) => ({ background: active ? "var(--w10)" : "var(--w03)", color: active ? C.white : C.muted, border: `1px solid ${active ? "var(--w14)" : C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "6px 12px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" });
 
   // filter (funnel status → ticker search → theme → grade → min-score → All/Taken) then group:
   // by date (default) or one ranked list (Top graded) — every control ANDs together.
@@ -221,34 +221,34 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
 
   // ── Restyle tokens (approved mockup: mockups/daily-setups.html) — uniform card chrome + chip
   //    language, all built on the C palette / font prop. Presentation only; no logic depends on these.
-  const faint = "rgba(255,255,255,0.45)";
+  const faint = C.faint;
   const cardChrome = {
     position: "relative",
-    background: `linear-gradient(135deg, rgba(255,255,255,0.05), transparent 55%), ${C.glass}`,
+    background: `linear-gradient(135deg, var(--w06), transparent 55%), ${C.glass}`,
     border: `1px solid ${C.border}`,
     borderRadius: 16,
     backdropFilter: "blur(24px) saturate(150%)",
     WebkitBackdropFilter: "blur(24px) saturate(150%)",
   };
-  const microLabel = { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.muted };
+  const microLabel = { fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: C.muted };
   const cardHead = { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingBottom: 11, marginBottom: 14, borderBottom: `1px solid ${C.border}` };
-  const segWrap = { display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 980, padding: 3, gap: 2, background: "rgba(255,255,255,0.02)" };
+  const segWrap = { display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 999, padding: 3, gap: 2, background: "var(--w02)" };
   const gradeBadge = (letter) => {
     const fam = (letter === "A+" || letter === "A")
-      ? { bg: "rgba(34,197,94,0.15)", col: "#86efac", bd: "rgba(34,197,94,0.3)" }
+      ? { bg: "rgba(0,200,5,0.15)", col: "var(--greenFg)", bd: "rgba(0,200,5,0.3)" }
       : letter === "B"
-        ? { bg: C.goldDim, col: C.goldBright, bd: C.borderGold }
-        : { bg: "rgba(239,68,68,0.12)", col: "#fca5a5", bd: "rgba(239,68,68,0.3)" };
-    return { display: "inline-flex", minWidth: 22, height: 22, padding: "0 4px", borderRadius: 6, alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.74rem", background: fam.bg, color: fam.col, border: `1px solid ${fam.bd}`, flex: "none" };
+        ? { bg: "var(--w08)", col: C.white, bd: "var(--w22)" }
+        : { bg: "rgba(255,80,0,0.12)", col: "var(--redFg)", bd: "rgba(255,80,0,0.3)" };
+    return { display: "inline-flex", minWidth: 22, height: 22, padding: "0 4px", borderRadius: 6, alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: "0.75rem", background: fam.bg, color: fam.col, border: `1px solid ${fam.bd}`, flex: "none", fontVariantNumeric: "tabular-nums" };
   };
 
   return (
     <div id="panel-daily" style={{ fontFamily: font }}>
       {/* command header — page top (approved mockup): eyebrow · h1 · muted meta */}
       <div className="dspagehead" style={{ marginBottom: 20 }}>
-        <div className="dseyebrow" style={{ fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.17em", textTransform: "uppercase", color: C.gold }}>Daily Setups</div>
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.03em", color: C.white, margin: "5px 0 0" }}>On the Radar</h1>
-        <div className="dsmeta" style={{ fontSize: "0.8rem", color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+        <div className="dseyebrow" style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: C.muted }}>Daily Setups</div>
+        <h1 style={{ fontSize: "1.75rem", fontWeight: 600, letterSpacing: "-0.02em", color: C.white, margin: "5px 0 0" }}>On the Radar</h1>
+        <div className="dsmeta" style={{ fontSize: "0.75rem", color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
           Posted fresh each market day{rows && rows.length ? ` · ${rows.length} idea${rows.length !== 1 ? "s" : ""} on the radar` : ""} · the chart, the read, and the full auditable scorecard behind every star · educational, not trade signals
         </div>
       </div>
@@ -266,43 +266,43 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
               if (!n) return null;
               return (
                 <button key={s} onClick={() => setStatusF(on ? null : s)} title={m.tip}
-                  style={{ background: on ? m.bg : "rgba(255,255,255,0.03)", color: on ? m.col : C.muted, border: `1px solid ${on ? m.bd : C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer" }}>
+                  style={{ background: on ? m.bg : "var(--w03)", color: on ? m.col : C.muted, border: `1px solid ${on ? m.bd : C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "6px 13px", borderRadius: 999, cursor: "pointer" }}>
                   {m.label} ({n})
                 </button>
               );
             })}
-            {statusF && <button onClick={() => setStatusF(null)} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "0.8rem", cursor: "pointer" }}>× clear</button>}
-            <span style={{ marginLeft: "auto", fontSize: "0.62rem", color: C.muted }}>status is read off each post's scorecard — nothing is hand-picked</span>
+            {statusF && <button onClick={() => setStatusF(null)} style={{ background: "transparent", border: "none", color: C.muted, fontSize: "0.75rem", cursor: "pointer" }}>× clear</button>}
+            <span style={{ marginLeft: "auto", fontSize: "0.6875rem", color: C.muted }}>status is read off each post's scorecard — nothing is hand-picked</span>
           </div>
           {/* the board: latest post per ticker — sortable, table-layout FIXED (headers can never drift
               from their cells), collapsed to the top rows with a toggle at BOTH top and bottom.
-              Color discipline (Valen): only A+ or a full-sweep (all scored ticks) earns green/gold — the rest stay dark. */}
+              Color discipline (Valen): only A+ or a full-sweep (all scored ticks) earns the green highlight — the rest stay dark. */}
           {(() => {
             const filteredBoard = sortedBoard.filter(x => !statusF || x.s === statusF);
             const LIMIT = 8;
             const shown = boardOpen ? filteredBoard : filteredBoard.slice(0, LIMIT);
             const toggle = (pos) => filteredBoard.length > LIMIT && (
               <button key={pos} onClick={() => setBoardOpen(o => !o)}
-                style={{ margin: pos === "top" ? "0 0 8px" : "8px 0 0", width: "100%", background: "rgba(255,255,255,0.03)", border: `1px dashed ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "6px 0", borderRadius: 10, cursor: "pointer" }}>
+                style={{ margin: pos === "top" ? "0 0 8px" : "8px 0 0", width: "100%", background: "var(--w03)", border: `1px dashed ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "6px 0", borderRadius: 999, cursor: "pointer" }}>
                 {boardOpen ? "Collapse ▴" : `Show all ${filteredBoard.length} ▾`}
               </button>
             );
             const th = (key, label, tip) => (
               <th key={key} onClick={() => setBoardSort(s => ({ k: key, d: s.k === key ? -s.d : 1 }))} title={tip || `Sort by ${label}`}
-                style={{ textAlign: "left", padding: "4px 8px 6px", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap", overflow: "hidden", cursor: "pointer", userSelect: "none", color: boardSort.k === key ? C.goldBright : C.muted, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                style={{ textAlign: "left", padding: "4px 8px 6px", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap", overflow: "hidden", cursor: "pointer", userSelect: "none", color: boardSort.k === key ? C.white : C.faint, fontSize: "0.6875rem", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 {label}{boardSort.k === key ? (boardSort.d > 0 ? " ▾" : " ▴") : ""}
               </th>
             );
             const td = (children, extra) => ({ children, style: { padding: "7px 8px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "left", ...extra } });
             const rankCell = (rank) => rank == null
-              ? { txt: "—", col: "rgba(255,255,255,0.25)", bold: false }
+              ? { txt: "—", col: C.faint, bold: false }
               : rank <= 5
-                ? { txt: `Top ${rank}`, col: "#22c55e", bold: true }
+                ? { txt: `Top ${rank}`, col: "var(--green)", bold: true }
                 : { txt: `#${rank}`, col: C.muted, bold: false };
             return (
               <>
                 <div style={{ overflowX: "auto" }}>
-                  <table className="minitable" style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse", fontSize: "0.76rem", minWidth: 520 }}>
+                  <table className="minitable" style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse", fontSize: "0.75rem", minWidth: 520 }}>
                     <colgroup>
                       <col style={{ width: "10%" }} />{/* ticker  */}
                       <col style={{ width: "13%" }} />{/* grade   */}
@@ -334,17 +334,17 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                         const passed = sc.passed;
                         const hot = r.letter === "A+" || (sc.total > 0 && sc.passed === sc.total); // ONLY these earn the highlight
                         const cells = [
-                          td(<><span style={{ fontWeight: 800, color: C.white }}>{r.ticker}</span>{s === "triggered" && <span title="Marked taken — this gameplan became a live trade" style={{ color: "#22c55e", marginLeft: 5, fontWeight: 800 }}>✔</span>}</>),
-                          td(<><span style={{ fontWeight: 800, color: hot ? C.green : C.text }}>{r.letter}</span> <span style={{ color: hot ? C.goldBright : "rgba(255,255,255,0.3)", fontSize: "0.66rem" }}>{"★".repeat(r.stars)}</span></>),
-                          td(<><span style={{ fontWeight: 800, color: hot ? C.goldBright : C.text }}>{passed}/{sc.total}</span><span style={{ color: C.muted, marginLeft: 6, fontSize: "0.68rem" }}>{r.pct != null ? `${Math.round(r.pct * 100)}%` : ""}</span></>),
+                          td(<><span style={{ fontWeight: 600, color: C.white }}>{r.ticker}</span>{s === "triggered" && <span title="Marked taken — this gameplan became a live trade" style={{ color: "var(--green)", marginLeft: 5, fontWeight: 600 }}>✔</span>}</>),
+                          td(<><span style={{ fontWeight: 600, color: hot ? C.green : C.text, fontVariantNumeric: "tabular-nums" }}>{r.letter}</span> <span style={{ color: hot ? C.green : C.faint, fontSize: "0.6875rem" }}>{"★".repeat(r.stars)}</span></>),
+                          td(<><span style={{ fontWeight: 600, color: hot ? C.green : C.text, fontVariantNumeric: "tabular-nums" }}>{passed}/{sc.total}</span><span style={{ color: C.muted, marginLeft: 6, fontSize: "0.6875rem", fontVariantNumeric: "tabular-nums" }}>{r.pct != null ? `${Math.round(r.pct * 100)}%` : ""}</span></>),
                           td(<span style={{ color: C.text }}>{shortDate(mi.first?.trade_date || r.trade_date)}</span>),
-                          td(<span style={{ color: wk.col, fontWeight: wk.bold ? 800 : 400 }}>{wk.txt}</span>),
-                          td(<span style={{ color: mo.col, fontWeight: mo.bold ? 800 : 400 }}>{mo.txt}</span>),
-                          td(<span style={{ color: fit === "in" ? "#22c55e" : fit === "off" ? "#ef4444" : C.muted }}>{r.sector || "—"}{fit === "in" ? " ✓" : ""}</span>),
+                          td(<span style={{ color: wk.col, fontWeight: wk.bold ? 600 : 400, fontVariantNumeric: "tabular-nums" }}>{wk.txt}</span>),
+                          td(<span style={{ color: mo.col, fontWeight: mo.bold ? 600 : 400, fontVariantNumeric: "tabular-nums" }}>{mo.txt}</span>),
+                          td(<span style={{ color: fit === "in" ? "var(--green)" : fit === "off" ? "var(--red)" : C.muted }}>{r.sector || "—"}{fit === "in" ? " ✓" : ""}</span>),
                         ];
                         return (
                           <tr key={r.id} onClick={() => { setQ(r.ticker); setStatusF(null); }} title={`${m.label} — ${m.tip}. Click to show ${r.ticker}'s full history below.`}
-                            style={{ cursor: "pointer", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                            style={{ cursor: "pointer", borderBottom: `1px solid var(--w04)` }}>
                             {cells.map((c, i) => <td key={i} style={c.style}>{c.children}</td>)}
                           </tr>
                         );
@@ -361,7 +361,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         <div style={{ ...cardChrome, padding: "16px 18px" }}>
           <div style={{ ...cardHead, marginBottom: 12 }}>
             <span style={{ ...microLabel, flex: 1 }}>Weekly Setups</span>
-            {(() => { const wk = tradingWeekMonFri(); return <span style={{ fontSize: "0.62rem", color: C.muted }}>{shortDate(wk[0])} – {shortDate(wk[4])}</span>; })()}
+            {(() => { const wk = tradingWeekMonFri(); return <span style={{ fontSize: "0.6875rem", color: C.muted }}>{shortDate(wk[0])} – {shortDate(wk[4])}</span>; })()}
           </div>
           {(() => {
             const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
@@ -374,16 +374,16 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
               return (
                 <div key={ds} title={future ? `${DAY_NAMES[i]} — not yet` : `${dateLabel(ds)} — ${n} setup${n !== 1 ? "s" : ""} posted`}
                   style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 6px", borderRadius: 8 }}>
-                  <span style={{ width: 96, flex: "none", fontSize: "0.7rem", fontWeight: 800, color: future ? "rgba(255,255,255,0.28)" : (n ? C.text : "rgba(255,255,255,0.4)"), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{DAY_NAMES[i]}</span>
-                  <div style={{ flex: 1, height: 16, background: "rgba(255,255,255,0.04)", borderRadius: 5, overflow: "hidden" }}>
-                    <div style={{ width: `${!future && n ? Math.max(4, (n / max) * 100) : 0}%`, height: "100%", background: C.goldDim, borderRight: n ? `2px solid ${C.goldBright}` : "none", transition: "width .3s" }} />
+                  <span style={{ width: 96, flex: "none", fontSize: "0.75rem", fontWeight: 500, color: future ? C.faint : (n ? C.text : C.faint), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{DAY_NAMES[i]}</span>
+                  <div style={{ flex: 1, height: 16, background: "var(--w04)", borderRadius: 5, overflow: "hidden" }}>
+                    <div style={{ width: `${!future && n ? Math.max(4, (n / max) * 100) : 0}%`, height: "100%", background: "var(--w14)", borderRight: n ? "2px solid var(--w35)" : "none", transition: "width .3s" }} />
                   </div>
-                  <b style={{ width: 24, flex: "none", textAlign: "right", fontSize: "0.78rem", color: future ? "rgba(255,255,255,0.28)" : (n ? C.text : "rgba(255,255,255,0.4)"), fontVariantNumeric: "tabular-nums" }}>{future ? "—" : n}</b>
+                  <b style={{ width: 24, flex: "none", textAlign: "right", fontSize: "0.75rem", fontWeight: 500, color: future ? C.faint : (n ? C.text : C.faint), fontVariantNumeric: "tabular-nums", letterSpacing: "-0.025em" }}>{future ? "—" : n}</b>
                 </div>
               );
             });
           })()}
-          <div style={{ fontSize: "0.66rem", color: C.muted, marginTop: 10, lineHeight: 1.55 }}>Fewer setups showing up = the market is offering less — traction drying up is information too.</div>
+          <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 10, lineHeight: 1.55 }}>Fewer setups showing up = the market is offering less — traction drying up is information too.</div>
         </div>
         </div>
       )}
@@ -394,7 +394,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
           <div style={segWrap}>
             {[["date", "Newest"], ["grade", "Top graded"]].map(([k, lbl]) => (
               <button key={k} onClick={() => setSortBy(k)}
-                style={{ border: "none", background: sortBy === k ? C.goldDim : "transparent", color: sortBy === k ? C.goldBright : C.muted, fontFamily: font, fontSize: "0.74rem", fontWeight: 700, padding: "7px 16px", borderRadius: 980, letterSpacing: "0.02em", cursor: "pointer" }}>{lbl}</button>
+                style={{ border: "none", background: sortBy === k ? "var(--w10)" : "transparent", color: sortBy === k ? C.white : C.muted, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "7px 16px", borderRadius: 999, letterSpacing: 0, cursor: "pointer" }}>{lbl}</button>
             ))}
           </div>
           <span style={{ width: 1, height: 18, background: C.border }} />
@@ -402,7 +402,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
           <div style={segWrap}>
             {[["all", "All"], ["taken", "✔ Taken"]].map(([k, lbl]) => (
               <button key={k} onClick={() => setView(k)}
-                style={{ border: "none", background: view === k ? (k === "taken" ? "rgba(34,197,94,0.12)" : C.goldDim) : "transparent", color: view === k ? (k === "taken" ? "#22c55e" : C.goldBright) : C.muted, fontFamily: font, fontSize: "0.74rem", fontWeight: 700, padding: "7px 15px", borderRadius: 980, letterSpacing: "0.02em", cursor: "pointer" }}>{lbl}</button>
+                style={{ border: "none", background: view === k ? (k === "taken" ? "rgba(0,200,5,0.12)" : "var(--w10)") : "transparent", color: view === k ? (k === "taken" ? "var(--green)" : C.white) : C.muted, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "7px 15px", borderRadius: 999, letterSpacing: 0, cursor: "pointer" }}>{lbl}</button>
             ))}
           </div>
           <span style={{ width: 1, height: 18, background: C.border }} />
@@ -410,16 +410,16 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
           <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 ticker…" spellCheck={false}
               title="Type a ticker to see its full history in the feed — every post, oldest thesis to latest"
-              style={{ background: "rgba(255,255,255,0.04)", color: C.white, border: `1px solid ${q.trim() ? C.borderGold : C.border}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: q.trim() ? "7px 26px 7px 14px" : "7px 14px", borderRadius: 980, width: 130, outline: "none", textTransform: "uppercase" }} />
+              style={{ background: "var(--w04)", color: C.white, border: `1px solid ${q.trim() ? "var(--w22)" : C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: q.trim() ? "7px 26px 7px 14px" : "7px 14px", borderRadius: 999, width: 130, outline: "none", textTransform: "uppercase" }} />
             {q.trim() && (
-              <button onClick={() => setQ("")} aria-label="Clear search" style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", color: faint, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
+              <button onClick={() => setQ("")} aria-label="Clear search" style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", color: faint, fontSize: "0.875rem", cursor: "pointer", lineHeight: 1, padding: 0 }}>×</button>
             )}
           </div>
           {(themeOptions.length > 0 || gradeOptions.length > 0) && <span style={{ width: 1, height: 18, background: C.border }} />}
           {/* theme filter — dropdown built ONLY from themes present in the current feed */}
           {themeOptions.length > 0 && (
             <select value={themeF} onChange={e => setThemeF(e.target.value)} title="Filter by theme"
-              style={{ background: "rgba(255,255,255,0.04)", color: themeF ? C.goldBright : C.muted, border: `1px solid ${themeF ? C.borderGold : C.border}`, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, padding: "7px 10px", borderRadius: 980, outline: "none", cursor: "pointer", maxWidth: 150 }}>
+              style={{ background: "var(--w04)", color: themeF ? C.white : C.muted, border: `1px solid ${themeF ? "var(--w22)" : C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "7px 10px", borderRadius: 999, outline: "none", cursor: "pointer", maxWidth: 150 }}>
               <option value="">All themes</option>
               {themeOptions.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -442,8 +442,8 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
           </div>
           {filtersActive > 0 && (
             <button onClick={clearAllFilters} title="Reset ticker search, theme, grade and min-score filters"
-              style={{ background: "transparent", border: "none", color: C.muted, fontFamily: font, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <span style={{ background: C.goldDim, color: C.goldBright, fontSize: "0.62rem", fontWeight: 800, padding: "2px 7px", borderRadius: 980 }}>{filtersActive}</span>
+              style={{ background: "transparent", border: "none", color: C.muted, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span style={{ background: "var(--w08)", color: C.white, fontSize: "0.6875rem", fontWeight: 600, padding: "2px 7px", borderRadius: 999 }}>{filtersActive}</span>
               × clear filters
             </button>
           )}
@@ -451,39 +451,39 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
       )}
 
       {isAdmin && tableMissing && (
-        <div style={{ background: "rgba(201,152,42,0.07)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "10px 14px", fontSize: "0.78rem", color: C.gold, marginBottom: 16 }}>
+        <div style={{ background: "rgba(255,80,0,0.08)", border: "1px solid rgba(255,80,0,0.35)", borderRadius: 12, padding: "10px 14px", fontSize: "0.75rem", color: "var(--redFg)", marginBottom: 16 }}>
           Table not found — run <b>supabase/daily-setups.sql</b> once in the Supabase SQL editor. Anything you publish meanwhile parks in this browser and shows below with a LOCAL badge.
         </div>
       )}
 
       {rows === null ? (
-        <div style={{ color: C.muted, fontSize: "0.84rem", padding: "30px 8px" }}>Loading the feed…</div>
+        <div style={{ color: C.muted, fontSize: "0.875rem", padding: "30px 8px" }}>Loading the feed…</div>
       ) : rows.length === 0 && loadFailed ? (
-        <div style={{ ...cardChrome, padding: "34px 20px", textAlign: "center", color: C.muted, fontSize: "0.86rem" }}>
+        <div style={{ ...cardChrome, padding: "34px 20px", textAlign: "center", color: C.muted, fontSize: "0.875rem" }}>
           Couldn't load the feed — check your connection.
           <div>
             <button onClick={() => { setLoadFailed(false); load(0); }}
-              style={{ marginTop: 14, background: "rgba(255,255,255,0.03)", border: `1px dashed ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.68rem", fontWeight: 800, padding: "6px 18px", borderRadius: 10, cursor: "pointer" }}>
+              style={{ marginTop: 14, background: "var(--w03)", border: `1px dashed ${C.border}`, color: C.muted, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "6px 18px", borderRadius: 999, cursor: "pointer" }}>
               Retry
             </button>
           </div>
         </div>
       ) : rows.length === 0 ? (
-        <div style={{ ...cardChrome, padding: "34px 20px", textAlign: "center", color: C.muted, fontSize: "0.86rem" }}>
+        <div style={{ ...cardChrome, padding: "34px 20px", textAlign: "center", color: C.muted, fontSize: "0.875rem" }}>
           No setups published yet — the first daily post lands here.
         </div>
       ) : groups.length === 0 ? (
-        <div style={{ ...cardChrome, padding: "30px 20px", textAlign: "center", color: C.muted, fontSize: "0.85rem" }}>
+        <div style={{ ...cardChrome, padding: "30px 20px", textAlign: "center", color: C.muted, fontSize: "0.875rem" }}>
           {filtersActive > 0 ? (
-            <>No setups match these filters. <button onClick={clearAllFilters} style={{ background: "transparent", border: "none", color: C.goldBright, fontFamily: font, fontWeight: 800, cursor: "pointer", textDecoration: "underline", fontSize: "inherit" }}>Clear filters</button></>
+            <>No setups match these filters. <button onClick={clearAllFilters} style={{ background: "transparent", border: "none", color: C.white, fontFamily: font, fontWeight: 600, cursor: "pointer", textDecoration: "underline", fontSize: "inherit" }}>Clear filters</button></>
           ) : (
             "No taken setups yet — ✔ Mark taken on a post when the trade is executed."
           )}
         </div>
       ) : groups.map((g, gi) => {
-        // Emphasized day dividers — TODAY in gold, YESTERDAY named, older dates plain (member ask)
+        // Emphasized day dividers — TODAY in white, YESTERDAY named, older dates plain (member ask)
         const dAgo = g.date === "__ranked__" ? null : daysAgo(g.date);
-        const rel = dAgo === 0 ? "TODAY" : dAgo === 1 ? "YESTERDAY" : null;
+        const rel = dAgo === 0 ? "Today" : dAgo === 1 ? "Yesterday" : null;
         // COLLAPSED BY DEFAULT (member ask): the feed is a row of dates — click a date to open its
         // charts. Search / Top-graded / funnel-chip views auto-expand (a filtered feed must show hits).
         const forceOpen = g.date === "__ranked__" || !!q.trim() || !!statusF || view === "taken" || !!themeF || !!gradeF || minStars > 0;
@@ -492,21 +492,21 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
         return (
         <div key={g.date + "-" + gi} style={{ marginBottom: dayOpen ? 22 : 12 }}>
           <div onClick={toggleDay} title={forceOpen ? undefined : dayOpen ? "Collapse this day" : "Show this day's charts"}
-            style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 2px 12px", cursor: forceOpen ? "default" : "pointer", padding: "10px 14px", borderRadius: 12, border: `1px solid ${rel === "TODAY" ? C.borderGold : C.border}`, background: "rgba(255,255,255,0.02)" }}>
-            <div style={{ fontSize: rel === "TODAY" ? "0.78rem" : "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: rel === "TODAY" ? C.goldBright : C.gold, whiteSpace: "nowrap" }}>
-              {rel ? <>{rel} <span style={{ color: C.muted, fontWeight: 700 }}>· {g.label}</span></> : g.label}
+            style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 2px 12px", cursor: forceOpen ? "default" : "pointer", padding: "10px 14px", borderRadius: 12, border: `1px solid ${rel === "Today" ? "var(--w22)" : C.border}`, background: "var(--w02)" }}>
+            <div style={{ fontSize: rel === "Today" ? "0.9375rem" : "0.8125rem", fontWeight: rel === "Today" ? 600 : 500, letterSpacing: 0, color: rel === "Today" ? C.white : C.muted, whiteSpace: "nowrap" }}>
+              {rel ? <>{rel} <span style={{ color: C.muted, fontWeight: 500 }}>· {g.label}</span></> : g.label}
             </div>
             {!dayOpen && (
               <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0, overflow: "hidden" }}>
                 {g.items.slice(0, 8).map(r => (
-                  <span key={r.id} style={{ fontSize: "0.6rem", fontWeight: 800, color: r.taken_at ? C.green : C.text, border: `1px solid ${r.taken_at ? "rgba(34,197,94,0.35)" : C.border}`, borderRadius: 8, padding: "2px 7px", whiteSpace: "nowrap" }}>{r.ticker}{r.letter ? <span style={{ color: C.muted, fontWeight: 700 }}> {r.letter}</span> : null}</span>
+                  <span key={r.id} style={{ fontSize: "0.6875rem", fontWeight: 600, color: r.taken_at ? C.green : C.text, border: `1px solid ${r.taken_at ? "rgba(0,200,5,0.35)" : C.border}`, borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap" }}>{r.ticker}{r.letter ? <span style={{ color: C.muted, fontWeight: 500 }}> {r.letter}</span> : null}</span>
                 ))}
-                {g.items.length > 8 && <span style={{ fontSize: "0.6rem", color: C.muted }}>+{g.items.length - 8} more</span>}
+                {g.items.length > 8 && <span style={{ fontSize: "0.6875rem", color: C.muted }}>+{g.items.length - 8} more</span>}
               </div>
             )}
-            <div style={{ flex: 1, height: 1, background: rel === "TODAY" ? "rgba(240,192,80,0.35)" : C.border }} />
-            {g.date !== "__ranked__" && <span style={{ fontSize: "0.62rem", color: C.muted, fontWeight: 700, whiteSpace: "nowrap" }}>{g.items.length} idea{g.items.length !== 1 ? "s" : ""}</span>}
-            {!forceOpen && <span style={{ fontSize: "0.7rem", color: dayOpen ? C.muted : C.goldBright }}>{dayOpen ? "▴" : "▾"}</span>}
+            <div style={{ flex: 1, height: 1, background: rel === "Today" ? "var(--w35)" : C.border }} />
+            {g.date !== "__ranked__" && <span style={{ fontSize: "0.6875rem", color: C.muted, fontWeight: 500, whiteSpace: "nowrap" }}>{g.items.length} idea{g.items.length !== 1 ? "s" : ""}</span>}
+            {!forceOpen && <span style={{ fontSize: "0.6875rem", color: dayOpen ? C.muted : C.muted }}>{dayOpen ? "▴" : "▾"}</span>}
           </div>
           {dayOpen && g.items.map(r => {
             const mi = mentionInfo(r);
@@ -520,7 +520,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
             const tickedSet = new Set(r.ticked || []);
             // in/off-theme vs the weekly DeepVue tracker AT THE POST'S DATE (same rule as position tagging)
             const fit = themeFit(r.sector, r.trade_date);
-            const fitCol = fit === "in" ? "#22c55e" : fit === "off" ? "#ef4444" : null;
+            const fitCol = fit === "in" ? "var(--green)" : fit === "off" ? "var(--red)" : null;
             return (
               <div key={r.id} style={{ ...cardChrome, padding: "16px 18px", marginBottom: 14, opacity: isStale ? 0.78 : 1 }}>
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
@@ -537,7 +537,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                         el.style.display = "none";
                         const ph = document.createElement("div");
                         ph.textContent = "Chart unavailable";
-                        ph.style.cssText = `flex:0 0 240px;width:240px;height:135px;display:flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid ${C.border};color:${C.muted};font-size:0.72rem;background:rgba(255,255,255,0.03)`;
+                        ph.style.cssText = `flex:0 0 240px;width:240px;height:135px;display:flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid ${C.border};color:${C.muted};font-size:0.75rem;background:var(--w03)`;
                         el.parentNode && el.parentNode.insertBefore(ph, el);
                       }}
                       style={{ flex: "0 0 240px", width: 240, height: 135, objectFit: "cover", borderRadius: 12, border: `1px solid ${C.border}`, cursor: "zoom-in" }} />
@@ -545,45 +545,45 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                   {/* headline */}
                   <div style={{ flex: "1 1 260px", minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: "1.3rem", fontWeight: 800, color: C.white }}>{r.ticker}</span>
+                      <span style={{ fontSize: "1.25rem", fontWeight: 600, color: C.white, letterSpacing: "-0.01em" }}>{r.ticker}</span>
                       {/* release date — always on the card, so repeats are datable even in ranked view */}
-                      <span title={`Posted ${dateLabel(r.trade_date)}`} style={{ fontSize: "0.66rem", fontWeight: 800, color: C.text, background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`, padding: "3px 9px", borderRadius: 99, whiteSpace: "nowrap" }}>
+                      <span title={`Posted ${dateLabel(r.trade_date)}`} style={{ fontSize: "0.6875rem", fontWeight: 600, color: C.text, background: "var(--w06)", border: `1px solid ${C.border}`, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap" }}>
                         {shortDate(r.trade_date)}
                       </span>
                       {/* mention badge: today's first-ever calls get NEW; any repeat shows DAY N + grade direction */}
                       {mi.nth === 1 && daysAgo(r.trade_date) === 0 && (
                         <span title={mi.total > 1 ? `First call — updated ${mi.total - 1}× since` : "First time on the radar"}
-                          style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: C.goldBright, background: "rgba(240,192,80,0.1)", border: `1px solid ${C.borderGold}`, padding: "3px 8px", borderRadius: 99 }}>NEW</span>
+                          style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: "0.04em", color: C.white, background: "var(--w10)", border: "1px solid var(--w35)", padding: "3px 8px", borderRadius: 999 }}>NEW</span>
                       )}
                       {stM && (
-                        <span title={stM.tip} style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.04em", color: stM.col, background: stM.bg, border: `1px solid ${stM.bd}`, padding: "3px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>{stM.label}</span>
+                        <span title={stM.tip} style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: stM.col, background: stM.bg, border: `1px solid ${stM.bd}`, padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>{stM.label}</span>
                       )}
                       {mi.nth > 1 && (
                         <span title={`On the focus list since ${dateLabel(mi.first.trade_date)} (first call: ${mi.first.letter}) — mention ${mi.nth} of ${mi.total} · previous: ${shortDate(mi.prev.trade_date)} (${mi.prev.letter})${gradeUp ? " · setup improving" : gradeDown ? " · setup weakening" : ""}`}
-                          style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: gradeUp ? "#22c55e" : gradeDown ? "#ef4444" : C.muted, background: gradeUp ? "rgba(34,197,94,0.1)" : gradeDown ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)", border: `1px solid ${gradeUp ? "rgba(34,197,94,0.35)" : gradeDown ? "rgba(239,68,68,0.35)" : C.border}`, padding: "3px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>
-                          DAY {mi.nth} · since {shortDate(mi.first.trade_date)}{mi.prev ? ` · ${mi.prev.letter}→${r.letter}${gradeUp ? " ↑" : gradeDown ? " ↓" : ""}` : ""}
+                          style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: gradeUp ? "var(--green)" : gradeDown ? "var(--red)" : C.muted, background: gradeUp ? "rgba(0,200,5,0.1)" : gradeDown ? "rgba(255,80,0,0.1)" : "var(--w06)", border: `1px solid ${gradeUp ? "rgba(0,200,5,0.35)" : gradeDown ? "rgba(255,80,0,0.35)" : C.border}`, padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>
+                          Day {mi.nth} · since {shortDate(mi.first.trade_date)}{mi.prev ? ` · ${mi.prev.letter}→${r.letter}${gradeUp ? " ↑" : gradeDown ? " ↓" : ""}` : ""}
                         </span>
                       )}
                       {r.setup_type && (
-                        <span style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#3b82f6", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.35)", padding: "3px 10px", borderRadius: 99 }}>{r.setup_type}</span>
+                        <span style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: C.blue, background: "var(--blueDim)", border: "1px solid rgba(59,158,255,0.35)" /* residual: no border-blue token */, padding: "3px 10px", borderRadius: 999 }}>{r.setup_type}</span>
                       )}
                       {r.sector && (
                         <span title={fit ? (fit === "in" ? "Sector is top-5 (1W or 1M) on the theme tracker at this date — flowing WITH the trend" : "Sector is NOT top-5 on the theme tracker at this date — fighting the rotation") : "No theme snapshot covers this date"}
-                          style={{ fontSize: "0.7rem", fontWeight: 700, color: fitCol || C.muted, background: fit === "in" ? "rgba(34,197,94,0.1)" : fit === "off" ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)", border: `1px solid ${fitCol ? (fit === "in" ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.35)") : C.border}`, padding: "3px 10px", borderRadius: 99 }}>
+                          style={{ fontSize: "0.75rem", fontWeight: 500, color: fitCol || C.muted, background: fit === "in" ? "rgba(0,200,5,0.1)" : fit === "off" ? "rgba(255,80,0,0.1)" : "var(--w06)", border: `1px solid ${fitCol ? (fit === "in" ? "rgba(0,200,5,0.35)" : "rgba(255,80,0,0.35)") : C.border}`, padding: "3px 10px", borderRadius: 999 }}>
                           {r.sector}{fit ? (fit === "in" ? " · in theme" : " · off theme") : ""}
                         </span>
                       )}
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 5, marginLeft: isAdmin ? 0 : "auto" }}>
                         <span style={gradeBadge(r.letter)}>{r.letter}</span>
-                        <Stars C={C} n={r.stars} size="0.72rem" />
+                        <Stars C={C} n={r.stars} size="0.75rem" />
                       </span>
-                      {r.taken_at && <span title={"Executed " + String(r.taken_at).slice(0, 10) + " — this gameplan became a live trade"} style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: "#22c55e", background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.4)", padding: "3px 8px", borderRadius: 99 }}>✔ TAKEN</span>}
-                      {r._local && <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.08em", color: C.gold, background: "rgba(201,152,42,0.12)", border: `1px solid ${C.borderGold}`, padding: "3px 8px", borderRadius: 99 }}>LOCAL</span>}
+                      {r.taken_at && <span title={"Executed " + String(r.taken_at).slice(0, 10) + " — this gameplan became a live trade"} style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: "var(--green)", background: "rgba(0,200,5,0.12)", border: "1px solid rgba(0,200,5,0.4)", padding: "3px 8px", borderRadius: 999 }}>✔ Taken</span>}
+                      {r._local && <span style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: C.white, background: "var(--w08)", border: "1px solid var(--w22)", padding: "3px 8px", borderRadius: 999 }}>Local</span>}
                       {isAdmin && (
                         <span style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
                           <button title={r.taken_at ? "Unmark — removes the executed flag" : "Mark as executed — syncs the gameplan to your live trade for the Friday review"}
                             onClick={() => takenToggle(r)}
-                            style={{ background: r.taken_at ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.05)", border: `1px solid ${r.taken_at ? "rgba(34,197,94,0.4)" : C.border}`, color: r.taken_at ? "#22c55e" : C.muted, fontFamily: font, fontSize: "0.66rem", fontWeight: 800, padding: "4px 11px", borderRadius: 99, cursor: "pointer" }}>
+                            style={{ background: r.taken_at ? "rgba(0,200,5,0.14)" : "var(--w06)", border: `1px solid ${r.taken_at ? "rgba(0,200,5,0.4)" : C.border}`, color: r.taken_at ? "var(--green)" : C.muted, fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, padding: "4px 11px", borderRadius: 999, cursor: "pointer" }}>
                             {r.taken_at ? "✔ Taken" : "Mark taken"}</button>
                           <button title="Edit in the Setup Grader — republish replaces this post"
                             onClick={() => {
@@ -595,18 +595,18 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                               } catch {}
                               setPage && setPage("tools");
                             }}
-                            style={{ background: "rgba(201,152,42,0.1)", border: `1px solid ${C.borderGold}`, color: C.gold, fontFamily: font, fontSize: "0.66rem", fontWeight: 800, padding: "4px 11px", borderRadius: 99, cursor: "pointer" }}>✎ Edit</button>
+                            style={{ background: "var(--w06)", border: `1px solid ${C.border}`, color: C.text, fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, padding: "4px 11px", borderRadius: 999, cursor: "pointer" }}>✎ Edit</button>
                           <button onClick={() => remove(r)} title="Remove post" style={{ background: "transparent", border: "none", color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>×</button>
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: "0.74rem", color: C.muted, marginTop: 5 }}>
+                    <div style={{ fontSize: "0.75rem", color: C.muted, marginTop: 5 }}>
                       {r.pct != null ? `${Math.round(r.pct * 100)}% of criteria` : ""}{r.star_hit != null ? ` · ${r.star_hit}/${r.starmakers} ★-makers` : ""}
                     </div>
-                    {r.note && <div style={{ fontSize: "0.84rem", color: C.text, lineHeight: 1.58, marginTop: 11 }}>{r.note}</div>}
+                    {r.note && <div style={{ fontSize: "0.875rem", color: C.text, lineHeight: 1.58, marginTop: 11 }}>{r.note}</div>}
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 11 }}>
                       <button onClick={() => setOpenId(expanded ? null : r.id)}
-                        style={{ background: "rgba(201,152,42,0.08)", color: C.gold, border: `1px solid ${C.borderGold}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer" }}>
+                        style={{ background: "var(--w08)", color: C.white, border: "1px solid var(--w14)", fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "6px 13px", borderRadius: 999, cursor: "pointer" }}>
                         {expanded ? "Hide the scorecard ▴" : "See the scorecard ▾"}
                       </button>
                       {/* JH 2026-08-04: taking the same trade → one click copies this post's scorecard into
@@ -621,7 +621,7 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                               auto: r.auto || [], note: r.note || "", chart_img: r.chart_img || "" });
                             setImportedIds((s) => { const nx = new Set(s); nx.add(r.id); return nx; });
                           }}
-                          style={{ background: importedIds.has(r.id) ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.05)", color: importedIds.has(r.id) ? "#22c55e" : C.text, border: `1px solid ${importedIds.has(r.id) ? "rgba(34,197,94,0.4)" : C.border}`, fontFamily: font, fontSize: "0.7rem", fontWeight: 800, padding: "6px 13px", borderRadius: 99, cursor: "pointer" }}>
+                          style={{ background: importedIds.has(r.id) ? "rgba(0,200,5,0.12)" : "var(--w06)", color: importedIds.has(r.id) ? "var(--green)" : C.text, border: `1px solid ${importedIds.has(r.id) ? "rgba(0,200,5,0.4)" : C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "6px 13px", borderRadius: 999, cursor: "pointer" }}>
                           {importedIds.has(r.id) ? "✓ In your grades" : "📥 I took this — copy the scorecard"}
                         </button>
                       )}
@@ -641,38 +641,38 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
                       <span style={{ ...microLabel }}>Setup-Grader Scorecard</span>
                       {/* 30×30 tap target (the tip layer is tap-driven on phones); negative margin keeps
                           the dot looking the same 15px and the header the same height as before. */}
-                      <span data-tip="Scored criteria — ★ marks a confluence factor (★-maker), a Bonus tick is tracked but not scored; a gold dot ● marks a tick VIV auto-read off the chart. Every grade is auditable: each star traces to its ticks."
-                        title="Scored criteria — ★ marks a confluence factor (★-maker), a Bonus tick is tracked but not scored; a gold dot ● marks a tick VIV auto-read off the chart. Every grade is auditable: each star traces to its ticks."
+                      <span data-tip="Scored criteria — ★ marks a confluence factor (★-maker), a Bonus tick is tracked but not scored; a dot ● marks a tick VIV auto-read off the chart. Every grade is auditable: each star traces to its ticks."
+                        title="Scored criteria — ★ marks a confluence factor (★-maker), a Bonus tick is tracked but not scored; a dot ● marks a tick VIV auto-read off the chart. Every grade is auditable: each star traces to its ticks."
                         style={{ width: 30, height: 30, margin: "-7px", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "help", flex: "none" }}>
-                        <span style={{ width: 15, height: 15, borderRadius: "50%", border: `1px solid ${C.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 700, fontStyle: "italic", color: faint, flex: "none" }}>i</span>
+                        <span style={{ width: 15, height: 15, borderRadius: "50%", border: `1px solid ${C.border}`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6875rem", fontWeight: 700, fontStyle: "italic", color: faint, flex: "none" }}>i</span>
                       </span>
-                      <span style={{ background: C.goldDim, color: C.goldBright, fontSize: "0.62rem", fontWeight: 800, padding: "2px 9px", borderRadius: 980, marginLeft: "auto" }}>{sec2.passed}/{sec2.total} criteria</span>
+                      <span style={{ background: "var(--w08)", color: C.white, fontSize: "0.6875rem", fontWeight: 600, padding: "2px 9px", borderRadius: 999, marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>{sec2.passed}/{sec2.total} criteria</span>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 12, alignItems: "stretch" }}>
                       {secs.map((sec, siLocal) => {
                         const si = sectionsFor(r.ticked).indexOf(sec);
                         const onCount = sec.items.filter((_, ii) => tickedSet.has(si + "-" + ii)).length;
                         return (
-                          <div key={sec.title} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: "rgba(255,255,255,0.018)", padding: "12px 14px", minWidth: 0 }}>
+                          <div key={sec.title} style={{ border: "none", borderRadius: 12, background: "var(--w02)", padding: "12px 14px", minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                              <span style={{ width: 20, height: 20, borderRadius: 6, background: C.goldDim, color: C.goldBright, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.66rem", fontWeight: 800, flex: "none" }}>{siLocal + 1}</span>
-                              <span style={{ fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold }}>{sec.title}</span>
-                              <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 800, color: onCount ? C.goldBright : faint, border: `1px solid ${C.border}`, padding: "1px 8px", borderRadius: 980, fontVariantNumeric: "tabular-nums" }}>{onCount}/{sec.items.length}</span>
+                              <span style={{ width: 20, height: 20, borderRadius: 6, background: "var(--w08)", color: C.white, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6875rem", fontWeight: 600, flex: "none" }}>{siLocal + 1}</span>
+                              <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: C.muted }}>{sec.title}</span>
+                              <span style={{ marginLeft: "auto", fontSize: "0.6875rem", fontWeight: 600, color: onCount ? C.white : faint, border: `1px solid ${C.border}`, padding: "1px 8px", borderRadius: 999, fontVariantNumeric: "tabular-nums" }}>{onCount}/{sec.items.length}</span>
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
                               {sec.items.map((it, ii) => {
                                 const k = si + "-" + ii, isOn = tickedSet.has(k);
                                 return (
                                   <div key={k} style={{ display: "flex", gap: 9, alignItems: "flex-start", minWidth: 0 }}>
-                                    <span style={{ flex: "none", width: 16, height: 16, marginTop: 1, borderRadius: 5, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.62rem", fontWeight: 800, border: `1px solid ${isOn ? "rgba(34,197,94,0.5)" : C.border}`, background: isOn ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.03)", color: isOn ? C.green : "rgba(255,255,255,0.18)" }}>{isOn ? "✓" : ""}</span>
+                                    <span style={{ flex: "none", width: 16, height: 16, marginTop: 1, borderRadius: 5, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6875rem", fontWeight: 600, border: `1px solid ${isOn ? "rgba(0,200,5,0.5)" : C.border}`, background: isOn ? "rgba(0,200,5,0.14)" : "var(--w03)", color: isOn ? C.green : C.faint }}>{isOn ? "✓" : ""}</span>
                                     <div style={{ minWidth: 0 }}>
-                                      <div style={{ fontSize: "0.74rem", fontWeight: 700, color: isOn ? C.text : "rgba(255,255,255,0.62)", lineHeight: 1.35 }}>
+                                      <div style={{ fontSize: "0.75rem", fontWeight: 500, color: isOn ? C.text : C.muted, lineHeight: 1.35 }}>
                                         {it.c}
-                                        {it.star && <span title="★-maker (confluence factor)" style={{ fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.05em", color: isOn ? C.goldBright : "rgba(255,255,255,0.3)", border: `1px solid ${isOn ? C.goldBright : "rgba(255,255,255,0.2)"}`, padding: "0 5px", borderRadius: 99, marginLeft: 6, whiteSpace: "nowrap" }}>★ MAKER</span>}
-                                        {it.bonus && <span title="Bonus factor — tracked but not scored" style={{ fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: isOn ? C.goldBright : "rgba(255,255,255,0.3)", border: `1px solid ${isOn ? C.goldBright : "rgba(255,255,255,0.2)"}`, padding: "0 5px", borderRadius: 99, marginLeft: 6, whiteSpace: "nowrap" }}>Bonus</span>}
-                                        {isOn && autoSet.has(k) && <span title="Auto-read from the chart by VIV" style={{ fontSize: "0.6rem", color: C.goldBright, marginLeft: 5 }}>●</span>}
+                                        {it.star && <span title="★-maker (confluence factor)" style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: isOn ? C.muted : C.faint, border: `1px solid ${isOn ? "var(--w35)" : "var(--w22)"}`, padding: "0 5px", borderRadius: 999, marginLeft: 6, whiteSpace: "nowrap" }}>★ maker</span>}
+                                        {it.bonus && <span title="Bonus factor — tracked but not scored" style={{ fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: isOn ? C.muted : C.faint, border: `1px solid ${isOn ? "var(--w35)" : "var(--w22)"}`, padding: "0 5px", borderRadius: 999, marginLeft: 6, whiteSpace: "nowrap" }}>Bonus</span>}
+                                        {isOn && autoSet.has(k) && <span title="Auto-read from the chart by VIV" style={{ fontSize: "0.6875rem", color: C.blue, marginLeft: 5 }}>●</span>}
                                       </div>
-                                      {it.s && <div style={{ fontSize: "0.66rem", color: faint, lineHeight: 1.45, marginTop: 1 }}>{it.s}</div>}
+                                      {it.s && <div style={{ fontSize: "0.75rem", color: faint, lineHeight: 1.45, marginTop: 1 }}>{it.s}</div>}
                                     </div>
                                   </div>
                                 );
@@ -696,10 +696,10 @@ export default function DailySetupsTab({ C, font, session, isAdmin, setPage }) {
           position:fixed and crops the chart (member-seen on RKLB). Body-level = true fullscreen. */}
       {lightbox && createPortal(
         <div onClick={() => setLightbox(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 1500, background: "rgba(4,4,8,0.94)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out", padding: 24 }}>
+          style={{ position: "fixed", inset: 0, zIndex: 1500, background: "var(--lightbox)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out", padding: 24 }}>
           <img src={lightbox} alt="chart"
-            style={{ maxWidth: "min(96vw, 1900px)", maxHeight: "92vh", width: "auto", height: "auto", objectFit: "contain", display: "block", borderRadius: 14, border: `1px solid ${C.borderGold}`, boxShadow: "0 30px 80px rgba(0,0,0,0.7)" }} />
-          <div style={{ position: "fixed", top: 18, right: 26, color: "rgba(255,255,255,0.7)", fontSize: "0.8rem", fontFamily: font }}>Esc / click to close</div>
+            style={{ maxWidth: "min(96vw, 1900px)", maxHeight: "92vh", width: "auto", height: "auto", objectFit: "contain", display: "block", borderRadius: 16, border: "1px solid rgba(255,255,255,0.16)", boxShadow: "var(--shadowOv)" }} />
+          <div style={{ position: "fixed", top: 18, right: 26, color: "rgba(255,255,255,0.7)", fontSize: "0.75rem", fontFamily: font }}>Esc / click to close</div>
         </div>,
         document.body
       )}

@@ -78,10 +78,10 @@ function useDailyMap(trades) {
 function nowYM() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 
 function navBtn(C) {
-  return { width: 34, height: 34, borderRadius: 9, background: C.glass, border: `1px solid ${C.border}`, color: C.white, fontSize: "1.1rem", cursor: "pointer", lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center" };
+  return { width: 34, height: 34, borderRadius: 999, background: C.glass, border: `1px solid ${C.border}`, color: C.white, fontSize: "1.125rem", cursor: "pointer", lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center" };
 }
 function dowStyle(C) {
-  return { fontSize: "0.62rem", letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, fontWeight: 700, textAlign: "center", padding: "6px 0" };
+  return { fontSize: "0.6875rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500, textAlign: "center", padding: "6px 0" };
 }
 
 // ─── Monthly view ───
@@ -115,12 +115,12 @@ function Monthly({ daily, C, font, ym, setYm, onOpenTrade, unit }) {
   };
 
   const cellStyle = (info) => {
-    let bg = "rgba(255,255,255,0.02)", bd = C.border;
+    let bg = "var(--w02)", bd = C.border;
     if (info) {
       const cv = unitVal(info, unit);
-      if (cv > 0) { bg = "rgba(34,197,94,0.13)"; bd = "rgba(34,197,94,0.34)"; }
-      else if (cv < 0) { bg = "rgba(239,68,68,0.12)"; bd = "rgba(239,68,68,0.30)"; }
-      else { bg = "rgba(255,255,255,0.05)"; }
+      if (cv > 0) { bg = "rgba(0,200,5,0.13)"; bd = "rgba(0,200,5,0.34)"; }
+      else if (cv < 0) { bg = "rgba(255,80,0,0.12)"; bd = "rgba(255,80,0,0.30)"; }
+      else { bg = "var(--w06)"; }
     }
     return { background: bg, border: `1px solid ${bd}`, borderRadius: 12, minHeight: 96, padding: "8px 11px", display: "flex", flexDirection: "column" };
   };
@@ -129,13 +129,13 @@ function Monthly({ daily, C, font, ym, setYm, onOpenTrade, unit }) {
     <div style={{ fontFamily: font }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <button onClick={() => nav(-1)} style={navBtn(C)}>‹</button>
-        <div style={{ fontSize: "1.15rem", fontWeight: 800, color: C.white, minWidth: 150 }}>{MONTHS[m - 1]} {y}</div>
+        <div style={{ fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em", color: C.white, minWidth: 150 }}>{MONTHS[m - 1]} {y}</div>
         <button onClick={() => nav(1)} style={navBtn(C)}>›</button>
-        <button onClick={() => setYm(nowYM())} style={{ ...navBtn(C), width: "auto", padding: "0 14px", fontSize: "0.72rem", fontWeight: 700 }}>This month</button>
+        <button onClick={() => setYm(nowYM())} style={{ ...navBtn(C), width: "auto", padding: "0 14px", fontSize: "0.75rem", fontWeight: 500 }}>This month</button>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, fontWeight: 700 }}>Monthly stats</span>
-          <span style={{ fontSize: "0.94rem", fontWeight: 800, padding: "5px 11px", borderRadius: 9, background: monthColVal > 0 ? "rgba(34,197,94,0.12)" : monthColVal < 0 ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.05)", color: monthColVal > 0 ? C.green : monthColVal < 0 ? C.red : C.muted }}>{monthDays ? unitMain(monthAgg, unit) : (unit === "$" ? "$0" : unit === "r" ? "—" : "0.00%")}</span>
-          <span style={{ fontSize: "0.78rem", fontWeight: 700, padding: "5px 11px", borderRadius: 9, background: C.goldDim, color: C.gold }}>{monthDays} day{monthDays !== 1 ? "s" : ""}</span>
+          <span style={{ fontSize: "0.75rem", letterSpacing: 0, color: "var(--muted)", fontWeight: 500 }}>Monthly stats</span>
+          <span style={{ fontSize: "1rem", fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", padding: "5px 11px", borderRadius: 999, background: monthColVal > 0 ? "rgba(0,200,5,0.12)" : monthColVal < 0 ? "rgba(255,80,0,0.12)" : "var(--w06)", color: monthColVal > 0 ? C.green : monthColVal < 0 ? C.red : C.muted }}>{monthDays ? unitMain(monthAgg, unit) : (unit === "$" ? "$0" : unit === "r" ? "—" : "0.00%")}</span>
+          <span style={{ fontSize: "0.75rem", fontWeight: 500, padding: "5px 11px", borderRadius: 999, background: "var(--w06)", color: C.muted }}>{monthDays} day{monthDays !== 1 ? "s" : ""}</span>
         </div>
       </div>
       <div className="calgrid" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr) 130px", gap: 7 }}>
@@ -148,32 +148,32 @@ function Monthly({ daily, C, font, ym, setYm, onOpenTrade, unit }) {
           return (
             <React.Fragment key={wi}>
               {wk.map((c, ci) => {
-                if (!c) return <div key={ci} style={{ background: "rgba(255,255,255,0.012)", border: "1px solid rgba(255,255,255,0.03)", borderRadius: 12, minHeight: 96 }} />;
+                if (!c) return <div key={ci} style={{ background: "var(--w02)", border: "1px solid var(--w03)", borderRadius: 12, minHeight: 96 }} />;
                 const key = `${y}-${String(m).padStart(2, "0")}-${String(c.d).padStart(2, "0")}`;
                 const sel = selDay === key;
                 return (
                   <div key={ci} onClick={c.info ? () => setSelDay(sel ? null : key) : undefined}
                     title={c.info ? (sel ? "Hide the day's trades" : "Click to see the trades exited this day") : undefined}
-                    style={{ ...cellStyle(c.info), cursor: c.info ? "pointer" : "default", ...(sel ? { border: `1px solid ${C.goldBright}`, boxShadow: "0 0 0 1px " + C.goldBright + ", 0 6px 18px rgba(240,192,80,0.15)" } : {}), transition: "border-color .12s, box-shadow .12s" }}>
-                    <div style={{ fontSize: "0.72rem", fontWeight: 700, color: c.info ? C.white : C.muted, textAlign: "right" }}>{c.d}</div>
+                    style={{ ...cellStyle(c.info), cursor: c.info ? "pointer" : "default", ...(sel ? { border: "1px solid var(--w22)", boxShadow: "0 0 0 1px var(--w22), var(--shadowOv)" } : {}), transition: "border-color .12s, box-shadow .12s" }}>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", color: c.info ? C.white : C.muted, textAlign: "right" }}>{c.d}</div>
                     {c.info && (() => { const cv = unitVal(c.info, unit); return <div style={{ marginTop: "auto" }}>
-                      <div style={{ fontWeight: 800, fontSize: "0.98rem", color: cv > 0 ? C.green : cv < 0 ? C.red : C.muted }}>{unitMain(c.info, unit)}</div>
-                      <div style={{ fontSize: "0.6rem", color: C.muted, marginTop: 2 }}>{c.info.n} trade{c.info.n > 1 ? "s" : ""} · {Math.round(100 * c.info.w / c.info.n)}% {sel ? "▴" : "▾"}</div>
+                      <div style={{ fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", fontSize: "1rem", color: cv > 0 ? C.green : cv < 0 ? C.red : C.muted }}>{unitMain(c.info, unit)}</div>
+                      <div style={{ fontSize: "0.6875rem", color: C.muted, marginTop: 2 }}>{c.info.n} trade{c.info.n > 1 ? "s" : ""} · {Math.round(100 * c.info.w / c.info.n)}% {sel ? "▴" : "▾"}</div>
                     </div>; })()}
                   </div>
                 );
               })}
-              <div className="calweekcol" style={{ background: "rgba(201,152,42,0.05)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: 10, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                <div style={{ fontSize: "0.58rem", letterSpacing: "0.08em", textTransform: "uppercase", color: C.gold, fontWeight: 800 }}>Week {wi + 1}</div>
-                <div style={{ fontWeight: 800, fontSize: "1rem", marginTop: 3, color: wcv > 0 ? C.green : wcv < 0 ? C.red : C.muted }}>{wdays ? unitMain(wAgg, unit) : "—"}</div>
-                <div style={{ fontSize: "0.56rem", color: C.muted }}>{wdays} day{wdays !== 1 ? "s" : ""}</div>
+              <div className="calweekcol" style={{ background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 12, padding: 10, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={{ fontSize: "0.6875rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", fontWeight: 500 }}>Week {wi + 1}</div>
+                <div style={{ fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", fontSize: "1rem", marginTop: 3, color: wcv > 0 ? C.green : wcv < 0 ? C.red : C.muted }}>{wdays ? unitMain(wAgg, unit) : "—"}</div>
+                <div style={{ fontSize: "0.6875rem", color: C.muted }}>{wdays} day{wdays !== 1 ? "s" : ""}</div>
               </div>
             </React.Fragment>
           );
         })}
       </div>
       {unit === "r" && monthNoR > 0 && (
-        <div style={{ marginTop: 10, fontSize: "0.64rem", color: C.muted }}>{monthNoR} trade{monthNoR === 1 ? "" : "s"} without a recorded R excluded — never guessed.</div>
+        <div style={{ marginTop: 10, fontSize: "0.6875rem", color: C.muted }}>{monthNoR} trade{monthNoR === 1 ? "" : "s"} without a recorded R excluded — never guessed.</div>
       )}
       {/* DAY EXPANSION — the trades exited on the clicked day, each openable */}
       {selDay && daily[selDay] && (() => {
@@ -182,25 +182,25 @@ function Monthly({ daily, C, font, ym, setYm, onOpenTrade, unit }) {
         const nice = `${DOW[dt.getUTCDay()]}, ${dt.getUTCDate()} ${MONTHS[dt.getUTCMonth()]} ${dt.getUTCFullYear()}`;
         const plOf = (t) => t.plDollar == null ? Number(t.pl_dollar) : Number(t.plDollar);
         return (
-          <div style={{ marginTop: 12, background: "rgba(255,255,255,0.02)", border: `1px solid ${C.borderGold}`, borderRadius: 14, padding: "14px 16px" }}>
+          <div style={{ marginTop: 12, background: "var(--w02)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.gold }}>{nice}</span>
-              <span style={{ fontSize: "0.8rem", fontWeight: 800, color: info.net > 0 ? C.green : info.net < 0 ? C.red : C.muted }}>{fmtK(info.net)}</span>
-              <span style={{ fontSize: "0.68rem", color: C.muted }}>{info.n} trade{info.n > 1 ? "s" : ""} exited · {Math.round(100 * info.w / info.n)}% win</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>{nice}</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", color: info.net > 0 ? C.green : info.net < 0 ? C.red : C.muted }}>{fmtK(info.net)}</span>
+              <span style={{ fontSize: "0.6875rem", color: C.muted }}>{info.n} trade{info.n > 1 ? "s" : ""} exited · {Math.round(100 * info.w / info.n)}% win</span>
               <button onClick={() => setSelDay(null)} aria-label="Collapse" style={{ marginLeft: "auto", background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 8, width: 26, height: 26, cursor: "pointer", lineHeight: 1 }}>×</button>
             </div>
             {(info.trades || []).slice().sort((a, b) => plOf(b) - plOf(a)).map((t, k) => {
               const pl = plOf(t), pct = t.plPct == null ? (t.pl_pct == null ? null : Number(t.pl_pct)) : Number(t.plPct);
               const r = t.rMult == null ? (t.r_mult == null ? null : Number(t.r_mult)) : Number(t.rMult);
               return (
-                <div key={t.id || k} style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 4px", borderTop: k ? "1px solid rgba(255,255,255,0.05)" : "none", fontSize: "0.82rem", flexWrap: "wrap" }}>
-                  <span style={{ fontWeight: 800, color: C.white, minWidth: 58 }}>{t.ticker}</span>
-                  <span style={{ fontSize: "0.66rem", fontWeight: 700, color: C.muted, minWidth: 42 }}>{t.tradeType || t.trade_type || "Long"}</span>
-                  <span style={{ fontWeight: 800, minWidth: 76, color: pl > 0 ? C.green : pl < 0 ? C.red : C.muted }}>{(pl >= 0 ? "+" : "-") + "$" + Math.abs(pl).toFixed(0)}</span>
+                <div key={t.id || k} style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 4px", borderTop: k ? "1px solid var(--w06)" : "none", fontSize: "0.875rem", flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 600, color: C.white, minWidth: 58 }}>{t.ticker}</span>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 500, color: C.muted, minWidth: 42 }}>{t.tradeType || t.trade_type || "Long"}</span>
+                  <span style={{ fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", minWidth: 76, color: pl > 0 ? C.green : pl < 0 ? C.red : C.muted }}>{(pl >= 0 ? "+" : "-") + "$" + Math.abs(pl).toFixed(0)}</span>
                   <span style={{ minWidth: 62, color: (pct || 0) >= 0 ? C.green : C.red }}>{pct != null && !isNaN(pct) ? `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%` : "—"}</span>
                   <span style={{ minWidth: 52, color: C.muted }}>{r != null && !isNaN(r) ? `${r >= 0 ? "+" : ""}${r.toFixed(2)}R` : "—"}</span>
                   {onOpenTrade && (
-                    <button onClick={() => onOpenTrade(t)} style={{ marginLeft: "auto", background: C.goldDim, border: `1px solid ${C.borderGold}`, color: C.goldBright, fontFamily: font, fontWeight: 700, fontSize: "0.7rem", padding: "6px 14px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" }}>Go to trade details ›</button>
+                    <button onClick={() => onOpenTrade(t)} style={{ marginLeft: "auto", background: "var(--w10)", border: "1px solid var(--w14)", color: C.white, fontFamily: font, fontWeight: 500, fontSize: "0.75rem", padding: "6px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Go to trade details ›</button>
                   )}
                 </div>
               );
@@ -233,14 +233,14 @@ function Yearly({ daily, C, font, onPickMonth, unit }) {
   }, [daily]);
 
   const cellBg = (info) => {
-    if (!info) return "rgba(255,255,255,0.02)";
+    if (!info) return "var(--w02)";
     if (metric === "winrate") {
       const wr = info.n ? info.w / info.n : 0; const mag = Math.min(1, Math.abs(wr - 0.5) * 2);
-      return wr >= 0.5 ? `rgba(34,197,94,${0.14 + mag * 0.5})` : `rgba(239,68,68,${0.12 + mag * 0.5})`;
+      return wr >= 0.5 ? `rgba(0,200,5,${0.14 + mag * 0.5})` : `rgba(255,80,0,${0.12 + mag * 0.5})`;
     }
-    if (metric === "trades") { const mag = Math.min(1, info.n / maxN); return `rgba(201,152,42,${0.10 + mag * 0.45})`; }
+    if (metric === "trades") { const mag = Math.min(1, info.n / maxN); return `color-mix(in srgb, var(--text) ${((0.08 + mag * 0.35) * 100).toFixed(1)}%, transparent)`; }
     const mag = Math.min(1, Math.abs(info.net) / maxAbsNet);
-    return info.net > 0 ? `rgba(34,197,94,${0.14 + mag * 0.52})` : info.net < 0 ? `rgba(239,68,68,${0.12 + mag * 0.52})` : "rgba(255,255,255,0.06)";
+    return info.net > 0 ? `rgba(0,200,5,${0.14 + mag * 0.52})` : info.net < 0 ? `rgba(255,80,0,${0.12 + mag * 0.52})` : "var(--w06)";
   };
   const cellMain = (info) => {
     if (!info) return "--";
@@ -261,9 +261,9 @@ function Yearly({ daily, C, font, onPickMonth, unit }) {
   return (
     <div style={{ fontFamily: font }}>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
-        <div style={{ display: "flex", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ display: "flex", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 999, overflow: "hidden" }}>
           {TOGGLES.map(([k, lbl]) => (
-            <button key={k} onClick={() => setMetric(k)} style={{ background: metric === k ? C.gold : "transparent", color: metric === k ? "#1a1206" : C.muted, border: "none", padding: "7px 15px", fontFamily: font, fontWeight: 700, fontSize: "0.76rem", cursor: "pointer" }}>{lbl}</button>
+            <button key={k} onClick={() => setMetric(k)} style={{ background: metric === k ? "var(--w10)" : "transparent", color: metric === k ? C.white : C.muted, border: "none", padding: "7px 15px", fontFamily: font, fontWeight: 500, fontSize: "0.75rem", cursor: "pointer" }}>{lbl}</button>
           ))}
         </div>
       </div>
@@ -276,22 +276,22 @@ function Yearly({ daily, C, font, onPickMonth, unit }) {
             const tot = yearTotal(yr);
             return (
               <div key={yr} style={{ display: "grid", gridTemplateColumns: "62px repeat(12, 1fr) 84px", gap: 7, marginBottom: 7 }}>
-                <div style={{ display: "flex", alignItems: "center", fontWeight: 800, fontSize: "0.9rem", color: C.white, paddingLeft: 4 }}>{yr}</div>
+                <div style={{ display: "flex", alignItems: "center", fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", fontSize: "0.875rem", color: C.white, paddingLeft: 4 }}>{yr}</div>
                 {MONTHS_SHORT.map((_, mi) => {
                   const info = monthly[`${yr}-${String(mi + 1).padStart(2, "0")}`];
                   return (
                     <div key={mi} onClick={() => info && onPickMonth(`${yr}-${String(mi + 1).padStart(2, "0")}`)} title={info ? `${MONTHS_SHORT[mi]} ${yr}` : ""}
-                      style={{ background: cellBg(info), border: `1px solid ${info ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)"}`, borderRadius: 10, minHeight: 60, padding: "8px 6px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", cursor: info ? "pointer" : "default", textAlign: "center" }}>
-                      <div style={{ fontWeight: 800, fontSize: "0.82rem", color: info ? C.white : C.muted }}>{cellMain(info)}</div>
-                      {info && <div style={{ fontSize: "0.58rem", color: "rgba(255,255,255,0.6)", marginTop: 2 }}>{info.n} trade{info.n > 1 ? "s" : ""}</div>}
+                      style={{ background: cellBg(info), border: `1px solid ${info ? "var(--w08)" : "var(--w03)"}`, borderRadius: 10, minHeight: 60, padding: "8px 6px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", cursor: info ? "pointer" : "default", textAlign: "center" }}>
+                      <div style={{ fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", fontSize: "0.875rem", color: info ? C.white : C.muted }}>{cellMain(info)}</div>
+                      {info && <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 2 }}>{info.n} trade{info.n > 1 ? "s" : ""}</div>}
                     </div>
                   );
                 })}
-                <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
-                  <div style={{ fontWeight: 800, fontSize: "0.82rem", color: metric === "pnl" ? (unitVal(tot, unit) > 0 ? C.green : unitVal(tot, unit) < 0 ? C.red : C.muted) : C.white }}>
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                  <div style={{ fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", fontSize: "0.875rem", color: metric === "pnl" ? (unitVal(tot, unit) > 0 ? C.green : unitVal(tot, unit) < 0 ? C.red : C.muted) : C.white }}>
                     {tot.n === 0 ? "--" : metric === "winrate" ? `${Math.round(100 * tot.w / tot.n)}%` : metric === "trades" ? `${tot.n}` : unitMain(tot, unit)}
                   </div>
-                  {tot.n > 0 && <div style={{ fontSize: "0.58rem", color: "rgba(255,255,255,0.6)", marginTop: 2 }}>{tot.n} trades</div>}
+                  {tot.n > 0 && <div style={{ fontSize: "0.6875rem", color: "var(--muted)", marginTop: 2 }}>{tot.n} trades</div>}
                 </div>
               </div>
             );
@@ -299,7 +299,7 @@ function Yearly({ daily, C, font, onPickMonth, unit }) {
         </div>
       </div>
       {unit === "r" && metric === "pnl" && yearsNoR > 0 && (
-        <div style={{ marginTop: 10, fontSize: "0.64rem", color: C.muted }}>{yearsNoR} trade{yearsNoR === 1 ? "" : "s"} without a recorded R excluded — never guessed.</div>
+        <div style={{ marginTop: 10, fontSize: "0.6875rem", color: C.muted }}>{yearsNoR} trade{yearsNoR === 1 ? "" : "s"} without a recorded R excluded — never guessed.</div>
       )}
     </div>
   );
@@ -319,9 +319,9 @@ export default function TradeCalendar({ trades, C, font, onOpenTrade }) {
   const [camOpen, setCamOpen] = useState(false);
   const [camStatus, setCamStatus] = useState(null);
 
-  const toggle = (m) => ({ background: mode === m ? C.gold : "transparent", color: mode === m ? "#1a1206" : C.muted, border: "none", padding: "7px 15px", fontFamily: font, fontWeight: 700, fontSize: "0.78rem", cursor: "pointer" });
+  const toggle = (m) => ({ background: mode === m ? "var(--w10)" : "transparent", color: mode === m ? C.white : C.muted, border: "none", padding: "7px 15px", fontFamily: font, fontWeight: 500, fontSize: "0.75rem", cursor: "pointer" });
 
-  // $ / R / % segmented control — a gold thumb slides between three options; click OR drag on the
+  // $ / R / % segmented control — a neutral thumb slides between three options; click OR drag on the
   // track (pointer x → option) selects. Persisted per browser as "viv-cal-mode".
   const UNITS = [["$", "$"], ["r", "R"], ["pct", "%"]];
   const idx = Math.max(0, UNITS.findIndex(u => u[0] === unit));
@@ -336,26 +336,26 @@ export default function TradeCalendar({ trades, C, font, onOpenTrade }) {
         {/* camera */}
         <div className="viv-hide-screenshot" style={{ position: "relative" }}>
           <button type="button" onClick={() => setCamOpen(o => !o)} title="Save this calendar as an image"
-            style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 9, color: camStatus ? C.green : C.muted, cursor: "pointer", fontSize: "0.9rem", lineHeight: 1, padding: "6px 10px" }}>
+            style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 999, color: camStatus ? C.green : C.muted, cursor: "pointer", fontSize: "0.875rem", lineHeight: 1, padding: "6px 10px" }}>
             {camStatus === "copied" ? "Copied ✓" : camStatus === "downloaded" ? "Downloaded ✓" : "📷"}
           </button>
           {camOpen && (
-            <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 20, background: "#11111b", border: `1px solid ${C.border}`, borderRadius: 10, padding: 5, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", whiteSpace: "nowrap" }}>
-              <button type="button" onClick={() => doCapture("copy")} style={{ display: "block", width: "100%", textAlign: "left", background: "transparent", border: "none", color: C.white, fontFamily: font, fontSize: "0.72rem", fontWeight: 600, padding: "6px 12px", borderRadius: 7, cursor: "pointer" }}>Copy image</button>
-              <button type="button" onClick={() => doCapture("download")} style={{ display: "block", width: "100%", textAlign: "left", background: "transparent", border: "none", color: C.white, fontFamily: font, fontSize: "0.72rem", fontWeight: 600, padding: "6px 12px", borderRadius: 7, cursor: "pointer" }}>Download PNG</button>
+            <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 20, background: "var(--sheet)", border: `1px solid ${C.border}`, borderRadius: 10, padding: 5, boxShadow: "var(--shadowOv)", whiteSpace: "nowrap" }}>
+              <button type="button" onClick={() => doCapture("copy")} style={{ display: "block", width: "100%", textAlign: "left", background: "transparent", border: "none", color: C.white, fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "6px 12px", borderRadius: 7, cursor: "pointer" }}>Copy image</button>
+              <button type="button" onClick={() => doCapture("download")} style={{ display: "block", width: "100%", textAlign: "left", background: "transparent", border: "none", color: C.white, fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "6px 12px", borderRadius: 7, cursor: "pointer" }}>Download PNG</button>
             </div>
           )}
         </div>
         {/* $ / R / % sliding toggle */}
         <div ref={trackRef} onPointerDown={onTrackDown} title="Show P&L as dollars, R-multiples, or percent"
-          style={{ position: "relative", display: "flex", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", cursor: "pointer", userSelect: "none", touchAction: "none" }}>
-          <div style={{ position: "absolute", top: 3, bottom: 3, left: 3, width: "calc((100% - 6px) / 3)", transform: `translateX(${idx * 100}%)`, background: C.gold, borderRadius: 8, transition: "transform .18s cubic-bezier(.22,1,.36,1)", pointerEvents: "none" }} />
+          style={{ position: "relative", display: "flex", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 999, overflow: "hidden", cursor: "pointer", userSelect: "none", touchAction: "none" }}>
+          <div style={{ position: "absolute", top: 3, bottom: 3, left: 3, width: "calc((100% - 6px) / 3)", transform: `translateX(${idx * 100}%)`, background: "var(--w14)", border: "1px solid var(--w14)", borderRadius: 999, transition: "transform .18s cubic-bezier(.22,1,.36,1)", pointerEvents: "none" }} />
           {UNITS.map(([k, lbl]) => (
-            <span key={k} style={{ position: "relative", zIndex: 1, color: unit === k ? "#1a1206" : C.muted, padding: "7px 0", width: 40, textAlign: "center", fontFamily: font, fontWeight: 700, fontSize: "0.78rem", pointerEvents: "none" }}>{lbl}</span>
+            <span key={k} style={{ position: "relative", zIndex: 1, color: unit === k ? C.white : C.muted, padding: "7px 0", width: 40, textAlign: "center", fontFamily: font, fontWeight: 500, fontSize: "0.75rem", pointerEvents: "none" }}>{lbl}</span>
           ))}
         </div>
         {/* Monthly / Yearly */}
-        <div style={{ display: "flex", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ display: "flex", background: C.glass, border: `1px solid ${C.border}`, borderRadius: 999, overflow: "hidden" }}>
           <button onClick={() => setMode("month")} style={toggle("month")}>Monthly</button>
           <button onClick={() => setMode("year")} style={toggle("year")}>Yearly</button>
         </div>

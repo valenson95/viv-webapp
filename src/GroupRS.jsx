@@ -13,25 +13,26 @@ import { LensCamera, SectionCamera, XShare } from "./capture.jsx";
 // Member-safe: the whole page renders for any logged-in user; the collapsible
 // "Method / formulas" card is ADMIN-ONLY (holds provenance).
 //
-// DESIGN = the webapp Pro system: near-black, palette C, Plus Jakarta (font prop),
-// rounded-16 glass cards, uppercase gold section labels, gold-gradient active chips.
+// DESIGN = the webapp Robinhood register: near-black, palette C, Geist (font prop),
+// rounded-16 glass cards, quiet sentence-case section labels, neutral-white active chips.
 
 const ADMIN_EMAIL = "vc-lv@live.com";
 
 const num = (v, d = 1) => v == null || !isFinite(v) ? "—" : (+v).toFixed(d);
 const sgn = (v, d = 1) => v == null || !isFinite(v) ? "—" : (v > 0 ? "+" : "") + (+v).toFixed(d);
 const SUP = ["¹", "²", "³"];
+const MONO = "'Geist Mono', ui-monospace, monospace";
 
 // PRIMARY-state chip metadata — NEUTRAL, no trade-advice wording. `label` = full
 // (how-to / filters), `short` = compact table chip.
 const STATE = {
-  buy:     { emoji: "🟢", label: "Leading + accelerating", short: "Leading",     fg: "#7ef0a0", bg: "rgba(34,197,94,0.12)",  bd: "rgba(34,197,94,0.35)" },
-  fresh:   { emoji: "🟡", label: "Fresh week surge",        short: "Fresh surge",  fg: "#f0c050", bg: "rgba(201,152,42,0.14)", bd: "rgba(201,152,42,0.4)" },
-  resting: { emoji: "😴", label: "Strong month, cool week", short: "Cooling",      fg: "#93c5fd", bg: "rgba(59,130,246,0.12)", bd: "rgba(59,130,246,0.35)" },
+  buy:     { emoji: "🟢", label: "Leading + accelerating", short: "Leading",     fg: "var(--greenFg)", bg: "rgba(0,200,5,0.12)",  bd: "rgba(0,200,5,0.35)" },
+  fresh:   { emoji: "🟡", label: "Fresh week surge",        short: "Fresh surge",  fg: "var(--white)", bg: "var(--w08)", bd: "var(--w22)" },
+  resting: { emoji: "😴", label: "Strong month, cool week", short: "Cooling",      fg: "var(--blueFg)", bg: "rgba(59,158,255,0.12)", bd: "rgba(59,158,255,0.35)" },
 };
 const WARN = {
-  artifact: { emoji: "⚠️", label: "Percentile illusion", short: "Illusion",  fg: "#fca5a5", bg: "rgba(239,68,68,0.10)", bd: "rgba(239,68,68,0.3)" },
-  trap:     { emoji: "🪤", label: "Off the floor",       short: "Off floor", fg: "#fca5a5", bg: "rgba(239,68,68,0.10)", bd: "rgba(239,68,68,0.3)" },
+  artifact: { emoji: "⚠️", label: "Percentile illusion", short: "Illusion",  fg: "var(--redFg)", bg: "rgba(255,80,0,0.10)", bd: "rgba(255,80,0,0.3)" },
+  trap:     { emoji: "🪤", label: "Off the floor",       short: "Off floor", fg: "var(--redFg)", bg: "rgba(255,80,0,0.10)", bd: "rgba(255,80,0,0.3)" },
 };
 
 // EW ↔ cap-weighted sector pairs for the pairing strip.
@@ -88,11 +89,11 @@ export function TipBody({ tip }) {
   if (!points) return <>{tip}</>;
   return (
     <>
-      {lead && <div style={{ marginBottom: 7, color: "#fff", fontWeight: 600 }}>{lead}</div>}
+      {lead && <div style={{ marginBottom: 7, color: "var(--white)", fontWeight: 600 }}>{lead}</div>}
       <ul style={{ margin: 0, paddingLeft: 14, listStyle: "none" }}>
         {points.map((p, i) => (
           <li key={i} style={{ position: "relative", marginBottom: i === points.length - 1 ? 0 : 5 }}>
-            <span style={{ position: "absolute", left: -12, color: "#c9982a" }}>▸</span>{p}
+            <span style={{ position: "absolute", left: -12, color: "var(--faint)" }}>▸</span>{p}
           </li>
         ))}
       </ul>
@@ -126,15 +127,15 @@ export function InfoDot({ tip, size = 14 }) {
   }, [pos]);
   return (
     <span ref={ref} onMouseEnter={show} onMouseLeave={() => setPos(null)} onClick={toggle}
-      style={{ width: size, height: size, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.16)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.56rem", fontWeight: 700, fontStyle: "italic", color: "rgba(255,255,255,0.5)", cursor: "help", flex: "none", verticalAlign: "middle" }}>
+      style={{ width: size, height: size, borderRadius: "50%", border: "1px solid var(--w14)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6875rem", fontWeight: 500, fontStyle: "italic", color: "var(--faint)", cursor: "help", flex: "none", verticalAlign: "middle" }}>
       i
       {pos && createPortal(
         <div style={{ position: "fixed", top: pos.top, left: pos.left, right: pos.right,
           transform: (pos.cx ? "translateX(-50%)" : "") + (pos.up ? " translateY(-100%)" : ""),
           zIndex: 1300, maxWidth: Math.min(300, window.innerWidth - 16), width: "max-content",
-          background: "#13131c", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, padding: "9px 12px",
-          fontSize: "0.66rem", fontWeight: 500, lineHeight: 1.55, color: "#E7E9EE", textTransform: "none", letterSpacing: 0,
-          whiteSpace: "normal", textAlign: "left", boxShadow: "0 10px 30px rgba(0,0,0,0.55)", pointerEvents: "none", fontVariantNumeric: "normal" }}>
+          background: "var(--tipbg)", border: "1px solid var(--tipbd)", borderRadius: 10, padding: "9px 12px",
+          fontSize: "0.75rem", fontWeight: 500, lineHeight: 1.55, color: "var(--text)", textTransform: "none", letterSpacing: 0,
+          whiteSpace: "normal", textAlign: "left", boxShadow: "var(--shadowOv)", pointerEvents: "none", fontVariantNumeric: "normal" }}>
           <TipBody tip={tip} />
         </div>, document.body)}
     </span>
@@ -177,9 +178,9 @@ export function Tip({ tip, children, as: Tag = "span", className, style }) {
         <div style={{ position: "fixed", top: pos.top, left: pos.left, right: pos.right,
           transform: (pos.cx ? "translateX(-50%)" : "") + (pos.up ? " translateY(-100%)" : ""),
           zIndex: 1300, maxWidth: Math.min(300, window.innerWidth - 16), width: "max-content",
-          background: "#13131c", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, padding: "9px 12px",
-          fontSize: "0.66rem", fontWeight: 500, lineHeight: 1.55, color: "#E7E9EE", textTransform: "none", letterSpacing: 0,
-          whiteSpace: "normal", textAlign: "left", boxShadow: "0 10px 30px rgba(0,0,0,0.55)", pointerEvents: "none", fontVariantNumeric: "normal" }}>
+          background: "var(--tipbg)", border: "1px solid var(--tipbd)", borderRadius: 10, padding: "9px 12px",
+          fontSize: "0.75rem", fontWeight: 500, lineHeight: 1.55, color: "var(--text)", textTransform: "none", letterSpacing: 0,
+          whiteSpace: "normal", textAlign: "left", boxShadow: "var(--shadowOv)", pointerEvents: "none", fontVariantNumeric: "normal" }}>
           <TipBody tip={tip} />
         </div>, document.body)}
     </Tag>
@@ -187,11 +188,11 @@ export function Tip({ tip, children, as: Tag = "span", className, style }) {
 }
 
 // green heat 0..1 (deepest green = highest value)
-const greenHeat = (frac) => frac == null ? "rgba(255,255,255,0.03)" : `rgba(34,197,94,${(0.06 + 0.42 * Math.max(0, Math.min(1, frac))).toFixed(3)})`;
+const greenHeat = (frac) => frac == null ? "var(--w03)" : `rgba(0,200,5,${(0.06 + 0.42 * Math.max(0, Math.min(1, frac))).toFixed(3)})`;
 // off-52W-high heat is RED and tracks MAGNITUDE: 0% ≈ neutral, −60% ≈ strong red.
 // mag = how far below the high (|v|/60); deeper red = further below.
 const off52Mag = (v) => v == null || !isFinite(v) || v >= 0 ? 0 : Math.min(1, Math.abs(v) / 60);
-const redHeat = (mag) => !mag || mag <= 0.02 ? "rgba(255,255,255,0.03)" : `rgba(239,68,68,${(0.05 + 0.45 * Math.max(0, Math.min(1, mag))).toFixed(3)})`;
+const redHeat = (mag) => !mag || mag <= 0.02 ? "var(--w03)" : `rgba(255,80,0,${(0.05 + 0.45 * Math.max(0, Math.min(1, mag))).toFixed(3)})`;
 
 // ── HOLDINGS POPUP — nested ABOVE the rotation popup (z 1250) at z 1320, below
 // modals (1400). Reads the committed ETF_HOLDINGS snapshot statically — never a
@@ -227,52 +228,52 @@ function HoldingsPopup({ target, onClose, C, font }) {
   const weightsUnpublished = holdings && holdings.every(h => h.w == null);
   const maxW = holdings ? Math.max(0.0001, ...holdings.map(h => (h.w == null || !isFinite(h.w) ? 0 : h.w))) : 1;
 
-  const label = { fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.gold };
+  const label = { fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" };
   return createPortal(
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1320, background: "rgba(4,4,8,0.6)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", overflowY: "auto", padding: "40px 16px", fontFamily: font }}>
-      <div onClick={e => e.stopPropagation()} style={{ maxWidth: 460, margin: "0 auto", background: "rgba(255,255,255,0.042)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)", boxShadow: "0 24px 70px rgba(0,0,0,0.6)", overflow: "hidden" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1320, background: "var(--scrim)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", overflowY: "auto", padding: "40px 16px", fontFamily: font }}>
+      <div onClick={e => e.stopPropagation()} style={{ maxWidth: 460, margin: "0 auto", background: "var(--w04)", border: "1px solid var(--w10)", borderRadius: 16, backdropFilter: "blur(24px) saturate(150%)", WebkitBackdropFilter: "blur(24px) saturate(150%)", boxShadow: "var(--shadowOv)", overflow: "hidden" }}>
         {/* header */}
-        <div style={{ padding: "16px 18px 13px", borderBottom: `1px solid ${C.border}`, background: "linear-gradient(135deg,rgba(255,255,255,0.05),transparent 60%)" }}>
+        <div style={{ padding: "16px 18px 13px", borderBottom: `1px solid ${C.border}`, background: "linear-gradient(135deg,var(--w06),transparent 60%)" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 9, minWidth: 0 }}>
-              <span style={{ fontSize: "1.05rem", fontWeight: 800, color: C.white, letterSpacing: "-0.01em" }}>{target.t}</span>
-              <span style={{ fontSize: "0.72rem", fontWeight: 600, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{target.name || ""}</span>
+              <span style={{ fontSize: "1.125rem", fontWeight: 600, color: C.white, letterSpacing: "-0.012em" }}>{target.t}</span>
+              <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{target.name || ""}</span>
             </div>
-            <button onClick={onClose} title="Close" style={{ flex: "none", width: 38, height: 38, display: "grid", placeItems: "center", padding: 0, borderRadius: 8, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.03)", color: C.muted, fontSize: "0.9rem", cursor: "pointer", lineHeight: 1, fontFamily: font }}>×</button>
+            <button onClick={onClose} title="Close" style={{ flex: "none", width: 38, height: 38, display: "grid", placeItems: "center", padding: 0, borderRadius: 999, border: `1px solid ${C.border}`, background: "var(--w03)", color: C.muted, fontSize: "0.875rem", cursor: "pointer", lineHeight: 1, fontFamily: font }}>×</button>
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 7 }}>
             <span style={label}>{holdings ? `Top ${holdings.length} holdings · weighted` : "Holdings"}</span>
-            <span style={{ fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums" }}>as of {asof}</span>
           </div>
-          <div style={{ marginTop: 5, fontSize: "0.6rem", color: "rgba(255,255,255,0.42)", lineHeight: 1.5 }}>
+          <div style={{ marginTop: 5, fontSize: "0.75rem", color: "var(--faint)", lineHeight: 1.5 }}>
             Holdings change slowly — refreshed periodically.
           </div>
         </div>
         {/* body */}
         {note ? (
-          <div style={{ padding: "22px 20px", fontSize: "0.76rem", lineHeight: 1.6, color: C.muted }}>{note}</div>
+          <div style={{ padding: "22px 20px", fontSize: "0.75rem", lineHeight: 1.6, color: C.muted }}>{note}</div>
         ) : (
           <div style={{ padding: "6px 0 8px", maxHeight: "62vh", overflowY: "auto" }}>
             {weightsUnpublished && (
-              <div style={{ padding: "8px 18px 10px", fontSize: "0.62rem", lineHeight: 1.5, color: "rgba(255,255,255,0.42)" }}>
+              <div style={{ padding: "8px 18px 10px", fontSize: "0.75rem", lineHeight: 1.5, color: "var(--faint)" }}>
                 Per-holding weights aren't published for this fund — showing the top names in the fund's own weight order.
               </div>
             )}
             {holdings.map((h, i) => {
               const frac = h.w == null || !isFinite(h.w) ? 0 : Math.max(0, Math.min(1, h.w / maxW));
               return (
-                <div key={h.t + i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 18px", borderBottom: i < holdings.length - 1 ? `1px solid rgba(255,255,255,0.045)` : "none" }}>
-                  <span style={{ flex: "none", width: 20, textAlign: "right", fontSize: "0.62rem", fontWeight: 700, color: "rgba(255,255,255,0.35)", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
+                <div key={h.t + i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 18px", borderBottom: i < holdings.length - 1 ? `1px solid var(--w04)` : "none" }}>
+                  <span style={{ flex: "none", width: 20, textAlign: "right", fontSize: "0.6875rem", fontWeight: 500, fontFamily: MONO, color: "var(--faint)", fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
                   {(() => { const { sym, ex } = parseHoldingTicker(h.t); return (
                     <span style={{ flex: "none", width: 92, display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-                      <span style={{ fontSize: "0.74rem", fontWeight: 800, color: C.white, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sym}</span>
-                      {ex && <span style={{ flex: "none", fontSize: "0.5rem", fontWeight: 700, letterSpacing: "0.04em", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 5, padding: "1px 4px", lineHeight: 1.3 }}>{ex}</span>}
+                      <span style={{ fontSize: "0.75rem", fontWeight: 600, color: C.white, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sym}</span>
+                      {ex && <span style={{ flex: "none", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.02em", color: "var(--faint)", border: "1px solid var(--w10)", borderRadius: 5, padding: "1px 4px", lineHeight: 1.3 }}>{ex}</span>}
                     </span>
                   ); })()}
-                  <span style={{ flex: 1, minWidth: 0, fontSize: "0.68rem", color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.n || ""}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: "0.75rem", color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.n || ""}</span>
                   <span style={{ flex: "none", width: 74, display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
-                    {frac > 0 && <span style={{ flex: "none", display: "inline-block", width: Math.round(frac * 34) + 6, height: 7, borderRadius: 3, background: `linear-gradient(90deg, ${C.gold}, ${C.goldBright})` }} />}
-                    <span style={{ flex: "none", width: 42, textAlign: "right", fontSize: "0.7rem", fontWeight: 700, color: h.w == null ? C.muted : C.text, fontVariantNumeric: "tabular-nums" }}>{h.w == null ? "—" : h.w.toFixed(2) + "%"}</span>
+                    {frac > 0 && <span style={{ flex: "none", display: "inline-block", width: Math.round(frac * 34) + 6, height: 7, borderRadius: 3, background: "var(--w35)" }} />}
+                    <span style={{ flex: "none", width: 42, textAlign: "right", fontSize: "0.75rem", fontWeight: 500, letterSpacing: "-0.025em", fontFamily: MONO, color: h.w == null ? C.muted : C.text, fontVariantNumeric: "tabular-nums" }}>{h.w == null ? "—" : h.w.toFixed(2) + "%"}</span>
                   </span>
                 </div>
               );
@@ -367,44 +368,47 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
   }), [llRows]);
 
   // ── style primitives ──────────────────────────────────────────────────────
-  const cardLabel = { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: C.gold };
-  const asofStyle = { fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums", textAlign: "right" };
+  const cardLabel = { fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" };
+  const asofStyle = { fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums", textAlign: "right" };
   const chip = (active) => ({
     display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
-    fontSize: "0.72rem", fontWeight: 700, padding: "7px 15px", borderRadius: 99, cursor: "pointer", fontFamily: font, transition: "all .14s",
-    border: `1px solid ${active ? C.goldBright : C.border}`, color: active ? "#08080e" : C.muted,
-    background: active ? `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})` : "rgba(255,255,255,0.03)",
+    fontSize: "0.75rem", fontWeight: 500, padding: "7px 15px", borderRadius: 999, cursor: "pointer", fontFamily: font, transition: "all .14s",
+    border: `1px solid ${active ? "var(--w14)" : C.border}`, color: active ? "var(--white)" : C.muted,
+    background: active ? "var(--w10)" : "var(--w03)",
   });
-  const heat = (v) => v == null ? "transparent" : `rgba(34,197,94,${(0.06 + 0.4 * (v / 100)).toFixed(3)})`;
-  const toneCol = (v) => v == null ? C.muted : v > 0 ? "#86efac" : v < 0 ? "#fca5a5" : C.muted;
+  const heat = (v) => v == null ? "transparent" : `rgba(0,200,5,${(0.06 + 0.4 * (v / 100)).toFixed(3)})`;
+  const toneCol = (v) => v == null ? C.muted : v > 0 ? "var(--greenFg)" : v < 0 ? "var(--redFg)" : C.muted;
 
-  const Spark = ({ pts, stroke = C.goldBright }) => {
-    if (!pts || pts.length < 2) return <span style={{ color: C.muted, fontSize: "0.7rem" }}>—</span>;
+  const Spark = ({ pts, stroke }) => {
+    if (!pts || pts.length < 2) return <span style={{ color: C.muted, fontSize: "0.6875rem" }}>—</span>;
+    // Dashboard convention (Valen 2026-08-06): line color = window direction, green up / red down.
+    const dir = stroke || (pts[pts.length - 1] >= pts[0] ? "var(--green)" : "var(--red)");
     const W = 90, H = 26, n = pts.length;
     const d = pts.map((v, i) => `${(i / (n - 1) * (W - 2) + 1).toFixed(1)},${((1 - v) * (H - 4) + 2).toFixed(1)}`).join(" ");
-    return (<svg width={W} height={H} style={{ display: "block", margin: "0 auto" }}><polyline points={d} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" /></svg>);
+    return (<svg width={W} height={H} style={{ display: "block", margin: "0 auto" }}><polyline points={d} fill="none" stroke={dir} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" /></svg>);
   };
   const RsStrip = ({ pts }) => {
-    if (!pts || !pts.length) return <span style={{ color: C.muted, fontSize: "0.7rem" }}>—</span>;
+    if (!pts || !pts.length) return <span style={{ color: C.muted, fontSize: "0.6875rem" }}>—</span>;
     const H = 26, bw = 2.6, gap = 1, W = pts.length * (bw + gap);
     return (<svg width={W} height={H} style={{ display: "block", margin: "0 auto" }}>{pts.map((v, i) => {
       const h = Math.max(1.5, (v ?? 0) * (H - 2));
-      return <rect key={i} x={i * (bw + gap)} y={H - h} width={bw} height={h} rx={0.6} fill={`rgba(34,197,94,${(0.35 + 0.55 * (v ?? 0)).toFixed(2)})`} />;
+      return <rect key={i} x={i * (bw + gap)} y={H - h} width={bw} height={h} rx={0.6} fill={`rgba(0,200,5,${(0.35 + 0.55 * (v ?? 0)).toFixed(2)})`} />;
     })}</svg>);
   };
   const StateChips = ({ row }) => (
     <span style={{ display: "inline-flex", gap: 5, flexWrap: "wrap" }}>
       {row.state && (() => { const s = STATE[row.state]; return (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.6rem", fontWeight: 800, padding: "2px 8px", borderRadius: 980, background: s.bg, border: `1px solid ${s.bd}`, color: s.fg, whiteSpace: "nowrap" }}>{s.emoji} {s.short}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.6875rem", fontWeight: 500, padding: "2px 8px", borderRadius: 999, background: s.bg, border: `1px solid ${s.bd}`, color: s.fg, whiteSpace: "nowrap" }}>{s.emoji} {s.short}</span>
       ); })()}
       {(row.warns || []).map(w => { const g = WARN[w]; return (
-        <span key={w} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.6rem", fontWeight: 800, padding: "2px 8px", borderRadius: 980, background: g.bg, border: `1px solid ${g.bd}`, color: g.fg, whiteSpace: "nowrap" }}>{g.emoji} {g.short}</span>
+        <span key={w} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.6875rem", fontWeight: 500, padding: "2px 8px", borderRadius: 999, background: g.bg, border: `1px solid ${g.bd}`, color: g.fg, whiteSpace: "nowrap" }}>{g.emoji} {g.short}</span>
       ); })}
-      {!row.state && !(row.warns || []).length && <span style={{ color: C.muted, fontSize: "0.7rem" }}>—</span>}
+      {!row.state && !(row.warns || []).length && <span style={{ color: C.muted, fontSize: "0.6875rem" }}>—</span>}
     </span>
   );
 
-  const td = { padding: "7px 9px", borderBottom: `1px solid ${C.border}`, fontSize: "0.74rem", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: C.text };
+  const td = { padding: "7px 9px", borderBottom: `1px solid ${C.border}`, fontSize: "0.75rem", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: C.text };
+  const tdn = { ...td, fontWeight: 500, letterSpacing: "-0.025em", fontFamily: MONO };
 
   const jc = (align) => align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start";
   // sortable header cell (multi-sort aware) — takes the chain/onSort to sort BY so the
@@ -414,7 +418,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
     const ci = chainSpec.findIndex(c => c.key === key);
     const active = ci >= 0;
     return (
-      <th onClick={() => onSort(key)} style={{ padding: "8px 9px", fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: active ? C.goldBright : C.muted, borderBottom: `1px solid ${C.border}`, textAlign: align, whiteSpace: "nowrap", cursor: key ? "pointer" : "default", userSelect: "none" }}>
+      <th onClick={() => onSort(key)} style={{ padding: "8px 9px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: active ? C.white : "var(--faint)", borderBottom: `1px solid ${C.border}`, textAlign: align, whiteSpace: "nowrap", cursor: key ? "pointer" : "default", userSelect: "none" }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, justifyContent: jc(align) }}>
           {label}{active ? (chainSpec[ci].dir === "desc" ? " ▾" : " ▴") + SUP[ci] : ""}{tip && <InfoDot tip={tip} />}
         </span>
@@ -423,7 +427,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
   };
   // static (non-sortable) header cell — Group, the two sparkline columns, and State.
   const sth = (label, tip, align = "left") => (
-    <th style={{ padding: "8px 9px", fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.09em", textTransform: "uppercase", color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: align, whiteSpace: "nowrap" }}>
+    <th style={{ padding: "8px 9px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", borderBottom: `1px solid ${C.border}`, textAlign: align, whiteSpace: "nowrap" }}>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 4, justifyContent: jc(align) }}>{label}{tip && <InfoDot tip={tip} />}</span>
     </th>
   );
@@ -435,10 +439,10 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
   // (see the doctrine comment in PlanFocus) and never get a rank number.
   const RANK_TIP = "Position in the current ranking — sorted by 1-month relative strength, then thrust.";
   const rth = () => (
-    <th title={RANK_TIP} style={{ padding: "8px 6px", fontSize: "0.62rem", fontWeight: 800, color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: "right", width: 26, whiteSpace: "nowrap", cursor: "default" }}>#</th>
+    <th title={RANK_TIP} style={{ padding: "8px 6px", fontSize: "0.6875rem", fontWeight: 500, color: "var(--faint)", borderBottom: `1px solid ${C.border}`, textAlign: "right", width: 26, whiteSpace: "nowrap", cursor: "default" }}>#</th>
   );
   const rtd = (n) => (
-    <td style={{ padding: "7px 6px", borderBottom: `1px solid ${C.border}`, fontSize: "0.62rem", color: C.muted, textAlign: "right", width: 26, fontVariantNumeric: "tabular-nums" }}>{n}</td>
+    <td style={{ padding: "7px 6px", borderBottom: `1px solid ${C.border}`, fontSize: "0.6875rem", fontWeight: 500, fontFamily: MONO, color: C.muted, textAlign: "right", width: 26, fontVariantNumeric: "tabular-nums" }}>{n}</td>
   );
 
   // one shared data row (used by Groups table AND Plan & Focus blocks). No ★ column.
@@ -449,29 +453,29 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
     const spy = row.t === "SPY";
     const benchCell = <span style={{ color: C.muted, fontStyle: "italic" }}>benchmark</span>;
     return (
-      <tr style={spy ? { boxShadow: `inset 3px 0 0 ${C.gold}` } : undefined}>
+      <tr style={spy ? { boxShadow: `inset 3px 0 0 var(--w35)` } : undefined}>
         {rank != null && rtd(rank)}
-        <td style={{ ...td, fontWeight: 800, color: C.white }}>
+        <td style={{ ...td, fontWeight: 600, color: C.white }}>
           <span className="grs-tk" title="View top holdings" onClick={() => setHoldingsFor({ t: row.t, name: row.name })}>{row.t}</span>
         </td>
         <td style={{ ...td, color: C.muted, whiteSpace: "normal", minWidth: 130, maxWidth: 200 }}>{row.name}</td>
-        <td style={{ ...td, textAlign: "right", background: bench ? "transparent" : heat(row.thrust) }}>
-          {bench ? benchCell : (row.thrust == null ? <span title={blank || "not computed"} style={{ color: C.muted }}>—</span> : <span title={`exact ${row.thrust}`} style={{ fontWeight: 700 }}>{row.thrust_snap}</span>)}
+        <td style={{ ...tdn, textAlign: "right", background: bench ? "transparent" : heat(row.thrust) }}>
+          {bench ? benchCell : (row.thrust == null ? <span title={blank || "not computed"} style={{ color: C.muted, fontFamily: font }}>—</span> : <span title={`exact ${row.thrust}`}>{row.thrust_snap}</span>)}
         </td>
-        <td style={{ ...td, textAlign: "right", background: bench ? "transparent" : heat(row.rs1m) }}>
-          {bench ? benchCell : (row.rs1m == null ? <span title={blank || "not computed"} style={{ color: C.muted }}>—</span> : <span title={`exact ${row.rs1m}`} style={{ fontWeight: 700 }}>{row.rs1m_snap}</span>)}
+        <td style={{ ...tdn, textAlign: "right", background: bench ? "transparent" : heat(row.rs1m) }}>
+          {bench ? benchCell : (row.rs1m == null ? <span title={blank || "not computed"} style={{ color: C.muted, fontFamily: font }}>—</span> : <span title={`exact ${row.rs1m}`}>{row.rs1m_snap}</span>)}
         </td>
         <td style={{ ...td, textAlign: "center" }}>{row.spark?.length ? <Spark pts={row.spark} /> : <span style={{ color: C.muted }}>—</span>}</td>
         <td style={{ ...td, textAlign: "center" }}>{row.rsSpark?.length ? <RsStrip pts={row.rsSpark} /> : <span style={{ color: C.muted }}>—</span>}</td>
-        <td style={{ ...td, textAlign: "right", color: toneCol(row.pctIntraday) }}>{row.pctIntraday == null ? "—" : sgn(row.pctIntraday) + "%"}</td>
-        <td style={{ ...td, textAlign: "right", color: toneCol(row.pct1d) }}>{row.pct1d == null ? "—" : sgn(row.pct1d) + "%"}</td>
-        <td style={{ ...td, textAlign: "right", color: toneCol(row.pct1m), position: "relative", overflow: "hidden" }}>
+        <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pctIntraday) }}>{row.pctIntraday == null ? "—" : sgn(row.pctIntraday) + "%"}</td>
+        <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pct1d) }}>{row.pct1d == null ? "—" : sgn(row.pct1d) + "%"}</td>
+        <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pct1m), position: "relative", overflow: "hidden" }}>
           {row.pct1m != null && isFinite(row.pct1m) && row.pct1m !== 0 && (
-            <div style={{ position: "absolute", top: 4, bottom: 4, right: 0, width: `${(Math.min(1, Math.abs(row.pct1m) / 15) * 100).toFixed(1)}%`, background: row.pct1m > 0 ? "rgba(34,197,94,0.16)" : "rgba(239,68,68,0.16)", borderRadius: 3, pointerEvents: "none" }} />
+            <div style={{ position: "absolute", top: 4, bottom: 4, right: 0, width: `${(Math.min(1, Math.abs(row.pct1m) / 15) * 100).toFixed(1)}%`, background: row.pct1m > 0 ? "rgba(0,200,5,0.16)" : "rgba(255,80,0,0.16)", borderRadius: 3, pointerEvents: "none" }} />
           )}
           <span style={{ position: "relative" }}>{row.pct1m == null ? "—" : sgn(row.pct1m) + "%"}</span>
         </td>
-        <td style={{ ...td, textAlign: "right", background: bench ? "transparent" : redHeat(off52Mag(row.off52)), color: row.off52 == null ? C.muted : row.off52 >= -0.05 ? "#86efac" : "#fca5a5" }}>
+        <td style={{ ...tdn, textAlign: "right", background: bench ? "transparent" : redHeat(off52Mag(row.off52)), color: row.off52 == null ? C.muted : row.off52 >= -0.05 ? "var(--greenFg)" : "var(--redFg)" }}>
           {row.off52 == null ? "—" : (row.off52 >= -0.05 ? "0%" : sgn(row.off52) + "%")}
         </td>
         <td style={{ ...td, textAlign: "center" }}>{bench ? <span style={{ color: C.muted }}>—</span> : <StateChips row={row} />}</td>
@@ -515,7 +519,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
     // Valen 2026-07-19: UPPERCASE + visible chips (they were lowercase muted and easy to miss).
     return <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
       {arr.map(e => (
-        <span key={e} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "0.64rem", fontWeight: 800, color: C.goldBright, letterSpacing: "0.03em", background: "rgba(201,152,42,0.10)", border: "1px solid rgba(201,152,42,0.3)", borderRadius: 6, padding: "1px 6px" }}>{e.toUpperCase()}</span>
+        <span key={e} style={{ fontFamily: MONO, fontSize: "0.6875rem", fontWeight: 500, color: C.white, letterSpacing: "0.02em", background: "var(--w06)", border: "1px solid var(--w22)", borderRadius: 6, padding: "1px 6px" }}>{e.toUpperCase()}</span>
       ))}
     </span>;
   };
@@ -543,26 +547,26 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
     return (
       <tr key={row.t}>
         {rtd(rank)}
-        <td style={{ ...td, fontWeight: 800, color: C.white }}>{row.t}</td>
+        <td style={{ ...td, fontWeight: 600, color: C.white }}>{row.t}</td>
         <td style={{ ...td, color: C.muted, textAlign: "left", maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis" }} title={row.industry || ""}>{row.industry || <span style={{ color: C.muted }}>—</span>}</td>
-        <td style={{ ...td, textAlign: "right", background: heat(row.thrust) }}>
-          {row.thrust == null ? <span title={blank || "not computed"} style={{ color: C.muted }}>—</span> : <span title={`exact ${row.thrust}`} style={{ fontWeight: 700 }}>{row.thrust_snap}</span>}
+        <td style={{ ...tdn, textAlign: "right", background: heat(row.thrust) }}>
+          {row.thrust == null ? <span title={blank || "not computed"} style={{ color: C.muted, fontFamily: font }}>—</span> : <span title={`exact ${row.thrust}`}>{row.thrust_snap}</span>}
         </td>
-        <td style={{ ...td, textAlign: "right", background: heat(row.rs1m) }}>
-          {row.rs1m == null ? <span title={blank || "not computed"} style={{ color: C.muted }}>—</span> : <span title={`exact ${row.rs1m}`} style={{ fontWeight: 700 }}>{row.rs1m_snap}</span>}
+        <td style={{ ...tdn, textAlign: "right", background: heat(row.rs1m) }}>
+          {row.rs1m == null ? <span title={blank || "not computed"} style={{ color: C.muted, fontFamily: font }}>—</span> : <span title={`exact ${row.rs1m}`}>{row.rs1m_snap}</span>}
         </td>
         <td style={{ ...td, textAlign: "center" }}>{row.spark?.length ? <Spark pts={row.spark} /> : <span style={{ color: C.muted }}>—</span>}</td>
-        <td style={{ ...td, textAlign: "right", color: toneCol(row.pctIntraday) }}>{row.pctIntraday == null ? "—" : sgn(row.pctIntraday) + "%"}</td>
-        <td style={{ ...td, textAlign: "right", color: toneCol(row.pct1d) }}>{row.pct1d == null ? "—" : sgn(row.pct1d) + "%"}</td>
-        <td style={{ ...td, textAlign: "right", color: toneCol(row.pct1m), position: "relative", overflow: "hidden" }}>
+        <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pctIntraday) }}>{row.pctIntraday == null ? "—" : sgn(row.pctIntraday) + "%"}</td>
+        <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pct1d) }}>{row.pct1d == null ? "—" : sgn(row.pct1d) + "%"}</td>
+        <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pct1m), position: "relative", overflow: "hidden" }}>
           {row.pct1m != null && isFinite(row.pct1m) && row.pct1m !== 0 && (
-            <div style={{ position: "absolute", top: 4, bottom: 4, right: 0, width: `${(Math.min(1, Math.abs(row.pct1m) / 15) * 100).toFixed(1)}%`, background: row.pct1m > 0 ? "rgba(34,197,94,0.16)" : "rgba(239,68,68,0.16)", borderRadius: 3, pointerEvents: "none" }} />
+            <div style={{ position: "absolute", top: 4, bottom: 4, right: 0, width: `${(Math.min(1, Math.abs(row.pct1m) / 15) * 100).toFixed(1)}%`, background: row.pct1m > 0 ? "rgba(0,200,5,0.16)" : "rgba(255,80,0,0.16)", borderRadius: 3, pointerEvents: "none" }} />
           )}
           <span style={{ position: "relative" }}>{row.pct1m == null ? "—" : sgn(row.pct1m) + "%"}</span>
         </td>
-        <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap", background: redHeat(off52Mag(row.off52)), color: row.off52 == null ? C.muted : row.off52 >= -0.05 ? "#86efac" : "#fca5a5" }}>
-          {(row.warns || []).includes("trap") && <Tip tip="Strong, but still far below its 52-week high. This is a bounce, not a breakout." style={{ marginRight: 4, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
-          {(row.warns || []).includes("artifact") && <Tip tip="The rank looks high, but the actual month is negative. Ranking beats a weak field." style={{ marginRight: 3, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
+        <td style={{ ...tdn, textAlign: "right", whiteSpace: "nowrap", background: redHeat(off52Mag(row.off52)), color: row.off52 == null ? C.muted : row.off52 >= -0.05 ? "var(--greenFg)" : "var(--redFg)" }}>
+          {(row.warns || []).includes("trap") && <Tip tip="Strong, but still far below its 52-week high. This is a bounce, not a breakout." style={{ marginRight: 4, fontSize: "0.75rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
+          {(row.warns || []).includes("artifact") && <Tip tip="The rank looks high, but the actual month is negative. Ranking beats a weak field." style={{ marginRight: 3, fontSize: "0.75rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
           {row.off52 == null ? "—" : (row.off52 >= -0.05 ? "0%" : sgn(row.off52) + "%")}
         </td>
         <td style={{ ...td, textAlign: "center" }}><StateChips row={row} /></td>
@@ -615,16 +619,16 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
     }).filter(b => b.rows.length);
 
     const miniChip = (lbl, v, frac) => (
-      <span title={lbl} style={{ minWidth: 26, textAlign: "center", fontSize: "0.6rem", fontWeight: 800, padding: "2px 6px", borderRadius: 6, background: greenHeat(frac), border: `1px solid ${C.border}`, color: C.text, fontVariantNumeric: "tabular-nums" }}>{v == null ? "—" : Math.round(v)}</span>
+      <span title={lbl} style={{ minWidth: 26, textAlign: "center", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "-0.025em", fontFamily: MONO, padding: "2px 6px", borderRadius: 6, background: greenHeat(frac), border: `1px solid ${C.border}`, color: C.text, fontVariantNumeric: "tabular-nums" }}>{v == null ? "—" : Math.round(v)}</span>
     );
 
     const pairTag = (rsp, xl) => {
       const a = rsp?.rs1m, b = xl?.rs1m;
-      if (a == null || b == null) return { t: "No data", fg: C.muted, bg: "rgba(255,255,255,0.04)", bd: C.border, tip: "No reading for one side today." };
-      if (a >= 70 && b >= 70 && Math.abs(b - a) <= 20) return { t: "Broad", fg: "#7ef0a0", bg: "rgba(34,197,94,0.12)", bd: "rgba(34,197,94,0.35)", tip: "The whole sector is moving together — healthy." };
-      if (b - a >= 25) return { t: "Narrow", fg: "#f0c050", bg: "rgba(201,152,42,0.14)", bd: "rgba(201,152,42,0.4)", tip: "Just a few giant stocks are carrying it." };
-      if (a < 40 && b < 40) return { t: "Weak", fg: "#fca5a5", bg: "rgba(239,68,68,0.12)", bd: "rgba(239,68,68,0.35)", tip: "Both sides are lagging the market." };
-      return { t: "Mixed", fg: C.muted, bg: "rgba(255,255,255,0.04)", bd: C.border, tip: "In between — not clearly broad or narrow." };
+      if (a == null || b == null) return { t: "No data", fg: C.muted, bg: "var(--w04)", bd: C.border, tip: "No reading for one side today." };
+      if (a >= 70 && b >= 70 && Math.abs(b - a) <= 20) return { t: "Broad", fg: "var(--greenFg)", bg: "rgba(0,200,5,0.12)", bd: "rgba(0,200,5,0.35)", tip: "The whole sector is moving together — healthy." };
+      if (b - a >= 25) return { t: "Narrow", fg: "var(--white)", bg: "var(--w08)", bd: "var(--w22)", tip: "Just a few giant stocks are carrying it." };
+      if (a < 40 && b < 40) return { t: "Weak", fg: "var(--redFg)", bg: "rgba(255,80,0,0.12)", bd: "rgba(255,80,0,0.35)", tip: "Both sides are lagging the market." };
+      return { t: "Mixed", fg: C.muted, bg: "var(--w04)", bd: C.border, tip: "In between — not clearly broad or narrow." };
     };
 
     return (
@@ -638,7 +642,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
                 <span style={cardLabel}>{b.block}</span>
                 {!bs.isDefault && (
                   <button onClick={bs.reset} title="Restore the default order"
-                    style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.62rem", fontWeight: 700, padding: "4px 10px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "rgba(255,255,255,0.03)" }}>
+                    style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.6875rem", fontWeight: 500, padding: "4px 11px", borderRadius: 999, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "var(--w03)" }}>
                     × reset sort
                   </button>
                 )}
@@ -657,7 +661,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
             <span style={cardLabel}>Equal-weight ↔ cap-weighted</span>
             <InfoDot tip="Equal-weight (RSP-) beside cap-weighted (XL-). Broad = the whole sector is moving; Narrow = just a few giant stocks." />
           </div>
-          <p style={{ margin: "0 0 12px", fontSize: "0.74rem", lineHeight: 1.55, color: C.muted, maxWidth: "92ch" }}>
+          <p style={{ margin: "0 0 12px", fontSize: "0.75rem", lineHeight: 1.55, color: C.muted, maxWidth: "92ch" }}>
             Equal-weight vs cap-weighted: when both are strong and close, the WHOLE sector is working — when only the cap-weighted side is strong, a few megacaps are carrying it.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px,1fr))", gap: 10 }}>
@@ -665,17 +669,17 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
               const rsp = byTicker[rspT], xl = byTicker[xlT];
               const tag = pairTag(rsp, xl);
               return (
-                <div key={name} style={{ padding: "11px 13px", borderRadius: 11, background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}` }}>
+                <div key={name} style={{ padding: "11px 13px", borderRadius: 11, background: "var(--w02)", border: `1px solid ${C.border}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 9 }}>
-                    <span style={{ fontSize: "0.76rem", fontWeight: 800, color: C.white }}>{name}</span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.58rem", fontWeight: 800, padding: "2px 8px", borderRadius: 980, background: tag.bg, border: `1px solid ${tag.bd}`, color: tag.fg }}>{tag.t}<InfoDot tip={tag.tip} size={12} /></span>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 600, color: C.white }}>{name}</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.6875rem", fontWeight: 500, padding: "2px 8px", borderRadius: 999, background: tag.bg, border: `1px solid ${tag.bd}`, color: tag.fg }}>{tag.t}<InfoDot tip={tag.tip} size={12} /></span>
                   </div>
                   {[[rspT, rsp], [xlT, xl]].map(([tk, r]) => (
-                    <div key={tk} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.68rem", marginBottom: 5 }}>
-                      <span style={{ fontWeight: 700, color: C.muted, width: 46, flex: "none" }}>{tk}</span>
-                      <span style={{ color: C.muted, fontSize: "0.56rem", width: 34, flex: "none" }}>thr</span>
+                    <div key={tk} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.6875rem", marginBottom: 5 }}>
+                      <span style={{ fontWeight: 500, color: C.muted, width: 46, flex: "none" }}>{tk}</span>
+                      <span style={{ color: C.muted, fontSize: "0.6875rem", width: 34, flex: "none" }}>thr</span>
                       {miniChip("Thrust", r?.thrust, r?.thrust == null ? null : r.thrust / 100)}
-                      <span style={{ color: C.muted, fontSize: "0.56rem", width: 18, flex: "none", textAlign: "right" }}>rs</span>
+                      <span style={{ color: C.muted, fontSize: "0.6875rem", width: 18, flex: "none", textAlign: "right" }}>rs</span>
                       {miniChip("1M RS", r?.rs1m, r?.rs1m == null ? null : r.rs1m / 100)}
                     </div>
                   ))}
@@ -691,12 +695,12 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
   return (
     <div ref={rootRef} className="grs" style={{ fontFamily: font, maxWidth: 1440, margin: "0 auto", color: C.text }}>
       <style>{`
-        .grs .grs-card{position:relative;background:rgba(255,255,255,0.042);border:1px solid rgba(255,255,255,0.09);border-radius:16px;backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);padding:18px 20px;margin-bottom:14px}
-        .grs .grs-card::before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,0.05),transparent 55%)}
+        .grs .grs-card{position:relative;background:var(--w04);border:1px solid var(--w08);border-radius:16px;backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);padding:18px 20px;margin-bottom:14px}
+        .grs .grs-card::before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:linear-gradient(135deg,var(--w06),transparent 55%)}
         .grs table{border-collapse:collapse;width:100%}
-        .grs thead th{position:sticky;top:0;background:#0c0c14;z-index:2}
+        .grs thead th{position:sticky;top:0;background:var(--bg2);z-index:2}
         .grs tbody tr{transition:background .12s}
-        .grs tbody tr:hover{background:rgba(255,255,255,0.028)}
+        .grs tbody tr:hover{background:var(--w03)}
         .grs .grs-tk{cursor:pointer;text-decoration:underline;text-decoration-color:rgba(201,152,42,0.4);text-underline-offset:3px;text-decoration-thickness:1px;transition:color .12s}
         .grs .grs-tk:hover{color:${C.goldBright}}
       `}</style>
@@ -705,8 +709,8 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
       <section className="grs-card" style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start", justifyContent: "space-between" }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ ...cardLabel, marginBottom: 6 }}>Rotation</div>
-          <h1 style={{ margin: "0 0 6px", fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.02em", color: C.white }}>Rotation — sector groups & top-down view</h1>
-          <p style={{ margin: 0, fontSize: "0.8rem", lineHeight: 1.6, color: C.muted, maxWidth: "72ch" }}>
+          <h1 style={{ margin: "0 0 6px", fontSize: "1.25rem", fontWeight: 600, letterSpacing: "-0.02em", color: C.white }}>Rotation — sector groups & top-down view</h1>
+          <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.6, color: C.muted, maxWidth: "72ch" }}>
             Which groups are accelerating, which are resting, which are traps — computed daily from ETF closes vs the equal-weight benchmark.
           </p>
         </div>
@@ -720,13 +724,13 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
       <section className="grs-card">
         <div onClick={() => setHowOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
           <span style={{ ...cardLabel, flex: 1 }}>How to read this</span>
-          <span style={{ fontSize: "0.7rem", color: C.muted }}>{howOpen ? "▴" : "▾"}</span>
+          <span style={{ fontSize: "0.6875rem", color: C.muted }}>{howOpen ? "▴" : "▾"}</span>
         </div>
         {howOpen && (
           <div style={{ marginTop: 12, display: "grid", gap: 7 }}>
             {howLines.map(([k, v]) => (
-              <div key={k} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: "0.76rem", lineHeight: 1.5 }}>
-                <span style={{ color: C.goldBright, fontWeight: 800, flex: "none", minWidth: 148 }}>{k}</span>
+              <div key={k} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: "0.75rem", lineHeight: 1.5 }}>
+                <span style={{ color: C.white, fontWeight: 600, flex: "none", minWidth: 148 }}>{k}</span>
                 <span style={{ color: C.muted }}>{v}</span>
               </div>
             ))}
@@ -755,20 +759,20 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
         <>
           {/* LIQUID LEADERS — state filters, then the wide per-stock table */}
           <section className="grs-card" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginRight: 2 }}>Preset auto-filters</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)", marginRight: 2 }}>Preset auto-filters</span>
             {llFilterChips.map(([k, label]) => (
               <button key={k} onClick={() => setLLFilter(k)} style={chip(llFilter === k)}>{label}</button>
             ))}
             {!llSort.isDefault && (
               <button onClick={llSort.reset} title="Restore the default sort chain"
-                style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.66rem", fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "rgba(255,255,255,0.03)" }}>
+                style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.6875rem", fontWeight: 500, padding: "6px 13px", borderRadius: 999, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "var(--w03)" }}>
                 × reset sort
               </button>
             )}
           </section>
           <section className="grs-card" style={{ padding: "6px 8px" }}>
             <SectionCamera sel=".grs-card" name="rotation-liquid-leaders" C={C} />
-            <p style={{ margin: "8px 10px 6px", fontSize: "0.72rem", lineHeight: 1.55, color: C.muted, maxWidth: "94ch" }}>
+            <p style={{ margin: "8px 10px 6px", fontSize: "0.75rem", lineHeight: 1.55, color: C.muted, maxWidth: "94ch" }}>
               Individual leading stocks — the same weekly-thrust / monthly-RS reads as the group table, on a curated universe of liquid leaders. These are companies, not funds.
             </p>
             <div style={{ overflowX: "auto" }}>
@@ -786,13 +790,13 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
         <>
           {/* FILTER (sort lives on the column headers) */}
           <section className="grs-card" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.muted, marginRight: 2 }}>Preset auto-filters</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)", marginRight: 2 }}>Preset auto-filters</span>
             {filterChips.map(([k, label]) => (
               <button key={k} onClick={() => setFilter(k)} style={chip(filter === k)}>{label}</button>
             ))}
             {!isDefaultChain && (
               <button onClick={resetGroupSort} title="Restore the default sort chain"
-                style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.66rem", fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "rgba(255,255,255,0.03)" }}>
+                style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.6875rem", fontWeight: 500, padding: "6px 13px", borderRadius: 999, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "var(--w03)" }}>
                 × reset sort
               </button>
             )}
@@ -819,11 +823,11 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
         <section className="grs-card">
           <div onClick={() => setMethodOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
             <span style={{ ...cardLabel, flex: 1 }}>Method — exact formulas (admin)</span>
-            <span style={{ fontSize: "0.7rem", color: C.muted }}>{methodOpen ? "▴" : "▾"}</span>
+            <span style={{ fontSize: "0.6875rem", color: C.muted }}>{methodOpen ? "▴" : "▾"}</span>
           </div>
           {methodOpen && (
             <div style={{ marginTop: 12 }}>
-              <pre style={{ margin: 0, padding: "14px 16px", background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: "0.68rem", lineHeight: 1.7, color: C.text, overflowX: "auto", whiteSpace: "pre", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{
+              <pre style={{ margin: 0, padding: "14px 16px", background: "rgba(0,0,0,0.35)", border: `1px solid ${C.border}`, borderRadius: 10, fontSize: "0.75rem", lineHeight: 1.7, color: C.text, overflowX: "auto", whiteSpace: "pre", fontFamily: "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" }}>{
 `rel[i]        = close_ETF[i] / close_RSP[i]        (aligned by date, both must have a bar)
 rs1m          = PERCENTRANK of today's rel within its OWN trailing 21 sessions, 0–100
 w5            = Σ k=0..4  weight[k] × (rel[last-k]/rel[last-k-1] - 1),
@@ -840,19 +844,19 @@ decode (pre-registered thresholds):
   WARNINGS (coexist):     artifact (rs1m≥60 & pct1m<0)   ·   trap (thrust≥75 & off52≤-15)`
               }</pre>
               <div style={{ margin: "12px 0 0", display: "grid", gap: 10, maxWidth: "92ch" }}>
-                <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.7, color: C.muted }}>
-                  <b style={{ color: C.text }}>1-Mth RS % — formula-identical to the source sheet, verified.</b> PERCENTRANK of today's RS ratio (close ÷ RSP) within its own trailing 21 sessions. Cross-checked against the source's posted table for the 2026-07-17 close: <b style={{ color: "#86efac" }}>51/51 overlapping tickers matched exactly.</b>
+                <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.7, color: C.muted }}>
+                  <b style={{ color: C.text }}>1-Mth RS % — formula-identical to the source sheet, verified.</b> PERCENTRANK of today's RS ratio (close ÷ RSP) within its own trailing 21 sessions. Cross-checked against the source's posted table for the 2026-07-17 close: <b style={{ color: "var(--greenFg)" }}>51/51 overlapping tickers matched exactly.</b>
                 </p>
-                <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.7, color: C.muted }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.7, color: C.muted }}>
                   <b style={{ color: C.text }}>Thrust — our stand-in</b> (weighted 5-day relative return, PERCENTRANK within its own trailing 25). The source's published metric adds unpublished weighting/bonus scoring (prints −8…106); rank correlation vs their printed values <b style={{ color: C.text }}>≈0.78</b>. Read the STATE chips, not the decimals.
                 </p>
-                <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.7, color: C.muted }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.7, color: C.muted }}>
                   % columns use <b style={{ color: C.text }}>unadjusted closes</b> (matches real fills); distribution-paying ETFs can drift ±1–3% vs adjusted-data vendors.
                 </p>
-                <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.7, color: C.muted }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.7, color: C.muted }}>
                   <b style={{ color: C.text }}>Liquid Leaders (3rd tab)</b> runs the IDENTICAL rs1m / thrust machinery on individual stocks (vs RSP, no benchmark row) over a single curated universe of ~62 liquid leaders that ship with leveraged/inverse ETF mappings. The Long/Short cells list those liquid lev/inverse ETFs (always vet the fund before using it). These are companies, not funds — no holdings popup. (A wider DeepVue "screen" list is kept documented-but-inactive in the script for easy re-add.)
                 </p>
-                <p style={{ margin: 0, fontSize: "0.72rem", lineHeight: 1.7, color: "rgba(255,255,255,0.5)" }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.7, color: "var(--faint)" }}>
                   DeepVue remains the source of truth for single-stock RS and sector grouping. Refresh: <code style={{ color: C.text }}>node scripts/group-rs.mjs</code>.
                 </p>
               </div>
@@ -883,8 +887,8 @@ export function RotationMini({ C, font, session, noStamp }) {
     resting: rows.filter(r => r.state === "resting").length,
     trap: rows.filter(r => (r.warns || []).includes("trap")).length,
   };
-  const cellChip = (bg) => ({ display: "block", width: "100%", boxSizing: "border-box", textAlign: "center", fontSize: "0.7rem", fontWeight: 700, padding: "6px 6px", borderRadius: 3, background: bg, border: "none", color: "#fff", fontVariantNumeric: "tabular-nums", letterSpacing: "0.01em" });
-  const hcell = { fontSize: "0.5rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, padding: "0 4px 6px", whiteSpace: "nowrap" };
+  const cellChip = (bg) => ({ display: "block", width: "100%", boxSizing: "border-box", textAlign: "center", fontSize: "0.75rem", fontWeight: 500, fontFamily: MONO, padding: "6px 6px", borderRadius: 3, background: bg, border: "none", color: "var(--white)", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.025em" });
+  const hcell = { fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", padding: "0 4px 6px", whiteSpace: "nowrap" };
   return (
     <>
       <div ref={cardRef} className="card lensmini" onClick={() => setOpen(true)} style={{ fontFamily: font, cursor: "pointer" }}>
@@ -898,7 +902,7 @@ export function RotationMini({ C, font, session, noStamp }) {
           ] }} />
           <LensCamera getEl={() => cardRef.current} name="rotation" C={C} style={{ marginLeft: 6 }} />
           <XShare getEl={() => cardRef.current} C={C} />
-          {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.62rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
+          {!noStamp && <span style={{ marginLeft: "auto", fontSize: "0.75rem", fontWeight: 500, color: C.muted, fontVariantNumeric: "tabular-nums" }}>{stamp}</span>}
         </div>
         <table className="minitable" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr>
@@ -911,30 +915,30 @@ export function RotationMini({ C, font, session, noStamp }) {
           <tbody>
             {top.map(r => (
               <tr key={r.t}>
-                <td style={{ fontSize: "0.72rem", fontWeight: 800, color: C.white, padding: "3px 4px", textAlign: "left" }}>{r.t}</td>
-                <td style={{ fontSize: "0.66rem", color: C.muted, padding: "3px 4px", textAlign: "left", maxWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</td>
+                <td style={{ fontSize: "0.75rem", fontWeight: 600, color: C.white, padding: "3px 4px", textAlign: "left" }}>{r.t}</td>
+                <td style={{ fontSize: "0.75rem", color: C.muted, padding: "3px 4px", textAlign: "left", maxWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</td>
                 <td style={{ padding: "2px 3px", width: 62 }}><span style={cellChip(greenHeat(r.thrust == null ? null : r.thrust / 100))}>{r.thrust == null ? "—" : Math.round(r.thrust)}</span></td>
                 <td style={{ padding: "2px 3px", width: 62 }}><span style={cellChip(greenHeat(r.rs1m == null ? null : r.rs1m / 100))}>{r.rs1m == null ? "—" : Math.round(r.rs1m)}</span></td>
                 <td style={{ padding: "2px 3px", whiteSpace: "nowrap", width: 78 }}>
                   {/* Valen 2026-07-19: OFF-FLOOR flag = plain ⚠️ to the LEFT of the value so the
                       right-aligned % column stays a clean edge. No separate column. */}
-                  {(r.warns || []).includes("trap") && <Tip tip="Strong, but still far below its 52-week high. This is a bounce, not a breakout." style={{ marginRight: 4, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
-                  {(r.warns || []).includes("artifact") && <Tip tip="The rank looks high, but the actual month is negative. Ranking beats a weak field." style={{ marginRight: 3, fontSize: "0.66rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
+                  {(r.warns || []).includes("trap") && <Tip tip="Strong, but still far below its 52-week high. This is a bounce, not a breakout." style={{ marginRight: 4, fontSize: "0.75rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
+                  {(r.warns || []).includes("artifact") && <Tip tip="The rank looks high, but the actual month is negative. Ranking beats a weak field." style={{ marginRight: 3, fontSize: "0.75rem", cursor: "help", verticalAlign: "middle" }}>⚠️</Tip>}
                   <span style={{ ...cellChip(redHeat(off52Mag(r.off52))), display: "inline-block", width: "auto", minWidth: 46 }}>{r.off52 == null ? "—" : (r.off52 >= -0.05 ? "0%" : Math.round(r.off52) + "%")}</span>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <div style={{ marginTop: 10, paddingTop: 9, borderTop: `1px solid ${C.border}`, fontSize: "0.64rem", color: C.muted, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+        <div style={{ marginTop: 10, paddingTop: 9, borderTop: `1px solid ${C.border}`, fontSize: "0.6875rem", color: C.muted, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
           {counts.buy} leading+accelerating · {counts.fresh} fresh surge · {counts.resting} cooling · {counts.trap} off-floor flags
         </div>
       </div>
       {open && createPortal(
-        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "rgba(4,4,8,0.55)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "32px 16px" }}>
+        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1250, background: "var(--scrim)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", overflowY: "auto", padding: "32px 16px" }}>
           <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1480, margin: "0 auto", position: "relative" }}>
             {/* explicit close (mobile audit A7 2026-08-04): on phones the inner div fills the popup and stops propagation, leaving only 16px backdrop strips to tap */}
-            <button onClick={() => setOpen(false)} aria-label="Close" style={{ position: "sticky", top: 0, float: "right", zIndex: 5, width: 38, height: 38, borderRadius: "50%", background: "rgba(8,8,14,0.9)", border: `1px solid ${C.border}`, color: C.muted, fontSize: "1.05rem", cursor: "pointer", lineHeight: 1 }}>✕</button>
+            <button onClick={() => setOpen(false)} aria-label="Close" style={{ position: "sticky", top: 0, float: "right", zIndex: 5, width: 38, height: 38, borderRadius: "50%", background: "var(--sheet)", border: `1px solid ${C.border}`, color: C.muted, fontSize: "1rem", cursor: "pointer", lineHeight: 1 }}>✕</button>
             <GroupRS C={C} font={font} session={session} />
           </div>
         </div>, document.body)}

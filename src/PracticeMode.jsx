@@ -119,11 +119,11 @@ export default function PracticeMode({ C, font, session }) {
 
   // ── shared inline styles ──
   const card = { background: C.glass, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 };
-  const label = { fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" };
+  const label = { fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" };
   const input = {
-    width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.04)",
+    width: "100%", boxSizing: "border-box", background: "var(--w04)",
     border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px",
-    color: C.white, fontSize: "0.9rem", fontWeight: 600, fontFamily: font, outline: "none",
+    color: C.white, fontSize: "0.875rem", fontWeight: 600, fontFamily: font, outline: "none",
   };
 
   return (
@@ -131,9 +131,9 @@ export default function PracticeMode({ C, font, session }) {
       <style dangerouslySetInnerHTML={{ __html: PM_CSS }} />
       {/* header */}
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.gold }}>Sandbox</div>
-        <div style={{ fontSize: "1.9rem", fontWeight: 800, letterSpacing: "-0.02em", marginTop: 4 }}>🧪 Practice</div>
-        <div style={{ color: C.muted, fontSize: "0.9rem", marginTop: 6, maxWidth: 640 }}>
+        <div style={{ fontSize: "0.75rem", fontWeight: 500, letterSpacing: 0, color: "var(--muted)" }}>Sandbox</div>
+        <div style={{ fontSize: "2rem", fontWeight: 700, letterSpacing: "-0.02em", marginTop: 4 }}>🧪 Practice</div>
+        <div style={{ color: C.muted, fontSize: "0.875rem", marginTop: 6, maxWidth: 640 }}>
           Paper-trade any setup when you're unsure — log a hypothetical idea, close it at any price, and see how it would have played out. Test the market without risking a cent.
         </div>
       </div>
@@ -141,10 +141,10 @@ export default function PracticeMode({ C, font, session }) {
       {/* loud NOT-REAL banner */}
       <div style={{
         display: "flex", alignItems: "center", gap: 10, marginTop: 14, marginBottom: 22,
-        background: "rgba(240,192,80,0.08)", border: `1px solid ${C.borderGold}`, borderRadius: 12, padding: "12px 16px",
+        background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 16px",
       }}>
-        <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>⚠️</span>
-        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: C.goldBright, lineHeight: 1.5 }}>
+        <span style={{ fontSize: "1.125rem", lineHeight: 1 }}>⚠️</span>
+        <span style={{ fontSize: "0.875rem", fontWeight: 500, color: C.white, lineHeight: 1.5 }}>
           Practice mode — hypothetical trades only. Nothing here touches your real journal, positions, or stats.
         </span>
       </div>
@@ -186,8 +186,8 @@ export default function PracticeMode({ C, font, session }) {
           onClick={clearAll}
           style={{
             background: "transparent", border: `1px solid ${C.border}`, color: C.muted,
-            fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "9px 18px",
-            borderRadius: 980, cursor: "pointer",
+            fontFamily: font, fontWeight: 500, fontSize: "0.75rem", padding: "9px 18px",
+            borderRadius: 999, cursor: "pointer",
           }}
         >
           Clear practice data
@@ -253,15 +253,15 @@ function IdeaForm({ C, font, card, label, input, onAdd }) {
   };
 
   const seg = (active) => ({
-    flex: 1, padding: "9px 0", borderRadius: 8, border: "none", cursor: "pointer",
-    fontFamily: font, fontWeight: 800, fontSize: "0.78rem",
-    background: active ? C.goldDim : "transparent",
-    color: active ? C.goldBright : C.muted,
+    flex: 1, padding: "9px 0", borderRadius: 999, border: "none", cursor: "pointer",
+    fontFamily: font, fontWeight: 500, fontSize: "0.75rem",
+    background: active ? "var(--w10)" : "transparent",
+    color: active ? "var(--white)" : C.muted,
   });
 
   return (
     <div style={card}>
-      <div style={{ fontSize: "0.95rem", fontWeight: 800, marginBottom: 16 }}>Log a practice idea</div>
+      <div style={{ fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em", marginBottom: 16 }}>Log a practice idea</div>
 
       {/* ticker + direction */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
@@ -271,7 +271,7 @@ function IdeaForm({ C, font, card, label, input, onAdd }) {
         </div>
         <div>
           <label style={label}>Direction</label>
-          <div style={{ display: "flex", gap: 6, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: 4 }}>
+          <div style={{ display: "flex", gap: 6, background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: 4 }}>
             <button type="button" style={seg(dir === "long")} onClick={() => setDir("long")}>Long</button>
             <button type="button" style={seg(dir === "short")} onClick={() => setDir("short")}>Short</button>
           </div>
@@ -297,7 +297,7 @@ function IdeaForm({ C, font, card, label, input, onAdd }) {
       {/* size mode */}
       <div style={{ marginBottom: 12 }}>
         <label style={label}>Size by</label>
-        <div style={{ display: "flex", gap: 6, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: 4, marginBottom: 10 }}>
+        <div style={{ display: "flex", gap: 6, background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 10, padding: 4, marginBottom: 10 }}>
           <button type="button" style={seg(sizeMode === "shares")} onClick={() => setSizeMode("shares")}>Shares</button>
           <button type="button" style={seg(sizeMode === "risk")} onClick={() => setSizeMode("risk")}>$ risk</button>
         </div>
@@ -309,21 +309,21 @@ function IdeaForm({ C, font, card, label, input, onAdd }) {
       </div>
 
       {/* live math preview */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, padding: "12px 14px", background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 14 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, padding: "12px 14px", background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 14 }}>
         <Metric C={C} k="Risk / share" v={Number.isFinite(rps) ? fmtUsd(rps) : "—"} />
         <Metric C={C} k="Shares" v={Number.isFinite(computedShares) && computedShares > 0 ? fmtNum(computedShares, 0) : "—"} />
         <Metric C={C} k="$ risk" v={Number.isFinite(dollarRisk) ? fmtUsd(dollarRisk) : "—"} />
         <Metric C={C} k="R:R" v={Number.isFinite(rr) ? `${rr.toFixed(2)} : 1` : "—"} accent />
       </div>
 
-      {err && <div style={{ color: C.red, fontSize: "0.78rem", fontWeight: 700, marginBottom: 10 }}>{err}</div>}
+      {err && <div style={{ color: C.red, fontSize: "0.75rem", fontWeight: 500, marginBottom: 10 }}>{err}</div>}
 
       <button
         type="button"
         onClick={submit}
         style={{
-          width: "100%", background: `linear-gradient(135deg, ${C.goldMid}, ${C.goldBright})`, color: "#000",
-          fontFamily: font, fontWeight: 800, fontSize: "0.86rem", padding: "12px 0", borderRadius: 980,
+          width: "100%", background: `linear-gradient(135deg, ${C.goldMid}, ${C.goldBright})`, color: "var(--goldOn)",
+          fontFamily: font, fontWeight: 600, fontSize: "0.875rem", padding: "12px 0", borderRadius: 999,
           border: "none", cursor: "pointer",
         }}
       >
@@ -344,19 +344,19 @@ function StatsCard({ C, card, stats, closedCount }) {
   return (
     <div style={card}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
-        <div style={{ fontSize: "0.95rem", fontWeight: 800 }}>Practice stats</div>
-        <div style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: C.goldBright, background: C.goldDim, border: `1px solid ${C.borderGold}`, borderRadius: 980, padding: "2px 8px" }}>Practice only</div>
+        <div style={{ fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em" }}>Practice stats</div>
+        <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 999, padding: "2px 8px" }}>Practice only</div>
       </div>
-      <div style={{ color: C.muted, fontSize: "0.72rem", marginBottom: 16 }}>Across your closed practice trades — never mixed with your real performance.</div>
+      <div style={{ color: C.muted, fontSize: "0.75rem", marginBottom: 16 }}>Across your closed practice trades — never mixed with your real performance.</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {items.map((it) => (
-          <div key={it.k} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 12px" }}>
-            <div style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>{it.k}</div>
-            <div style={{ fontSize: "1.4rem", fontWeight: 800, color: it.col || C.white }}>{it.v}</div>
+          <div key={it.k} style={{ background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 12px" }}>
+            <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, marginBottom: 6 }}>{it.k}</div>
+            <div style={{ fontSize: "1.25rem", fontWeight: 500, letterSpacing: "-0.025em", color: it.col || C.white }}>{it.v}</div>
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 14, fontSize: "0.72rem", color: C.muted }}>
+      <div style={{ marginTop: 14, fontSize: "0.75rem", color: C.muted }}>
         Total hypothetical P&L: <b style={{ color: closedCount && stats.totalPnl >= 0 ? C.green : closedCount ? C.red : C.muted }}>{closedCount ? fmtUsd(stats.totalPnl) : "—"}</b>
       </div>
     </div>
@@ -376,14 +376,14 @@ function OpenRow({ C, font, input, t, onClose, onDelete }) {
   };
 
   const dirTag = t.dir === "short"
-    ? { t: "SHORT", c: C.red, bg: "rgba(239,68,68,0.12)" }
-    : { t: "LONG", c: C.green, bg: "rgba(34,197,94,0.12)" };
+    ? { t: "SHORT", c: C.red, bg: "rgba(255,80,0,0.12)" }
+    : { t: "LONG", c: C.green, bg: "rgba(0,200,5,0.12)" };
 
   return (
     <div style={{ background: C.glass, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 12 }}>
-        <span style={{ fontSize: "1.05rem", fontWeight: 800, letterSpacing: "-0.01em" }}>{t.ticker}</span>
-        <span style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.06em", color: dirTag.c, background: dirTag.bg, borderRadius: 980, padding: "3px 9px" }}>{dirTag.t}</span>
+        <span style={{ fontSize: "1rem", fontWeight: 600, letterSpacing: "-0.01em" }}>{t.ticker}</span>
+        <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", color: dirTag.c, background: dirTag.bg, borderRadius: 999, padding: "3px 9px" }}>{dirTag.t}</span>
         <span style={{ flex: 1 }} />
         <Metric C={C} k="Entry" v={fmtNum(t.entry)} />
         <Metric C={C} k="Stop" v={fmtNum(t.stop)} />
@@ -395,7 +395,7 @@ function OpenRow({ C, font, input, t, onClose, onDelete }) {
 
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 10, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
         <div style={{ width: 150 }}>
-          <label style={{ fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" }}>Exit price</label>
+          <label style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, marginBottom: 6, display: "block" }}>Exit price</label>
           <input style={input} value={exitVal} placeholder="close at…" inputMode="decimal" onChange={(ev) => setExitVal(ev.target.value)} />
         </div>
         {Number.isFinite(exit) && (
@@ -411,8 +411,8 @@ function OpenRow({ C, font, input, t, onClose, onDelete }) {
           disabled={!Number.isFinite(exit)}
           style={{
             background: Number.isFinite(exit) ? C.goldDim : "transparent", border: `1px solid ${C.borderGold}`,
-            color: Number.isFinite(exit) ? C.goldBright : C.muted, fontFamily: font, fontWeight: 800, fontSize: "0.78rem",
-            padding: "9px 18px", borderRadius: 980, cursor: Number.isFinite(exit) ? "pointer" : "default",
+            color: Number.isFinite(exit) ? C.goldBright : C.muted, fontFamily: font, fontWeight: 600, fontSize: "0.75rem",
+            padding: "9px 18px", borderRadius: 999, cursor: Number.isFinite(exit) ? "pointer" : "default",
           }}
         >
           Close
@@ -421,7 +421,7 @@ function OpenRow({ C, font, input, t, onClose, onDelete }) {
           type="button"
           onClick={() => onDelete(t.id)}
           title="Discard this practice idea"
-          style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 700, fontSize: "0.78rem", padding: "9px 14px", borderRadius: 980, cursor: "pointer" }}
+          style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, fontFamily: font, fontWeight: 500, fontSize: "0.75rem", padding: "9px 14px", borderRadius: 999, cursor: "pointer" }}
         >
           Discard
         </button>
@@ -437,12 +437,12 @@ function ClosedRow({ C, t, onDelete }) {
   const win = Number.isFinite(pnl) && pnl > 0;
   const dirTag = t.dir === "short" ? "SHORT" : "LONG";
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.025)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 16px", opacity: 0.94 }}>
-      <span style={{ fontSize: "0.95rem", fontWeight: 800 }}>{t.ticker}</span>
-      <span style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.06em", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 980, padding: "2px 8px" }}>{dirTag}</span>
-      <span style={{ fontSize: "0.74rem", color: C.muted }}>{fmtNum(t.entry)} → {fmtNum(t.exit)} · {fmtNum(t.shares, 0)} sh</span>
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, background: "var(--w03)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 16px", opacity: 0.94 }}>
+      <span style={{ fontSize: "1rem", fontWeight: 600 }}>{t.ticker}</span>
+      <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: "2px 8px" }}>{dirTag}</span>
+      <span style={{ fontSize: "0.75rem", color: C.muted }}>{fmtNum(t.entry)} → {fmtNum(t.exit)} · {fmtNum(t.shares, 0)} sh</span>
       <span style={{ flex: 1 }} />
-      <span style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: win ? C.green : C.red, background: win ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)", borderRadius: 980, padding: "3px 10px" }}>{win ? "Win" : "Loss"}</span>
+      <span style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: win ? C.green : C.red, background: win ? "rgba(0,200,5,0.10)" : "rgba(255,80,0,0.10)", borderRadius: 999, padding: "3px 10px" }}>{win ? "Win" : "Loss"}</span>
       <Metric C={C} k="R" v={fmtR(r)} col={Number.isFinite(r) && r >= 0 ? C.green : C.red} />
       <Metric C={C} k="P&L" v={fmtUsd(pnl)} col={Number.isFinite(pnl) && pnl >= 0 ? C.green : C.red} />
       <button
@@ -461,8 +461,8 @@ function ClosedRow({ C, t, onDelete }) {
 function Metric({ C, k, v, accent, col }) {
   return (
     <div style={{ textAlign: "right" }}>
-      <div style={{ fontSize: "0.58rem", fontWeight: 800, letterSpacing: "0.07em", textTransform: "uppercase", color: C.muted }}>{k}</div>
-      <div style={{ fontSize: "0.86rem", fontWeight: 800, color: col || (accent ? C.goldBright : C.white), fontVariantNumeric: "tabular-nums" }}>{v}</div>
+      <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted }}>{k}</div>
+      <div style={{ fontSize: "0.875rem", fontWeight: 500, letterSpacing: "-0.025em", color: col || C.white, fontVariantNumeric: "tabular-nums" }}>{v}</div>
     </div>
   );
 }
@@ -470,15 +470,15 @@ function Metric({ C, k, v, accent, col }) {
 function SectionTitle({ C, title, count }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 30, marginBottom: 14 }}>
-      <div style={{ fontSize: "1rem", fontWeight: 800 }}>{title}</div>
-      <div style={{ fontSize: "0.66rem", fontWeight: 800, color: C.muted, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, borderRadius: 980, padding: "2px 9px" }}>{count}</div>
+      <div style={{ fontSize: "1.125rem", fontWeight: 600, letterSpacing: "-0.012em" }}>{title}</div>
+      <div style={{ fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", color: C.muted, background: "var(--w06)", border: `1px solid ${C.border}`, borderRadius: 999, padding: "2px 9px" }}>{count}</div>
     </div>
   );
 }
 
 function EmptyState({ C, text }) {
   return (
-    <div style={{ border: `1px dashed ${C.border}`, borderRadius: 14, padding: "26px 20px", textAlign: "center", color: C.muted, fontSize: "0.84rem" }}>
+    <div style={{ border: `1px dashed ${C.border}`, borderRadius: 14, padding: "26px 20px", textAlign: "center", color: C.muted, fontSize: "0.875rem" }}>
       {text}
     </div>
   );
