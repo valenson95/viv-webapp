@@ -34,6 +34,7 @@ const UNIVERSE = [
   ["JETS", "Airlines"],
   ["ITB", "Home Construction"],
   ["ARTY", "Artificial Intelligence"],
+  ["SOXX", "Semiconductors"],   // group row (was LL-only) — Hunt List coverage audit 2026-08-06
   ["URA", "Uranium Miners"],
   ["KWEB", "Chinese Tech & E-commerce"],
   ["CHIQ", "China Consumer"],

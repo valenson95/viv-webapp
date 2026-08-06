@@ -27,6 +27,7 @@
 export const THEME_GROUPS = {
   // ── exact matches ─────────────────────────────────────────
   "AI":                "ARTY",   // Artificial Intelligence (added 2026-08-05 batch)
+  "Semiconductors":    "SOXX",   // group row added 2026-08-06 (coverage audit; was LL-only)
   "Genomics":          "ARKG",   // Genomics
   "Robotics":          "ROBO",   // Robotics & Automation
   "Solar":             "TAN",    // Solar (added 2026-08-05 batch)
