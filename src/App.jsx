@@ -13528,6 +13528,23 @@ function LiveTradesFab({ C, font, isMobile }) {
             <span style={{ fontFamily: LT_GEIST, fontSize: "0.66rem", fontWeight: 500, color: "rgba(255,255,255,0.42)" }}>&nbsp;of account</span>
           </span>
         ))}
+        {/* Entry date/price + BOTH stops (Valen 2026-08-06: "always use Original Stoploss,
+            Current stoploss — both"). Original = the locked stop that defines R; Current = the
+            trail when one is set (breakeven tagged), else it equals the original. */}
+        {chipRow("Date of entry", <span style={val}>{o.entryDate ? wlFmtDay(o.entryDate) + ", " + String(o.entryDate).slice(0, 4) : "—"}</span>)}
+        {chipRow("Entry price", <span style={val}>{o.entry == null ? "—" : Number(o.entry).toFixed(2)}</span>)}
+        {chipRow("Original stoploss", <span style={val}>{o.stop == null ? "—" : Number(o.stop).toFixed(2)}</span>)}
+        {chipRow("Current stoploss", (() => {
+          const eff = o.trail != null ? o.trail : o.stop;
+          const be = o.trail != null && o.entry != null && Math.abs(o.trail - o.entry) <= o.entry * 0.001;
+          return (
+            <span style={val}>
+              {eff == null ? "—" : Number(eff).toFixed(2)}
+              {be && <span style={{ fontFamily: LT_GEIST, fontSize: "0.66rem", fontWeight: 500, color: "rgba(255,255,255,0.42)" }}>&nbsp;breakeven</span>}
+              {!be && o.trail != null && <span style={{ fontFamily: LT_GEIST, fontSize: "0.66rem", fontWeight: 500, color: "rgba(255,255,255,0.42)" }}>&nbsp;trailed</span>}
+            </span>
+          );
+        })())}
         {chipRow("Since entry", <span style={val}>{o.daysHeld == null ? "—" : "Day " + o.daysHeld}</span>)}
       </div>
     );
