@@ -13461,6 +13461,24 @@ function LiveTradesFab({ C, font, isMobile }) {
 
   const rows = data && Array.isArray(data.open) ? data.open : [];
 
+  // Click-anywhere-else collapses the drawer (Valen 2026-08-06). Same mousedown/touchstart
+  // pattern as the watchlist flag popover: the [data-wllt] guard keeps clicks inside the
+  // drawer (and on the launcher) from closing it, and the page behind stays interactive.
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      const t = e.target;
+      if (t && t.closest && t.closest("[data-wllt]")) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("touchstart", onDoc, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+    };
+  }, [open]);
+
   {/* Compact register (Valen 2026-08-06: "slightly smaller and more compact").
       Detail rows use the MODEL BOOK's typefaces (his call, same day): Geist labels +
       Geist Mono values. Geist Mono tops out at weight 600 — heavier renders faux-bold. */}
@@ -13507,9 +13525,19 @@ function LiveTradesFab({ C, font, isMobile }) {
 
   return createPortal(
     <>
+      <style>{`
+        @keyframes vivltIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+        .vivlt-drawer{animation:vivltIn .28s cubic-bezier(0.22,1,0.36,1)}
+        @keyframes vivltPulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,0.55)}70%{box-shadow:0 0 0 6px rgba(34,197,94,0)}}
+        .vivlt-live{animation:vivltPulse 2s infinite}
+        @media (prefers-reduced-motion: reduce){.vivlt-drawer,.vivlt-live{animation:none}}
+      `}</style>
+
       {/* Floating launcher — the Feedback button's shape, stacked directly above it so the two
-          never overlap, and gold-tinted GLASS rather than solid gold so they read as different. */}
+          never overlap, and gold-tinted GLASS rather than solid gold so they read as different.
+          The pulsing green dot is the "live" symbol (Valen 2026-08-06, replaced the chart icon). */}
       <button
+        data-wllt
         onClick={() => setOpen(true)}
         title="Live Trades"
         style={{
@@ -13522,31 +13550,29 @@ function LiveTradesFab({ C, font, isMobile }) {
           boxShadow: "0 12px 30px rgba(0,0,0,0.45)",
         }}
       >
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={C.goldBright} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 7-8" /><path d="M14 7h6v6" /></svg>
+        <span className="vivlt-live" style={{ width: 9, height: 9, borderRadius: 99, background: "#22c55e", display: "inline-block", flex: "0 0 auto" }} />
         Live Trades
       </button>
 
       {!open ? null : (
-        // Backdrop click closes. z 1100 sits above the page and both launchers, and below the
-        // drawer / detail / modal layers (1200-1400) so nothing this opens can trap them.
+        // Right-side slide-in drawer, same pattern as Feedback (Valen 2026-08-06: "it should be
+        // like the feedback where it slides from the right side"). No backdrop — the page stays
+        // visible; the document-level mousedown listener above collapses it on any outside tap.
         <div
-          onClick={() => setOpen(false)}
+          data-wllt
+          className="vivlt-drawer"
           style={{
-            position: "fixed", inset: 0, zIndex: 1100, fontFamily: font, overflowY: "auto",
-            background: "radial-gradient(1000px 600px at 70% -10%, rgba(201,152,42,0.09), transparent 60%), rgba(3,3,6,0.82)",
-            backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
-            display: "flex", justifyContent: "center", alignItems: "flex-start",
-            padding: phone ? "18px 12px 40px" : "48px 16px",
+            position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 1340, fontFamily: font,
+            width: "min(400px, 92vw)", display: "flex", flexDirection: "column",
+            background: "linear-gradient(180deg, rgba(18,18,26,0.97), rgba(8,8,14,0.99))",
+            borderLeft: `1px solid ${C.borderGold}`, boxShadow: "-24px 0 70px rgba(0,0,0,0.55)",
+            backdropFilter: "blur(30px) saturate(160%)", WebkitBackdropFilter: "blur(30px) saturate(160%)",
           }}
         >
           <div
-            onClick={(e) => e.stopPropagation()}
             style={{
-              width: "min(440px, 100%)", position: "relative", borderRadius: 18, overflow: "hidden",
-              background: "linear-gradient(180deg, rgba(18,18,26,0.97), rgba(8,8,14,0.99))",
-              border: `1px solid ${C.borderGold}`, boxShadow: "0 30px 80px rgba(0,0,0,0.6)",
-              backdropFilter: "blur(30px) saturate(160%)", WebkitBackdropFilter: "blur(30px) saturate(160%)",
-              padding: phone ? "14px 13px 12px" : "16px 17px 14px",
+              position: "relative", flex: "1 1 auto", overflowY: "auto",
+              padding: phone ? "14px 13px 24px" : "16px 17px 24px",
             }}
           >
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${C.gold}, ${C.goldBright}, ${C.gold}, transparent)`, opacity: 0.85 }} />
