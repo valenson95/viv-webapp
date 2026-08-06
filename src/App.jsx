@@ -13461,9 +13461,13 @@ function LiveTradesFab({ C, font, isMobile }) {
 
   const rows = data && Array.isArray(data.open) ? data.open : [];
 
-  {/* Compact register (Valen 2026-08-06: "slightly smaller and more compact") */}
-  const muted = { fontSize: "0.62rem", fontWeight: 600, color: C.muted, whiteSpace: "nowrap" };
-  const val = { fontSize: phone ? "0.75rem" : "0.78rem", fontWeight: 800, color: "#fff", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" };
+  {/* Compact register (Valen 2026-08-06: "slightly smaller and more compact").
+      Detail rows use the MODEL BOOK's typefaces (his call, same day): Geist labels +
+      Geist Mono values. Geist Mono tops out at weight 600 — heavier renders faux-bold. */}
+  const LT_GEIST = "'Geist','Plus Jakarta Sans',-apple-system,sans-serif";
+  const LT_MONO = "'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace";
+  const muted = { fontFamily: LT_GEIST, fontSize: "0.62rem", fontWeight: 500, letterSpacing: "0.02em", color: C.muted, whiteSpace: "nowrap" };
+  const val = { fontFamily: LT_MONO, fontSize: phone ? "0.73rem" : "0.76rem", fontWeight: 600, color: "#fff", fontVariantNumeric: "tabular-nums", letterSpacing: "0" };
   const foot = { fontSize: "0.66rem", fontWeight: 500, color: "rgba(255,255,255,0.50)", lineHeight: 1.65 };
   const chipRow = (label, value, first) => (
     <div key={label} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "6px 0", borderTop: first ? "none" : `1px solid ${LT_HAIR}` }}>
