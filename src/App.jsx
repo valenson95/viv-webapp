@@ -10010,9 +10010,10 @@ function WatchlistCard({ C, font, session }) {
       // rank that theme at all — grey "untracked", never a made-up number.
       const ranks = theme && snapDate ? themeRanks(theme, snapDate) : null;
       const rank = ranks && ranks.week != null ? ranks.week : null;
-      {/* Theme→group first; per-ticker FUND-MEMBERSHIP override fills the gaps (TICKER_GROUPS,
-          each entry verified against the issuer's own holdings list — 2026-08-06 audit). */}
-      const grp = (theme ? groupForTheme(theme) : null) || TICKER_GROUPS[tk] || null;
+      {/* Per-ticker FUND-MEMBERSHIP override wins (TICKER_GROUPS — each entry verified against
+          the issuer's own holdings list, multi-fund ties broken by highest weight, Valen's rule
+          2026-08-06); the generic theme→group mapping fills everything else. */}
+      const grp = TICKER_GROUPS[tk] || (theme ? groupForTheme(theme) : null) || null;
       const grow = grp ? WATCHLIST_GROUP_ROWS[grp] : null;
       const srow = WATCHLIST_STOCK_ROWS[tk] || null;
       const sched = (WATCHLIST_EARNINGS[tk] || []).find(([d]) => d >= today);

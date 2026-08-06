@@ -74,6 +74,9 @@ export const THEME_GROUPS = {
 // not a categorisation. Multi-holder judgment calls (GOOGL/GGLL, ANET) are NOT here —
 // they await Valen's pick.
 export const TICKER_GROUPS = {
+  // Multi-fund names resolved by HIGHEST FUND WEIGHT (Valen's rule, 2026-08-06):
+  GOOGL: "SOCL", // SOCL 5.32% > FDN 5.12% > MAGS 1.0%
+  ANET:  "FDN",  // FDN 5.17% > ARTY 2.86% > CIBR 2.12%
   WDC:  "ARTY", // iShares AI ETF holds WDC 2.63%
   ORKA: "XBI",  // SPDR Biotech holds ORKA 1.51%
   SAIL: "BUG",  // Global X Cybersecurity holds SAIL 4.64%
