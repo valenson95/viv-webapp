@@ -548,10 +548,10 @@ ${s} .tag,${s} .countchip,${s} .chipbtn,${s} .ghostchip,${s} .kpichip{font-weigh
 const THEME_KEY = "viv-theme";
 const THEME_PREFS = ["auto", "dark", "light"];
 let _themePref = (() => { try { const v = localStorage.getItem(THEME_KEY); return THEME_PREFS.includes(v) ? v : "dark"; } catch { return "dark"; } })();
-// Light theme is ADMIN-ONLY until its QA pass finishes (Valen 2026-08-06): members always get
-// dark; the toggle/choice UI renders null for them. setThemeUiAllowed(isAdmin) is wired in
-// AppInner once the session lands.
-let _themeUiOn = false;
+// Light theme released to ALL members (Valen 2026-08-06 "light theme push as well").
+// Default stays dark; light is opt-in via the nav toggle. The gate machinery stays so a
+// one-line flip re-gates it if light-mode QA ever needs to pull it back.
+let _themeUiOn = true;
 function setThemeUiAllowed(on) {
   if (_themeUiOn === !!on) return;
   _themeUiOn = !!on;
@@ -1490,6 +1490,7 @@ const WHATS_NEW = [
       "Everything has been redrawn around one idea: your money first, at a glance. The dashboard now opens with your equity as one big number, your open profit right under it, and your equity curve below — drag along the curve to see the value at any point, and use the 1W · 1M · 3M · YTD · ALL chips to change the window.",
       "Your open positions moved above the market plan, each with its protection status spelled out — At Risk in red, Risk-Free in blue, Profit Locked in green — the same three colors everywhere in the app, so one glance always means the same thing.",
       "Cleaner everywhere else too: quieter headers, thinner lines, smoother movement, and numbers that are easier to read on every page. Every feature is exactly where it was — nothing was removed.",
+      "Light mode is here. Tap the sun/moon at the right of the top bar to switch any time — or set Auto in Settings to follow your device. A few light-mode corners are still being polished; dark stays the default.",
       "The Live Trades panel now opens instantly.",
     ],
   },
@@ -15632,10 +15633,9 @@ function AppInner() {
 
   // ─── Auth State ───
   const [session, setSession] = useState(null);
-  // Light theme stays admin-gated until its QA pass is done — members always render dark.
-  useEffect(() => {
-    setThemeUiAllowed((session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase());
-  }, [session]);
+  // Light theme is live for everyone (opt-in, dark default) — re-wire setThemeUiAllowed(isAdmin)
+  // here if it ever needs to go back behind the admin gate.
+  useEffect(() => { setThemeUiAllowed(true); }, []);
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   // Hash routing (Valen 2026-07-30): the URL mirrors the section (#modelbook, #journal, …) so a
