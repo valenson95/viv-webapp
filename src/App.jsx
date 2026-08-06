@@ -9923,7 +9923,7 @@ function WatchlistCard({ C, font, session }) {
   const [idxPct, setIdxPct] = useState(null);
   useEffect(() => {
     let dead = false;
-    fetch("/api/indices")
+    fetch("/api/prices?indices=1") /* indices branch folded into prices.js — 12-function plan cap */
       .then(r => (r.ok ? r.json() : null))
       .then(j => { if (!dead && j && typeof j === "object") setIdxPct(j); })
       .catch(() => {});
