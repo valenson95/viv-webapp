@@ -220,15 +220,10 @@ body{font-family:var(--font);}
 ::-webkit-scrollbar-thumb:hover{background:var(--w22);}
 ::selection{background:rgba(240,192,80,0.28); color:var(--white);}
 
-/* ── Theme switch: 200ms cross-tint. The class is added for the length of the switch and
-   removed after, so normal renders never carry a global transition. ── */
-body.theme-anim,body.theme-anim *,body.theme-anim *::before,body.theme-anim *::after{
-  transition:background-color var(--t-med) var(--ease),background var(--t-med) var(--ease),
-    border-color var(--t-med) var(--ease),color var(--t-med) var(--ease),
-    fill var(--t-med) var(--ease),stroke var(--t-med) var(--ease),
-    box-shadow var(--t-med) var(--ease) !important;
-  animation:none !important;
-}
+/* ── Theme switch: INSTANT (Robinhood's is one clean repaint). The old 200ms cross-tint put a
+   transition on EVERY element — thousands of simultaneous tweens = the laggy switch Valen felt
+   (2026-08-06). Only the page background eases now; everything else snaps with the repaint. ── */
+body.theme-anim{ transition:background-color var(--t-fast) var(--ease) !important; }
 
 /* ══════════ SECTION SEGMENTATION — Robinhood's grammar (owner directive, 2026-08-06) ══════════
    SPACE FIRST · ONE LINE SECOND · BOXES LAST. A section is separated by whitespace on the 4px
