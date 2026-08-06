@@ -621,7 +621,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "4px 2px 12px" }}>
             <span style={{ fontSize: "0.75rem", fontWeight: 600, color: C.white }}>{sel.size} selected</span>
             <button disabled={busy} onClick={copySummary} style={{ background: "var(--w06)", color: C.text, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "6px 13px", borderRadius: 999, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>📋 Copy summary</button>
-            <button disabled={busy} onClick={downloadCards} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>🖼 Download {sel.size} card{sel.size > 1 ? "s" : ""}</button>
+            <button disabled={busy} onClick={downloadCards} style={{ background: `linear-gradient(135deg, var(--goldPill), var(--goldPillMid))`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>🖼 Download {sel.size} card{sel.size > 1 ? "s" : ""}</button>
             <button onClick={() => setSel(new Set())} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "6px 12px", borderRadius: 999, cursor: "pointer" }}>Clear</button>
           </div>
         )}
@@ -703,7 +703,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
                             <span style={{ fontSize: "0.75rem", color: C.muted }}>{ePassed}/{eTotal} criteria · {eStarHit}/{eSM} ★-makers{eV === 1 ? " · previous checklist" : ""}{dirty ? " · unsaved edits" : ""}</span>
                             <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                               {rowMsg && <span style={{ fontSize: "0.75rem", fontWeight: 600, color: rowMsg.includes("✓") ? C.green : C.white }}>{rowMsg}</span>}
-                              <button onClick={saveRow} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.6875rem", fontWeight: 600, padding: "6px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Save grade</button>
+                              <button onClick={saveRow} style={{ background: `linear-gradient(135deg, var(--goldPill), var(--goldPillMid))`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.6875rem", fontWeight: 600, padding: "6px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Save grade</button>
                               <button onClick={deleteRow} style={{ background: "rgba(255,80,0,0.10)", color: "var(--redFg)", border: "1px solid rgba(255,80,0,0.4)", fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, padding: "6px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Delete</button>
                               <button onClick={() => loadTicker(g.sym)} title="Load into the full grader below for the chart, annotation and publishing" style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.6875rem", fontWeight: 500, padding: "6px 12px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Full kit ↓</button>
                             </div>
@@ -806,7 +806,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
           <div style={{ fontSize: "0.6875rem", color: C.muted, letterSpacing: 0 }}>criteria passed</div>
         </div>
         <div style={{ position: "relative", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <button onClick={() => doSave()} style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "9px 16px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Save grade{ticker ? ` · ${ticker.toUpperCase().trim()}` : ""}</button>
+          <button onClick={() => doSave()} style={{ background: `linear-gradient(135deg, var(--goldPill), var(--goldPillMid))`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "9px 16px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Save grade{ticker ? ` · ${ticker.toUpperCase().trim()}` : ""}</button>
           <button onClick={() => setShowSync(s => !s)} style={{ background: "rgba(59,158,255,0.12)", color: C.blue, border: "1px solid rgba(59,158,255,0.3)", fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "9px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Sync to Open Position ▾</button>
           <button onClick={reset} style={{ background: "var(--w06)", color: C.muted, border: `1px solid ${C.border}`, fontFamily: font, fontSize: "0.75rem", fontWeight: 500, padding: "9px 16px", borderRadius: 999, cursor: "pointer" }}>Reset</button>
           {showSync && (
@@ -874,7 +874,7 @@ export default function SetupGraderTab({ C, font, guideEnter, guideLeave, gactiv
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
           {isAdmin && (
             <button disabled={busy} onClick={doPublish}
-              style={{ background: `linear-gradient(135deg, ${C.goldBright}, ${C.goldMid})`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "9px 16px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
+              style={{ background: `linear-gradient(135deg, var(--goldPill), var(--goldPillMid))`, color: "var(--goldOn)", border: "none", fontFamily: font, fontSize: "0.75rem", fontWeight: 600, padding: "9px 16px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
               📣 Publish to members{ticker ? ` · ${ticker.toUpperCase().trim()}` : ""}
             </button>
           )}

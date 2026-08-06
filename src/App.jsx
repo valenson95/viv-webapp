@@ -141,7 +141,7 @@ const THEME_TOKENS = `:root{
     --text:#ffffff;
     --muted:rgba(255,255,255,0.65);
     --faint:rgba(255,255,255,0.45);
-    --border:rgba(255,255,255,0.10); --hair:rgba(255,255,255,0.09); --rule:rgba(255,255,255,0.07);
+    --border:rgba(255,255,255,0.13); --hair:rgba(255,255,255,0.11); --rule:rgba(255,255,255,0.085);
     --w02:rgba(255,255,255,0.02); --w03:rgba(255,255,255,0.03); --w04:rgba(255,255,255,0.045);
     --w06:rgba(255,255,255,0.06); --w08:rgba(255,255,255,0.08); --w10:rgba(255,255,255,0.10);
     --w14:rgba(255,255,255,0.14); --w22:rgba(255,255,255,0.22); --w35:rgba(255,255,255,0.35);
@@ -525,6 +525,7 @@ ${s} .tick{font-weight:600; font-size:0.875rem; letter-spacing:-0.01em;}
 
 /* ── Inputs ── */
 ${s} input,${s} select,${s} textarea{font-family:var(--font); letter-spacing:0;}
+${s} select{background-color:var(--sheet); color:var(--text);}
 ${s} .capinput,${s} .numfield,${s} .mgin,${s} .mgsel,${s} .mgta{border-radius:10px; font-weight:500;
   border-color:var(--hair);}
 ${s} .numfield,${s} .mgin,${s} .capinput{font-family:var(--font); font-variant-numeric:tabular-nums;}
@@ -5500,7 +5501,7 @@ const JOUR_CSS = `${RH_TOKENS}
 .vj .provischip{flex:none; font-size:0.6875rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; padding:4px 8px; border-radius:980px; background:var(--orange); color:#1a1205; white-space:nowrap}
 .vj .projprovis b{color:var(--orange); font-weight:800}
 .vj .filterbar .daterange{display:inline-flex; align-items:center; gap:8px}
-.vj .filterbar input[type=date].filtsel{padding:6px 9px; color-scheme:dark}
+.vj .filterbar input[type=date].filtsel{padding:6px 9px; color-scheme:dark} body.theme-light .vj .filterbar input[type=date].filtsel{color-scheme:light}
 .vj .vachip{font-size:0.6875rem; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:var(--text);
     border:1px solid var(--w14); background:var(--w06); padding:6px 12px; border-radius:980px}
 .vj .vagrid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin-top:6px}
@@ -5966,7 +5967,7 @@ const JOUR_CSS = `${RH_TOKENS}
 .vj .tz-row>span{color:var(--muted); font-weight:600}
 .vj .tz-row>b{font-weight:700; color:var(--text); text-align:right}
 .vj .tz-sect{font-size:0.6875rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--faint); margin:12px 0 2px}
-.vj .tz-in{width:120px; background:var(--w06); border:1px solid var(--border); border-radius:8px; color:var(--white); padding:6px 10px; font-family:var(--font); font-size:0.75rem; font-weight:700; outline:none; text-align:right; color-scheme:dark}
+.vj .tz-in{width:120px; background:var(--w06); border:1px solid var(--border); border-radius:8px; color:var(--white); padding:6px 10px; font-family:var(--font); font-size:0.75rem; font-weight:700; outline:none; text-align:right; color-scheme:dark} body.theme-light .vj .tz-in{color-scheme:light}
 .vj .tz-in:focus{border-color:var(--borderGold)}
 .vj .tdz-tabs{display:flex; gap:6px; margin-bottom:12px}
 .vj .tdz-tab{background:var(--w03); border:1px solid var(--border); color:var(--muted); font-family:var(--font); font-weight:700; font-size:0.75rem; padding:8px 20px; border-radius:99px; cursor:pointer; transition:all .14s}
@@ -6057,7 +6058,7 @@ const JOUR_CSS = `${RH_TOKENS}
 .vj.expert .tradehead .sech,.vj.expert .tradehead h2{font-size:1rem}
 .vj.expert .countchip{background:var(--w06); color:var(--text); font-size:0.6875rem; font-weight:800; padding:3px 10px; border-radius:980px}
 .vj.expert .tablewrap{overflow-x:auto; container-type:inline-size}
-.vj.expert .tablewrap thead th{position:sticky; top:0; z-index:2; background:rgba(9,9,15,0.94); font-size:0.6875rem; padding:9px 10px}
+.vj.expert .tablewrap thead th{position:sticky; top:0; z-index:2; background:var(--sheet); font-size:0.6875rem; padding:9px 10px}
 .vj.expert .tablewrap tbody tr.traderow td{height:auto; padding:8px 10px; font-size:0.75rem; font-variant-numeric:tabular-nums}
 @media(min-width:761px){ .vj.expert .tablewrap tbody tr.traderow td{white-space:nowrap} }
 ${RH_SYS('.vj')}
@@ -10555,7 +10556,7 @@ const DASH_CSS = `${RH_TOKENS}
 .vd.expert .poshead h2{font-size:1rem; font-weight:800; letter-spacing:-0.02em; color:var(--white)}
 .vd.expert .countchip{background:var(--w06); color:var(--text); font-size:0.6875rem; font-weight:800; padding:3px 10px; border-radius:980px}
 @media(min-width:761px){
-.vd.expert .poscard thead th{font-size:0.6875rem; padding:9px 10px; position:sticky; top:0; z-index:2; background:rgba(9,9,15,0.94)}
+.vd.expert .poscard thead th{font-size:0.6875rem; padding:9px 10px; position:sticky; top:0; z-index:2; background:var(--sheet)}
 .vd.expert .poscard tbody td{padding:8px 10px; font-size:0.75rem}
   }
 ${RH_SYS('.vd')}
