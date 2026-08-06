@@ -77,7 +77,9 @@ const C = {
   blue: "#3b82f6", blueDim: "rgba(59,130,246,0.10)",
   purple: "#a78bfa", purpleDim: "rgba(167,139,250,0.10)",
 };
-const font = "'Plus Jakarta Sans', -apple-system, sans-serif";
+// Geist-first (Valen 2026-08-06: "ensure the entire webapp is using clear fonts like my model
+// book"). Jakarta stays as fallback; Zella's Inter override still wins where chosen.
+const font = "'Geist', 'Plus Jakarta Sans', -apple-system, sans-serif";
 const fmt$ = (v, dec = 0) => `$${Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
 
 // ─── Brand wordmark — tri-color lockup (Valen / Insiders / Vault) ───
@@ -12126,8 +12128,15 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
           market: (<MarketContext C={C} font={font} />),
           /* THEME LEADERS STRIP (this week's DeepVue leaders) */
           themes: (<ThemeStrip C={C} font={font} />),
-          /* RISK ALLOCATION — swapped with Market context (2026-07-17) */
-          alloc: (
+          /* RISK ALLOCATION — swapped with Market context (2026-07-17).
+             Privacy eye hides ALL of it (Valen 2026-08-06) — the slot stays so the drag grid
+             keeps its shape, but every dollar figure is gone while the eye is on. */
+          alloc: privacyOn ? (
+        <div className="card alloc">
+          <div className="row"><div className="label">Risk allocation</div><div className="spacer"></div></div>
+          <div style={{ fontSize: "0.72rem", color: "var(--muted)", padding: "18px 0 10px" }}>Hidden while the privacy eye is on.</div>
+        </div>
+          ) : (
         <div className={"card alloc guide reveal" + gactive("alloc")} onMouseEnter={guideEnter("alloc", "Risk allocation", "A picture of your risk budget — red is risk already in the market, green is what's still free to deploy.", "/audio/allocation.mp3")} onMouseLeave={guideLeave("alloc")}>
           <div className="row">
             <div className="label">Risk allocation</div>
@@ -13479,43 +13488,44 @@ function LiveTradesFab({ C, font, isMobile }) {
     };
   }, [open]);
 
-  {/* Compact register (Valen 2026-08-06: "slightly smaller and more compact").
-      Detail rows use the MODEL BOOK's typefaces (his call, same day): Geist labels +
-      Geist Mono values. Geist Mono tops out at weight 600 — heavier renders faux-bold. */}
+  {/* MODEL BOOK register (Valen 2026-08-06 ×2: "clear to see" then "make the fonts bigger" +
+      "classy and minimalistic"): Geist labels, Geist Mono values (mono caps at weight 600 —
+      heavier renders faux-bold), and OPEN typography — no boxed cards, positions separated by
+      hairlines only, exactly the book-page grammar. */}
   const LT_GEIST = "'Geist','Plus Jakarta Sans',-apple-system,sans-serif";
   const LT_MONO = "'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace";
-  const muted = { fontFamily: LT_GEIST, fontSize: "0.62rem", fontWeight: 500, letterSpacing: "0.02em", color: C.muted, whiteSpace: "nowrap" };
-  const val = { fontFamily: LT_MONO, fontSize: phone ? "0.73rem" : "0.76rem", fontWeight: 600, color: "#fff", fontVariantNumeric: "tabular-nums", letterSpacing: "0" };
-  const foot = { fontSize: "0.66rem", fontWeight: 500, color: "rgba(255,255,255,0.50)", lineHeight: 1.65 };
-  const chipRow = (label, value, first) => (
-    <div key={label} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "6px 0", borderTop: first ? "none" : `1px solid ${LT_HAIR}` }}>
+  const muted = { fontFamily: LT_GEIST, fontSize: "0.7rem", fontWeight: 500, letterSpacing: "0.01em", color: C.muted, whiteSpace: "nowrap" };
+  const val = { fontFamily: LT_MONO, fontSize: phone ? "0.84rem" : "0.87rem", fontWeight: 600, color: "#fff", fontVariantNumeric: "tabular-nums", letterSpacing: "0" };
+  const foot = { fontFamily: LT_GEIST, fontSize: "0.7rem", fontWeight: 500, color: "rgba(255,255,255,0.50)", lineHeight: 1.65 };
+  const chipRow = (label, value) => (
+    <div key={label} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "8px 0" }}>
       <span style={muted}>{label}</span>
       <span style={{ marginLeft: "auto", textAlign: "right" }}>{value}</span>
     </div>
   );
 
-  const card = (o) => {
+  const card = (o, i) => {
     const s = LT_STATUS[o.status] || LT_STATUS["At Risk"];
     return (
       <div key={o.tk} style={{
-        position: "relative", overflow: "hidden", marginBottom: 8,
-        background: "rgba(255,255,255,0.042)", border: `1px solid ${C.border}`, borderRadius: 14,
-        padding: phone ? "11px 12px 9px" : "12px 15px 10px",
+        padding: "14px 2px 8px",
+        borderTop: i === 0 ? "none" : `1px solid ${C.border}`,
       }}>
-        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: `linear-gradient(180deg, ${s.rail}, rgba(255,255,255,0.06))` }} />
-        <div style={{ fontSize: phone ? "1.12rem" : "1.22rem", fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", lineHeight: 1, marginBottom: 8 }}>{o.tk}</div>
-        {chipRow("Direction", <span style={val}>{o.side || "Long"}</span>, true)}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <span style={{ fontFamily: LT_GEIST, fontSize: phone ? "1.05rem" : "1.12rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#fff", lineHeight: 1 }}>{o.tk}</span>
+          <span style={{ width: 7, height: 7, borderRadius: 99, background: s.rail, flex: "0 0 auto" }} />
+        </div>
+        {chipRow("Direction", <span style={val}>{o.side || "Long"}</span>)}
         {chipRow("Status", (
           <span style={{
-            display: "inline-block", fontSize: "0.575rem", fontWeight: 800, letterSpacing: "0.05em",
-            textTransform: "uppercase", padding: "4px 10px", borderRadius: 980,
-            color: s.fg, background: s.bg, border: `1px solid ${s.bd}`, whiteSpace: "nowrap",
+            display: "inline-block", fontFamily: LT_GEIST, fontSize: "0.66rem", fontWeight: 700, letterSpacing: "0.04em",
+            textTransform: "uppercase", color: s.fg, whiteSpace: "nowrap",
           }}>{o.status}</span>
         ))}
         {chipRow("Position size", (
           <span style={{ ...val, color: C.goldBright }}>
             {o.sizePct == null ? "—" : o.sizePct.toFixed(1) + "%"}
-            <span style={{ fontSize: "0.62rem", fontWeight: 700, color: "rgba(255,255,255,0.42)" }}>&nbsp;of account</span>
+            <span style={{ fontFamily: LT_GEIST, fontSize: "0.66rem", fontWeight: 500, color: "rgba(255,255,255,0.42)" }}>&nbsp;of account</span>
           </span>
         ))}
         {chipRow("Since entry", <span style={val}>{o.daysHeld == null ? "—" : "Day " + o.daysHeld}</span>)}
@@ -13578,7 +13588,8 @@ function LiveTradesFab({ C, font, isMobile }) {
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${C.gold}, ${C.goldBright}, ${C.gold}, transparent)`, opacity: 0.85 }} />
 
             <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", paddingBottom: 11, borderBottom: `1px solid ${C.border}`, marginBottom: 14 }}>
-              <span style={{ fontSize: "0.86rem", fontWeight: 800, letterSpacing: "-0.02em", color: "rgba(255,255,255,0.95)" }}>Live Trades</span>
+              <span className="vivlt-live" style={{ width: 8, height: 8, borderRadius: 99, background: "#22c55e", display: "inline-block", flex: "0 0 auto" }} />
+              <span style={{ fontFamily: "'Geist','Plus Jakarta Sans',sans-serif", fontSize: "0.9rem", fontWeight: 700, letterSpacing: "-0.02em", color: "rgba(255,255,255,0.95)" }}>Live Trades</span>
               {state === "ready" && <span style={{ fontSize: "0.6rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{rows.length} open</span>}
               {state === "ready" && <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>as of {data.asof} {wlWkd(data.asof)}</span>}
               <button
@@ -14460,8 +14471,10 @@ function AppInner() {
   // Interface style: "classic" (VIV Classic, the default) · "zella" (Zella Clean) · "geist" (Book
   // — Classic's colours with the Model Book's Geist type). Persisted per browser; revert = one click.
   const UI_THEMES = ["zella", "geist"];
+  // Default = "geist" (Book) since 2026-08-06 — Valen: the whole webapp reads in the Model
+  // Book's type. A member who explicitly saved "classic" or "zella" keeps their choice.
   const [uiTheme, setUiThemeState] = useState(() => {
-    try { const v = localStorage.getItem("viv-ui-theme"); return UI_THEMES.includes(v) ? v : "classic"; } catch { return "classic"; }
+    try { const v = localStorage.getItem("viv-ui-theme"); if (UI_THEMES.includes(v)) return v; return v === "classic" ? "classic" : "geist"; } catch { return "geist"; }
   });
   const setUiTheme = useCallback((t) => {
     const next = UI_THEMES.includes(t) ? t : "classic";
