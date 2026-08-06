@@ -13504,18 +13504,32 @@ function LiveTradesFab({ C, font, isMobile }) {
     </div>
   );
 
+  {/* Accordion list (Valen 2026-08-06: "make it a list, click the ticker to expand — cleaner").
+      Collapsed = ticker · status dot · size%. One open at a time. Sorted earliest entry first,
+      always — no sort UI at this list size (his "too much info" note). */}
   const card = (o, i) => {
     const s = LT_STATUS[o.status] || LT_STATUS["At Risk"];
+    const isOpen = openTk === o.tk;
     return (
-      <div key={o.tk} style={{
-        padding: "14px 2px 8px",
-        borderTop: i === 0 ? "none" : `1px solid ${C.border}`,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-          <span style={{ fontFamily: LT_GEIST, fontSize: phone ? "1.05rem" : "1.12rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#fff", lineHeight: 1 }}>{o.tk}</span>
+      <div key={o.tk} style={{ borderTop: i === 0 ? "none" : `1px solid ${C.border}` }}>
+        <button
+          type="button"
+          onClick={() => setOpenTk(isOpen ? null : o.tk)}
+          aria-expanded={isOpen}
+          style={{
+            display: "flex", alignItems: "center", gap: 10, width: "100%",
+            padding: "13px 2px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
+          }}
+        >
+          <span style={{ fontFamily: LT_GEIST, fontSize: phone ? "1rem" : "1.06rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#fff", lineHeight: 1 }}>{o.tk}</span>
           <span style={{ width: 7, height: 7, borderRadius: 99, background: s.rail, flex: "0 0 auto" }} />
-        </div>
-        {chipRow("Direction", <span style={val}>{o.side || "Long"}</span>)}
+          <span style={{ marginLeft: "auto", fontFamily: LT_MONO, fontSize: "0.76rem", fontWeight: 600, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>
+            {o.sizePct == null ? "—" : o.sizePct.toFixed(1) + "%"}
+          </span>
+          <span style={{ fontFamily: LT_GEIST, fontSize: "0.62rem", fontWeight: 600, color: "rgba(255,255,255,0.4)", transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .18s" }}>▾</span>
+        </button>
+        {isOpen && <div style={{ padding: "0 2px 12px" }}>
+        {/* Direction row removed — the Longs/Shorts section header already carries it. */}
         {chipRow("Status", (
           <span style={{
             display: "inline-block", fontFamily: LT_GEIST, fontSize: "0.66rem", fontWeight: 700, letterSpacing: "0.04em",
@@ -13546,9 +13560,23 @@ function LiveTradesFab({ C, font, isMobile }) {
           );
         })())}
         {chipRow("Since entry", <span style={val}>{o.daysHeld == null ? "—" : "Day " + o.daysHeld}</span>)}
+        </div>}
       </div>
     );
   };
+
+  // Earliest entry first (campaign order), then Longs before Shorts as separate sections —
+  // the Shorts header only renders when a short actually exists.
+  const [openTk, setOpenTk] = useState(null);
+  const sortedRows = [...rows].sort((a, b) => String(a.entryDate || "").localeCompare(String(b.entryDate || "")));
+  const longRows = sortedRows.filter((o) => (o.side || "Long") !== "Short");
+  const shortRows = sortedRows.filter((o) => (o.side || "Long") === "Short");
+  const secHead = (label) => (
+    <div style={{
+      fontFamily: LT_GEIST, fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.12em",
+      textTransform: "uppercase", color: C.gold, padding: "12px 2px 4px",
+    }}>{label}</div>
+  );
 
   return createPortal(
     <>
@@ -13620,7 +13648,12 @@ function LiveTradesFab({ C, font, isMobile }) {
             {state === "error" && <div style={{ ...foot, textAlign: "center", padding: "18px 0" }}>The live book is not available right now.</div>}
             {state === "ready" && (rows.length === 0
               ? <div style={{ ...foot, padding: "6px 2px 4px" }}>No open positions right now — flat is a position too.</div>
-              : rows.map(card))}
+              : <>
+                  {longRows.length > 0 && secHead("Longs")}
+                  {longRows.map(card)}
+                  {shortRows.length > 0 && secHead("Shorts")}
+                  {shortRows.map(card)}
+                </>)}
           </div>
         </div>
       )}
