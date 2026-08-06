@@ -224,6 +224,11 @@ body{font-family:var(--font);}
    transition on EVERY element — thousands of simultaneous tweens = the laggy switch Valen felt
    (2026-08-06). Only the page background eases now; everything else snaps with the repaint. ── */
 body.theme-anim{ transition:background-color var(--t-fast) var(--ease) !important; }
+/* ── Font smoothing: light-on-dark text "blooms" on macOS (bright strokes bleed into the dark
+   ground → thin text reads blurry). Grayscale antialiasing tightens it on dark; light keeps the
+   browser default, which is already crisp for dark-on-light. ── */
+body{ -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+body.theme-light{ -webkit-font-smoothing:auto; -moz-osx-font-smoothing:auto; }
 
 /* ══════════ SECTION SEGMENTATION — Robinhood's grammar (owner directive, 2026-08-06) ══════════
    SPACE FIRST · ONE LINE SECOND · BOXES LAST. A section is separated by whitespace on the 4px
