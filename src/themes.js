@@ -7,6 +7,15 @@
 // ─────────────────────────────────────────────────────────────
 
 export const THEME_SNAPSHOTS = {
+  // 2026-08-06 — his Thu-early-MYT drop; data = the US Wed 08-05 session (captured intraday,
+  // all four panels fresh). day = Since Open (Wednesday intraday, ex-gap). PRECIOUS-METALS
+  // TAKEOVER: Gold/Silver Miners own #1-#2 on BOTH boards; last week's growth leaders rest red
+  // on the day but hold their 1W ranks (Software #3, Robotics #4, Quantum #5).
+  "2026-08-06": {
+    week: [["Silver Miners", 13.22], ["Gold Miners", 12.76], ["Software", 10.38], ["Robotics", 9.77], ["Quantum", 9.61], ["Genomics", 9.04], ["AI", 8.94], ["Cybersecurity", 8.46], ["Semiconductors", 7.57], ["Steel", 5.35], ["Airlines", 5.24], ["Telecom", 4.73], ["China Internet", 4.50], ["Solar", 4.42], ["Oil & Gas", 3.69], ["Aerospace", 2.98], ["Growth Stocks", 2.17], ["Industrials", 2.12], ["Bitcoin Miners", 2.09], ["Medical", 1.95], ["Bitcoin", 1.66], ["Social Media", 1.52], ["Banks", 1.00], ["Biotechnology", 0.67], ["Materials", 0.57], ["Home Construction", 0.55], ["Retail", -0.11], ["Transports", -0.23], ["HealthCare", -1.50], ["Real Estate", -1.76], ["Utilities", -4.09]],
+    month: [["Gold Miners", 13.80], ["Silver Miners", 13.17], ["Steel", 13.02], ["Software", 9.55], ["China Internet", 8.07], ["Retail", 6.30], ["Banks", 5.65], ["Airlines", 5.47], ["Cybersecurity", 5.33], ["Aerospace", 5.28], ["Home Construction", 5.18], ["Materials", 4.94], ["Medical", 4.80], ["Bitcoin", 4.29], ["Robotics", 3.64], ["Industrials", 3.29], ["Real Estate", 2.38], ["Oil & Gas", 1.91], ["Social Media", 1.19], ["HealthCare", 0.70], ["Telecom", 0.31], ["Transports", 0.21], ["AI", -0.34], ["Genomics", -1.50], ["Quantum", -1.63], ["Biotechnology", -2.31], ["Utilities", -3.75], ["Semiconductors", -3.93], ["Growth Stocks", -4.67], ["Solar", -5.30], ["Bitcoin Miners", -8.89]],
+    day: [["Gold Miners", 1.80], ["Home Construction", 1.37], ["Silver Miners", 1.36], ["Bitcoin", 1.21], ["Genomics", 1.03], ["Steel", 0.93], ["HealthCare", 0.38], ["Aerospace", 0.11], ["Materials", 0.10], ["Airlines", 0.00], ["Biotechnology", -0.04], ["Industrials", -0.12], ["Real Estate", -0.18], ["Banks", -0.59], ["Growth Stocks", -0.65], ["Transports", -0.77], ["Semiconductors", -0.82], ["Medical", -0.87], ["Utilities", -1.00], ["AI", -1.17], ["Robotics", -1.21], ["China Internet", -1.25], ["Retail", -1.44], ["Cybersecurity", -1.50], ["Solar", -1.63], ["Quantum", -1.65], ["Social Media", -1.73], ["Software", -1.97], ["Telecom", -2.31], ["Oil & Gas", -2.36], ["Bitcoin Miners", -4.78]],
+  },
   // 2026-08-05 — his Wed-AM-MYT drop; data = the US Tue 08-04 close (all four panels fresh).
   // day = Since Open (Tuesday's intraday move, ex-gap). Follow-through session: Software runaway
   // 1W #1 (+16.07), Quantum + Robotics enter the 1W top-5, Semis led the day (+5.51) as the
