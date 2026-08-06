@@ -147,6 +147,7 @@ const THEME_TOKENS = `:root{
     --w14:rgba(255,255,255,0.14); --w22:rgba(255,255,255,0.22); --w35:rgba(255,255,255,0.35);
     --w55:rgba(255,255,255,0.55); --w82:rgba(255,255,255,0.82); --wHover:rgba(255,255,255,0.03);
     --rule2:rgba(255,255,255,0.10); --ruleMax:rgba(255,255,255,0.15); --ruleOpaque:#30363a;
+    --fillGreen:rgba(0,200,5,0.40); --fillRed:rgba(255,80,0,0.36);
     --scrim:rgba(0,0,0,0.58); --lightbox:rgba(0,0,0,0.86); --recess:rgba(0,0,0,0.32);
     --shadow:none; --shadowLg:none;
     /* Elevation that must exist in BOTH themes (drawers, popovers, tooltips): dark separates
@@ -178,6 +179,7 @@ body.theme-light{
     --w14:rgba(0,0,0,0.11); --w22:rgba(0,0,0,0.17); --w35:rgba(0,0,0,0.30);
     --w55:rgba(0,0,0,0.50); --w82:rgba(0,0,0,0.78); --wHover:rgba(0,0,0,0.03);
     --rule2:rgba(0,0,0,0.10); --ruleMax:rgba(0,0,0,0.12); --ruleOpaque:#e2e5e5;
+    --fillGreen:rgba(0,200,5,0.20); --fillRed:rgba(255,80,0,0.18);
     --scrim:rgba(0,0,0,0.42); --lightbox:rgba(0,0,0,0.82); --recess:rgba(0,0,0,0.035);
     --shadow:0 1px 2px rgba(11,13,14,0.06); --shadowLg:0 10px 32px rgba(11,13,14,0.12);
     --shadowOv:0 8px 30px rgba(11,13,14,0.12);
@@ -12575,8 +12577,8 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 >
                   <svg className="herospark" viewBox="0 0 320 56" preserveAspectRatio="none" role="img" aria-label="Realized equity trend">
                     <defs><linearGradient id="heroSparkG" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={heroSpark.up ? "rgba(0,200,5,0.22)" : "rgba(255,80,0,0.20)"} />
-                      <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+                      <stop offset="0%" style={{ stopColor: heroSpark.up ? "var(--fillGreen)" : "var(--fillRed)" }} />
+                      <stop offset="100%" stopOpacity="0" style={{ stopColor: heroSpark.up ? "var(--fillGreen)" : "var(--fillRed)" }} />
                     </linearGradient></defs>
                     <path d={heroArea} fill="url(#heroSparkG)" />
                     <path d={heroLine} fill="none" stroke={heroSpark.up ? "var(--green)" : "var(--red)"} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
