@@ -525,7 +525,7 @@ ${s} .tick{font-weight:600; font-size:0.875rem; letter-spacing:-0.01em;}
 
 /* ── Inputs ── */
 ${s} input,${s} select,${s} textarea{font-family:var(--font); letter-spacing:0;}
-${s} select{background-color:var(--sheet); color:var(--text);}
+${s} select{background-color:var(--sheet) !important; color:var(--text) !important;}
 ${s} .capinput,${s} .numfield,${s} .mgin,${s} .mgsel,${s} .mgta{border-radius:10px; font-weight:500;
   border-color:var(--hair);}
 ${s} .numfield,${s} .mgin,${s} .capinput{font-family:var(--font); font-variant-numeric:tabular-nums;}
