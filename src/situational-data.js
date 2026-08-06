@@ -17,38 +17,39 @@
 //
 // Voice: plain, short, punchy (skill `plain-voice`). Describe what the lenses show — never instruct.
 export const SITUATIONAL = {
-  asof: "2026-08-04",     // the market close this read describes (matches the lens data)
-  updated: "2026-08-05",  // when it was written (Valen's clock)
+  asof: "2026-08-05",     // the market close this read describes (matches the lens data)
+  updated: "2026-08-06",  // when it was written (Valen's clock)
 
   // "RISK ON" | "NEUTRAL" | "RISK OFF" — rendered as the coloured chip that closes the verdict.
-  // 08-04 basis: the 08-03 card said "one more strong follow-through day converts this" — it came.
-  // 718 up-4% vs 114 down, the MONTH pair flipped green (112 vs 109) joining the quarter pair
-  // (1,495 vs 1,055), both buy/sell ratios rising (r5 1.81 · r10 1.23). Both horizons now agree.
+  // 08-05 basis: both switches STILL green and wider on the month (144 vs 125, quarter 1,445 vs
+  // 1,080), r5 2.73 / r10 1.28 both rising. The session itself was a rest day (257 up-4% vs 202
+  // down) with money hiding in metals. One watch-line: 20 stocks up 50%/month = the froth
+  // threshold exactly (≥20 = documented red zone).
   stance: "RISK ON",
 
-  headline: "The follow-through day came: 718 stocks up 4%+ against 114 down, and the month switch flipped green to join the quarter. Both breadth horizons now agree for the first time since the correction began.",
+  headline: "Both breadth switches stay green — the market rested for a day and rotated into gold and silver miners while last week's leaders caught their breath. First froth reading: 20 stocks are up 50%+ in a month, right at the warning line.",
 
   weather: `<ul>
-    <li><b>718 stocks up 4%+ vs 114 down</b> — a second, bigger buying day right after Monday's 573/74.</li>
-    <li><b>The month switch flipped GREEN:</b> 112 stocks up 25% this month vs 109 down (it was 79 vs 162 two sessions ago).</li>
-    <li>The quarter switch widened: <b>1,495 up vs 1,055 down</b>.</li>
-    <li>Buy/sell ratios strengthening: 5-day <b>1.81</b>, 10-day <b>1.23</b>.</li>
-    <li>Not frothy yet: only 19 stocks up 50% in a month (red zone starts at 20) and T2108 at 55 — mid-range, room to run.</li>
+    <li><b>A rest day, not a sell day:</b> 257 stocks up 4%+ vs 202 down — mild, two-way tape after Tuesday's 718/114 surge.</li>
+    <li><b>Both switches green and wider:</b> month 144 up-25% vs 125 down (from 112/109), quarter 1,445 vs 1,080.</li>
+    <li>Buy/sell ratios still climbing: 5-day <b>2.73</b> (deep green territory), 10-day <b>1.28</b>.</li>
+    <li><b>First froth flag: 20 stocks up 50% in a month</b> — exactly the level where the gauge turns red. Worth respect, not panic.</li>
+    <li>T2108 at 54 — mid-range, neither stretched nor washed out.</li>
   </ul>`,
 
   shop: `<ul>
-    <li><b>Software is the runaway weekly leader: +16.1%</b> — and its earnings gaps are HOLDING, which this market had refused to do for months.</li>
-    <li>The beaten growth complex led the session — <b>Semiconductors +5.5% on the day</b>, Quantum +4.9, AI +4.2, Cybersecurity +4.1 — the worst monthly groups bounced hardest.</li>
-    <li>Fresh money on the week: <b>Quantum +9.7 and Robotics +9.6 entered the weekly top-5</b>, alongside Software, Airlines (+11.0) and China Internet (+9.9).</li>
-    <li>Intraday demand was real: Software +3.8 and Cybersecurity +3.6 <b>since the open</b> — buying all day, not a gap.</li>
-    <li>Month board still shows the repair job: Semis −4.8, Solar −7.4, Growth −8.1 on the month — bounces becoming trends, not yet leaders.</li>
+    <li><b>Gold and silver miners took over the whole board</b> — +7.4% and +6.6% on the day, now #1 and #2 on BOTH the weekly and monthly theme boards.</li>
+    <li>Last week's growth leaders rested red (Software −0.7, AI −1.2, Quantum −1.9 on the day) but <b>kept their weekly ranks</b> — one down day after a vertical week is normal digestion.</li>
+    <li>Semiconductors' weekly repair held (+7.6 on the week) while the month is still broken (−3.9) — bounce, not yet a leader.</li>
+    <li>Steel quietly jumped to #3 on the month (+13.0) — the metals bid is broader than just gold.</li>
+    <li>Bitcoin Miners stay the worst board: −4.8 on the day, −8.9 on the month.</li>
   </ul>`,
 
   flip: `<ul>
+    <li>The froth gauge printing clearly above 20 stocks up-50%/month = the documented overheat signal — trims come before it, not after.</li>
     <li>The 5-day buy/sell ratio slipping back under 1 would mean the thrust failed.</li>
-    <li>The month pair is barely green (112 vs 109) — one heavy selling day re-reds it.</li>
     <li>A 300+ down-4% day = the documented selling extreme; that word overrides everything.</li>
-    <li>Watch whether this week's big earnings gaps keep holding — leaders failing their gaps was the old market's tell.</li>
+    <li>If the resting growth leaders keep bleeding while only metals rise, that is rotation OUT of risk — not digestion.</li>
   </ul>`,
 
   // Optional free-form commentary block — usually Valen's own words via the in-app editor.

@@ -67,6 +67,25 @@ export const THEME_GROUPS = {
 
 // Theme name → group ETF ticker, or null when the theme has no defensible group.
 // Case/whitespace tolerant; unknown or empty theme → null (the card renders "—").
+// ── Per-ticker group OVERRIDES (2026-08-06, ETF-holdings audit) ────────────────
+// Resolution by FUND MEMBERSHIP — each entry verified against the issuer's own published
+// holdings list (sources in scratchpad/group-holdings-map.md, weights as of the audit).
+// Consulted when the theme→group path yields nothing; a fund holding is a checkable fact,
+// not a categorisation. Multi-holder judgment calls (GOOGL/GGLL, ANET) are NOT here —
+// they await Valen's pick.
+export const TICKER_GROUPS = {
+  WDC:  "ARTY", // iShares AI ETF holds WDC 2.63%
+  ORKA: "XBI",  // SPDR Biotech holds ORKA 1.51%
+  SAIL: "BUG",  // Global X Cybersecurity holds SAIL 4.64%
+  LLY:  "PPH",  // VanEck Pharmaceutical — LLY is its #1 holding, 19.71%
+  PTRN: "XRT",  // SPDR Retail holds Pattern Group 0.97% (NB: PTRN = Pattern Group, NOT Patterson)
+  GRPN: "XRT",  // SPDR Retail holds GRPN 1.93%
+  PSNL: "ARKG", // ARK Genomic Revolution holds PSNL 5.48%
+  NTAP: "CIBR", // First Trust Cybersecurity holds NTAP 1.98% (odd fit, but it is the fund's own list)
+  HNGE: "XHS",  // SPDR Health Care Services holds Hinge Health 2.09%
+  TGTX: "XBI",  // SPDR Biotech holds TGTX 1.03%
+};
+
 export function groupForTheme(themeName) {
   if (!themeName) return null;
   const key = String(themeName).trim();

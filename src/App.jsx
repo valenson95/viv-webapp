@@ -9,7 +9,7 @@ import TradeReplayChart from "./TradeReplayChart.jsx";
 import { sectorFor, useSectors, setSectorOverrides } from "./sectors.js";
 import { themeFit, themeRanks, consistentTop, top5, latestSnapshot, THEME_COVERAGE_START } from "./themes.js";
 import { WATCHLIST } from "./watchlist-data.js";
-import { groupForTheme } from "./themeGroups.js";
+import { groupForTheme, TICKER_GROUPS } from "./themeGroups.js";
 import { GROUP_RS } from "./groupRS-data.js";
 import { WATCHLIST_RS } from "./watchlistRS-data.js";
 import { EARNINGS } from "./earnings-data.js";
@@ -774,6 +774,16 @@ function PlaybookTracker({ trades, uid, setPage }) {
 }
 
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "August 6, 2026",
+    title: "Live Trades — follow the real book",
+    items: [
+      "There's a new Live Trades button on every page, sitting just above the Feedback button. Tap it and the real positions open right there, over whatever you were looking at.",
+      "Every position shows four things: the direction it was taken in, how protected it is right now — At Risk, Risk-Free or Profit Locked — how big it is as a share of the account, and how many days it has been held.",
+      "It reads the real book, live. Tap the background to close it.",
+    ],
+  },
   {
     tag: "New",
     date: "August 5, 2026",
@@ -9998,7 +10008,9 @@ function WatchlistCard({ C, font, session }) {
       // rank that theme at all — grey "untracked", never a made-up number.
       const ranks = theme && snapDate ? themeRanks(theme, snapDate) : null;
       const rank = ranks && ranks.week != null ? ranks.week : null;
-      const grp = (theme ? groupForTheme(theme) : null) || null;
+      {/* Theme→group first; per-ticker FUND-MEMBERSHIP override fills the gaps (TICKER_GROUPS,
+          each entry verified against the issuer's own holdings list — 2026-08-06 audit). */}
+      const grp = (theme ? groupForTheme(theme) : null) || TICKER_GROUPS[tk] || null;
       const grow = grp ? WATCHLIST_GROUP_ROWS[grp] : null;
       const srow = WATCHLIST_STOCK_ROWS[tk] || null;
       const sched = (WATCHLIST_EARNINGS[tk] || []).find(([d]) => d >= today);
@@ -11894,7 +11906,8 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                     <button className={showPro ? "on" : ""} onClick={() => setTableView("pro")}>Pro</button>
                   </div>
                 </div>
-                <div className="allocstrip moballoc">
+                {/* Risk budget hides fully under the privacy eye (Valen 2026-08-06) — dollar-of-NLV surface. */}
+                {!privacyOn && <div className="allocstrip moballoc">
                   <button type="button" className="allocsum" onClick={() => setAllocOpen(o => !o)} aria-expanded={allocOpen}>
                     <span className="allocsumpct" style={{ color: over ? "var(--red)" : allocPct >= 70 ? "var(--goldBright)" : "var(--text)" }}>{Math.round(allocPct)}%</span>
                     <span className="allocsumlbl">risk used</span>
@@ -11911,7 +11924,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                       <span className="allocnote">{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</span>
                     </div>
                   )}
-                </div>
+                </div>}
               </>
             ) : (
               <>
@@ -11931,7 +11944,8 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               </div>
               <button className="btn ghost posRefreshBtn" onClick={fetchLivePrices} disabled={priceLoading} title="Pull the latest market prices for every open position">{priceLoading ? "Refreshing…" : "Refresh Prices"}</button>
             </div>
-            <div className="allocstrip">
+            {/* Risk budget hides fully under the privacy eye (Valen 2026-08-06) — dollar-of-NLV surface. */}
+            {!privacyOn && <div className="allocstrip">
               {/* Energy-bar gauge (Valen 2026-08-05 — replaced the 54px donut, unreadable at strip size).
                   Guided's full Risk Allocation card keeps its 112px donut. */}
               <div className="term" data-tip={over ? "You're over your risk budget — the bar is maxed and red." : "How much of your total risk budget is deployed across your open stops right now. Fills up as you add risk; empties as stops move to breakeven."} style={{ display: "flex", flexDirection: "column", gap: 4, width: 150, flex: "none", cursor: "help", borderBottom: "none" }}>
@@ -11949,7 +11963,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
               <Tip className="leg" tip="Positions whose stop is at or above breakeven — a pullback can't turn these into a loss."><span className="legdot free"></span>Risk-Free&nbsp;<b>{budget.freeCount}</b></Tip>
               <Tip className="leg" tip="Total dollars across all open positions (the sum of the Position size column) — your gross exposure, with its % of account."><span className="legdot" style={{ background: "var(--goldBright)" }}></span>Exposure&nbsp;<b>{usd0(totalExposure)}</b>{compEquity > 0 && <span style={{ color: "var(--muted)", fontWeight: 600 }}>&nbsp;· {((totalExposure / compEquity) * 100).toFixed(1)}%</span>}</Tip>
               <span className="allocnote" style={{ marginLeft: "auto" }}>{over ? `Over budget by ${usd0(-rawAvail)}` : `${usd0(budget.deployedRisk)} of ${usd0(budget.totalBudget)} budget deployed`}</span>
-            </div>
+            </div>}
               </>
             )}
             <div className="pos-scroll">
@@ -13387,6 +13401,176 @@ function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
     </div>
   );
 }
+
+// ═══════════ LIVE TRADES — start (self-contained block; the screenshot harness slices it) ═══════════
+// A floating button in the shape of the Feedback launcher. Tapping it opens the REAL open book as
+// an overlay: one card per position carrying the ticker, the direction, how protected it is, how
+// big it is as a share of the account, and how long it has been held. Nothing else — no entry
+// price, no stop, no target zone (Valen 2026-08-06: "I don't need the full calendar list … just
+// the alert feed", with exactly these five fields).
+//
+// Data comes from /api/live-trades, which is read-only and strips share counts and dollar figures
+// server-side. That endpoint still returns the closed trades and the weekly record; this overlay
+// simply doesn't read them — they stay in the payload for the fuller version later.
+//
+// Module scope, NEVER nested inside another component: a nested component is a new function
+// identity on every parent render, so React unmounts and remounts it and the fetched data is lost.
+
+const LT_STATUS = {
+  "At Risk":       { fg: "#fca5a5", bg: "rgba(239,68,68,0.10)",  bd: "rgba(239,68,68,0.30)",  rail: "rgba(252,165,165,0.85)" },
+  "Risk-Free":     { fg: "#f0c050", bg: "rgba(201,152,42,0.13)", bd: "rgba(201,152,42,0.38)", rail: "rgba(240,192,80,0.90)" },
+  "Profit Locked": { fg: "#86efac", bg: "rgba(34,197,94,0.11)",  bd: "rgba(34,197,94,0.32)",  rail: "rgba(134,239,172,0.85)" },
+};
+const LT_HAIR = "rgba(255,255,255,0.065)";
+// Viewport width, local to this block so the overlay carries no outside dependency.
+function useLtNarrow() {
+  const [w, setW] = useState(() => (typeof window === "undefined" ? 1200 : window.innerWidth));
+  useEffect(() => {
+    const on = () => setW(window.innerWidth);
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  return w < 768;
+}
+
+function LiveTradesFab({ C, font, isMobile }) {
+  const narrow = useLtNarrow();
+  const phone = isMobile == null ? narrow : !!isMobile;
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [state, setState] = useState("idle"); // idle | loading | ready | error
+  const pulled = useRef(false);
+
+  // Pulled the first time the overlay is opened, once. A member who never taps it costs the
+  // endpoint nothing, and re-opening reuses what was already fetched.
+  useEffect(() => {
+    if (!open || pulled.current) return;
+    pulled.current = true;
+    setState("loading");
+    (async () => {
+      try {
+        const r = await fetch("/api/live-trades");
+        if (!r.ok) throw new Error("bad status");
+        const j = await r.json();
+        if (!j || j.error) { setState("error"); return; }
+        setData(j);
+        setState("ready");
+      } catch { setState("error"); }
+    })();
+  }, [open]);
+
+  const rows = data && Array.isArray(data.open) ? data.open : [];
+
+  {/* Compact register (Valen 2026-08-06: "slightly smaller and more compact") */}
+  const muted = { fontSize: "0.62rem", fontWeight: 600, color: C.muted, whiteSpace: "nowrap" };
+  const val = { fontSize: phone ? "0.75rem" : "0.78rem", fontWeight: 800, color: "#fff", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" };
+  const foot = { fontSize: "0.66rem", fontWeight: 500, color: "rgba(255,255,255,0.50)", lineHeight: 1.65 };
+  const chipRow = (label, value, first) => (
+    <div key={label} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "6px 0", borderTop: first ? "none" : `1px solid ${LT_HAIR}` }}>
+      <span style={muted}>{label}</span>
+      <span style={{ marginLeft: "auto", textAlign: "right" }}>{value}</span>
+    </div>
+  );
+
+  const card = (o) => {
+    const s = LT_STATUS[o.status] || LT_STATUS["At Risk"];
+    return (
+      <div key={o.tk} style={{
+        position: "relative", overflow: "hidden", marginBottom: 8,
+        background: "rgba(255,255,255,0.042)", border: `1px solid ${C.border}`, borderRadius: 14,
+        padding: phone ? "11px 12px 9px" : "12px 15px 10px",
+      }}>
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: `linear-gradient(180deg, ${s.rail}, rgba(255,255,255,0.06))` }} />
+        <div style={{ fontSize: phone ? "1.12rem" : "1.22rem", fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", lineHeight: 1, marginBottom: 8 }}>{o.tk}</div>
+        {chipRow("Direction", <span style={val}>{o.side || "Long"}</span>, true)}
+        {chipRow("Status", (
+          <span style={{
+            display: "inline-block", fontSize: "0.575rem", fontWeight: 800, letterSpacing: "0.05em",
+            textTransform: "uppercase", padding: "4px 10px", borderRadius: 980,
+            color: s.fg, background: s.bg, border: `1px solid ${s.bd}`, whiteSpace: "nowrap",
+          }}>{o.status}</span>
+        ))}
+        {chipRow("Position size", (
+          <span style={{ ...val, color: C.goldBright }}>
+            {o.sizePct == null ? "—" : o.sizePct.toFixed(1) + "%"}
+            <span style={{ fontSize: "0.62rem", fontWeight: 700, color: "rgba(255,255,255,0.42)" }}>&nbsp;of account</span>
+          </span>
+        ))}
+        {chipRow("Since entry", <span style={val}>{o.daysHeld == null ? "—" : "Day " + o.daysHeld}</span>)}
+      </div>
+    );
+  };
+
+  return createPortal(
+    <>
+      {/* Floating launcher — the Feedback button's shape, stacked directly above it so the two
+          never overlap, and gold-tinted GLASS rather than solid gold so they read as different. */}
+      <button
+        onClick={() => setOpen(true)}
+        title="Live Trades"
+        style={{
+          position: "fixed", right: phone ? 16 : 24, bottom: phone ? 134 : 80, zIndex: 1050,
+          display: "inline-flex", alignItems: "center", gap: 9,
+          background: "rgba(201,152,42,0.14)", color: C.goldBright,
+          border: `1px solid ${C.borderGold}`, fontFamily: font, fontWeight: 800, fontSize: "0.76rem",
+          padding: "10px 16px", borderRadius: 99, cursor: "pointer", letterSpacing: "-0.01em",
+          backdropFilter: "blur(20px) saturate(150%)", WebkitBackdropFilter: "blur(20px) saturate(150%)",
+          boxShadow: "0 12px 30px rgba(0,0,0,0.45)",
+        }}
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={C.goldBright} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 7-8" /><path d="M14 7h6v6" /></svg>
+        Live Trades
+      </button>
+
+      {!open ? null : (
+        // Backdrop click closes. z 1100 sits above the page and both launchers, and below the
+        // drawer / detail / modal layers (1200-1400) so nothing this opens can trap them.
+        <div
+          onClick={() => setOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 1100, fontFamily: font, overflowY: "auto",
+            background: "radial-gradient(1000px 600px at 70% -10%, rgba(201,152,42,0.09), transparent 60%), rgba(3,3,6,0.82)",
+            backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+            display: "flex", justifyContent: "center", alignItems: "flex-start",
+            padding: phone ? "18px 12px 40px" : "48px 16px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(440px, 100%)", position: "relative", borderRadius: 18, overflow: "hidden",
+              background: "linear-gradient(180deg, rgba(18,18,26,0.97), rgba(8,8,14,0.99))",
+              border: `1px solid ${C.borderGold}`, boxShadow: "0 30px 80px rgba(0,0,0,0.6)",
+              backdropFilter: "blur(30px) saturate(160%)", WebkitBackdropFilter: "blur(30px) saturate(160%)",
+              padding: phone ? "14px 13px 12px" : "16px 17px 14px",
+            }}
+          >
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${C.gold}, ${C.goldBright}, ${C.gold}, transparent)`, opacity: 0.85 }} />
+
+            <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", paddingBottom: 11, borderBottom: `1px solid ${C.border}`, marginBottom: 14 }}>
+              <span style={{ fontSize: "0.86rem", fontWeight: 800, letterSpacing: "-0.02em", color: "rgba(255,255,255,0.95)" }}>Live Trades</span>
+              {state === "ready" && <span style={{ fontSize: "0.6rem", fontWeight: 800, color: C.goldBright, background: C.goldDim, borderRadius: 980, padding: "4px 10px", fontVariantNumeric: "tabular-nums" }}>{rows.length} open</span>}
+              {state === "ready" && <span style={{ marginLeft: "auto", fontSize: "0.6rem", fontWeight: 700, color: C.goldBright, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>as of {data.asof} {wlWkd(data.asof)}</span>}
+              <button
+                onClick={() => setOpen(false)}
+                title="Close"
+                style={{ marginLeft: state === "ready" ? 0 : "auto", background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, color: C.muted, width: 32, height: 32, borderRadius: 10, fontSize: "1.2rem", cursor: "pointer", lineHeight: 1, flex: "0 0 auto", fontFamily: font }}
+              >&times;</button>
+            </div>
+
+            {state === "loading" && <div style={{ ...foot, textAlign: "center", padding: "18px 0" }}>Loading the live book…</div>}
+            {state === "error" && <div style={{ ...foot, textAlign: "center", padding: "18px 0" }}>The live book is not available right now.</div>}
+            {state === "ready" && (rows.length === 0
+              ? <div style={{ ...foot, padding: "6px 2px 4px" }}>No open positions right now — flat is a position too.</div>
+              : rows.map(card))}
+          </div>
+        </div>
+      )}
+    </>,
+    document.body
+  );
+}
+// ═══════════ LIVE TRADES — end ═══════════
 
 // ── DAILY SETUPS shell — its own nav section (promoted out of Premium tools 2026-07-06) ──
 function DailySetupsShell({ setPage, session, displayName }) {
@@ -15624,6 +15808,8 @@ function AppInner() {
       <IbkrSyncModal open={ibkrOpen} onClose={() => setIbkrOpen(false)} status={ibkrStatus} data={ibkrData} error={ibkrError} result={ibkrResult} onRetry={runIbkrSync} onConfirm={confirmIbkrSync} lastSync={lastSync} onUndo={undoLastSync} undoStatus={undoStatus} />
       <IntegrityReportModal open={integrityOpen} onClose={() => setIntegrityOpen(false)} report={integrityReport} onReRun={runIntegrityCheck} running={integrityRunning} />
       <FeedbackWidget session={session} isAdmin={(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()} displayName={displayName} C={C} font={font} isMobile={isMobile} />
+      {/* Live Trades launcher — every member, every page. Portal-mounted like Feedback. */}
+      <LiveTradesFab C={C} font={font} isMobile={isMobile} />
     </>
   );
 
