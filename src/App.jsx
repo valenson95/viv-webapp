@@ -13425,10 +13425,12 @@ function ModelBookShell({ setPage, session, displayName, journaledTrades }) {
 // Module scope, NEVER nested inside another component: a nested component is a new function
 // identity on every parent render, so React unmounts and remounts it and the fetched data is lost.
 
+// Dot colours are FULL-SATURATION on purpose (Valen 2026-08-06: "striking colour, obvious
+// difference") — red at risk · gold risk-free · green profit locked, each with a matching glow.
 const LT_STATUS = {
-  "At Risk":       { fg: "#fca5a5", bg: "rgba(239,68,68,0.10)",  bd: "rgba(239,68,68,0.30)",  rail: "rgba(252,165,165,0.85)" },
-  "Risk-Free":     { fg: "#f0c050", bg: "rgba(201,152,42,0.13)", bd: "rgba(201,152,42,0.38)", rail: "rgba(240,192,80,0.90)" },
-  "Profit Locked": { fg: "#86efac", bg: "rgba(34,197,94,0.11)",  bd: "rgba(34,197,94,0.32)",  rail: "rgba(134,239,172,0.85)" },
+  "At Risk":       { fg: "#fca5a5", bg: "rgba(239,68,68,0.10)",  bd: "rgba(239,68,68,0.30)",  rail: "#f23645", glow: "rgba(242,54,69,0.55)" },
+  "Risk-Free":     { fg: "#f0c050", bg: "rgba(201,152,42,0.13)", bd: "rgba(201,152,42,0.38)", rail: "#f5b514", glow: "rgba(245,181,20,0.55)" },
+  "Profit Locked": { fg: "#86efac", bg: "rgba(34,197,94,0.11)",  bd: "rgba(34,197,94,0.32)",  rail: "#17c964", glow: "rgba(23,201,100,0.55)" },
 };
 const LT_HAIR = "rgba(255,255,255,0.065)";
 // Viewport width, local to this block so the overlay carries no outside dependency.
@@ -13522,7 +13524,7 @@ function LiveTradesFab({ C, font, isMobile }) {
           }}
         >
           <span style={{ fontFamily: LT_GEIST, fontSize: phone ? "1rem" : "1.06rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#fff", lineHeight: 1 }}>{o.tk}</span>
-          <span style={{ width: 7, height: 7, borderRadius: 99, background: s.rail, flex: "0 0 auto" }} />
+          <span style={{ width: 9, height: 9, borderRadius: 99, background: s.rail, boxShadow: `0 0 8px ${s.glow}`, flex: "0 0 auto" }} />
           <span style={{ marginLeft: "auto", fontFamily: LT_MONO, fontSize: "0.76rem", fontWeight: 600, color: C.goldBright, fontVariantNumeric: "tabular-nums" }}>
             {o.sizePct == null ? "—" : o.sizePct.toFixed(1) + "%"}
           </span>
@@ -13649,6 +13651,11 @@ function LiveTradesFab({ C, font, isMobile }) {
             {state === "ready" && (rows.length === 0
               ? <div style={{ ...foot, padding: "6px 2px 4px" }}>No open positions right now — flat is a position too.</div>
               : <>
+                  {/* Column labels (Valen 2026-08-06): the size % needs its name above it. */}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "2px 2px 6px", borderBottom: `1px solid ${C.border}` }}>
+                    <span style={{ fontFamily: LT_GEIST, fontSize: "0.56rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.42)" }}>Ticker · status</span>
+                    <span style={{ marginLeft: "auto", fontFamily: LT_GEIST, fontSize: "0.56rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.42)" }}>Position size</span>
+                  </div>
                   {longRows.length > 0 && secHead("Longs")}
                   {longRows.map(card)}
                   {shortRows.length > 0 && secHead("Shorts")}
