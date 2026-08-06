@@ -24,6 +24,7 @@ const rspMap = new Map(c.benchmarks.RSP.map(b => [b.d, b.c]));
 const byT = new Map();
 for (const r of c.raw)   if (r.bars) byT.set(r.t, r.bars);
 for (const r of c.rawPF) if (r.bars && !byT.has(r.t)) byT.set(r.t, r.bars);
+for (const r of (c.rawLad || [])) if (r.bars && !byT.has(r.t)) byT.set(r.t, r.bars); // ladder-only tickers
 
 const aligned = (bars) => bars.filter(x => rspMap.has(x.d)).map(x => x.c / rspMap.get(x.d));
 const prank = (arr, x) => { const b = arr.filter(v => v < x).length; return arr.length > 1 ? b / (arr.length - 1) * 100 : null; };

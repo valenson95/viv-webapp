@@ -317,6 +317,15 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
   const blockSortSPDR = useSortChain([]);
   const blockSorts = { "Index": blockSortIndex, "Segment": blockSortSegment, "EW Sector": blockSortEW, "SPDR Sector": blockSortSPDR };
 
+  // Style / Country / Macro ladders — one fixed hook each (never in a loop, so hook order holds).
+  // Default chain = [] → the FIXED authored order, exactly like Index/Segment: these are read by
+  // POSITION, not as a leaderboard, so they carry no rank numbers. Headers still sort on click.
+  const ladderSortStyle = useSortChain([]);
+  const ladderSortCountry = useSortChain([]);
+  const ladderSortMacro = useSortChain([]);
+  const ladderSorts = { style: ladderSortStyle, country: ladderSortCountry, macro: ladderSortMacro };
+  const NO_SORT = { chain: [], clickSort: () => {}, isDefault: true, reset: () => {} };
+
   // Liquid Leaders — its own multi-sort chain. Default = the dual-layer law: 1M RS desc → thrust
   // desc (same presentation order as the groups table; NO benchmark row on this tab).
   const LL_DEFAULT_CHAIN = [{ key: "rs1m", dir: "desc" }, { key: "thrust", dir: "desc" }];
@@ -328,6 +337,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
   const allRows = GROUP_RS?.rows || [];
   const pf = GROUP_RS?.pf; // Plan & Focus rows — may be undefined while regenerating
   const ll = GROUP_RS?.ll; // Liquid Leaders per-stock rows — may be undefined while regenerating
+  const ladders = GROUP_RS?.ladders; // Style / Country / Macro ladder blocks — may be undefined while regenerating
 
   const cmpChain = chainComparator(chain);
 
@@ -469,12 +479,16 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
         <td style={{ ...td, textAlign: "center" }}>{row.rsSpark?.length ? <RsStrip pts={row.rsSpark} /> : <span style={{ color: C.muted }}>—</span>}</td>
         <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pctIntraday) }}>{row.pctIntraday == null ? "—" : sgn(row.pctIntraday) + "%"}</td>
         <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pct1d) }}>{row.pct1d == null ? "—" : sgn(row.pct1d) + "%"}</td>
+        <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pct1w) }}>{row.pct1w == null ? "—" : sgn(row.pct1w) + "%"}</td>
         <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pct1m), position: "relative", overflow: "hidden" }}>
           {row.pct1m != null && isFinite(row.pct1m) && row.pct1m !== 0 && (
             <div style={{ position: "absolute", top: 4, bottom: 4, right: 0, width: `${(Math.min(1, Math.abs(row.pct1m) / 15) * 100).toFixed(1)}%`, background: row.pct1m > 0 ? "rgba(0,200,5,0.16)" : "rgba(255,80,0,0.16)", borderRadius: 3, pointerEvents: "none" }} />
           )}
           <span style={{ position: "relative" }}>{row.pct1m == null ? "—" : sgn(row.pct1m) + "%"}</span>
         </td>
+        <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pct3m) }}>{row.pct3m == null ? "—" : sgn(row.pct3m) + "%"}</td>
+        <td style={{ ...tdn, textAlign: "right", color: toneCol(row.pct6m) }}>{row.pct6m == null ? "—" : sgn(row.pct6m) + "%"}</td>
+        <td style={{ ...tdn, textAlign: "right", color: toneCol(row.ytd) }}>{row.ytd == null ? "—" : sgn(row.ytd) + "%"}</td>
         <td style={{ ...tdn, textAlign: "right", background: bench ? "transparent" : redHeat(off52Mag(row.off52)), color: row.off52 == null ? C.muted : row.off52 >= -0.05 ? "var(--greenFg)" : "var(--redFg)" }}>
           {row.off52 == null ? "—" : (row.off52 >= -0.05 ? "0%" : sgn(row.off52) + "%")}
         </td>
@@ -496,7 +510,12 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
       {sth("1-Month RS", "Is the group beating the market lately? Rising bars = yes.", "center")}
       {th(hChain, onSort, "% Intraday", "Today's move from the open — ignoring the overnight gap.", "pctIntraday", "right")}
       {th(hChain, onSort, "% 1-Day", "Today's change vs yesterday's close.", "pct1d", "right")}
+      {/* performance ladder — plain price change over each window, same unadjusted closes as the rest */}
+      {th(hChain, onSort, "% 1-Week", "Plain price change over the last week.", "pct1w", "right")}
       {th(hChain, onSort, "% 1-Month", "Plain price change over the last month.", "pct1m", "right")}
+      {th(hChain, onSort, "% 3-Month", "Plain price change over the last three months.", "pct3m", "right")}
+      {th(hChain, onSort, "% 6-Month", "Plain price change over the last six months.", "pct6m", "right")}
+      {th(hChain, onSort, "% YTD", "Price change since the start of this year. A dash means the fund is too young to have one.", "ytd", "right")}
       {th(hChain, onSort, "% off 52W H", "How far below its 1-year high it sits. 0% = right at highs.", "off52", "right")}
       {sth("State", "🟢 leading · 🟡 fresh surge · 😴 cooling · ⚠️ illusion · 🪤 off the floor.", "center")}
     </tr>
@@ -592,7 +611,9 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
     ["😴 Strong month, cool week", "a leader taking a breather — strong month, quiet week."],
     ["⚠️ Percentile illusion", "RS% high but the actual month is NEGATIVE."],
     ["🪤 Off the floor", "big thrust but ≥15% below its 52-week high — a bounce, not a breakout."],
-    ["Tabs", "Industry Groups (the ETF groups) · Top-Down View (the index → sector ladder) · Liquid Leaders (the same reads on individual leading stocks from a curated liquid-leader universe)."],
+    ["% ladder", "1W · 1M · 3M · 6M · YTD are plain price changes over each window. A dash means the fund hasn't traded that long yet."],
+    ["Style · Country · Macro", "three fixed ladders at the bottom of the Top-Down View. They're never ranked — read them by position: which end of each ladder is being bought."],
+    ["Tabs", "Industry Groups (the ETF groups) · Top-Down View (the index → sector ladder, then style, country and macro) · Liquid Leaders (the same reads on individual leading stocks from a curated liquid-leader universe)."],
   ];
 
   // ── Plan & Focus (only when GROUP_RS.pf is present) ────────────────────────
@@ -649,6 +670,32 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table><thead><HeadRow chain={bs.chain} onSort={bs.clickSort} showRank={b.showRank} /></thead><tbody>{b.rows.map((r, i) => <DataRow key={r.t} row={r} rank={b.showRank ? i + 1 : undefined} />)}</tbody></table>
+              </div>
+            </section>
+          );
+        })}
+
+        {/* STYLE · COUNTRY · MACRO ladders — same visual grammar as the Index/Segment ladders:
+            fixed authored order, NO rank numbers, read by position (which end of the ladder is
+            bid). Each header carries a one-line plain-English tooltip from the data file. */}
+        {(ladders || []).map(b => {
+          const bs = ladderSorts[b.key] || NO_SORT;
+          const lrows = bs.chain.length ? [...b.rows].sort(chainComparator(bs.chain)) : b.rows;
+          return (
+            <section key={b.key} className="grs-card" style={{ padding: "6px 8px" }}>
+              <SectionCamera sel=".grs-card" name={`rotation-${b.key}`} C={C} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 10px 4px" }}>
+                <span style={cardLabel}>{b.label}</span>
+                {b.tip && <InfoDot tip={b.tip} />}
+                {!bs.isDefault && (
+                  <button onClick={bs.reset} title="Restore the default order"
+                    style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.6875rem", fontWeight: 500, padding: "4px 11px", borderRadius: 999, cursor: "pointer", fontFamily: font, border: `1px solid ${C.border}`, color: C.muted, background: "var(--w03)" }}>
+                    × reset sort
+                  </button>
+                )}
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table><thead><HeadRow chain={bs.chain} onSort={bs.clickSort} /></thead><tbody>{lrows.map(r => <DataRow key={r.t} row={r} />)}</tbody></table>
               </div>
             </section>
           );
@@ -810,7 +857,7 @@ export default function GroupRS({ C, font, session, initialTab = "groups" }) {
                 <thead><HeadRow chain={chain} onSort={clickSort} showRank /></thead>
                 <tbody>
                   {view.map((row, i) => <DataRow key={row.t} row={row} rank={i + 1} />)}
-                  {!view.length && (<tr><td colSpan={12} style={{ ...td, textAlign: "center", color: C.muted, padding: 24 }}>No groups match this filter.</td></tr>)}
+                  {!view.length && (<tr><td colSpan={16} style={{ ...td, textAlign: "center", color: C.muted, padding: 24 }}>No groups match this filter.</td></tr>)}
                 </tbody>
               </table>
             </div>

@@ -101,6 +101,11 @@ const UNIVERSE = [
   ["BETZ", "Sports Betting & iGaming"],
   ["SHLD", "Defense Tech"],
   ["COPX", "Copper Miners"],
+  // 2026-08-06 theme adds — tradeable theme groups, so they JOIN the ranked table (unlike the
+  // Style/Country/Macro ladders below). Both are YOUNG funds: short history is expected, the
+  // longer-horizon % columns simply render "—" until the window exists (never 0, never NaN).
+  ["DRAM", "Memory"],
+  ["EUV", "Lithography/Photonics"],
 ];
 // Plan & Focus map — the source's SECOND artifact (jeff-sun-master-system.md §14b): four FIXED
 // blocks (Index → Segment → EW Sector → SPDR Sector), RSP pinned as the labeled benchmark row.
@@ -120,6 +125,26 @@ const PF_UNIVERSE = [
   ["XLB", "Materials", "SPDR Sector"], ["XLU", "Utilities", "SPDR Sector"], ["XLI", "Industrials", "SPDR Sector"],
   ["XLY", "Consumer Discretionary", "SPDR Sector"], ["XLK", "Technology", "SPDR Sector"],
 ];
+
+// ── LADDER BLOCKS (2026-08-06) — Style · Country · Macro. PRESENTATION LAW: exactly like the
+// Index and Segment blocks these are NON-RANKED — they stay in a FIXED order and are read by
+// POSITION (which end of the ladder is bid), never sorted into a leaderboard and never numbered.
+// They do NOT join the ranked groups table. Bars are reused from whichever cached section already
+// holds them (raw / rawPF / rawLL / benchmarks); only the genuinely new tickers live in cache.rawLad.
+// STYLE deliberately re-cuts six funds that also appear in the Segment ladder — same bars, different
+// question (growth vs value across three sizes, instead of the small→large size ladder).
+// Tooltips are member-facing plain voice — one sentence, no jargon.
+const LADDERS = [
+  { key: "style", label: "Style", tip: "Growth vs value, three sizes — which side of the market money favors.",
+    rows: [["IVW", "S&P 500 Growth"], ["IVE", "S&P 500 Value"], ["IJK", "Mid-Cap Growth"], ["IJJ", "Mid-Cap Value"], ["IJT", "Small-Cap Growth"], ["IJS", "Small-Cap Value"]] },
+  { key: "country", label: "Country", tip: "Money rotating between markets — leadership isn't only a US question.",
+    rows: [["EWY", "South Korea"], ["EWJ", "Japan"], ["INDA", "India"], ["MCHI", "China"], ["KWEB", "China Internet"], ["EWZ", "Brazil"], ["EEM", "Emerging Markets"]] },
+  // MACRO: bitcoin rides the ALREADY-CACHED spot-bitcoin fund (IBIT) — no new data source was added
+  // for it, and no crypto API is called anywhere in this script.
+  { key: "macro", label: "Macro", tip: "The risk dials: metals, bonds, dollar, oil.",
+    rows: [["GLD", "Gold"], ["SLV", "Silver"], ["TLT", "20+yr Treasuries"], ["UUP", "US Dollar"], ["USO", "Oil"], ["IBIT", "Bitcoin"]] },
+];
+const LADDER_TICKERS = [...new Set(LADDERS.flatMap(b => b.rows.map(r => r[0])))];
 
 // ── LIQUID LEADERS universe — a per-STOCK momentum lens over the SAME machinery as the
 // Industry Groups table (rs1m / thrust vs RSP, absolute % stats). Two curated liquid-leader
@@ -323,7 +348,7 @@ if (fastMode) {
   const step = (s) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
   if (utcMins < 1215) target = step(target); // before ~20:15 UTC → today's close not printed yet
   while ([0, 6].includes(new Date(target + "T12:00:00Z").getUTCDay())) target = step(target);
-  const wanted = new Set(["RSP", "SPY", ...UNIVERSE.map(u => u[0]), ...PF_UNIVERSE.map(u => u[0]), ...LL_UNIVERSE.map(u => u.t)]);
+  const wanted = new Set(["RSP", "SPY", ...UNIVERSE.map(u => u[0]), ...PF_UNIVERSE.map(u => u[0]), ...LL_UNIVERSE.map(u => u.t), ...LADDER_TICKERS]);
   const symbolsCSV = [...wanted].join(",");
   const days = [];
   for (let d = lastCached; d < target;) { d = (() => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); })(); if (![0, 6].includes(new Date(d + "T12:00:00Z").getUTCDay())) days.push(d); }
@@ -339,16 +364,27 @@ if (fastMode) {
     for (const r2 of c.raw) append(r2.t, r2.bars);
     for (const r2 of c.rawPF || []) append(r2.t, r2.bars);
     for (const r2 of c.rawLL || []) append(r2.t, r2.bars);
+    for (const r2 of c.rawLad || []) append(r2.t, r2.bars); // ladder-only tickers (Style/Country/Macro)
     console.log(`  ${d}: appended ${j.count} tickers ✓`);
   }
   c.fetched = today;
   writeFileSync(CACHE, JSON.stringify(c));
 }
 const useCache = (process.argv.includes("--from-cache") || fastMode) && existsSync(CACHE);
-let spy, spyAlt, raw, rawPF, rawLL;
+let spy, spyAlt, raw, rawPF, rawLL, rawLad;
 if (useCache) {
   const c = JSON.parse(readFileSync(CACHE, "utf8"));
-  spy = c.benchmarks[BENCH]; spyAlt = c.benchmarks[BENCH === "RSP" ? "SPY" : "RSP"]; raw = c.raw; rawPF = c.rawPF;
+  spy = c.benchmarks[BENCH]; spyAlt = c.benchmarks[BENCH === "RSP" ? "SPY" : "RSP"]; rawPF = c.rawPF;
+  // Re-cut the RANKED groups universe from the CURRENT UNIVERSE const using cached bars (same law
+  // the Liquid Leaders re-cut already followed): the ranked table is exactly UNIVERSE, so a ticker
+  // parked in the cache for another tool can never leak in as a ranked group row, and a ticker
+  // added to UNIVERSE picks up its backfilled bars on the next --from-cache run.
+  const cacheBars = new Map(c.raw.map(r => [r.t, r.bars]));
+  raw = UNIVERSE.map(([t, name]) => {
+    const b = cacheBars.get(t);
+    return b ? { t, name, bars: b } : { t, name, bars: null, err: "no data" };
+  });
+  rawLad = c.rawLad || [];
   // Re-cut the Liquid Leaders universe from the CURRENT LL_UNIVERSE using cached bars — so trimming
   // the universe (e.g. dropping the screen list) takes effect on --from-cache without re-fetching.
   const cacheLLbars = new Map((c.rawLL || []).map(r => [r.t, r.bars]));
@@ -412,7 +448,27 @@ if (useCache) {
       console.log(`FAILED (${e.message}) → row kept with nulls`);
     }
   }
-  writeFileSync(CACHE, JSON.stringify({ fetched: new Date().toISOString().slice(0, 10), benchmarks, raw, rawPF, rawLL }));
+  // Ladder-only tickers (Style/Country/Macro) that no other universe already fetched.
+  const alreadyFetched = new Map([
+    ...Object.entries(benchmarks), ...raw.map(r => [r.t, r.bars]),
+    ...rawPF.map(r => [r.t, r.bars]), ...rawLL.map(r => [r.t, r.bars]),
+  ]);
+  rawLad = [];
+  const ladTodo = LADDER_TICKERS.filter(t => !alreadyFetched.has(t));
+  for (let i = 0; i < ladTodo.length; i++) {
+    const t = ladTodo[i];
+    process.stdout.write(`[LAD ${i + 1}/${ladTodo.length}] ${t}… `);
+    await sleep(1600);
+    try {
+      const b = await bars(t);
+      rawLad.push({ t, bars: b });
+      console.log(`${b.length} bars ✓`);
+    } catch (e) {
+      rawLad.push({ t, bars: null, err: "no data" });
+      console.log(`FAILED (${e.message}) → row kept with nulls`);
+    }
+  }
+  writeFileSync(CACHE, JSON.stringify({ fetched: new Date().toISOString().slice(0, 10), benchmarks, raw, rawPF, rawLL, rawLad }));
   console.log(`raw bars cached → ${CACHE}`);
 }
 const spyByDate = new Map(spy.map(b => [b.d, b.c]));
@@ -514,16 +570,26 @@ function computeRaw(b) {
   const pctIntraday = (lastBar.c - lastBar.o) / lastBar.o * 100;     // ex-gap move of the latest session
   const pct1d = (close[last] / close[last - 1] - 1) * 100;
   const pct1m = (close[last] / close[last - 21] - 1) * 100;          // absolute 1-month, NOT relative
+  // ── MULTI-HORIZON % LADDER (2026-08-06) — plain price change over N SESSIONS, same unadjusted
+  // closes as every other % column here. Cache-only: no extra fetching, no extra data source.
+  // Short history → null (the UI renders "—"); never 0, never NaN.
+  const pctBack = (k) => (last - k >= 0 ? (close[last] / close[last - k] - 1) * 100 : null);
+  const pct1w = pctBack(5), pct3m = pctBack(63), pct6m = pctBack(126);
+  // YTD = vs the LAST session of the PRIOR calendar year. null when the bars don't reach back that far.
+  const yr = aligned[last].d.slice(0, 4);
+  let ytdIdx = -1;
+  for (let i = last; i >= 0; i--) if (aligned[i].d.slice(0, 4) < yr) { ytdIdx = i; break; }
+  const ytd = ytdIdx >= 0 ? (close[last] / close[ytdIdx] - 1) * 100 : null;
   const hi252 = Math.max(...b.slice(Math.max(0, b.length - 252)).map(x => x.h));
   const off52 = (close[last] / hi252 - 1) * 100;                     // negative or 0
 
   const spark = norm01(close.slice(-21));                            // last 21 closes, 0..1
   const rsSpark = norm01(rel.slice(-21));                            // last 21 rel values, 0..1
-  return { r21, w5, rs1mOwn, thrustOwn, pctIntraday, pct1d, pct1m, off52, spark, rsSpark };
+  return { r21, w5, rs1mOwn, thrustOwn, pctIntraday, pct1d, pct1w, pct1m, pct3m, pct6m, ytd, off52, spark, rsSpark };
 }
 
 // split-adjustment pass over every universe (cache stays RAW; adjustment is compute-time only)
-for (const list of [raw, rawPF, rawLL]) for (const r of list) if (r.bars) r.bars = await splitAdjust(r.bars, r.t);
+for (const list of [raw, rawPF, rawLL, rawLad || []]) for (const r of list) if (r.bars) r.bars = await splitAdjust(r.bars, r.t);
 
 const metrics = raw.map(r => ({ ...r, m: r.bars ? computeRaw(r.bars) : null }));
 
@@ -549,7 +615,7 @@ function decode(thrust, rs1m, pct1m, off52) {
 // ── 5) assemble rows.
 const rows = metrics.map((x, i) => {
   if (!x.m) return { t: x.t, name: x.name, thrust: null, thrust_snap: null, rs1m: null, rs1m_snap: null,
-    r21: null, w5: null, pctIntraday: null, pct1d: null, pct1m: null, off52: null,
+    r21: null, w5: null, pctIntraday: null, pct1d: null, pct1w: null, pct1m: null, pct3m: null, pct6m: null, ytd: null, off52: null,
     spark: [], rsSpark: [], state: null, warns: [], err: x.err || "no data" };
   const thrust = thrustPct[i], rs1m = rs1mPct[i];
   const { state, warns } = decode(thrust, rs1m, x.m.pct1m, x.m.off52);
@@ -557,7 +623,9 @@ const rows = metrics.map((x, i) => {
     t: x.t, name: x.name,
     thrust, thrust_snap: snap5(thrust), rs1m, rs1m_snap: snap5(rs1m),
     r21: f(x.m.r21, 4), w5: f(x.m.w5, 5),
-    pctIntraday: f(x.m.pctIntraday, 2), pct1d: f(x.m.pct1d, 2), pct1m: f(x.m.pct1m, 2), off52: f(x.m.off52, 2),
+    pctIntraday: f(x.m.pctIntraday, 2), pct1d: f(x.m.pct1d, 2),
+    pct1w: f(x.m.pct1w, 2), pct1m: f(x.m.pct1m, 2), pct3m: f(x.m.pct3m, 2), pct6m: f(x.m.pct6m, 2), ytd: f(x.m.ytd, 2),
+    off52: f(x.m.off52, 2),
     spark: x.m.spark.map(v => f(v, 4)), rsSpark: x.m.rsSpark.map(v => f(v, 4)),
     state, warns,
   };
@@ -568,13 +636,16 @@ const rows = metrics.map((x, i) => {
 const metricsPF = rawPF.map(r => ({ ...r, m: r.bars ? computeRaw(r.bars) : null }));
 const pfRows = metricsPF.map((x) => {
   if (!x.m) return { t: x.t, name: x.name, block: x.block, thrust: null, rs1m: null, pctIntraday: null,
-    pct1d: null, pct1m: null, off52: null, spark: [], rsSpark: [], state: null, warns: [], err: x.err || "no data" };
+    pct1d: null, pct1w: null, pct1m: null, pct3m: null, pct6m: null, ytd: null, off52: null,
+    spark: [], rsSpark: [], state: null, warns: [], err: x.err || "no data" };
   const thrust = x.m.thrustOwn, rs1m = x.m.rs1mOwn;
   const { state, warns } = decode(thrust, rs1m, x.m.pct1m, x.m.off52);
   return {
     t: x.t, name: x.name, block: x.block,
     thrust, thrust_snap: snap5(thrust), rs1m, rs1m_snap: snap5(rs1m),
-    pctIntraday: f(x.m.pctIntraday, 2), pct1d: f(x.m.pct1d, 2), pct1m: f(x.m.pct1m, 2), off52: f(x.m.off52, 2),
+    pctIntraday: f(x.m.pctIntraday, 2), pct1d: f(x.m.pct1d, 2),
+    pct1w: f(x.m.pct1w, 2), pct1m: f(x.m.pct1m, 2), pct3m: f(x.m.pct3m, 2), pct6m: f(x.m.pct6m, 2), ytd: f(x.m.ytd, 2),
+    off52: f(x.m.off52, 2),
     spark: x.m.spark.map(v => f(v, 4)), rsSpark: x.m.rsSpark.map(v => f(v, 4)),
     state, warns,
   };
@@ -602,6 +673,35 @@ const llRows = metricsLL.map((x) => {
   };
 });
 
+// ── 5d) LADDER BLOCKS (Style · Country · Macro) — the SAME computeRaw machinery, byte-identical
+// formulas, but NON-RANKED: fixed order, no rank numbers, read by position like Index/Segment.
+// Bars are looked up across every already-loaded section first (rawLad, then the three universes),
+// so a fund another universe already carries is never fetched or cached twice.
+const barsIndex = new Map();
+for (const list of [rawLad || [], raw, rawPF, rawLL]) for (const r of list) if (r.bars && !barsIndex.has(r.t)) barsIndex.set(r.t, r.bars);
+const NULL_METRICS = { thrust: null, thrust_snap: null, rs1m: null, rs1m_snap: null, pctIntraday: null,
+  pct1d: null, pct1w: null, pct1m: null, pct3m: null, pct6m: null, ytd: null, off52: null,
+  spark: [], rsSpark: [], state: null, warns: [] };
+const ladders = LADDERS.map(b => ({
+  key: b.key, label: b.label, tip: b.tip,
+  rows: b.rows.map(([t, name]) => {
+    const bars = barsIndex.get(t) || null;
+    const m = bars ? computeRaw(bars) : null;
+    if (!m) return { t, name, ...NULL_METRICS, err: bars ? "insufficient history" : "no data" };
+    const thrust = m.thrustOwn, rs1m = m.rs1mOwn;
+    const { state, warns } = decode(thrust, rs1m, m.pct1m, m.off52);
+    return {
+      t, name,
+      thrust, thrust_snap: snap5(thrust), rs1m, rs1m_snap: snap5(rs1m),
+      pctIntraday: f(m.pctIntraday, 2), pct1d: f(m.pct1d, 2),
+      pct1w: f(m.pct1w, 2), pct1m: f(m.pct1m, 2), pct3m: f(m.pct3m, 2), pct6m: f(m.pct6m, 2), ytd: f(m.ytd, 2),
+      off52: f(m.off52, 2),
+      spark: m.spark.map(v => f(v, 4)), rsSpark: m.rsSpark.map(v => f(v, 4)),
+      state, warns,
+    };
+  }),
+}));
+
 // asof = the latest date common to SPY and the ETFs we could fetch (honest "as of close").
 // If that date is TODAY and the US session is still open, the last bar is a PARTIAL day —
 // stamp it "(intraday HH:MM ET)" so members never mistake a mid-session read for the close.
@@ -618,7 +718,7 @@ let asof = spy[spy.length - 1].d;
     asof += ` (intraday ${String(etH).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")} ET)`;
   }
 }
-const payload = { asof, refreshed: today, rows, pf, ll: llRows };
+const payload = { asof, refreshed: today, rows, pf, ll: llRows, ladders };
 
 const banner = `// AUTO-GENERATED by scripts/group-rs.mjs — DO NOT EDIT BY HAND.
 // Refresh: node --env-file=.env.local scripts/group-rs.mjs
@@ -632,6 +732,11 @@ const banner = `// AUTO-GENERATED by scripts/group-rs.mjs — DO NOT EDIT BY HAN
 // payload.ll = the Liquid Leaders per-STOCK table (same rs1m/thrust machinery vs RSP, no benchmark
 // row) over a SINGLE curated universe of ~62 leaders that ship with lev/inverse ETF mappings;
 // long/short = the liquid leveraged/inverse ETFs tracking each name.
+// payload.ladders = the NON-RANKED Style / Country / Macro ladders — fixed order, read by position,
+// never ranked and never part of the groups table.
+// pct1w/pct1m/pct3m/pct6m = plain price change over 5/21/63/126 SESSIONS; ytd = change vs the last
+// session of the prior calendar year. Unadjusted closes, same convention as every % column here;
+// a window longer than the available history is null (renders "—"), never 0.
 `;
 writeFileSync("src/groupRS-data.js", banner + `export const GROUP_RS = ${JSON.stringify(payload, null, 2)};\n`);
 
@@ -643,3 +748,7 @@ const llOk = llRows.filter(r => r.thrust != null).length;
 const llFailed = llRows.filter(r => r.err).map(r => r.t);
 console.log(`  liquid leaders (curated only) · ${llRows.length} rows (${llOk} with numbers, ${llFailed.length} failed)`);
 if (llFailed.length) console.log(`  LL failed/blank tickers: ${llFailed.join(", ")}`);
+for (const b of ladders) {
+  const bad = b.rows.filter(r => r.err).map(r => `${r.t} (${r.err})`);
+  console.log(`  ladder ${b.label} · ${b.rows.length} rows${bad.length ? ` · blank: ${bad.join(", ")}` : ""}`);
+}

@@ -1488,6 +1488,17 @@ const WHATS_NEW = [
   {
     tag: "New",
     date: "August 6, 2026",
+    title: "Rotation table goes wider — style, country and macro dials + a full performance ladder",
+    items: [
+      "Every rotation table now shows the whole performance ladder: 1 week, 1 month, 3 months, 6 months and year-to-date, side by side. Green is up, red is down. A dash means the fund hasn't traded that long yet.",
+      "Three new ladders sit at the bottom of the Top-Down View. Style: growth vs value across three sizes. Country: how the US stacks up against Korea, Japan, India, China, Brazil and emerging markets. Macro: the risk dials — gold, silver, bonds, the dollar, oil and bitcoin.",
+      "These three are never ranked. Read them by position: which end of each ladder is being bought.",
+      "Two new theme groups joined the main table: memory chips and lithography.",
+    ],
+  },
+  {
+    tag: "New",
+    date: "August 6, 2026",
     title: "A brand-new look — the whole app, redesigned",
     items: [
       "Everything has been redrawn around one idea: your money first, at a glance. The dashboard now opens with your equity as one big number, your open profit right under it, and your equity curve below — drag along the curve to see the value at any point, and use the 1W · 1M · 3M · YTD · ALL chips to change the window.",
