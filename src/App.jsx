@@ -1498,9 +1498,11 @@ const WHATS_NEW = [
   {
     tag: "Improved",
     date: "August 8, 2026",
-    title: "Theme moved to the end of the positions table",
+    title: "Live Trades: partials bar + a cleaner stop line",
     items: [
-      "The Theme tag on Open Positions now sits in the last column, so the numbers you check most — size, stop, risk, P/L — read left to right without a colored pill in the middle. Sorting and tooltips work the same.",
+      "When part of a position has been sold, its Live Trades row now shows the same fill-up bar as the dashboard — how much of the original position was sold and the R banked. A slim version sits right in the list, no tap needed.",
+      "The two stop rows are now one line that tells the story: the original stop struck through, an arrow, and where protection sits now — breakeven, trailed, or profit locked, colored by status.",
+      "The Theme tag on Open Positions moved to the last column, so the numbers you check most — size, stop, risk, P/L — read straight across.",
     ],
   },
   {
@@ -14714,8 +14716,13 @@ function LiveTradesFab({ C, font, isMobile }) {
             <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 600, letterSpacing: 0, color: s.fg, lineHeight: 1, whiteSpace: "nowrap" }}>{o.status}</span>
           </span>
           <span style={{ width: 9, height: 9, borderRadius: 99, background: s.rail, boxShadow: `0 0 8px ${s.glow}`, flex: "0 0 auto" }} />
-          <span style={{ marginLeft: "auto", fontFamily: LT_MONO, fontSize: "0.75rem", fontWeight: 600, color: "var(--white)", fontVariantNumeric: "tabular-nums" }}>
-            {o.sizePct == null ? "—" : o.sizePct.toFixed(1) + "%"}
+          <span style={{ marginLeft: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <span style={{ fontFamily: LT_MONO, fontSize: "0.75rem", fontWeight: 600, color: "var(--white)", fontVariantNumeric: "tabular-nums" }}>
+              {o.sizePct == null ? "—" : o.sizePct.toFixed(1) + "%"}
+            </span>
+            {o.trimPct > 0 && <span title={o.trimPct + "% of the position sold"} style={{ display: "inline-block", width: 40, height: 3, borderRadius: 99, background: "var(--w10)", overflow: "hidden" }}>
+              <span style={{ display: "block", height: "100%", width: Math.max(8, Math.min(100, o.trimPct)) + "%", borderRadius: 99, background: o.trimUp === false ? "var(--red)" : "var(--green)" }} />
+            </span>}
           </span>
           <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 600, color: "var(--faint)", transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .18s" }}>▾</span>
         </button>
@@ -14733,23 +14740,42 @@ function LiveTradesFab({ C, font, isMobile }) {
             <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 500, color: "var(--faint)" }}>&nbsp;of account</span>
           </span>
         ))}
-        {/* Entry date/price + BOTH stops (Valen 2026-08-06: "always use Original Stoploss,
-            Current stoploss — both"). Original = the locked stop that defines R; Current = the
-            trail when one is set (breakeven tagged), else it equals the original. */}
         {chipRow("Date of entry", <span style={val}>{o.entryDate ? wlFmtDay(o.entryDate) + ", " + String(o.entryDate).slice(0, 4) : "—"}</span>)}
         {chipRow("Entry price", <span style={val}>{o.entry == null ? "—" : Number(o.entry).toFixed(2)}</span>)}
-        {chipRow("Original stoploss", <span style={val}>{o.stop == null ? "—" : Number(o.stop).toFixed(2)}</span>)}
-        {chipRow("Current stoploss", (() => {
-          const eff = o.trail != null ? o.trail : o.stop;
+        {/* Stoploss journey (Valen 2026-08-07: "think of a better way of presenting original +
+            current"). One row: original stop struck-muted → current stop bold, with the status
+            word in the status colour. Both numbers still ship — the original defines R, the
+            current is where protection actually sits. No trail yet = just the original. */}
+        {chipRow("Stoploss", (() => {
+          const s2 = LT_STATUS[o.status] || LT_STATUS["At Risk"];
           const be = o.trail != null && o.entry != null && Math.abs(o.trail - o.entry) <= o.entry * 0.001;
+          const word = o.trail == null ? "original" : be ? "breakeven" : (o.trail > (o.entry || 0) ? "profit locked" : "trailed");
+          if (o.trail == null || o.stop == null || Math.abs((o.trail ?? 0) - (o.stop ?? 0)) < 0.005) {
+            const only = o.trail != null ? o.trail : o.stop;
+            return <span style={val}>{only == null ? "—" : Number(only).toFixed(2)}
+              <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 500, color: "var(--faint)" }}>&nbsp;{only == null ? "" : word}</span></span>;
+          }
           return (
             <span style={val}>
-              {eff == null ? "—" : Number(eff).toFixed(2)}
-              {be && <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 500, color: "var(--faint)" }}>&nbsp;breakeven</span>}
-              {!be && o.trail != null && <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 500, color: "var(--faint)" }}>&nbsp;trailed</span>}
+              <span style={{ color: "var(--faint)", textDecoration: "line-through", textDecorationColor: "var(--w22)", fontWeight: 500 }}>{Number(o.stop).toFixed(2)}</span>
+              <span style={{ color: "var(--faint)", fontWeight: 500 }}>&nbsp;→&nbsp;</span>
+              {Number(o.trail).toFixed(2)}
+              <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 600, color: s2.fg }}>&nbsp;{word}</span>
             </span>
           );
         })())}
+        {/* Partials taken — the dashboard's Realized energy bar, member-shaped: percentage of the
+            original position sold + R banked. Never shares, never dollars. Hidden until a trim exists. */}
+        {o.trimPct > 0 && chipRow("Partials taken", (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span style={{ display: "inline-block", width: 84, height: 5, borderRadius: 99, background: "var(--w10)", overflow: "hidden" }}>
+              <span style={{ display: "block", height: "100%", width: Math.max(6, Math.min(100, o.trimPct)) + "%", borderRadius: 99, background: o.trimUp === false ? "var(--red)" : "var(--green)" }} />
+            </span>
+            <span style={{ ...val, fontSize: "0.78rem" }}>{o.trimPct}%
+              <span style={{ fontFamily: LT_GEIST, fontSize: "0.6875rem", fontWeight: 500, color: "var(--faint)" }}>&nbsp;sold{o.trimR != null ? ` · ${o.trimR >= 0 ? "+" : ""}${o.trimR.toFixed(1)}R banked` : ""}</span>
+            </span>
+          </span>
+        ))}
         {chipRow("Since entry", <span style={val}>{o.daysHeld == null ? "—" : "Day " + o.daysHeld}</span>)}
         </div>}
       </div>

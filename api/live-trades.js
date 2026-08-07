@@ -140,7 +140,7 @@ async function build() {
   // ── open positions (internal read: shares stay here, they never reach the payload) ──
   const { data: posRows, error: posErr } = await sb
     .from("positions")
-    .select("symbol,entry_date,shares,entry_price,stop_price,trailing_stop,is_closed,is_demo,trade_type")
+    .select("id,symbol,entry_date,shares,entry_price,stop_price,trailing_stop,is_closed,is_demo,trade_type")
     .eq("user_id", OWNER_UID)
     .eq("is_closed", false)
     .eq("is_demo", false);
@@ -149,7 +149,7 @@ async function build() {
   // ── closed trades (the review record) ──
   const { data: tradeRows, error: trErr } = await sb
     .from("trades")
-    .select("ticker,entry_date,exit_date,entry_price,exit_price,pl_pct,pl_dollar,r_mult,exit_reason,is_sample,is_deleted,is_demo,trade_type")
+    .select("ticker,entry_date,exit_date,entry_price,exit_price,pl_pct,pl_dollar,r_mult,exit_reason,is_sample,is_deleted,is_demo,trade_type,position_id,shares")
     .eq("user_id", OWNER_UID)
     .eq("is_deleted", false)
     .eq("is_sample", false)
@@ -184,6 +184,15 @@ async function build() {
       // his book takes today, and the sign is the only other signal available.
       const tt = String(p.trade_type || "").trim().toLowerCase();
       const side = tt === "short" ? "Short" : tt === "long" ? "Long" : ((num(p.shares) || 0) < 0 ? "Short" : "Long");
+      // ── partials taken (the dashboard's Realized "energy bar", privacy-shaped) ──
+      // Trims are the closed trades rows LINKED to this open campaign via position_id (the
+      // trade-log scripts always set it). Shares stay internal: only the trimmed PERCENTAGE of
+      // the original position, the banked R and the sign ship — never counts or dollars.
+      const trims = (tradeRows || []).filter((t) => t.position_id != null && t.position_id === p.id && !t.is_deleted);
+      const trimShares = trims.reduce((s, t) => s + Math.abs(num(t.shares) || 0), 0);
+      const origShares = Math.abs(num(p.shares) || 0) + trimShares;
+      const trimPl = trims.reduce((s, t) => s + (num(t.pl_dollar) || 0), 0);
+      const trimR = trims.reduce((s, t) => s + (num(t.r_mult) || 0), 0);
       return {
         tk: String(p.symbol || "").toUpperCase(),
         side,
@@ -197,6 +206,9 @@ async function build() {
         targetLow: risk != null && risk > 0 ? r2(entry + 3 * risk) : null,
         targetHigh: risk != null && risk > 0 ? r2(entry + 5 * risk) : null,
         trimWindow: trimWindow(days),
+        trimPct: trimShares > 0 && origShares > 0 ? Math.round((trimShares / origShares) * 100) : 0,
+        trimUp: trimShares > 0 ? trimPl >= 0 : null,
+        trimR: trimShares > 0 ? r2(trimR) : null,
       };
     })
     .sort((a, b) => (b.sizePct || 0) - (a.sizePct || 0));
