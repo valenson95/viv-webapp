@@ -13,7 +13,14 @@
 // THROTTLE: 1.6s between requests; on ANY failure wait 61s and retry ONCE (per-minute rate limit).
 import { writeFileSync } from 'fs';
 
-const PROXY = "https://www.valensontrades.com/api/candles";
+// CANDLES_BASE + CANDLES_COOKIE: run against the same serverless functions when the custom
+// domain sits behind an edge challenge (2026-08-06/07) — same code, same key; only the
+// hostname/cookie differ. Formulas and data path are untouched.
+const PROXY_BASE = process.env.CANDLES_BASE || "https://www.valensontrades.com";
+const PROXY = PROXY_BASE + "/api/candles";
+const PROXY_HEADERS = process.env.CANDLES_COOKIE
+  ? { cookie: process.env.CANDLES_COOKIE, "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36" }
+  : {};
 
 // ── UNIVERSE (ticker → group label). Transcribed from Valen's reference rotation table.
 // Keep as a plain const so it's trivial to extend. SPY is the benchmark (fetched, not a row).
@@ -289,7 +296,7 @@ const FROM = shift(today, -420); // ~420 calendar days back → comfortably >252
 
 // bars() — identical shape to study-fill.mjs; returns [{d,t,o,h,l,c,v}] oldest→newest.
 async function barsRaw(sym, from, to, res = "1day") {
-  const r = await fetch(`${PROXY}?symbol=${sym}&from=${from}&to=${to}&res=${res}`);
+  const r = await fetch(`${PROXY}?symbol=${sym}&from=${from}&to=${to}&res=${res}`, { headers: PROXY_HEADERS });
   const j = await r.json();
   if (!j.ok || !j.candles?.length) throw new Error(`${sym}: ${j.error || "no bars"}`);
   return j.candles.map(c => ({ d: new Date(c.time * 1000).toISOString().slice(0, 10), t: c.time, o: c.open, h: c.high, l: c.low, c: c.close, v: c.volume }));
@@ -354,7 +361,7 @@ if (fastMode) {
   for (let d = lastCached; d < target;) { d = (() => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); })(); if (![0, 6].includes(new Date(d + "T12:00:00Z").getUTCDay())) days.push(d); }
   console.log(`GROUP-RS · FAST · cache thru ${lastCached} · target ${target} · ${days.length} missing session(s)`);
   for (const d of days) {
-    const r = await fetch(`https://www.valensontrades.com/api/grouped?date=${d}&symbols=${symbolsCSV}`);
+    const r = await fetch(`${PROXY_BASE}/api/grouped?date=${d}&symbols=${symbolsCSV}`, { headers: PROXY_HEADERS });
     const j = await r.json();
     if (!j.ok) { console.log(`  ${d}: grouped fetch failed (${j.error}) — skipping`); continue; }
     if (!j.count) { console.log(`  ${d}: no bars (holiday) — skipped`); continue; }

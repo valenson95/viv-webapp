@@ -7,6 +7,15 @@
 // ─────────────────────────────────────────────────────────────
 
 export const THEME_SNAPSHOTS = {
+  // 2026-08-07 — his Fri-AM-MYT drop; data = the US Thu 08-06 close (Since Open / 1W / 1M panels).
+  // day = Since Open (Thursday intraday, ex-gap). Metals still own both boards, but the 1W top-5
+  // TURNS OVER hard: Semiconductors (#3, +13.34) + Quantum + Bitcoin Miners surge in; Software
+  // drops to #11. Month unchanged regime: Steel/Gold/Silver lead, growth complex still negative.
+  "2026-08-07": {
+    week: [["Silver Miners", 14.15], ["Gold Miners", 14.07], ["Semiconductors", 13.34], ["Quantum", 12.86], ["Bitcoin Miners", 11.92], ["AI", 10.66], ["Robotics", 9.68], ["Cybersecurity", 8.96], ["Genomics", 8.13], ["Telecom", 7.79], ["Software", 7.63], ["Solar", 7.49], ["Oil & Gas", 6.56], ["Aerospace", 5.81], ["Airlines", 5.39], ["Steel", 4.99], ["Industrials", 4.59], ["Biotechnology", 2.36], ["China Internet", 2.09], ["Home Construction", 1.96], ["Medical", 1.52], ["Bitcoin", 1.36], ["Growth Stocks", 0.96], ["Materials", 0.83], ["Banks", 0.72], ["Transports", 0.57], ["Social Media", 0.42], ["HealthCare", -0.74], ["Retail", -1.70], ["Real Estate", -2.50], ["Utilities", -3.41]],
+    month: [["Steel", 12.06], ["Gold Miners", 10.74], ["Silver Miners", 8.41], ["China Internet", 7.18], ["Software", 5.90], ["Medical", 5.52], ["Oil & Gas", 4.69], ["Aerospace", 4.33], ["Materials", 3.80], ["Retail", 3.37], ["Banks", 2.68], ["Industrials", 2.02], ["Bitcoin", 1.90], ["Home Construction", 1.63], ["Real Estate", 1.31], ["Cybersecurity", 1.17], ["Robotics", 0.85], ["HealthCare", 0.81], ["Airlines", 0.71], ["Social Media", 0.01], ["Transports", -2.19], ["Biotechnology", -2.21], ["Telecom", -2.68], ["AI", -2.95], ["Utilities", -3.88], ["Quantum", -4.07], ["Genomics", -5.70], ["Semiconductors", -5.96], ["Solar", -6.73], ["Growth Stocks", -9.96], ["Bitcoin Miners", -15.26]],
+    day: [["Software", 1.85], ["Gold Miners", 1.80], ["AI", 1.16], ["Semiconductors", 1.06], ["Silver Miners", 0.99], ["Quantum", 0.98], ["Solar", 0.87], ["Cybersecurity", 0.82], ["Telecom", 0.51], ["Bitcoin", 0.41], ["China Internet", 0.28], ["Oil & Gas", 0.28], ["Medical", 0.07], ["Bitcoin Miners", -0.08], ["Biotechnology", -0.38], ["Social Media", -0.52], ["Robotics", -0.57], ["Transports", -0.59], ["Genomics", -0.83], ["HealthCare", -0.85], ["Retail", -0.86], ["Materials", -0.87], ["Industrials", -1.04], ["Steel", -1.14], ["Aerospace", -1.42], ["Real Estate", -1.59], ["Airlines", -1.63], ["Banks", -1.64], ["Utilities", -1.70], ["Growth Stocks", -2.12], ["Home Construction", -2.29]],
+  },
   // 2026-08-06 — his Thu-early-MYT drop; data = the US Wed 08-05 session (captured intraday,
   // all four panels fresh). day = Since Open (Wednesday intraday, ex-gap). PRECIOUS-METALS
   // TAKEOVER: Gold/Silver Miners own #1-#2 on BOTH boards; last week's growth leaders rest red
