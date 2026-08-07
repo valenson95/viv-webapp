@@ -45,24 +45,48 @@ function toISO(s) {
 // Aggregate closed trades → { "YYYY-MM-DD": {net, n, w} } by EXIT date.
 // IMPORTANT: campaign rows arrive MERGED (partial trims rolled up, stamped with the LAST exit date —
 // right for the trades list, wrong for daily booking: a Jul-1 trim must not book on Jul-6).
-// So explode campaigns back to their fills (._fills), book each fill on its own exit day, then
-// re-group same ticker+side+day so the day panel still reads one line per position.
+// So explode campaigns back to their fills (._fills) and book each fill on its own exit day.
+//
+// The re-group key is DAY + CAMPAIGN, never day + ticker. You can trade the same stock twice and
+// close both on the same day (a re-entry, or a runner plus a fresh position). Keying on the ticker
+// merged those two trades into ONE line, so the second one — usually the multi-fill campaign —
+// never appeared in the calendar and the day's trade count came up short (member JH, 2026-08-07;
+// 12 members, 43 trade rows silently merged away). Keying on the campaign keeps them separate, so
+// clicking a day lists exactly the trades booked that day.
 function useDailyMap(trades) {
   return useMemo(() => {
-    const fills = (trades || []).flatMap(t => (t._fills && t._fills.length > 1 ? t._fills : [t]));
-    const byDayTicker = {};
-    for (const f of fills) {
-      const pl = f.plDollar == null ? (f.pl_dollar == null ? null : Number(f.pl_dollar)) : Number(f.plDollar);
-      const iso = toISO(f.exit || f.exit_date);
-      if (pl == null || isNaN(pl) || !iso) continue;
-      const k = iso + "|" + (f.ticker || "") + "|" + (f.tradeType || f.trade_type || "Long");
-      (byDayTicker[k] = byDayTicker[k] || { iso, rows: [] }).rows.push(f);
+    const byDayCampaign = {};
+    for (const t of (trades || [])) {
+      const campFills = (t._fills && t._fills.length > 1) ? t._fills : [t];
+      // campaign id (= lowest fill id) is unique per campaign; fall back to ticker+side if absent
+      const campKey = t.id != null ? "c" + t.id : "t" + (t.ticker || "") + "|" + (t.tradeType || t.trade_type || "Long");
+      for (const f of campFills) {
+        const pl = f.plDollar == null ? (f.pl_dollar == null ? null : Number(f.pl_dollar)) : Number(f.plDollar);
+        const iso = toISO(f.exit || f.exit_date);
+        if (pl == null || isNaN(pl) || !iso) continue;
+        const k = iso + "|" + campKey;
+        (byDayCampaign[k] = byDayCampaign[k] || { iso, camp: t, nFills: campFills.length, rows: [] }).rows.push(f);
+      }
     }
     const m = {};
-    for (const { iso, rows } of Object.values(byDayTicker)) {
+    for (const { iso, camp, nFills, rows } of Object.values(byDayCampaign)) {
       const pl = rows.reduce((s, f) => s + (Number(f.plDollar ?? f.pl_dollar) || 0), 0);
       const cost = rows.reduce((s, f) => s + (Number(f.entryP ?? f.entry_price) || 0) * (Number(f.shares) || 0), 0);
-      const rep = { ...rows[0], plDollar: +pl.toFixed(2), plPct: cost ? +((pl / cost) * 100).toFixed(2) : (rows[0].plPct ?? rows[0].pl_pct ?? null), _dayFills: rows.length };
+      // Whole campaign closed on this day → show the campaign's own % and R, so the day panel reads
+      // exactly like the trades list. Split across days → that day's share only, and the fill-level R
+      // (never the campaign R, which would then be counted once per day).
+      const whole = rows.length >= nFills;
+      const campPct = camp.plPct == null ? (camp.pl_pct == null ? null : Number(camp.pl_pct)) : Number(camp.plPct);
+      const campR = camp.rMult == null ? (camp.r_mult == null ? null : Number(camp.r_mult)) : Number(camp.rMult);
+      const rep = {
+        ...rows[0],
+        id: camp.id != null ? camp.id : rows[0].id,
+        ticker: camp.ticker || rows[0].ticker,
+        plDollar: +pl.toFixed(2),
+        plPct: whole && campPct != null ? campPct : (cost ? +((pl / cost) * 100).toFixed(2) : (rows[0].plPct ?? rows[0].pl_pct ?? null)),
+        rMult: whole ? campR : (rows[0].rMult ?? rows[0].r_mult ?? null),
+        _dayFills: rows.length, _campFills: nFills, _campaign: camp,
+      };
       if (!m[iso]) m[iso] = { net: 0, n: 0, w: 0, r: 0, rN: 0, noR: 0, pct: 0, trades: [] };
       m[iso].net += pl; m[iso].n += 1; if (pl > 0) m[iso].w += 1; m[iso].trades.push(rep);
       // Per-day R (recorded only) + per-day sum of trade %. R is never invented — no-R trades are counted.
@@ -196,11 +220,19 @@ function Monthly({ daily, C, font, ym, setYm, onOpenTrade, unit }) {
                 <div key={t.id || k} style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 4px", borderTop: k ? "1px solid var(--w06)" : "none", fontSize: "0.875rem", flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 600, color: C.white, minWidth: 58 }}>{t.ticker}</span>
                   <span style={{ fontSize: "0.6875rem", fontWeight: 500, color: C.muted, minWidth: 42 }}>{t.tradeType || t.trade_type || "Long"}</span>
+                  {(t._campFills > 1) && (
+                    <span title={t._dayFills < t._campFills
+                      ? `${t._dayFills} of this trade's ${t._campFills} fills closed on this day. The rest booked on their own days.`
+                      : `${t._campFills} fills, all closed on this day.`}
+                      style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>
+                      {t._dayFills < t._campFills ? `${t._dayFills} of ${t._campFills} fills` : `${t._campFills} fills`}
+                    </span>
+                  )}
                   <span style={{ fontWeight: 500, letterSpacing: "-0.025em", fontVariantNumeric: "tabular-nums", minWidth: 76, color: pl > 0 ? C.green : pl < 0 ? C.red : C.muted }}>{(pl >= 0 ? "+" : "-") + "$" + Math.abs(pl).toFixed(0)}</span>
                   <span style={{ minWidth: 62, color: (pct || 0) >= 0 ? C.green : C.red }}>{pct != null && !isNaN(pct) ? `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%` : "—"}</span>
                   <span style={{ minWidth: 52, color: C.muted }}>{r != null && !isNaN(r) ? `${r >= 0 ? "+" : ""}${r.toFixed(2)}R` : "—"}</span>
                   {onOpenTrade && (
-                    <button onClick={() => onOpenTrade(t)} style={{ marginLeft: "auto", background: "var(--w10)", border: "1px solid var(--w14)", color: C.white, fontFamily: font, fontWeight: 500, fontSize: "0.75rem", padding: "6px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Go to trade details ›</button>
+                    <button onClick={() => onOpenTrade(t._campaign || t)} style={{ marginLeft: "auto", background: "var(--w10)", border: "1px solid var(--w14)", color: C.white, fontFamily: font, fontWeight: 500, fontSize: "0.75rem", padding: "6px 14px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap" }}>Go to trade details ›</button>
                   )}
                 </div>
               );

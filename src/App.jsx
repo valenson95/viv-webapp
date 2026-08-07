@@ -14,6 +14,7 @@ import { GROUP_RS } from "./groupRS-data.js";
 import { WATCHLIST_RS } from "./watchlistRS-data.js";
 import { EARNINGS } from "./earnings-data.js";
 import ThemeTracker from "./ThemeTracker.jsx";
+import PushSettings from "./PushSettings.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import MarketContext from "./MarketContext.jsx";
 import EdgeLedger from "./EdgeLedger.jsx";
@@ -1494,6 +1495,29 @@ function PlaybookTracker({ trades, uid, setPage }) {
 }
 
 const WHATS_NEW = [
+  {
+    tag: "New",
+    date: "August 8, 2026",
+    title: "Push notifications (beta) — get a ping when something drops",
+    items: [
+      "Turn on notifications in Settings and your browser gets a ping when there's something worth knowing: live trade updates, new setups, and app announcements. Works on desktop and Android right away.",
+      "On iPhone, add the app to your Home Screen first (Share → Add to Home Screen) — Apple only allows notifications for installed web apps. The Settings card walks you through it.",
+      "Live trade pings carry the ticker and the action only — never position sizes or amounts.",
+      "You can switch it off anytime in the same place. Thanks Mandy for the request.",
+    ],
+  },
+  {
+    tag: "Fix",
+    date: "August 8, 2026",
+    title: "Multi-fill trades now show up in the calendar — and you can open every fill",
+    items: [
+      "If you traded the same stock twice and closed both on the same day, the performance calendar showed only one of them. The second trade — usually the one marked \"3 fills\" — was quietly folded into the first, so it never appeared and the day's trade count was short. Both now stand as their own trade, and the day's dollars still match your broker.",
+      "Click a day and you see exactly the trades booked that day, each with a fills tag. If only part of a trade closed that day it says so — \"2 of 3 fills\" — because the rest booked on their own days.",
+      "New: click the \"3 fills\" tag on any trade — in your trades list, in the side preview, or on the trade details page — and it opens the breakdown. Every fill on its own line: dates, shares, entry and exit price, P/L, R and fees, with the total underneath.",
+      "Each fill has an Edit button, so you can fix one execution without touching the rest. With IBKR sync on, broker prices and dates stay locked as always — the stop is still yours to set.",
+      "Thanks JH for reporting both.",
+    ],
+  },
   {
     tag: "Fix",
     date: "August 7, 2026",
@@ -6547,6 +6571,74 @@ const excTime = (bt, res) => {
   return String(bt);
 };
 
+// ── Fill breakdown ───────────────────────────────────────────────────────────
+// One "3 fills" row in the trades list is one position built (or sold) in several broker
+// executions. This opens it up: every fill on its own line, in exit order, with the running
+// total so the campaign's P&L adds up in front of you. Each line has an Edit button that opens
+// the normal edit window on that single fill — which is where the IBKR lock lives (with sync on,
+// broker facts stay locked and only the stop is yours), so nothing here weakens it.
+// Inline only — it never creates a layer, so it can't fight the preview / details / edit stack.
+function FillBreakdown({ fills, privacyMode, ibkrLocked, onEdit }) {
+  const rows = [...(fills || [])].sort((a, b) =>
+    String(tradeDateISO(a.exit) || "").localeCompare(String(tradeDateISO(b.exit) || "")) || ((a.id || 0) - (b.id || 0)));
+  const n2 = (v) => Number(v) || 0;
+  const money = (v) => privacyMode ? "••••" : (v < 0 ? "−" : "+") + "$" + Math.abs(n2(v)).toFixed(2);
+  const dt = (d, tm) => (tradeDateISO(d) || d || "—") + (tm ? ` · ${tm}` : "");
+  const total = rows.reduce((s, f) => s + n2(f.plDollar), 0);
+  const totalSh = rows.reduce((s, f) => s + n2(f.shares), 0);
+  const totalFee = rows.reduce((s, f) => s + n2(f.commission), 0);
+  const cell = { padding: "7px 10px", fontSize: "0.75rem", color: "var(--text)", whiteSpace: "nowrap", borderTop: "1px solid var(--w06)" };
+  const head = { padding: "6px 10px", fontSize: "0.6875rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)", textAlign: "left", whiteSpace: "nowrap" };
+  return (
+    <div style={{ padding: "12px 14px", background: "var(--w02)", borderTop: "1px solid var(--border)" }}>
+      <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginBottom: 8 }}>
+        {rows.length} fills make up this trade. {ibkrLocked
+          ? "Prices and dates come from your broker and stay locked — the stop is yours to set."
+          : "Edit any fill and the trade above updates."}
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table className="minitable" style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr>
+            <th style={head}>Entry</th><th style={head}>Exit</th><th style={head}>Shares</th>
+            <th style={head}>Entry $</th><th style={head}>Exit $</th><th style={head}>P/L</th>
+            <th style={head}>R</th><th style={head}>Fees</th><th style={head}></th>
+          </tr></thead>
+          <tbody>
+            {rows.map((f, i) => {
+              const pl = n2(f.plDollar);
+              return (
+                <tr key={f.id ?? i}>
+                  <td style={cell}>{dt(f.entry, f.entryTime)}</td>
+                  <td style={cell}>{dt(f.exit, f.exitTime)}</td>
+                  <td style={cell}>{n2(f.shares).toLocaleString()}</td>
+                  <td style={cell}>${n2(f.entryP).toFixed(2)}</td>
+                  <td style={cell}>${n2(f.exitP).toFixed(2)}</td>
+                  <td style={{ ...cell, color: pl >= 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>{money(pl)}</td>
+                  <td style={cell}>{f.rMult == null ? "—" : (n2(f.rMult) >= 0 ? "+" : "−") + Math.abs(n2(f.rMult)).toFixed(2) + "R"}</td>
+                  <td style={cell}>{privacyMode ? "••••" : "$" + n2(f.commission).toFixed(2)}</td>
+                  <td style={{ ...cell, textAlign: "right" }}>
+                    <button type="button" className="btn" onClick={(e) => { e.stopPropagation(); onEdit && onEdit(f); }}
+                      title="Edit this fill" style={{ padding: "3px 10px", fontSize: "0.6875rem" }}>Edit</button>
+                  </td>
+                </tr>
+              );
+            })}
+            <tr>
+              <td style={{ ...cell, color: "var(--muted)" }} colSpan={2}>Total</td>
+              <td style={{ ...cell, color: "var(--muted)" }}>{totalSh.toLocaleString()}</td>
+              <td style={cell} colSpan={2}></td>
+              <td style={{ ...cell, color: total >= 0 ? "var(--green)" : "var(--red)", fontWeight: 700 }}>{money(total)}</td>
+              <td style={cell}></td>
+              <td style={{ ...cell, color: "var(--muted)" }}>{privacyMode ? "••••" : "$" + totalFee.toFixed(2)}</td>
+              <td style={cell}></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupTypes, tags: allTags, exitReasons, session, onManualSave, onSavePositions, saveStatus, positions, setPositions, positionsRef, portfolioSize, displayName, isIbkrMode = false, ibkrSyncInfo = null, onIbkrTradeEdit, demoMode = false, onToggleDemo }) {
   const isAdmin = (session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
   // MOBILE-ONLY gate (2026-08-05 mobile polish) — same <768 breakpoint the shell uses. Only shortens
@@ -6595,13 +6687,12 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   const [deletedTradeIds, setDeletedTradeIds] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [expandedTrade, setExpandedTrade] = useState(null); // full-page trade details overlay
+  const [fillsOpenId, setFillsOpenId] = useState(null); // campaign id whose fill breakdown is open (list, preview + details share it)
   const [tdTab, setTdTab] = useState("chart"); // trade-details right pane: chart | replay | notes
   const [edgeOpen, setEdgeOpen] = useState(null); // Objective Edge: which group is expanded ("t:in", "t:off", "g:A+", …)
   const [edgeNotes, setEdgeNotes] = useState({}); // Objective Edge definition blocks — collapsed by default, per-key expand
   const [edgeMatrixView, setEdgeMatrixView] = useState("table"); // 3-D edge matrix presentation: "table" (DEFAULT — Valen) | "heatmap"
   const [tgts, setTgts] = useState(loadTargets); // TradeZella-style planning targets per trade id
-  const tdTradeObj = expandedTrade ? (journaledTrades || []).find(x => x.id === expandedTrade) : null;
-  const excursion = useTradeExcursion(tdTradeObj); // MAE/MFE/Best-Exit off real candles
   const [previewTrade, setPreviewTrade] = useState(null); // TradeZella-style slide-in overview preview
   const [highlightTradeId, setHighlightTradeId] = useState(null); // gold flash on a trade row jumped-to from VIV Analytics
   const [tradeSorts, setTradeSorts] = useState([]); // [{key, dir}] multi-sort for trades
@@ -6852,6 +6943,12 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   }, [distExpanded]);
 
   const allTrades = useMemo(() => groupPositionFills(journaledTrades.filter(t => !deletedTradeIds.includes(t.id))), [journaledTrades, deletedTradeIds]);
+
+  // MAE/MFE for the open trade-details page. Reads the GROUPED campaign so the excursion window is the
+  // whole position (first entry → last exit), matching the dates the page prints. (Declared here, after
+  // allTrades, rather than with the other state — hook order is fixed by code position, so this is stable.)
+  const tdTradeObj = expandedTrade ? (allTrades.find(x => x.id === expandedTrade) || (journaledTrades || []).find(x => x.id === expandedTrade) || null) : null;
+  const excursion = useTradeExcursion(tdTradeObj); // MAE/MFE/Best-Exit off real candles
 
   const handleImport = (e) => {
     const file = e.target.files?.[0];
@@ -8650,7 +8747,7 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                         const isTrimOnly = (t._fills || [t]).every(f => (f.reason || "") === "Partial Trim");
                         const stillOpen = isTrimOnly && (positions || []).some(p => String(p.sym || "").toUpperCase() === sym);
                         return stillOpen ? <span className="term" data-tip="Realized-so-far: partial trims of a position you still hold. This row moves your equity curve in real time and merges into one final row when the position closes — never double-counted." style={{ marginLeft: 6, fontSize: "0.6875rem", fontWeight: 800, color: "var(--text)", border: "1px solid var(--w14)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>OPEN · partials</span> : null;
-                      })()}{t._fillCount > 1 ? <span title={`${t._fillCount} IBKR executions combined into one position`} style={{ marginLeft: 6, fontSize: "0.6875rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap" }}>{t._fillCount} fills</span> : null}{isAdmin && t.extExit != null ? <span className="term" data-tip={`Extension at exit: ${Number(t.extExit).toFixed(1)}× ATR from the 50-day MA${t.extEntry != null ? ` (entry was ${Number(t.extEntry).toFixed(1)}×)` : ""}. ≥7× = sold into strength (rare, 3-sigma territory) · <2× = a stop/management exit near the mean.`} style={{ marginLeft: 6, fontSize: "0.6875rem", fontWeight: 700, color: t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--orange)" : t.extExit < 2 ? "var(--red)" : "var(--muted)", border: `1px solid ${t.extExit >= 7 ? "rgba(0,200,5,0.35)" : t.extExit >= 5 ? "rgba(255,170,5,0.35)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(t.extExit).toFixed(1)}×</span> : null}</span></td>
+                      })()}{t._fillCount > 1 ? <button type="button" onClick={(e) => { e.stopPropagation(); setFillsOpenId(cur => cur === t.id ? null : t.id); }} title={`${t._fillCount} broker executions combined into one trade — click to see and edit each fill`} style={{ marginLeft: 6, fontFamily: "inherit", fontSize: "0.6875rem", fontWeight: 700, color: fillsOpenId === t.id ? "var(--white)" : "var(--muted)", background: fillsOpenId === t.id ? "var(--w10)" : "transparent", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "pointer" }}>{t._fillCount} fills {fillsOpenId === t.id ? "▴" : "▾"}</button> : null}{isAdmin && t.extExit != null ? <span className="term" data-tip={`Extension at exit: ${Number(t.extExit).toFixed(1)}× ATR from the 50-day MA${t.extEntry != null ? ` (entry was ${Number(t.extEntry).toFixed(1)}×)` : ""}. ≥7× = sold into strength (rare, 3-sigma territory) · <2× = a stop/management exit near the mean.`} style={{ marginLeft: 6, fontSize: "0.6875rem", fontWeight: 700, color: t.extExit >= 7 ? "var(--green)" : t.extExit >= 5 ? "var(--orange)" : t.extExit < 2 ? "var(--red)" : "var(--muted)", border: `1px solid ${t.extExit >= 7 ? "rgba(0,200,5,0.35)" : t.extExit >= 5 ? "rgba(255,170,5,0.35)" : "var(--border)"}`, borderRadius: 10, padding: "1px 6px", whiteSpace: "nowrap", cursor: "help" }}>{Number(t.extExit).toFixed(1)}×</span> : null}</span></td>
                       <td className="pro-only" data-l="Entry $">${(Number(t.entryP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Exit $">${(Number(t.exitP) || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Shares">{(Number(t.shares) || 0).toLocaleString()}</td>
@@ -8683,6 +8780,13 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                       }</td>
                       <td className="revcell" data-l=""><button className="revbtn" onClick={(e) => { e.stopPropagation(); setPreviewTrade(t); }}>View ›</button></td>
                     </tr>
+                    {/* Fill breakdown — the "N fills" chip opens the executions behind this campaign row.
+                        colSpan matches the 14 columns of this table (bump both together if a column moves). */}
+                    {t._fillCount > 1 && fillsOpenId === t.id && (
+                      <tr className="revrow"><td colSpan={14}>
+                        <FillBreakdown fills={t._fills} privacyMode={privacyMode} ibkrLocked={isIbkrMode} onEdit={(f) => startEdit(f)} />
+                      </td></tr>
+                    )}
                     {false && (
                       <tr className="revrow"><td colSpan={14}>
                         <div className={"revpanel" + (closingReview ? " closing" : "")}>
@@ -8795,6 +8899,22 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                   <Row k="Setup grade" v={gr ? `${gr.letter} · ${gr.stars}★` : "Not graded"} c={gcol} />
                   <Row k="Commission" v={privacyMode ? "••••" : "$" + (parseFloat(t.commission) || 0).toFixed(2)} />
                 </div>
+                {/* Fill breakdown — inline inside the preview panel (z 1200). No new layer, so the
+                    details page (1300) and the edit window (1400) still sit exactly where they should. */}
+                {t._fillCount > 1 && (
+                  <div className="tp-reason" style={{ padding: 0, overflow: "hidden" }}>
+                    <button type="button" onClick={() => setFillsOpenId(cur => cur === t.id ? null : t.id)}
+                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 11px", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                      <span className="tp-reason-h" style={{ margin: 0 }}>Fills</span>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text)" }}>{t._fillCount}</span>
+                      <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--muted)" }}>{fillsOpenId === t.id ? "Hide ▴" : "See the breakdown ▾"}</span>
+                    </button>
+                    {fillsOpenId === t.id && (
+                      <FillBreakdown fills={t._fills} privacyMode={privacyMode} ibkrLocked={isIbkrMode}
+                        onEdit={(f) => { setPreviewTrade(null); startEdit(f); }} />
+                    )}
+                  </div>
+                )}
                 {t.reason && <div className="tp-reason"><div className="tp-reason-h">Exit reason</div><div className="tp-reason-b">{t.reason}</div></div>}
                 {/* Your uploaded chart, at a glance — tap to open the full review. */}
                 {t.chartImage && (
@@ -8829,7 +8949,10 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
   );
   const tradeDetailsPortal = (
         expandedTrade && createPortal((() => {
-          const t = journaledTrades.find(x => x.id === expandedTrade);
+          // Prefer the GROUPED campaign row: a multi-fill trade is one campaign here, so the details
+          // page shows the same shares / prices / P&L as the trades list (and carries ._fills for the
+          // breakdown). Falls back to the raw row for anything not in the current filtered set.
+          const t = allTrades.find(x => x.id === expandedTrade) || journaledTrades.find(x => x.id === expandedTrade);
           if (!t) return null;
           const up = (Number(t.plPct) || 0) > 0, cls = up ? "st-win" : "st-loss";
           const gr = getSavedGrade(t.ticker);
@@ -8931,6 +9054,21 @@ function TradeJournalPage({ setPage, journaledTrades, setJournaledTrades, setupT
                               chart with createExecutionShape() fill arrows, TradeZella-style, + server-saved
                               drawings). Until then: fills as ▲/▼ arrows at their exact ET time bars,
                               drawings auto-saved per trade. */}
+                          {/* Fill breakdown — inline inside the details page (z 1300). Editing a fill
+                              opens the normal edit window, which portals to body at z 1400 and wins. */}
+                          {t._fillCount > 1 && (
+                            <div style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "var(--w02)" }}>
+                              <button type="button" onClick={() => setFillsOpenId(cur => cur === t.id ? null : t.id)}
+                                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "11px 14px", background: "transparent", border: "none", cursor: "pointer", fontFamily: font, textAlign: "left" }}>
+                                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--white)" }}>Fills</span>
+                                <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 10, padding: "1px 6px" }}>{t._fillCount}</span>
+                                <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--muted)" }}>{fillsOpenId === t.id ? "Hide ▴" : "See the breakdown ▾"}</span>
+                              </button>
+                              {fillsOpenId === t.id && (
+                                <FillBreakdown fills={t._fills} privacyMode={privacyMode} ibkrLocked={isIbkrMode} onEdit={(f) => startEdit(f)} />
+                              )}
+                            </div>
+                          )}
                           <div className="revchart" style={{ marginBottom: 14 }}><TradeReplayChart trade={t} C={C} font={font} /></div>
                           {true && (
                             <>
@@ -14068,6 +14206,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
             </div>
           </div>
 
+          <PushSettings session={session} />
           {/* Lists & labels — the three existing chip managers as three compact columns */}
           <div className="card">
             <div className="cardhead"><span className="label">Lists &amp; Labels</span><span className="infodot" data-tip="The options that appear in the Setup, Tags, and Exit Reason dropdowns across your positions and journal.">i</span></div>
@@ -14310,6 +14449,7 @@ function SettingsPage({ setPage, onLogout, setupTypes, setSetupTypes, tags, setT
           </div>
         )}
 
+        <PushSettings session={session} />
         {/* ===== LIST MANAGERS (preserved) — Setup Types / Tags / Exit Reasons ===== */}
         <div className="card">
           <div className="eyebrow">Your dropdowns</div>
@@ -14453,6 +14593,8 @@ function LiveTradesFab({ C, font, isMobile }) {
   const narrow = useLtNarrow();
   const phone = isMobile == null ? narrow : !!isMobile;
   const [open, setOpen] = useState(false);
+  // Push-notification deep link: send-push.mjs --live-trade sends members to /?lt=open.
+  useEffect(() => { try { if (new URLSearchParams(window.location.search).get("lt") === "open") setOpen(true); } catch { } }, []);
   // ─── Stale-while-revalidate (Valen 2026-08-06) ───
   // The drawer used to fetch only on first OPEN, so the member watched "Loading the live book…"
   // through a serverless cold start every session. Now: (1) the last good payload is read from
