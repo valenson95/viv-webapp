@@ -1503,6 +1503,7 @@ const WHATS_NEW = [
     items: [
       "When part of a position has been sold, its Live Trades row now shows the same fill-up bar as the dashboard — how much of the original position was sold and the R banked. A slim version sits right in the list, no tap needed.",
       "The two stop rows are now one line that tells the story: the original stop struck through, an arrow, and where protection sits now — breakeven, trailed, or profit locked, colored by status.",
+      "Fixed: re-enter a stock the same day you exited it and the old trade's result no longer leaks into the new position's Realized bar — each round trip stands alone.",
       "The Theme tag on Open Positions moved to the last column, so the numbers you check most — size, stop, risk, P/L — read straight across.",
     ],
   },
@@ -11916,7 +11917,15 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
         if (!posEntryISO) return false;
         const tExitISO = tradeDateISO(t.exit);
         if (!tExitISO) return false;
-        return tExitISO >= posEntryISO;
+        if (tExitISO < posEntryISO) return false;
+        // Same-day re-entry guard (DELL 2026-08-07): a stop-out of the PREVIOUS cycle can land on
+        // the very day the new lot opens, so the exit-date rule alone cannot separate cycles.
+        // The trade's own ENTRY date can: a past cycle opened before this position did — exclude
+        // it. Trims of the current campaign carry the campaign's entry date (base+add stays
+        // blended to one date), so genuine partials keep matching.
+        const tEntryISO = tradeDateISO(t.entry);
+        if (tEntryISO && tEntryISO < posEntryISO) return false;
+        return true;
       }) : [];
 
       const matches = [...linkedMatches, ...heuristicMatches];
