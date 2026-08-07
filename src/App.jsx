@@ -15,6 +15,7 @@ import { WATCHLIST_RS } from "./watchlistRS-data.js";
 import { EARNINGS } from "./earnings-data.js";
 import ThemeTracker from "./ThemeTracker.jsx";
 import PushSettings from "./PushSettings.jsx";
+import PushNudge from "./PushNudge.jsx";
 import ThemeStrip from "./ThemeStrip.jsx";
 import MarketContext from "./MarketContext.jsx";
 import EdgeLedger from "./EdgeLedger.jsx";
@@ -1511,6 +1512,7 @@ const WHATS_NEW = [
     title: "Push notifications (beta) — get a ping when something drops",
     items: [
       "Turn on notifications in Settings and your browser gets a ping when there's something worth knowing: live trade updates, new setups, and app announcements. Works on desktop and Android right away.",
+      "The app now offers it to everyone once — a small banner with a one-tap Turn on. Dismiss it and it stays quiet for two weeks; enable it and it never appears again.",
       "On iPhone, add the app to your Home Screen first (Share → Add to Home Screen) — Apple only allows notifications for installed web apps. The Settings card walks you through it.",
       "Live trade pings carry the ticker and the action only — never position sizes or amounts.",
       "You can switch it off anytime in the same place. Thanks Mandy for the request.",
@@ -17206,6 +17208,8 @@ function AppInner() {
       <FeedbackWidget session={session} isAdmin={(session?.user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()} displayName={displayName} C={C} font={font} isMobile={isMobile} />
       {/* Live Trades launcher — every member, every page. Portal-mounted like Feedback. */}
       <LiveTradesFab C={C} font={font} isMobile={isMobile} />
+      {/* Notifications-by-default nudge — every signed-in member who hasn't enabled push (Valen 2026-08-08). */}
+      <PushNudge session={session} />
     </>
   );
 
