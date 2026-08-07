@@ -1496,6 +1496,14 @@ function PlaybookTracker({ trades, uid, setPage }) {
 
 const WHATS_NEW = [
   {
+    tag: "Improved",
+    date: "August 8, 2026",
+    title: "Theme moved to the end of the positions table",
+    items: [
+      "The Theme tag on Open Positions now sits in the last column, so the numbers you check most — size, stop, risk, P/L — read left to right without a colored pill in the middle. Sorting and tooltips work the same.",
+    ],
+  },
+  {
     tag: "New",
     date: "August 8, 2026",
     title: "Push notifications (beta) — get a ping when something drops",
@@ -12391,7 +12399,6 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 <th className="pro-only"><span className="term" data-tip="How many shares you currently hold.">Shares</span></th>
                 <th className="pro-only"><span className="term" data-tip="Your average entry price per share.">Avg Cost</span></th>
                 <th className="pro-only"><span className="term" data-tip="Total broker fees paid on this position so far.">Commission</span></th>
-                <th className="pro-only" onClick={() => togglePosSort("themeName")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "themeName" ? C.white : undefined }} title="Sort by theme"><span className="term" data-tip="DeepVue-style sector, auto-recognized from the ticker — no AI needed. Unknown tickers show a dash. Click to sort by theme.">Theme</span>{posSort && posSort.key === "themeName" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 {false && <th className="pro-only"><span className="term" data-tip="The Setup Grader score for this position (★ / letter / %). Grade a name in Premium Tools → Setup Grader, then Sync to Open Position.">Grade</span></th> /* GRADE COLUMN HIDDEN (Valen 2026-08-05) — grade still lives in Manage + trade views */}
                 <th onClick={() => togglePosSort("posValue")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "posValue" ? C.white : undefined }} title="Sort by position size"><span className="term" data-tip="Total dollars in this position — shares × average cost.">Position size</span>{posSort && posSort.key === "posValue" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th><span className="term" data-tip="Profit banked from partial sells of this position. The bar fills to the percentage of your original shares you've sold (trimmed).">Realized</span></th>
@@ -12400,6 +12407,7 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                 <th className="pro-only" onClick={() => togglePosSort("rMult")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "rMult" ? C.white : undefined }} title="Sort by R-multiple"><span className="term tipright" data-tip="R-multiple — profit/loss in units of your initial risk.">R</span>{posSort && posSort.key === "rMult" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th><span className="term tipright" data-tip="Open profit or loss on this position right now.">P/L</span>{" "}<span onClick={(e) => { e.stopPropagation(); togglePosSort("plD"); }} title="Sort by P/L ($)" style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "plD" ? C.white : C.muted }}>${posSort && posSort.key === "plD" ? (posSort.dir === "asc" ? "▲" : "▼") : ""}</span>{" "}<span onClick={(e) => { e.stopPropagation(); togglePosSort("plPct"); }} title="Sort by P/L (%)" style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "plPct" ? C.white : C.muted }}>%{posSort && posSort.key === "plPct" ? (posSort.dir === "asc" ? "▲" : "▼") : ""}</span></th>
                 <th className="pro-only"><span className="term tipright" data-tip="The setup you traded — Breakout, Pullback Buy or Episodic Pivot.">Setup</span></th>
+                <th className="pro-only" onClick={() => togglePosSort("themeName")} style={{ cursor: "pointer", userSelect: "none", color: posSort && posSort.key === "themeName" ? C.white : undefined }} title="Sort by theme"><span className="term tipright" data-tip="DeepVue-style sector, auto-recognized from the ticker — no AI needed. Unknown tickers show a dash. Click to sort by theme.">Theme</span>{posSort && posSort.key === "themeName" ? (posSort.dir === "asc" ? " ▲" : " ▼") : ""}</th>
                 <th></th>
               </tr>
             </thead>
@@ -12431,18 +12439,6 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                       <td className="pro-only" data-l="Shares">{p.sharesN}</td>
                       <td className="pro-only" data-l="Avg Cost">${(p.epN || 0).toFixed(2)}</td>
                       <td className="pro-only" data-l="Commission">${(p.commN || 0).toFixed(2)}</td>
-                      <td className="pro-only" data-l="Theme">{(() => {
-                        const th = sectorFor(p.sym);
-                        if (!th) return <span className="term" data-tip="No DeepVue sector mapped for this ticker yet — it'll tag automatically once added to the theme map.">—</span>;
-                        const fit = themeFit(th, p.entry), r = themeRanks(th, p.entry) || {};
-                        const rk = (x) => x ? "#" + x : "—";
-                        if (!fit) return <span className="term" data-tip={`⚪ Untagged — entry date is before the first DeepVue tracker snapshot${THEME_COVERAGE_START ? ` (${THEME_COVERAGE_START})` : ""} or unreadable. A later theme snapshot never judges an older trade.`} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.6875rem", fontWeight: 700, background: "var(--w06)", border: "1px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap", cursor: "help" }}>⚪ {th}</span>;
-                        const tip = fit === "in"
-                          ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend — where the money was rotating. Judged vs the ${r.date} tracker snapshot (nearest at/before your entry).`
-                          : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. The leaders that week were ${top5("week", p.entry).slice(0,3).join(", ")}. Judged vs the ${r.date} tracker snapshot (nearest at/before your entry).`;
-                        const g = fit === "in", bg = g ? "var(--greenDim)" : "var(--redDim)", bd = g ? "rgba(0,200,5,0.28)" : "rgba(255,80,0,0.26)", cl = g ? "var(--green)" : "var(--red)";
-                        return <span className="term" data-tip={tip} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.6875rem", fontWeight: 700, background: bg, border: `1px solid ${bd}`, color: cl, whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
-                      })()}</td>
                       {false && <td className="pro-only" data-l="Grade">{(() => {
                         const gr = getSavedGrade(p.sym);
                         if (!gr) return <span className="term" data-tip="Not graded yet. Grade it in Premium Tools → Setup Grader, then Sync to Open Position." style={{ color: "var(--faint)" }}>—</span>;
@@ -12470,6 +12466,18 @@ function DashboardPage({ setPage, onJournalTrade, setupTypes, tags: allTags, exi
                       <td className="pro-only" data-l="R"><span className={"pl " + (p.rMult >= 0 ? "up" : "dn")}>{(p.rMult >= 0 ? "+" : "") + p.rMult.toFixed(1)}R</span></td>
                       <td data-l="P/L"><span className={"pl " + (p.plD >= 0 ? "up" : "dn")}>{usdSigned(p.plD)}<span className="pct">{pctSigned(p.plPct)}</span></span></td>
                       <td className="pro-only" data-l="Setup"><select value={p.setup || ""} onChange={e => updateField(p.id, "setup", e.target.value)} style={{ background: "var(--w06)", border: "1px solid var(--border)", borderRadius: 7, color: p.setup ? "var(--text)" : "var(--faint)", fontFamily: font, fontSize: "0.6875rem", fontWeight: 600, padding: "4px 8px", outline: "none", cursor: "pointer", maxWidth: 130 }}><option value="">— Setup —</option>{[...new Set([p.setup, ...(setupTypes || [])])].filter(Boolean).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                      <td className="pro-only" data-l="Theme">{(() => {
+                        const th = sectorFor(p.sym);
+                        if (!th) return <span className="term tipright" data-tip="No DeepVue sector mapped for this ticker yet — it'll tag automatically once added to the theme map.">—</span>;
+                        const fit = themeFit(th, p.entry), r = themeRanks(th, p.entry) || {};
+                        const rk = (x) => x ? "#" + x : "—";
+                        if (!fit) return <span className="term tipright" data-tip={`⚪ Untagged — entry date is before the first DeepVue tracker snapshot${THEME_COVERAGE_START ? ` (${THEME_COVERAGE_START})` : ""} or unreadable. A later theme snapshot never judges an older trade.`} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.6875rem", fontWeight: 700, background: "var(--w06)", border: "1px solid var(--border)", color: "var(--muted)", whiteSpace: "nowrap", cursor: "help" }}>⚪ {th}</span>;
+                        const tip = fit === "in"
+                          ? `🟢 In-theme — ${th} was a top-5 DeepVue leader at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were flowing WITH the trend — where the money was rotating. Judged vs the ${r.date} tracker snapshot (nearest at/before your entry).`
+                          : `🔴 Off-theme — ${th} was not a top-5 leader in 1W or 1M at your entry (1W ${rk(r.week)} · 1M ${rk(r.month)}). You were fighting the trend. The leaders that week were ${top5("week", p.entry).slice(0,3).join(", ")}. Judged vs the ${r.date} tracker snapshot (nearest at/before your entry).`;
+                        const g = fit === "in", bg = g ? "var(--greenDim)" : "var(--redDim)", bd = g ? "rgba(0,200,5,0.28)" : "rgba(255,80,0,0.26)", cl = g ? "var(--green)" : "var(--red)";
+                        return <span className="term tipright" data-tip={tip} style={{ display: "inline-block", padding: "3px 9px", borderRadius: 7, fontSize: "0.6875rem", fontWeight: 700, background: bg, border: `1px solid ${bd}`, color: cl, whiteSpace: "nowrap", cursor: "help" }}>{g ? "🟢" : "🔴"} {th}</span>;
+                      })()}</td>
                       <td className="mgcell" data-l="">
                         <button className="mgbtn" title={notesPreview(p.notes) || undefined} onClick={() => openManage(p)}>{notesPreview(p.notes) ? "Manage 📝" : "Manage"}</button>
                         <button className="mgbtn sell" title="Sell or close this position" onClick={() => openSell(p)}>Sell</button>
